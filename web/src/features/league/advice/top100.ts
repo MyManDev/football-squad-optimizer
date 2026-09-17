@@ -36,3 +36,28 @@ export function parseTop100(params: URLSearchParams): {
 export function top100Path(entryId: number, weight: number, word: boolean): string {
   return `advice/${entryId}/saf-puan/1/top100-${weight}${word ? "-hoca-sozu" : ""}.json`;
 }
+
+/** Which plan a setting is asked for: the strategy, its window and, for a rival strategy, the rival. */
+export interface Top100Target {
+  strategy: string;
+  window: number;
+  rivalEntryId: number | null;
+}
+
+/**
+ * The one path a setting's document may be read from, for any plan. The one-week
+ * pure-points plan keeps its own (the only one the manager's word combines with).
+ */
+export function top100TargetPath(
+  entryId: number,
+  target: Top100Target,
+  weight: number,
+  word: boolean,
+): string | null {
+  if (target.strategy === "saf-puan" && target.window === 1) {
+    return top100Path(entryId, weight, word);
+  }
+  if (word) return null;
+  const rival = target.rivalEntryId === null ? "" : `/vs-${target.rivalEntryId}`;
+  return `advice/${entryId}/${target.strategy}/${target.window}${rival}/top100-${weight}.json`;
+}

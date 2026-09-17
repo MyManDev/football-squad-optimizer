@@ -70,7 +70,18 @@ export. **The published plan must stay at 0, so a week that offers the menu is r
 handoff, and the loader then refuses the menu (`published_plan_carries_top100`) rather than
 stack a member's setting on it. The Friday run is therefore
 `--rotation --projection component-only` with no `--skip-top100` and no `--snapshot-id`.
-A hand publish passes the export with `--top100-evidence <csv>`. The same handoff feeds
+The menu reaches beyond the one-week pure-points plan, against the **default rival only**:
+every pure-points window (`saf-puan/<3|5>/top100-<w>.json`), each rival strategy at one week
+(`<strategy>/1/vs-<rival>/top100-<w>.json`), and each rival strategy over a window, at 0
+(`<strategy>/<3|5>/vs-<rival>.json`, written whenever the windows are, with or without the
+export) and under each setting (`.../vs-<rival>/top100-<w>.json`). The index lists them under
+`top100.documents`, `windows` and `computed`. A window's band holds the first week only, at
+the level one transfer reaches, and a window's price is against the member's pure-points
+window at 0; window solves are found rather than proven, so that price is nearly always
+stated as at most. This adds about forty window solves per member, so plan the league stage
+in hours, not minutes, and start a deadline-day run in the morning. The full menu against
+every rival is the on-demand path's work. A hand publish passes the export with
+`--top100-evidence <csv>`. The same handoff feeds
 `--decide`, so on such a week the system's own squad is also decided without the uplift,
 which departs from `docs/phase_c_operational_elite_policy.md`'s default; that is the
 owner's call before `--decide` is passed, and the policy's rule itself is unchanged.

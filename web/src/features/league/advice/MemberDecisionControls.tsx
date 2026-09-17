@@ -111,11 +111,13 @@ export function MemberDecisionControls({
   const suggested = index?.suggested_strategy ?? null;
   const top100Copy = TOP100_COPY[language];
   const top100 = selection.top100;
-  const top100Applies = top100.available && strategy === "saf-puan" && windowSize === 1;
+  // A setting exists wherever the producer solved one: every pure-points window, and a
+  // strategy's windows against the default rival.
+  const top100Applies = top100.available && top100.offered.length > 1;
   const top100Note = !top100.available
     ? top100Unavailable(top100Copy, top100.reason)
     : !top100Applies
-      ? top100Copy.onlyBaseline
+      ? top100Copy.notForSelection
       : top100.notOffered
         ? top100Copy.notOffered
         : top100.weights.length < TOP100_WEIGHTS.length
@@ -214,6 +216,7 @@ export function MemberDecisionControls({
               <p className={styles.note}>{copy.rivalNoDefault}</p>
             ) : null}
             <p className={styles.note}>{copy.rivalNote}</p>
+            {windows.length > 1 ? <p className={styles.note}>{top100Copy.rivalWindows}</p> : null}
           </fieldset>
         ) : null}
 

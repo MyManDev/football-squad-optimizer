@@ -1,7 +1,7 @@
 import { withRequestDeadline, type RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
-import { isTop100Weight, top100Path } from "./advice/top100";
+import { isTop100Weight, top100TargetPath, type Top100Target } from "./advice/top100";
 import type { WindowSize } from "../moves/modePrices";
 import type {
   EntryAdvice,
@@ -155,17 +155,21 @@ export async function loadEntryAdviceTop100(
   weight: number,
   word: boolean,
   options?: RequestOptions,
+  target: Top100Target = { strategy: "saf-puan", window: 1, rivalEntryId: null },
 ): Promise<LeagueViewEnvelope<EntryAdvice>> {
   if (!isTop100Weight(weight) || weight === 0) {
     throw new LeagueDataError(`No Top 100 document exists for setting ${weight}.`);
   }
-  const expected = top100Path(entryId, weight, word);
-  if (path !== expected) {
+  if (![1, 3, 5].includes(target.window) || !/^[a-z][a-z0-9-]{0,63}$/.test(target.strategy)) {
+    throw new LeagueDataError("No Top 100 document exists for that plan.");
+  }
+  const expected = top100TargetPath(entryId, target, weight, word);
+  if (expected === null || path !== expected) {
     throw new LeagueDataError(`The Top 100 plan for ${entryId} is not at ${path}.`);
   }
   return readOrExample<EntryAdvice>(
     expected,
-    async () => (await mockModule()).mockEntryAdviceTop100Envelope(entryId, weight, word),
+    async () => (await mockModule()).mockEntryAdviceTop100Envelope(entryId, weight, word, target),
     options,
   );
 }

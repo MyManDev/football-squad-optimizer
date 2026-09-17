@@ -641,10 +641,20 @@ export function mockEntryAdviceTop100Envelope(
   entryId: number,
   weight: number,
   word: boolean,
+  target: { strategy: string; window: number; rivalEntryId: number | null } = {
+    strategy: "saf-puan",
+    window: 1,
+    rivalEntryId: null,
+  },
 ): LeagueViewEnvelope<EntryAdvice> {
   const base = word
     ? mockEntryAdviceEvidenceEnvelope(entryId)
-    : mockEntryAdviceEnvelope(entryId, "saf-puan", 1);
+    : mockEntryAdviceEnvelope(
+        entryId,
+        target.strategy as AdviceStrategy,
+        target.window as WindowSize,
+        target.rivalEntryId,
+      );
   // The example plan is the published one, so the example setting changes nothing and
   // costs nothing; a test that wants a changed plan says so.
   return {

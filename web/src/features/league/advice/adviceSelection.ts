@@ -10,7 +10,13 @@ import {
   type MemberStrategy,
 } from "../types";
 import type { AdviceRequest } from "./adviceClient";
-import { TOP100_WEIGHTS, parseTop100, top100Path, type Top100Weight } from "./top100";
+import {
+  TOP100_WEIGHTS,
+  parseTop100,
+  top100TargetPath,
+  type Top100Target,
+  type Top100Weight,
+} from "./top100";
 
 /**
  * The windows the producer published for a strategy, from the index. A tree from
@@ -126,6 +132,8 @@ export interface PublishedAdviceSelection {
   top100: {
     available: boolean;
     weights: Top100Weight[];
+    /** The settings solved for this plan with the manager's word off. */
+    offered: Top100Weight[];
     weight: Top100Weight;
     notOffered: boolean;
     reason: string | null;
@@ -145,6 +153,7 @@ const EVIDENCE_OFF = {
 const TOP100_OFF = {
   available: false,
   weights: [0],
+  offered: [0],
   weight: 0,
   notOffered: false,
   reason: null,
@@ -154,14 +163,58 @@ const TOP100_OFF = {
  * The weights whose file the index names at the one path it may name, for this member,
  * with or without the manager's word. A path anywhere else is not a file this page reads.
  */
-function top100Weights(index: EntryAdviceIndex, entryId: number, word: boolean): Top100Weight[] {
+function top100Weights(
+  index: EntryAdviceIndex,
+  entryId: number,
+  word: boolean,
+  target: Top100Target = BASELINE_TARGET,
+): Top100Weight[] {
   const menu = index.top100;
   if (!menu || menu.available !== true) return [0];
+  const baseline = target.strategy === "saf-puan" && target.window === 1;
   const paths = word ? menu.word_paths : menu.paths;
-  if (!paths || typeof paths !== "object") return [0];
-  return TOP100_WEIGHTS.filter(
-    (weight) => weight === 0 || paths[String(weight)] === top100Path(entryId, weight, word),
-  );
+  const documents = Array.isArray(menu.documents) ? menu.documents : [];
+  return TOP100_WEIGHTS.filter((weight) => {
+    if (weight === 0) return true;
+    const expected = top100TargetPath(entryId, target, weight, word);
+    if (expected === null) return false;
+    if (baseline) return !!paths && typeof paths === "object" && paths[String(weight)] === expected;
+    return documents.some(
+      (row) =>
+        row &&
+        row.strategy === target.strategy &&
+        row.window === target.window &&
+        (row.rival_entry_id ?? null) === target.rivalEntryId &&
+        row.weight === weight &&
+        row.path === expected,
+    );
+  });
+}
+
+const BASELINE_TARGET: Top100Target = { strategy: "saf-puan", window: 1, rivalEntryId: null };
+
+/** The setting for one plan: which weights can be shown, which one is, and whether the link asked for more. */
+function top100For(
+  base: PublishedAdviceSelection["top100"],
+  index: EntryAdviceIndex,
+  entryId: number,
+  target: Top100Target,
+  word: boolean,
+  asked: Top100Weight,
+): PublishedAdviceSelection["top100"] & { path: string | null } {
+  const weights = top100Weights(index, entryId, word, target);
+  const weight = weights.includes(asked) ? asked : 0;
+  // "Not offered" is about the menu itself; a weight solved without the word but not with
+  // it is offered, and the controls say which settings the switches leave off.
+  const offered = top100Weights(index, entryId, false, target);
+  return {
+    ...base,
+    weights,
+    offered,
+    weight,
+    notOffered: base.notOffered || (asked !== 0 && !offered.includes(asked)),
+    path: weight === 0 ? null : top100TargetPath(entryId, target, weight, word),
+  };
 }
 
 /** One authority for controls, templates, static reads and the compute button. */
@@ -183,7 +236,7 @@ export function resolvePublishedAdvice(
     windows: [],
     rivals: [],
     evidence: { ...EVIDENCE_OFF },
-    top100: { ...TOP100_OFF, weights: [...TOP100_OFF.weights] },
+    top100: { ...TOP100_OFF, weights: [0], offered: [0] },
   };
   if (!index) return result;
   if (
@@ -232,6 +285,7 @@ export function resolvePublishedAdvice(
   result.top100 = {
     ...TOP100_OFF,
     weights: [0],
+    offered: [0],
     available: top100Index?.available === true && top100Weights(index, entryId, false).length > 1,
     notOffered: !top100Asked.offered,
     reason: top100Index && top100Index.available === false ? top100Index.reason : null,
@@ -293,34 +347,33 @@ export function resolvePublishedAdvice(
     // The word is solved for the one-week pure-points plan only; asked for anywhere
     // else, the switch stays off and the controls say why.
     const switched = evidenceAsked && evidencePath !== null && window === 1;
-    // The Top 100 menu is the same one-week plan at another weight. A weight whose file
-    // this selection cannot read shows the published plan, and the controls say so.
-    const weights = window === 1 ? top100Weights(index, entryId, switched) : [0 as const];
-    const asked = top100Asked.weight;
-    const weight = weights.includes(asked) ? asked : 0;
-    // "Not offered" is about the menu itself; a weight solved without the word but not with
-    // it is offered, and the controls say which settings the switches leave off.
-    const offeredAtAll = window === 1 && top100Weights(index, entryId, false).includes(asked);
-    const top100 = {
-      ...result.top100,
-      weights,
-      weight,
-      notOffered: result.top100.notOffered || (asked !== 0 && !offeredAtAll),
-    };
+    // The Top 100 menu is the same plan at another setting. A setting whose file this
+    // selection cannot read shows the plan at 0, and the controls say so.
+    const { path: weightedPath, ...top100 } = top100For(
+      result.top100,
+      index,
+      entryId,
+      { strategy, window, rivalEntryId: null },
+      switched,
+      top100Asked.weight,
+    );
     return {
       ...result,
       status: "ready",
-      path:
-        weight !== 0
-          ? top100Path(entryId, weight, switched)
-          : switched
-            ? evidencePath
-            : `advice/${entryId}/saf-puan/${window}.json`,
+      path: weightedPath ?? (switched ? evidencePath : `advice/${entryId}/saf-puan/${window}.json`),
       evidence: { ...result.evidence, on: switched },
       top100,
     };
   }
   const rival = result.rivals.find((row) => row.entryId === request.rivalEntryId);
   if (!rival?.path) return result;
-  return { ...result, status: "ready", path: rival.path };
+  const { path: weightedPath, ...top100 } = top100For(
+    result.top100,
+    index,
+    entryId,
+    { strategy, window, rivalEntryId: request.rivalEntryId ?? null },
+    false,
+    top100Asked.weight,
+  );
+  return { ...result, status: "ready", path: weightedPath ?? rival.path, top100 };
 }
