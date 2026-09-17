@@ -31,10 +31,12 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `publish_gameweek_site.py` | shim | `squadopt.platform.weekly_publish`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `recommend_current_squad.py` | operational | `docs/opening_week_runbook.md`, `docs/gw1_run_sheet.md`, `docs/gw2_run_sheet.md` | 2026-09-07 |
 | `run_artifact_preflight.py` | operational | `docs/recalibration_runbook.md`; validates, writes nothing by default | 2026-08-15 |
+| `run_backend_local.ps1` | operational | `docs/backend_free_hosting.md`; PowerShell, run directly; writes only under git-ignored `data/runtime/backend` | 2026-09-17 |
 | `run_calendar_recalibration.py` | operational | `docs/recalibration_runbook.md`; `--json-output` only | 2026-08-15 |
 | `run_measurement_preflight.py` | operational | validates a `docs/*.json` record; ADR 0003, `docs/measurements_index.md` | 2026-08-16 |
 | `run_week.py` | shim | `squadopt.platform.weekly_operations`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `seed_entry_registry.py` | operational | `data/entries/registry.json`; `docs/weekly_runbook.md` | 2026-09-07 |
+| `smoke_backend_local.py` | operational | `docs/backend_free_hosting.md`; standard library only, writes nothing | 2026-09-17 |
 
 ## Measurement runners
 
