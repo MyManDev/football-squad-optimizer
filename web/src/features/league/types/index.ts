@@ -196,7 +196,8 @@ export interface AdviceMove {
    * not the same fact as a swap that gains nothing.
    */
   expected_points_delta: number | null;
-  reason_code: "window_value" | "mode_tradeoff" | "points_gain" | "manager_word";
+  reason_code:
+    "window_value" | "mode_tradeoff" | "points_gain" | "manager_word" | "top100_preference";
 }
 
 /**
@@ -249,6 +250,34 @@ export type IndexEvidence =
     }
   | { available: false; reason: string };
 
+/**
+ * The Top 100 influence a weighted document was chosen under. Every expected-points
+ * number in the document is the base model's; `changed` says whether the setting moved
+ * the member's pure-points plan.
+ */
+export interface AdviceTop100 {
+  weight: number;
+  changed: boolean;
+  price_basis: string;
+  cohort_snapshot_id?: string;
+  picks_snapshot_id?: string;
+  table_sha256?: string;
+  picks_gameweek?: number;
+}
+
+/** Which Top 100 weights the producer solved for a member, and where, or why none. */
+export type IndexTop100 =
+  | {
+      available: true;
+      published_weight: number;
+      weights: number[];
+      paths: Record<string, string>;
+      word_paths: Record<string, string>;
+      unavailable: { weight: number; word: boolean; reason: string }[];
+      source?: Record<string, unknown>;
+    }
+  | { available: false; reason: string };
+
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
   league_id: number;
@@ -267,6 +296,8 @@ export interface EntryAdviceIndex {
   default_rival_entry_id: number | null;
   /** The manager's word for this member: solved and where, or not and why. Absent before it existed. */
   evidence?: IndexEvidence;
+  /** The Top 100 influence menu for this member. Absent before it existed. */
+  top100?: IndexTop100;
   /**
    * The declared rule's pick among the three strategies, and the two numbers it read:
    * the member's league points against their default rival (signed, negative when
@@ -375,6 +406,8 @@ export interface EntryAdvice {
   control_optimality_gap?: number | null;
   /** Present on the switched-on document only; absent on every plan solved without the word. */
   evidence?: AdviceEvidence;
+  /** Present on a Top 100 weighted document only. */
+  top100?: AdviceTop100;
   /**
    * The transfer rule the strategy played under: the free transfers it could spend
    * without hits, the overlap it asked for, the overlap it applied, and which of the

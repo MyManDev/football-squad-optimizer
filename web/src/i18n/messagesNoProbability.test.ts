@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { AS_A_CHANCE } from "../testSupport/honesty";
 import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
+import { TOP100_COPY } from "../features/league/advice/top100Copy";
 import { MESSAGES, type Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
@@ -75,6 +76,7 @@ for (const language of LANGUAGES) collect(MESSAGES[language], language, catalogu
 // Page-scoped copy kept out of the first visit's bundle is walked as if it were here.
 for (const language of LANGUAGES) {
   collect(EVIDENCE_COPY[language], `${language}.evidenceCopy`, catalogue);
+  collect(TOP100_COPY[language], `${language}.top100Copy`, catalogue);
 }
 
 describe("every string in both message catalogues", () => {
@@ -95,6 +97,19 @@ describe("every string in both message catalogues", () => {
     const offenders = [...catalogue]
       .filter(([path]) => !exempt.has(path))
       .filter(([, text]) => AS_A_CHANCE.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+  });
+
+  it("never writes the Top 100 setting as a share, a winner or a gain", () => {
+    const top100 = [...catalogue].filter(([path]) => path.includes(".top100Copy."));
+    expect(top100.length).toBeGreaterThan(40);
+    const offenders = top100
+      .filter(([, text]) =>
+        /per\s?cent|\bbest\b|optimal|likely|uplift|boost|recommended|\/\s*100|önerilen|en iyi|artış|getiri/i.test(
+          text,
+        ),
+      )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
   });

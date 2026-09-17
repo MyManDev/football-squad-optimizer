@@ -633,6 +633,44 @@ export function mockEntryAdviceEvidenceEnvelope(entryId: number): LeagueViewEnve
   };
 }
 
+/**
+ * A Top 100 weighted plan for the example publish: the published plan's decision at the
+ * base model's numbers, a small price, and the setting it was chosen under.
+ */
+export function mockEntryAdviceTop100Envelope(
+  entryId: number,
+  weight: number,
+  word: boolean,
+): LeagueViewEnvelope<EntryAdvice> {
+  const base = word
+    ? mockEntryAdviceEvidenceEnvelope(entryId)
+    : mockEntryAdviceEnvelope(entryId, "saf-puan", 1);
+  return {
+    ...base,
+    payload: {
+      ...base.payload,
+      expected_points_cost: 0.4,
+      expected_points_cost_ceiling: 0.4,
+      solver_status: "OPTIMAL",
+      control_solver_status: "OPTIMAL",
+      control_optimality_gap: 0,
+      stated_limits: [
+        ...(base.payload.stated_limits ?? []),
+        `The plan was chosen with the Top 100 influence at ${weight}; every expected-points number in this document is the base model's, without it.`,
+      ],
+      top100: {
+        weight,
+        changed: weight >= 20,
+        price_basis: "base_model_pure_points_v1",
+        cohort_snapshot_id: "fpl-top100-example",
+        picks_snapshot_id: "fpl-elite-picks-example",
+        table_sha256: "0".repeat(64),
+        picks_gameweek: GAMEWEEK - 1,
+      },
+    },
+  };
+}
+
 function rivalFields(
   entryId: number,
   mode: AdviceStrategy,

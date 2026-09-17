@@ -5,6 +5,7 @@ import {
   loadEntryAdvice,
   loadEntryAdviceEvidence,
   loadEntryAdviceIndex,
+  loadEntryAdviceTop100,
   loadEntrySquad,
   loadLeagueMembers,
 } from "../data";
@@ -60,18 +61,32 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
       request.rivalEntryId,
       selection.path,
       selection.evidence.on,
+      selection.top100.weight,
       request.season,
       request.gameweek,
       squad.data?.payload.source_snapshot_id,
     ],
     // With the manager's word switched on, the document is the one the index names; the
     // plain paths below would serve the plan solved without it under the same request.
+    // A Top 100 weight reads its own document at the one path the index may name.
     queryFn: ({ signal }) =>
-      selection.evidence.on && selection.path
-        ? loadEntryAdviceEvidence(entryId, selection.path, { signal })
-        : loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null, {
-            signal,
-          }),
+      selection.top100.weight !== 0 && selection.path
+        ? loadEntryAdviceTop100(
+            entryId,
+            selection.path,
+            selection.top100.weight,
+            selection.evidence.on,
+            { signal },
+          )
+        : selection.evidence.on && selection.path
+          ? loadEntryAdviceEvidence(entryId, selection.path, { signal })
+          : loadEntryAdvice(
+              entryId,
+              request.strategy,
+              request.window,
+              request.rivalEntryId ?? null,
+              { signal },
+            ),
     enabled: adviceEnabled,
     staleTime: 60_000,
   });

@@ -134,6 +134,22 @@ def advice_read_schema() -> dict[str, Any]:
                 },
                 "required": ["kind", "source_kind", "clubs_covered", "applied"],
             },
+            # The Top 100 influence a weighted document was chosen under. The weight is a
+            # setting, not a share; every expected-points number in the document is the
+            # base model's.
+            "top100": {
+                "type": "object",
+                "properties": {
+                    "weight": {"enum": [5, 10, 20, 30, 40, 50]},
+                    "changed": {"type": "boolean"},
+                    "price_basis": {"const": "base_model_pure_points_v1"},
+                    "cohort_snapshot_id": {"type": "string"},
+                    "picks_snapshot_id": {"type": "string"},
+                    "table_sha256": {"type": "string"},
+                    "picks_gameweek": {"type": "integer", "minimum": 1},
+                },
+                "required": ["weight", "changed", "price_basis"],
+            },
             "expected_own_points": nullable_number,
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
@@ -201,6 +217,7 @@ def advice_read_schema() -> dict[str, Any]:
                                         "mode_tradeoff",
                                         "points_gain",
                                         "manager_word",
+                                        "top100_preference",
                                     ]
                                 },
                             },
