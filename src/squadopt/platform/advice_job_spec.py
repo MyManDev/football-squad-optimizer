@@ -30,7 +30,7 @@ import os
 import re
 import tempfile
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Protocol
 
@@ -69,6 +69,12 @@ class AdviceJobSpec:
     context: AdviceRequestContext
     rival_entry_id: int | None = None
     contract_version: str = ADVICE_JOB_SPEC_CONTRACT_VERSION
+    switches: Mapping[str, Mapping[str, str | int | bool | None]] = field(default_factory=dict)
+    """The switched-on part of the request, exactly as it entered the cache key: each
+    switch's value and the identity of the input it was accepted against. Empty for a plain
+    request, and then absent from the stored bytes, so a plain spec is the spec it has
+    always been. The worker reads the values from here and refuses to compute against an
+    input whose identity has since changed."""
 
     def __post_init__(self) -> None:
         if self.contract_version != ADVICE_JOB_SPEC_CONTRACT_VERSION:
@@ -90,8 +96,34 @@ class AdviceJobSpec:
             raise AdviceJobSpecError("rival_entry_id must be None or a positive integer.")
         if not isinstance(self.context, AdviceRequestContext):
             raise AdviceJobSpecError("context must be an AdviceRequestContext.")
+        if not isinstance(self.switches, Mapping):
+            raise AdviceJobSpecError("switches must be a mapping of switch name to identity.")
+        normalized: dict[str, dict[str, str | int | bool | None]] = {}
+        for name, identity in self.switches.items():
+            if not isinstance(name, str) or not name.strip():
+                raise AdviceJobSpecError("A switch name must be non-empty text.")
+            if not isinstance(identity, Mapping) or not identity:
+                raise AdviceJobSpecError(f"Switch {name!r} must carry its identity.")
+            for part, scalar in identity.items():
+                if not isinstance(part, str) or (
+                    scalar is not None and not isinstance(scalar, str | int | bool)
+                ):
+                    raise AdviceJobSpecError(f"Switch {name!r} must hold JSON scalars only.")
+            normalized[name] = dict(identity)
+        object.__setattr__(self, "switches", normalized)
+
+    def switch(self, name: str) -> Mapping[str, str | int | bool | None]:
+        """One switch's recorded identity; empty when it was off."""
+
+        return self.switches.get(name, {})
 
     def as_payload(self) -> dict[str, object]:
+        payload = self._plain_payload()
+        if self.switches:
+            payload["switches"] = {name: dict(value) for name, value in self.switches.items()}
+        return payload
+
+    def _plain_payload(self) -> dict[str, object]:
         return {
             "contract_version": self.contract_version,
             "league_id": self.league_id,
@@ -136,6 +168,7 @@ class AdviceJobSpec:
                 context=request_context,
                 rival_entry_id=None if rival is None else int(str(rival)),
                 contract_version=str(payload.get("contract_version", "")),
+                switches=payload.get("switches", {}),
             )
         except (KeyError, TypeError, ValueError) as error:
             raise AdviceJobSpecError(f"Malformed advice job spec: {error}") from error
@@ -170,7 +203,13 @@ class FileAdviceJobSpecStore:
             raw = self._path(key).read_bytes()
         except FileNotFoundError:
             return None
-        return AdviceJobSpec.from_payload(json.loads(raw))
+        try:
+            document = json.loads(raw)
+        except (ValueError, UnicodeError) as error:
+            # The same refusal as a well-formed document with the wrong fields: the worker
+            # records either as a request it cannot read, never as a failed computation.
+            raise AdviceJobSpecError("The stored advice job spec is not JSON.") from error
+        return AdviceJobSpec.from_payload(document)
 
     def put(self, key: str, spec: AdviceJobSpec) -> None:
         """Write once. The same meaning again is a no-op; a different one is a defect."""

@@ -296,6 +296,11 @@ def test_the_batch_publishes_the_windows_without_moving_the_baseline_bytes(
         f"advice/{ENTRY}/saf-puan/3.json",
         f"advice/{ENTRY}/saf-puan/5.json",
         f"advice/{ENTRY}/index.json",
+        # The chips the member may choose travel with the index that names them.
+        *(
+            f"advice/{ENTRY}/saf-puan/1/chip-{chip}.json"
+            for chip in ("wildcard", "freehit", "bboost")
+        ),
     }
     for window in (3, 5):
         document = json.loads(

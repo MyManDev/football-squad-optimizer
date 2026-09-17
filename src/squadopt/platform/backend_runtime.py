@@ -32,13 +32,14 @@ import os
 import threading
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from squadopt.application.advice_capabilities import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     advice_capabilities,
+    menu_capabilities,
 )
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
@@ -51,6 +52,11 @@ from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, rea
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import AdviceReadStore, AdviceRequestContext, FileLeagueDirectory
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
+from squadopt.platform.advice_switches import (
+    AdviceSwitchInputs,
+    discovery_signature,
+    load_switch_inputs,
+)
 from squadopt.platform.capture_context import (
     AdviceCaptureContext,
     CaptureIdentity,
@@ -127,6 +133,13 @@ def configuration_fingerprint() -> str:
     correct. What is here is what a different value of would make an old answer wrong —
     the served document's contract, the computed mode and window, and the catalogue's
     bands, which are the constraints the solver actually receives.
+
+    The two switches' rule versions (``TOP100_PRICE_BASIS``, ``MANAGERS_WORD_RULE_VERSION``)
+    are deliberately **not** here. This digest is in every plain key already written, so
+    adding a field would orphan all of them to version something a plain answer never
+    used. They are hashed into the switched-on part of a key instead
+    (``advice_switches.switch_identity``), where they reach exactly the answers they can
+    change.
     """
 
     document = {
@@ -186,6 +199,14 @@ class BackendConfig:
     season: str | None = None
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
+    artifact_root: Path | None = None
+    """The repository's ``artifacts/`` directory, where the weekly run leaves the Top 100
+    evidence export (``phase_b/``) and the rotation table (``rotation/``). Optional: unset,
+    neither switch is offered and the backend answers exactly what it did before them."""
+    club_news_source: Path | None = None
+    """The club-news fixture file, or a club-news capture directory under the snapshot
+    root, that the rotation table was coded from. The manager's word needs both this and
+    ``artifact_root``."""
 
     @property
     def queue_root(self) -> Path:
@@ -231,6 +252,8 @@ class BackendConfig:
                 "allowlist is the Pages domains (ADR 0006)."
             )
         season = source.get("SQUADOPT_BACKEND_SEASON", "").strip() or None
+        artifact_root = source.get("SQUADOPT_BACKEND_ARTIFACT_ROOT", "").strip()
+        club_news_source = source.get("SQUADOPT_BACKEND_CLUB_NEWS_SOURCE", "").strip()
         return cls(
             store_root=values["store_root"],
             site_data_root=values["site_data_root"],
@@ -242,6 +265,8 @@ class BackendConfig:
             rate_window_seconds=_positive_float(
                 source, "SQUADOPT_BACKEND_RATE_WINDOW_SECONDS", DEFAULT_RATE_WINDOW_SECONDS
             ),
+            artifact_root=Path(artifact_root) if artifact_root else None,
+            club_news_source=Path(club_news_source) if club_news_source else None,
         )
 
 
@@ -305,6 +330,7 @@ class CaptureContextProvider:
         self._lock = threading.Lock()
         self._identity: CaptureIdentity | None = None
         self._context: AdviceCaptureContext | None = None
+        self._switch_signature: tuple[object, ...] | None = None
         self._reported: str | None = None
 
     def identity(self) -> CaptureIdentity | None:
@@ -380,11 +406,79 @@ class CaptureContextProvider:
             return None
         with self._lock:
             held = self._context
-            if held is not None and held.context == context:
-                return held
-            bundle = load_capture_context(identity)
-            self._context = bundle
-            return bundle
+            if held is None or held.context != context:
+                held = load_capture_context(identity)
+                self._context = held
+                self._switch_signature = None
+            return self._with_current_switches(held)
+
+    def _with_current_switches(self, held: AdviceCaptureContext) -> AdviceCaptureContext:
+        """``held`` with the switch inputs as they are on disk now; called under the lock.
+
+        The projection is kept for the life of the context; the switch inputs are read
+        again whenever what they would be read from has changed. The api and the worker
+        are two processes, and an export that lands after one of them looked must not
+        leave them disagreeing about an address until the next capture.
+        """
+
+        if self._config.artifact_root is None:
+            return held
+        signature = discovery_signature(
+            artifact_root=self._config.artifact_root,
+            club_news_source=self._config.club_news_source,
+            season=held.context.season,
+            gameweek=held.context.gameweek,
+            capture_snapshot_id=held.context.capture_snapshot_id,
+        )
+        if signature == self._switch_signature:
+            return held
+        try:
+            switches = load_switch_inputs(
+                artifact_root=self._config.artifact_root,
+                club_news_source=self._config.club_news_source,
+                snapshot_root=self._config.snapshot_root,
+                inputs=held.inputs,
+                projection=held.projection,
+            )
+        except Exception as error:  # an unreadable input turns a switch off, nothing more
+            switches = AdviceSwitchInputs(notes=(f"switch inputs unreadable: {error}",))
+        refreshed = replace(held, switches=switches)
+        self._context = refreshed
+        self._switch_signature = signature
+        if self._log is not None:
+            self._log.event(
+                "advice_switch_inputs_loaded",
+                snapshot_id=held.context.capture_snapshot_id,
+                top100=switches.top100_counts is not None,
+                managers_word=switches.manager_words is not None,
+                notes=" | ".join(switches.notes),
+            )
+        return refreshed
+
+    def switch_inputs(self, context: AdviceRequestContext) -> AdviceSwitchInputs | None:
+        """What ``context`` offers the switches, or ``None`` when it is not current.
+
+        Runs inside a request, so it never raises. Without an artifact root it answers
+        at once and projects nothing, which keeps the api process the reader it was; with
+        one, the first question about a switch pays for the projection once per context,
+        because the Top 100 gate is the handoff's own and needs the projected table.
+        """
+
+        if self._config.artifact_root is None:
+            identity = self.identity()
+            if identity is None or identity.context != context:
+                return None
+            return AdviceSwitchInputs()
+        try:
+            bundle = self.capture(context)
+        except Exception as error:
+            self._report(
+                "advice_switch_inputs_unreadable",
+                snapshot_id=context.capture_snapshot_id,
+                reason=str(error),
+            )
+            return AdviceSwitchInputs()
+        return None if bundle is None else bundle.switches
 
     def _report(self, event: str, **fields: object) -> None:
         marker = f"{event}:{fields.get('snapshot_id', '')}:{fields.get('reason', '')}"
@@ -470,10 +564,14 @@ class AdviceBackend:
     def readiness(self) -> tuple[bool, Mapping[str, bool]]:
         """Ready means this process can actually answer, checked rather than assumed."""
 
+        context = self.contexts.current()
+        directory = FileLeagueDirectory(self.config.site_data_root)
         return readiness_report(
-            context_loaded=self.contexts.current() is not None,
-            league_tree_readable=FileLeagueDirectory(self.config.site_data_root).readable(),
+            context_loaded=context is not None,
+            league_tree_readable=directory.readable(),
             cache_writable=self.probe.passed(),
+            # Season and gameweek are already in the context; nothing is projected for it.
+            league_tree_matches_capture=directory.matches(context),
         )
 
 
@@ -507,6 +605,8 @@ def build_backend(
         cache,
         contexts,
         computable_strategies(),
+        capabilities=menu_capabilities(),
+        switches=contexts,
     )
     submit = AdviceSubmitService(
         reader,

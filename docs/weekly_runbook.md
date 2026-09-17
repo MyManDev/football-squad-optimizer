@@ -70,10 +70,37 @@ export. **The published plan must stay at 0, so a week that offers the menu is r
 handoff, and the loader then refuses the menu (`published_plan_carries_top100`) rather than
 stack a member's setting on it. The Friday run is therefore
 `--rotation --projection component-only` with no `--skip-top100` and no `--snapshot-id`.
-A hand publish passes the export with `--top100-evidence <csv>`. The same handoff feeds
+The menu reaches beyond the one-week pure-points plan, against the **default rival only**:
+every pure-points window (`saf-puan/<3|5>/top100-<w>.json`), each rival strategy at one week
+(`<strategy>/1/vs-<rival>/top100-<w>.json`), and each rival strategy over a window, at 0
+(`<strategy>/<3|5>/vs-<rival>.json`, written whenever the windows are, with or without the
+export) and under each setting (`.../vs-<rival>/top100-<w>.json`). The index lists them under
+`top100.documents`, `windows` and `computed`. A window's band holds the first week only, at
+the level one transfer reaches, and a window's price is against the member's pure-points
+window at 0; window solves are found rather than proven, so that price is nearly always
+stated as at most. This adds about forty window solves per member, so plan the league stage
+in hours, not minutes, and start a deadline-day run in the morning. The full menu against
+every rival is the on-demand path's work. A hand publish passes the export with
+`--top100-evidence <csv>`. The same handoff feeds
 `--decide`, so on such a week the system's own squad is also decided without the uplift,
 which departs from `docs/phase_c_operational_elite_policy.md`'s default; that is the
 owner's call before `--decide` is passed, and the policy's rule itself is unchanged.
+
+**The chips a member may choose need no flag and no extra input.** The planner still decides
+no chip for anyone (a finite window counts nothing for holding one back). The league stage
+reads each member's own chip history from the capture and, for every chip they can still
+play this gameweek, solves their one-week pure-points plan with that chip forced:
+`advice/<id>/saf-puan/1/chip-<wildcard|freehit|bboost|3xc>.json`. The index's `chips` block
+names the files, the chips the member holds, and why any chip has none (`already_played`,
+`window_not_open`, `free_hit_played_last_gameweek`, `not_solved_for_member`), or says why
+there are none at all (`no_chip_left`, `chip_history_unknown`). Each document states what
+the chip week is expected to score above the member's own plan without it, this gameweek
+only, beside the sentence saying a later gameweek's value is not measured; it combines with
+neither the manager's word nor a Top 100 setting, and it is not in the advice record. A
+Wildcard or Free Hit solve is a whole-squad problem: on the GW5 capture one took 25 to 42
+seconds with three members solved side by side on a machine already running a league
+build, so budget about a minute and a half per member. A chip file an earlier publish wrote
+and this one did not is removed and printed with the other removals.
 
 An optional second live capture in the final 24 hours before the deadline can be
 compared with the earlier capture using `squadopt.platform.capture_measurement`

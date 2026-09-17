@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Final, Protocol
 
+from squadopt.platform._queue_lock import QueueLockTimeout as QueueLockTimeout
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.jobs_contract import AdviceJob
 

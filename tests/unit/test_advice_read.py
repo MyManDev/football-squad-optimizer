@@ -1,6 +1,8 @@
 """The read side: league state from the published tree, advice from the cache only."""
 
 import json
+from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -152,6 +154,59 @@ def test_every_refusal_is_typed(tmp_path: Path) -> None:
         )
     with pytest.raises(AdviceNotComputedError):
         store.read_advice(league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1)
+
+
+@pytest.mark.parametrize(
+    "context", [replace(CONTEXT, gameweek=4), replace(CONTEXT, season="2027-28")]
+)
+def test_a_tree_from_another_week_is_not_ready_and_names_both_weeks(
+    tmp_path: Path, context: AdviceRequestContext
+) -> None:
+    """The tree and the capture are published apart; both readable is not both current."""
+
+    store = _store(tmp_path, context=context)
+    with pytest.raises(AdviceBackendNotReadyError) as refused:
+        store.read_advice(league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1)
+    assert "2026-27 gameweek 3" in str(refused.value)
+    assert f"{context.season} gameweek {context.gameweek}" in str(refused.value)
+    # A request the tree itself refuses is still refused as what it is.
+    with pytest.raises(UnknownEntryError):
+        store.read_advice(league_id=LEAGUE_ID, entry_id=42, strategy="saf-puan", window=1)
+
+    directory = FileLeagueDirectory(tmp_path / "site")
+    assert directory.readable()
+    assert not directory.matches(context)
+    assert directory.matches(CONTEXT)
+    assert not directory.matches(None)
+    # League state needs no capture, so it has no week to disagree with.
+    assert store.league_state(LEAGUE_ID)["connected"] is True
+
+
+class _OlderTree:
+    """A directory whose payload predates the gameweek field."""
+
+    def league(self, league_id: int) -> Mapping[str, object] | None:
+        return {
+            "league_id": league_id,
+            "league_name": "Test League",
+            "season": "2026-27",
+            "members": [{"member_kind": "human", "entry_id": 313686}],
+        }
+
+
+def test_a_tree_that_names_no_gameweek_matches_nothing(tmp_path: Path) -> None:
+    store = AdviceReadStore(
+        _OlderTree(), FileAdviceCache(tmp_path / "cache"), _Context(CONTEXT), {"saf-puan": False}
+    )
+    with pytest.raises(AdviceBackendNotReadyError, match="2026-27 no gameweek"):
+        store.read_advice(league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1)
+    # The file reader already refuses such a tree outright, so it cannot match either.
+    _publish_members(tmp_path / "site")
+    path = tmp_path / "site" / "league" / "members.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    del document["payload"]["gameweek"]
+    path.write_text(json.dumps(document), encoding="utf-8")
+    assert not FileLeagueDirectory(tmp_path / "site").matches(CONTEXT)
 
 
 def test_no_context_is_not_ready_not_a_404(tmp_path: Path) -> None:

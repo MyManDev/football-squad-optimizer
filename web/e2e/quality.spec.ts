@@ -41,7 +41,9 @@ for (const language of ["tr", "en"] as const) {
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
     const systemDataRequests: string[] = [];
     page.on("request", (request) => {
-      if (new URL(request.url()).pathname.startsWith("/data/")) {
+      // The shell's fixture list is the game's schedule, not a view of the system squad.
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith("/data/") && path !== "/data/fixtures.json") {
         systemDataRequests.push(request.url());
       }
     });

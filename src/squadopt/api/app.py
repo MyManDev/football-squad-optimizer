@@ -24,12 +24,15 @@ from squadopt.api.views import (
 )
 from squadopt.platform import BACKEND_API_VERSION, ApiError, ApiErrorResponse, ApiServiceInfo
 from squadopt.platform.advice_documents import AdviceDocumentError
+from squadopt.platform.advice_job_spec import AdviceJobSpecConflictError
 from squadopt.platform.advice_observability import AdviceMetrics
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
     AdviceNotComputedError,
     AdviceReadStore,
     LeagueNotConnectedError,
+    ManagersWordUnavailableError,
+    Top100InputsUnavailableError,
     UnknownEntryError,
     UnknownStrategyError,
     UnsupportedAdviceRequestError,
@@ -37,22 +40,33 @@ from squadopt.platform.advice_read import (
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     IdempotencyConflictError,
+    MalformedIdempotencyKeyError,
     RateLimitedError,
 )
-from squadopt.platform.api_contract import BackendApiContractError
-from squadopt.platform.queue_contracts import AdviceQueueError, AdviceQueueIntegrityError
+from squadopt.platform.api_contract import ADVISE_TOP100_WEIGHTS, BackendApiContractError
+from squadopt.platform.queue_contracts import (
+    AdviceQueueError,
+    AdviceQueueIntegrityError,
+    QueueLockTimeout,
+)
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
 _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
+# A queue transaction holds its lock for milliseconds and gives up after five seconds, so
+# a client told to come back in a couple of seconds finds it free.
+_QUEUE_BUSY_RETRY_AFTER_SECONDS: Final = 2
 _LOGGER = logging.getLogger(__name__)
 
 SeasonPath = Annotated[str, ApiPath(pattern=_SEASON_PATTERN)]
 GameweekPath = Annotated[int, ApiPath(ge=1)]
 
 
-def _contract_error(status_code: int, code: str, message: str) -> JSONResponse:
+def _contract_error(
+    status_code: int, code: str, message: str, *, retry_after_seconds: int | None = None
+) -> JSONResponse:
     document = ApiErrorResponse(ApiError(code=code, message=message)).to_dict()
-    return JSONResponse(status_code=status_code, content=document)
+    headers = None if retry_after_seconds is None else {"Retry-After": str(retry_after_seconds)}
+    return JSONResponse(status_code=status_code, content=document, headers=headers)
 
 
 def _view_response(document: JsonDocument) -> JSONResponse:
@@ -67,18 +81,21 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
-def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
+def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
     """The AdviseRequestBody schema, enforced in one place.
 
     Exactly the declared keys (additionalProperties: false), a string strategy, an
     integer window of 1/3/5 with bool explicitly refused, and a rival that is null or
     a positive integer. Every refusal is a contract error the route maps onto 422 —
     a malformed body is the client's mistake, never this process's 500.
+
+    The two switches are optional and absent means off: ``top100_weight`` is one of the
+    offered settings (an integer, never a bool), ``managers_word`` a boolean.
     """
 
     if not isinstance(body, dict):
         raise BackendApiContractError("The POST body must be an object.")
-    allowed = {"strategy", "window", "rival_entry_id"}
+    allowed = {"strategy", "window", "rival_entry_id", "top100_weight", "managers_word"}
     unexpected = set(body) - allowed
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
@@ -91,7 +108,19 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
     rival = body.get("rival_entry_id")
     if rival is not None and (isinstance(rival, bool) or not isinstance(rival, int) or rival < 1):
         raise BackendApiContractError("rival_entry_id must be null or a positive integer.")
-    return strategy, window, rival
+    weight = body.get("top100_weight", 0)
+    if (
+        isinstance(weight, bool)
+        or not isinstance(weight, int)
+        or weight not in (ADVISE_TOP100_WEIGHTS)
+    ):
+        raise BackendApiContractError(
+            f"top100_weight must be one of {list(ADVISE_TOP100_WEIGHTS)}."
+        )
+    word = body.get("managers_word", False)
+    if not isinstance(word, bool):
+        raise BackendApiContractError("managers_word must be true or false.")
+    return strategy, window, rival, weight, word
 
 
 def create_app(
@@ -132,6 +161,10 @@ def create_app(
             allow_origins=list(allowed_origins),
             allow_methods=["GET", "POST"],
             allow_headers=["Content-Type", "Idempotency-Key"],
+            # A browser hides every response header it was not told it may read, so
+            # without this the page sees the 429 or the 503 and cannot see how long the
+            # refusal asked it to wait.
+            expose_headers=["Retry-After"],
         )
 
     @application.exception_handler(PublishedViewNotFoundError)
@@ -198,6 +231,56 @@ def create_app(
     ) -> JSONResponse:
         return _contract_error(422, "UNSUPPORTED_ADVICE_REQUEST", str(error))
 
+    @application.exception_handler(Top100InputsUnavailableError)
+    async def top100_unavailable(
+        _request: Request, error: Top100InputsUnavailableError
+    ) -> JSONResponse:
+        return _contract_error(422, "TOP100_INPUTS_UNAVAILABLE", str(error))
+
+    @application.exception_handler(ManagersWordUnavailableError)
+    async def managers_word_unavailable(
+        _request: Request, error: ManagersWordUnavailableError
+    ) -> JSONResponse:
+        return _contract_error(422, "MANAGERS_WORD_UNAVAILABLE", str(error))
+
+    @application.exception_handler(MalformedIdempotencyKeyError)
+    async def idempotency_key_malformed(
+        _request: Request, error: MalformedIdempotencyKeyError
+    ) -> JSONResponse:
+        return _contract_error(422, "VALIDATION_FAILED", str(error))
+
+    @application.exception_handler(QueueLockTimeout)
+    async def queue_busy(_request: Request, _error: QueueLockTimeout) -> JSONResponse:
+        # Contention, not a fault: another queue transaction held the lock for the whole
+        # bounded wait. Nothing was written, so the same request may simply be sent again.
+        return _contract_error(
+            503,
+            "NOT_READY",
+            "The advice queue is busy; try again shortly.",
+            retry_after_seconds=_QUEUE_BUSY_RETRY_AFTER_SECONDS,
+        )
+
+    @application.exception_handler(AdviceJobSpecConflictError)
+    async def spec_conflict(request: Request, error: AdviceJobSpecConflictError) -> JSONResponse:
+        _log_exception("api.advice_job_spec_conflict", request, error)
+        return _contract_error(
+            409,
+            "REQUEST_CONFLICT",
+            "This request's address already records a different request.",
+        )
+
+    @application.exception_handler(AdviceQueueError)
+    async def queue_unavailable(request: Request, error: AdviceQueueError) -> JSONResponse:
+        # The integrity subclass has its own handler; what reaches here is a queue write
+        # that was refused (a job id already taken by a concurrent submission, say).
+        _log_exception("api.advice_queue_unavailable", request, error)
+        return _contract_error(
+            503,
+            "QUEUE_UNAVAILABLE",
+            "The advice queue could not accept the request; try again shortly.",
+            retry_after_seconds=_QUEUE_BUSY_RETRY_AFTER_SECONDS,
+        )
+
     @application.exception_handler(AdviceQueueIntegrityError)
     async def queue_integrity(_request: Request, _error: AdviceQueueIntegrityError) -> JSONResponse:
         return _contract_error(503, "QUEUE_INTEGRITY_ERROR", "The stored job is unavailable.")
@@ -221,7 +304,9 @@ def create_app(
 
     @application.exception_handler(RateLimitedError)
     async def rate_limited(_request: Request, error: RateLimitedError) -> JSONResponse:
-        return _contract_error(429, "RATE_LIMITED", str(error))
+        return _contract_error(
+            429, "RATE_LIMITED", str(error), retry_after_seconds=error.retry_after_seconds
+        )
 
     @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
     def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
@@ -229,6 +314,17 @@ def create_app(
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         return JSONResponse(
             content=advice_store.league_state(league_id),
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @application.get("/api/v1/leagues/{league_id}/capabilities", response_class=JSONResponse)
+    def league_capabilities(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
+        """What may be asked right now, so a page enables only the controls that answer."""
+
+        if advice_store is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        return JSONResponse(
+            content=advice_store.league_capabilities(league_id),
             headers={"Cache-Control": "no-cache"},
         )
 
@@ -242,11 +338,19 @@ def create_app(
         strategy: Annotated[str, Query(pattern=r"^[a-z][a-z0-9._-]{0,63}$")],
         window: Annotated[int, Query()],
         rival: Annotated[int | None, Query(ge=1)] = None,
+        top100_weight: Annotated[int, Query()] = 0,
+        managers_word: Annotated[bool, Query()] = False,
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         if window not in (1, 3, 5):
             return _contract_error(422, "VALIDATION_FAILED", "window must be 1, 3, or 5.")
+        if top100_weight not in ADVISE_TOP100_WEIGHTS:
+            return _contract_error(
+                422,
+                "VALIDATION_FAILED",
+                f"top100_weight must be one of {list(ADVISE_TOP100_WEIGHTS)}.",
+            )
         try:
             payload = advice_store.read_advice(
                 league_id=league_id,
@@ -254,6 +358,8 @@ def create_app(
                 strategy=strategy,
                 window=window,
                 rival_entry_id=rival,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -289,7 +395,7 @@ def create_app(
         except Exception:
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
         try:
-            strategy, window, rival = _parse_advise_body(body)
+            strategy, window, rival, top100_weight, managers_word = _parse_advise_body(body)
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         current = datetime.now(UTC) if utc_now is None else utc_now()
@@ -305,6 +411,8 @@ def create_app(
             idempotency_key=request.headers.get("Idempotency-Key"),
             client_bucket=request.client.host if request.client else "unknown",
             at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            top100_weight=top100_weight,
+            managers_word=managers_word,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

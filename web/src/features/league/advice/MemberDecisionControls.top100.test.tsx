@@ -92,10 +92,59 @@ describe("the Top 100 influence control", () => {
     expect(query().has("top100")).toBe(false);
   });
 
-  it("is disabled outside the one-week pure-points plan, with the note", () => {
+  it("is disabled where no setting was solved for the selection, with the note", () => {
     renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=3&top100=20`, SOLVED, "en");
     expect(settings().every((input) => input.disabled)).toBe(true);
-    expect(document.body.textContent).toContain(TOP100_COPY.en.onlyBaseline);
+    expect(document.body.textContent).toContain(TOP100_COPY.en.notForSelection);
+  });
+
+  it("offers a window's and a rival strategy's settings where the index names them", () => {
+    const rival = mockEntryAdviceIndex(ENTRY).payload.default_rival_entry_id!;
+    const documents = [
+      {
+        strategy: "saf-puan",
+        window: 3,
+        rival_entry_id: null,
+        weight: 20,
+        path: `advice/${ENTRY}/saf-puan/3/top100-20.json`,
+      },
+      {
+        strategy: "ortak-koru",
+        window: 1,
+        rival_entry_id: rival,
+        weight: 5,
+        path: `advice/${ENTRY}/ortak-koru/1/vs-${rival}/top100-5.json`,
+      },
+    ];
+    const first = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=3`, {
+      ...SOLVED!,
+      documents,
+    } as EntryAdviceIndex["top100"]);
+    expect(settings().map((input) => !input.disabled)).toEqual([
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+    ]);
+    fireEvent.click(settings()[3]!);
+    expect(query().get("top100")).toBe("20");
+    first.unmount();
+    renderControls(`/league/members/${ENTRY}?mode=ortak-koru&window=1`, {
+      ...SOLVED!,
+      documents,
+    } as EntryAdviceIndex["top100"]);
+    expect(settings().map((input) => !input.disabled)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it("keeps the settings without a file for the word off while the word is on", () => {

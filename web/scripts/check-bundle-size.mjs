@@ -8,7 +8,11 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { join } from "node:path";
 
-export const BUDGET_GZIP_BYTES = 150 * 1024;
+// Raised from 150 kB on the owner's decision (2026-09-17): the member page's switches had
+// taken the headroom to under half a kilobyte, and every new control was being shaped by
+// the byte count rather than by the page. Page-scoped copy and lazy routes stay the rule;
+// the budget is a ceiling on the first visit, not a target.
+export const BUDGET_GZIP_BYTES = 200 * 1024;
 
 /** The JavaScript files index.html loads up front, as paths relative to dist/. */
 export function initialAssets(html) {
