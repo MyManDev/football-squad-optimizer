@@ -1,0 +1,239 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 5,
+    "entry_id": 8548384,
+    "league_id": 352490,
+    "mode": "saf-puan",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "moves": [
+      {
+        "move_id": "gw05-1",
+        "player_out": {
+          "player_id": 209244,
+          "name": "Phil Foden",
+          "short_name": "Foden",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 513418,
+          "name": "Kevin Schade",
+          "short_name": "Schade",
+          "position": "MID",
+          "team": "Brentford"
+        },
+        "expected_points_delta": 3.289233298458626,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 445087,
+          "name": "Ronald Araujo",
+          "short_name": "Araujo",
+          "position": "DEF",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 17761,
+          "name": "James Tarkowski",
+          "short_name": "Tarkowski",
+          "position": "DEF",
+          "team": "Everton"
+        },
+        "expected_points_delta": 1.6548551236779687,
+        "reason_code": "points_gain"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 4.944088422136595,
+    "expected_points_cost": 0.0,
+    "rival_label": null,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "expected_own_points": 57.427771645736634,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.37533371727625
+    },
+    "vice_captain": {
+      "player_id": 475168,
+      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+      "short_name": "Jesus",
+      "position": "FWD",
+      "team": "Chelsea",
+      "expected_points": 4.719728956049396
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.8238320826783507
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 4.472528385131045
+      },
+      {
+        "player_id": 17761,
+        "name": "James Tarkowski",
+        "short_name": "Tarkowski",
+        "position": "DEF",
+        "team": "Everton",
+        "expected_points": 4.159047731336366
+      },
+      {
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
+        "position": "DEF",
+        "team": "Man City",
+        "expected_points": 4.056371668311424
+      },
+      {
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 3.555548676659022
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.415892336727386
+      },
+      {
+        "player_id": 513418,
+        "name": "Kevin Schade",
+        "short_name": "Schade",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 4.179784872411939
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 3.780893844188471
+      },
+      {
+        "player_id": 577725,
+        "name": "Josh King",
+        "short_name": "King",
+        "position": "MID",
+        "team": "Fulham",
+        "expected_points": 3.513475657690736
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.37533371727625
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 4.719728956049396
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 67089,
+        "name": "Martin Dubravka",
+        "short_name": "Dubravka",
+        "position": "GK",
+        "team": "Spurs",
+        "expected_points": 0.10027015579447286
+      },
+      {
+        "player_id": 572584,
+        "name": "Abdoul Ouattara",
+        "short_name": "Ouattara",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 0.8905515739533116
+      },
+      {
+        "player_id": 108413,
+        "name": "Will Hughes",
+        "short_name": "Hughes",
+        "position": "MID",
+        "team": "Crystal Palace",
+        "expected_points": 0.6628182574567039
+      },
+      {
+        "player_id": 470313,
+        "name": "Nick Woltemade",
+        "short_name": "Woltemade",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 0.0
+      }
+    ],
+    "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "purchase_prices"
+    ],
+    "squad_basis": "captured",
+    "expected_points_cost_ceiling": 0.0,
+    "evidence": {
+      "kind": "managers_word",
+      "rule_version": "managers_word_rule_v1",
+      "source_kind": "synthetic_fixture",
+      "source_label": "club_news_v1.fixture.json",
+      "evidence_table": "rotation_evidence_v2_2026-27_gw05_382941835994.csv",
+      "clubs_covered": [
+        "Arsenal",
+        "Man Utd"
+      ],
+      "binding": false,
+      "applied": [
+        {
+          "player_id": 184029,
+          "name": "Martin \u00d8degaard",
+          "disposition": "stated_rotation_risk",
+          "role": "not_captain",
+          "speaker": "manager",
+          "published_at_utc": "2026-09-11T14:00:00Z",
+          "published_precision": "instant",
+          "club": "Arsenal",
+          "source_url": "https://club.example/arsenal/team-news-gw4",
+          "fetched_at_utc": "2026-09-12T14:05:00Z",
+          "words": null,
+          "words_status": "withheld_figure"
+        }
+      ]
+    }
+  }
+}
