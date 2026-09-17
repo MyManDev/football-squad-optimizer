@@ -103,7 +103,7 @@ describe("the Top 100 influence control", () => {
     const inputs = settings();
     expect(inputs[0]!.disabled).toBe(false);
     expect(inputs.slice(1).every((input) => input.disabled)).toBe(true);
-    expect(document.body.textContent).toContain(TOP100_COPY.tr.wordNotSolved);
+    expect(document.body.textContent).toContain(TOP100_COPY.tr.notSolved);
   });
 
   it("says why when the publish solved nothing, and never prints the code", () => {
@@ -117,10 +117,20 @@ describe("the Top 100 influence control", () => {
     expect(text).not.toContain("published_plan_carries_top100");
   });
 
-  it("says when the link asks for a setting that is not offered", () => {
+  it("says when the link asks for a setting that is not offered, and 0 clears it", () => {
     renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&top100=15`, SOLVED, "en");
     expect(document.body.textContent).toContain(TOP100_COPY.en.notOffered);
     expect(settings()[0]!.checked).toBe(true);
+    fireEvent.click(settings()[0]!);
+    expect(query().has("top100")).toBe(false);
+    expect(document.body.textContent).not.toContain(TOP100_COPY.en.notOffered);
+  });
+
+  it("names the switches, not the menu, when the word has no file for the setting", () => {
+    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&llm=on&top100=20`, SOLVED);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain(TOP100_COPY.tr.notSolved);
+    expect(text).not.toContain(TOP100_COPY.tr.notOffered);
   });
 
   it("carries no probability wording and no share of the setting, in either language", () => {

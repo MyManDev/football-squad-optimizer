@@ -27,6 +27,10 @@ from squadopt.application.advice import (
 )
 from squadopt.application.entries import EntryError, EntryRegistration
 from squadopt.application.league_views import build_league_views
+from squadopt.application.lineup_publication import (
+    best_eleven_basis,
+    best_eleven_points_under,
+)
 from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.application.strategies.catalog import (
     FORBIDDEN_FIELD_PATTERN,
@@ -446,6 +450,58 @@ def test_the_favoured_players_move_the_plan_and_the_moves_say_why(world: dict[st
             )
 
 
+@pytest.mark.parametrize("favoured", [PREFERRED, [1008, 1014, 1021], [1008], [1012]])
+def test_the_gain_describes_the_eleven_the_weighted_plan_fields(
+    world: dict[str, Any], favoured: list[int]
+) -> None:
+    """The rows add up to the plan's own total less what holding is worth, both for the
+    elevens chosen on the weighted points and stated on the base ones; favouring bench
+    players moves the eleven without moving the fifteen."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    provider = _Provider({101: picks})
+    counts = _counts(favoured)
+    payload = advise_with_top100(
+        _request(),
+        weight=50,
+        counts=counts,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    ).payload
+    base = base_points(projection)
+    weighted = base_points(weighted_projection(projection, counts.counts, 50))
+    positions = {
+        int(p): str(q)
+        for p, q in zip(projection.table["player_id"], projection.table["position"], strict=True)
+    }
+    hold = best_eleven_basis((positions[p], weighted[p], base[p], True, True) for p in squad)
+    assert hold is not None
+    assert payload["expected_gain_vs_hold"] == pytest.approx(
+        payload["expected_own_points"] - hold, abs=1e-9
+    )
+    rows = [m["expected_points_delta"] for m in payload["moves"]]
+    assert sum(rows) == pytest.approx(payload["expected_gain_vs_hold"], abs=1e-9)
+
+
+def test_the_eleven_basis_matches_the_existing_rule_when_both_points_agree() -> None:
+    squad = [
+        ("GK", 3.0, True, True),
+        ("GK", 2.0, True, True),
+        *(("DEF", float(v), True, v != 3) for v in (3, 2.5, 2.5, 2, 1)),
+        *(("MID", float(v), v != 2.5, True) for v in (3, 3, 2.5, 2, 2)),
+        ("FWD", 9.0, True, False),
+        ("FWD", 3.0, True, True),
+        ("FWD", 2.5, True, True),
+    ]
+    assert best_eleven_basis((p, v, v, s, c) for p, v, s, c in squad) == (
+        best_eleven_points_under(squad)
+    )
+
+
 def test_weight_zero_and_other_strategies_are_refused(world: dict[str, Any]) -> None:
     inputs, projection, rules = _world_context(world)
     picks = _member_picks(world, 101, _legal_squad(world))
@@ -487,6 +543,44 @@ def test_with_the_word_the_price_is_the_pairs_and_the_word_still_binds(
     # The plain weighted document is untouched by the word.
     assert "evidence" not in advice.payload
     assert favoured  # the counts favoured someone
+
+
+def _decision(payload: dict[str, Any]) -> tuple[object, ...]:
+    moves = payload["moves"]
+    return (
+        sorted(m["player_out"]["player_id"] for m in moves),
+        sorted(m["player_in"]["player_id"] for m in moves),
+        sorted(p["player_id"] for p in payload["starting_xi"]),
+        payload["captain"]["player_id"],
+    )
+
+
+@pytest.mark.parametrize("weight", [5, 50])
+def test_with_the_word_changed_is_measured_against_the_words_own_plan(
+    world: dict[str, Any], weight: int
+) -> None:
+    """On the word's document, "changed" compares with what the member sees with the word
+    on and the setting at 0, not with the plain plan."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    provider = _Provider({101: picks})
+    words = _words(squad[0])
+    word = advise_with_managers_word(
+        _request(),
+        words=words,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    advice, _control, _context = _advise(world, weight, words=words)
+    assert advice.word_payload is not None
+    assert advice.word_payload["top100"]["changed"] is (
+        _decision(advice.word_payload) != _decision(word)
+    )
+    assert advice.payload["top100"]["changed"] is (weight == 50)
 
 
 def test_at_weight_zero_the_pair_price_is_the_words_own(

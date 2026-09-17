@@ -9,12 +9,12 @@ gets the one-week pure-points plan solved on points scaled by it::
 where ``count`` is how many of the 100 Top 100 teams started the player in the previous
 gameweek (``elite_start_count_lag1``). A player all 100 teams started gets ``weight``
 extra points for every 100 base points; a player nobody started, or one the evidence does
-not name, is unchanged, and a zero stays a zero. This is the frozen five-point rule of
+not name, is unchanged, and a zero stays a zero. This is the frozen 0.05 rule of
 ``prediction/elite_evidence.py`` with the coefficient chosen by the member instead of
 fixed, applied to the base the handoff already holds, never stacked on an uplifted one.
 
-Nothing measured says any weight scores better (``docs/top100_weights_20260915.json``
-measured how often the decision changes, and says so). So every number a weighted
+Nothing measured says any weight scores better (the GW4 study on #566 measured how often
+the decision changes, and says so). So every number a weighted
 document publishes is the **base model's**: the plan is chosen on the weighted points and
 then scored on the unweighted ones, and what the preference costs is the base-model
 difference against the member's own pure-points plan (``application/advice.py``).
@@ -143,35 +143,34 @@ def load_top100_counts(
             decision_captured_at_utc=inputs.captured_at_utc,
         )
         document = json.loads(manifest.read_text(encoding="utf-8"))
-    except (DataError, PredictionConfigurationError, OSError, ValueError) as error:
+        sources = document.get("source_snapshot_ids") if isinstance(document, dict) else None
+        picks = [
+            str(value)
+            for value in (sources if isinstance(sources, list) else [])
+            if str(value).startswith(_ELITE_PICKS_PREFIX)
+        ]
+        if len(picks) != 1:
+            raise ValueError(
+                f"The evidence manifest names {len(picks)} picks captures; exactly one is required."
+            )
+        counts = {
+            int(player): int(count)
+            for player, count in zip(
+                evidence["player_id"].tolist(),
+                evidence["elite_start_count_lag1"].tolist(),
+                strict=True,
+            )
+            if int(count) > 0
+        }
+        return Top100Counts(
+            counts=counts,
+            table_sha256=str(evidence.attrs["table_sha256"]),
+            cohort_snapshot_id=str(evidence.attrs["cohort_snapshot_id"]),
+            picks_snapshot_id=picks[0],
+            picks_gameweek=int(inputs.deadline.gameweek) - 1,
+        )
+    except (DataError, PredictionConfigurationError, OSError, ValueError, KeyError) as error:
         raise Top100InputsRefused(TOP100_INPUTS_REFUSED, str(error)) from error
-    sources = document.get("source_snapshot_ids")
-    picks = [
-        str(value)
-        for value in (sources if isinstance(sources, list) else [])
-        if str(value).startswith(_ELITE_PICKS_PREFIX)
-    ]
-    if len(picks) != 1:
-        raise Top100InputsRefused(
-            TOP100_INPUTS_REFUSED,
-            f"The evidence manifest names {len(picks)} picks captures; exactly one is required.",
-        )
-    counts = {
-        int(player): int(count)
-        for player, count in zip(
-            evidence["player_id"].tolist(),
-            evidence["elite_start_count_lag1"].tolist(),
-            strict=True,
-        )
-        if int(count) > 0
-    }
-    return Top100Counts(
-        counts=counts,
-        table_sha256=str(evidence.attrs["table_sha256"]),
-        cohort_snapshot_id=str(evidence.attrs["cohort_snapshot_id"]),
-        picks_snapshot_id=picks[0],
-        picks_gameweek=int(inputs.deadline.gameweek) - 1,
-    )
 
 
 def weighted_projection(base: Projection, counts: Mapping[int, int], weight: int) -> Projection:

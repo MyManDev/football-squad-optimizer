@@ -126,6 +126,8 @@ describe("the Top 100 selection", () => {
     const word = resolve("mode=saf-puan&window=1&top100=5&llm=on", partial);
     expect(word.top100.weights).toEqual([0]);
     expect(word.top100.weight).toBe(0);
+    // Solved without the word, so offered; the controls name the switches instead.
+    expect(word.top100.notOffered).toBe(false);
     expect(word.path).toBe(`advice/${ENTRY}/saf-puan/1/hoca-sozu.json`);
   });
 

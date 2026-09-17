@@ -39,6 +39,7 @@ from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     MEMBER_WINDOWS,
+    TOP100_SOLVE_ERRORS,
     AdviseEntryRequest,
     HorizonBuilder,
     advise_entry,
@@ -46,6 +47,7 @@ from squadopt.application.advice import (
     advise_with_top100,
     build_advice_payload,
     solve_member_control,
+    solve_word_control,
 )
 from squadopt.application.advice_record import (
     AdviceRecordConflictError,
@@ -274,6 +276,13 @@ def render_member(
     top100_unavailable: list[tuple[int, bool, str]] = []
     top100_notes: list[str] = []
     if top100_counts is not None:
+        word_control = None
+        if manager_words is not None:
+            try:
+                word_control = solve_word_control(control, manager_words, inputs, projection, rules)
+            except TOP100_SOLVE_ERRORS:
+                # Each weight then solves it again and records the same failure.
+                word_control = None
         for weight in task.top100_weights:
             try:
                 weighted = advise_with_top100(
@@ -291,8 +300,11 @@ def render_member(
                     rules=rules,
                     control=control,
                     words=manager_words,
+                    word_control=word_control,
                 )
-            except (EntryError, DataError) as error:
+            except TOP100_SOLVE_ERRORS as error:
+                # The menu is an addition to the member's week: a setting the planner could
+                # not solve or verify is recorded, and the member's other documents stand.
                 top100_unavailable.append((weight, False, str(error)))
                 if manager_words is not None:
                     top100_unavailable.append((weight, True, str(error)))

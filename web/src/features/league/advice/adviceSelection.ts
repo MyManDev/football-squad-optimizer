@@ -298,11 +298,14 @@ export function resolvePublishedAdvice(
     const weights = window === 1 ? top100Weights(index, entryId, switched) : [0 as const];
     const asked = top100Asked.weight;
     const weight = weights.includes(asked) ? asked : 0;
+    // "Not offered" is about the menu itself; a weight solved without the word but not with
+    // it is offered, and the controls say which settings the switches leave off.
+    const offeredAtAll = window === 1 && top100Weights(index, entryId, false).includes(asked);
     const top100 = {
       ...result.top100,
       weights,
       weight,
-      notOffered: result.top100.notOffered || (asked !== 0 && weight === 0),
+      notOffered: result.top100.notOffered || (asked !== 0 && !offeredAtAll),
     };
     return {
       ...result,

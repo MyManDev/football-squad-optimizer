@@ -20,7 +20,7 @@
  *
  * The Top 100 influence is a row of weights beside the manager's word. Each one is a
  * file the producer solved for this member on the one-week pure-points plan; a weight
- * without a file is shown disabled, and zero is always the published plan.
+ * without a file is shown disabled, and zero switches the influence off.
  *
  * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`), the same parameters the
  * templates set and the compute panel reads, so the whole state stays shareable.
@@ -118,8 +118,8 @@ export function MemberDecisionControls({
       ? top100Copy.onlyBaseline
       : top100.notOffered
         ? top100Copy.notOffered
-        : selection.evidence.on && top100.weights.length < TOP100_WEIGHTS.length
-          ? top100Copy.wordNotSolved
+        : top100.weights.length < TOP100_WEIGHTS.length
+          ? top100Copy.notSolved
           : top100Copy.published;
 
   return (
@@ -281,6 +281,13 @@ export function MemberDecisionControls({
                   onChange={() =>
                     update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
                   }
+                  // Zero reads as checked while the link carries a setting the page cannot
+                  // show; a click on it still has to clear that setting from the link.
+                  onClick={() => {
+                    if (weight === 0 && searchParams.has(TOP100_PARAMETER)) {
+                      update({ [TOP100_PARAMETER]: null });
+                    }
+                  }}
                 />
                 <span>{weight === 0 ? top100Copy.zero : weight}</span>
               </label>

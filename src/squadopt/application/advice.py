@@ -16,7 +16,7 @@ paper entry, so nothing a member is told can depend on the system's own squad.
 import functools
 import logging
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -41,8 +41,11 @@ from squadopt.application.entries import (
     held_squad_from_picks,
 )
 from squadopt.application.lineup_publication import advice_player as _advice_player
+from squadopt.application.lineup_publication import (
+    best_eleven_basis,
+    best_eleven_points_under,
+)
 from squadopt.application.lineup_publication import best_eleven_points as best_eleven_points
-from squadopt.application.lineup_publication import best_eleven_points_under
 from squadopt.application.lineup_publication import lineup_fields as lineup_fields
 from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
@@ -83,6 +86,7 @@ from squadopt.planning import (
     PlanningWeekResult,
     ProjectionHorizon,
     TransferPlanningConfig,
+    TransferPlanningError,
     TransferPlanResult,
 )
 
@@ -217,6 +221,7 @@ def _attributed_gains(
     held: Sequence[int],
     lookup: dict[int, tuple[str, float]],
     exclusion: FirstWeekExclusion | None = None,
+    choice: Mapping[int, float] | None = None,
 ) -> list[float] | None:
     """Each swap's share of what the plan is worth against holding the squad.
 
@@ -243,6 +248,20 @@ def _attributed_gains(
         return None
 
     def value_of(players: Sequence[int]) -> float | None:
+        if choice is not None:
+            # The eleven a plan chosen on other points would field, stated on these.
+            if any(player not in choice for player in players):
+                return None
+            return best_eleven_basis(
+                (
+                    lookup[player][0],
+                    choice[player],
+                    lookup[player][1],
+                    exclusion is None or player not in exclusion.not_starting,
+                    exclusion is None or player not in exclusion.not_captain,
+                )
+                for player in players
+            )
         if exclusion is None:
             return best_eleven_points(lookup[player] for player in players)
         return best_eleven_points_under(
@@ -283,6 +302,7 @@ def _moves(
     reason_code: str,
     exclusion: FirstWeekExclusion | None = None,
     move_reason: Callable[[int | None, int | None], str] | None = None,
+    choice: Mapping[int, float] | None = None,
 ) -> tuple[list[dict[str, object]], float | None]:
     """The published moves and what the whole set is worth against holding the squad.
 
@@ -310,7 +330,7 @@ def _moves(
         for table in (pool_by_id, by_id)
         for player, row in table.items()
     }
-    gains = _attributed_gains(pairs, held=held, lookup=lookup, exclusion=exclusion)
+    gains = _attributed_gains(pairs, held=held, lookup=lookup, exclusion=exclusion, choice=choice)
     moves: list[dict[str, object]] = []
     for index, (player_out, player_in) in enumerate(pairs):
         moves.append(
@@ -519,6 +539,7 @@ def build_advice_payload(
     reason_code: str | None = None,
     exclusion: FirstWeekExclusion | None = None,
     move_reason: Callable[[int | None, int | None], str] | None = None,
+    choice_points: Mapping[int, float] | None = None,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
 
@@ -590,6 +611,7 @@ def build_advice_payload(
             reason_code=reason_code,
             exclusion=exclusion,
             move_reason=move_reason,
+            choice=choice_points,
         )
     missing = _missing_fields(picks)
     return {
@@ -1176,6 +1198,20 @@ TOP100_LIMIT: str = (
 )
 
 
+#: What one Top 100 setting's solve may fail with and still be recorded rather than
+#: raised: the menu is an addition to the member's week, so a setting the planner could
+#: not solve, verify or render is named in the index and the member note, and every
+#: other document the member gets stands.
+TOP100_SOLVE_ERRORS: tuple[type[Exception], ...] = (
+    EntryError,
+    DataError,
+    SolverExecutionError,
+    TransferPlanningError,
+    KeyError,
+    ValueError,
+)
+
+
 @dataclass(frozen=True, slots=True)
 class Top100Advice:
     """One weight's documents for one member, and what the operator should hear about them.
@@ -1196,6 +1232,36 @@ def _move_ids(decision: TransferDecision) -> tuple[set[int], set[int]]:
     return set(decision.transfers_out_ids), set(decision.transfers_in_ids)
 
 
+def solve_word_control(
+    control: MemberControl,
+    words: ManagerWords,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+) -> MemberControl:
+    """The plan a member sees with the manager's word on and no Top 100 setting.
+
+    The control itself when the word does not break it; otherwise the control re-solved
+    under the word, as ``advise_with_managers_word`` solves it. Solved once per member and
+    handed to every weight, which each compare their own plan with it.
+    """
+
+    exclusion = words.exclusion()
+    if not control.plan.weeks:
+        raise EntryError("The pure-points control has no solution; nothing can be compared.")
+    if exclusion is None or not _breaks(control.plan.weeks[0], exclusion):
+        return control
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(control.picks, current_prices=prices)
+    plan, decision, config = plan_transfers_with_exclusion(
+        inputs, projection, held, rules, exclusion
+    )
+    return MemberControl(picks=control.picks, plan=plan, decision=decision, transfer_config=config)
+
+
 def advise_with_top100(
     request: AdviseEntryRequest,
     *,
@@ -1207,6 +1273,7 @@ def advise_with_top100(
     rules: SeasonRules,
     control: MemberControl | None = None,
     words: ManagerWords | None = None,
+    word_control: MemberControl | None = None,
 ) -> Top100Advice:
     """The one-week pure-points plan chosen on Top 100 weighted points, priced on base ones.
 
@@ -1248,6 +1315,7 @@ def advise_with_top100(
     if not preferred.plan.has_solution or not preferred.plan.weeks:
         raise EntryError(f"The plan at Top 100 influence {weight} has no solution.")
     points = base_points(projection)
+    weighted_points = base_points(weighted)
     control_week = solved.plan.weeks[0]
     control_value = base_net(control_week, points)
     slack = bound_slack(solved.plan)
@@ -1270,6 +1338,7 @@ def advise_with_top100(
         decision: TransferDecision,
         exclusion: FirstWeekExclusion | None,
         label: str,
+        changed: bool,
     ) -> tuple[dict[str, object], tuple[str, ...]]:
         week = plan.weeks[0]
         selected = base_net(week, points)
@@ -1301,6 +1370,9 @@ def advise_with_top100(
             week=rebased_week(week, points),
             exclusion=exclusion,
             move_reason=move_reason,
+            # The rows and the gain describe the eleven this plan fields, which was chosen
+            # on the weighted points; they are stated on the base ones.
+            choice_points=weighted_points,
         )
         payload["expected_points_cost_ceiling"] = max(cost, control_value + slack - selected)
         payload["control_solver_status"] = solved.plan.solver_status.name
@@ -1320,7 +1392,7 @@ def advise_with_top100(
         }
         return payload, tuple(notes)
 
-    payload, notes = priced(preferred.plan, preferred.decision, None, "")
+    payload, notes = priced(preferred.plan, preferred.decision, None, "", changed)
     if words is None:
         return Top100Advice(weight, payload, notes=notes)
     if (words.season, words.gameweek) != (inputs.season, request.gameweek):
@@ -1336,20 +1408,30 @@ def advise_with_top100(
     exclusion = words.exclusion()
     preferred_week = preferred.plan.weeks[0]
     binding = exclusion is not None and _breaks(preferred_week, exclusion)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
     try:
+        held = held_squad_from_picks(picks, current_prices=prices)
         if exclusion is not None and binding:
-            prices = {
-                int(str(row["player_id"])): int(str(row["price_tenths"]))
-                for _, row in inputs.players.iterrows()
-            }
-            held = held_squad_from_picks(picks, current_prices=prices)
             plan, decision, _config = plan_transfers_with_exclusion(
                 inputs, weighted, held, rules, exclusion
             )
         else:
             plan, decision = preferred.plan, preferred.decision
-        word_payload, word_notes = priced(plan, decision, exclusion, " with the word")
-    except (EntryError, DataError) as error:
+        # "Changed" on this document is against what the member sees with the word on and
+        # the setting at 0 (``hoca-sozu.json``), solved once per member by the caller.
+        if word_control is not None and word_control.picks != picks:
+            raise EntryError("The word's control was solved for another member's picks.")
+        zero = (
+            word_control
+            if word_control is not None
+            else solve_word_control(solved, words, inputs, projection, rules)
+        )
+        word_changed = decision_changed(zero.plan.weeks[0], zero.decision, plan.weeks[0], decision)
+        word_payload, word_notes = priced(plan, decision, exclusion, " with the word", word_changed)
+    except TOP100_SOLVE_ERRORS as error:
         return Top100Advice(weight, payload, word_unavailable=str(error), notes=notes)
     if exclusion is not None:
         _vice_not_barred(word_payload, exclusion.not_captain)

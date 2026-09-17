@@ -645,12 +645,14 @@ export function mockEntryAdviceTop100Envelope(
   const base = word
     ? mockEntryAdviceEvidenceEnvelope(entryId)
     : mockEntryAdviceEnvelope(entryId, "saf-puan", 1);
+  // The example plan is the published one, so the example setting changes nothing and
+  // costs nothing; a test that wants a changed plan says so.
   return {
     ...base,
     payload: {
       ...base.payload,
-      expected_points_cost: 0.4,
-      expected_points_cost_ceiling: 0.4,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 0,
       solver_status: "OPTIMAL",
       control_solver_status: "OPTIMAL",
       control_optimality_gap: 0,
@@ -660,7 +662,7 @@ export function mockEntryAdviceTop100Envelope(
       ],
       top100: {
         weight,
-        changed: weight >= 20,
+        changed: false,
         price_basis: "base_model_pure_points_v1",
         cohort_snapshot_id: "fpl-top100-example",
         picks_snapshot_id: "fpl-elite-picks-example",

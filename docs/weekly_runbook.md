@@ -70,7 +70,10 @@ export. **The published plan must stay at 0, so a week that offers the menu is r
 handoff, and the loader then refuses the menu (`published_plan_carries_top100`) rather than
 stack a member's setting on it. The Friday run is therefore
 `--rotation --projection component-only` with no `--skip-top100` and no `--snapshot-id`.
-A hand publish passes the export with `--top100-evidence <csv>`.
+A hand publish passes the export with `--top100-evidence <csv>`. The same handoff feeds
+`--decide`, so on such a week the system's own squad is also decided without the uplift,
+which departs from `docs/phase_c_operational_elite_policy.md`'s default; that is the
+owner's call before `--decide` is passed, and the policy's rule itself is unchanged.
 
 An optional second live capture in the final 24 hours before the deadline can be
 compared with the earlier capture using `squadopt.platform.capture_measurement`
