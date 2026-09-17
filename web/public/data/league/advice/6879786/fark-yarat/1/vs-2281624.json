@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": 2.4436051352621178,
+        "expected_points_delta": 2.4436051352621107,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 2.4436051352621178,
+    "expected_gain_vs_hold": 2.4436051352621107,
     "expected_points_cost": 0.0,
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 51.31957330495694,
+    "expected_own_points": 50.13964106594459,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -128,20 +128,20 @@
         "expected_points": 4.897045438301909
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
-      },
-      {
         "player_id": 216646,
         "name": "Yoane Wissa",
         "short_name": "Wissa",
         "position": "FWD",
         "team": "Newcastle",
         "expected_points": 3.5637000012914486
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -201,7 +201,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 0.03574510823383292,
+    "expected_gap_vs_rival": 1.215677347246178,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

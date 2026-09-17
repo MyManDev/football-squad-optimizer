@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,29 +9,10 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
-        "player_out": {
-          "player_id": 95658,
-          "name": "Harry Maguire",
-          "short_name": "Maguire",
-          "position": "DEF",
-          "team": "Man Utd"
-        },
-        "player_in": {
-          "player_id": 231416,
-          "name": "Ferdi Kad\u0131o\u011flu",
-          "short_name": "Kad\u0131o\u011flu",
-          "position": "DEF",
-          "team": "Brighton"
-        },
-        "expected_points_delta": 0.0,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw05-2",
         "player_out": {
           "player_id": 439509,
           "name": "Christos Tzolis",
@@ -40,23 +21,42 @@
           "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Man City"
         },
-        "expected_points_delta": 0.6758792620225336,
+        "expected_points_delta": 1.5502969784721827,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
+          "position": "FWD",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 169432,
+          "name": "Oli McBurnie",
+          "short_name": "McBurnie",
+          "position": "FWD",
+          "team": "Hull City"
+        },
+        "expected_points_delta": -0.702900024023684,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.6758792620225336,
-    "expected_points_cost": 1.3996790649374873,
+    "expected_gain_vs_hold": 0.8473969544484987,
+    "expected_points_cost": 1.2767918712526765,
     "rival_label": "entry-3832237",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.304399203361804,
+    "expected_own_points": 55.338865087405686,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -115,6 +115,14 @@
         "expected_points": 6.421694651064867
       },
       {
+        "player_id": 437730,
+        "name": "Antoine Semenyo",
+        "short_name": "Semenyo",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 4.620473859853053
+      },
+      {
         "player_id": 446008,
         "name": "Bryan Mbeumo",
         "short_name": "Mbeumo",
@@ -128,15 +136,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
-      },
-      {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 3.7460561434034036
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 513545,
@@ -155,12 +155,12 @@
         "expected_points": 8.37533371727625
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
         "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "team": "Hull City",
+        "expected_points": 2.836896693013364
       }
     ],
     "bench": [
@@ -173,12 +173,12 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 231416,
-        "name": "Ferdi Kad\u0131o\u011flu",
-        "short_name": "Kad\u0131o\u011flu",
+        "player_id": 95658,
+        "name": "Harry Maguire",
+        "short_name": "Maguire",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 2.4492708555664957
+        "team": "Man Utd",
+        "expected_points": 2.4986285568677755
       },
       {
         "player_id": 449429,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 3832237,
-    "expected_points_cost_ceiling": 1.3996790649374873,
+    "expected_points_cost_ceiling": 1.2767918712526765,
     "overlap_count": 4,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 20.0,
-      "expected_points_cost": 23.073605499764938,
-      "expected_points_cost_ceiling": 23.073605499764938
+      "expected_points_cost": 21.942303759493747,
+      "expected_points_cost_ceiling": 21.942303759493747
     },
-    "expected_gap_vs_rival": 13.094180874798482,
+    "expected_gap_vs_rival": 12.128646758842365,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

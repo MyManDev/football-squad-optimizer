@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.266465607546337,
+        "expected_points_delta": 1.3093460381766064,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.266465607546337,
+    "expected_gain_vs_hold": 1.3093460381766064,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 33.085000000000036,
-    "expected_own_points": 55.60883753155394,
+    "optimality_gap": 36.66300000000001,
+    "expected_own_points": 54.471785723171855,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -101,7 +101,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 184029,
@@ -141,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -204,17 +204,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.60883753155393
+        "expected_points": 54.47178572317186
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
             "position": "DEF",
-            "team": "Brighton"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
@@ -230,85 +230,85 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.338880951374165
+        "expected_points": 55.23960388832778
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
+            "player_id": 201658,
+            "name": "Marcus Tavernier",
+            "short_name": "Tavernier",
+            "position": "MID",
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
-            "position": "DEF",
-            "team": "Arsenal"
+            "player_id": 474120,
+            "name": "Julio Enciso",
+            "short_name": "Enciso",
+            "position": "MID",
+            "team": "Ipswich Town"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.95738361878335
+        "expected_points": 55.76604248386322
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
             "position": "GK",
-            "team": "Hull City"
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 67089,
-            "name": "Martin Dubravka",
-            "short_name": "Dubravka",
+            "player_id": 204936,
+            "name": "Gianluigi Donnarumma",
+            "short_name": "Donnarumma",
             "position": "GK",
-            "team": "Spurs"
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.95738361878335
+        "expected_points": 56.184967880429824
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 487676,
-            "name": "Trai Hume",
-            "short_name": "Hume",
-            "position": "DEF",
-            "team": "Sunderland"
+            "player_id": 215413,
+            "name": "Kiernan Dewsbury-Hall",
+            "short_name": "Dewsbury-Hall",
+            "position": "MID",
+            "team": "Everton"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.28919569808163
+        "expected_points": 56.67400171181628
       }
     ],
     "stated_limits": [

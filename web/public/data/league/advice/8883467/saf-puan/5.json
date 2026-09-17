@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -21,23 +21,23 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 60307,
-          "name": "Pascal Gro\u00df",
-          "short_name": "Gro\u00df",
+          "player_id": 513418,
+          "name": "Kevin Schade",
+          "short_name": "Schade",
           "position": "MID",
-          "team": "Brighton"
+          "team": "Brentford"
         },
-        "expected_points_delta": 1.3908540757292087,
+        "expected_points_delta": 1.4498024470148465,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.3908540757292087,
+    "expected_gain_vs_hold": 1.4498024470148465,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 34.644000000000005,
-    "expected_own_points": 55.27653075985847,
+    "optimality_gap": 38.40899999999999,
+    "expected_own_points": 54.15554689213175,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -96,12 +96,12 @@
         "expected_points": 5.199892083433812
       },
       {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
+        "player_id": 513418,
+        "name": "Kevin Schade",
+        "short_name": "Schade",
         "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "team": "Brentford",
+        "expected_points": 4.222757269435823
       },
       {
         "player_id": 204580,
@@ -133,7 +133,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       },
       {
         "player_id": 169432,
@@ -184,11 +184,11 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Brighton"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -204,36 +204,10 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.27653075985846
+        "expected_points": 54.15554689213176
       },
       {
         "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 606930,
-            "name": "Nobel Mendy",
-            "short_name": "Mendy",
-            "position": "DEF",
-            "team": "Hull City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.95966300944748
-      },
-      {
-        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 226182,
@@ -256,17 +230,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.671103394846284
+        "expected_points": 54.87645388705646
       },
       {
-        "gameweek": 8,
+        "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
             "position": "MID",
-            "team": "Bournemouth"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -282,33 +256,59 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.7352415900899
+        "expected_points": 56.24624652282355
       },
       {
-        "gameweek": 9,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 209036,
-            "name": "Marc Gu\u00e9hi",
-            "short_name": "Gu\u00e9hi",
+            "player_id": 491279,
+            "name": "Micky van de Ven",
+            "short_name": "Ven",
             "position": "DEF",
-            "team": "Man City"
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.959833773967034
+        "expected_points": 56.723297565619745
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 57.231332155519006
       }
     ],
     "stated_limits": [

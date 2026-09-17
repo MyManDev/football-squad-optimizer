@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -33,11 +33,11 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.4673993039370359,
-    "expected_points_cost": 0.9632598732980497,
+    "expected_points_cost": 1.006232270321938,
     "rival_label": "entry-5349883",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 52.29994342530218,
+    "expected_own_points": 51.16344403334278,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -72,20 +72,20 @@
         "expected_points": 3.555548676659022
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 469142,
@@ -141,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -188,7 +188,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 5349883,
-    "expected_points_cost_ceiling": 0.9632598732980497,
+    "expected_points_cost_ceiling": 1.006232270321938,
     "overlap_count": 6,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,10 +198,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 10.395369477898065,
-      "expected_points_cost_ceiling": 10.395369477898065
+      "expected_points_cost": 10.438341874921967,
+      "expected_points_cost_ceiling": 10.438341874921967
     },
-    "expected_gap_vs_rival": 1.613176262521435,
+    "expected_gap_vs_rival": 2.836541348586728,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

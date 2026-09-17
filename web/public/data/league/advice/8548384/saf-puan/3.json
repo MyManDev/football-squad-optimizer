@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -21,23 +21,23 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 503139,
-          "name": "Alex Scott",
-          "short_name": "Scott",
+          "player_id": 60307,
+          "name": "Pascal Gro\u00df",
+          "short_name": "Gro\u00df",
           "position": "MID",
-          "team": "Bournemouth"
+          "team": "Brighton"
         },
-        "expected_points_delta": 3.2505307586235332,
+        "expected_points_delta": 3.316137754827139,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 3.2505307586235332,
+    "expected_gain_vs_hold": 3.316137754827139,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 17.478999999999985,
-    "expected_own_points": 55.73421398222357,
+    "optimality_gap": 18.423000000000002,
+    "expected_own_points": 54.61988873941483,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -47,12 +47,12 @@
       "expected_points": 8.37533371727625
     },
     "vice_captain": {
-      "player_id": 475168,
-      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-      "short_name": "Jesus",
-      "position": "FWD",
-      "team": "Chelsea",
-      "expected_points": 4.719728956049396
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Magalh\u00e3es",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.472528385131045
     },
     "starting_xi": [
       {
@@ -104,12 +104,12 @@
         "expected_points": 4.415892336727386
       },
       {
-        "player_id": 503139,
-        "name": "Alex Scott",
-        "short_name": "Scott",
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
         "position": "MID",
-        "team": "Bournemouth",
-        "expected_points": 4.141082332576842
+        "team": "Brighton",
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 184029,
@@ -141,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -184,11 +184,11 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
             "position": "MID",
-            "team": "Bournemouth"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -204,7 +204,7 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.73421398222358
+        "expected_points": 54.61988873941483
       },
       {
         "gameweek": 6,
@@ -230,33 +230,33 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.38906910590154
+        "expected_points": 56.274743863092795
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
+            "player_id": 177815,
+            "name": "Dominic Calvert-Lewin",
+            "short_name": "Calvert-Lewin",
+            "position": "FWD",
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
-            "team": "Arsenal"
+            "player_id": 470313,
+            "name": "Nick Woltemade",
+            "short_name": "Woltemade",
+            "position": "FWD",
+            "team": "Newcastle"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.78796013412501
+        "expected_points": 56.3967876027275
       }
     ],
     "stated_limits": [

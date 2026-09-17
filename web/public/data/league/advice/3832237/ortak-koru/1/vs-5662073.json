@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,7 +27,7 @@
           "position": "FWD",
           "team": "Chelsea"
         },
-        "expected_points_delta": 1.9820873592323665,
+        "expected_points_delta": 0.7029000240236769,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -46,7 +46,7 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": -0.9619660520545708,
+        "expected_points_delta": -0.9185332050016228,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -65,7 +65,7 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": 4.169806469105659,
+        "expected_points_delta": 4.269061565301996,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -89,12 +89,12 @@
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 6.729401066401145,
-    "expected_points_cost": 3.35915008900853,
+    "expected_gain_vs_hold": 5.592901674441741,
+    "expected_points_cost": 4.5819627586511515,
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 50.73626117213917,
+    "expected_own_points": 49.59976178017977,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -104,12 +104,12 @@
       "expected_points": 6.421694651064867
     },
     "vice_captain": {
-      "player_id": 475168,
-      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-      "short_name": "Jesus",
-      "position": "FWD",
-      "team": "Chelsea",
-      "expected_points": 4.719728956049396
+      "player_id": 437730,
+      "name": "Antoine Semenyo",
+      "short_name": "Semenyo",
+      "position": "MID",
+      "team": "Man City",
+      "expected_points": 4.620473859853053
     },
     "starting_xi": [
       {
@@ -121,20 +121,20 @@
         "expected_points": 3.8238320826783507
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 231416,
@@ -185,20 +185,20 @@
         "expected_points": 3.1354935560927677
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
-      },
-      {
         "player_id": 502500,
         "name": "Igor Thiago Nascimento Rodrigues",
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
         "expected_points": 3.93101668263493
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -245,7 +245,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 5662073,
-    "expected_points_cost_ceiling": 3.35915008900853,
+    "expected_points_cost_ceiling": 4.5819627586511515,
     "overlap_count": 5,
     "transfer_cap": 4,
     "overlap_target": 9,
@@ -255,8 +255,8 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 17.911336979651715,
-      "expected_points_cost_ceiling": 17.911336979651715
+      "expected_points_cost": 18.70809198291139,
+      "expected_points_cost_ceiling": 18.70809198291139
     },
     "expected_gap_vs_rival": 2.0028846316616224,
     "captain_agreement": false,

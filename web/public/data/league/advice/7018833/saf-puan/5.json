@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,35 +9,35 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 441164,
-          "name": "Pedro Porro Sauceda",
-          "short_name": "Sauceda",
-          "position": "DEF",
-          "team": "Spurs"
+          "player_id": 494595,
+          "name": "Florian Wirtz",
+          "short_name": "Wirtz",
+          "position": "MID",
+          "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
-          "position": "DEF",
-          "team": "Leeds"
+          "player_id": 513418,
+          "name": "Kevin Schade",
+          "short_name": "Schade",
+          "position": "MID",
+          "team": "Brentford"
         },
-        "expected_points_delta": 0.037774745335681814,
+        "expected_points_delta": 0.5365151365259209,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.037774745335681814,
+    "expected_gain_vs_hold": 0.5365151365259209,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 31.956999999999994,
-    "expected_own_points": 55.1963503916815,
+    "optimality_gap": 36.47500000000002,
+    "expected_own_points": 54.55859139091233,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -47,12 +47,12 @@
       "expected_points": 8.37533371727625
     },
     "vice_captain": {
-      "player_id": 475168,
-      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-      "short_name": "Jesus",
-      "position": "FWD",
+      "player_id": 244850,
+      "name": "Morgan Rogers",
+      "short_name": "Rogers",
+      "position": "MID",
       "team": "Chelsea",
-      "expected_points": 4.719728956049396
+      "expected_points": 4.414905789016978
     },
     "starting_xi": [
       {
@@ -80,12 +80,12 @@
         "expected_points": 3.555548676659022
       },
       {
-        "player_id": 226182,
-        "name": "Jayden Bogle",
-        "short_name": "Bogle",
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
         "position": "DEF",
-        "team": "Leeds",
-        "expected_points": 3.5483370784121617
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
       },
       {
         "player_id": 244850,
@@ -94,6 +94,14 @@
         "position": "MID",
         "team": "Chelsea",
         "expected_points": 4.414905789016978
+      },
+      {
+        "player_id": 513418,
+        "name": "Kevin Schade",
+        "short_name": "Schade",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 4.222757269435823
       },
       {
         "player_id": 204480,
@@ -112,14 +120,6 @@
         "expected_points": 3.701108435650504
       },
       {
-        "player_id": 494595,
-        "name": "Florian Wirtz",
-        "short_name": "Wirtz",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 3.6862421329099
-      },
-      {
         "player_id": 223094,
         "name": "Erling Haaland",
         "short_name": "Haaland",
@@ -128,20 +128,20 @@
         "expected_points": 8.37533371727625
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
-      },
-      {
         "player_id": 216646,
         "name": "Yoane Wissa",
         "short_name": "Wissa",
         "position": "FWD",
         "team": "Newcastle",
         "expected_points": 3.5637000012914486
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -154,20 +154,12 @@
         "expected_points": 2.9398808352076324
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
-      },
-      {
         "player_id": 540324,
         "name": "Mohamed Belloumi",
         "short_name": "Belloumi",
         "position": "MID",
         "team": "Hull City",
-        "expected_points": 3.128919375693713
+        "expected_points": 3.1713655845566326
       },
       {
         "player_id": 231416,
@@ -176,6 +168,14 @@
         "position": "DEF",
         "team": "Brighton",
         "expected_points": 2.4492708555664957
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 1.5182138705784642
       }
     ],
     "chip": null,
@@ -184,37 +184,11 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 441164,
-            "name": "Pedro Porro Sauceda",
-            "short_name": "Sauceda",
-            "position": "DEF",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.196350391681506
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Nott'm Forest"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -230,17 +204,17 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.35472165817711
+        "expected_points": 54.55859139091234
       },
       {
-        "gameweek": 7,
+        "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 108416,
-            "name": "John Egan",
-            "short_name": "Egan",
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
             "position": "DEF",
-            "team": "Hull City"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
@@ -256,36 +230,10 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.35472165817711
+        "expected_points": 54.56713175228745
       },
       {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 466525,
-            "name": "Anton Stach",
-            "short_name": "Stach",
-            "position": "MID",
-            "team": "Leeds"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.81742212067679
-      },
-      {
-        "gameweek": 9,
+        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 17761,
@@ -308,7 +256,59 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.42092117535413
+        "expected_points": 55.170630806964795
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
+            "position": "MID",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 204480,
+            "name": "Declan Rice",
+            "short_name": "Rice",
+            "position": "MID",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.46057048217662
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 219168,
+            "name": "Alexander Isak",
+            "short_name": "Isak",
+            "position": "FWD",
+            "team": "Liverpool"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 475168,
+            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+            "short_name": "Jesus",
+            "position": "FWD",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.80927884206637
       }
     ],
     "stated_limits": [

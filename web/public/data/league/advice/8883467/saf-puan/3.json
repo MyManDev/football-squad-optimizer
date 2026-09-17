@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.3908540757292087,
+        "expected_points_delta": 1.4337345063594782,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.3908540757292087,
+    "expected_gain_vs_hold": 1.4337345063594782,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 20.152000000000015,
-    "expected_own_points": 55.27653075985847,
+    "optimality_gap": 22.750999999999976,
+    "expected_own_points": 54.139478951476384,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -101,7 +101,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 204580,
@@ -133,7 +133,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       },
       {
         "player_id": 169432,
@@ -204,36 +204,10 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.27653075985846
+        "expected_points": 54.13947895147638
       },
       {
         "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 440089,
-            "name": "Mikkel Damsgaard",
-            "short_name": "Damsgaard",
-            "position": "MID",
-            "team": "Brentford"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.62888554878294
-      },
-      {
-        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 477424,
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.84836052408101
+        "expected_points": 55.36842053630036
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 440089,
+            "name": "Mikkel Damsgaard",
+            "short_name": "Damsgaard",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.754281112722815
       }
     ],
     "stated_limits": [

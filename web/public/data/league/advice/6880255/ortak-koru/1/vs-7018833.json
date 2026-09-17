@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.767183326010887,
-    "expected_points_cost": 0.47867643676143956,
+    "expected_points_cost": 0.5216488337853278,
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
@@ -188,7 +188,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 7018833,
-    "expected_points_cost_ceiling": 0.47867643676143956,
+    "expected_points_cost_ceiling": 0.5216488337853278,
     "overlap_count": 2,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,10 +198,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 28.0,
-      "expected_points_cost": 27.263678377182863,
-      "expected_points_cost_ceiling": 27.263678377182863
+      "expected_points_cost": 28.046314000426257,
+      "expected_points_cost_ceiling": 28.046314000426257
     },
-    "expected_gap_vs_rival": 0.5638875037194069,
+    "expected_gap_vs_rival": 1.7438197427317519,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

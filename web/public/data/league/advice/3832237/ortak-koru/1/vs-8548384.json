@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -46,7 +46,7 @@
           "position": "FWD",
           "team": "Chelsea"
         },
-        "expected_points_delta": 1.9820873592323665,
+        "expected_points_delta": 0.7029000240236769,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -84,32 +84,32 @@
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 1.6071008127449247,
+        "expected_points_delta": 1.6071008127449176,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 5.5216471764248,
-    "expected_points_cost": 4.566903978984875,
+    "expected_gain_vs_hold": 4.242459841216103,
+    "expected_points_cost": 5.9324045918767965,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 49.52850728216283,
+    "expected_own_points": 48.24931994695413,
     "captain": {
-      "player_id": 475168,
-      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-      "short_name": "Jesus",
-      "position": "FWD",
-      "team": "Chelsea",
-      "expected_points": 4.719728956049396
-    },
-    "vice_captain": {
       "player_id": 437730,
       "name": "Antoine Semenyo",
       "short_name": "Semenyo",
       "position": "MID",
       "team": "Man City",
       "expected_points": 4.620473859853053
+    },
+    "vice_captain": {
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Magalh\u00e3es",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.472528385131045
     },
     "starting_xi": [
       {
@@ -185,20 +185,20 @@
         "expected_points": 3.513475657690736
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
-      },
-      {
         "player_id": 502500,
         "name": "Igor Thiago Nascimento Rodrigues",
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
         "expected_points": 3.93101668263493
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -245,7 +245,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 8548384,
-    "expected_points_cost_ceiling": 4.566903978984875,
+    "expected_points_cost_ceiling": 5.9324045918767965,
     "overlap_count": 7,
     "transfer_cap": 4,
     "overlap_target": 9,
@@ -255,10 +255,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 8.0,
-      "expected_points_cost": 12.739864011771097,
-      "expected_points_cost_ceiling": 12.739864011771097
+      "expected_points_cost": 14.105364624663004,
+      "expected_points_cost_ceiling": 14.105364624663004
     },
-    "expected_gap_vs_rival": -2.0646243674839013,
+    "expected_gap_vs_rival": -2.163879463680246,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
