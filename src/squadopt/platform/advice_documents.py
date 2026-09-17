@@ -25,8 +25,12 @@ from typing import Any, Final
 import jsonschema
 
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
+LEAGUE_CAPABILITIES_CONTRACT_VERSION: Final = "league_capabilities_v1"
 ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
 LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.schema.json"
+LEAGUE_CAPABILITIES_SCHEMA_PATH: Final = (
+    Path("docs") / "contracts" / "league_capabilities_v1.schema.json"
+)
 
 
 class AdviceDocumentError(ValueError):
@@ -314,8 +318,85 @@ def league_state_schema() -> dict[str, Any]:
     }
 
 
+def league_capabilities_schema() -> dict[str, Any]:
+    """The strict shape of what may be asked for a league right now.
+
+    A page reads this before it enables a control: the strategies and their windows are
+    the deployment's, and each switch is ``available`` only while the current capture has
+    the input it is computed from. ``weights`` are the Top 100 settings that would be
+    accepted now, so zero (off) is always among them.
+    """
+
+    flag = {
+        "type": "object",
+        "properties": {"available": {"type": "boolean"}},
+        "required": ["available"],
+        "additionalProperties": False,
+    }
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://squadopt.dev/contracts/league_capabilities_v1.schema.json",
+        "title": "SquadOpt league advice capabilities",
+        "type": "object",
+        "properties": {
+            "contract_version": {
+                "type": "string",
+                "const": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
+            },
+            "league_id": {"type": "integer", "minimum": 1},
+            "capture_snapshot_id": {"type": "string", "minLength": 1},
+            "season": {"type": "string", "minLength": 1},
+            "gameweek": {"type": "integer", "minimum": 1},
+            "strategies": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "windows": {
+                            "type": "array",
+                            "items": {"type": "integer", "enum": [1, 3, 5]},
+                            "uniqueItems": True,
+                        },
+                        "requires_rival": {"type": "boolean"},
+                    },
+                    "required": ["windows", "requires_rival"],
+                    "additionalProperties": False,
+                },
+            },
+            "top100": {
+                "type": "object",
+                "properties": {
+                    "available": {"type": "boolean"},
+                    "weights": {
+                        "type": "array",
+                        "items": {"type": "integer", "minimum": 0, "maximum": 100},
+                        "uniqueItems": True,
+                    },
+                },
+                "required": ["available", "weights"],
+                "additionalProperties": False,
+            },
+            "managers_word": flag,
+        },
+        "required": [
+            "contract_version",
+            "league_id",
+            "capture_snapshot_id",
+            "season",
+            "gameweek",
+            "strategies",
+            "top100",
+            "managers_word",
+        ],
+        "additionalProperties": False,
+    }
+
+
 _ADVICE_VALIDATOR: Final = jsonschema.Draft202012Validator(advice_read_schema())
 _LEAGUE_STATE_VALIDATOR: Final = jsonschema.Draft202012Validator(league_state_schema())
+_LEAGUE_CAPABILITIES_VALIDATOR: Final = jsonschema.Draft202012Validator(
+    league_capabilities_schema()
+)
 
 
 def validate_advice_document(raw: bytes) -> None:
@@ -349,12 +430,21 @@ def validate_league_state(document: dict[str, object]) -> None:
         raise AdviceDocumentError(f"The league state violates league_state_v1: {errors[0].message}")
 
 
-def write_public_read_schemas() -> tuple[Path, Path]:
-    """Commit both schemas, the same way the other wire contracts are committed."""
+def validate_league_capabilities(document: dict[str, object]) -> None:
+    errors = sorted(_LEAGUE_CAPABILITIES_VALIDATOR.iter_errors(document), key=str)
+    if errors:
+        raise AdviceDocumentError(
+            f"The capabilities violate league_capabilities_v1: {errors[0].message}"
+        )
+
+
+def write_public_read_schemas() -> tuple[Path, ...]:
+    """Commit the read schemas, the same way the other wire contracts are committed."""
 
     for path, schema in (
         (ADVICE_READ_SCHEMA_PATH, advice_read_schema()),
         (LEAGUE_STATE_SCHEMA_PATH, league_state_schema()),
+        (LEAGUE_CAPABILITIES_SCHEMA_PATH, league_capabilities_schema()),
     ):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -362,4 +452,4 @@ def write_public_read_schemas() -> tuple[Path, Path]:
             encoding="utf-8",
             newline="\n",
         )
-    return ADVICE_READ_SCHEMA_PATH, LEAGUE_STATE_SCHEMA_PATH
+    return ADVICE_READ_SCHEMA_PATH, LEAGUE_STATE_SCHEMA_PATH, LEAGUE_CAPABILITIES_SCHEMA_PATH

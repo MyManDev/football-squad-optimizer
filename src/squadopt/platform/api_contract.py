@@ -33,6 +33,9 @@ _OPERATIONS: Final = frozenset(
     {"gameweek.decide", "gameweek.settle", "season.tick", "league.advise"}
 )
 _RUN_STATUSES: Final = frozenset({"completed", "failed"})
+#: The Top 100 settings ``league.advise`` accepts; zero is off. A wire contract states its
+#: own enum, and a test holds it equal to the application's ``TOP100_WEIGHTS``.
+ADVISE_TOP100_WEIGHTS: Final[tuple[int, ...]] = (0, 5, 10, 20, 30, 40, 50)
 _IDENTIFIER_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _IDEMPOTENCY_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 _SEASON_PATTERN: Final = re.compile(r"^[0-9]{4}-[0-9]{2}$")
@@ -49,6 +52,16 @@ def _require_pattern(value: object, *, label: str, pattern: re.Pattern[str]) -> 
     if not isinstance(value, str) or not pattern.fullmatch(value):
         raise BackendApiContractError(f"{label} has an invalid format: {value!r}.")
     return value
+
+
+def validate_idempotency_key(value: object) -> str:
+    """The client's ``Idempotency-Key`` as the contract accepts it, or a contract error.
+
+    Public so a route can refuse a malformed header as the client's mistake before any
+    other work, with the same rule ``ApiCommandRequest`` applies.
+    """
+
+    return _require_pattern(value, label="idempotency_key", pattern=_IDEMPOTENCY_PATTERN)
 
 
 def _optional_pattern(
@@ -138,6 +151,12 @@ class ApiCommandRequest:
     capture_snapshot_id: str | None = None
     """Server-resolved, never client-supplied: which capture answers this request.
     Part of the advise fingerprint so deduplication cannot outlive the capture."""
+    top100_weight: int = 0
+    managers_word: bool = False
+    """The member menu's switches on ``league.advise``. Off is the default and is **left
+    out** of the fingerprint and the wire document, so every request that existed before
+    the switches did keeps its fingerprint and its bytes. A further switch is added the
+    same way: an off default, and a fingerprint entry only when it is on."""
     contract_version: str = BACKEND_API_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -214,6 +233,16 @@ class ApiCommandRequest:
                 pattern=_IDENTIFIER_PATTERN,
             ),
         )
+        if (
+            isinstance(self.top100_weight, bool)
+            or not isinstance(self.top100_weight, int)
+            or self.top100_weight not in ADVISE_TOP100_WEIGHTS
+        ):
+            raise BackendApiContractError(
+                f"top100_weight must be one of {list(ADVISE_TOP100_WEIGHTS)}."
+            )
+        if not isinstance(self.managers_word, bool):
+            raise BackendApiContractError("managers_word must be boolean.")
         self._validate_shape()
 
     def _validate_shape(self) -> None:
@@ -230,6 +259,10 @@ class ApiCommandRequest:
         ):
             raise BackendApiContractError(
                 f"{self.operation} accepts no league, entry, strategy, window, or rival."
+            )
+        if self.operation != "league.advise" and (self.top100_weight or self.managers_word):
+            raise BackendApiContractError(
+                f"{self.operation} accepts no top100_weight or managers_word."
             )
         if self.operation == "league.advise":
             if (
@@ -328,6 +361,11 @@ class ApiCommandRequest:
                     "capture_snapshot_id": self.capture_snapshot_id,
                 }
             )
+            # Only when on: an absent switch and an off switch are one request.
+            if self.top100_weight:
+                payload["top100_weight"] = self.top100_weight
+            if self.managers_word:
+                payload["managers_word"] = True
         else:
             payload["dry_run"] = self.dry_run
         return payload
@@ -383,7 +421,8 @@ class ApiCommandRequest:
             },
         }[operation]
         expected = common | specific
-        actual = set(document)
+        optional = {"top100_weight", "managers_word"} if operation == "league.advise" else set()
+        actual = set(document) - optional
         if actual != expected:
             raise BackendApiContractError(
                 "API command fields do not match its operation: "
@@ -407,6 +446,8 @@ class ApiCommandRequest:
             window=document.get("window"),  # type: ignore[arg-type]
             rival_entry_id=document.get("rival_entry_id"),  # type: ignore[arg-type]
             capture_snapshot_id=document.get("capture_snapshot_id"),  # type: ignore[arg-type]
+            top100_weight=document.get("top100_weight", 0),  # type: ignore[arg-type]
+            managers_word=document.get("managers_word", False),  # type: ignore[arg-type]
         )
         if document["request_fingerprint"] != request.request_fingerprint:
             raise BackendApiContractError(
@@ -663,6 +704,12 @@ def backend_api_schema() -> dict[str, Any]:
             "dry_run": {"type": "boolean"},
         }
     )
+    # Optional on both shapes, and absent means off: a request written before the
+    # switches existed is still exactly one valid document.
+    advise_switches = {
+        "top100_weight": {"type": "integer", "enum": list(ADVISE_TOP100_WEIGHTS)},
+        "managers_word": {"type": "boolean"},
+    }
     advise = _object(
         {
             **common_request,
@@ -677,7 +724,19 @@ def backend_api_schema() -> dict[str, Any]:
             "window": {"type": "integer", "enum": [1, 3, 5]},
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
             "capture_snapshot_id": identifier,
-        }
+            **advise_switches,
+        },
+        required=[
+            *common_request,
+            "operation",
+            "gameweek",
+            "league_id",
+            "entry_id",
+            "strategy",
+            "window",
+            "rival_entry_id",
+            "capture_snapshot_id",
+        ],
     )
     decide_body = _object(
         {
@@ -701,6 +760,7 @@ def backend_api_schema() -> dict[str, Any]:
             "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
             "window": {"type": "integer", "enum": [1, 3, 5]},
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
+            **advise_switches,
         },
         required=["strategy", "window"],
     )

@@ -26,6 +26,7 @@ from squadopt.application.advice_capabilities import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     MEMBER_WINDOWS,
+    TOP100_WEIGHTS,
     AdviceCapability,
     validate_advice_selection,
 )
@@ -33,9 +34,19 @@ from squadopt.application.entries import EntryError
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import (
+    LEAGUE_CAPABILITIES_CONTRACT_VERSION,
     LEAGUE_STATE_CONTRACT_VERSION,
     validate_advice_document,
+    validate_league_capabilities,
     validate_league_state,
+)
+from squadopt.platform.advice_switches import (
+    MANAGERS_WORD_SWITCH,
+    TOP100_SWITCH,
+    AdviceSwitchInputs,
+    SwitchIdentity,
+    SwitchInputUnavailable,
+    switch_identity,
 )
 
 LEAGUE_TREE_CONTRACT_VERSION: Final = LEAGUE_VIEW_CONTRACT_VERSION
@@ -69,6 +80,14 @@ class UnsupportedAdviceRequestError(AdviceReadError):
     """A validly encoded request is not a computable strategy/window/rival combination."""
 
 
+class Top100InputsUnavailableError(AdviceReadError):
+    """A Top 100 setting was asked for and this capture has no usable counts."""
+
+
+class ManagersWordUnavailableError(AdviceReadError):
+    """The manager's word was asked for and this capture has no coded club news."""
+
+
 @dataclass(frozen=True, slots=True)
 class AdviceRequestContext:
     """What the deployment knows at read time; every field enters the cache key."""
@@ -86,6 +105,21 @@ class AdviceContextProvider(Protocol):
     """Where the current capture context comes from; ``None`` means not ready."""
 
     def current(self) -> AdviceRequestContext | None: ...
+
+
+class SwitchInputsProvider(Protocol):
+    """What the current context offers the switches; ``None`` when it is not current."""
+
+    def switch_inputs(self, context: AdviceRequestContext) -> AdviceSwitchInputs | None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedAdviceRequest:
+    """One validated request: its address, the context, and the switched-on identity."""
+
+    key: str
+    context: AdviceRequestContext
+    switches: SwitchIdentity
 
 
 class LeagueDirectory(Protocol):
@@ -179,6 +213,11 @@ class AdviceReadStore:
     ``strategies`` maps each computable slug onto whether it uses a rival — the
     forced-null rule's input. It is injected rather than imported so this module
     states no opinion about the catalogue; the composition root wires the real one.
+
+    ``capabilities`` is the fuller statement of the same thing (windows, and which
+    windows each switch may be asked at); left out, it is derived from ``strategies`` as
+    it always was, with no switch offered. ``switches`` is where the current context's
+    switch inputs come from; without one every switched-on request is refused by name.
     """
 
     def __init__(
@@ -187,17 +226,25 @@ class AdviceReadStore:
         cache: AdviceCacheRepository,
         context_provider: AdviceContextProvider,
         strategies: Mapping[str, bool],
+        *,
+        capabilities: Mapping[str, AdviceCapability] | None = None,
+        switches: SwitchInputsProvider | None = None,
     ) -> None:
         self._directory = directory
         self._cache = cache
         self._context = context_provider
         self._strategies = dict(strategies)
-        self._capabilities = {
-            slug: AdviceCapability(
-                MEMBER_WINDOWS if slug == COMPUTED_MODE else (COMPUTED_WINDOW,), rival
-            )
-            for slug, rival in strategies.items()
-        }
+        self._capabilities = (
+            {
+                slug: AdviceCapability(
+                    MEMBER_WINDOWS if slug == COMPUTED_MODE else (COMPUTED_WINDOW,), rival
+                )
+                for slug, rival in strategies.items()
+            }
+            if capabilities is None
+            else {slug: capabilities[slug] for slug in strategies}
+        )
+        self._switches = switches
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""
@@ -222,7 +269,53 @@ class AdviceReadStore:
         validate_league_state(document)  # the route serves only what the contract names
         return document
 
-    def resolve_key(
+    def _switch_inputs(self, context: AdviceRequestContext) -> AdviceSwitchInputs:
+        if self._switches is None:
+            return AdviceSwitchInputs()
+        return self._switches.switch_inputs(context) or AdviceSwitchInputs()
+
+    def league_capabilities(self, league_id: int) -> dict[str, object]:
+        """What may be asked for this league right now, so a page enables only that.
+
+        The strategies and their windows are this deployment's; the two switches are
+        offered only while the current capture has the input each one is computed from.
+        """
+
+        if self._directory.league(league_id) is None:
+            raise LeagueNotConnectedError(f"League {league_id} is not connected here.")
+        context = self._context.current()
+        if context is None:
+            raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        inputs = self._switch_inputs(context)
+        top100 = inputs.top100_counts is not None and any(
+            capability.top100_windows for capability in self._capabilities.values()
+        )
+        word = (
+            inputs.manager_words is not None
+            and inputs.rotation_table_sha256 is not None
+            and any(capability.managers_word_windows for capability in self._capabilities.values())
+        )
+        document: dict[str, object] = {
+            "contract_version": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
+            "league_id": int(league_id),
+            "capture_snapshot_id": context.capture_snapshot_id,
+            "season": context.season,
+            "gameweek": context.gameweek,
+            "strategies": {
+                slug: {
+                    "windows": list(capability.windows),
+                    "requires_rival": capability.requires_rival,
+                }
+                for slug, capability in sorted(self._capabilities.items())
+            },
+            # The settings that would be accepted now: zero is always one of them.
+            "top100": {"available": top100, "weights": list(TOP100_WEIGHTS) if top100 else [0]},
+            "managers_word": {"available": word},
+        }
+        validate_league_capabilities(document)
+        return document
+
+    def resolve(
         self,
         *,
         league_id: int,
@@ -230,7 +323,9 @@ class AdviceReadStore:
         strategy: str,
         window: int,
         rival_entry_id: int | None = None,
-    ) -> tuple[str, AdviceRequestContext]:
+        top100_weight: int = 0,
+        managers_word: bool = False,
+    ) -> ResolvedAdviceRequest:
         """Validate one request against what this deployment knows and address it.
 
         The same validation and the same key serve the GET and the POST: a request the
@@ -255,12 +350,29 @@ class AdviceReadStore:
                 entry_id=entry_id,
                 rival_entry_id=rival_entry_id,
                 capabilities=self._capabilities,
+                top100_weight=top100_weight,
+                managers_word=managers_word,
             )
         except EntryError as error:
             raise UnsupportedAdviceRequestError(str(error)) from error
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        switches: SwitchIdentity = {}
+        if top100_weight or managers_word:
+            # Refused here, before a job exists: a switch whose input this capture does
+            # not have can never be computed, and a queued job would only say so later.
+            try:
+                switches = switch_identity(
+                    self._switch_inputs(context),
+                    top100_weight=top100_weight,
+                    managers_word=managers_word,
+                )
+            except SwitchInputUnavailable as error:
+                if error.switch == TOP100_SWITCH:
+                    raise Top100InputsUnavailableError(str(error)) from error
+                assert error.switch == MANAGERS_WORD_SWITCH
+                raise ManagersWordUnavailableError(str(error)) from error
         key = advice_cache_key(
             advice_contract_version=context.advice_contract_version,
             capture_snapshot_id=context.capture_snapshot_id,
@@ -275,8 +387,33 @@ class AdviceReadStore:
             configuration_fingerprint=context.configuration_fingerprint,
             rival_entry_id=rival_entry_id,
             strategy_uses_rival=self._strategies[strategy],
+            switches=switches,
         )
-        return key, context
+        return ResolvedAdviceRequest(key=key, context=context, switches=switches)
+
+    def resolve_key(
+        self,
+        *,
+        league_id: int,
+        entry_id: int,
+        strategy: str,
+        window: int,
+        rival_entry_id: int | None = None,
+        top100_weight: int = 0,
+        managers_word: bool = False,
+    ) -> tuple[str, AdviceRequestContext]:
+        """``resolve`` for a caller that needs only the address and its context."""
+
+        resolved = self.resolve(
+            league_id=league_id,
+            entry_id=entry_id,
+            strategy=strategy,
+            window=window,
+            rival_entry_id=rival_entry_id,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
+        )
+        return resolved.key, resolved.context
 
     def strategy_uses_rival(self, strategy: str) -> bool:
         """Whether a rival is part of this strategy's identity, or dropped before hashing.
@@ -306,6 +443,8 @@ class AdviceReadStore:
         strategy: str,
         window: int,
         rival_entry_id: int | None = None,
+        top100_weight: int = 0,
+        managers_word: bool = False,
     ) -> bytes:
         """The cached answer under the complete key, or a typed refusal."""
 
@@ -315,6 +454,8 @@ class AdviceReadStore:
             strategy=strategy,
             window=window,
             rival_entry_id=rival_entry_id,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
         )
         cached = self.cached(key)
         if cached is None:

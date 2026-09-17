@@ -95,6 +95,8 @@ window, never a path.
 | `SQUADOPT_BACKEND_HANDOFF_ROOT` | yes | projection handoffs, addressed by the capture's own season and gameweek |
 | `SQUADOPT_BACKEND_ALLOWED_ORIGINS` | no | comma-separated CORS allowlist; a wildcard is refused |
 | `SQUADOPT_BACKEND_SEASON` | no | override; otherwise inferred from the capture |
+| `SQUADOPT_BACKEND_ARTIFACT_ROOT` | no | the repository's `artifacts/` directory; where the week's Top 100 export (`phase_b/`) and rotation table (`rotation/`) are found. Unset, neither switch is offered |
+| `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE` | no | the club-news fixture file or capture directory the rotation table was coded from; the manager's word needs this and the artifact root |
 | `SQUADOPT_REPOSITORY_COMMIT` | in a container | part of every answer's identity; falls back to `git rev-parse` locally |
 
 The backend answers only from a capture that has a **projection handoff** — the same handoff
@@ -200,7 +202,8 @@ schema during that transition.
 | Method and route | Meaning |
 | --- | --- |
 | `GET /api/v1/leagues/{league_id}` | Published league connection state |
-| `GET /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cache lookup for strategy, window and optional rival; never starts a solve |
+| `GET /api/v1/leagues/{league_id}/capabilities` | `league_capabilities_v1`: the strategies and their windows, and whether the current capture offers the Top 100 settings and the manager's word |
+| `GET /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cache lookup for strategy, window, optional rival and the two switches; never starts a solve |
 | `POST /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cached answer (`200`) or accepted job (`202`) |
 | `GET /api/v1/advice-jobs/{job_id}` | Public job state: queued, running, completed or failed |
 | `GET /ready` | Injected readiness checks, or static data-root readiness in the default app |
@@ -210,7 +213,30 @@ Advice routes return `503 ADVICE_BACKEND_DISABLED` when their required injected 
 absent. A missing current capture context is a readiness failure; a valid context with no
 cached answer is a cache miss. These are different states.
 
-The POST body contains `strategy`, `window` and optional `rival_entry_id`. An explicit
+The POST body contains `strategy`, `window`, optional `rival_entry_id`, and the two optional
+switches of the member menu: `top100_weight` (one of 0, 5, 10, 20, 30, 40, 50; default 0) and
+`managers_word` (boolean; default false). The GET takes the same two as query parameters.
+Unknown body keys are refused. A switch left off is left out of the request fingerprint, the
+job spec and the cache key, so a plain request has the identities it had before the switches
+existed. A switch turned on adds its value and the identity of the per-capture input it is
+computed from to the cache key: the export's `table_sha256`, source captures and
+`TOP100_PRICE_BASIS` for a setting; the rotation table's `table_sha256`, the source label and
+`MANAGERS_WORD_RULE_VERSION` for the word. The job spec records the same mapping, and the
+worker refuses a job whose recorded input is no longer the one it holds
+(`SWITCH_INPUTS_CHANGED`) instead of filing one export's answer at another's address.
+
+The combinations are the batch menu's: `saf-puan` at windows 1, 3 and 5; a rival strategy
+(`ortak-koru`, `fark-yarat`) at 1, 3 and 5 with a rival; a Top 100 setting on any of them; the
+manager's word on `saf-puan` window 1 only, alone or with a setting. The worker answers all of
+them through `application/advice_menu.py::advise_menu_entry`, which calls the producers the
+batch calls, and a plain request is `advise_entry` byte for byte. The switch inputs are found
+under `SQUADOPT_BACKEND_ARTIFACT_ROOT` by the weekly run's own file names
+(`platform/advice_switches.py`): the newest generated Top 100 export of the week that passes
+`load_top100_counts` for the capture, and the rotation table named after the capture. A
+capture without one refuses the switch with `TOP100_INPUTS_UNAVAILABLE` or
+`MANAGERS_WORD_UNAVAILABLE` before any job exists.
+
+An explicit
 `Idempotency-Key` is supported; the advice submission service also handles its absence.
 Reusing an explicit key with a different request conflicts. Equivalent open work is deduplicated,
 and configured request buckets can reject excess submissions. The in-memory limiter is per API
@@ -225,11 +251,10 @@ provider (`backend_runtime.CaptureContextProvider` over `capture_context.py`) an
 composition (`backend_runtime.py`) are in the repository; what is not is a running deployment
 of them, and the default `app = create_app()` deliberately does not assemble those services.
 
-The API accepts window values 1, 3 and 5 at the transport boundary. That is not a claim that the
-current engine computes all three: `advise_entry` currently computes window 1 and refuses the
-others. Strategy registration also differs from executable support; only wired constraints
-can produce a plan. The current public advice envelope contains expected-point trade-offs,
-not member-facing probability claims.
+The API accepts window values 1, 3 and 5 at the transport boundary, and the capabilities route
+says which of them each strategy computes. Strategy registration differs from executable
+support; only wired constraints can produce a plan. The current public advice envelope
+contains expected-point trade-offs, not member-facing probability claims.
 
 The frontend's general pages still use `StaticDataClient`. The member advice client optionally
 uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. The member page
@@ -326,6 +351,29 @@ debug dump.
 | 409 | `STATE_CONFLICT` | Idempotency mismatch, duplicate mutation, or active lock |
 | 422 | `VALIDATION_FAILED` | Structurally valid request rejected by an application contract |
 | 500 | `INTERNAL_ERROR` | Unexpected failure; public message is sanitized |
+
+The advice routes add their own codes:
+
+| HTTP | Stable code | Use |
+| ---: | --- | --- |
+| 404 | `LEAGUE_NOT_CONNECTED`, `UNKNOWN_ENTRY`, `UNKNOWN_STRATEGY`, `NOT_COMPUTED` | The league, member or strategy is not served here, or nothing is cached at the address |
+| 409 | `IDEMPOTENCY_CONFLICT` | One `Idempotency-Key` reused for a different request |
+| 409 | `REQUEST_CONFLICT` | The address already records a different request; a defect, logged |
+| 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token |
+| 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival or switch combination the menu does not offer |
+| 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |
+| 422 | `MANAGERS_WORD_UNAVAILABLE` | The manager's word was asked for and the current capture has no coded club news |
+| 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds |
+| 503 | `NOT_READY` | No capture context, the store probe is failing, or the queue lock stayed busy (then with `Retry-After`) |
+| 503 | `QUEUE_UNAVAILABLE` | A queue write was refused; nothing was accepted, with `Retry-After` |
+| 503 | `QUEUE_INTEGRITY_ERROR` | A stored job record cannot be trusted |
+| 503 | `ADVICE_BACKEND_DISABLED` | The app was built without the advice services |
+
+A failed job carries one of these codes in the public job view: `TOO_MANY_ATTEMPTS`,
+`REQUEST_UNREADABLE` (the spec is missing or malformed), `CONTEXT_UNAVAILABLE`,
+`ENTRY_NOT_IN_CAPTURE` (the member or the rival is listed but the capture holds no squad for
+them), `TOP100_INPUTS_UNAVAILABLE`, `MANAGERS_WORD_UNAVAILABLE`, `SWITCH_INPUTS_CHANGED`,
+`DETERMINISM_DEFECT`, or `ADVICE_FAILED` for anything else.
 
 An error before a run starts uses `ApiErrorResponse`. A failure after a run starts uses a failed
 `ApiRunResponse`, and the nested error must carry the same `run_id`. A solver reporting no
