@@ -354,7 +354,12 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
 
     def publish(request, **kwargs):
         calls.append(request)
-        return SimpleNamespace(output_paths=(), snapshot_id=request.snapshot_id, gameweek=2)
+        return SimpleNamespace(
+            output_paths=(),
+            snapshot_id=request.snapshot_id,
+            gameweek=2,
+            report=SimpleNamespace(members=(), removed=()),
+        )
 
     monkeypatch.setattr(weekly, "publish_league", publish)
     assert operation._league().value["advice_recorded"] is False

@@ -369,3 +369,33 @@ def test_a_source_that_does_not_hold_the_cited_documents_is_refused(
             source_kind=kind,
             source_label=label,
         )
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "He is at 80% and we will see.",
+        "He is eighty per cent fit.",
+        "Ninety percent of the squad trained.",
+        "It is a 50-50 call for Saturday.",
+        "It is fifty-fifty whether he starts.",
+        "The chance he plays is small.",
+        "There is a good percentage of doubt.",
+        "Başlama ihtimali düşük.",
+        "Oynama şansı yüzde elli.",  # noqa: RUF001
+    ],
+)
+def test_the_quote_screen_withholds_every_form_the_pages_may_not_show(quote: str) -> None:
+    assert module.QUOTE_WITHHELD_PATTERN.search(quote)
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "Havertz will not travel.",
+        "Bu yüzden rotasyon yapacağız.",  # noqa: RUF001
+        "Martinez has trained all week and will start.",
+    ],
+)
+def test_the_quote_screen_leaves_plain_statements_alone(quote: str) -> None:
+    assert not module.QUOTE_WITHHELD_PATTERN.search(quote)

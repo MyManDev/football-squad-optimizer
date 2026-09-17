@@ -15,7 +15,7 @@ import type { Language } from "../../../i18n/messages";
 export interface EvidenceCopy {
   legend: string;
   switchLabel: string;
-  unavailable: (reason: string | null) => string;
+  unavailableReasons: Record<string, string>;
   onlyBaseline: string;
   sourceExample: string;
   sourceCapture: string;
@@ -38,10 +38,10 @@ export interface EvidenceCopy {
 const en: EvidenceCopy = {
   legend: "The manager's word",
   switchLabel: "Apply what the club's page said",
-  unavailable: (reason: string | null) =>
-    reason === "not_solved_for_member"
-      ? "Not solved for this member in this publish."
-      : "No club news was read for this publish.",
+  unavailableReasons: {
+    no_evidence_this_run: "No club news was read for this publish.",
+    not_solved_for_member: "Not solved for this member in this publish.",
+  },
   onlyBaseline: "One-week pure-points plan only.",
   sourceExample: "Example data: not a real club page.",
   sourceCapture: "Read from registered club pages before this capture.",
@@ -56,7 +56,7 @@ const en: EvidenceCopy = {
     manager: "The manager",
     club_official: "A club official",
     club_statement: "A club statement",
-    unattributed: "Unattributed",
+    unattributed: "Speaker not named",
   } as Record<string, string>,
   speakerUnknown: "The club",
   said: (speaker: string, when: string | null) => (when ? `${speaker}, ${when}.` : `${speaker}.`),
@@ -75,10 +75,10 @@ const en: EvidenceCopy = {
 const tr: EvidenceCopy = {
   legend: "Hocanın sözü",
   switchLabel: "Kulübün sayfasının dediğini uygula",
-  unavailable: (reason) =>
-    reason === "not_solved_for_member"
-      ? "Bu yayında bu üye için çözülmedi."
-      : "Bu yayında kulüp haberi okunmadı.",
+  unavailableReasons: {
+    no_evidence_this_run: "Bu yayında kulüp haberi okunmadı.",
+    not_solved_for_member: "Bu yayında bu üye için çözülmedi.",
+  },
   onlyBaseline: "Yalnız bir haftalık saf puan planında.",
   sourceExample: "Örnek veri: gerçek bir kulüp sayfası değil.",
   sourceCapture: "Capture öncesi kayıtlı kulüp sayfalarından okundu.",
@@ -93,7 +93,7 @@ const tr: EvidenceCopy = {
     manager: "Teknik direktör",
     club_official: "Kulüp yetkilisi",
     club_statement: "Kulüp açıklaması",
-    unattributed: "Kaynak belirtilmemiş",
+    unattributed: "Konuşan belirtilmemiş",
   },
   speakerUnknown: "Kulüp",
   said: (speaker, when) => (when ? `${speaker}, ${when}.` : `${speaker}.`),
@@ -107,3 +107,19 @@ const tr: EvidenceCopy = {
 };
 
 export const EVIDENCE_COPY: Record<Language, EvidenceCopy> = { tr, en };
+
+/** The sentence for an index reason; an unknown code reads as "nothing was read". */
+export function evidenceUnavailable(copy: EvidenceCopy, reason: string | null): string {
+  return (
+    (reason !== null ? copy.unavailableReasons[reason] : undefined) ??
+    copy.unavailableReasons.no_evidence_this_run
+  );
+}
+
+/**
+ * The page's own check on a quote before it is shown. The producer withholds these
+ * already (``QUOTE_WITHHELD_PATTERN``); a document from anywhere else is held to the same
+ * list here, so the rule does not rest on one side of the wire.
+ */
+export const QUOTE_WITHHELD =
+  /%|per\s?cent|percentage|probabilit|olasıl|\bP\(|chance|likelihood|odds|quantile|spread|\btail\b|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım|\bkuyruk\b|\b50\s*[-/]\s*50\b|fifty[\s-]fifty/i;

@@ -555,6 +555,15 @@ class WeeklyOperations:
                 "snapshot_id": result.snapshot_id,
                 "gameweek": result.gameweek,
                 "advice_recorded": record,
+                # What the build told the operator about individual members (a name it
+                # changed, a mode or the manager's word it could not solve) and the files
+                # it removed from the tree, so a run is not "completed" in silence.
+                "member_notes": {
+                    str(member.entry_id): member.reason
+                    for member in result.report.members
+                    if member.reason
+                },
+                "removed": list(result.report.removed),
             },
         )
 

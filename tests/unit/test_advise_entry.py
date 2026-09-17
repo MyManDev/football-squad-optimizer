@@ -1429,3 +1429,62 @@ def test_the_rows_of_a_switched_on_plan_are_measured_under_the_rule() -> None:
 
     assert unconstrained is not None and unconstrained[0] < 0
     assert constrained is not None and constrained[0] > 0
+
+
+def test_a_player_barred_from_the_armband_is_not_the_vice_captain(world: dict[str, Any]) -> None:
+    """The vice-captain wears the armband when the captain does not play, so the rule that
+    bars a player from the armband bars him from the vice-captaincy too; the rest of the
+    plan stays the control's when the rule binds nothing else."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    baseline = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+    vice = int(str(baseline["vice_captain"]["player_id"]))  # type: ignore[index]
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(vice, "stated_rotation_risk"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["evidence"]["binding"] is False  # type: ignore[index]
+    new_vice = payload["vice_captain"]
+    assert isinstance(new_vice, dict) and int(str(new_vice["player_id"])) != vice
+    assert int(str(new_vice["player_id"])) != int(str(baseline["captain"]["player_id"]))  # type: ignore[index]
+    assert payload["starting_xi"] == baseline["starting_xi"]
+    assert payload["captain"] == baseline["captain"]
+
+
+def test_a_binding_word_is_priced_against_the_control_under_one_policy(
+    world: dict[str, Any],
+) -> None:
+    """The tag is the control's net minus the constrained plan's net, both solved under the
+    member planning policy, floored at zero, and the ceiling is never below it."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    control = advice_service.solve_member_control(
+        _member_picks(world, 101, _legal_squad(world)), inputs, projection, rules
+    )
+    captain = int(str(control.plan.weeks[0].captain["player_id"]))
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(captain, "stated_expected_absent"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=control,
+    )
+
+    assert payload["evidence"]["binding"] is True  # type: ignore[index]
+    cost = float(str(payload["expected_points_cost"]))
+    ceiling = float(str(payload["expected_points_cost_ceiling"]))
+    assert cost >= 0.0 and ceiling >= cost
+    assert payload["control_solver_status"] == control.plan.solver_status.name

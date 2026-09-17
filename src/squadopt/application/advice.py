@@ -952,6 +952,39 @@ def _breaks(week: PlanningWeekResult, exclusion: FirstWeekExclusion) -> bool:
     return int(str(week.captain["player_id"])) in exclusion.not_captain
 
 
+def _vice_not_barred(payload: dict[str, object], barred: frozenset[object]) -> None:
+    """Re-pick the vice-captain when the published one is barred from the armband.
+
+    The vice-captain takes the armband when the captain does not play, so a player the
+    page barred from the armband cannot hold it either. The replacement follows the
+    completion rule ``lineup_fields`` applies (highest expected points, ties by id) among
+    the other starters the rule allows; ``None`` when no starter is allowed.
+    """
+
+    vice = payload.get("vice_captain")
+    captain = payload.get("captain")
+    eleven = payload.get("starting_xi")
+    if not isinstance(vice, dict) or not isinstance(captain, dict) or not isinstance(eleven, list):
+        return
+    if int(str(vice["player_id"])) not in barred:
+        return
+    captain_id = int(str(captain["player_id"]))
+    candidates = [
+        player
+        for player in eleven
+        if isinstance(player, dict)
+        and int(str(player["player_id"])) != captain_id
+        and int(str(player["player_id"])) not in barred
+    ]
+    candidates.sort(
+        key=lambda player: (
+            -float(str(player.get("expected_points", 0.0))),
+            int(str(player["player_id"])),
+        )
+    )
+    payload["vice_captain"] = candidates[0] if candidates else None
+
+
 def advise_with_managers_word(
     request: AdviseEntryRequest,
     *,
@@ -972,10 +1005,16 @@ def advise_with_managers_word(
     **Whether the word binds** is read off the member's own control, the pure-points plan
     solved under the same planning policy: if that plan already starts nobody the rule
     benches and captains nobody it bars, it is also the best plan under the rule, so the
-    document is the control itself at a price of zero (and a ceiling of the control's own
+    document is the control's plan at a price of zero (and a ceiling of the control's own
     bound slack, zero under a proof). Only when the control breaks the rule is a second
-    plan solved under it, and priced exactly as a rival band is: against the control at the
-    game's charge, net of hits, with the ceiling beside the tag when a proof is missing.
+    plan solved under it. **The price** compares two plans solved under one policy, the
+    control and the constrained plan, net of the hits each pays at the game's charge, and
+    is floored at zero; the ceiling adds the control's bound slack. Anchoring on a plan
+    solved at the charge instead (as the rival band does) would put the caution margin's
+    own effect on unrelated transfers into the price of the club's word.
+
+    Either way the rows are measured under the rule, and a vice-captain the rule bars from
+    the armband is replaced (``_vice_not_barred``).
 
     **What the member reads** is every statement about a player in the fifteen they hold,
     the fifteen the control would end with, or the fifteen this plan ends with, so a word
@@ -1029,8 +1068,16 @@ def advise_with_managers_word(
     control_squad = _player_ids(control_week.selected_squad)
     if exclusion is None or not _breaks(control_week, exclusion):
         payload = build_advice_payload(
-            picks, inputs, projection, rules, league_id=request.league_id, control=solved
+            picks,
+            inputs,
+            projection,
+            rules,
+            league_id=request.league_id,
+            control=solved,
+            exclusion=exclusion,
         )
+        if exclusion is not None:
+            _vice_not_barred(payload, exclusion.not_captain)
         payload["expected_points_cost"] = 0.0
         payload["expected_points_cost_ceiling"] = bound_slack(solved.plan)
         payload["evidence"] = _evidence(words.about({*picks.squad, *control_squad}), binding=False)
@@ -1044,22 +1091,15 @@ def advise_with_managers_word(
     plan, decision, _config = plan_transfers_with_exclusion(
         inputs, projection, held, rules, exclusion
     )
-    # The same anchor the rival band prices against: the control solved at the game's
-    # own charge, so the tag compares maximisers of one objective (see
-    # ``_advise_against_rival`` for the arithmetic and the ceiling's derivation).
-    pricing_plan, _pricing_decision, _pricing_config = plan_transfers(
-        inputs,
-        projection,
-        held,
-        rules,
-        transfer_hit_cost_points=solved.transfer_config.hit_points_charged,
-    )
+    # Both plans are solved under the member planning policy, so the tag is what the rule
+    # costs under the policy that chose the plan, not the policy's own caution on other
+    # transfers. Floored at zero: the rule only removes plans.
     constrained_net = net_expected_points(plan)
-    pricing_net = net_expected_points(pricing_plan)
-    control_net = max(pricing_net, constrained_net, net_expected_points(solved.plan))
-    control_ceiling = max(control_net, pricing_net + bound_slack(pricing_plan))
+    control_value = net_expected_points(solved.plan)
+    control_net = max(control_value, constrained_net)
+    control_ceiling = max(control_net, control_value + bound_slack(solved.plan))
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
-    raw_control_gap = pricing_plan.diagnostics.get("absolute_optimality_gap")
+    raw_control_gap = solved.plan.diagnostics.get("absolute_optimality_gap")
     cost = control_net - constrained_net
     record = solved.decision.as_record()
     outs_raw = record.get("transfers_out", [])
@@ -1089,10 +1129,11 @@ def advise_with_managers_word(
         move_reason=move_reason,
     )
     payload["expected_points_cost_ceiling"] = max(cost, control_ceiling - constrained_net)
-    payload["control_solver_status"] = pricing_plan.solver_status.name
+    payload["control_solver_status"] = solved.plan.solver_status.name
     payload["control_optimality_gap"] = (
         float(str(raw_control_gap)) if raw_control_gap is not None else None
     )
+    _vice_not_barred(payload, exclusion.not_captain)
     plan_squad = _player_ids(plan.weeks[0].selected_squad)
     payload["evidence"] = _evidence(
         words.about({*picks.squad, *control_squad, *plan_squad}), binding=True

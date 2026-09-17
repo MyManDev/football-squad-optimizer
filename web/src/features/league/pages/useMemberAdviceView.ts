@@ -59,8 +59,11 @@ export function useMemberAdviceView(
     sameAdviceRequest(job.state.request, request)
       ? job.state
       : null;
-  const computed = current?.phase === "done" ? current : null;
-  const waiting = current?.phase === "waiting" ? current : null;
+  // A computed plan is solved without the club's word, so it never stands in for the
+  // switched-on plan, finished or while waiting.
+  const evidenceOn = selection.evidence.on;
+  const computed = !evidenceOn && current?.phase === "done" ? current : null;
+  const waiting = !evidenceOn && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
   let rejectedContext = false;
   let rejectedUnreadable = false;

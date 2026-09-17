@@ -17,13 +17,15 @@ The rule is declared here, not measured anywhere:
 
 The exclusion names every player the club's page spoke about, held or not: a player the
 manager said will not travel must not be bought and started either. What the member is
-shown is the subset that touches their own plan (the fifteen they hold, and the fifteen the
-switched-on plan ends with). What the constraint costs is the difference between two of the
-member's own solves, published by ``advice.advise_with_managers_word``.
+shown is the subset that touches their own plan (the fifteen they hold, the fifteen their
+pure-points control ends with, and the fifteen the switched-on plan ends with). What the
+constraint costs is the difference between two of the member's own solves, published by
+``advice.advise_with_managers_word``.
 """
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +49,40 @@ NOT_CAPTAIN_DISPOSITIONS: Final[frozenset[str]] = frozenset(
     {"stated_expected_absent", "stated_rotation_risk", "stated_minutes_limited"}
 )
 SOURCE_SYNTHETIC_FIXTURE: Final = "synthetic_fixture"
+#: What a quote may not carry onto a member page. The Python copy guard
+#: (``FORBIDDEN_TEXT_PATTERN``) was written for the site's own words; a quote is a third
+#: party's sentence and can say anything, so this is the wider list the web guard applies to
+#: rendered pages (``web/src/testSupport/honesty.ts``, ``AS_A_CHANCE``) plus the spelled-out
+#: forms a manager says aloud. No ownership exception: a quote is never an ownership share.
+#: Over-withholding costs a member one quote, which stays one link away; under-withholding
+#: publishes a claim the site has promised never to make.
+QUOTE_WITHHELD_PATTERN: Final = re.compile(
+    "|".join(
+        (
+            FORBIDDEN_TEXT_PATTERN.pattern,
+            r"per\s?cent",
+            r"percentage",
+            r"probabilit",
+            "olas\u0131l",
+            r"chance",
+            r"likelihood",
+            r"odds",
+            r"quantile",
+            r"spread",
+            r"\btail\b",
+            r"ihtimal",
+            "\u015fans",
+            "y\u00fczde(?!n\\b)",
+            r"kantil",
+            "yay\u0131l\u0131m",
+            r"\bkuyruk\b",
+            r"\b50\s*[-/]\s*50\b",
+            r"fifty[\s-]fifty",
+        )
+    ),
+    re.IGNORECASE,
+)
+
 WORDS_SHOWN: Final = "shown"
 WORDS_UNRESOLVED: Final = "unresolved"
 WORDS_WITHHELD_FIGURE: Final = "withheld_figure"
@@ -262,7 +298,7 @@ def manager_words_from_artifact(
             row.get("rotation_claim_span_end"),
         )
         status = WORDS_SHOWN if cited is not None else WORDS_UNRESOLVED
-        if cited is not None and FORBIDDEN_TEXT_PATTERN.search(cited):
+        if cited is not None and QUOTE_WITHHELD_PATTERN.search(cited):
             cited, status = None, WORDS_WITHHELD_FIGURE
         words.append(
             ManagerWord(
@@ -332,6 +368,7 @@ __all__ = [
     "MANAGERS_WORD_RULE_VERSION",
     "NOT_CAPTAIN_DISPOSITIONS",
     "NOT_STARTING_DISPOSITIONS",
+    "QUOTE_WITHHELD_PATTERN",
     "SOURCE_CLUB_NEWS_CAPTURE",
     "SOURCE_FIXTURE_FILE",
     "SOURCE_SYNTHETIC_FIXTURE",

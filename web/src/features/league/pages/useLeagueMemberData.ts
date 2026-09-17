@@ -59,6 +59,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
       request.window,
       request.rivalEntryId,
       selection.path,
+      selection.evidence.on,
       request.season,
       request.gameweek,
       squad.data?.payload.source_snapshot_id,

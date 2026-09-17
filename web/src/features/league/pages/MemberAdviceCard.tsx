@@ -2,7 +2,7 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints, utcShort } from "../../../lib/format";
-import { EVIDENCE_COPY } from "../advice/evidenceCopy";
+import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
@@ -457,11 +457,17 @@ function EvidenceSection({ view }: { view: EntryAdvice }) {
         </p>
       )}
       <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
-      <p className={styles.muted}>{evidence.binding ? copy.changed : copy.unchanged}</p>
+      {evidence.binding === undefined ? null : (
+        <p className={styles.muted}>{evidence.binding ? copy.changed : copy.unchanged}</p>
+      )}
       {evidence.applied.length > 0 ? (
         <ul className={styles.assumptionList}>
           {evidence.applied.map((item) => {
-            const status = item.words_status ?? (item.words ? "shown" : "unresolved");
+            const declared = item.words_status ?? (item.words ? "shown" : "unresolved");
+            const status =
+              declared === "shown" && item.words && QUOTE_WITHHELD.test(item.words)
+                ? "withheld_figure"
+                : declared;
             const href = webAddress(item.source_url);
             const speaker = item.speaker
               ? (copy.speakers[item.speaker] ?? copy.speakerUnknown)

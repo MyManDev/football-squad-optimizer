@@ -212,7 +212,11 @@ function LeagueMemberContent({
           members={members}
           index={selection.status === "index-error" ? null : index}
         />
-        <AdviceRequestPanel request={request} job={job} selectionAvailable={selectionAvailable} />
+        <AdviceRequestPanel
+          request={request}
+          job={job}
+          selectionAvailable={selectionAvailable && !selection.evidence.on}
+        />
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (
@@ -238,7 +242,7 @@ function LeagueMemberContent({
                   ? onRetryAdvice
                   : undefined
             }
-            canCompute={selectionAvailable && canComputeAdvice(request)}
+            canCompute={selectionAvailable && !selection.evidence.on && canComputeAdvice(request)}
           />
         )}
       </section>

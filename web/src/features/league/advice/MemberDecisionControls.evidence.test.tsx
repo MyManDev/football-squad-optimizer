@@ -56,7 +56,7 @@ describe("the manager's word switch", () => {
     const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
-    expect(screen.getByText(EVIDENCE_COPY.tr.unavailable(null))).toBeTruthy();
+    expect(screen.getByText(EVIDENCE_COPY.tr.unavailableReasons.no_evidence_this_run)).toBeTruthy();
   });
 
   it("switches the URL on and off where the producer solved it, and says it is example data", () => {
@@ -104,7 +104,9 @@ describe("the manager's word switch, source and reason", () => {
       available: false,
       reason: "not_solved_for_member",
     });
-    expect(container.textContent).toContain(EVIDENCE_COPY.tr.unavailable("not_solved_for_member"));
+    expect(container.textContent).toContain(
+      EVIDENCE_COPY.tr.unavailableReasons.not_solved_for_member,
+    );
     expect(container.textContent).not.toContain("not_solved_for_member");
   });
 

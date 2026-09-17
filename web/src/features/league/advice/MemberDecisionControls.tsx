@@ -30,7 +30,7 @@ import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
-import { EVIDENCE_COPY } from "./evidenceCopy";
+import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -240,7 +240,7 @@ export function MemberDecisionControls({
           </label>
           <p className={styles.note}>
             {!selection.evidence.available
-              ? evidenceCopy.unavailable(selection.evidence.reason)
+              ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
               : !evidenceApplies
                 ? evidenceCopy.onlyBaseline
                 : evidenceIsReal

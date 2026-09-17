@@ -180,15 +180,45 @@ describe("the manager's word on the advice card", () => {
   });
 
   it("captions a move the word caused, and only that move", () => {
-    const base = switchedOn();
-    const moves = base.payload.moves.map((move, index) => ({
-      ...move,
-      reason_code: index === 0 ? ("manager_word" as const) : ("points_gain" as const),
-    }));
-    const { container } = renderPage("en", { ...base, payload: { ...base.payload, moves } });
+    const player = (id: number, name: string) => ({
+      player_id: id,
+      name,
+      short_name: name,
+      team: "Arsenal",
+      position: "MID" as const,
+      expected_points: 4,
+    });
+    const moves = [
+      {
+        move_id: "gw05-1",
+        player_out: player(1, "Out One"),
+        player_in: player(2, "In One"),
+        expected_points_delta: 1.5,
+        reason_code: "manager_word" as const,
+      },
+      {
+        move_id: "gw05-2",
+        player_out: player(3, "Out Two"),
+        player_in: player(4, "In Two"),
+        expected_points_delta: 0.5,
+        reason_code: "points_gain" as const,
+      },
+    ];
+    const advice = switchedOn([item()], { moves, expected_gain_vs_hold: 2 });
+    const { container } = renderPage("en", advice);
     const text = container.textContent ?? "";
-    if (moves.length > 0) expect(text).toContain(EVIDENCE_COPY.en.moveReason);
-    if (moves.length > 1) expect(text).toContain(MESSAGES.en.leagueMembers.pointsGainReason);
+    expect(text).toContain(EVIDENCE_COPY.en.moveReason);
+    expect(text).toContain(MESSAGES.en.leagueMembers.pointsGainReason);
+    expect(text.split(EVIDENCE_COPY.en.moveReason).length - 1).toBe(1);
+    expect(text).not.toMatch(AS_A_CHANCE);
+  });
+
+  it("withholds a quote the page itself would not show, even if the file says shown", () => {
+    const spelled = item({ words: "He is fifty per cent fit.", words_status: "shown" });
+    const { container } = renderPage("en", switchedOn([spelled]));
+    const text = sectionText(container);
+    expect(text).toContain(EVIDENCE_COPY.en.wordsWithheld);
+    expect(text).not.toContain("per cent");
   });
 
   it("does not show a plan without evidence as the switched-on plan", () => {
@@ -209,5 +239,22 @@ describe("the manager's word on the advice card", () => {
       expect(container.textContent ?? "").not.toMatch(AS_A_CHANCE);
       unmount();
     }
+  });
+});
+
+describe("the manager's word and the rest of the page", () => {
+  it("says nothing about change when the document does not say whether the word bound", () => {
+    const advice = switchedOn();
+    const { binding: _binding, ...rest } = advice.payload.evidence!;
+    advice.payload.evidence = rest;
+    const { container } = renderPage("en", advice);
+    const text = sectionText(container);
+    expect(text).not.toContain(EVIDENCE_COPY.en.changed);
+    expect(text).not.toContain(EVIDENCE_COPY.en.unchanged);
+  });
+
+  it("offers no computation while the club's word is switched on", () => {
+    const { container } = renderPage("en", switchedOn());
+    expect(container.textContent).toContain(MESSAGES.en.leagueMembers.computeUnsupportedSelection);
   });
 });
