@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 1.4306591772350856,
+        "expected_points_delta": 1.4736315742589738,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.4306591772350856,
+    "expected_gain_vs_hold": 1.4736315742589738,
     "expected_points_cost": 1.5246492127629594,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 51.73855408583727,
+    "expected_own_points": 50.645027090901756,
     "captain": {
       "player_id": 219168,
       "name": "Alexander Isak",
@@ -47,12 +47,12 @@
       "expected_points": 4.897045438301909
     },
     "vice_captain": {
-      "player_id": 475168,
-      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-      "short_name": "Jesus",
-      "position": "FWD",
-      "team": "Chelsea",
-      "expected_points": 4.719728956049396
+      "player_id": 446008,
+      "name": "Bryan Mbeumo",
+      "short_name": "Mbeumo",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 4.415892336727386
     },
     "starting_xi": [
       {
@@ -72,20 +72,20 @@
         "expected_points": 3.555548676659022
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 141746,
@@ -117,7 +117,7 @@
         "short_name": "Schade",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 4.179784872411939
+        "expected_points": 4.222757269435823
       },
       {
         "player_id": 184029,
@@ -141,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -195,7 +195,7 @@
       "rule_version": "managers_word_rule_v1",
       "source_kind": "synthetic_fixture",
       "source_label": "club_news_v1.fixture.json",
-      "evidence_table": "rotation_evidence_v2_2026-27_gw05_382941835994.csv",
+      "evidence_table": "rotation_evidence_v2_2026-27_gw05_d0bb92785d5c.csv",
       "clubs_covered": [
         "Arsenal",
         "Man Utd"

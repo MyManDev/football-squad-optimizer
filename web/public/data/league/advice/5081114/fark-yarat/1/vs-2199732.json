@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -46,17 +46,17 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.3966782914718578,
+        "expected_points_delta": 1.4401111385247987,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 2.881370236052014,
+    "expected_gain_vs_hold": 2.9248030831049547,
     "expected_points_cost": 0.0,
     "rival_label": "entry-2199732",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.18444902548797,
+    "expected_own_points": 56.22788187254091,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -83,20 +83,20 @@
         "expected_points": 3.8238320826783507
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 226182,
         "name": "Jayden Bogle",
         "short_name": "Bogle",
         "position": "DEF",
         "team": "Leeds",
         "expected_points": 3.5483370784121617
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 463726,
@@ -220,7 +220,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 3.491791193750892,
+    "expected_gap_vs_rival": 4.6288430021329745,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

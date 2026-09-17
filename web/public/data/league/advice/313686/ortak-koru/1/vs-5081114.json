@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
+          "player_id": 439509,
+          "name": "Christos Tzolis",
+          "short_name": "Tzolis",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Arsenal"
         },
         "player_in": {
           "player_id": 577725,
@@ -27,36 +27,36 @@
           "position": "MID",
           "team": "Fulham"
         },
-        "expected_points_delta": -0.23258048571266698,
+        "expected_points_delta": 0.4432987763098666,
         "reason_code": "mode_tradeoff"
       },
       {
         "move_id": "gw05-2",
         "player_out": {
-          "player_id": 631786,
-          "name": "Jonah Kusi-Asare",
-          "short_name": "Kusi-Asare",
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
           "position": "FWD",
-          "team": "Fulham"
+          "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 177815,
-          "name": "Dominic Calvert-Lewin",
-          "short_name": "Calvert-Lewin",
+          "player_id": 502500,
+          "name": "Igor Thiago Nascimento Rodrigues",
+          "short_name": "Rodrigues",
           "position": "FWD",
-          "team": "Leeds"
+          "team": "Brentford"
         },
-        "expected_points_delta": 0.5653425159445575,
+        "expected_points_delta": 0.39121996559788386,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.33276203023189055,
-    "expected_points_cost": 1.5087196433578711,
+    "expected_gain_vs_hold": 0.8345187419077504,
+    "expected_points_cost": 1.0499353287059137,
     "rival_label": "entry-5081114",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.212238706331675,
+    "expected_own_points": 56.62037645667839,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -83,20 +83,20 @@
         "expected_points": 2.9398808352076324
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 108416,
@@ -128,7 +128,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 3.7460561434034036
       },
       {
         "player_id": 577725,
@@ -147,20 +155,12 @@
         "expected_points": 8.37533371727625
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
         "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
-      },
-      {
-        "player_id": 177815,
-        "name": "Dominic Calvert-Lewin",
-        "short_name": "Calvert-Lewin",
-        "position": "FWD",
-        "team": "Leeds",
-        "expected_points": 3.635519397325434
+        "team": "Brentford",
+        "expected_points": 3.93101668263493
       }
     ],
     "bench": [
@@ -171,14 +171,6 @@
         "position": "GK",
         "team": "Ipswich Town",
         "expected_points": 0.08206076680465356
-      },
-      {
-        "player_id": 439509,
-        "name": "Christos Tzolis",
-        "short_name": "Tzolis",
-        "position": "MID",
-        "team": "Arsenal",
-        "expected_points": 3.0701768813808723
       },
       {
         "player_id": 199798,
@@ -195,6 +187,14 @@
         "position": "DEF",
         "team": "Chelsea",
         "expected_points": 1.9720001998749073
+      },
+      {
+        "player_id": 631786,
+        "name": "Jonah Kusi-Asare",
+        "short_name": "Kusi-Asare",
+        "position": "FWD",
+        "team": "Fulham",
+        "expected_points": 0.1239557013485021
       }
     ],
     "chip": null,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 5081114,
-    "expected_points_cost_ceiling": 1.5087196433578711,
+    "expected_points_cost_ceiling": 1.0499353287059137,
     "overlap_count": 5,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 17.38113501978652,
-      "expected_points_cost_ceiling": 17.38113501978652
+      "expected_points_cost": 17.055941265365192,
+      "expected_points_cost_ceiling": 17.055941265365192
     },
-    "expected_gap_vs_rival": 4.344572180943381,
+    "expected_gap_vs_rival": 3.7527099312900987,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

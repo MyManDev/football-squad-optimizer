@@ -106,6 +106,10 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # category, the declared rule's role, and the page they came from. Words and
         # labels, never a number about the player; the price it cost is the field above.
         "evidence",
+        # The member's Top 100 influence setting on a weighted document: the weight, whether
+        # it changed the plan, how the price was measured and which captures the counts
+        # came from. A setting and its provenance; every number beside it is base-model.
+        "top100",
     }
 )
 

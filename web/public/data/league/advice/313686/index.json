@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -20,6 +20,42 @@
       ],
       "rule_version": "managers_word_rule_v1",
       "binding": false
+    },
+    "top100": {
+      "available": true,
+      "published_weight": 0,
+      "weights": [
+        0,
+        5,
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
+      "paths": {
+        "5": "advice/313686/saf-puan/1/top100-5.json",
+        "10": "advice/313686/saf-puan/1/top100-10.json",
+        "20": "advice/313686/saf-puan/1/top100-20.json",
+        "30": "advice/313686/saf-puan/1/top100-30.json",
+        "40": "advice/313686/saf-puan/1/top100-40.json",
+        "50": "advice/313686/saf-puan/1/top100-50.json"
+      },
+      "word_paths": {
+        "5": "advice/313686/saf-puan/1/top100-5-hoca-sozu.json",
+        "10": "advice/313686/saf-puan/1/top100-10-hoca-sozu.json",
+        "20": "advice/313686/saf-puan/1/top100-20-hoca-sozu.json",
+        "30": "advice/313686/saf-puan/1/top100-30-hoca-sozu.json",
+        "40": "advice/313686/saf-puan/1/top100-40-hoca-sozu.json",
+        "50": "advice/313686/saf-puan/1/top100-50-hoca-sozu.json"
+      },
+      "unavailable": [],
+      "source": {
+        "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
+        "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
+        "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+        "picks_gameweek": 4
+      }
     },
     "windows": {
       "saf-puan": [

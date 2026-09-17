@@ -428,7 +428,8 @@
                   "window_value",
                   "mode_tradeoff",
                   "points_gain",
-                  "manager_word"
+                  "manager_word",
+                  "top100_preference"
                 ]
               }
             },
@@ -668,6 +669,45 @@
             "array",
             "null"
           ]
+        },
+        "top100": {
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "cohort_snapshot_id": {
+              "type": "string"
+            },
+            "picks_gameweek": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "picks_snapshot_id": {
+              "type": "string"
+            },
+            "price_basis": {
+              "const": "base_model_pure_points_v1"
+            },
+            "table_sha256": {
+              "type": "string"
+            },
+            "weight": {
+              "enum": [
+                5,
+                10,
+                20,
+                30,
+                40,
+                50
+              ]
+            }
+          },
+          "required": [
+            "weight",
+            "changed",
+            "price_basis"
+          ],
+          "type": "object"
         },
         "transfer_cap": {
           "type": "number"

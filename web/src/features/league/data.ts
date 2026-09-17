@@ -1,6 +1,7 @@
 import { withRequestDeadline, type RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
+import { isTop100Weight, top100Path } from "./advice/top100";
 import type { WindowSize } from "../moves/modePrices";
 import type {
   EntryAdvice,
@@ -139,6 +140,32 @@ export async function loadEntryAdviceEvidence(
   return readOrExample<EntryAdvice>(
     expected,
     async () => (await mockModule()).mockEntryAdviceEvidenceEnvelope(entryId),
+    options,
+  );
+}
+
+/**
+ * A Top 100 weighted plan, read only at the one path the producer writes for this member,
+ * weight and switch. Any other path is refused rather than fetched, so a malformed index
+ * cannot point the page at another document.
+ */
+export async function loadEntryAdviceTop100(
+  entryId: number,
+  path: string,
+  weight: number,
+  word: boolean,
+  options?: RequestOptions,
+): Promise<LeagueViewEnvelope<EntryAdvice>> {
+  if (!isTop100Weight(weight) || weight === 0) {
+    throw new LeagueDataError(`No Top 100 document exists for setting ${weight}.`);
+  }
+  const expected = top100Path(entryId, weight, word);
+  if (path !== expected) {
+    throw new LeagueDataError(`The Top 100 plan for ${entryId} is not at ${path}.`);
+  }
+  return readOrExample<EntryAdvice>(
+    expected,
+    async () => (await mockModule()).mockEntryAdviceTop100Envelope(entryId, weight, word),
     options,
   );
 }

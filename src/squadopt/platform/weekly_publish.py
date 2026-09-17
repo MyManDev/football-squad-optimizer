@@ -101,6 +101,8 @@ class LeaguePublish:
     #: neither, passed through to the league build as the manager's word.
     rotation_evidence: Path | None = None
     club_news_source: Path | None = None
+    #: The week's Top 100 evidence export, passed through as the Top 100 menu.
+    top100_evidence: Path | None = None
 
     def __post_init__(self) -> None:
         if self.league_id < 1:
@@ -191,6 +193,8 @@ class LeaguePublish:
             arguments += ["--rotation-evidence", str(self.rotation_evidence)]
         if self.club_news_source is not None:
             arguments += ["--club-news-source", str(self.club_news_source)]
+        if self.top100_evidence is not None:
+            arguments += ["--top100-evidence", str(self.top100_evidence)]
         return arguments
 
 
@@ -547,6 +551,12 @@ def main() -> int:
         help="the fixture file or club-news capture the evidence was coded from",
     )
     parser.add_argument(
+        "--top100-evidence",
+        type=Path,
+        help="the week's Top 100 evidence export (csv, manifest beside it); every member "
+        "then gets the Top 100 influence menu",
+    )
+    parser.add_argument(
         "--no-advice-record",
         action="store_true",
         help="publish without recording what was published; the escape when a rebuild of "
@@ -591,6 +601,11 @@ def main() -> int:
                 club_news_source=(
                     arguments.club_news_source.resolve()
                     if arguments.club_news_source is not None
+                    else None
+                ),
+                top100_evidence=(
+                    arguments.top100_evidence.resolve()
+                    if arguments.top100_evidence is not None
                     else None
                 ),
             )

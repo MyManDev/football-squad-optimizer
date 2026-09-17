@@ -1,10 +1,10 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:59:48Z",
+  "generated_at_utc": "2026-09-17T11:18:37Z",
   "payload": {
-    "captured_at_utc": "2026-09-15T17:52:25.802810Z",
-    "cohort_picks_snapshot_id": null,
-    "cohort_snapshot_id": null,
+    "captured_at_utc": "2026-09-17T10:33:11.704498Z",
+    "cohort_picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
+    "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
     "cumulative": {
       "average_entry_score": 251.0,
       "gameweeks": [
@@ -48,7 +48,7 @@
             "kind": "system",
             "net": 26.0,
             "scoring_basis": "named_eleven_no_autosubs",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           },
           {
             "diagnostics": {
@@ -96,7 +96,7 @@
             "kind": "league_mean",
             "net": 54.266666666666666,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           },
           {
             "diagnostics": {
@@ -108,7 +108,7 @@
             "kind": "game_mean",
             "net": 50.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           }
         ],
         "data_checked": true,
@@ -235,7 +235,7 @@
           "hits": 0.0,
           "mode": "live",
           "net": 26.0,
-          "outcome_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+          "outcome_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
           "projected": 56.077499304365105,
           "scoring_basis": "named_eleven_no_autosubs",
           "vice_captain_named": false,
@@ -304,7 +304,7 @@
             "kind": "league_mean",
             "net": 86.26666666666667,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           },
           {
             "diagnostics": {
@@ -316,7 +316,7 @@
             "kind": "game_mean",
             "net": 81.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           }
         ],
         "data_checked": true,
@@ -497,7 +497,7 @@
             "kind": "league_mean",
             "net": 58.666666666666664,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           },
           {
             "diagnostics": {
@@ -509,7 +509,7 @@
             "kind": "game_mean",
             "net": 51.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           }
         ],
         "data_checked": true,
@@ -642,7 +642,7 @@
             "kind": "system",
             "net": 68.0,
             "scoring_basis": "official_autosub_captain_v2",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           },
           {
             "diagnostics": {
@@ -657,16 +657,18 @@
             "source_snapshot_id": null
           },
           {
+            "construction": "constrained_ownership_template_v2_replay",
             "diagnostics": {
-              "autosub_recovery": null,
-              "captain_shortfall": null,
+              "autosub_recovery": 0.0,
+              "captain_shortfall": -1.0149166355741404,
               "minutes_shortfall": null,
-              "zero_minute_starters": null
+              "zero_minute_starters": 0
             },
             "kind": "elite_xi",
-            "net": null,
-            "scoring_basis": null,
-            "source_snapshot_id": null
+            "net": 58.0,
+            "outcome_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-elite-picks-20260912T095941Z-a0f72a506e05;fpl-top100-20260912T095914Z-3f0b69089266"
           },
           {
             "construction": "constrained_ownership_template_v2_replay",
@@ -678,7 +680,7 @@
             },
             "kind": "ownership_template",
             "net": 99.0,
-            "outcome_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+            "outcome_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
             "scoring_basis": "official_autosub_captain_v2",
             "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57"
           },
@@ -692,7 +694,7 @@
             "kind": "league_mean",
             "net": 79.73333333333333,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           },
           {
             "diagnostics": {
@@ -704,7 +706,7 @@
             "kind": "game_mean",
             "net": 69.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+            "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
           }
         ],
         "data_checked": true,
@@ -831,20 +833,28 @@
           "hits": 0.0,
           "mode": "replay",
           "net": 68.0,
-          "outcome_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+          "outcome_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
           "projected": 55.71773291655146,
           "scoring_basis": "official_autosub_captain_v2",
           "vice_captain_named": true,
           "xi": 68.0
         },
-        "top100": null
+        "top100": {
+          "basis": "net",
+          "cohort_size": 100,
+          "final": true,
+          "gameweek": 4,
+          "hit_points": 4.0,
+          "mean_score": 101.04,
+          "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351"
+        }
       }
     ],
     "histories_held": 15,
     "league_id": 352490,
     "registered_members": 15,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994"
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c"
   },
   "source_kind": "live"
 }

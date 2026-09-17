@@ -55,6 +55,26 @@ stops at the first refusal and records what refused. An explicit `--handoff` reu
 prebuilt projection for this exact capture and week; it requires `--skip-top100`, bypasses
 `--projection` build selection, and records that no new evidence was applied.
 
+**The Top 100 influence menu rides on the evidence stage.** When the Top-100 stages ran,
+the league stage receives the export and gives every member their one-week pure-points plan
+at each setting 5, 10, 20, 30, 40 and 50: `advice/<id>/saf-puan/1/top100-<w>.json`, and
+`top100-<w>-hoca-sozu.json` beside it when `--rotation` ran too. The plan is chosen on
+points scaled by `1 + w/100 * count/100` and every number in it is scored on the base
+projection; the price is the base-model difference against the member's own plan at 0. The
+index's `top100` block names the files, or says why there are none
+(`no_top100_this_run`, `top100_inputs_refused`, `published_plan_carries_top100`), and the
+league receipt's `top100_note` carries the refusal. The export passes the handoff's own gate
+before anything is solved, so the menu needs a live capture taken **after** the Top-100
+export. **The published plan must stay at 0, so a week that offers the menu is run with
+`--projection component-only`**: the default `component` bakes the frozen uplift into the
+handoff, and the loader then refuses the menu (`published_plan_carries_top100`) rather than
+stack a member's setting on it. The Friday run is therefore
+`--rotation --projection component-only` with no `--skip-top100` and no `--snapshot-id`.
+A hand publish passes the export with `--top100-evidence <csv>`. The same handoff feeds
+`--decide`, so on such a week the system's own squad is also decided without the uplift,
+which departs from `docs/phase_c_operational_elite_policy.md`'s default; that is the
+owner's call before `--decide` is passed, and the policy's rule itself is unchanged.
+
 An optional second live capture in the final 24 hours before the deadline can be
 compared with the earlier capture using `squadopt.platform.capture_measurement`
 ([commands and interpretation](operations/capture_measurement.md)). This offline

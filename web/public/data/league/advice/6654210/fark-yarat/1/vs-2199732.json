@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,29 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
+        "player_out": {
+          "player_id": 95658,
+          "name": "Harry Maguire",
+          "short_name": "Maguire",
+          "position": "DEF",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 0.9716084376462177,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw05-2",
         "player_out": {
           "player_id": 439509,
           "name": "Christos Tzolis",
@@ -27,36 +46,17 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 1.1096079910310692,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw05-2",
-        "player_out": {
-          "player_id": 449429,
-          "name": "Jacob Greaves",
-          "short_name": "Greaves",
-          "position": "DEF",
-          "team": "Ipswich Town"
-        },
-        "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
-          "position": "DEF",
-          "team": "Leeds"
-        },
-        "expected_points_delta": 0.9659503359289587,
+        "expected_points_delta": 1.1525803880549574,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 2.075558326960028,
+    "expected_gain_vs_hold": 2.124188825701175,
     "expected_points_cost": 0.0,
     "rival_label": "entry-2199732",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.7040782682993,
+    "expected_own_points": 56.61565695865836,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -91,12 +91,12 @@
         "expected_points": 3.555548676659022
       },
       {
-        "player_id": 226182,
-        "name": "Jayden Bogle",
-        "short_name": "Bogle",
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
         "position": "DEF",
-        "team": "Leeds",
-        "expected_points": 3.5483370784121617
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
       },
       {
         "player_id": 191866,
@@ -128,7 +128,7 @@
         "short_name": "Schade",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 4.179784872411939
+        "expected_points": 4.222757269435823
       },
       {
         "player_id": 60307,
@@ -136,7 +136,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 513545,
@@ -160,7 +160,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -181,12 +181,12 @@
         "expected_points": 2.582386742483201
       },
       {
-        "player_id": 95658,
-        "name": "Harry Maguire",
-        "short_name": "Maguire",
+        "player_id": 449429,
+        "name": "Jacob Greaves",
+        "short_name": "Greaves",
         "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.4986285568677755
+        "team": "Ipswich Town",
+        "expected_points": 1.8900683591077632
       },
       {
         "player_id": 631786,
@@ -208,7 +208,7 @@
     "squad_basis": "captured",
     "rival_entry_id": 2199732,
     "expected_points_cost_ceiling": 0.0,
-    "overlap_count": 4,
+    "overlap_count": 5,
     "transfer_cap": 2,
     "overlap_target": 5,
     "overlap_applied": 5,
@@ -220,7 +220,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 5.011420436562219,
+    "expected_gap_vs_rival": 5.016618088250425,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

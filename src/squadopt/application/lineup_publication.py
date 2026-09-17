@@ -96,6 +96,74 @@ def best_eleven_points(squad: Iterable[tuple[str, float]]) -> float | None:
     return best_basis
 
 
+def best_eleven_basis(
+    squad: Iterable[tuple[str, float, float, bool, bool]],
+) -> float | None:
+    """The published basis of the eleven a fifteen would field, chosen on other points.
+
+    Each player is ``(position, choice_points, basis_points, may_start, may_captain)``. The
+    shape, the eleven and the armband are chosen exactly as ``best_eleven_points_under``
+    chooses them, on ``choice_points``; what comes back is that eleven's total with the
+    captain doubled, on ``basis_points``. A plan chosen on points the member asked for
+    (the Top 100 influence) is scored this way on the base model's points, so its rows
+    and its total describe the eleven it actually fields.
+
+    ``None`` when no legal eleven with an eligible captain exists.
+    """
+
+    players = [
+        (str(position), float(choice), float(basis), bool(may_start), bool(may_captain))
+        for position, choice, basis, may_start, may_captain in squad
+    ]
+    total = sum(choice for _position, choice, _basis, _start, _captain in players)
+    starters: dict[str, list[tuple[float, float, bool]]] = {
+        str(position): [] for position in _POSITION_ORDER
+    }
+    for position, choice, basis, may_start, may_captain in players:
+        if may_start and position in starters:
+            starters[position].append((choice, basis, may_captain))
+    for rows in starters.values():
+        rows.sort(key=lambda row: row[0], reverse=True)
+    best_objective: float | None = None
+    best_basis: float | None = None
+    for shape in _LEGAL_SHAPES:
+        if any(len(starters[position]) < count for position, count in shape):
+            continue
+        for captain_position, _count in shape:
+            for captain_index, (captain_choice, captain_basis, eligible) in enumerate(
+                starters[captain_position]
+            ):
+                if not eligible:
+                    continue
+                chosen: list[float] = []
+                stated: list[float] = []
+                for position, count in shape:
+                    pool = starters[position]
+                    if position == captain_position:
+                        others = [
+                            (choice, basis)
+                            for index, (choice, basis, _eligible) in enumerate(pool)
+                            if index != captain_index
+                        ][: count - 1]
+                        if len(others) < count - 1:
+                            break
+                        chosen.extend([captain_choice, *(choice for choice, _ in others)])
+                        stated.extend([captain_basis, *(basis for _, basis in others)])
+                    else:
+                        chosen.extend(choice for choice, _basis, _eligible in pool[:count])
+                        stated.extend(basis for _choice, basis, _eligible in pool[:count])
+                else:
+                    objective = (
+                        sum(chosen)
+                        + captain_choice
+                        + _LINEUP_DEFAULTS.bench_weight * (total - sum(chosen))
+                    )
+                    if best_objective is None or objective > best_objective:
+                        best_objective = objective
+                        best_basis = sum(stated) + captain_basis
+    return best_basis
+
+
 def best_eleven_points_under(
     squad: Iterable[tuple[str, float, bool, bool]],
 ) -> float | None:
@@ -112,49 +180,10 @@ def best_eleven_points_under(
     ``None`` when no legal eleven with an eligible captain exists.
     """
 
-    players = [
-        (str(position), float(points), bool(may_start), bool(may_captain))
+    return best_eleven_basis(
+        (position, points, points, may_start, may_captain)
         for position, points, may_start, may_captain in squad
-    ]
-    total = sum(points for _position, points, _start, _captain in players)
-    starters: dict[str, list[tuple[float, bool]]] = {
-        str(position): [] for position in _POSITION_ORDER
-    }
-    for position, points, may_start, may_captain in players:
-        if may_start and position in starters:
-            starters[position].append((points, may_captain))
-    for rows in starters.values():
-        rows.sort(key=lambda row: row[0], reverse=True)
-    best_objective: float | None = None
-    best_basis: float | None = None
-    for shape in _LEGAL_SHAPES:
-        if any(len(starters[position]) < count for position, count in shape):
-            continue
-        for captain_position, _count in shape:
-            for captain_index, (captain_points, eligible) in enumerate(starters[captain_position]):
-                if not eligible:
-                    continue
-                chosen: list[float] = []
-                for position, count in shape:
-                    pool = starters[position]
-                    if position == captain_position:
-                        others = [
-                            points
-                            for index, (points, _eligible) in enumerate(pool)
-                            if index != captain_index
-                        ][: count - 1]
-                        if len(others) < count - 1:
-                            break
-                        chosen.extend([captain_points, *others])
-                    else:
-                        chosen.extend(points for points, _eligible in pool[:count])
-                else:
-                    basis = sum(chosen) + captain_points
-                    objective = basis + _LINEUP_DEFAULTS.bench_weight * (total - sum(chosen))
-                    if best_objective is None or objective > best_objective:
-                        best_objective = objective
-                        best_basis = basis
-    return best_basis
+    )
 
 
 def advice_player(row: "pd.Series[Any]") -> dict[str, object]:
