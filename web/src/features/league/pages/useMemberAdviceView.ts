@@ -61,7 +61,7 @@ export function useMemberAdviceView(
       : selection.status === "ready" && plainSelection && canComputeAdvice(request));
   const baselineAvailable =
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
-  const job = useAdviceJob(adviceClient, baselineAvailable);
+  const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
   const requestKey = [
     adviceRequestKey(request),
     selection.status,
@@ -73,7 +73,8 @@ export function useMemberAdviceView(
   // A new selection starts clean: an earlier request's answer, wait or failure must not
   // read as this member's, strategy's, window's or rival's.
   // A wait this tab began for the same selection before a reload is picked up again.
-  const { reset, resume } = job;
+  const { reset, resume, readCached } = job;
+  const readOnOpen = computeService === "ready" && computeAvailable && advice == null;
   const resumable = useRef(request);
   useEffect(() => {
     resumable.current = request;
@@ -82,6 +83,9 @@ export function useMemberAdviceView(
     reset();
     if (computeAvailable) resume?.(resumable.current);
   }, [requestKey, computeAvailable, reset, resume]);
+  useEffect(() => {
+    if (readOnOpen) readCached?.(resumable.current);
+  }, [requestKey, readOnOpen, readCached]);
 
   const current =
     (selectionAvailable || computeAvailable) &&

@@ -59,9 +59,14 @@ export interface AdviceRequestOptions extends RequestOptions {
   idempotencyKey?: string;
 }
 
+export interface AdviceReadOptions extends RequestOptions {
+  /** An on-open cache read already knows the static index has no answer. */
+  publishedFallback?: boolean;
+}
+
 export interface AdviceClient {
   /** Read an already-computed answer; never triggers computation. */
-  readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult>;
+  readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;
   /** Ask for the answer, computing it if needed (202 + job when it will take time). */
   requestAdvice(
     request: AdviceRequest,
@@ -364,15 +369,22 @@ export class FallbackAdviceClient implements AdviceClient {
     this.fallback = fallback;
   }
 
-  async readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+  async readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult> {
     let primaryResult: AdviceReadResult | null = null;
     try {
       primaryResult = await this.primary.readAdvice(request, options);
     } catch (error) {
-      if (isRequestRejection(error) || isAbortError(error) || options?.signal?.aborted) throw error;
+      if (
+        options?.publishedFallback === false ||
+        isRequestRejection(error) ||
+        isAbortError(error) ||
+        options?.signal?.aborted
+      )
+        throw error;
       primaryResult = null;
     }
     if (primaryResult && primaryResult.kind === "advice") return primaryResult;
+    if (options?.publishedFallback === false) return primaryResult ?? { kind: "not-computed" };
     const fallbackResult = await this.fallback.readAdvice(request, options);
     if (fallbackResult.kind === "advice") {
       return primaryResult === null
