@@ -394,10 +394,12 @@ A failed job carries one of these codes in the public job view: `TOO_MANY_ATTEMP
 `REQUEST_UNREADABLE` (the spec is missing or malformed), `CONTEXT_UNAVAILABLE`,
 `ENTRY_NOT_IN_CAPTURE` (the member or the rival is listed but the capture holds no squad for
 them), `TOP100_INPUTS_UNAVAILABLE`, `MANAGERS_WORD_UNAVAILABLE`, `SWITCH_INPUTS_CHANGED`,
-`MANAGERS_WORD_NOT_SOLVED`, `DETERMINISM_DEFECT`, or `ADVICE_FAILED` for anything else.
+`MANAGERS_WORD_NOT_SOLVED`, `PLAN_NOT_FOUND`, `DETERMINISM_DEFECT`, or `ADVICE_FAILED` for
+anything else.
 
 | Job error code | Use |
 | --- | --- |
+| `PLAN_NOT_FOUND` | The planner found no plan for this selection from this capture. A member-level outcome, not a fault. The job record carries this code and one plain sentence; the planner's own text (deterministic time, gaps, player ids) goes to the worker's log as the `detail` of `advice_job_refused` and is never served |
 | `MANAGERS_WORD_NOT_SOLVED` | The word was asked for together with a Top 100 setting, the capture has the club news, and this one member's plan under both could not be produced. A member-level outcome, distinct from `MANAGERS_WORD_UNAVAILABLE` (no input at all, refused before a job exists); the same request without the word still answers |
 
 An error before a run starts uses `ApiErrorResponse`. A failure after a run starts uses a failed
