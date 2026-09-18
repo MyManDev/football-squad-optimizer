@@ -93,7 +93,7 @@ and N `python -m squadopt.platform.advice_worker` processes from `.venv`, with:
 | `SQUADOPT_BACKEND_RATE_LIMIT`, `..._RATE_WINDOW_SECONDS` | 30 per 60 s, the code's defaults, settable with `-RateLimit` and `-RateWindowSeconds` |
 | `SQUADOPT_REPOSITORY_COMMIT` | `git rev-parse HEAD`, stamped once so the api and every worker file answers under one identity |
 | `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` | 1 |
-| `SQUADOPT_BACKEND_ARTIFACT_ROOT`, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE` | commented out: the backend does not read them yet |
+| `SQUADOPT_BACKEND_ARTIFACT_ROOT`, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE` | `<repo>/artifacts` and the committed example fixture; the inputs of the Top 100 setting and the manager's word (`-ArtifactRoot`, `-ClubNewsSource` override) |
 
 It writes `data\runtime\backend\run\backend.pids.json`, logs to
 `data\runtime\backend\logs\<role>-<utc stamp>.out.log` and `.err.log` (a new pair per start,
@@ -314,8 +314,8 @@ repository **variable** so it can be changed or emptied without a commit:
 gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "https://squadopt-api.mymandev.com"
 ```
 
-The workflow change, **not applied in this PR** because workflows are a release-critical
-path:
+The workflow change, applied on its own pull request because workflows are a
+release-critical path:
 
 ```diff
 --- a/.github/workflows/ci.yml
