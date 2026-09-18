@@ -431,7 +431,7 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <div className={styles.windowScroll}>
+      <div className={styles.windowScroll} tabIndex={0}>
         <table className={styles.windowTable}>
           <thead>
             <tr>
