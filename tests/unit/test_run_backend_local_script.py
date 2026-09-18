@@ -60,6 +60,16 @@ def test_the_launcher_parses_under_windows_powershell_5_1() -> None:
     assert re.search(r"\?\s*[^:\n]+\s*:\s", code) is None, "a ternary is PowerShell 7 syntax"
 
 
+def test_the_logon_script_remains_compatible_with_windows_powershell_5_1() -> None:
+    raw = (REPOSITORY_ROOT / "scripts" / "start_backend_at_logon.ps1").read_bytes()
+    assert all(byte < 128 for byte in raw), "non-ASCII bytes would be misread by 5.1"
+    text = re.sub(r"<#.*?#>", "", raw.decode("ascii"), flags=re.DOTALL)
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    assert "&&" not in code
+    assert "||" not in code
+    assert re.search(r"\?\s*[^:\n]+\s*:\s", code) is None, "a ternary is PowerShell 7 syntax"
+
+
 def test_the_api_listens_on_loopback_and_trusts_only_loopback_for_forwarded_headers() -> None:
     code = _launcher_code()
     assert '"--host", "127.0.0.1"' in code
