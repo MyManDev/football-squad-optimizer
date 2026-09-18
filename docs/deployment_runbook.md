@@ -172,6 +172,34 @@ fortnight early, from a capture that cannot know the team news, with nothing on 
 so. Inside a gap, publish the settled view once and then stop until the next deadline is inside
 the lead-time window.
 
+## Release in one command
+
+The release recipe is in `scripts/release/`. From a checkout with Git, GitHub CLI
+and Python on PATH (Git Bash on Windows), preview it first:
+
+```sh
+sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
+  release/gw05-fix8 2026-09-18T17:00:00Z 'Publish the accepted decision tree.'
+```
+
+Replace the example's site PR, unused tag, release branch, content timestamp and
+summary with the accepted publication. The dry run prints every step and performs
+no network requests or writes. Remove `--dry-run` only when operating the release.
+The script waits for the site PR to merge, creates a two-parent release whose tree
+equals develop, waits for the release PR to be clean and merges it with a merge
+commit. It then waits for successful main push CI at the exact SHA with one
+unexpired site artifact, creates the annotated tag, dispatches the trusted workflow
+and checks the live site. Existing remote tags refuse. Choose a fresh release
+branch: the recipe removes an existing local worktree and branch with that name.
+
+`deploy.sh <tag>` is the second stage. `verify_live.py <generated-after-ISO>`
+retains the ten smoke checks and content checks. `queue2.sh <PR>...` is the separate
+develop queue: it rebases existing PR worktrees, waits for clean checks and squash
+merges with `clean_body.py` removing attribution lines. It is not the release-to-main
+path. These are operator commands, not scheduled jobs; inspect their output and stop
+on any refusal. GitHub CLI is found on PATH, with the usual Windows installation as
+a fallback. No machine-specific repository or scratch path is required.
+
 ## Daily circuit breaker
 
 The workflow queries all deployments for this Pages project in the current UTC day and
