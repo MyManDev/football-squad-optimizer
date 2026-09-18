@@ -97,11 +97,10 @@ export function useMemberAdviceView(
   // switched-on plan, finished or while waiting.
   // The same holds for a Top 100 weight: the computed plan is the plain one.
   const evidenceOn = selection.evidence.on;
-  // Nor for a chip the member chose: the computed plan plays none.
   // With the service's capabilities the request states its switches and the answer was
   // held to them, so a computed plan stands for exactly the selection that asked for it.
   const plainOnly = selection.computable
-    ? selection.chip.chip === null
+    ? true
     : !evidenceOn && selection.top100.weight === 0 && selection.chip.chip === null;
   const finished = plainOnly && current?.phase === "done" ? current : null;
   const waiting = plainOnly && current?.phase === "waiting" ? current : null;

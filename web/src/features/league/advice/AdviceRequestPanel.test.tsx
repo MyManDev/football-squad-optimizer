@@ -130,7 +130,7 @@ describe("with the service answering", () => {
     cleanup();
     const chip = renderPanel({ service: "ready", computable: false, chipChosen: true });
     expect(chip.button).toBeDisabled();
-    expect(chip.container).toHaveTextContent(tr.chipNotComputed);
+    expect(chip.container).toHaveTextContent(tr.chipUnavailable);
   });
 
   it("tells a waiting member the page can be left open", () => {

@@ -18,7 +18,8 @@ import type { WindowSize } from "../../moves/modePrices";
 export interface ComputeCopy {
   notPrecomputed: string;
   notComputable: string;
-  chipNotComputed: string;
+  chipUnavailable: string;
+  chipDurationUnknown: string;
   duration: Record<WindowSize, string>;
   durationNote: string;
   leaveOpen: string;
@@ -37,8 +38,9 @@ const en: ComputeCopy = {
     "This selection was not computed ahead of time for this publish. You can compute it now.",
   notComputable:
     "The service does not compute this selection right now. Change the selection to use Compute.",
-  chipNotComputed:
-    "A plan with a chosen chip is shown as it was published; the service does not compute chips yet.",
+  chipUnavailable:
+    "The service cannot confirm this chip is available for this selection. The published plan, if any, still stands.",
+  chipDurationUnknown: "The time to compute a chosen chip has not been measured.",
   duration: {
     1: "A one-week plan takes between a few seconds and half a minute to compute; a rival strategy and the settings you switch on make it longer.",
     3: "A 3-week plan takes about a minute and a half to compute, and up to two and a half minutes for a rival strategy.",
@@ -66,6 +68,8 @@ const en: ComputeCopy = {
       "The service has no Top 100 selections for this gameweek. Set the influence to 0 and try again.",
     MANAGERS_WORD_UNAVAILABLE:
       "The service has no club news for this gameweek. Switch the manager's word off and try again.",
+    CHIP_NOT_HELD: "This member does not hold the chosen chip. Choose another chip or no chip.",
+    CHIP_HISTORY_UNKNOWN: "The service could not confirm which chips this member holds.",
     UNKNOWN_ENTRY: "The service could not find this member or this rival in the league.",
     LEAGUE_NOT_CONNECTED: "This league is not connected to the compute service.",
     UNKNOWN_STRATEGY: "The service does not compute this strategy.",
@@ -111,8 +115,9 @@ const en: ComputeCopy = {
 const tr: ComputeCopy = {
   notPrecomputed: "Bu seçim bu yayın için önceden hesaplanmadı. Şimdi hesaplatabilirsin.",
   notComputable: "Servis bu seçimi şu an hesaplamıyor. Hesapla için seçimi değiştir.",
-  chipNotComputed:
-    "Çip seçilmiş plan yayınlandığı haliyle gösterilir; servis henüz çip hesaplamıyor.",
+  chipUnavailable:
+    "Servis bu seçim için çipin kullanılabilir olduğunu doğrulayamıyor. Yayınlanmış plan varsa geçerli olmaya devam ediyor.",
+  chipDurationUnknown: "Seçilen çipin hesaplama süresi ölçülmedi.",
   duration: {
     1: "Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer; rakip stratejisi ve açtığın ayarlar süreyi uzatır.",
     3: "3 haftalık planın hesabı yaklaşık bir buçuk dakika, rakip stratejisinde iki buçuk dakikaya kadar sürer.",
@@ -139,6 +144,8 @@ const tr: ComputeCopy = {
       "Serviste bu hafta için Top 100 seçimleri yok. Etkiyi 0 yapıp yeniden dene.",
     MANAGERS_WORD_UNAVAILABLE:
       "Serviste bu hafta için kulüp haberi yok. Hocanın sözünü kapatıp yeniden dene.",
+    CHIP_NOT_HELD: "Bu üyenin seçilen çipi yok. Başka bir çip seç ya da çipi kapat.",
+    CHIP_HISTORY_UNKNOWN: "Servis bu üyenin hangi çiplere sahip olduğunu doğrulayamadı.",
     UNKNOWN_ENTRY: "Servis bu üyeyi ya da bu rakibi ligde bulamadı.",
     LEAGUE_NOT_CONNECTED: "Bu lig hesaplama servisine bağlı değil.",
     UNKNOWN_STRATEGY: "Servis bu stratejiyi hesaplamıyor.",

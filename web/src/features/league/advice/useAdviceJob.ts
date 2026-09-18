@@ -91,7 +91,8 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     left.gameweek === right.gameweek &&
     (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null) &&
     (left.top100Weight ?? 0) === (right.top100Weight ?? 0) &&
-    (left.managersWord ?? false) === (right.managersWord ?? false)
+    (left.managersWord ?? false) === (right.managersWord ?? false) &&
+    (left.chip ?? null) === (right.chip ?? null)
   );
 }
 
@@ -235,6 +236,7 @@ export function useAdviceJob(
                     rivalEntryId: null,
                     top100Weight: undefined,
                     managersWord: undefined,
+                    chip: undefined,
                   },
                   options,
                 )
