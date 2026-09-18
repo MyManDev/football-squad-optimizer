@@ -1375,3 +1375,55 @@ def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not
     served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
     assert served.json()["error_code"] == "PLAN_NOT_FOUND"
     assert "deterministic" not in served.text
+
+
+def test_chip_entry_error_is_private_through_the_real_menu_branch(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    import squadopt.application.advice_menu as menu
+    from squadopt.platform.advice_observability import AdviceLog
+
+    diagnostic = "Entry 987654 re-adds to 123.456 points but planner counted 234.567"
+
+    def fail(*args: Any, **kwargs: Any) -> Any:
+        raise EntryError(diagnostic)
+
+    monkeypatch.setattr(menu, "advise_with_chip", fail)
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 202, response.text
+    logger = logging.getLogger("test.chip-refusal")
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        job = run_advice_worker_once(
+            backend.queue,
+            backend.cache,
+            build_advice_compute(backend.contexts, backend.job_specs),
+            at_utc=_now_stamp(),
+            log=AdviceLog("worker", logger=logger),
+        )
+    assert job is not None and job.status == "failed"
+    served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
+    assert served.json()["error_code"] == "PLAN_NOT_FOUND"
+    for detail in ("987654", "re-adds", "123.456", "234.567"):
+        assert detail not in served.text
+    assert diagnostic in caplog.text
+
+
+def test_accepted_chip_with_artifacts_does_not_prepare_a_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = _deployment(tmp_path, monkeypatch, artifact_root=tmp_path / "artifacts")
+    backend = state["backend"]
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 202, response.text
+    assert backend.contexts._context is None

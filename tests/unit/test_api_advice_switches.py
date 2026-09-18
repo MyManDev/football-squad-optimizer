@@ -8,13 +8,12 @@ an answer from one export is never served as the answer from another.
 
 import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 import pytest
-from fastapi.testclient import TestClient
+from tests.unit.conftest import advice_http_world
 from tests.unit.test_api_advice_post import (
     ADVICE_URL,
     BODY,
@@ -23,8 +22,7 @@ from tests.unit.test_api_advice_post import (
     _publish_members,
 )
 
-from squadopt.api.app import create_app
-from squadopt.application.advice_capabilities import TOP100_WEIGHTS, menu_capabilities
+from squadopt.application.advice_capabilities import TOP100_WEIGHTS
 from squadopt.application.manager_words import MANAGERS_WORD_RULE_VERSION, ManagerWords
 from squadopt.application.top100_weight import TOP100_PRICE_BASIS, Top100Counts
 from squadopt.platform.advice_cache import (
@@ -40,15 +38,12 @@ from squadopt.platform.advice_documents import (
 from squadopt.platform.advice_job_spec import (
     AdviceJobSpec,
     AdviceJobSpecError,
-    FileAdviceJobSpecStore,
 )
-from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import (
     AdviceReadStore,
     AdviceRequestContext,
     FileLeagueDirectory,
 )
-from squadopt.platform.advice_submit import AdviceSubmitService
 from squadopt.platform.advice_switches import (
     MANAGERS_WORD_SWITCH,
     TOP100_SWITCH,
@@ -103,32 +98,8 @@ def _world(
     held_chips: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     _publish_members(tmp_path / "site")
-    cache = FileAdviceCache(tmp_path / "cache")
-    queue = FileJobQueue(tmp_path / "jobs")
-    specs = FileAdviceJobSpecStore(tmp_path / "specs")
     switches = None if inputs is None else _Switches(inputs)
-    reader = AdviceReadStore(
-        FileLeagueDirectory(tmp_path / "site"),
-        cache,
-        _Context(),
-        {slug: value.requires_rival for slug, value in menu_capabilities().items()},
-        capabilities=menu_capabilities(),
-        switches=switches,
-        chip_availability=lambda context, league, entry: held_chips,
-    )
-    application = create_app(
-        data_root=tmp_path / "site",
-        advice_store=reader,
-        advice_submit=AdviceSubmitService(reader, queue, specs=specs),
-        utc_now=lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
-    )
-    return {
-        "client": TestClient(application, raise_server_exceptions=False),
-        "queue": queue,
-        "specs": specs,
-        "reader": reader,
-        "switches": switches,
-    }
+    return advice_http_world(tmp_path, _Context(), switches, held_chips)
 
 
 # --- the contract -------------------------------------------------------------------------

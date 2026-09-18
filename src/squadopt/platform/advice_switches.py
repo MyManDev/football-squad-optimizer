@@ -42,6 +42,7 @@ from squadopt.data.errors import DataError
 from squadopt.live import Projection, RecommendationInputs
 
 __all__ = [
+    "CHIP_SWITCH",
     "EVIDENCE_DIRECTORY",
     "MANAGERS_WORD_SWITCH",
     "ROTATION_DIRECTORY",
@@ -54,6 +55,7 @@ __all__ = [
     "switch_identity",
 ]
 
+CHIP_SWITCH: Final = "chip"
 TOP100_SWITCH: Final = "top100"
 MANAGERS_WORD_SWITCH: Final = "managers_word"
 #: Where the weekly run writes the two artifacts, under the repository's ``artifacts/``.
@@ -102,7 +104,7 @@ def switch_identity(
 
     identity: SwitchIdentity = {}
     if chip is not None:
-        identity["chip"] = {"chip": chip, "basis": CHIP_CHOICE_BASIS}
+        identity[CHIP_SWITCH] = {"chip": chip, "basis": CHIP_CHOICE_BASIS}
     if top100_weight:
         counts = inputs.top100_counts
         if counts is None:

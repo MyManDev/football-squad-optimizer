@@ -229,8 +229,8 @@ worker refuses a job whose recorded input is no longer the one it holds
 A chosen chip requires `saf-puan`, window 1, no rival, Top 100 at 0 and the word off.
 Its name and `CHIP_CHOICE_BASIS` enter the switch identity; it needs no extra artifact.
 Capabilities' `chips.held_by_entry` reads the current capture: a missing member key
-means unknown history, while an empty list means no held chip. This read reuses the
-loaded capture context; the first request may load it. `CHIP_HISTORY_UNKNOWN` or
+means unknown history, while an empty list means no held chip. This read caches the capture's picks and rules per identity and never projects them.
+An unreadable capture returns `NOT_READY`; unknown member history stays absent. `CHIP_HISTORY_UNKNOWN` or
 `CHIP_NOT_HELD` refuses before queueing, and the worker validates the captured history
 again. The existing chip solve stays unchanged; a solve failure remains `PLAN_NOT_FOUND`
 with diagnostics confined to the operator log.
@@ -388,9 +388,11 @@ The advice routes add their own codes:
 | 409 | `IDEMPOTENCY_CONFLICT` | One `Idempotency-Key` reused for a different request |
 | 409 | `REQUEST_CONFLICT` | The address already records a different request; a defect, logged |
 | 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token |
-| 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival or switch combination the menu does not offer |
+| 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival, chip or switch combination the menu does not offer |
 | 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |
 | 422 | `MANAGERS_WORD_UNAVAILABLE` | The manager's word was asked for and the current capture has no coded club news |
+| 422 | `CHIP_HISTORY_UNKNOWN` | The capture cannot establish which chips the member holds |
+| 422 | `CHIP_NOT_HELD` | The member cannot play the requested chip this gameweek |
 | 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds. Only a request that needs work is charged: a POST the cache already answers spends no token |
 | 503 | `NOT_READY` | No capture context, the published league tree is for another week than the capture (the message names both), the store probe is failing, or the queue lock stayed busy (then with `Retry-After`) |
 | 503 | `QUEUE_UNAVAILABLE` | A queue write was refused; nothing was accepted, with `Retry-After` |
@@ -404,7 +406,7 @@ A failed job carries one of these codes in the public job view: `TOO_MANY_ATTEMP
 `REQUEST_UNREADABLE` (the spec is missing or malformed), `CONTEXT_UNAVAILABLE`,
 `ENTRY_NOT_IN_CAPTURE` (the member or the rival is listed but the capture holds no squad for
 them), `TOP100_INPUTS_UNAVAILABLE`, `MANAGERS_WORD_UNAVAILABLE`, `SWITCH_INPUTS_CHANGED`,
-`MANAGERS_WORD_NOT_SOLVED`, `PLAN_NOT_FOUND`, `DETERMINISM_DEFECT`, or `ADVICE_FAILED` for
+`CHIP_HISTORY_UNKNOWN`, `CHIP_NOT_HELD`, `MANAGERS_WORD_NOT_SOLVED`, `PLAN_NOT_FOUND`, `DETERMINISM_DEFECT`, or `ADVICE_FAILED` for
 anything else.
 
 | Job error code | Use |

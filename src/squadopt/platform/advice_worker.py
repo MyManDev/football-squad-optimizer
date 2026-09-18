@@ -67,6 +67,7 @@ from squadopt.platform.advice_queue import (
     run_advice_worker_once,
 )
 from squadopt.platform.advice_switches import (
+    CHIP_SWITCH,
     MANAGERS_WORD_SWITCH,
     TOP100_SWITCH,
     SwitchInputUnavailable,
@@ -110,7 +111,7 @@ def _stamp(moment: datetime) -> str:
 
 #: The switches this worker computes, and the code a job fails with when the capture has
 #: no input for one. A switch that needs no per-capture input is added to the first only.
-_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, "chip"})
+_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH})
 _SWITCH_REFUSAL_CODES: Final = {
     TOP100_SWITCH: "TOP100_INPUTS_UNAVAILABLE",
     MANAGERS_WORD_SWITCH: "MANAGERS_WORD_UNAVAILABLE",
@@ -128,8 +129,8 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
     weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
     word = MANAGERS_WORD_SWITCH in spec.switches
-    chip = spec.switch("chip").get("chip")
-    if "chip" in spec.switches and not isinstance(chip, str):
+    chip = spec.switch(CHIP_SWITCH).get("chip")
+    if CHIP_SWITCH in spec.switches and not isinstance(chip, str):
         raise AdviceComputeRefused("REQUEST_UNREADABLE", "The chip choice is unreadable.")
     unknown = set(spec.switches) - _KNOWN_SWITCHES
     if unknown or (TOP100_SWITCH in spec.switches and weight < 1):

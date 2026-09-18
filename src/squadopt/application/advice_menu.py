@@ -225,14 +225,17 @@ def advise_menu_entry(
         held_chips = held_member_chips(plain, provider=provider, inputs=inputs, rules=rules)
         if held_chips is None or request.chip not in held_chips:
             raise ChipUnavailable("CHIP_HISTORY_UNKNOWN" if held_chips is None else "CHIP_NOT_HELD")
-        return advise_with_chip(
-            plain,
-            chip=request.chip,
-            provider=provider,
-            inputs=inputs,
-            projection=projection,
-            rules=rules,
-        ).payload
+        try:
+            return advise_with_chip(
+                plain,
+                chip=request.chip,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+            ).payload
+        except EntryError as error:
+            raise TransferPlanningError(str(error)) from error
 
     def at_zero(address: MenuRequest) -> dict[str, object]:
         """A document this one depends on: taken from the caller when held, else solved."""

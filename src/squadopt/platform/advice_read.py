@@ -306,7 +306,9 @@ class AdviceReadStore:
         *,
         capabilities: Mapping[str, AdviceCapability] | None = None,
         switches: SwitchInputsProvider | None = None,
-        chip_availability: Callable[[AdviceRequestContext, int, int], tuple[str, ...] | None]
+        chip_availability: Callable[
+            [AdviceRequestContext, int, tuple[int, ...]], Mapping[int, tuple[str, ...] | None]
+        ]
         | None = None,
     ) -> None:
         self._directory = directory
@@ -355,13 +357,13 @@ class AdviceReadStore:
         return self._switches.switch_inputs(context) or AdviceSwitchInputs()
 
     def _held_chips(
-        self, context: AdviceRequestContext, league_id: int, entry_id: int
-    ) -> tuple[str, ...] | None:
+        self, context: AdviceRequestContext, league_id: int, entries: tuple[int, ...]
+    ) -> Mapping[int, tuple[str, ...] | None]:
         if self._chip_availability is None or not any(
             c.chip_windows for c in self._capabilities.values()
         ):
-            return None
-        return self._chip_availability(context, league_id, entry_id)
+            return {}
+        return self._chip_availability(context, league_id, entries)
 
     def league_capabilities(self, league_id: int) -> dict[str, object]:
         """What may be asked for this league right now, so a page enables only that.
@@ -377,6 +379,7 @@ class AdviceReadStore:
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
         inputs = self._switch_inputs(context)
+        chips = self._held_chips(context, league_id, tuple(sorted(_member_entry_ids(league))))
         top100 = inputs.top100_counts is not None and any(
             capability.top100_windows for capability in self._capabilities.values()
         )
@@ -403,9 +406,7 @@ class AdviceReadStore:
             "managers_word": {"available": word},
             "chips": {
                 "held_by_entry": {
-                    str(entry): list(held)
-                    for entry in sorted(_member_entry_ids(league))
-                    if (held := self._held_chips(context, league_id, entry)) is not None
+                    str(entry): list(held) for entry, held in chips.items() if held is not None
                 },
             },
         }
@@ -469,7 +470,7 @@ class AdviceReadStore:
             )
         switches: SwitchIdentity = {}
         if chip is not None:
-            held = self._held_chips(context, league_id, entry_id)
+            held = self._held_chips(context, league_id, (entry_id,)).get(entry_id)
             if held is None or chip not in held:
                 raise ChipUnavailableError(
                     "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
@@ -479,7 +480,9 @@ class AdviceReadStore:
             # not have can never be computed, and a queued job would only say so later.
             try:
                 switches = switch_identity(
-                    self._switch_inputs(context),
+                    self._switch_inputs(context)
+                    if top100_weight or managers_word
+                    else AdviceSwitchInputs(),
                     top100_weight=top100_weight,
                     managers_word=managers_word,
                     chip=chip,

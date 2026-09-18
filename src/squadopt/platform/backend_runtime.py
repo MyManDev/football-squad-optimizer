@@ -48,11 +48,17 @@ from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import SourceRevisionError
 from squadopt.data.source_revision import require_source_revision
 from squadopt.data.sources import FPL_LIVE_SOURCE
+from squadopt.live import SeasonRules, read_season_rules
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
 from squadopt.platform.advice_queue import FileJobQueue
-from squadopt.platform.advice_read import AdviceReadStore, AdviceRequestContext, FileLeagueDirectory
+from squadopt.platform.advice_read import (
+    AdviceBackendNotReadyError,
+    AdviceReadStore,
+    AdviceRequestContext,
+    FileLeagueDirectory,
+)
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
@@ -62,6 +68,7 @@ from squadopt.platform.advice_switches import (
 from squadopt.platform.capture_context import (
     AdviceCaptureContext,
     CaptureIdentity,
+    CapturePicksProvider,
     handoff_fingerprint_for,
     latest_snapshot_id,
     load_capture_context,
@@ -335,6 +342,9 @@ class CaptureContextProvider:
         self._switch_signature: tuple[object, ...] | None = None
         self._reported: dict[tuple[str, str], str] = {}
         self._directory = FileLeagueDirectory(config.site_data_root)
+        self._chip_identity: CaptureIdentity | None = None
+        self._chip_source: tuple[CapturePicksProvider, SeasonRules] | None = None
+        self._chip_members: dict[tuple[int, int], tuple[str, ...] | None] = {}
 
     def identity(self) -> CaptureIdentity | None:
         """The current capture's identity, reading it only when the capture changed."""
@@ -519,26 +529,51 @@ class CaptureContextProvider:
         return None if bundle is None else bundle.switches
 
     def held_chips(
-        self, context: AdviceRequestContext, league_id: int, entry_id: int
-    ) -> tuple[str, ...] | None:
-        """Read chip history from the same capture the worker will answer from."""
-        try:
-            bundle = self.capture(context)
-            if bundle is None:
-                return None
-            return held_member_chips(
-                AdviseEntryRequest(context.season, context.gameweek, league_id, entry_id),
-                provider=bundle.provider,
-                inputs=bundle.inputs,
-                rules=bundle.rules,
-            )
-        except Exception as error:
-            self._report(
-                "advice_chip_history_unreadable",
-                snapshot_id=context.capture_snapshot_id,
-                reason=str(error),
-            )
-            return None
+        self, context: AdviceRequestContext, league_id: int, entries: tuple[int, ...]
+    ) -> Mapping[int, tuple[str, ...] | None]:
+        """Read the requested members once per identity, without projecting the capture."""
+        identity = self.identity()
+        if identity is None or identity.context != context:
+            raise AdviceBackendNotReadyError("The capture context is no longer current.")
+        with self._lock:
+            if self._chip_identity is not identity:
+                self._chip_identity = identity
+                self._chip_source = None
+                self._chip_members = {}
+                try:
+                    self._chip_source = (
+                        CapturePicksProvider(identity.snapshot, identity.inputs.snapshot_id),
+                        read_season_rules(identity.snapshot, season=identity.inputs.season),
+                    )
+                except Exception as error:
+                    self._report(
+                        "advice_chip_history_unreadable",
+                        snapshot_id=context.capture_snapshot_id,
+                        reason=str(error),
+                    )
+            if self._chip_source is None:
+                raise AdviceBackendNotReadyError("The capture's chip inputs are unreadable.")
+            provider, rules = self._chip_source
+            for entry in entries:
+                key = (league_id, entry)
+                if key in self._chip_members:
+                    continue
+                try:
+                    self._chip_members[key] = held_member_chips(
+                        AdviseEntryRequest(context.season, context.gameweek, league_id, entry),
+                        provider=provider,
+                        inputs=identity.inputs,
+                        rules=rules,
+                    )
+                except Exception as error:
+                    self._chip_members[key] = None
+                    self._report(
+                        "advice_chip_history_unreadable",
+                        snapshot_id=context.capture_snapshot_id,
+                        entry_id=entry,
+                        reason=str(error),
+                    )
+            return {entry: self._chip_members[(league_id, entry)] for entry in entries}
 
     def _report(self, event: str, **fields: object) -> None:
         key = event, str(fields.get("snapshot_id", ""))
