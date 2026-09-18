@@ -40,9 +40,9 @@ Everything below is computed, for a decision at gameweek *g* of season *s*, from
 gameweeks before *g* in season *s* and from completed earlier seasons. Nothing from gameweek *g*
 or later is read, and the locked 2025-26 season is named to no loader.
 
-**Team match scores** are taken from the player panel, because the fixture panel carries no
-score: a club's goals conceded in a fixture is the maximum `goals_conceded` over that club's
-players in that fixture, and its goals scored is its opponent's goals conceded.
+**Team match scores** are the archive's final scores, read by
+`data/sources/vaastav.py::load_fixture_results`: one row per side of every finished fixture. They
+are outcomes and are read only for gameweeks before the one decided.
 
 **Ratings.** For each club, an attack rate (goals scored per match) and a defence rate (goals
 conceded per match), each an exponentially weighted mean over the club's matches in time order
@@ -62,19 +62,22 @@ goals by the square root of *H*; an away fixture divides by it.
 `f_def = exp(-lambda_o) / exp(-m)`, the ratio of a clean sheet's Poisson chance in this fixture
 to its chance in an average one.
 
-**Position shares.** For each position, the share of points that came from appearance
-(minutes points), from attacking returns (goals, assists, and the bonus on those matches is
-left with them) and from defensive returns (clean sheets, goals conceded, saves, defensive
-contribution), measured on completed earlier seasons only. Shares sum to one by position.
+**Position elasticities.** For each position, two exponents `a` and `d`: how strongly that
+position's points move with the attacking factor and with the defensive factor. They are fitted
+on completed earlier seasons only, by a Poisson regression with a log link of realized points
+(floored at zero) on `log f_att` and `log f_def`, with the control's projection as the exposure,
+over player gameweeks with exactly one fixture and a control projection of at least 0.5. No
+regularisation and no other feature. A decision in season *s* uses exponents fitted on the
+seasons before *s* that the panel holds.
 
-**The multiplier.** For one fixture: `s_app + s_att * f_att + s_def * f_def`. For a gameweek, a
-player's projected points are the control's per-fixture points times the sum of the multipliers
-of that gameweek's fixtures. With every factor at one this is the control, which is the
-candidate's own sanity check and is tested.
+**The multiplier.** For one fixture: `f_att ** a * f_def ** d`. For a gameweek, a player's
+projected points are the control's per-fixture points times the sum of the multipliers of that
+gameweek's fixtures. With both exponents at zero, or every factor at one, this is the control,
+which is the candidate's own sanity check and is tested.
 
 **Frozen parameters:** half-life 19 matches; one league-wide home factor; Poisson clean sheets;
-three shares per position. They are not tuned on the readings below. A changed parameter is a
-new candidate with its own protocol.
+two exponents per position from the regression above. They are not tuned on the readings below.
+A changed parameter is a new candidate with its own protocol.
 
 ## Compared arms
 
@@ -150,12 +153,27 @@ this way.
 
 `docs/opponent_aware_projection.json` and its markdown twin, with a row in
 `measurements_index.md`: the three readings with their intervals, the gate table with pass or
-fail beside each statistic, the solver block, the frozen parameters, the position shares and the
-home factor as measured, `locked_holdout_accessed: false`, and the elapsed time. Per-fold
+fail beside each statistic, the solver block, the frozen parameters, the position exponents and
+the home factor as fitted for each decision season, `locked_holdout_accessed: false`, and the elapsed time. Per-fold
 evidence goes to `artifacts/` and is not committed.
+
+## Amendment of 2026-09-18, before any reading
+
+Two sentences of the first version could not be carried out, and both were replaced above
+before any number under this protocol was read.
+
+- Team scores were to come from the player panel. The canonical panel is at player and gameweek
+  grain and carries no goals, so they come from the archive's final scores instead
+  (`load_fixture_results`). The quantity is the same.
+- The multiplier was to weight the two factors by each position's share of points from
+  appearance, attack and defence. The panel carries total points only, so those shares cannot be
+  measured from it. The weights are instead two exponents per position, fitted on earlier
+  seasons. This is a different functional form, and it is stated here as a change of candidate
+  made before measurement, not as a detail. The name `opponent_venue_v1` stays because no
+  reading exists under the first form.
 
 ## Deliberate exclusions
 
-No tuning of the half-life, the shares or the home factor on these readings. No player-level
+No tuning of the half-life, the exponents or the home factor on these readings. No player-level
 opponent effects. No price changes over the horizon. No chips in R2 or R3. No reading of the
 2026-27 live season: that is the live projection audit, under its own protocol.
