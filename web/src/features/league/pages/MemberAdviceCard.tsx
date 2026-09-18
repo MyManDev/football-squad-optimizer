@@ -182,7 +182,6 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
-      <WindowComparison view={view} control={windowControl?.payload ?? null} />
       {basisNote ? (
         <p className={styles.honesty}>
           {basisNote.kind === "week"
@@ -335,6 +334,7 @@ export function AdviceCard({
       <ChipChoiceSection view={view} />
       <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
+      <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
@@ -774,8 +774,8 @@ function AdviceRow({
 }
 
 function WindowComparison({ view, control }: { view: EntryAdvice; control: EntryAdvice | null }) {
-  const { locale, messages } = useLanguage();
-  const copy = messages.leagueMembers;
+  const { locale, language, messages } = useLanguage();
+  const copy = TOP100_COPY[language];
   if (
     !control ||
     view.window <= 1 ||
@@ -818,18 +818,18 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
   return (
     <section aria-label={copy.windowComparisonTitle}>
       <h3 className={styles.lineupTitle}>{copy.windowComparisonTitle}</h3>
-      <dl>
+      <dl className={styles.armband}>
         <div>
           <dt>{copy.windowSelectedTotal}</dt>
-          <dd>{points(selected, 1, locale)}</dd>
+          <dd className="num">{points(selected, 1, locale)}</dd>
         </div>
         <div>
           <dt>{copy.windowPureTotal}</dt>
-          <dd>{points(pure, 1, locale)}</dd>
+          <dd className="num">{points(pure, 1, locale)}</dd>
         </div>
       </dl>
       <p className={styles.honesty}>{copy.windowComparisonBasis}</p>
-      <p className={styles.honesty}>{copy.windowLimits}</p>
+      <p className={styles.honesty}>{messages.leagueMembers.windowLimits}</p>
     </section>
   );
 }

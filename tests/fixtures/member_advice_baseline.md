@@ -1,18 +1,4 @@
-# Member advice baseline
-
-This fixture pins five current product outputs from the synthetic window world.
-List ordering is pinned exactly; the test does not define a policy for tie-breaking.
-Floating values use an absolute tolerance of 1e-12 and no relative tolerance.
-
-To verify the pin, with the repository environment active and `PYTHONPATH=src`:
-
-```text
-python -m pytest tests/unit/test_member_windows.py::test_existing_five_plans_keep_their_recorded_results
-```
-
-Regeneration is a deliberate replacement of the reference, not a verification step.
-From the repository root in PowerShell, the following command rebuilds it using only
-synthetic inputs. Review every difference before retaining the generated file.
+Rebuild only when deliberately replacing the synthetic baseline; review every difference.
 
 ```powershell
 $env:PYTHONPATH = 'src'
@@ -40,4 +26,3 @@ with tempfile.TemporaryDirectory() as temporary:
                     encoding='utf-8', newline=chr(10))
 '@ | python -
 ```
-

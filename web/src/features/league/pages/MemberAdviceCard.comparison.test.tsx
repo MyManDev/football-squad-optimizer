@@ -5,6 +5,7 @@ import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtu
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import { TOP100_COPY } from "../advice/top100Copy";
 import { AdviceCard } from "./MemberAdviceCard";
 
 afterEach(cleanup);
@@ -49,11 +50,11 @@ it.each(["en", "tr"] as const)(
   (language) => {
     const selected = plan("fark-yarat", 70);
     show(selected, plan("saf-puan", 60), language);
-    const copy = MESSAGES[language].leagueMembers;
+    const copy = TOP100_COPY[language];
     const region = screen.getByRole("region", { name: copy.windowComparisonTitle });
     expect(within(region).getByText(language === "en" ? "198.0" : "198,0")).toBeInTheDocument();
     expect(within(region).getByText(language === "en" ? "168.0" : "168,0")).toBeInTheDocument();
-    expect(region).toHaveTextContent(copy.windowLimits);
+    expect(region).toHaveTextContent(MESSAGES[language].leagueMembers.windowLimits);
     expect(region).toHaveTextContent(copy.windowComparisonBasis);
     expect(region).not.toHaveTextContent("30");
   },
@@ -73,23 +74,22 @@ it.each([
   const control = plan("saf-puan", 60);
   Object.assign(control.payload, change);
   show(plan("fark-yarat", 70), control);
-  expect(
-    screen.queryByRole("region", { name: MESSAGES.en.leagueMembers.windowComparisonTitle }),
-  ).toBeNull();
+  expect(screen.queryByRole("region", { name: TOP100_COPY.en.windowComparisonTitle })).toBeNull();
 });
 it("does not use first-week points when a later week has no total", () => {
   const control = plan("saf-puan", 60);
   control.payload.plan_weeks![1]!.expected_points = Number.NaN;
   show(plan("fark-yarat", 70), control);
-  expect(
-    screen.queryByRole("region", { name: MESSAGES.en.leagueMembers.windowComparisonTitle }),
-  ).toBeNull();
+  expect(screen.queryByRole("region", { name: TOP100_COPY.en.windowComparisonTitle })).toBeNull();
 });
 it("leaves a missing published control absent for a computed plan", () => {
   show(plan("fark-yarat", 70), null);
-  expect(
-    screen.queryByRole("region", { name: MESSAGES.en.leagueMembers.windowComparisonTitle }),
-  ).toBeNull();
+  expect(screen.queryByRole("region", { name: TOP100_COPY.en.windowComparisonTitle })).toBeNull();
+});
+
+it("does not compare an unswitched pure-points plan to itself", () => {
+  show(plan("saf-puan", 60), plan("saf-puan", 60));
+  expect(screen.queryByRole("region", { name: TOP100_COPY.en.windowComparisonTitle })).toBeNull();
 });
 
 it("shows a Top 100 pure-points selection against the published plan at zero", () => {
@@ -97,7 +97,7 @@ it("shows a Top 100 pure-points selection against the published plan at zero", (
   selected.payload.top100 = { weight: 20, changed: true, price_basis: "base_projection" };
   show(selected, plan("saf-puan", 60));
   const region = screen.getByRole("region", {
-    name: MESSAGES.en.leagueMembers.windowComparisonTitle,
+    name: TOP100_COPY.en.windowComparisonTitle,
   });
   expect(region).toHaveTextContent("153.0");
   expect(region).toHaveTextContent("168.0");

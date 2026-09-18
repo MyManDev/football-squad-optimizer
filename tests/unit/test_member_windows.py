@@ -165,7 +165,7 @@ def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str,
             encoding="utf-8"
         ),
         # Runtime float summation can differ in the last binary digits (observed
-        # below 2e-15 on Python 3.11). Keep every key, identity and ordering exact.
+        # below 2e-15 on Python 3.11). Keep every key, identity and list ordering exact.
         parse_float=lambda value: pytest.approx(float(value), rel=0, abs=1e-12),
     )
     for key, expected in reference.items():

@@ -5,6 +5,7 @@ import type { ComputeService } from "../advice/AdviceRequestPanel";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
+import { checkedAdvice } from "../advice/adviceResponse";
 import {
   loadEntryAdvice,
   loadEntryAdviceChip,
@@ -158,10 +159,15 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
       squad.data?.payload.source_snapshot_id,
       controlSelection.path,
     ],
-    queryFn: ({ signal }) => loadEntryAdvice(entryId, "saf-puan", request.window, null, { signal }),
+    queryFn: async ({ signal }) =>
+      checkedAdvice(
+        await loadEntryAdvice(entryId, "saf-puan", request.window, null, { signal }),
+        controlSelection.request,
+      ),
     enabled:
       validEntryId &&
       !!squad.data &&
+      (selection.status === "ready" || selection.computable?.selection === true) &&
       request.window > 1 &&
       (request.strategy !== "saf-puan" || selection.top100.weight !== 0) &&
       controlSelection.status === "ready" &&
