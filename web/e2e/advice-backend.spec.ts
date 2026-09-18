@@ -51,7 +51,7 @@ test("a browser computes through the worker, then reads the same answer from cac
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
   });
-  await expect(page.getByText("Bir haftalık planın hesabı birkaç saniye sürer.")).toBeVisible();
+  await expect(page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer")).toBeVisible();
   await expect(page).toHaveURL(`/league/members/${context.entryId}`);
   expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
