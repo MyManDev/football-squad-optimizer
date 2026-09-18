@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -46,24 +46,24 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.5204471958705525,
+        "expected_points_delta": 0.5631463028175006,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.5204471958705525,
-    "expected_points_cost": 0.6808874890805185,
+    "expected_gain_vs_hold": 0.5631463028175006,
+    "expected_points_cost": 0.9868951049477204,
     "rival_label": "entry-313686",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.542523450256965,
+    "expected_own_points": 54.626540749348194,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 244850,
@@ -144,7 +144,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 216646,
@@ -194,7 +194,7 @@
         "short_name": "Sauceda",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 1.5182138705784642
+        "expected_points": 1.9840939651002099
       }
     ],
     "chip": null,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 313686,
-    "expected_points_cost_ceiling": 0.6808874890805185,
+    "expected_points_cost_ceiling": 0.9868951049477204,
     "overlap_count": 6,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 12.65094339405946,
-      "expected_points_cost_ceiling": 12.65094339405946
+      "expected_points_cost": 12.956951009926655,
+      "expected_points_cost_ceiling": 12.956951009926655
     },
-    "expected_gap_vs_rival": 3.7831023128561796,
+    "expected_gap_vs_rival": 3.825110962401787,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

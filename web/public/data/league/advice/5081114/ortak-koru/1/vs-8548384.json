@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,29 +9,10 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
-        "player_out": {
-          "player_id": 106760,
-          "name": "Luke Shaw",
-          "short_name": "Shaw",
-          "position": "DEF",
-          "team": "Man Utd"
-        },
-        "player_in": {
-          "player_id": 477424,
-          "name": "Jo\u0161ko Gvardiol",
-          "short_name": "Gvardiol",
-          "position": "DEF",
-          "team": "Man City"
-        },
-        "expected_points_delta": 1.9927265344794165,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw05-2",
         "player_out": {
           "player_id": 223340,
           "name": "Bukayo Saka",
@@ -46,24 +27,43 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": -0.8885305561251116,
+        "expected_points_delta": -0.8885305561251045,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 463726,
+          "name": "Amar Dedic",
+          "short_name": "Dedic",
+          "position": "DEF",
+          "team": "Newcastle"
+        },
+        "player_in": {
+          "player_id": 477424,
+          "name": "Jo\u0161ko Gvardiol",
+          "short_name": "Gvardiol",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "expected_points_delta": 2.3778998907544633,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.104195978354305,
-    "expected_points_cost": 1.8206071047506427,
+    "expected_gain_vs_hold": 1.4893693346293588,
+    "expected_points_cost": 1.9138067118101247,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.40727476779026,
+    "expected_own_points": 53.832234495222224,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -91,20 +91,20 @@
         "expected_points": 4.056371668311424
       },
       {
-        "player_id": 463726,
-        "name": "Amar Dedic",
-        "short_name": "Dedic",
-        "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 2.679647630609125
-      },
-      {
         "player_id": 219924,
         "name": "Issa Diop",
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
         "expected_points": 2.1138840416046176
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 2.0636451338320074
       },
       {
         "player_id": 141746,
@@ -144,7 +144,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 502500,
@@ -152,7 +152,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       },
       {
         "player_id": 177815,
@@ -173,20 +173,20 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 199798,
-        "name": "Ezri Konsa Ngoyo",
-        "short_name": "Ngoyo",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 2.0636451338320074
-      },
-      {
         "player_id": 247348,
         "name": "Daniel Mu\u00f1oz Mej\u00eda",
         "short_name": "Mej\u00eda",
         "position": "DEF",
         "team": "Nott'm Forest",
         "expected_points": 1.6784717775569535
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.0851965732879876
       },
       {
         "player_id": 153366,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 8548384,
-    "expected_points_cost_ceiling": 1.8206071047506427,
+    "expected_points_cost_ceiling": 1.9138067118101247,
     "overlap_count": 5,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 17.171813533908924,
-      "expected_points_cost_ceiling": 17.171813533908924
+      "expected_points_cost": 16.66096753440877,
+      "expected_points_cost_ceiling": 16.66096753440877
     },
-    "expected_gap_vs_rival": 3.994075357155886,
+    "expected_gap_vs_rival": 3.291925687572302,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

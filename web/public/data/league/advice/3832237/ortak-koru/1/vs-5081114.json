@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,7 +27,7 @@
           "position": "FWD",
           "team": "Man City"
         },
-        "expected_points_delta": 9.293296881686075,
+        "expected_points_delta": 9.377314180777319,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -46,7 +46,7 @@
           "position": "DEF",
           "team": "Arsenal"
         },
-        "expected_points_delta": -2.408883251299038,
+        "expected_points_delta": -2.408883251299031,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -65,7 +65,7 @@
           "position": "MID",
           "team": "Fulham"
         },
-        "expected_points_delta": -0.44037821928395005,
+        "expected_points_delta": -0.44037821928395715,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -84,24 +84,24 @@
           "position": "DEF",
           "team": "Newcastle"
         },
-        "expected_points_delta": 0.6785758567996396,
+        "expected_points_delta": -0.016977808709270903,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 7.122611267902727,
-    "expected_points_cost": 3.052253165190173,
+    "expected_gain_vs_hold": 6.51107490148506,
+    "expected_points_cost": 3.5591733337043934,
     "rival_label": "entry-5081114",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 51.129471373640754,
+    "expected_own_points": 50.474879932340926,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 437730,
@@ -121,14 +121,6 @@
         "expected_points": 3.8238320826783507
       },
       {
-        "player_id": 463726,
-        "name": "Amar Dedic",
-        "short_name": "Dedic",
-        "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 2.679647630609125
-      },
-      {
         "player_id": 231416,
         "name": "Ferdi Kad\u0131o\u011flu",
         "short_name": "Kad\u0131o\u011flu",
@@ -143,6 +135,14 @@
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 2.0636451338320074
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 1.9840939651002099
       },
       {
         "player_id": 437730,
@@ -190,7 +190,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 502500,
@@ -198,7 +198,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       }
     ],
     "bench": [
@@ -219,20 +219,20 @@
         "expected_points": 2.836896693013364
       },
       {
-        "player_id": 441164,
-        "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
-        "position": "DEF",
-        "team": "Spurs",
-        "expected_points": 1.5182138705784642
-      },
-      {
         "player_id": 106611,
         "name": "Michael Keane",
         "short_name": "Keane",
         "position": "DEF",
         "team": "Everton",
         "expected_points": 0.13980101442937173
+      },
+      {
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -245,7 +245,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 5081114,
-    "expected_points_cost_ceiling": 3.052253165190173,
+    "expected_points_cost_ceiling": 3.5591733337043934,
     "overlap_count": 6,
     "transfer_cap": 4,
     "overlap_target": 9,
@@ -255,10 +255,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 14.478840878268706,
-      "expected_points_cost_ceiling": 14.478840878268706
+      "expected_points_cost": 14.985761046782926,
+      "expected_points_cost_ceiling": 14.985761046782926
     },
-    "expected_gap_vs_rival": -1.73819515174754,
+    "expected_gap_vs_rival": 0.2458988133526816,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

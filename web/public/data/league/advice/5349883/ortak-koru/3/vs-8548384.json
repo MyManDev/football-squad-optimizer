@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,42 +9,42 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 153682,
-          "name": "Harry Wilson",
-          "short_name": "Wilson",
-          "position": "MID",
-          "team": "Leeds"
+          "player_id": 204936,
+          "name": "Gianluigi Donnarumma",
+          "short_name": "Donnarumma",
+          "position": "GK",
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 577725,
-          "name": "Josh King",
-          "short_name": "King",
-          "position": "MID",
-          "team": "Fulham"
+          "player_id": 154561,
+          "name": "David Raya Mart\u00edn",
+          "short_name": "Mart\u00edn",
+          "position": "GK",
+          "team": "Arsenal"
         },
-        "expected_points_delta": 0.616132367086891,
+        "expected_points_delta": 0.4189253965666211,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.616132367086891,
-    "expected_points_cost": 0.0,
+    "expected_gain_vs_hold": 0.4189253965666211,
+    "expected_points_cost": 1.301284454741392,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.77857205208214,
+    "expected_own_points": 53.708474478577415,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 219168,
@@ -56,12 +56,12 @@
     },
     "starting_xi": [
       {
-        "player_id": 204936,
-        "name": "Gianluigi Donnarumma",
-        "short_name": "Donnarumma",
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
         "position": "GK",
-        "team": "Man City",
-        "expected_points": 3.404906686111741
+        "team": "Arsenal",
+        "expected_points": 3.8238320826783507
       },
       {
         "player_id": 466075,
@@ -101,7 +101,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 215413,
@@ -112,12 +112,12 @@
         "expected_points": 3.73372343804937
       },
       {
-        "player_id": 577725,
-        "name": "Josh King",
-        "short_name": "King",
+        "player_id": 474120,
+        "name": "Julio Enciso",
+        "short_name": "Enciso",
         "position": "MID",
-        "team": "Fulham",
-        "expected_points": 3.513475657690736
+        "team": "Ipswich Town",
+        "expected_points": 2.8973432906038457
       },
       {
         "player_id": 223094,
@@ -125,7 +125,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 219168,
@@ -154,12 +154,12 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 474120,
-        "name": "Julio Enciso",
-        "short_name": "Enciso",
+        "player_id": 153682,
+        "name": "Harry Wilson",
+        "short_name": "Wilson",
         "position": "MID",
-        "team": "Ipswich Town",
-        "expected_points": 2.8973432906038457
+        "team": "Leeds",
+        "expected_points": 2.2828626625459596
       },
       {
         "player_id": 487676,
@@ -184,11 +184,37 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
+            "position": "GK",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 204936,
+            "name": "Gianluigi Donnarumma",
+            "short_name": "Donnarumma",
+            "position": "GK",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 53.7084744785774
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Fulham"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -204,33 +230,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 53.77857205208214
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
-            "position": "MID",
-            "team": "Nott'm Forest"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.88525502575463
+        "expected_points": 55.03388845740939
       },
       {
         "gameweek": 7,
@@ -256,7 +256,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.65307319091055
+        "expected_points": 55.84466732185216
       }
     ],
     "stated_limits": [
@@ -272,9 +272,9 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 24.85064931639883,
+    "expected_points_cost_ceiling": 24.877182330594962,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 22.628000000000014,
+    "control_optimality_gap": 21.555000000000007,
     "rival_entry_id": 8548384,
     "overlap_count": 4,
     "transfer_cap": 1,
@@ -282,7 +282,7 @@
     "overlap_applied": 4,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 3.365372641447763,
+    "expected_gap_vs_rival": 3.1681656709274932,
     "captain_agreement": true
   }
 }

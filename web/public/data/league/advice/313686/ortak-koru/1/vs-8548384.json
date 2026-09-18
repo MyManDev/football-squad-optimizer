@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
+          "player_id": 439509,
+          "name": "Christos Tzolis",
+          "short_name": "Tzolis",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Arsenal"
         },
         "player_in": {
           "player_id": 577725,
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Fulham"
         },
-        "expected_points_delta": -0.23258048571266698,
+        "expected_points_delta": 0.4432987763098595,
         "reason_code": "mode_tradeoff"
       },
       {
         "move_id": "gw05-2",
         "player_out": {
-          "player_id": 551210,
-          "name": "Jorrel Hato",
-          "short_name": "Hato",
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
           "position": "DEF",
-          "team": "Chelsea"
+          "team": "Arsenal"
         },
         "player_in": {
           "player_id": 477424,
@@ -46,24 +46,24 @@
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 1.239908272457967,
+        "expected_points_delta": 0.5158266043842445,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.0073277867453,
-    "expected_points_cost": 0.877126283868364,
+    "expected_gain_vs_hold": 0.959125380694104,
+    "expected_points_cost": 0.7092816117450838,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.79318550151594,
+    "expected_own_points": 56.82900039455599,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -99,12 +99,12 @@
         "expected_points": 3.5539951801294207
       },
       {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
         "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.54054506392718
+        "team": "Hull City",
+        "expected_points": 2.8164633958534613
       },
       {
         "player_id": 141746,
@@ -131,6 +131,14 @@
         "expected_points": 4.206689328780451
       },
       {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 3.7460561434034036
+      },
+      {
         "player_id": 577725,
         "name": "Josh King",
         "short_name": "King",
@@ -139,20 +147,12 @@
         "expected_points": 3.513475657690736
       },
       {
-        "player_id": 439509,
-        "name": "Christos Tzolis",
-        "short_name": "Tzolis",
-        "position": "MID",
-        "team": "Arsenal",
-        "expected_points": 3.0701768813808723
-      },
-      {
         "player_id": 223094,
         "name": "Erling Haaland",
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 475168,
@@ -173,20 +173,20 @@
         "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 108416,
-        "name": "John Egan",
-        "short_name": "Egan",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.8164633958534613
-      },
-      {
         "player_id": 199798,
         "name": "Ezri Konsa Ngoyo",
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 2.0636451338320074
+      },
+      {
+        "player_id": 551210,
+        "name": "Jorrel Hato",
+        "short_name": "Hato",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 1.9720001998749073
       },
       {
         "player_id": 631786,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 8548384,
-    "expected_points_cost_ceiling": 0.877126283868364,
+    "expected_points_cost_ceiling": 0.7092816117450838,
     "overlap_count": 4,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 20.0,
-      "expected_points_cost": 21.273256775195676,
-      "expected_points_cost_ceiling": 21.273256775195676
+      "expected_points_cost": 21.55097383065528,
+      "expected_points_cost_ceiling": 21.55097383065528
     },
-    "expected_gap_vs_rival": 6.379986090881566,
+    "expected_gap_vs_rival": 6.288691586906069,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

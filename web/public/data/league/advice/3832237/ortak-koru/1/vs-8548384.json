@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -46,7 +46,7 @@
           "position": "FWD",
           "team": "Chelsea"
         },
-        "expected_points_delta": 0.7029000240236769,
+        "expected_points_delta": 0.7029000240236911,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -65,7 +65,7 @@
           "position": "DEF",
           "team": "Liverpool"
         },
-        "expected_points_delta": 1.5544769028495438,
+        "expected_points_delta": 1.5544769028495296,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -84,17 +84,17 @@
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 1.6071008127449176,
+        "expected_points_delta": 1.6071008127449318,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 4.242459841216103,
-    "expected_points_cost": 5.9324045918767965,
+    "expected_gain_vs_hold": 4.242459841216117,
+    "expected_points_cost": 5.827788393973336,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 48.24931994695413,
+    "expected_own_points": 48.20626487207198,
     "captain": {
       "player_id": 437730,
       "name": "Antoine Semenyo",
@@ -190,7 +190,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       },
       {
         "player_id": 475168,
@@ -245,7 +245,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 8548384,
-    "expected_points_cost_ceiling": 5.9324045918767965,
+    "expected_points_cost_ceiling": 5.827788393973336,
     "overlap_count": 7,
     "transfer_cap": 4,
     "overlap_target": 9,
@@ -255,10 +255,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 8.0,
-      "expected_points_cost": 14.105364624663004,
-      "expected_points_cost_ceiling": 14.105364624663004
+      "expected_points_cost": 13.957656328835242,
+      "expected_points_cost_ceiling": 13.957656328835242
     },
-    "expected_gap_vs_rival": -2.163879463680246,
+    "expected_gap_vs_rival": -2.334043935577938,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

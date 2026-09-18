@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,42 +9,42 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 500040,
-          "name": "Cristhian Mosquera",
-          "short_name": "Mosquera",
-          "position": "DEF",
-          "team": "Arsenal"
+          "player_id": 430871,
+          "name": "Matheus Santos Carneiro da Cunha",
+          "short_name": "Cunha",
+          "position": "MID",
+          "team": "Man Utd"
         },
         "player_in": {
-          "player_id": 477424,
-          "name": "Jo\u0161ko Gvardiol",
-          "short_name": "Gvardiol",
-          "position": "DEF",
-          "team": "Man City"
+          "player_id": 222531,
+          "name": "Morgan Gibbs-White",
+          "short_name": "Gibbs-White",
+          "position": "MID",
+          "team": "Nott'm Forest"
         },
-        "expected_points_delta": 1.3740207607157728,
+        "expected_points_delta": 0.9337229408862839,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.3740207607157728,
+    "expected_gain_vs_hold": 0.9337229408862839,
     "expected_points_cost": 0.0,
     "rival_label": "entry-7252721",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 20.727000000000004,
-    "expected_own_points": 54.575638891585605,
+    "optimality_gap": 18.320999999999998,
+    "expected_own_points": 54.26245046877166,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 244851,
@@ -64,14 +64,6 @@
         "expected_points": 2.9465399121005427
       },
       {
-        "player_id": 477424,
-        "name": "Jo\u0161ko Gvardiol",
-        "short_name": "Gvardiol",
-        "position": "DEF",
-        "team": "Man City",
-        "expected_points": 4.056371668311424
-      },
-      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
@@ -88,12 +80,28 @@
         "expected_points": 2.7566531047175307
       },
       {
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
+        "position": "DEF",
+        "team": "Sunderland",
+        "expected_points": 2.682350907595655
+      },
+      {
         "player_id": 244851,
         "name": "Cole Palmer",
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
         "expected_points": 5.199892083433812
+      },
+      {
+        "player_id": 222531,
+        "name": "Morgan Gibbs-White",
+        "short_name": "Gibbs-White",
+        "position": "MID",
+        "team": "Nott'm Forest",
+        "expected_points": 4.887576817860959
       },
       {
         "player_id": 244850,
@@ -104,20 +112,12 @@
         "expected_points": 4.414905789016978
       },
       {
-        "player_id": 430871,
-        "name": "Matheus Santos Carneiro da Cunha",
-        "short_name": "Cunha",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 3.9538538769746867
-      },
-      {
         "player_id": 184029,
         "name": "Martin \u00d8degaard",
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 223094,
@@ -125,7 +125,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 177815,
@@ -162,52 +162,26 @@
         "expected_points": 3.3442643683372464
       },
       {
-        "player_id": 223827,
-        "name": "Daniel Ballard",
-        "short_name": "Ballard",
-        "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.682350907595655
-      },
-      {
         "player_id": 451284,
         "name": "Milan van Ewijk",
         "short_name": "Ewijk",
         "position": "DEF",
         "team": "Coventry City",
         "expected_points": 2.040792632135852
+      },
+      {
+        "player_id": 500040,
+        "name": "Cristhian Mosquera",
+        "short_name": "Mosquera",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 0.9015708394453049
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
         "gameweek": 5,
-        "transfers_in": [
-          {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 500040,
-            "name": "Cristhian Mosquera",
-            "short_name": "Mosquera",
-            "position": "DEF",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.575638891585605
-      },
-      {
-        "gameweek": 6,
         "transfers_in": [
           {
             "player_id": 222531,
@@ -230,17 +204,43 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.509361832471875
+        "expected_points": 54.26245046877165
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 500040,
+            "name": "Cristhian Mosquera",
+            "short_name": "Mosquera",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.17139733887501
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
             "position": "DEF",
-            "team": "Brighton"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
@@ -256,7 +256,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.306703907883765
+        "expected_points": 56.47111590246891
       }
     ],
     "stated_limits": [
@@ -272,9 +272,9 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 23.92056860486241,
+    "expected_points_cost_ceiling": 24.64079253407951,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 20.727000000000004,
+    "control_optimality_gap": 21.47200000000001,
     "rival_entry_id": 7252721,
     "overlap_count": 3,
     "transfer_cap": 1,
@@ -282,7 +282,7 @@
     "overlap_applied": 3,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -0.7241481727608701,
+    "expected_gap_vs_rival": -1.1213538946660577,
     "captain_agreement": true
   }
 }

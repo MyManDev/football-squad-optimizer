@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -21,13 +21,13 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 513418,
-          "name": "Kevin Schade",
-          "short_name": "Schade",
+          "player_id": 60307,
+          "name": "Pascal Gro\u00df",
+          "short_name": "Gro\u00df",
           "position": "MID",
-          "team": "Brentford"
+          "team": "Brighton"
         },
-        "expected_points_delta": 3.3322056954825072,
+        "expected_points_delta": 3.316137754827139,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -46,24 +46,24 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 1.6548551236779687,
+        "expected_points_delta": 1.6548551236779616,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 4.987060819160476,
+    "expected_gain_vs_hold": 4.9709928785051005,
     "expected_points_cost": 0.0,
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.29081180374817,
+    "expected_own_points": 56.40185326010834,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 226597,
@@ -123,12 +123,12 @@
         "expected_points": 4.415892336727386
       },
       {
-        "player_id": 513418,
-        "name": "Kevin Schade",
-        "short_name": "Schade",
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
         "position": "MID",
-        "team": "Brentford",
-        "expected_points": 4.222757269435823
+        "team": "Brighton",
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 184029,
@@ -136,7 +136,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 577725,
@@ -152,7 +152,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 475168,
@@ -220,7 +220,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 8.693934655230024,
+    "expected_gap_vs_rival": 8.71879191574157,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
