@@ -1,9 +1,35 @@
 .page,
 .adviceSection,
+.squadContext,
 .systemPage {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.contextDetails > summary {
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.selectionSummary {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.contextDetails > summary > h2 {
+  display: inline;
+  font: inherit;
+  margin: 0;
+}
+
+@media (min-width: 641px) {
+  .contextDetails > summary {
+    display: none;
+  }
 }
 
 .assumptionList {
@@ -222,6 +248,20 @@
 }
 
 @media (max-width: 640px) {
+  :global(html).memberPage {
+    scroll-padding-bottom: 45dvh;
+  }
+  .squadContext > section:first-child > header > h2 {
+    display: none;
+  }
+  .computeDock {
+    position: sticky;
+    bottom: 0;
+    max-height: 45dvh;
+    overflow-y: auto;
+    z-index: 1;
+  }
+
   .head {
     align-items: flex-start;
     flex-direction: column;

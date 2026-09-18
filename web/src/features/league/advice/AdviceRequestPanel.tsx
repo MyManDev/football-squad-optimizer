@@ -85,7 +85,7 @@ export function AdviceRequestPanel({
       {service === "unreachable" ? <p role="note">{computeCopy.serviceUnreachable}</p> : null}
       {service === "other-capture" ? <p role="note">{computeCopy.otherCapture}</p> : null}
       {service === "ready" && supported ? (
-        <p role="note">
+        <p role="note" className={styles.durationNote}>
           {published ? null : <>{computeCopy.notPrecomputed} </>}
           {computeCopy.duration[request.window]} {computeCopy.durationNote}
         </p>
