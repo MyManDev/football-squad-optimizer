@@ -1479,6 +1479,7 @@ def build_league_views(
         # Every advice document this member gets, kept with the bytes that landed so the
         # record digests what was published rather than a re-rendering of the payload.
         emitted: list[PublishedAdvice] = []
+        switches: list[PublishedAdvice] = []
 
         relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json"
         emitted.append(
@@ -1503,7 +1504,7 @@ def build_league_views(
         evidence_index: dict[str, object]
         if render.evidence_payload is not None:
             relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}/{MANAGERS_WORD_FILE}"
-            emitted.append(
+            switches.append(
                 PublishedAdvice(
                     COMPUTED_MODE,
                     COMPUTED_WINDOW,
@@ -1561,7 +1562,7 @@ def build_league_views(
                 f"{top100_directory}/"
                 f"{top100_file(weight, word_file=MANAGERS_WORD_FILE if word else None)}"
             )
-            emitted.append(
+            switches.append(
                 PublishedAdvice(
                     COMPUTED_MODE,
                     COMPUTED_WINDOW,
@@ -1578,7 +1579,7 @@ def build_league_views(
         variant_computed: list[dict[str, object]] = []
         for strategy, window, rival_id, weight, payload in render.variant_payloads:
             relative = variant_path(entry_id, strategy, window, rival_id, weight)
-            emitted.append(
+            switches.append(
                 PublishedAdvice(
                     strategy, window, rival_id, relative, payload, _write(relative, payload)
                 )
@@ -1608,7 +1609,7 @@ def build_league_views(
         chip_paths: dict[str, str] = {}
         for chip, payload in render.chip_payloads:
             relative = f"{top100_directory}/{chip_file(chip)}"
-            emitted.append(
+            switches.append(
                 PublishedAdvice(
                     COMPUTED_MODE,
                     COMPUTED_WINDOW,
@@ -1860,6 +1861,7 @@ def build_league_views(
         # the rule could not be stated, or its file did not solve, the page shows the
         # pure-points baseline, and the record says which of the two it was rather than
         # leaving a later reader to re-apply a rule from inputs that have since moved.
+        emitted.extend(switches)
         emitted_paths = {item.relative_path for item in emitted}
         suggested_slug = str(suggested["strategy"]) if suggested is not None else None
         suggested_path = (

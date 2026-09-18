@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 import tests.unit.test_live_transfers as world_module
 
+import squadopt.application.advice_record as advice_records
 import squadopt.application.league_views as league_views
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
@@ -29,6 +30,8 @@ from squadopt.application.advice_record import (
     AdviceRecordConflictError,
     AdviceRecordError,
     AdviceRecordNotLandedError,
+    PublishedAdvice,
+    _advice_document,
     entry_directory,
     load_member_advice_record,
     load_member_advice_record_for_deadline,
@@ -190,15 +193,20 @@ def test_every_published_switch_is_recorded_with_its_bytes_and_replays(
         rendered = original(task, **kwargs)
         assert rendered.baseline is not None
         base = rendered.baseline
+        rival = 202 if task.entry_id == 101 else 101
         word = {**base, "evidence": {"binding": False, "applied": []}}
         return replace(
             rendered,
             evidence_payload=word,
             top100_payloads=(
-                (20, False, {**base, "top100": {"weight": 20}}),
+                (20, False, {**base, "top100": {"weight": 20}, "expected_points_cost": 2.5}),
                 (20, True, {**word, "top100": {"weight": 20}}),
             ),
-            variant_payloads=(("saf-puan", 3, None, 20, {**base, "window": 3}),),
+            variant_payloads=(
+                ("saf-puan", 3, None, 20, {**base, "window": 3}),
+                ("fark-yarat", 3, rival, 0, {**base, "window": 3}),
+                ("fark-yarat", 3, rival, 20, {**base, "window": 3}),
+            ),
             chip_payloads=(("bboost", {**base, "chip": "bboost"}),),
         )
 
@@ -216,9 +224,28 @@ def test_every_published_switch_is_recorded_with_its_bytes_and_replays(
         }
         assert documents.keys() == published
         assert len(documents) == len(record["advice"])
+        paths = list(documents)
+        rival = 202 if entry == 101 else 101
+        switch_start = paths.index(f"advice/{entry}/saf-puan/1/hoca-sozu.json")
+        assert paths[switch_start:] == [
+            f"advice/{entry}/saf-puan/1/hoca-sozu.json",
+            f"advice/{entry}/saf-puan/1/top100-20.json",
+            f"advice/{entry}/saf-puan/1/top100-20-hoca-sozu.json",
+            f"advice/{entry}/saf-puan/3/top100-20.json",
+            f"advice/{entry}/fark-yarat/3/vs-{rival}.json",
+            f"advice/{entry}/fark-yarat/3/vs-{rival}/top100-20.json",
+            f"advice/{entry}/saf-puan/1/chip-bboost.json",
+        ]
+        assert any("vs-" in path for path in paths[:switch_start])
         assert any(path.endswith("hoca-sozu.json") for path in published)
         assert any(path.endswith("top100-20.json") for path in published)
         assert any(path.endswith("chip-bboost.json") for path in published)
+        priced = documents[f"advice/{entry}/saf-puan/1/top100-20.json"]
+        assert priced["expected_points_cost"] == 2.5
+        assert priced["top100_weight"] == 20
+        assert "expected_points_cost_ceiling" not in priced
+        assert "managers_word" not in priced
+        assert documents[f"advice/{entry}/saf-puan/1/hoca-sozu.json"]["managers_word"] is True
         for path, document in documents.items():
             assert (
                 document["published_sha256"]
@@ -228,6 +255,18 @@ def test_every_published_switch_is_recorded_with_its_bytes_and_replays(
         assert "chip-" not in record["told"]["published_path"]
     _build(world, out, record_root=records)
     assert _digests(records) == before
+
+
+@pytest.mark.parametrize("price", [None, 0, 2.5])
+def test_recorded_price_and_settings_are_only_the_fields_the_payload_carries(price: Any) -> None:
+    payload = {"expected_points_cost": price, "expected_points_cost_ceiling": price}
+    plain = _advice_document(PublishedAdvice("saf-puan", 1, None, "plain.json", payload, b"{}"))
+    for field in ("expected_points_cost", "expected_points_cost_ceiling"):
+        if price is None:
+            assert field not in plain
+        else:
+            assert plain[field] == price
+    assert "top100_weight" not in plain and "managers_word" not in plain
 
 
 def test_the_publish_records_what_each_member_was_told(
@@ -680,13 +719,12 @@ def test_a_record_in_the_pre_capture_layout_is_refused_rather_than_ignored(
 
 
 def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differed(
-    world: dict[str, Any], tmp_path: Path
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Different advice over a recorded capture is refused, and the refusal is readable.
 
-    This is the property the capture key must not lose. The capture is the whole input, so
-    the same capture producing different advice is a non-determinism in our own code —
-    which is how a real one in the multi-week solves was found. A record that can be
+    This is the property the capture key must not lose. The capture and external evidence
+    inputs can yield different advice after an input or code change. A record that can be
     overwritten proves nothing about what was published, so the second build loses rather
     than the first, and the message names the fields that moved so an operator does not
     have to diff two files by hand.
@@ -698,6 +736,16 @@ def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differe
 
     records = tmp_path / "records"
     _build(world, tmp_path / "first", record_root=records)
+    differences: list[str] = []
+    original_conflict = advice_records._conflict
+
+    def conflict(directory, recorded, incoming):
+        differences.extend(
+            advice_records._differences(*advice_records._reconciled(recorded, incoming))
+        )
+        return original_conflict(directory, recorded, incoming)
+
+    monkeypatch.setattr(advice_records, "_conflict", conflict)
 
     # A second free transfer the source did publish, at a later minute: the state read
     # changed, the week's hit charge went with it, and the message names the input that
@@ -707,13 +755,12 @@ def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differe
         _build(world, tmp_path / "second", record_root=records, free_transfers=2, now=later)
     message = str(changed.value)
     assert "state.free_transfers: recorded 1, now 2" in message
-    # Switch documents add differences before this field in the bounded diagnostic.
-    assert (
-        "state.free_transfers_known: recorded False, now True" in message
-        or "more differing field(s)" in message
-    )
-    assert "transfer_hit_points" in message
-    assert "advice_sha256" in message
+    assert "state.free_transfers_known: recorded False, now True" in message
+    assert "state.free_transfers_known: recorded False, now True" in differences
+    assert any("transfer_hit_points" in field for field in differences)
+    assert any("advice_sha256" in field for field in differences)
+    assert message.index("state.free_transfers:") < message.index("advice[")
+    assert "rotation table, Top 100 export" in message
     # The clock moved with all of that and is deliberately not named: it is never the
     # reason for a refusal, and naming it invites reading this one as a harmless re-run.
     assert "generated_at_utc" not in message
