@@ -1,0 +1,20 @@
+{
+  "contract_version": "live_score_v1",
+  "generated_at_utc": "2026-09-18T14:01:50Z",
+  "payload": {
+    "bonus_confirmed": null,
+    "captured_at_utc": "2026-09-18T12:25:16.241963Z",
+    "decision_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "fixtures_finished": null,
+    "fixtures_total": null,
+    "gameweek": 5,
+    "named_score": null,
+    "net_score": null,
+    "prediction_fingerprint": "7b35168a45a012d0a5079a32db6c205c076184bf78c1c8363bcdbe73e84b9d32",
+    "reason": "missing_payload",
+    "season": "2026-27",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "status": "unavailable",
+    "transfer_hit_points": null
+  }
+}

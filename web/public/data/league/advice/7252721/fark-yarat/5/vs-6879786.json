@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,59 +9,59 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 67089,
-          "name": "Martin Dubravka",
-          "short_name": "Dubravka",
-          "position": "GK",
-          "team": "Spurs"
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
+          "position": "FWD",
+          "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
-          "position": "GK",
-          "team": "Arsenal"
+          "player_id": 219168,
+          "name": "Alexander Isak",
+          "short_name": "Isak",
+          "position": "FWD",
+          "team": "Liverpool"
         },
-        "expected_points_delta": 0.8839512474707121,
+        "expected_points_delta": 1.3572487212648525,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.8839512474707121,
+    "expected_gain_vs_hold": 1.3572487212648525,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6879786",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 31.504999999999995,
-    "expected_own_points": 56.39820638962787,
+    "optimality_gap": 29.156999999999982,
+    "expected_own_points": 56.95552116251325,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
-      "player_id": 222531,
-      "name": "Morgan Gibbs-White",
-      "short_name": "Gibbs-White",
-      "position": "MID",
-      "team": "Nott'm Forest",
-      "expected_points": 4.887576817860959
+      "player_id": 219168,
+      "name": "Alexander Isak",
+      "short_name": "Isak",
+      "position": "FWD",
+      "team": "Liverpool",
+      "expected_points": 4.897045438301909
     },
     "starting_xi": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.8238320826783507
+        "team": "Brighton",
+        "expected_points": 2.9398808352076324
       },
       {
         "player_id": 477424,
@@ -133,25 +133,25 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
         "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 3.539796717037047
+        "team": "Liverpool",
+        "expected_points": 4.897045438301909
       }
     ],
     "bench": [
       {
-        "player_id": 489639,
-        "name": "Bart Verbruggen",
-        "short_name": "Verbruggen",
+        "player_id": 67089,
+        "name": "Martin Dubravka",
+        "short_name": "Dubravka",
         "position": "GK",
-        "team": "Brighton",
-        "expected_points": 2.9398808352076324
+        "team": "Spurs",
+        "expected_points": 0.10027015579447286
       },
       {
         "player_id": 244723,
@@ -184,53 +184,53 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
-            "team": "Arsenal"
+            "player_id": 219168,
+            "name": "Alexander Isak",
+            "short_name": "Isak",
+            "position": "FWD",
+            "team": "Liverpool"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 67089,
-            "name": "Martin Dubravka",
-            "short_name": "Dubravka",
-            "position": "GK",
-            "team": "Spurs"
+            "player_id": 475168,
+            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+            "short_name": "Jesus",
+            "position": "FWD",
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.39820638962787
+        "expected_points": 56.95552116251325
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 522047,
-            "name": "Tarik Muharemovi\u0107",
-            "short_name": "Muharemovi\u0107",
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
             "position": "DEF",
-            "team": "Leeds"
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 219924,
-            "name": "Issa Diop",
-            "short_name": "Diop",
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
             "position": "DEF",
-            "team": "Ipswich Town"
+            "team": "Crystal Palace"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.93198844192675
+        "expected_points": 58.317714073555734
       },
       {
         "gameweek": 7,
@@ -256,59 +256,59 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.408689567959165
+        "expected_points": 58.79441519958816
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
-            "position": "FWD",
-            "team": "Liverpool"
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
+            "position": "MID",
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
+            "position": "MID",
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.76593828922403
+        "expected_points": 59.478364232587595
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
+            "position": "MID",
+            "team": "Chelsea"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 146426,
-            "name": "Semi Ajayi",
-            "short_name": "Ajayi",
-            "position": "DEF",
-            "team": "Hull City"
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
+            "position": "MID",
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.983638495043444
+        "expected_points": 59.37383342316892
       }
     ],
     "stated_limits": [
@@ -324,17 +324,17 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 36.32330503066237,
+    "expected_points_cost_ceiling": 32.31472040537449,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 31.504999999999995,
+    "control_optimality_gap": 29.156999999999982,
     "rival_entry_id": 6879786,
-    "overlap_count": 2,
+    "overlap_count": 1,
     "transfer_cap": 1,
     "overlap_target": 5,
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 15.048662152456835,
+    "expected_gap_vs_rival": 15.605976925342212,
     "captain_agreement": false
   }
 }

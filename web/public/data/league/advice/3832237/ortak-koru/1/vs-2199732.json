@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,7 +27,7 @@
           "position": "FWD",
           "team": "Man City"
         },
-        "expected_points_delta": 9.293296881686075,
+        "expected_points_delta": 9.377314180777319,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -46,17 +46,17 @@
           "position": "DEF",
           "team": "Arsenal"
         },
-        "expected_points_delta": -2.408883251299038,
+        "expected_points_delta": -2.408883251299031,
         "reason_code": "mode_tradeoff"
       },
       {
         "move_id": "gw05-3",
         "player_out": {
-          "player_id": 430871,
-          "name": "Matheus Santos Carneiro da Cunha",
-          "short_name": "Cunha",
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
           "position": "MID",
-          "team": "Man Utd"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 60307,
@@ -65,7 +65,7 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.2528354518057654,
+        "expected_points_delta": -0.4137845310726078,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -89,27 +89,27 @@
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 8.690172488512736,
-    "expected_points_cost": 1.4846919445801632,
+    "expected_gain_vs_hold": 8.107569804725614,
+    "expected_points_cost": 1.9626784304638392,
     "rival_label": "entry-2199732",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 52.697032594250764,
+    "expected_own_points": 52.07137483558148,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
-      "player_id": 437730,
-      "name": "Antoine Semenyo",
-      "short_name": "Semenyo",
+      "player_id": 446008,
+      "name": "Bryan Mbeumo",
+      "short_name": "Mbeumo",
       "position": "MID",
-      "team": "Man City",
-      "expected_points": 4.620473859853053
+      "team": "Man Utd",
+      "expected_points": 4.415892336727386
     },
     "starting_xi": [
       {
@@ -145,14 +145,6 @@
         "expected_points": 2.0636451338320074
       },
       {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.620473859853053
-      },
-      {
         "player_id": 446008,
         "name": "Bryan Mbeumo",
         "short_name": "Mbeumo",
@@ -167,6 +159,14 @@
         "position": "MID",
         "team": "Brighton",
         "expected_points": 4.206689328780451
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 3.9538538769746867
       },
       {
         "player_id": 424876,
@@ -190,7 +190,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 502500,
@@ -198,7 +198,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       }
     ],
     "bench": [
@@ -224,7 +224,7 @@
         "short_name": "Sauceda",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 1.5182138705784642
+        "expected_points": 1.9840939651002099
       },
       {
         "player_id": 106611,
@@ -245,7 +245,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 2199732,
-    "expected_points_cost_ceiling": 1.4846919445801632,
+    "expected_points_cost_ceiling": 1.9626784304638392,
     "overlap_count": 6,
     "transfer_cap": 4,
     "overlap_target": 9,
@@ -255,10 +255,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 12.210669567386894,
-      "expected_points_cost_ceiling": 12.210669567386894
+      "expected_points_cost": 11.978980995510057,
+      "expected_points_cost_ceiling": 11.978980995510057
     },
-    "expected_gap_vs_rival": 1.0979937238428263,
+    "expected_gap_vs_rival": 0.43032731562792037,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

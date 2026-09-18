@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,24 +27,24 @@
           "position": "FWD",
           "team": "Leeds"
         },
-        "expected_points_delta": 0.09572268028838948,
+        "expected_points_delta": 0.09572268028837527,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.09572268028838948,
-    "expected_points_cost": 0.0,
+    "expected_gain_vs_hold": 0.09572268028837527,
+    "expected_points_cost": 0.03604014888156826,
     "rival_label": "entry-2281624",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 55.88158039505903,
+    "expected_own_points": 55.96559769415026,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -133,7 +133,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 177815,
@@ -204,36 +204,10 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.88158039505903
+        "expected_points": 55.965597694150276
       },
       {
         "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 551210,
-            "name": "Jorrel Hato",
-            "short_name": "Hato",
-            "position": "DEF",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 57.22416473054194
-      },
-      {
-        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 513418,
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 58.376745118596894
+        "expected_points": 57.11817808220522
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
+            "position": "GK",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
+            "position": "GK",
+            "team": "Brighton"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 58.00212932967594
       }
     ],
     "stated_limits": [
@@ -274,9 +274,9 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 18.937923963507217,
+    "expected_points_cost_ceiling": 19.137008427895864,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 17.709000000000003,
+    "control_optimality_gap": 17.491000000000014,
     "rival_entry_id": 2281624,
     "overlap_count": 5,
     "transfer_cap": 1,
@@ -284,15 +284,15 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 6.957616676360622,
+    "expected_gap_vs_rival": 6.956533227981922,
     "captain_agreement": false,
     "top100": {
       "weight": 40,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }
