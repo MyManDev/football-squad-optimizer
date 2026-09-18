@@ -13,8 +13,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from squadopt.backtest.production_benchmark import (
+    DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
+    DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
+)
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, ARCHIVE_REPOSITORY, SUPPORTED_SEASONS
+from squadopt.evaluation import EvaluationResult
 from squadopt.experiments import SCREENING_EXPERIMENT_CONTRACT_VERSION
+from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import FEATURE_GENERATION_CONTRACT_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -134,3 +140,46 @@ def _bootstrap_gap_interval(
         pick = generator.integers(0, n, size=n)
         gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
     return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
+
+
+def measurement_optimization_config() -> OptimizationConfig:
+    """The solver limits of a run that writes a committed record.
+
+    ``OptimizationConfig()`` binds on ten wall-clock seconds, so a busy machine gives the
+    solver less work, a solve that would have been proved returns an incumbent, and the same
+    commit writes a different record (#590: the rotation ceiling moved from 0.959 to 0.667 and
+    lost five folds under load). Deterministic time measures solver work, not elapsed seconds,
+    so it is the binding limit here and the wall clock is a cap far above it. The values are
+    the production benchmark's, so a measurement and the benchmark solve under one policy.
+    """
+
+    return OptimizationConfig(
+        solver_time_limit_seconds=DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
+        solver_deterministic_time_limit=DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
+    )
+
+
+def solver_record(*results: EvaluationResult) -> dict[str, object]:
+    """What a record has to say about the solves it rests on.
+
+    The limits the solver ran under, and how many of the solves were proved and how many
+    returned an incumbent. A number over unproven solves is still a number; a reader who
+    cannot tell which kind it is cannot tell whether a re-run may move it.
+    """
+
+    config = results[0].config.optimization_config
+    statuses: dict[str, int] = {}
+    for result in results:
+        for fold in result.folds:
+            name = fold.optimization_result.solver_status.value
+            statuses[name] = statuses.get(name, 0) + 1
+    return {
+        "solver_time_limit_seconds": config.solver_time_limit_seconds,
+        "solver_deterministic_time_limit": config.solver_deterministic_time_limit,
+        "binding_limit": (
+            "deterministic_time"
+            if config.solver_deterministic_time_limit is not None
+            else "wall_clock"
+        ),
+        "solver_status_counts": dict(sorted(statuses.items())),
+    }
