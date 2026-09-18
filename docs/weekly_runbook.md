@@ -1,5 +1,10 @@
 # Weekly runbook — the league advice loop
 
+Before publishing, run `python -m scripts.check_league_tree web/public/data` against the
+candidate tree. It runs the wider menu, Top 100 and manager's-word release checks and exits
+non-zero on any finding. Pass a site origin URL instead to check its published `/data/league/`
+documents. This command reads inputs only; it does not publish or solve anything.
+
 One command produces everything the league members' pages need for the coming
 gameweek, from the capture to the site pull request, and — when asked — decides our
 own squad on the way:
