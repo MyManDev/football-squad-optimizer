@@ -36,6 +36,7 @@ _RUN_STATUSES: Final = frozenset({"completed", "failed"})
 #: The Top 100 settings ``league.advise`` accepts; zero is off. A wire contract states its
 #: own enum, and a test holds it equal to the application's ``TOP100_WEIGHTS``.
 ADVISE_TOP100_WEIGHTS: Final[tuple[int, ...]] = (0, 5, 10, 20, 30, 40, 50)
+ADVISE_CHIPS: Final[tuple[str, ...]] = ("wildcard", "freehit", "bboost", "3xc")
 _IDENTIFIER_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _IDEMPOTENCY_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 _SEASON_PATTERN: Final = re.compile(r"^[0-9]{4}-[0-9]{2}$")
@@ -203,7 +204,11 @@ class ApiCommandRequest:
         object.__setattr__(
             self,
             "chip",
-            _optional_pattern(self.chip, label="chip", pattern=_NAME_PATTERN),
+            _optional_pattern(
+                self.chip,
+                label="chip",
+                pattern=_IDENTIFIER_PATTERN if self.operation == "league.advise" else _NAME_PATTERN,
+            ),
         )
         if self.mode not in {None, "live", "replay"}:
             raise BackendApiContractError("mode must be 'live' or 'replay'.")
@@ -265,6 +270,8 @@ class ApiCommandRequest:
                 f"{self.operation} accepts no top100_weight or managers_word."
             )
         if self.operation == "league.advise":
+            if self.chip is not None and self.chip not in ADVISE_CHIPS:
+                raise BackendApiContractError("Unknown chip choice.")
             if (
                 self.season is None
                 or self.gameweek is None
@@ -286,14 +293,13 @@ class ApiCommandRequest:
                     for value in (
                         self.snapshot_id,
                         self.projection_artifact_id,
-                        self.chip,
                         self.mode,
                     )
                 )
                 or self.dry_run
             ):
                 raise BackendApiContractError(
-                    "league.advise accepts no snapshot, projection, chip, mode, or "
+                    "league.advise accepts no snapshot, projection, mode, or "
                     "dry_run; the server answers from the current capture."
                 )
             return
@@ -366,6 +372,8 @@ class ApiCommandRequest:
                 payload["top100_weight"] = self.top100_weight
             if self.managers_word:
                 payload["managers_word"] = True
+            if self.chip is not None:
+                payload["chip"] = self.chip
         else:
             payload["dry_run"] = self.dry_run
         return payload
@@ -421,7 +429,9 @@ class ApiCommandRequest:
             },
         }[operation]
         expected = common | specific
-        optional = {"top100_weight", "managers_word"} if operation == "league.advise" else set()
+        optional = (
+            {"top100_weight", "managers_word", "chip"} if operation == "league.advise" else set()
+        )
         actual = set(document) - optional
         if actual != expected:
             raise BackendApiContractError(
@@ -709,6 +719,7 @@ def backend_api_schema() -> dict[str, Any]:
     advise_switches = {
         "top100_weight": {"type": "integer", "enum": list(ADVISE_TOP100_WEIGHTS)},
         "managers_word": {"type": "boolean"},
+        "chip": {"enum": [None, *ADVISE_CHIPS]},
     }
     advise = _object(
         {

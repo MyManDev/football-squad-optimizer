@@ -1479,6 +1479,7 @@ def build_league_views(
         # Every advice document this member gets, kept with the bytes that landed so the
         # record digests what was published rather than a re-rendering of the payload.
         emitted: list[PublishedAdvice] = []
+        switches: list[PublishedAdvice] = []
 
         relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json"
         emitted.append(
@@ -1503,7 +1504,16 @@ def build_league_views(
         evidence_index: dict[str, object]
         if render.evidence_payload is not None:
             relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}/{MANAGERS_WORD_FILE}"
-            _write(relative, render.evidence_payload)
+            switches.append(
+                PublishedAdvice(
+                    COMPUTED_MODE,
+                    COMPUTED_WINDOW,
+                    None,
+                    relative,
+                    render.evidence_payload,
+                    _write(relative, render.evidence_payload),
+                )
+            )
             source = render.evidence_payload.get("evidence")
             source = source if isinstance(source, Mapping) else {}
             applied = source.get("applied")
@@ -1552,7 +1562,16 @@ def build_league_views(
                 f"{top100_directory}/"
                 f"{top100_file(weight, word_file=MANAGERS_WORD_FILE if word else None)}"
             )
-            _write(relative, payload)
+            switches.append(
+                PublishedAdvice(
+                    COMPUTED_MODE,
+                    COMPUTED_WINDOW,
+                    None,
+                    relative,
+                    payload,
+                    _write(relative, payload),
+                )
+            )
             (word_paths if word else paths)[str(weight)] = relative
         # The menu beyond the one-week pure-points plan, each document at its own address.
         documents: list[dict[str, object]] = []
@@ -1560,7 +1579,11 @@ def build_league_views(
         variant_computed: list[dict[str, object]] = []
         for strategy, window, rival_id, weight, payload in render.variant_payloads:
             relative = variant_path(entry_id, strategy, window, rival_id, weight)
-            _write(relative, payload)
+            switches.append(
+                PublishedAdvice(
+                    strategy, window, rival_id, relative, payload, _write(relative, payload)
+                )
+            )
             if weight:
                 documents.append(
                     {
@@ -1586,7 +1609,16 @@ def build_league_views(
         chip_paths: dict[str, str] = {}
         for chip, payload in render.chip_payloads:
             relative = f"{top100_directory}/{chip_file(chip)}"
-            _write(relative, payload)
+            switches.append(
+                PublishedAdvice(
+                    COMPUTED_MODE,
+                    COMPUTED_WINDOW,
+                    None,
+                    relative,
+                    payload,
+                    _write(relative, payload),
+                )
+            )
             chip_paths[chip] = relative
         kept_variants = {
             *paths.values(),
@@ -1829,6 +1861,7 @@ def build_league_views(
         # the rule could not be stated, or its file did not solve, the page shows the
         # pure-points baseline, and the record says which of the two it was rather than
         # leaving a later reader to re-apply a rule from inputs that have since moved.
+        emitted.extend(switches)
         emitted_paths = {item.relative_path for item in emitted}
         suggested_slug = str(suggested["strategy"]) if suggested is not None else None
         suggested_path = (

@@ -7,6 +7,33 @@
       "minLength": 1,
       "type": "string"
     },
+    "chips": {
+      "additionalProperties": false,
+      "properties": {
+        "held_by_entry": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[1-9][0-9]*$": {
+              "items": {
+                "enum": [
+                  "wildcard",
+                  "freehit",
+                  "bboost",
+                  "3xc"
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "held_by_entry"
+      ],
+      "type": "object"
+    },
     "contract_version": {
       "const": "league_capabilities_v1",
       "type": "string"
