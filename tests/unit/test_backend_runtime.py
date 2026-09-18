@@ -357,6 +357,67 @@ def test_a_new_capture_replaces_the_context_without_a_restart(
     assert second != first
 
 
+@pytest.mark.parametrize("retained", [False, True])
+def test_the_backend_follows_the_published_capture_without_a_restart(
+    deployment: dict[str, Any], retained: bool
+) -> None:
+    older = deployment["snapshot_id"]
+    root = deployment["handoff_root"]
+    original = handoff_path_for(root, SEASON, 2).read_bytes()
+    newer = write_snapshot(
+        deployment["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-27T10:00:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: world_module._bootstrap(
+                events=[dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]],
+                elements=world_module._elements(event_points=3),
+            ),
+            FIXTURES_PAYLOAD: b"[]",
+        },
+    ).snapshot_id
+    if retained:
+        saved = root / "by-capture" / older / "retained.json"
+        saved.parent.mkdir(parents=True)
+        saved.write_bytes(original)
+        _handoff(root, newer)
+    entry = deployment["site_root"] / "league" / "entries" / f"{ENTRY_ID}.json"
+    entry.parent.mkdir()
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": older}}), encoding="utf-8")
+    backend = build_backend(deployment["config"])
+    first = backend.contexts.current()
+    assert first is not None and first.capture_snapshot_id == older
+    assert backend.contexts.current() == first
+    assert backend.readiness() == (
+        True,
+        {
+            "capture_context": True,
+            "league_tree": True,
+            "cache_store": True,
+            "league_tree_matches_capture": True,
+        },
+    )
+    _handoff(root, newer)
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": newer}}), encoding="utf-8")
+    second = backend.contexts.current()
+    assert second is not None and second.capture_snapshot_id == newer
+    if retained:
+        saved.unlink()
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": older}}), encoding="utf-8")
+    assert backend.contexts.current() == second
+
+
+@pytest.mark.parametrize("published", ["fpl-live-missing", "../outside", None])
+def test_an_unusable_published_capture_keeps_the_latest_live_fallback(
+    deployment: dict[str, Any], published: str | None
+) -> None:
+    entry = deployment["site_root"] / "league" / "entries" / f"{ENTRY_ID}.json"
+    entry.parent.mkdir()
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": published}}), encoding="utf-8")
+    current = build_backend(deployment["config"]).contexts.current()
+    assert current is not None and current.capture_snapshot_id == deployment["snapshot_id"]
+
+
 def test_a_capture_a_week_ahead_of_the_tree_is_not_ready_until_the_tree_catches_up(
     deployment: dict[str, Any],
 ) -> None:

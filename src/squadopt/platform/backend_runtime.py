@@ -336,8 +336,9 @@ class CaptureContextProvider:
     def identity(self) -> CaptureIdentity | None:
         """The current capture's identity, reading it only when the capture changed."""
 
-        snapshot_id = latest_snapshot_id(self._config.snapshot_root)
-        if snapshot_id is None:
+        published_id = FileLeagueDirectory(self._config.site_data_root).published_snapshot_id()
+        latest_id = latest_snapshot_id(self._config.snapshot_root)
+        if published_id is None and latest_id is None:
             # Names the source, because the root is shared: it can hold cohort and
             # elite-picks captures and still hold nothing this adapter can serve advice
             # from. "No capture at all" would send an operator to look at the mount.
@@ -346,11 +347,23 @@ class CaptureContextProvider:
                 reason=f"no {FPL_LIVE_SOURCE} capture under the snapshot root",
             )
             return None
+        for snapshot_id in dict.fromkeys((published_id, latest_id)):
+            if snapshot_id is None:
+                continue
+            identity = self._identity_for(snapshot_id)
+            if identity is not None:
+                return identity
+        return None
+
+    def _identity_for(self, snapshot_id: str) -> CaptureIdentity | None:
         with self._lock:
             held = self._identity
             if held is not None and held.context.capture_snapshot_id == snapshot_id:
                 published = handoff_fingerprint_for(
-                    self._config.handoff_root, held.context.season, held.context.gameweek
+                    self._config.handoff_root,
+                    held.context.season,
+                    held.context.gameweek,
+                    snapshot_id,
                 )
                 if published == held.context.projection_handoff_fingerprint:
                     return held
