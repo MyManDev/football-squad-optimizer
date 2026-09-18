@@ -28,6 +28,20 @@ export interface PlayerReview {
   forecast_error: number | null;
 }
 
+export interface RecordedPlan {
+  published_path: string;
+  strategy: string;
+  window: number;
+  rival_entry_id: number | null;
+  chip: SuggestedScore["chip"];
+  captain: string | null;
+  moves: { player_out: string | null; player_in: string | null }[];
+  top100_weight?: number;
+  managers_word?: true;
+  expected_points_cost?: number;
+  expected_points_cost_ceiling?: number;
+}
+
 export interface WeekReview {
   gameweek: number;
   status: "available" | "unsettled" | "unavailable";
@@ -45,6 +59,7 @@ export interface WeekReview {
   actual_reason: string | null;
   net_difference: number | null;
   players: PlayerReview[];
+  recorded_plans?: RecordedPlan[];
 }
 
 export interface SuggestionHistory {
@@ -133,6 +148,51 @@ export function checkedHistory(value: unknown, entryId: number): SuggestionHisto
         (text(row.advice_sha256) && /^[a-f0-9]{64}$/.test(row.advice_sha256)),
     );
     requireThat(Array.isArray(row.players));
+    if (row.recorded_plans !== undefined) {
+      requireThat(Array.isArray(row.recorded_plans));
+      const paths = new Set<string>();
+      for (const item of row.recorded_plans) {
+        const plan = object(item);
+        requireThat(
+          text(plan.published_path) &&
+            plan.published_path.startsWith(`advice/${entryId}/`) &&
+            !paths.has(plan.published_path),
+        );
+        paths.add(plan.published_path);
+        requireThat(
+          [
+            "saf-puan",
+            "fark-yarat",
+            "ortak-koru",
+            "garantici",
+            "agresif",
+            "asiri-agresif",
+          ].includes(String(plan.strategy)),
+        );
+        requireThat([1, 3, 5].includes(plan.window as number));
+        requireThat(
+          plan.rival_entry_id === null ||
+            (Number.isSafeInteger(plan.rival_entry_id) && Number(plan.rival_entry_id) > 0),
+        );
+        requireThat(
+          [null, "wildcard", "freehit", "bboost", "3xc"].includes(plan.chip as string | null),
+        );
+        requireThat(plan.captain === null || text(plan.captain));
+        requireThat(
+          plan.top100_weight === undefined ||
+            [0, 5, 10, 20, 30, 40, 50].includes(plan.top100_weight as number),
+        );
+        requireThat(plan.managers_word === undefined || plan.managers_word === true);
+        for (const key of ["expected_points_cost", "expected_points_cost_ceiling"])
+          requireThat(plan[key] === undefined || number(plan[key]));
+        requireThat(Array.isArray(plan.moves));
+        for (const value of plan.moves) {
+          const move = object(value);
+          requireThat(move.player_out === null || text(move.player_out));
+          requireThat(move.player_in === null || text(move.player_in));
+        }
+      }
+    }
     if (row.status !== "available") {
       requireThat(
         text(row.reason) &&

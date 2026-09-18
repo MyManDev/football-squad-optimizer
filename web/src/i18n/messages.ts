@@ -4,6 +4,13 @@ export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
   suggestionHistory: {
+    recordedPlans: "Recorded Plans and Settings",
+    recordedPlansNote:
+      "These plans were recorded in the publication. This does not show what you chose, and these alternatives have not been scored against results here.",
+    recordedCost: "Cost in Expected Points",
+    recordedCeiling: "Recorded Cost Limit",
+    unknownPlayer: "Player Not Recorded",
+    noRecordedMoves: "No Moves Listed",
     title: "Weekly Suggestion History",
     overview: "Overview",
     systemNet: "System Suggestion · Net",
@@ -967,6 +974,13 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    recordedPlans: "Kaydedilmiş Planlar ve Ayarlar",
+    recordedPlansNote:
+      "Bu planlar yayında kaydedildi. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
+    recordedCost: "Beklenen Puan Maliyeti",
+    recordedCeiling: "Kaydedilen Maliyet Tavanı",
+    unknownPlayer: "Oyuncu Kaydedilmemiş",
+    noRecordedMoves: "Listelenen Hamle Yok",
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",
     systemNet: "Sistem Tavsiyesi · Net",

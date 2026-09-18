@@ -14,6 +14,7 @@ import {
 } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
 import { summarizeHistory } from "../history/historySummary";
+import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
@@ -265,6 +266,7 @@ function WeekResult({ week }: { week: WeekReview }) {
           </>
         )}
       </Card>
+      <RecordedPlans week={week} />
       {week.status === "available" && (
         <Card title={copy.players}>
           <p className={styles.muted}>{copy.playerNote}</p>
@@ -346,5 +348,74 @@ function WeekResult({ week }: { week: WeekReview }) {
         </dl>
       </details>
     </>
+  );
+}
+
+function RecordedPlans({ week }: { week: WeekReview }) {
+  const { messages, language, locale } = useLanguage();
+  const copy = messages.suggestionHistory;
+  if (!week.recorded_plans?.length) return null;
+  const labels: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(messages.leagueMembers.strategies).map(([key, value]) => [key, value.name]),
+    ),
+    garantici: messages.decision.modes.safe,
+    agresif: messages.decision.modes.aggressive,
+    "asiri-agresif": messages.decision.modes.extreme,
+  };
+  return (
+    <details className={styles.evidence}>
+      <summary>{copy.recordedPlans}</summary>
+      <p>{copy.recordedPlansNote}</p>
+      <ul>
+        {week.recorded_plans.map((plan) => (
+          <li key={plan.published_path}>
+            <p>
+              <strong>
+                {[
+                  labels[plan.strategy],
+                  messages.decision.week(plan.window),
+                  plan.rival_entry_id === null
+                    ? null
+                    : `${messages.leagueMembers.rivalLabel}: #${plan.rival_entry_id}`,
+                  plan.top100_weight === undefined ? null : `Top 100 ${plan.top100_weight}`,
+                  plan.managers_word === true ? EVIDENCE_COPY[language].legend : null,
+                  plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              </strong>
+            </p>
+            {plan.captain !== null && (
+              <p>
+                {copy.captain}: {plan.captain}
+              </p>
+            )}
+            {plan.expected_points_cost !== undefined && (
+              <p>
+                {copy.recordedCost}: {points(plan.expected_points_cost, 1, locale)}
+              </p>
+            )}
+            {plan.expected_points_cost_ceiling !== undefined && (
+              <p>
+                {copy.recordedCeiling}: {points(plan.expected_points_cost_ceiling, 1, locale)}
+              </p>
+            )}
+            {plan.moves.length ? (
+              <ul>
+                {plan.moves.map((move, index) => (
+                  <li key={index}>
+                    {messages.leagueMembers.out}: {move.player_out ?? copy.unknownPlayer};{" "}
+                    {messages.leagueMembers.in}: {move.player_in ?? copy.unknownPlayer}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>{copy.noRecordedMoves}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

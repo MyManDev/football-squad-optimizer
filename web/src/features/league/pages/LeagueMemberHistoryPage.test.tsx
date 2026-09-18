@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, expect, it } from "vitest";
 import fixture from "../../../fixtures/weeklySuggestionHistory.json";
+import planRows from "../../../fixtures/recordedPlanRows.json";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { type Language, MESSAGES } from "../../../i18n/messages";
 import type { SuggestionHistory } from "../history/historyData";
@@ -10,6 +11,28 @@ import { LeagueMemberHistoryView } from "./LeagueMemberHistoryPage";
 import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOverview";
 
 afterEach(cleanup);
+it.each<Language>(["tr", "en"])(
+  "keeps archived plans collapsed and old prices absent in %s",
+  async (language) => {
+    const value = history();
+    Object.assign(value.payload.weeks[0], { recorded_plans: planRows });
+    show(value, language);
+    const copy = MESSAGES[language].suggestionHistory;
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    const summary = screen.getByText(copy.recordedPlans);
+    const section = summary.closest("details")!;
+    expect(section).not.toHaveAttribute("open");
+    await userEvent.click(summary);
+    expect(section).toHaveAttribute("open");
+    expect(section).toHaveTextContent("Player 8");
+    expect(section).toHaveTextContent("Player 1");
+    expect(section).toHaveTextContent("#17");
+    expect(section).toHaveTextContent("Top 100 20");
+    expect(section).not.toHaveTextContent("Top 100 0");
+    expect(within(section).getAllByText(new RegExp(copy.recordedCost))).toHaveLength(1);
+    expect(section).toHaveTextContent(language === "tr" ? "2,5" : "2.5");
+  },
+);
 const history = () => structuredClone(fixture) as SuggestionHistory;
 function show(value = history(), language: Language = "tr") {
   return render(

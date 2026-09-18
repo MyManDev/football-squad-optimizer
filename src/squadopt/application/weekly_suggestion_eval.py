@@ -629,6 +629,56 @@ def live_series_reading(
     return read_live_series(settled_member_week_comparisons(reviews, season=season), policy=policy)
 
 
+def _history_week(
+    week: WeekReview, record_root: Path, season: str, entry_id: int
+) -> dict[str, Any]:
+    """Add only recorded decisions from the exact publication already selected for this week."""
+    result = asdict(week)
+    if week.advice_snapshot_id is None:
+        return result
+    record = load_member_advice_record(
+        record_root, season, week.gameweek, entry_id, week.advice_snapshot_id
+    )
+    documents = cast(list[dict[str, Any]], record.get("advice", []))
+    fields = (
+        "expected_points_cost",
+        "expected_points_cost_ceiling",
+        "top100_weight",
+        "managers_word",
+    )
+    # Older archives did not retain settings. Missing evidence cannot mean switches off.
+    if not any(any(field in doc for field in fields) for doc in documents):
+        return result
+    players = cast(dict[str, dict[str, Any]], record.get("players", {}))
+
+    def name(player_id: object) -> str | None:
+        if player_id is None:
+            return None
+        return str(players.get(str(player_id), {}).get("name", f"#{player_id}"))
+
+    result["recorded_plans"] = [
+        {
+            "published_path": doc["published_path"],
+            "strategy": doc["strategy"],
+            "window": doc["window"],
+            "rival_entry_id": doc.get("rival_entry_id"),
+            "chip": doc.get("chip"),
+            "captain": name(doc.get("captain")),
+            "moves": [
+                {
+                    "player_out": name(move.get("player_out")),
+                    "player_in": name(move.get("player_in")),
+                }
+                for move in doc.get("moves", [])
+            ],
+            **{field: doc[field] for field in fields if field in doc},
+        }
+        for doc in documents
+        if "published_path" in doc
+    ]
+    return result
+
+
 def publish_suggestion_histories(
     *,
     record_root: Path,
@@ -666,7 +716,9 @@ def publish_suggestion_histories(
                 "entry_id": entry_id,
                 "season": season,
                 "as_of_snapshot_id": as_of_snapshot.metadata.snapshot_id,
-                "weeks": [asdict(week) for week in reviews[entry_id]],
+                "weeks": [
+                    _history_week(week, record_root, season, entry_id) for week in reviews[entry_id]
+                ],
             },
         }
         path = out_dir / "history" / f"{entry_id}.json"
