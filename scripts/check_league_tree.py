@@ -46,12 +46,14 @@ class Tree:
             if not path.is_file():
                 return None
             raw = path.read_text(encoding="utf-8")
-        if relative.endswith("/hoca-sozu.json"):
+        if self.live and relative.endswith("/hoca-sozu.json"):
             self.word_files[relative] = raw
         try:
             return json.loads(raw)
-        except ValueError:
-            return None
+        except ValueError as error:
+            if self.live:
+                return None
+            raise ValueError(f"{path} exists and does not parse as JSON") from error
 
 
 def walk(node, where, problems):
@@ -268,9 +270,14 @@ def check_word(tree):
             check(False, f"{entry}: index has no evidence entry")
             continue
         word_file = f"{advice_dir}/saf-puan/1/hoca-sozu.json"
+        word_exists = (
+            read(word_file) is not None
+            if tree.live
+            else (Path(tree.root) / "league" / word_file).is_file()
+        )
         if not evidence.get("available"):
             check(
-                read(word_file) is None,
+                not word_exists,
                 f"{entry}: unavailable ({evidence.get('reason')}) and no file",
             )
             continue
@@ -279,7 +286,7 @@ def check_word(tree):
             evidence.get("path") == f"advice/{entry}/saf-puan/1/hoca-sozu.json",
             f"{entry}: index path",
         )
-        check(read(word_file) is not None, f"{entry}: hoca-sozu.json exists")
+        check(word_exists, f"{entry}: hoca-sozu.json exists")
         doc = read(word_file)["payload"]
         base = read(f"{advice_dir}/saf-puan/1.json")["payload"]
         ev = doc.get("evidence") or {}
@@ -328,14 +335,17 @@ def check_word(tree):
         f"withheld {withheld}"
     )
 
-    if not tree.live:
-        for path in Path(tree.root).rglob("hoca-sozu.json"):
-            tree.word_files[path.relative_to(Path(tree.root)).as_posix()] = path.read_text(
-                encoding="utf-8"
-            )
+    word_files = (
+        tree.word_files
+        if tree.live
+        else {
+            path.relative_to(Path(tree.root)).as_posix(): path.read_text(encoding="utf-8")
+            for path in Path(tree.root).rglob("hoca-sozu.json")
+        }
+    )
     hits = [
         path
-        for path, text in tree.word_files.items()
+        for path, text in word_files.items()
         if "80%" in text or re.search(r"per\s?cent", text, re.IGNORECASE)
     ]
     check(not hits, f"no switched-on file carries the figure ({hits[:3]})")
@@ -348,6 +358,12 @@ def main(argv=None):
     parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
     args = parser.parse_args(argv)
     tree = Tree(args.root)
+    if not tree.live and not (Path(tree.root) / "league" / "members.json").is_file():
+        print(
+            f"Missing {Path(tree.root) / 'league' / 'members.json'}; "
+            "pass the directory containing league/, such as <preview>/data."
+        )
+        return 1
     findings = []
     for name, check in (
         ("variants", lambda: check_variants(tree.read)),

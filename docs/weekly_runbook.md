@@ -1,10 +1,5 @@
 # Weekly runbook — the league advice loop
 
-Before publishing, run `python -m scripts.check_league_tree web/public/data` against the
-candidate tree. It runs the wider menu, Top 100 and manager's-word release checks and exits
-non-zero on any finding. Pass a site origin URL instead to check its published `/data/league/`
-documents. This command reads inputs only; it does not publish or solve anything.
-
 One command produces everything the league members' pages need for the coming
 gameweek, from the capture to the site pull request, and — when asked — decides our
 own squad on the way:
@@ -49,6 +44,14 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | site | `scripts.build_site` | the ledger and captures | `<preview>/data/**` season views (they read the ledger, so after the decision) |
 | scoreboard | `scripts.build_scoreboard --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>` | the capture, the registry, the ledger, and the Top-100 captures when they were taken or reused | `<preview>/data/league/scoreboard.json` — per played gameweek: the game's average and highest, every member's gross week, hit cost and net, our ledger row with its mode and its scoring basis, the Top-100 mean for the cohort capture's own week with the basis it is on; `null` wherever a file on disk does not say |
 | publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --cohort-snapshot … --elite-snapshot … --workers …` (only with `--publish`) | a clean `origin/develop` | an owned `.codex-tmp/publications/gw<NN>-decision[-<suffix>]` worktree, a commit of `web/public/data` holding the preview's `data/` tree, copied in over the tree the worktree carried from `origin/develop` and read back byte for byte before the commit (nothing is solved again: what was previewed is what ships), a push, a pull request; then the printed human steps: merge, release, tag, dispatch. The advice record at this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` is the league step's, written from the solve that ships: the immutable record of what each member was told, digests included, so the week can be reviewed after the site has been overwritten. One record per capture: publishing a week twice (mid-week, then again before the deadline from a fresher capture) records both, and the review page reads the last capture that preceded the deadline. What is **refused** is rebuilding *one* capture into different bytes — the capture is the whole input, so that difference is our own code's — with the differing fields named; if the deadline will not wait, `--no-advice-record` publishes without recording and leaves the first record and the difference to be reconciled afterwards. Typed by hand rather than run through `--publish`, this command builds by shelling out with `cwd` in the worktree, which takes `scripts` from the worktree and `squadopt` from wherever the interpreter's install points; a `squadopt` outside the worktree is **refused** before any build, with both paths named, because a tree built from two revisions cannot be attributed to either. Recovery is to bring that checkout up to `origin/develop`; `--allow-split-build` publishes anyway and prints both paths |
+
+Before publishing, run `python -m scripts.check_league_tree <preview>/data` against the
+candidate tree, or use the publication worktree's `web/public/data`. It runs the wider
+menu, Top 100 and manager's-word release checks and exits non-zero on any finding.
+Pass a site origin URL instead to check its published `/data/league/` documents. The URL
+form is narrower: its figure sweep covers only the word files it fetches, while the local
+check sweeps every word file under the supplied root. This command only reads the tree;
+it does not publish or solve anything.
 
 Existing captures can be named explicitly: `--cohort-snapshot` / `--elite-snapshot`
 reuse the Top-100 captures (an export already on disk for that picks capture is reused,
