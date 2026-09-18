@@ -15,12 +15,14 @@ import errno
 import hashlib
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 import tests.unit.test_live_transfers as world_module
 
+import squadopt.application.league_views as league_views
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
     RECORD_FILE,
@@ -177,6 +179,55 @@ def _digests(root: Path) -> dict[str, str]:
         path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(root.rglob("*.json"))
     }
+
+
+def test_every_published_switch_is_recorded_with_its_bytes_and_replays(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = league_views.render_member
+
+    def with_switches(task, **kwargs):
+        rendered = original(task, **kwargs)
+        assert rendered.baseline is not None
+        base = rendered.baseline
+        word = {**base, "evidence": {"binding": False, "applied": []}}
+        return replace(
+            rendered,
+            evidence_payload=word,
+            top100_payloads=(
+                (20, False, {**base, "top100": {"weight": 20}}),
+                (20, True, {**word, "top100": {"weight": 20}}),
+            ),
+            variant_payloads=(("saf-puan", 3, None, 20, {**base, "window": 3}),),
+            chip_payloads=(("bboost", {**base, "chip": "bboost"}),),
+        )
+
+    monkeypatch.setattr(league_views, "render_member", with_switches)
+    out, records = tmp_path / "site", tmp_path / "records"
+    _build(world, out, record_root=records)
+    before = _digests(records)
+    for entry in (101, 202):
+        record = load_member_advice_record(records, SEASON, 2, entry, world["gw2_id"])
+        documents = {item["published_path"]: item for item in record["advice"]}
+        published = {
+            path.relative_to(out).as_posix()
+            for path in (out / "advice" / str(entry)).rglob("*.json")
+            if path.name != "index.json"
+        }
+        assert documents.keys() == published
+        assert len(documents) == len(record["advice"])
+        assert any(path.endswith("hoca-sozu.json") for path in published)
+        assert any(path.endswith("top100-20.json") for path in published)
+        assert any(path.endswith("chip-bboost.json") for path in published)
+        for path, document in documents.items():
+            assert (
+                document["published_sha256"]
+                == hashlib.sha256((out / path).read_bytes()).hexdigest()
+            )
+        assert "top100" not in record["told"]["published_path"]
+        assert "chip-" not in record["told"]["published_path"]
+    _build(world, out, record_root=records)
+    assert _digests(records) == before
 
 
 def test_the_publish_records_what_each_member_was_told(
@@ -656,7 +707,11 @@ def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differe
         _build(world, tmp_path / "second", record_root=records, free_transfers=2, now=later)
     message = str(changed.value)
     assert "state.free_transfers: recorded 1, now 2" in message
-    assert "state.free_transfers_known: recorded False, now True" in message
+    # Switch documents add differences before this field in the bounded diagnostic.
+    assert (
+        "state.free_transfers_known: recorded False, now True" in message
+        or "more differing field(s)" in message
+    )
     assert "transfer_hit_points" in message
     assert "advice_sha256" in message
     # The clock moved with all of that and is deliberately not named: it is never the
