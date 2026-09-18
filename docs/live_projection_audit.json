@@ -1,0 +1,1760 @@
+{
+  "captures_read": [
+    "fpl-live-20260910T190328Z-e46daae991bd",
+    "fpl-live-20260910T190430Z-369360398135",
+    "fpl-live-20260912T082014Z-6d6236f98aaf",
+    "fpl-live-20260912T100000Z-24613792ef57",
+    "fpl-live-20260915T175225Z-382941835994",
+    "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "fpl-live-20260918T122516Z-cd5c04029774"
+  ],
+  "contract_version": "live_projection_audit_v1",
+  "descriptive_only": true,
+  "gameweeks": {
+    "1": {
+      "deadline_utc": "2026-08-21T17:30:00Z",
+      "pre_deadline_capture": null,
+      "projections": [
+        {
+          "ledger_mode": "live",
+          "model_version": "opening-carry-over-v1",
+          "note": "The capture this projection was made from was lost on 2026-09-10, and with it the game's forecast and the unconditional projection. An opening-week model, read for our decided numbers only and never pooled.",
+          "reading": {
+            "forecasts": {
+              "ours_decided": {
+                "all_players": {
+                  "bias": 0.03827052029110121,
+                  "mean_absolute_error": 1.5969138848541944,
+                  "mean_forecast": 1.5383961463755655,
+                  "mean_realized": 1.5766666666666667,
+                  "players": 600
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.5888674395141029,
+                      "forecast_points": 174.70900907238206,
+                      "mean_absolute_error": 1.1147731880280825,
+                      "mean_forecast": 1.7827449905345107,
+                      "mean_realized": 1.1938775510204083,
+                      "players": 98
+                    },
+                    "60_and_above": {
+                      "bias": 1.7137872927459306,
+                      "forecast_points": 469.1046685233546,
+                      "mean_absolute_error": 2.7127454678864855,
+                      "mean_forecast": 2.2338317548731172,
+                      "mean_realized": 3.947619047619048,
+                      "players": 210
+                    },
+                    "did_not_appear": {
+                      "bias": -0.9562466103753515,
+                      "forecast_points": 279.22401022960264,
+                      "mean_absolute_error": 0.9562466103753515,
+                      "mean_forecast": 0.9562466103753515,
+                      "mean_realized": 0.0,
+                      "players": 292
+                    }
+                  },
+                  "forecast_points": 923.0376878253393,
+                  "forecast_points_on_players_who_did_not_appear": 279.22401022960264,
+                  "share_on_players_who_did_not_appear": 0.30250553570293487
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.21506502801264435,
+                    "mean_absolute_error": 1.762882944545596,
+                    "mean_forecast": 1.5021066891590726,
+                    "mean_realized": 1.7171717171717171,
+                    "players": 198
+                  },
+                  "FWD": {
+                    "bias": -0.35529669670303865,
+                    "mean_absolute_error": 1.4652162818765377,
+                    "mean_forecast": 1.6469633633697054,
+                    "mean_realized": 1.2916666666666667,
+                    "players": 72
+                  },
+                  "GK": {
+                    "bias": -0.36079750383790204,
+                    "mean_absolute_error": 1.3241776445106654,
+                    "mean_forecast": 1.390648250106559,
+                    "mean_realized": 1.0298507462686568,
+                    "players": 67
+                  },
+                  "MID": {
+                    "bias": 0.11457882717838544,
+                    "mean_absolute_error": 1.5774982259131682,
+                    "mean_forecast": 1.5736341005782684,
+                    "mean_realized": 1.688212927756654,
+                    "players": 263
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.08020421010348736,
+                    "mean_absolute_error": 1.6406308602753397,
+                    "mean_forecast": 1.680834750935474,
+                    "mean_realized": 1.761038961038961,
+                    "players": 385
+                  },
+                  "above_7.5": {
+                    "bias": -0.9912567211954656,
+                    "mean_absolute_error": 3.339874428628686,
+                    "mean_forecast": 4.407923387862133,
+                    "mean_realized": 3.4166666666666665,
+                    "players": 12
+                  },
+                  "under_5.0": {
+                    "bias": 0.019599861769279258,
+                    "mean_absolute_error": 1.4109702293742195,
+                    "mean_forecast": 1.0986267392159423,
+                    "mean_realized": 1.1182266009852218,
+                    "players": 203
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 198,
+                      "spearman": 0.421791790780302
+                    },
+                    "FWD": {
+                      "players": 72,
+                      "spearman": 0.5445152834771004
+                    },
+                    "GK": {
+                      "players": 67,
+                      "spearman": 0.5490239689828823
+                    },
+                    "MID": {
+                      "players": 263,
+                      "spearman": 0.5288672540207513
+                    }
+                  },
+                  "players": 600,
+                  "weighted_mean": 0.4976609478569363
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 77,
+                      "spearman": 0.43989641676109403
+                    },
+                    "DEF|under_5.0": {
+                      "players": 120,
+                      "spearman": 0.3032994694686616
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 56,
+                      "spearman": 0.5280959378723684
+                    },
+                    "FWD|above_7.5": {
+                      "players": 4,
+                      "spearman": 0.0
+                    },
+                    "FWD|under_5.0": {
+                      "players": 12,
+                      "spearman": 0.25482359571881286
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 21,
+                      "spearman": 0.5064530204487957
+                    },
+                    "GK|under_5.0": {
+                      "players": 46,
+                      "spearman": 0.3720854338700904
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 231,
+                      "spearman": 0.4976739214331731
+                    },
+                    "MID|above_7.5": {
+                      "players": 7,
+                      "spearman": -0.5345224838248489
+                    },
+                    "MID|under_5.0": {
+                      "players": 25,
+                      "spearman": 0.11536762364566733
+                    }
+                  },
+                  "players": 599,
+                  "weighted_mean": 0.40860745999866716
+                },
+                "top_per_position": {
+                  "bias": -0.1332114951892825,
+                  "mean_absolute_error": 2.4703754091350363,
+                  "mean_forecast": 2.770711495189283,
+                  "mean_realized": 2.6375,
+                  "per_position": 40,
+                  "players": 160
+                }
+              }
+            },
+            "players": 600
+          },
+          "source": "ledger projections.csv (availability already applied)"
+        }
+      ]
+    },
+    "4": {
+      "deadline_utc": "2026-09-12T12:30:00Z",
+      "hours_before_deadline": 2.5,
+      "pre_deadline_capture": "fpl-live-20260912T100000Z-24613792ef57",
+      "projections": [
+        {
+          "handoff_fingerprint": "e7abac4df7be17c17bee5922dfc575d1f091bb2bf57d41633eed08335a7027f4",
+          "in_ledger": true,
+          "ledger_mode": "replay",
+          "model_name": "squadopt-deterministic-baseline",
+          "model_version": "phase_c_control_components_v1",
+          "reading": {
+            "forecasts": {
+              "game": {
+                "all_players": {
+                  "bias": -0.003963414634146347,
+                  "mean_absolute_error": 1.234451219512195,
+                  "mean_forecast": 1.4079268292682927,
+                  "mean_realized": 1.4039634146341464,
+                  "players": 656
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.3600000000000001,
+                      "forecast_points": 174.6,
+                      "mean_absolute_error": 1.5854545454545454,
+                      "mean_forecast": 1.5872727272727272,
+                      "mean_realized": 1.2272727272727273,
+                      "players": 110
+                    },
+                    "60_and_above": {
+                      "bias": 0.7223350253807107,
+                      "forecast_points": 643.7,
+                      "mean_absolute_error": 2.6908629441624368,
+                      "mean_forecast": 3.26751269035533,
+                      "mean_realized": 3.989847715736041,
+                      "players": 197
+                    },
+                    "did_not_appear": {
+                      "bias": -0.30171919770773636,
+                      "forecast_points": 105.3,
+                      "mean_absolute_error": 0.30171919770773636,
+                      "mean_forecast": 0.30171919770773636,
+                      "mean_realized": 0.0,
+                      "players": 349
+                    }
+                  },
+                  "forecast_points": 923.6,
+                  "forecast_points_on_players_who_did_not_appear": 105.3,
+                  "share_on_players_who_did_not_appear": 0.11401039411000433
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.04511627906976744,
+                    "mean_absolute_error": 1.4711627906976743,
+                    "mean_forecast": 1.5130232558139536,
+                    "mean_realized": 1.558139534883721,
+                    "players": 215
+                  },
+                  "FWD": {
+                    "bias": 0.2141025641025641,
+                    "mean_absolute_error": 1.226923076923077,
+                    "mean_forecast": 1.2346153846153847,
+                    "mean_realized": 1.4487179487179487,
+                    "players": 78
+                  },
+                  "GK": {
+                    "bias": 0.252112676056338,
+                    "mean_absolute_error": 0.8549295774647888,
+                    "mean_forecast": 0.9309859154929576,
+                    "mean_realized": 1.1830985915492958,
+                    "players": 71
+                  },
+                  "MID": {
+                    "bias": -0.16061643835616438,
+                    "mean_absolute_error": 1.1544520547945205,
+                    "mean_forecast": 1.4928082191780823,
+                    "mean_realized": 1.332191780821918,
+                    "players": 292
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.029446064139941684,
+                    "mean_absolute_error": 1.4166180758017493,
+                    "mean_forecast": 1.6994169096209912,
+                    "mean_realized": 1.728862973760933,
+                    "players": 343
+                  },
+                  "above_7.5": {
+                    "bias": -1.04375,
+                    "mean_absolute_error": 2.86875,
+                    "mean_forecast": 5.73125,
+                    "mean_realized": 4.6875,
+                    "players": 16
+                  },
+                  "under_5.0": {
+                    "bias": 0.01346801346801348,
+                    "mean_absolute_error": 0.936026936026936,
+                    "mean_forecast": 0.8383838383838383,
+                    "mean_realized": 0.8518518518518519,
+                    "players": 297
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 215,
+                      "spearman": 0.6127198172452836
+                    },
+                    "FWD": {
+                      "players": 78,
+                      "spearman": 0.7218321593436717
+                    },
+                    "GK": {
+                      "players": 71,
+                      "spearman": 0.8801018276253848
+                    },
+                    "MID": {
+                      "players": 292,
+                      "spearman": 0.7237323755781999
+                    }
+                  },
+                  "players": 656,
+                  "weighted_mean": 0.7040468789127731
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 62,
+                      "spearman": 0.5929292609725801
+                    },
+                    "DEF|under_5.0": {
+                      "players": 152,
+                      "spearman": 0.5843816175645108
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 60,
+                      "spearman": 0.6547487575242684
+                    },
+                    "FWD|above_7.5": {
+                      "players": 5,
+                      "spearman": 0.7
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 16,
+                      "spearman": 0.7532347413963545
+                    },
+                    "GK|under_5.0": {
+                      "players": 55,
+                      "spearman": 0.761825408509449
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 205,
+                      "spearman": 0.6677829178461998
+                    },
+                    "MID|above_7.5": {
+                      "players": 10,
+                      "spearman": -0.2500781616401777
+                    },
+                    "MID|under_5.0": {
+                      "players": 77,
+                      "spearman": 0.6392363253218089
+                    }
+                  },
+                  "players": 642,
+                  "weighted_mean": 0.632306249881264
+                },
+                "top_per_position": {
+                  "bias": -0.49750000000000005,
+                  "mean_absolute_error": 2.8237499999999995,
+                  "mean_forecast": 3.65375,
+                  "mean_realized": 3.15625,
+                  "per_position": 40,
+                  "players": 160
+                }
+              },
+              "ours_decided": {
+                "all_players": {
+                  "bias": 0.12089008628736625,
+                  "mean_absolute_error": 1.1934869442151363,
+                  "mean_forecast": 1.2830733283467801,
+                  "mean_realized": 1.4039634146341464,
+                  "players": 656
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.34398910150911866,
+                      "forecast_points": 172.83880116600304,
+                      "mean_absolute_error": 1.3671634973648346,
+                      "mean_forecast": 1.5712618287818458,
+                      "mean_realized": 1.2272727272727273,
+                      "players": 110
+                    },
+                    "60_and_above": {
+                      "bias": 1.2583211312878373,
+                      "forecast_points": 538.1107371362959,
+                      "mean_absolute_error": 2.5471720081310107,
+                      "mean_forecast": 2.731526584448203,
+                      "mean_realized": 3.989847715736041,
+                      "players": 197
+                    },
+                    "did_not_appear": {
+                      "bias": -0.3746319916710277,
+                      "forecast_points": 130.74656509318865,
+                      "mean_absolute_error": 0.3746319916710277,
+                      "mean_forecast": 0.3746319916710277,
+                      "mean_realized": 0.0,
+                      "players": 349
+                    }
+                  },
+                  "forecast_points": 841.6961033954877,
+                  "forecast_points_on_players_who_did_not_appear": 130.74656509318865,
+                  "share_on_players_who_did_not_appear": 0.1553370207676425
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.27899429292443645,
+                    "mean_absolute_error": 1.4621267922608427,
+                    "mean_forecast": 1.2791452419592846,
+                    "mean_realized": 1.558139534883721,
+                    "players": 215
+                  },
+                  "FWD": {
+                    "bias": 0.16735033887032438,
+                    "mean_absolute_error": 1.2122083422798142,
+                    "mean_forecast": 1.2813676098476243,
+                    "mean_realized": 1.4487179487179487,
+                    "players": 78
+                  },
+                  "GK": {
+                    "bias": 0.29785449172424716,
+                    "mean_absolute_error": 0.8941816962890378,
+                    "mean_forecast": 0.8852440998250486,
+                    "mean_realized": 1.1830985915492958,
+                    "players": 71
+                  },
+                  "MID": {
+                    "bias": -0.050961889447083644,
+                    "mean_absolute_error": 1.063462410735278,
+                    "mean_forecast": 1.3831536702690015,
+                    "mean_realized": 1.332191780821918,
+                    "players": 292
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.15979605948451095,
+                    "mean_absolute_error": 1.338538549086662,
+                    "mean_forecast": 1.569066914276422,
+                    "mean_realized": 1.728862973760933,
+                    "players": 343
+                  },
+                  "above_7.5": {
+                    "bias": 0.13239081994268287,
+                    "mean_absolute_error": 2.8055775364089452,
+                    "mean_forecast": 4.555109180057317,
+                    "mean_realized": 4.6875,
+                    "players": 16
+                  },
+                  "under_5.0": {
+                    "bias": 0.07533870398061307,
+                    "mean_absolute_error": 0.9391228029826979,
+                    "mean_forecast": 0.7765131478712388,
+                    "mean_realized": 0.8518518518518519,
+                    "players": 297
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 215,
+                      "spearman": 0.6277337859008969
+                    },
+                    "FWD": {
+                      "players": 78,
+                      "spearman": 0.75322988617883
+                    },
+                    "GK": {
+                      "players": 71,
+                      "spearman": 0.7291227816745149
+                    },
+                    "MID": {
+                      "players": 292,
+                      "spearman": 0.737990783861891
+                    }
+                  },
+                  "players": 656,
+                  "weighted_mean": 0.7027068924957383
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 62,
+                      "spearman": 0.6549313694445538
+                    },
+                    "DEF|under_5.0": {
+                      "players": 152,
+                      "spearman": 0.5664547931159358
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 60,
+                      "spearman": 0.712161500199747
+                    },
+                    "FWD|above_7.5": {
+                      "players": 5,
+                      "spearman": 0.7
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 16,
+                      "spearman": 0.7992091407994923
+                    },
+                    "GK|under_5.0": {
+                      "players": 55,
+                      "spearman": 0.5326718048153033
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 205,
+                      "spearman": 0.7024280936096793
+                    },
+                    "MID|above_7.5": {
+                      "players": 10,
+                      "spearman": 0.23685323746880915
+                    },
+                    "MID|under_5.0": {
+                      "players": 77,
+                      "spearman": 0.6021354404611708
+                    }
+                  },
+                  "players": 642,
+                  "weighted_mean": 0.6351270708239648
+                },
+                "top_per_position": {
+                  "bias": 0.38517625355822954,
+                  "mean_absolute_error": 2.3471893248240008,
+                  "mean_forecast": 2.7210737464417707,
+                  "mean_realized": 3.10625,
+                  "per_position": 40,
+                  "players": 160
+                }
+              },
+              "ours_unconditional": {
+                "all_players": {
+                  "bias": 0.04220068868275638,
+                  "mean_absolute_error": 1.2713281063305306,
+                  "mean_forecast": 1.36176272595139,
+                  "mean_realized": 1.4039634146341464,
+                  "players": 656
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.3637066045834311,
+                      "forecast_points": 175.00772650417744,
+                      "mean_absolute_error": 1.3818224324307327,
+                      "mean_forecast": 1.5909793318561585,
+                      "mean_realized": 1.2272727272727273,
+                      "players": 110
+                    },
+                    "60_and_above": {
+                      "bias": 1.2583211312878373,
+                      "forecast_points": 538.1107371362959,
+                      "mean_absolute_error": 2.5471720081310107,
+                      "mean_forecast": 2.731526584448203,
+                      "mean_realized": 3.989847715736041,
+                      "players": 197
+                    },
+                    "did_not_appear": {
+                      "bias": -0.5163263168585625,
+                      "forecast_points": 180.1978845836383,
+                      "mean_absolute_error": 0.5163263168585625,
+                      "mean_forecast": 0.5163263168585625,
+                      "mean_realized": 0.0,
+                      "players": 349
+                    }
+                  },
+                  "forecast_points": 893.3163482241118,
+                  "forecast_points_on_players_who_did_not_appear": 180.1978845836383,
+                  "share_on_players_who_did_not_appear": 0.2017178852059147
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.20302096500979383,
+                    "mean_absolute_error": 1.536488392926067,
+                    "mean_forecast": 1.3551185698739272,
+                    "mean_realized": 1.558139534883721,
+                    "players": 215
+                  },
+                  "FWD": {
+                    "bias": 0.047954709419770876,
+                    "mean_absolute_error": 1.331603971730368,
+                    "mean_forecast": 1.4007632392981781,
+                    "mean_realized": 1.4487179487179487,
+                    "players": 78
+                  },
+                  "GK": {
+                    "bias": 0.26558265586999663,
+                    "mean_absolute_error": 0.9264535321432883,
+                    "mean_forecast": 0.9175159356792991,
+                    "mean_realized": 1.1830985915492958,
+                    "players": 71
+                  },
+                  "MID": {
+                    "bias": -0.13206401233811424,
+                    "mean_absolute_error": 1.1438456256732241,
+                    "mean_forecast": 1.4642557931600322,
+                    "mean_realized": 1.332191780821918,
+                    "players": 292
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.05453831219712102,
+                    "mean_absolute_error": 1.4421740150885547,
+                    "mean_forecast": 1.6743246615638117,
+                    "mean_realized": 1.728862973760933,
+                    "players": 343
+                  },
+                  "above_7.5": {
+                    "bias": 0.10821278405933943,
+                    "mean_absolute_error": 2.8297555722922887,
+                    "mean_forecast": 4.579287215940661,
+                    "mean_realized": 4.6875,
+                    "players": 16
+                  },
+                  "under_5.0": {
+                    "bias": 0.024395980294027727,
+                    "mean_absolute_error": 0.9900655266692832,
+                    "mean_forecast": 0.827455871557824,
+                    "mean_realized": 0.8518518518518519,
+                    "players": 297
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 215,
+                      "spearman": 0.5911483934767139
+                    },
+                    "FWD": {
+                      "players": 78,
+                      "spearman": 0.697394379823952
+                    },
+                    "GK": {
+                      "players": 71,
+                      "spearman": 0.7228320788766656
+                    },
+                    "MID": {
+                      "players": 292,
+                      "spearman": 0.7084103676752569
+                    }
+                  },
+                  "players": 656,
+                  "weighted_mean": 0.6702295292457013
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 62,
+                      "spearman": 0.6128228130302102
+                    },
+                    "DEF|under_5.0": {
+                      "players": 152,
+                      "spearman": 0.5368695146032986
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 60,
+                      "spearman": 0.6369630850799696
+                    },
+                    "FWD|above_7.5": {
+                      "players": 5,
+                      "spearman": 0.7
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 16,
+                      "spearman": 0.7992091407994923
+                    },
+                    "GK|under_5.0": {
+                      "players": 55,
+                      "spearman": 0.5230572677203397
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 205,
+                      "spearman": 0.6713482025181593
+                    },
+                    "MID|above_7.5": {
+                      "players": 10,
+                      "spearman": 0.23685323746880915
+                    },
+                    "MID|under_5.0": {
+                      "players": 77,
+                      "spearman": 0.5723724920733223
+                    }
+                  },
+                  "players": 642,
+                  "weighted_mean": 0.6027103699226475
+                },
+                "top_per_position": {
+                  "bias": 0.34780422320539106,
+                  "mean_absolute_error": 2.3801343942205415,
+                  "mean_forecast": 2.7396957767946093,
+                  "mean_realized": 3.0875,
+                  "per_position": 40,
+                  "players": 160
+                }
+              }
+            },
+            "ours_decided_minus_game": {
+              "mean_absolute_error_difference": -0.04096427529705867,
+              "players": 656,
+              "top_per_position_difference": -0.3738060153146959,
+              "top_per_position_players": 160,
+              "top_per_position_ranked_by": "game"
+            },
+            "players": 656
+          }
+        },
+        {
+          "handoff_fingerprint": "48f9e1eab5403be0acae4b73912ee1b2cf4335fedae2ae356df27b02d7773cd7",
+          "in_ledger": false,
+          "ledger_mode": null,
+          "model_name": "squadopt-deterministic-baseline",
+          "model_version": "phase-c-component-elite-top100-v1",
+          "reading": {
+            "forecasts": {
+              "game": {
+                "all_players": {
+                  "bias": -0.003963414634146347,
+                  "mean_absolute_error": 1.234451219512195,
+                  "mean_forecast": 1.4079268292682927,
+                  "mean_realized": 1.4039634146341464,
+                  "players": 656
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.3600000000000001,
+                      "forecast_points": 174.6,
+                      "mean_absolute_error": 1.5854545454545454,
+                      "mean_forecast": 1.5872727272727272,
+                      "mean_realized": 1.2272727272727273,
+                      "players": 110
+                    },
+                    "60_and_above": {
+                      "bias": 0.7223350253807107,
+                      "forecast_points": 643.7,
+                      "mean_absolute_error": 2.6908629441624368,
+                      "mean_forecast": 3.26751269035533,
+                      "mean_realized": 3.989847715736041,
+                      "players": 197
+                    },
+                    "did_not_appear": {
+                      "bias": -0.30171919770773636,
+                      "forecast_points": 105.3,
+                      "mean_absolute_error": 0.30171919770773636,
+                      "mean_forecast": 0.30171919770773636,
+                      "mean_realized": 0.0,
+                      "players": 349
+                    }
+                  },
+                  "forecast_points": 923.6,
+                  "forecast_points_on_players_who_did_not_appear": 105.3,
+                  "share_on_players_who_did_not_appear": 0.11401039411000433
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.04511627906976744,
+                    "mean_absolute_error": 1.4711627906976743,
+                    "mean_forecast": 1.5130232558139536,
+                    "mean_realized": 1.558139534883721,
+                    "players": 215
+                  },
+                  "FWD": {
+                    "bias": 0.2141025641025641,
+                    "mean_absolute_error": 1.226923076923077,
+                    "mean_forecast": 1.2346153846153847,
+                    "mean_realized": 1.4487179487179487,
+                    "players": 78
+                  },
+                  "GK": {
+                    "bias": 0.252112676056338,
+                    "mean_absolute_error": 0.8549295774647888,
+                    "mean_forecast": 0.9309859154929576,
+                    "mean_realized": 1.1830985915492958,
+                    "players": 71
+                  },
+                  "MID": {
+                    "bias": -0.16061643835616438,
+                    "mean_absolute_error": 1.1544520547945205,
+                    "mean_forecast": 1.4928082191780823,
+                    "mean_realized": 1.332191780821918,
+                    "players": 292
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.029446064139941684,
+                    "mean_absolute_error": 1.4166180758017493,
+                    "mean_forecast": 1.6994169096209912,
+                    "mean_realized": 1.728862973760933,
+                    "players": 343
+                  },
+                  "above_7.5": {
+                    "bias": -1.04375,
+                    "mean_absolute_error": 2.86875,
+                    "mean_forecast": 5.73125,
+                    "mean_realized": 4.6875,
+                    "players": 16
+                  },
+                  "under_5.0": {
+                    "bias": 0.01346801346801348,
+                    "mean_absolute_error": 0.936026936026936,
+                    "mean_forecast": 0.8383838383838383,
+                    "mean_realized": 0.8518518518518519,
+                    "players": 297
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 215,
+                      "spearman": 0.6127198172452836
+                    },
+                    "FWD": {
+                      "players": 78,
+                      "spearman": 0.7218321593436717
+                    },
+                    "GK": {
+                      "players": 71,
+                      "spearman": 0.8801018276253848
+                    },
+                    "MID": {
+                      "players": 292,
+                      "spearman": 0.7237323755781999
+                    }
+                  },
+                  "players": 656,
+                  "weighted_mean": 0.7040468789127731
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 62,
+                      "spearman": 0.5929292609725801
+                    },
+                    "DEF|under_5.0": {
+                      "players": 152,
+                      "spearman": 0.5843816175645108
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 60,
+                      "spearman": 0.6547487575242684
+                    },
+                    "FWD|above_7.5": {
+                      "players": 5,
+                      "spearman": 0.7
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 16,
+                      "spearman": 0.7532347413963545
+                    },
+                    "GK|under_5.0": {
+                      "players": 55,
+                      "spearman": 0.761825408509449
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 205,
+                      "spearman": 0.6677829178461998
+                    },
+                    "MID|above_7.5": {
+                      "players": 10,
+                      "spearman": -0.2500781616401777
+                    },
+                    "MID|under_5.0": {
+                      "players": 77,
+                      "spearman": 0.6392363253218089
+                    }
+                  },
+                  "players": 642,
+                  "weighted_mean": 0.632306249881264
+                },
+                "top_per_position": {
+                  "bias": -0.49750000000000005,
+                  "mean_absolute_error": 2.8237499999999995,
+                  "mean_forecast": 3.65375,
+                  "mean_realized": 3.15625,
+                  "per_position": 40,
+                  "players": 160
+                }
+              },
+              "ours_decided": {
+                "all_players": {
+                  "bias": 0.11748077220880883,
+                  "mean_absolute_error": 1.1939242659767455,
+                  "mean_forecast": 1.2864826424253375,
+                  "mean_realized": 1.4039634146341464,
+                  "players": 656
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.346811645757189,
+                      "forecast_points": 173.1492810332908,
+                      "mean_absolute_error": 1.3699403223561404,
+                      "mean_forecast": 1.5740843730299163,
+                      "mean_realized": 1.2272727272727273,
+                      "players": 110
+                    },
+                    "60_and_above": {
+                      "bias": 1.2486672984035183,
+                      "forecast_points": 540.0125422145069,
+                      "mean_absolute_error": 2.546954785981451,
+                      "mean_forecast": 2.7411804173325223,
+                      "mean_realized": 3.989847715736041,
+                      "players": 197
+                    },
+                    "did_not_appear": {
+                      "bias": -0.3747014045364576,
+                      "forecast_points": 130.7707901832237,
+                      "mean_absolute_error": 0.3747014045364576,
+                      "mean_forecast": 0.3747014045364576,
+                      "mean_realized": 0.0,
+                      "players": 349
+                    }
+                  },
+                  "forecast_points": 843.9326134310214,
+                  "forecast_points_on_players_who_did_not_appear": 130.7707901832237,
+                  "share_on_players_who_did_not_appear": 0.15495406635794415
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.27677782794112155,
+                    "mean_absolute_error": 1.4614556720213878,
+                    "mean_forecast": 1.2813617069425993,
+                    "mean_realized": 1.558139534883721,
+                    "players": 215
+                  },
+                  "FWD": {
+                    "bias": 0.15743761535314346,
+                    "mean_absolute_error": 1.2118588370917502,
+                    "mean_forecast": 1.2912803333648053,
+                    "mean_realized": 1.4487179487179487,
+                    "players": 78
+                  },
+                  "GK": {
+                    "bias": 0.29593063675721676,
+                    "mean_absolute_error": 0.8933178994710411,
+                    "mean_forecast": 0.8871679547920789,
+                    "mean_realized": 1.1830985915492958,
+                    "players": 71
+                  },
+                  "MID": {
+                    "bias": -0.053873478238596256,
+                    "mean_absolute_error": 1.0652424275361174,
+                    "mean_forecast": 1.3860652590605143,
+                    "mean_realized": 1.332191780821918,
+                    "players": 292
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.1574140921113409,
+                    "mean_absolute_error": 1.3388880074809835,
+                    "mean_forecast": 1.5714488816495922,
+                    "mean_realized": 1.728862973760933,
+                    "players": 343
+                  },
+                  "above_7.5": {
+                    "bias": 0.0599589177063804,
+                    "mean_absolute_error": 2.8174719836366924,
+                    "mean_forecast": 4.62754108229362,
+                    "mean_realized": 4.6875,
+                    "players": 16
+                  },
+                  "under_5.0": {
+                    "bias": 0.07446131411274949,
+                    "mean_absolute_error": 0.9390443776989249,
+                    "mean_forecast": 0.7773905377391023,
+                    "mean_realized": 0.8518518518518519,
+                    "players": 297
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 215,
+                      "spearman": 0.6278302945605292
+                    },
+                    "FWD": {
+                      "players": 78,
+                      "spearman": 0.7530721597173509
+                    },
+                    "GK": {
+                      "players": 71,
+                      "spearman": 0.7301399190118444
+                    },
+                    "MID": {
+                      "players": 292,
+                      "spearman": 0.7376802419131223
+                    }
+                  },
+                  "players": 656,
+                  "weighted_mean": 0.7026916260319205
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 62,
+                      "spearman": 0.6549313694445538
+                    },
+                    "DEF|under_5.0": {
+                      "players": 152,
+                      "spearman": 0.5667053687291016
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 60,
+                      "spearman": 0.7118559826106438
+                    },
+                    "FWD|above_7.5": {
+                      "players": 5,
+                      "spearman": 0.7
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 16,
+                      "spearman": 0.8061121533412723
+                    },
+                    "GK|under_5.0": {
+                      "players": 55,
+                      "spearman": 0.5330088072002584
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 205,
+                      "spearman": 0.7018537095742927
+                    },
+                    "MID|above_7.5": {
+                      "players": 10,
+                      "spearman": 0.23685323746880915
+                    },
+                    "MID|under_5.0": {
+                      "players": 77,
+                      "spearman": 0.6021354404611708
+                    }
+                  },
+                  "players": 642,
+                  "weighted_mean": 0.6351753434757433
+                },
+                "top_per_position": {
+                  "bias": 0.37160889568089217,
+                  "mean_absolute_error": 2.348816290821577,
+                  "mean_forecast": 2.734641104319108,
+                  "mean_realized": 3.10625,
+                  "per_position": 40,
+                  "players": 160
+                }
+              },
+              "ours_unconditional": {
+                "all_players": {
+                  "bias": 0.038716287607419825,
+                  "mean_absolute_error": 1.2718405150889187,
+                  "mean_forecast": 1.3652471270267266,
+                  "mean_realized": 1.4039634146341464,
+                  "players": 656
+                },
+                "appearance_split": {
+                  "by_minutes": {
+                    "1_to_59": {
+                      "bias": -0.36681549594702484,
+                      "forecast_points": 175.34970455417275,
+                      "mean_absolute_error": 1.3848856045375615,
+                      "mean_forecast": 1.5940882232197522,
+                      "mean_realized": 1.2272727272727273,
+                      "players": 110
+                    },
+                    "60_and_above": {
+                      "bias": 1.2486672984035183,
+                      "forecast_points": 540.0125422145069,
+                      "mean_absolute_error": 2.546954785981451,
+                      "mean_forecast": 2.7411804173325223,
+                      "mean_realized": 3.989847715736041,
+                      "players": 197
+                    },
+                    "did_not_appear": {
+                      "bias": -0.5164466147875443,
+                      "forecast_points": 180.23986856085295,
+                      "mean_absolute_error": 0.5164466147875443,
+                      "mean_forecast": 0.5164466147875443,
+                      "mean_realized": 0.0,
+                      "players": 349
+                    }
+                  },
+                  "forecast_points": 895.6021153295327,
+                  "forecast_points_on_players_who_did_not_appear": 180.23986856085295,
+                  "share_on_players_who_did_not_appear": 0.20124993618905704
+                },
+                "by_position": {
+                  "DEF": {
+                    "bias": 0.2007140654203126,
+                    "mean_absolute_error": 1.535907707292778,
+                    "mean_forecast": 1.3574254694634087,
+                    "mean_realized": 1.558139534883721,
+                    "players": 215
+                  },
+                  "FWD": {
+                    "bias": 0.03804198590258994,
+                    "mean_absolute_error": 1.3312544665423036,
+                    "mean_forecast": 1.4106759628153587,
+                    "mean_realized": 1.4487179487179487,
+                    "players": 78
+                  },
+                  "GK": {
+                    "bias": 0.2636588009029663,
+                    "mean_absolute_error": 0.9255897353252917,
+                    "mean_forecast": 0.9194397906463295,
+                    "mean_realized": 1.1830985915492958,
+                    "players": 71
+                  },
+                  "MID": {
+                    "bias": -0.13507770260072752,
+                    "mean_absolute_error": 1.1457277439451643,
+                    "mean_forecast": 1.4672694834226454,
+                    "mean_realized": 1.332191780821918,
+                    "players": 292
+                  }
+                },
+                "by_price_band": {
+                  "5.0_to_7.5": {
+                    "bias": 0.0520269728787914,
+                    "mean_absolute_error": 1.4426528454280354,
+                    "mean_forecast": 1.6768360008821415,
+                    "mean_realized": 1.728862973760933,
+                    "players": 343
+                  },
+                  "above_7.5": {
+                    "bias": 0.03578088182303696,
+                    "mean_absolute_error": 2.841650019520036,
+                    "mean_forecast": 4.651719118176963,
+                    "mean_realized": 4.6875,
+                    "players": 16
+                  },
+                  "under_5.0": {
+                    "bias": 0.023502151056812637,
+                    "mean_absolute_error": 0.9900035407548615,
+                    "mean_forecast": 0.8283497007950393,
+                    "mean_realized": 0.8518518518518519,
+                    "players": 297
+                  }
+                },
+                "rank_agreement_within_position": {
+                  "groups": {
+                    "DEF": {
+                      "players": 215,
+                      "spearman": 0.5911571133791788
+                    },
+                    "FWD": {
+                      "players": 78,
+                      "spearman": 0.6972398652779872
+                    },
+                    "GK": {
+                      "players": 71,
+                      "spearman": 0.72384733115622
+                    },
+                    "MID": {
+                      "players": 292,
+                      "spearman": 0.7081025275957514
+                    }
+                  },
+                  "players": 656,
+                  "weighted_mean": 0.6701868710949047
+                },
+                "rank_agreement_within_position_and_price_band": {
+                  "groups": {
+                    "DEF|5.0_to_7.5": {
+                      "players": 62,
+                      "spearman": 0.6128228130302102
+                    },
+                    "DEF|under_5.0": {
+                      "players": 152,
+                      "spearman": 0.5372399134815827
+                    },
+                    "FWD|5.0_to_7.5": {
+                      "players": 60,
+                      "spearman": 0.6366630906916122
+                    },
+                    "FWD|above_7.5": {
+                      "players": 5,
+                      "spearman": 0.7
+                    },
+                    "GK|5.0_to_7.5": {
+                      "players": 16,
+                      "spearman": 0.8061121533412723
+                    },
+                    "GK|under_5.0": {
+                      "players": 55,
+                      "spearman": 0.523393759911014
+                    },
+                    "MID|5.0_to_7.5": {
+                      "players": 205,
+                      "spearman": 0.6708271877647766
+                    },
+                    "MID|above_7.5": {
+                      "players": 10,
+                      "spearman": 0.23685323746880915
+                    },
+                    "MID|under_5.0": {
+                      "players": 77,
+                      "spearman": 0.5723724920733223
+                    }
+                  },
+                  "players": 642,
+                  "weighted_mean": 0.6028045260175228
+                },
+                "top_per_position": {
+                  "bias": 0.3340084163146407,
+                  "mean_absolute_error": 2.381989809231531,
+                  "mean_forecast": 2.7534915836853595,
+                  "mean_realized": 3.0875,
+                  "per_position": 40,
+                  "players": 160
+                }
+              }
+            },
+            "ours_decided_minus_game": {
+              "mean_absolute_error_difference": -0.04052695353544963,
+              "players": 656,
+              "top_per_position_difference": -0.37251432298151205,
+              "top_per_position_players": 160,
+              "top_per_position_ranked_by": "game"
+            },
+            "players": 656
+          }
+        }
+      ]
+    }
+  },
+  "generated_at_utc": "2026-09-18T20:23:35+00:00",
+  "minimum_pooled_gameweeks": 6,
+  "not_audited": {
+    "2": "no capture from before its deadline survives, so neither our projection nor the game's forecast can be read",
+    "3": "no capture from before its deadline survives, so neither our projection nor the game's forecast can be read"
+  },
+  "operational_control_changed": false,
+  "pooled": {
+    "comparison_may_be_stated": false,
+    "forecasts": {
+      "game": {
+        "all_players": {
+          "bias": -0.003963414634146347,
+          "mean_absolute_error": 1.234451219512195,
+          "mean_forecast": 1.4079268292682927,
+          "mean_realized": 1.4039634146341464,
+          "players": 656
+        },
+        "appearance_split": {
+          "by_minutes": {
+            "1_to_59": {
+              "bias": -0.3600000000000001,
+              "forecast_points": 174.6,
+              "mean_absolute_error": 1.5854545454545454,
+              "mean_forecast": 1.5872727272727272,
+              "mean_realized": 1.2272727272727273,
+              "players": 110
+            },
+            "60_and_above": {
+              "bias": 0.7223350253807107,
+              "forecast_points": 643.7,
+              "mean_absolute_error": 2.6908629441624368,
+              "mean_forecast": 3.26751269035533,
+              "mean_realized": 3.989847715736041,
+              "players": 197
+            },
+            "did_not_appear": {
+              "bias": -0.30171919770773636,
+              "forecast_points": 105.3,
+              "mean_absolute_error": 0.30171919770773636,
+              "mean_forecast": 0.30171919770773636,
+              "mean_realized": 0.0,
+              "players": 349
+            }
+          },
+          "forecast_points": 923.6,
+          "forecast_points_on_players_who_did_not_appear": 105.3,
+          "share_on_players_who_did_not_appear": 0.11401039411000433
+        },
+        "by_position": {
+          "DEF": {
+            "bias": 0.04511627906976744,
+            "mean_absolute_error": 1.4711627906976743,
+            "mean_forecast": 1.5130232558139536,
+            "mean_realized": 1.558139534883721,
+            "players": 215
+          },
+          "FWD": {
+            "bias": 0.2141025641025641,
+            "mean_absolute_error": 1.226923076923077,
+            "mean_forecast": 1.2346153846153847,
+            "mean_realized": 1.4487179487179487,
+            "players": 78
+          },
+          "GK": {
+            "bias": 0.252112676056338,
+            "mean_absolute_error": 0.8549295774647888,
+            "mean_forecast": 0.9309859154929576,
+            "mean_realized": 1.1830985915492958,
+            "players": 71
+          },
+          "MID": {
+            "bias": -0.16061643835616438,
+            "mean_absolute_error": 1.1544520547945205,
+            "mean_forecast": 1.4928082191780823,
+            "mean_realized": 1.332191780821918,
+            "players": 292
+          }
+        },
+        "by_price_band": {
+          "5.0_to_7.5": {
+            "bias": 0.029446064139941684,
+            "mean_absolute_error": 1.4166180758017493,
+            "mean_forecast": 1.6994169096209912,
+            "mean_realized": 1.728862973760933,
+            "players": 343
+          },
+          "above_7.5": {
+            "bias": -1.04375,
+            "mean_absolute_error": 2.86875,
+            "mean_forecast": 5.73125,
+            "mean_realized": 4.6875,
+            "players": 16
+          },
+          "under_5.0": {
+            "bias": 0.01346801346801348,
+            "mean_absolute_error": 0.936026936026936,
+            "mean_forecast": 0.8383838383838383,
+            "mean_realized": 0.8518518518518519,
+            "players": 297
+          }
+        },
+        "rank_agreement_within_position": {
+          "groups": {
+            "4|DEF": {
+              "players": 215,
+              "spearman": 0.6127198172452836
+            },
+            "4|FWD": {
+              "players": 78,
+              "spearman": 0.7218321593436717
+            },
+            "4|GK": {
+              "players": 71,
+              "spearman": 0.8801018276253848
+            },
+            "4|MID": {
+              "players": 292,
+              "spearman": 0.7237323755781999
+            }
+          },
+          "players": 656,
+          "weighted_mean": 0.7040468789127731
+        },
+        "rank_agreement_within_position_and_price_band": {
+          "groups": {
+            "4|DEF|5.0_to_7.5": {
+              "players": 62,
+              "spearman": 0.5929292609725801
+            },
+            "4|DEF|under_5.0": {
+              "players": 152,
+              "spearman": 0.5843816175645108
+            },
+            "4|FWD|5.0_to_7.5": {
+              "players": 60,
+              "spearman": 0.6547487575242684
+            },
+            "4|FWD|above_7.5": {
+              "players": 5,
+              "spearman": 0.7
+            },
+            "4|GK|5.0_to_7.5": {
+              "players": 16,
+              "spearman": 0.7532347413963545
+            },
+            "4|GK|under_5.0": {
+              "players": 55,
+              "spearman": 0.761825408509449
+            },
+            "4|MID|5.0_to_7.5": {
+              "players": 205,
+              "spearman": 0.6677829178461998
+            },
+            "4|MID|above_7.5": {
+              "players": 10,
+              "spearman": -0.2500781616401777
+            },
+            "4|MID|under_5.0": {
+              "players": 77,
+              "spearman": 0.6392363253218089
+            }
+          },
+          "players": 642,
+          "weighted_mean": 0.632306249881264
+        },
+        "top_per_position": {
+          "bias": -0.49750000000000005,
+          "mean_absolute_error": 2.8237499999999995,
+          "mean_forecast": 3.65375,
+          "mean_realized": 3.15625,
+          "per_position": 40,
+          "players": 160
+        }
+      },
+      "ours_decided": {
+        "all_players": {
+          "bias": 0.12089008628736625,
+          "mean_absolute_error": 1.1934869442151363,
+          "mean_forecast": 1.2830733283467801,
+          "mean_realized": 1.4039634146341464,
+          "players": 656
+        },
+        "appearance_split": {
+          "by_minutes": {
+            "1_to_59": {
+              "bias": -0.34398910150911866,
+              "forecast_points": 172.83880116600304,
+              "mean_absolute_error": 1.3671634973648346,
+              "mean_forecast": 1.5712618287818458,
+              "mean_realized": 1.2272727272727273,
+              "players": 110
+            },
+            "60_and_above": {
+              "bias": 1.2583211312878373,
+              "forecast_points": 538.1107371362959,
+              "mean_absolute_error": 2.5471720081310107,
+              "mean_forecast": 2.731526584448203,
+              "mean_realized": 3.989847715736041,
+              "players": 197
+            },
+            "did_not_appear": {
+              "bias": -0.3746319916710277,
+              "forecast_points": 130.74656509318865,
+              "mean_absolute_error": 0.3746319916710277,
+              "mean_forecast": 0.3746319916710277,
+              "mean_realized": 0.0,
+              "players": 349
+            }
+          },
+          "forecast_points": 841.6961033954877,
+          "forecast_points_on_players_who_did_not_appear": 130.74656509318865,
+          "share_on_players_who_did_not_appear": 0.1553370207676425
+        },
+        "by_position": {
+          "DEF": {
+            "bias": 0.27899429292443645,
+            "mean_absolute_error": 1.4621267922608427,
+            "mean_forecast": 1.2791452419592846,
+            "mean_realized": 1.558139534883721,
+            "players": 215
+          },
+          "FWD": {
+            "bias": 0.16735033887032438,
+            "mean_absolute_error": 1.2122083422798142,
+            "mean_forecast": 1.2813676098476243,
+            "mean_realized": 1.4487179487179487,
+            "players": 78
+          },
+          "GK": {
+            "bias": 0.29785449172424716,
+            "mean_absolute_error": 0.8941816962890378,
+            "mean_forecast": 0.8852440998250486,
+            "mean_realized": 1.1830985915492958,
+            "players": 71
+          },
+          "MID": {
+            "bias": -0.050961889447083644,
+            "mean_absolute_error": 1.063462410735278,
+            "mean_forecast": 1.3831536702690015,
+            "mean_realized": 1.332191780821918,
+            "players": 292
+          }
+        },
+        "by_price_band": {
+          "5.0_to_7.5": {
+            "bias": 0.15979605948451095,
+            "mean_absolute_error": 1.338538549086662,
+            "mean_forecast": 1.569066914276422,
+            "mean_realized": 1.728862973760933,
+            "players": 343
+          },
+          "above_7.5": {
+            "bias": 0.13239081994268287,
+            "mean_absolute_error": 2.8055775364089452,
+            "mean_forecast": 4.555109180057317,
+            "mean_realized": 4.6875,
+            "players": 16
+          },
+          "under_5.0": {
+            "bias": 0.07533870398061307,
+            "mean_absolute_error": 0.9391228029826979,
+            "mean_forecast": 0.7765131478712388,
+            "mean_realized": 0.8518518518518519,
+            "players": 297
+          }
+        },
+        "rank_agreement_within_position": {
+          "groups": {
+            "4|DEF": {
+              "players": 215,
+              "spearman": 0.6277337859008969
+            },
+            "4|FWD": {
+              "players": 78,
+              "spearman": 0.75322988617883
+            },
+            "4|GK": {
+              "players": 71,
+              "spearman": 0.7291227816745149
+            },
+            "4|MID": {
+              "players": 292,
+              "spearman": 0.737990783861891
+            }
+          },
+          "players": 656,
+          "weighted_mean": 0.7027068924957383
+        },
+        "rank_agreement_within_position_and_price_band": {
+          "groups": {
+            "4|DEF|5.0_to_7.5": {
+              "players": 62,
+              "spearman": 0.6549313694445538
+            },
+            "4|DEF|under_5.0": {
+              "players": 152,
+              "spearman": 0.5664547931159358
+            },
+            "4|FWD|5.0_to_7.5": {
+              "players": 60,
+              "spearman": 0.712161500199747
+            },
+            "4|FWD|above_7.5": {
+              "players": 5,
+              "spearman": 0.7
+            },
+            "4|GK|5.0_to_7.5": {
+              "players": 16,
+              "spearman": 0.7992091407994923
+            },
+            "4|GK|under_5.0": {
+              "players": 55,
+              "spearman": 0.5326718048153033
+            },
+            "4|MID|5.0_to_7.5": {
+              "players": 205,
+              "spearman": 0.7024280936096793
+            },
+            "4|MID|above_7.5": {
+              "players": 10,
+              "spearman": 0.23685323746880915
+            },
+            "4|MID|under_5.0": {
+              "players": 77,
+              "spearman": 0.6021354404611708
+            }
+          },
+          "players": 642,
+          "weighted_mean": 0.6351270708239648
+        },
+        "top_per_position": {
+          "bias": 0.38517625355822954,
+          "mean_absolute_error": 2.3471893248240008,
+          "mean_forecast": 2.7210737464417707,
+          "mean_realized": 3.10625,
+          "per_position": 40,
+          "players": 160
+        }
+      },
+      "ours_unconditional": {
+        "all_players": {
+          "bias": 0.04220068868275638,
+          "mean_absolute_error": 1.2713281063305306,
+          "mean_forecast": 1.36176272595139,
+          "mean_realized": 1.4039634146341464,
+          "players": 656
+        },
+        "appearance_split": {
+          "by_minutes": {
+            "1_to_59": {
+              "bias": -0.3637066045834311,
+              "forecast_points": 175.00772650417744,
+              "mean_absolute_error": 1.3818224324307327,
+              "mean_forecast": 1.5909793318561585,
+              "mean_realized": 1.2272727272727273,
+              "players": 110
+            },
+            "60_and_above": {
+              "bias": 1.2583211312878373,
+              "forecast_points": 538.1107371362959,
+              "mean_absolute_error": 2.5471720081310107,
+              "mean_forecast": 2.731526584448203,
+              "mean_realized": 3.989847715736041,
+              "players": 197
+            },
+            "did_not_appear": {
+              "bias": -0.5163263168585625,
+              "forecast_points": 180.1978845836383,
+              "mean_absolute_error": 0.5163263168585625,
+              "mean_forecast": 0.5163263168585625,
+              "mean_realized": 0.0,
+              "players": 349
+            }
+          },
+          "forecast_points": 893.3163482241118,
+          "forecast_points_on_players_who_did_not_appear": 180.1978845836383,
+          "share_on_players_who_did_not_appear": 0.2017178852059147
+        },
+        "by_position": {
+          "DEF": {
+            "bias": 0.20302096500979383,
+            "mean_absolute_error": 1.536488392926067,
+            "mean_forecast": 1.3551185698739272,
+            "mean_realized": 1.558139534883721,
+            "players": 215
+          },
+          "FWD": {
+            "bias": 0.047954709419770876,
+            "mean_absolute_error": 1.331603971730368,
+            "mean_forecast": 1.4007632392981781,
+            "mean_realized": 1.4487179487179487,
+            "players": 78
+          },
+          "GK": {
+            "bias": 0.26558265586999663,
+            "mean_absolute_error": 0.9264535321432883,
+            "mean_forecast": 0.9175159356792991,
+            "mean_realized": 1.1830985915492958,
+            "players": 71
+          },
+          "MID": {
+            "bias": -0.13206401233811424,
+            "mean_absolute_error": 1.1438456256732241,
+            "mean_forecast": 1.4642557931600322,
+            "mean_realized": 1.332191780821918,
+            "players": 292
+          }
+        },
+        "by_price_band": {
+          "5.0_to_7.5": {
+            "bias": 0.05453831219712102,
+            "mean_absolute_error": 1.4421740150885547,
+            "mean_forecast": 1.6743246615638117,
+            "mean_realized": 1.728862973760933,
+            "players": 343
+          },
+          "above_7.5": {
+            "bias": 0.10821278405933943,
+            "mean_absolute_error": 2.8297555722922887,
+            "mean_forecast": 4.579287215940661,
+            "mean_realized": 4.6875,
+            "players": 16
+          },
+          "under_5.0": {
+            "bias": 0.024395980294027727,
+            "mean_absolute_error": 0.9900655266692832,
+            "mean_forecast": 0.827455871557824,
+            "mean_realized": 0.8518518518518519,
+            "players": 297
+          }
+        },
+        "rank_agreement_within_position": {
+          "groups": {
+            "4|DEF": {
+              "players": 215,
+              "spearman": 0.5911483934767139
+            },
+            "4|FWD": {
+              "players": 78,
+              "spearman": 0.697394379823952
+            },
+            "4|GK": {
+              "players": 71,
+              "spearman": 0.7228320788766656
+            },
+            "4|MID": {
+              "players": 292,
+              "spearman": 0.7084103676752569
+            }
+          },
+          "players": 656,
+          "weighted_mean": 0.6702295292457013
+        },
+        "rank_agreement_within_position_and_price_band": {
+          "groups": {
+            "4|DEF|5.0_to_7.5": {
+              "players": 62,
+              "spearman": 0.6128228130302102
+            },
+            "4|DEF|under_5.0": {
+              "players": 152,
+              "spearman": 0.5368695146032986
+            },
+            "4|FWD|5.0_to_7.5": {
+              "players": 60,
+              "spearman": 0.6369630850799696
+            },
+            "4|FWD|above_7.5": {
+              "players": 5,
+              "spearman": 0.7
+            },
+            "4|GK|5.0_to_7.5": {
+              "players": 16,
+              "spearman": 0.7992091407994923
+            },
+            "4|GK|under_5.0": {
+              "players": 55,
+              "spearman": 0.5230572677203397
+            },
+            "4|MID|5.0_to_7.5": {
+              "players": 205,
+              "spearman": 0.6713482025181593
+            },
+            "4|MID|above_7.5": {
+              "players": 10,
+              "spearman": 0.23685323746880915
+            },
+            "4|MID|under_5.0": {
+              "players": 77,
+              "spearman": 0.5723724920733223
+            }
+          },
+          "players": 642,
+          "weighted_mean": 0.6027103699226475
+        },
+        "top_per_position": {
+          "bias": 0.34780422320539106,
+          "mean_absolute_error": 2.3801343942205415,
+          "mean_forecast": 2.7396957767946093,
+          "mean_realized": 3.0875,
+          "per_position": 40,
+          "players": 160
+        }
+      }
+    },
+    "gameweeks": [
+      4
+    ],
+    "ours_decided_minus_game": {
+      "mean_absolute_error_difference": -0.04096427529705867,
+      "players": 656,
+      "top_per_position_difference": -0.3738060153146959,
+      "top_per_position_players": 160,
+      "top_per_position_ranked_by": "game"
+    },
+    "players": 656,
+    "primary_projection_rule": "the handoff the ledger's decision names for that gameweek; where the ledger names none of the kept handoffs, the last one by file name",
+    "rests_on_gameweeks": 1
+  },
+  "prereg": "docs/live_projection_audit_prereg.md",
+  "season": "2026-27",
+  "settled_capture": "fpl-live-20260918T122516Z-cd5c04029774",
+  "top_per_position": 40
+}

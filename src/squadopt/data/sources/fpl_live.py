@@ -18,6 +18,7 @@ produce a column of nulls.
 """
 
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -2108,3 +2109,40 @@ def fpl_entry_picks(
         source_snapshot_id=source_snapshot_id,
         active_chip=active_chip,
     )
+
+
+def game_forecast(bootstrap: bytes) -> Mapping[int, float]:
+    """Return the game's own next-gameweek forecast (``ep_next``), keyed on the persistent code.
+
+    The platform publishes, for every player, the points it expects of him in the next
+    gameweek, already adjusted for the availability it shows. It costs nothing, it was made
+    with the information of the capture's own instant, and nothing in this repository read
+    it until the live projection audit needed a yardstick.
+
+    It is a yardstick and never an input. A forecast somebody else made is not a feature this
+    repository can account for, and a model that read it would inherit whatever it rests on
+    without being able to say what that is.
+
+    The field is a decimal string, or null. A null or an unparseable value is **left out**
+    rather than read as zero: a player the game has no forecast for is not a player it
+    expects nothing of. Entries that are not squad-eligible players are skipped, as
+    :func:`player_snapshot` skips them.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, ("code", "element_type", "ep_next"), "Element")
+    forecast: dict[int, float] = {}
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        raw = record.get("ep_next")
+        if raw is None:
+            continue
+        try:
+            value = float(raw) if isinstance(raw, (str, int, float)) else None
+        except ValueError:
+            value = None
+        if isinstance(raw, bool) or value is None or not math.isfinite(value):
+            continue
+        forecast[_integer(record, "code", "Element")] = value
+    return MappingProxyType(forecast)
