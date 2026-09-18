@@ -40,5 +40,7 @@ export interface LeagueMemberViewProps {
   capabilities?: AdviceCapabilities | null;
   /** Where the page stands with that service; "static" when none is configured. */
   computeService?: ComputeService;
+  /** A service is configured and has not answered yet; never true on a static build. */
+  computePending?: boolean;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
 }

@@ -64,6 +64,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
         snapshotId: squad.data.payload.source_snapshot_id,
       })
     : null;
+  const computePending = canAsk && leagueId !== undefined && capabilitiesQuery.isPending;
   const computeService: ComputeService =
     !canAsk || capabilitiesQuery.isPending
       ? "static"
@@ -162,5 +163,6 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     client,
     capabilities,
     computeService,
+    computePending,
   };
 }
