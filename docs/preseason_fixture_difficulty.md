@@ -43,4 +43,5 @@ The published difficulty has not moved since it was recorded.
 | --- | --- | ---: | ---: | ---: |
 | `fpl-live-20260821T143619Z-11bc603a8e1c` | 2026-08-21T14:36:19Z | 760 | 0 | 0 |
 | `fpl-live-20260910T190328Z-e46daae991bd` | 2026-09-10T19:03:28.065701Z | 760 | 0 | 0 |
+| `fpl-live-20260912T100000Z-24613792ef57` | 2026-09-12T10:00:00.227050Z | 760 | 0 | 0 |
 
