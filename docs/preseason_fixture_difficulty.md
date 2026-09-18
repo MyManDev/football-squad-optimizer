@@ -21,12 +21,12 @@ Team strength is a separate field from fixture difficulty, and before a season i
 | Field | Clubs with a non-zero value |
 | --- | ---: |
 | `strength` | 0 of 20 |
-| `strength_overall_home` | 20 of 20 |
-| `strength_overall_away` | 20 of 20 |
-| `strength_attack_home` | 0 of 20 |
 | `strength_attack_away` | 0 of 20 |
-| `strength_defence_home` | 0 of 20 |
+| `strength_attack_home` | 0 of 20 |
 | `strength_defence_away` | 0 of 20 |
+| `strength_defence_home` | 0 of 20 |
+| `strength_overall_away` | 20 of 20 |
+| `strength_overall_home` | 20 of 20 |
 
 That asymmetry is evidence in its own right. A completed season's archive carries populated attack and defence numbers on a thousand-point scale; before a season the same fields are zero and only a coarse one-to-five overall rating exists. Whatever the archive's strength columns are, they are not what was published in August.
 
@@ -36,4 +36,11 @@ That asymmetry is evidence in its own right. A completed season's archive carrie
 - **0 changed** (0.0%), mean absolute change 0.00.
 
 The published difficulty has not moved since it was recorded.
+
+## Every reading so far
+
+| Later capture | Captured | Sides compared | Missing | Changed |
+| --- | --- | ---: | ---: | ---: |
+| `fpl-live-20260821T143619Z-11bc603a8e1c` | 2026-08-21T14:36:19Z | 760 | 0 | 0 |
+| `fpl-live-20260910T190328Z-e46daae991bd` | 2026-09-10T19:03:28.065701Z | 760 | 0 | 0 |
 
