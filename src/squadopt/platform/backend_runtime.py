@@ -331,13 +331,36 @@ class CaptureContextProvider:
         self._identity: CaptureIdentity | None = None
         self._context: AdviceCaptureContext | None = None
         self._switch_signature: tuple[object, ...] | None = None
-        self._reported: str | None = None
+        self._reported: dict[tuple[str, str], str] = {}
+        self._directory = FileLeagueDirectory(config.site_data_root)
 
     def identity(self) -> CaptureIdentity | None:
         """The current capture's identity, reading it only when the capture changed."""
 
-        published_id = FileLeagueDirectory(self._config.site_data_root).published_snapshot_id()
+        published = self._directory.published_snapshot_id()
+        published_id = None if published is None else published[0]
         latest_id = latest_snapshot_id(self._config.snapshot_root)
+        if published is None:
+            if self._directory.published_capture_unusable_reason is not None:
+                self._report(
+                    "advice_published_capture_unusable",
+                    reason=self._directory.published_capture_unusable_reason,
+                )
+        else:
+            self._reported.pop(("advice_published_capture_unusable", ""), None)
+            held = self._identity
+            if (
+                held is None or held.context.capture_snapshot_id != published_id
+            ) and handoff_fingerprint_for(
+                self._config.handoff_root, published[1], published[2], published[0]
+            ) is None:
+                if published_id != latest_id:
+                    self._report(
+                        "advice_context_unreadable",
+                        snapshot_id=published_id,
+                        reason="The published capture has no unambiguous matching handoff.",
+                    )
+                published_id = None
         if published_id is None and latest_id is None:
             # Names the source, because the root is shared: it can hold cohort and
             # elite-picks captures and still hold nothing this adapter can serve advice
@@ -389,7 +412,7 @@ class CaptureContextProvider:
                 return None
             self._identity = identity
             self._context = None  # the projection belongs to the capture that produced it
-            self._reported = None
+            self._reported.pop(("advice_context_unreadable", snapshot_id), None)
             if self._log is not None:
                 self._log.event(
                     "advice_context_loaded",
@@ -494,10 +517,11 @@ class CaptureContextProvider:
         return None if bundle is None else bundle.switches
 
     def _report(self, event: str, **fields: object) -> None:
-        marker = f"{event}:{fields.get('snapshot_id', '')}:{fields.get('reason', '')}"
-        if marker == self._reported:
+        key = event, str(fields.get("snapshot_id", ""))
+        marker = str(fields.get("reason", ""))
+        if marker == self._reported.get(key):
             return
-        self._reported = marker
+        self._reported[key] = marker
         if self._log is not None:
             self._log.event(event, **fields)
 

@@ -101,7 +101,9 @@ under `league/entries/`, when that capture and its matching handoff are readable
 gameweek handoff if it names that capture, otherwise the unambiguous retained projection under
 `handoffs/by-capture/<capture>/`. Without that published pair it follows the newest live capture
 as before. The files are checked again on each request, so replacing the published tree moves
-both processes to its capture without a restart; the four readiness checks keep their meanings.
+both processes to its capture without a restart. The four readiness checks remain;
+`league_tree_matches_capture` now checks the published capture's week while that capture
+is usable, or the newest capture's season and gameweek when the backend falls back.
 
 The ops process does not move. Captures, decisions, settles and site builds stay on the machine
 that owns the ledger; the backend **reads** what ops publishes and never writes it.

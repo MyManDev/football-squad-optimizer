@@ -155,7 +155,11 @@ def _capture_handoff(
         matches[handoff.fingerprint] = handoff
     if len(matches) == 1:
         return next(iter(matches.values()))
-    raise DataError(f"No unambiguous projection handoff for capture {snapshot_id!r}.")
+    raise DataError(
+        f"No unambiguous projection handoff for capture {snapshot_id!r}: "
+        f"gameweek handoff {alias} is absent, unreadable or mismatched; "
+        f"retained matching fingerprints: {len(matches)}."
+    )
 
 
 def handoff_fingerprint_for(
@@ -163,11 +167,10 @@ def handoff_fingerprint_for(
 ) -> str | None:
     """The fingerprint of the handoff a capture would be projected with, or ``None``.
 
-    Cheap on purpose: reading one small JSON is what lets a caller notice that ops
-    republished a corrected handoff for a capture it has already read, without paying for
-    the capture and its projection again. ``None`` when the file is absent or unreadable —
-    the caller treats "cannot be confirmed" as "changed", which fails toward unready rather
-    than toward serving a projection nobody can name.
+    Read the gameweek handoff and, if needed, retained handoffs for this capture, without
+    reading the capture or computing its projection. Return ``None`` if no matching
+    handoff is readable or the retained fingerprints disagree. The caller treats
+    "cannot be confirmed" as "changed" rather than serving an unidentified projection.
     """
 
     try:
