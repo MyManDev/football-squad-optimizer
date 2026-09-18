@@ -421,8 +421,10 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
+    chip: str | None,
 ) -> None:
     """POST, worker, GET — the actual request this backend exists to serve."""
 
@@ -430,6 +432,10 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     client = TestClient(app_for_backend(backend))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    if chip is not None:
+        body["chip"] = chip
+        capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+        assert chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
@@ -461,6 +467,8 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["window"] == COMPUTED_WINDOW
     assert isinstance(payload["moves"], list)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    if chip is not None:
+        assert payload["chip_choice"]["chip"] == chip
 
     # A second ask is answered from the cache and starts no second solve.
     again = client.post(route, json=body)
@@ -1336,8 +1344,11 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     assert both.json()["error"]["code"] == "TOP100_INPUTS_UNAVAILABLE"
 
 
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not_served(
-    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    running: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    chip: str | None,
 ) -> None:
     """The jobs endpoint is public: it names the outcome and carries none of the solver's text."""
 
@@ -1353,7 +1364,7 @@ def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not
     monkeypatch.setattr(worker_module, "advise_menu_entry", no_plan)
     accepted = client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
-        json={"strategy": COMPUTED_MODE, "window": 1},
+        json={"strategy": COMPUTED_MODE, "window": 1, **({"chip": chip} if chip else {})},
     )
     assert accepted.status_code == 202, accepted.text
     compute = build_advice_compute(backend.contexts, backend.job_specs)

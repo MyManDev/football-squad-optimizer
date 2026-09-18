@@ -202,8 +202,8 @@ schema during that transition.
 | Method and route | Meaning |
 | --- | --- |
 | `GET /api/v1/leagues/{league_id}` | Published league connection state |
-| `GET /api/v1/leagues/{league_id}/capabilities` | `league_capabilities_v1`: the strategies and their windows, and whether the current capture offers the Top 100 settings and the manager's word |
-| `GET /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cache lookup for strategy, window, optional rival and the two switches; never starts a solve |
+| `GET /api/v1/leagues/{league_id}/capabilities` | `league_capabilities_v1`: strategies, windows, available switch inputs and each member's held chips |
+| `GET /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cache lookup for strategy, window, optional rival and switches; never starts a solve |
 | `POST /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cached answer (`200`) or accepted job (`202`) |
 | `GET /api/v1/advice-jobs/{job_id}` | Public job state: queued, running, completed or failed |
 | `GET /ready` | Injected readiness checks, or static data-root readiness in the default app |
@@ -215,7 +215,8 @@ cached answer is a cache miss. These are different states.
 
 The POST body contains `strategy`, `window`, optional `rival_entry_id`, and the two optional
 switches of the member menu: `top100_weight` (one of 0, 5, 10, 20, 30, 40, 50; default 0) and
-`managers_word` (boolean; default false). The GET takes the same two as query parameters.
+`managers_word` (boolean; default false), plus `chip` (null or `wildcard`, `freehit`,
+`bboost`, `3xc`; default null). The GET takes the same fields as query parameters.
 Unknown body keys are refused. A switch left off is left out of the request fingerprint, the
 job spec and the cache key, so a plain request has the identities it had before the switches
 existed. A switch turned on adds its value and the identity of the per-capture input it is
@@ -224,6 +225,15 @@ computed from to the cache key: the export's `table_sha256`, source captures and
 `MANAGERS_WORD_RULE_VERSION` for the word. The job spec records the same mapping, and the
 worker refuses a job whose recorded input is no longer the one it holds
 (`SWITCH_INPUTS_CHANGED`) instead of filing one export's answer at another's address.
+
+A chosen chip requires `saf-puan`, window 1, no rival, Top 100 at 0 and the word off.
+Its name and `CHIP_CHOICE_BASIS` enter the switch identity; it needs no extra artifact.
+Capabilities' `chips.held_by_entry` reads the current capture: a missing member key
+means unknown history, while an empty list means no held chip. This read reuses the
+loaded capture context; the first request may load it. `CHIP_HISTORY_UNKNOWN` or
+`CHIP_NOT_HELD` refuses before queueing, and the worker validates the captured history
+again. The existing chip solve stays unchanged; a solve failure remains `PLAN_NOT_FOUND`
+with diagnostics confined to the operator log.
 
 The combinations are the batch menu's: `saf-puan` at windows 1, 3 and 5; a rival strategy
 (`ortak-koru`, `fark-yarat`) at 1, 3 and 5 with a rival; a Top 100 setting on any of them; the

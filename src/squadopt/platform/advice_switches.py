@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
+from squadopt.application.advice_chips import CHIP_CHOICE_BASIS
 from squadopt.application.manager_words import (
     MANAGERS_WORD_RULE_VERSION,
     ManagerWords,
@@ -84,7 +85,11 @@ class AdviceSwitchInputs:
 
 
 def switch_identity(
-    inputs: AdviceSwitchInputs, *, top100_weight: int = 0, managers_word: bool = False
+    inputs: AdviceSwitchInputs,
+    *,
+    top100_weight: int = 0,
+    managers_word: bool = False,
+    chip: str | None = None,
 ) -> SwitchIdentity:
     """What the switched-on part of a request adds to its address; empty when all are off.
 
@@ -96,6 +101,8 @@ def switch_identity(
     """
 
     identity: SwitchIdentity = {}
+    if chip is not None:
+        identity["chip"] = {"chip": chip, "basis": CHIP_CHOICE_BASIS}
     if top100_weight:
         counts = inputs.top100_counts
         if counts is None:

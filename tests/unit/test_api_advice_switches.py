@@ -96,7 +96,12 @@ class _Switches:
         return self.inputs
 
 
-def _world(tmp_path: Path, inputs: AdviceSwitchInputs | None = BOTH) -> dict[str, Any]:
+def _world(
+    tmp_path: Path,
+    inputs: AdviceSwitchInputs | None = BOTH,
+    *,
+    held_chips: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     _publish_members(tmp_path / "site")
     cache = FileAdviceCache(tmp_path / "cache")
     queue = FileJobQueue(tmp_path / "jobs")
@@ -109,6 +114,7 @@ def _world(tmp_path: Path, inputs: AdviceSwitchInputs | None = BOTH) -> dict[str
         {slug: value.requires_rival for slug, value in menu_capabilities().items()},
         capabilities=menu_capabilities(),
         switches=switches,
+        chip_availability=lambda context, league, entry: held_chips,
     )
     application = create_app(
         data_root=tmp_path / "site",
@@ -489,6 +495,7 @@ def test_capabilities_say_what_may_be_asked_right_now(tmp_path: Path) -> None:
         },
         "top100": {"available": True, "weights": list(TOP100_WEIGHTS)},
         "managers_word": {"available": True},
+        "chips": {"held_by_entry": {}},
     }
     jsonschema.validate(document, league_capabilities_schema())
 

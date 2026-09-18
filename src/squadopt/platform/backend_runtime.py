@@ -35,12 +35,14 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from squadopt.application.advice import AdviseEntryRequest
 from squadopt.application.advice_capabilities import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     advice_capabilities,
     menu_capabilities,
 )
+from squadopt.application.advice_menu import held_member_chips
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import SourceRevisionError
@@ -516,6 +518,28 @@ class CaptureContextProvider:
             return AdviceSwitchInputs()
         return None if bundle is None else bundle.switches
 
+    def held_chips(
+        self, context: AdviceRequestContext, league_id: int, entry_id: int
+    ) -> tuple[str, ...] | None:
+        """Read chip history from the same capture the worker will answer from."""
+        try:
+            bundle = self.capture(context)
+            if bundle is None:
+                return None
+            return held_member_chips(
+                AdviseEntryRequest(context.season, context.gameweek, league_id, entry_id),
+                provider=bundle.provider,
+                inputs=bundle.inputs,
+                rules=bundle.rules,
+            )
+        except Exception as error:
+            self._report(
+                "advice_chip_history_unreadable",
+                snapshot_id=context.capture_snapshot_id,
+                reason=str(error),
+            )
+            return None
+
     def _report(self, event: str, **fields: object) -> None:
         key = event, str(fields.get("snapshot_id", ""))
         marker = str(fields.get("reason", ""))
@@ -644,6 +668,7 @@ def build_backend(
         computable_strategies(),
         capabilities=menu_capabilities(),
         switches=contexts,
+        chip_availability=contexts.held_chips,
     )
     submit = AdviceSubmitService(
         reader,

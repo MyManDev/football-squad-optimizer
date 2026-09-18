@@ -1,0 +1,127 @@
+"""Chosen chips use the published solve and stay distinct through HTTP and storage."""
+
+import json
+from dataclasses import replace
+from pathlib import Path
+from typing import Any
+
+import pytest
+import tests.unit.test_live_transfers as world_module
+from tests.unit.test_advice_chips import LEAGUE, _every_chip_open
+from tests.unit.test_advice_read import _valid_advice_document
+from tests.unit.test_api_advice_switches import ADVICE_URL, BODY, LEAGUE_ID, _advise, _world
+from tests.unit.test_league_views import _legal_squad, _member_picks, _Provider, _world_context
+
+from squadopt.application.advice_menu import ChipUnavailable, MenuRequest, advise_menu_entry
+from squadopt.application.entries import EntryRegistration
+from squadopt.application.league_views import build_league_views
+from squadopt.live.rules import CHIP_NAMES
+from squadopt.platform.advice_cache import FileAdviceCache
+from squadopt.platform.api_contract import ADVISE_CHIPS, ApiCommandRequest
+
+world = world_module._world
+
+
+def test_chip_identity_roundtrips_and_preserves_the_plain_fingerprint() -> None:
+    assert ADVISE_CHIPS == CHIP_NAMES
+    assert _advise().request_fingerprint == _advise(chip=None).request_fingerprint
+    fingerprints = {_advise().request_fingerprint}
+    for chip in ADVISE_CHIPS:
+        command = _advise(chip=chip)
+        assert ApiCommandRequest.from_dict(command.to_dict()) == command
+        fingerprints.add(command.request_fingerprint)
+    assert len(fingerprints) == 5
+
+
+def test_post_get_cache_and_capabilities_carry_each_chip(tmp_path: Path) -> None:
+    state = _world(tmp_path, held_chips=ADVISE_CHIPS)
+    client = state["client"]
+    caps = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+    assert caps["chips"]["held_by_entry"]["313686"] == list(ADVISE_CHIPS)
+    keys = set()
+    for chip in ADVISE_CHIPS:
+        response = client.post(ADVICE_URL, json={**BODY, "chip": chip})
+        assert response.status_code == 202, response.text
+        job = state["queue"].load(response.json()["job_id"])
+        spec = state["specs"].get(job.cache_key)
+        assert spec.switch("chip")["chip"] == chip
+        keys.add(job.cache_key)
+        params = {"strategy": "saf-puan", "window": 1, "chip": chip}
+        assert client.get(ADVICE_URL, params=params).status_code == 404
+        payload = _valid_advice_document()
+        FileAdviceCache(tmp_path / "cache").put(job.cache_key, payload)
+        assert client.get(ADVICE_URL, params=params).content == payload
+        assert client.post(ADVICE_URL, json={**BODY, "chip": chip}).content == payload
+    assert len(keys) == 4
+
+
+@pytest.mark.parametrize("held,code", [(None, "CHIP_HISTORY_UNKNOWN"), ((), "CHIP_NOT_HELD")])
+def test_unknown_or_spent_chip_is_refused_before_queueing(
+    tmp_path: Path, held: Any, code: str
+) -> None:
+    state = _world(tmp_path, held_chips=held)
+    client = state["client"]
+    for response in (
+        client.post(ADVICE_URL, json={**BODY, "chip": "bboost"}),
+        client.get(ADVICE_URL, params={"strategy": "saf-puan", "window": 1, "chip": "bboost"}),
+    ):
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == code
+    assert not state["queue"].jobs()
+
+
+@pytest.mark.parametrize("extra", [{"top100_weight": 5}, {"managers_word": True}, {"window": 3}])
+def test_chip_cannot_combine_with_other_switches(tmp_path: Path, extra: dict[str, Any]) -> None:
+    state = _world(tmp_path, held_chips=ADVISE_CHIPS)
+    response = state["client"].post(ADVICE_URL, json={**BODY, "chip": "bboost", **extra})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert not state["queue"].jobs()
+
+
+def test_three_members_match_every_published_chip_file(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    rules = _every_chip_open(rules)
+    picks = {
+        entry: replace(_member_picks(world, entry, _legal_squad(world)), bank_tenths=bank)
+        for entry, bank in ((101, 5), (202, 10), (303, 15))
+    }
+    provider = _Provider(picks)
+    registrations = tuple(
+        EntryRegistration(entry, f"member-{entry}", "2026-08-23T00:00:00Z") for entry in picks
+    )
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=LEAGUE,
+        league_name="Test League",
+        out_dir=tmp_path,
+    )
+    fields = ("moves", "captain", "starting_xi", "expected_own_points", "chip_choice")
+    for entry in picks:
+        for chip in ADVISE_CHIPS:
+            published = json.loads(
+                (tmp_path / f"advice/{entry}/saf-puan/1/chip-{chip}.json").read_text(
+                    encoding="utf-8"
+                )
+            )["payload"]
+            request = MenuRequest("2026-27", 2, LEAGUE, entry, chip=chip)
+            answer = advise_menu_entry(
+                request, provider=provider, inputs=inputs, projection=projection, rules=rules
+            )
+            assert {f: answer[f] for f in fields} == {f: published[f] for f in fields}
+    spent = _Provider({101: replace(picks[101], chips_used={"bboost": (1,)})})
+    with pytest.raises(ChipUnavailable) as refused:
+        advise_menu_entry(
+            MenuRequest("2026-27", 2, LEAGUE, 101, chip="bboost"),
+            provider=spent,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+        )
+    assert refused.value.code == "CHIP_NOT_HELD"
