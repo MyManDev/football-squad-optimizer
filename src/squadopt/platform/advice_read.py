@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol
@@ -87,6 +87,14 @@ class Top100InputsUnavailableError(AdviceReadError):
 
 class ManagersWordUnavailableError(AdviceReadError):
     """The manager's word was asked for and this capture has no coded club news."""
+
+
+class ChipUnavailableError(AdviceReadError):
+    """A chip cannot be offered from this member's captured history."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__("This chip is not available from the member's captured history.")
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,6 +306,10 @@ class AdviceReadStore:
         *,
         capabilities: Mapping[str, AdviceCapability] | None = None,
         switches: SwitchInputsProvider | None = None,
+        chip_availability: Callable[
+            [AdviceRequestContext, int, tuple[int, ...]], Mapping[int, tuple[str, ...] | None]
+        ]
+        | None = None,
     ) -> None:
         self._directory = directory
         self._cache = cache
@@ -314,6 +326,7 @@ class AdviceReadStore:
             else {slug: capabilities[slug] for slug in strategies}
         )
         self._switches = switches
+        self._chip_availability = chip_availability
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""
@@ -343,6 +356,15 @@ class AdviceReadStore:
             return AdviceSwitchInputs()
         return self._switches.switch_inputs(context) or AdviceSwitchInputs()
 
+    def _held_chips(
+        self, context: AdviceRequestContext, league_id: int, entries: tuple[int, ...]
+    ) -> Mapping[int, tuple[str, ...] | None]:
+        if self._chip_availability is None or not any(
+            c.chip_windows for c in self._capabilities.values()
+        ):
+            return {}
+        return self._chip_availability(context, league_id, entries)
+
     def league_capabilities(self, league_id: int) -> dict[str, object]:
         """What may be asked for this league right now, so a page enables only that.
 
@@ -350,12 +372,14 @@ class AdviceReadStore:
         offered only while the current capture has the input each one is computed from.
         """
 
-        if self._directory.league(league_id) is None:
+        league = self._directory.league(league_id)
+        if league is None:
             raise LeagueNotConnectedError(f"League {league_id} is not connected here.")
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
         inputs = self._switch_inputs(context)
+        chips = self._held_chips(context, league_id, tuple(sorted(_member_entry_ids(league))))
         top100 = inputs.top100_counts is not None and any(
             capability.top100_windows for capability in self._capabilities.values()
         )
@@ -380,6 +404,11 @@ class AdviceReadStore:
             # The settings that would be accepted now: zero is always one of them.
             "top100": {"available": top100, "weights": list(TOP100_WEIGHTS) if top100 else [0]},
             "managers_word": {"available": word},
+            "chips": {
+                "held_by_entry": {
+                    str(entry): list(held) for entry, held in chips.items() if held is not None
+                },
+            },
         }
         validate_league_capabilities(document)
         return document
@@ -394,6 +423,7 @@ class AdviceReadStore:
         rival_entry_id: int | None = None,
         top100_weight: int = 0,
         managers_word: bool = False,
+        chip: str | None = None,
     ) -> ResolvedAdviceRequest:
         """Validate one request against what this deployment knows and address it.
 
@@ -421,6 +451,7 @@ class AdviceReadStore:
                 capabilities=self._capabilities,
                 top100_weight=top100_weight,
                 managers_word=managers_word,
+                chip=chip,
             )
         except EntryError as error:
             raise UnsupportedAdviceRequestError(str(error)) from error
@@ -438,14 +469,23 @@ class AdviceReadStore:
                 "waits until the two are for the same week."
             )
         switches: SwitchIdentity = {}
-        if top100_weight or managers_word:
+        if chip is not None:
+            held = self._held_chips(context, league_id, (entry_id,)).get(entry_id)
+            if held is None or chip not in held:
+                raise ChipUnavailableError(
+                    "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
+                )
+        if top100_weight or managers_word or chip is not None:
             # Refused here, before a job exists: a switch whose input this capture does
             # not have can never be computed, and a queued job would only say so later.
             try:
                 switches = switch_identity(
-                    self._switch_inputs(context),
+                    self._switch_inputs(context)
+                    if top100_weight or managers_word
+                    else AdviceSwitchInputs(),
                     top100_weight=top100_weight,
                     managers_word=managers_word,
+                    chip=chip,
                 )
             except SwitchInputUnavailable as error:
                 if error.switch == TOP100_SWITCH:
@@ -480,6 +520,7 @@ class AdviceReadStore:
         rival_entry_id: int | None = None,
         top100_weight: int = 0,
         managers_word: bool = False,
+        chip: str | None = None,
     ) -> tuple[str, AdviceRequestContext]:
         """``resolve`` for a caller that needs only the address and its context."""
 
@@ -491,6 +532,7 @@ class AdviceReadStore:
             rival_entry_id=rival_entry_id,
             top100_weight=top100_weight,
             managers_word=managers_word,
+            chip=chip,
         )
         return resolved.key, resolved.context
 
@@ -524,6 +566,7 @@ class AdviceReadStore:
         rival_entry_id: int | None = None,
         top100_weight: int = 0,
         managers_word: bool = False,
+        chip: str | None = None,
     ) -> bytes:
         """The cached answer under the complete key, or a typed refusal."""
 
@@ -535,6 +578,7 @@ class AdviceReadStore:
             rival_entry_id=rival_entry_id,
             top100_weight=top100_weight,
             managers_word=managers_word,
+            chip=chip,
         )
         cached = self.cached(key)
         if cached is None:

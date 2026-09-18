@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from squadopt.application.entries import EntryError
 from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.live.rules import CHIP_NAMES
 
 COMPUTED_MODE = "saf-puan"
 COMPUTED_WINDOW = 1
@@ -32,6 +33,7 @@ class AdviceCapability:
     #: Empty means the switch is not offered for this strategy on this path.
     top100_windows: tuple[int, ...] = ()
     managers_word_windows: tuple[int, ...] = ()
+    chip_windows: tuple[int, ...] = ()
 
 
 def _rival_strategies() -> tuple[str, ...]:
@@ -63,6 +65,7 @@ def menu_capabilities() -> dict[str, AdviceCapability]:
             False,
             top100_windows=MEMBER_WINDOWS,
             managers_word_windows=(COMPUTED_WINDOW,),
+            chip_windows=(COMPUTED_WINDOW,),
         )
     }
     for slug in _rival_strategies():
@@ -79,6 +82,7 @@ def validate_advice_selection(
     capabilities: Mapping[str, AdviceCapability] | None = None,
     top100_weight: int = 0,
     managers_word: bool = False,
+    chip: str | None = None,
 ) -> None:
     available = advice_capabilities() if capabilities is None else capabilities
     capability = available.get(strategy)
@@ -109,3 +113,10 @@ def validate_advice_selection(
         )
     if managers_word and window not in capability.managers_word_windows:
         raise EntryError("The manager's word applies to the one-week pure-points plan only.")
+    if chip is not None:
+        if chip not in CHIP_NAMES:
+            raise EntryError("Unknown chip choice.")
+        if window not in capability.chip_windows or top100_weight or managers_word:
+            raise EntryError(
+                "A chip requires the one-week pure-points plan with other switches off."
+            )

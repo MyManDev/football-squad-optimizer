@@ -7,6 +7,7 @@ itself ready with nothing to answer from.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -619,3 +620,64 @@ def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
             window=COMPUTED_WINDOW,
         )[0]
     )
+
+
+def test_chip_capabilities_resolve_once_for_all_members_without_projecting(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _publish_members(deployment["site_root"], 202, 303)
+    backend = build_backend(deployment["config"])
+    identity = Mock(wraps=backend.contexts.identity)
+    provider = Mock(wraps=backend_runtime.CapturePicksProvider)
+    rules = Mock(wraps=backend_runtime.read_season_rules)
+    held = Mock(wraps=backend_runtime.held_member_chips)
+    monkeypatch.setattr(backend.contexts, "identity", identity)
+    monkeypatch.setattr(backend_runtime, "CapturePicksProvider", provider)
+    monkeypatch.setattr(backend_runtime, "read_season_rules", rules)
+    monkeypatch.setattr(backend_runtime, "held_member_chips", held)
+    client = TestClient(app_for_backend(backend))
+    for _ in range(2):
+        response = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities")
+        assert response.status_code == 200, response.text
+        assert response.json()["chips"]["held_by_entry"] == {}
+        assert backend.contexts._context is None
+    assert identity.call_count == 6  # current, switch inputs, one bulk chip lookup per GET
+    assert provider.call_count == rules.call_count == 1
+    assert held.call_count == 3  # absent member histories are cached too
+
+
+def test_unreadable_chip_source_stays_not_ready_without_reloading_per_member(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _publish_members(deployment["site_root"], 202, 303)
+    backend = build_backend(deployment["config"])
+    rules = Mock(side_effect=ValueError("broken captured rules"))
+    monkeypatch.setattr(backend_runtime, "read_season_rules", rules)
+    client = TestClient(app_for_backend(backend))
+    for _ in range(2):
+        response = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities")
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "NOT_READY"
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": "saf-puan", "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "NOT_READY"
+    assert rules.call_count == 1
+    assert backend.contexts._context is None
+    assert not backend.queue.jobs()
+
+
+def test_chip_refusal_with_artifact_root_never_projects(deployment: dict[str, Any]) -> None:
+    config = replace(deployment["config"], artifact_root=deployment["site_root"] / "artifacts")
+    backend = build_backend(config)
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": "saf-puan", "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "CHIP_HISTORY_UNKNOWN"
+    assert backend.contexts._context is None
+    assert not backend.queue.jobs()

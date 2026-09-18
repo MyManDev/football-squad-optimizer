@@ -46,6 +46,7 @@ from typing import Final
 from squadopt.application.advice_capabilities import menu_capabilities
 from squadopt.application.advice_menu import (
     PLAN_NOT_FOUND_ERRORS,
+    ChipUnavailable,
     ManagersWordNotSolved,
     MenuRequest,
     advise_menu_entry,
@@ -66,6 +67,7 @@ from squadopt.platform.advice_queue import (
     run_advice_worker_once,
 )
 from squadopt.platform.advice_switches import (
+    CHIP_SWITCH,
     MANAGERS_WORD_SWITCH,
     TOP100_SWITCH,
     SwitchInputUnavailable,
@@ -109,7 +111,7 @@ def _stamp(moment: datetime) -> str:
 
 #: The switches this worker computes, and the code a job fails with when the capture has
 #: no input for one. A switch that needs no per-capture input is added to the first only.
-_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH})
+_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH})
 _SWITCH_REFUSAL_CODES: Final = {
     TOP100_SWITCH: "TOP100_INPUTS_UNAVAILABLE",
     MANAGERS_WORD_SWITCH: "MANAGERS_WORD_UNAVAILABLE",
@@ -127,6 +129,9 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
     weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
     word = MANAGERS_WORD_SWITCH in spec.switches
+    chip = spec.switch(CHIP_SWITCH).get("chip")
+    if CHIP_SWITCH in spec.switches and not isinstance(chip, str):
+        raise AdviceComputeRefused("REQUEST_UNREADABLE", "The chip choice is unreadable.")
     unknown = set(spec.switches) - _KNOWN_SWITCHES
     if unknown or (TOP100_SWITCH in spec.switches and weight < 1):
         raise AdviceComputeRefused(
@@ -134,7 +139,12 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
             "The recorded request names a switch this worker does not compute.",
         )
     try:
-        held = switch_identity(capture.switches, top100_weight=weight, managers_word=word)
+        held = switch_identity(
+            capture.switches,
+            top100_weight=weight,
+            managers_word=word,
+            chip=chip if isinstance(chip, str) else None,
+        )
     except SwitchInputUnavailable as error:
         raise AdviceComputeRefused(_SWITCH_REFUSAL_CODES[error.switch], str(error)) from error
     if held != {name: dict(value) for name, value in spec.switches.items()}:
@@ -153,6 +163,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
         rival_entry_id=spec.rival_entry_id,
         top100_weight=weight,
         managers_word=word,
+        chip=chip if isinstance(chip, str) else None,
     )
 
 
@@ -260,6 +271,8 @@ def build_advice_compute(
                 manager_words=capture.manager_words,
                 prerequisite=lambda address: cached_plain(spec, address),
             )
+        except ChipUnavailable as error:
+            raise AdviceComputeRefused(error.code, str(error)) from error
         except ManagersWordNotSolved as error:
             # One member's outcome, not a fault and not a missing input: the capture has
             # the club news, and this member's plan under the word and the setting could

@@ -7,6 +7,15 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
           "type": "string"
         },
+        "chip": {
+          "enum": [
+            null,
+            "wildcard",
+            "freehit",
+            "bboost",
+            "3xc"
+          ]
+        },
         "contract_version": {
           "const": "backend_api_v1",
           "type": "string"
@@ -97,6 +106,15 @@
     "AdviseRequestBody": {
       "additionalProperties": false,
       "properties": {
+        "chip": {
+          "enum": [
+            null,
+            "wildcard",
+            "freehit",
+            "bboost",
+            "3xc"
+          ]
+        },
         "managers_word": {
           "type": "boolean"
         },
