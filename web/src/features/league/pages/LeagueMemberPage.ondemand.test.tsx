@@ -31,6 +31,7 @@ import type {
   AdviceRequestResult,
 } from "../advice/adviceClient";
 import { rememberJob } from "../advice/adviceJobStore";
+import { AdviceApiError } from "../advice/adviceClient";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { TOP100_WEIGHTS } from "../advice/top100";
 import * as data from "../data";
@@ -121,7 +122,7 @@ function renderView(
   client: AdviceClient,
   props: Partial<Parameters<typeof LeagueMemberView>[0]> = {},
 ) {
-  return render(
+  const element = (updated: Partial<Parameters<typeof LeagueMemberView>[0]> = {}) => (
     <LanguageProvider initialLanguage="tr">
       <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
         <LeagueMemberView
@@ -132,10 +133,17 @@ function renderView(
           client={client}
           capabilities={CAPABILITIES}
           {...props}
+          {...updated}
         />
       </MemoryRouter>
-    </LanguageProvider>,
+    </LanguageProvider>
   );
+  const rendered = render(element());
+  return {
+    ...rendered,
+    update: (updated: Partial<Parameters<typeof LeagueMemberView>[0]>) =>
+      rendered.rerender(element(updated)),
+  };
 }
 
 async function pressCompute(): Promise<void> {
@@ -168,12 +176,63 @@ describe("a selection nobody published, with the service answering", () => {
     expect(client.requests).toEqual([]);
     expect(container).not.toHaveTextContent(copy.computeFailed);
     if (outcome === "hit") {
-      expect(container).toHaveTextContent(copy.computeDone);
+      await waitFor(() => expect(container).toHaveTextContent(copy.computeDone));
       expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
     } else {
       expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
       expect(container).not.toHaveTextContent(copy.computeDone);
     }
+  });
+
+  it.each(["selection", "capture"])(
+    "silently ignores an on-open answer for another %s",
+    async (mismatch) => {
+      const client = new RecordingClient((request) => ({
+        kind: "advice",
+        source: "api-cache",
+        envelope: computed(
+          request,
+          mismatch === "capture"
+            ? { source_snapshot_id: "another-capture" }
+            : { mode: "fark-yarat" },
+        ),
+      }));
+      const read = vi.spyOn(client, "readAdvice");
+      const { container } = renderView(link, client, {
+        adviceIssue: "not-listed",
+        computeService: "ready",
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
+      expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
+      expect(container).not.toHaveTextContent(copy.computeFailed);
+      expect(container).not.toHaveTextContent(computeCopy.failures.ANSWER_OTHER_CAPTURE!);
+    },
+  );
+
+  it("keeps a finished computed plan when the service becomes unreachable", async () => {
+    const client = new RecordingClient((request) => ({
+      kind: "advice",
+      envelope: computed(request),
+      source: "api-cache",
+    }));
+    const read = vi.spyOn(client, "readAdvice").mockResolvedValue({ kind: "not-computed" });
+    const { container, update } = renderView(link, client, {
+      adviceIssue: "not-listed",
+      computeService: "ready",
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await pressCompute();
+    await waitFor(() => expect(container).toHaveTextContent(copy.computeDone));
+    update({ computeService: "unreachable" });
+    expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
+    expect(container).toHaveTextContent(copy.computeDone);
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
   it("does not read the cache in a static build", async () => {
@@ -242,39 +301,53 @@ describe("a selection nobody published, with the service answering", () => {
     expect(container.querySelector('[data-testid="top100-influence"]')).toBeNull();
   });
 
-  it("picks a remembered wait up again after a reload, without asking twice", async () => {
-    const request: AdviceRequest = {
-      leagueId: INDEX.league_id,
-      entryId: ENTRY,
-      strategy: "ortak-koru",
-      window: 3,
-      rivalEntryId: OTHER_RIVAL,
-      top100Weight: 20,
-      managersWord: false,
-      season: INDEX.season,
-      gameweek: INDEX.gameweek,
-    };
-    rememberJob(request, { jobId: "advice-0123456789abcdef-1", startedAt: Date.now() - 20_000 });
-    const client = new RecordingClient((asked) => ({
-      kind: "advice",
-      envelope: computed(asked),
-      source: "api-cache",
-    }));
-    const { container } = renderView(link, client, { adviceIssue: "not-listed" });
-    expect(container).toHaveTextContent(copy.computeQueued);
-    expect(container).toHaveTextContent(computeCopy.leaveOpen);
-    await waitFor(() => expect(container).toHaveTextContent(copy.computeDone), { timeout: 4000 });
-    expect(client.polls).toEqual(["advice-0123456789abcdef-1"]);
-    expect(client.requests).toEqual([]);
-  });
+  it.each([false, true])(
+    "resumes a remembered job before reading the cache (missing: %s)",
+    async (missing) => {
+      const request: AdviceRequest = {
+        leagueId: INDEX.league_id,
+        entryId: ENTRY,
+        strategy: "ortak-koru",
+        window: 3,
+        rivalEntryId: OTHER_RIVAL,
+        top100Weight: 20,
+        managersWord: false,
+        season: INDEX.season,
+        gameweek: INDEX.gameweek,
+      };
+      rememberJob(request, { jobId: "advice-0123456789abcdef-1", startedAt: Date.now() - 20_000 });
+      const client = new RecordingClient((asked) => ({
+        kind: "advice",
+        envelope: computed(asked),
+        source: "api-cache",
+      }));
+      if (missing)
+        vi.spyOn(client, "readJob").mockRejectedValue(new AdviceApiError(404, "JOB_NOT_FOUND"));
+      const read = vi.spyOn(client, "readAdvice");
+      const { container } = renderView(link, client, {
+        adviceIssue: "not-listed",
+        computeService: "ready",
+      });
+      expect(read).not.toHaveBeenCalled();
+      expect(container).toHaveTextContent(copy.computeQueued);
+      expect(container).toHaveTextContent(computeCopy.leaveOpen);
+      await waitFor(() => expect(container).toHaveTextContent(copy.computeDone), { timeout: 4000 });
+      if (!missing) expect(client.polls).toEqual(["advice-0123456789abcdef-1"]);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(client.requests).toEqual([]);
+    },
+  );
 });
 
 describe("a published selection, with the service answering", () => {
   it("is shown at once with no request, and Hesapla can still recompute it", () => {
     const client = new RecordingClient(() => ({ kind: "unavailable" }));
+    const read = vi.spyOn(client, "readAdvice");
     const { container } = renderView("", client, {
       advice: mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1),
+      computeService: "ready",
     });
+    expect(read).not.toHaveBeenCalled();
     expect(client.requests).toEqual([]);
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
     expect(container).toHaveTextContent(computeCopy.duration[1]);

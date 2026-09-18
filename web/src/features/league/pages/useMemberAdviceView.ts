@@ -61,7 +61,7 @@ export function useMemberAdviceView(
       : selection.status === "ready" && plainSelection && canComputeAdvice(request));
   const baselineAvailable =
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
-  const job = useAdviceJob(adviceClient, baselineAvailable);
+  const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
   const requestKey = [
     adviceRequestKey(request),
     selection.status,
@@ -81,9 +81,11 @@ export function useMemberAdviceView(
   });
   useEffect(() => {
     reset();
-    const resumed = computeAvailable && resume?.(resumable.current);
-    if (!resumed && readOnOpen) readCached?.(resumable.current);
-  }, [requestKey, computeAvailable, readOnOpen, reset, resume, readCached]);
+    if (computeAvailable) resume?.(resumable.current);
+  }, [requestKey, computeAvailable, reset, resume]);
+  useEffect(() => {
+    if (readOnOpen) readCached?.(resumable.current);
+  }, [requestKey, readOnOpen, readCached]);
 
   const current =
     (selectionAvailable || computeAvailable) &&

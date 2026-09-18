@@ -125,6 +125,13 @@ test("a browser computes through the worker, then reads the same answer from cac
   expect(await cached.json()).toEqual(answer);
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
   expect(postsAfterReload).toEqual([]);
+  const postedCache = page.waitForResponse(
+    (response) => response.url().startsWith(route) && response.request().method() === "POST",
+  );
+  await compute.click();
+  const postedAnswer = await postedCache;
+  expect(postedAnswer.status()).toBe(200);
+  expect(await postedAnswer.json()).toEqual(answer);
 });
 
 test("a bundle built with an origin is the static page when the service is down", async ({
