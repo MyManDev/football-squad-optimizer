@@ -46,7 +46,7 @@ explicitly distinguishes this from a net forecast. No accuracy percentage is inf
 
 The optional `weeks[].recorded_plans` lists the archived publication's decisions,
 collapsed by default on the member history page. It includes strategy, window,
-named rival, moves and captain, plus chip and any explicitly recorded Top 100,
+rival id, moves and captain, plus chip and any explicitly recorded Top 100,
 manager's-word and expected-points cost fields. Player names come from that record;
 an unresolved player retains their recorded id. No switched plan is solved or scored
 against results here. The existing baseline comparison and horizon are unchanged.
