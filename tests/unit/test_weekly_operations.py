@@ -339,9 +339,8 @@ def test_missing_reused_rotation_refuses_before_capture_or_export(tmp_path: Path
 def test_the_preview_records_advice_only_when_it_is_the_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The record is written by the build whose bytes ship. Without --publish the preview
-    is a preview and records nothing; with it, the preview is the publication and records
-    into the private root, and the records history already reads are declared inputs."""
+    """Publication records its preview before history reads it; a default preview does not.
+    Explicit recording without publication is covered separately below."""
 
     week = tmp_path / "data/advice_records/2026-27/gw02/entry-101"
     earlier = week / "fpl-live-20260820T120000Z-earlier"
@@ -483,6 +482,24 @@ def test_record_advice_without_publish_records_every_rendered_member(
         record = paths.records / "2026-27/gw02" / f"entry-{entry.stem}" / snapshot / "advice.json"
         assert record.is_file()
     assert weekly.main([*args, "--record-advice", "--run-id", "recorded", "--resume"]) == 0
+    history = json.loads((entries.parent / "history/101.json").read_bytes())
+    assert [week["gameweek"] for week in history["payload"]["weeks"]] == [2]
+    assert weekly.main([*args, "--run-id", "recorded", "--resume"]) == 1
+    assert (
+        weekly.main(
+            [
+                *args,
+                "--record-advice",
+                "--publish",
+                "--publish-suffix",
+                "9",
+                "--run-id",
+                "recorded",
+                "--resume",
+            ]
+        )
+        == 1
+    )
 
 
 def test_dry_run_prints_recording_and_the_suffixed_branch_without_writing(
@@ -501,6 +518,7 @@ def test_dry_run_prints_recording_and_the_suffixed_branch_without_writing(
                 "352490",
                 "--dry-run",
                 "--record-advice",
+                "--publish",
                 "--publish-suffix",
                 "8",
             ]
@@ -514,10 +532,32 @@ def test_dry_run_prints_recording_and_the_suffixed_branch_without_writing(
     assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.parametrize("suffix", ["../branch", "space here", "x..y", "--", "x/lock"])
+@pytest.mark.parametrize(
+    "suffix", ["../branch", "space here", "x..y", "--", "x/lock", "-x", "x-", "8\n", "a;b"]
+)
 def test_invalid_publish_suffix_is_refused(suffix: str) -> None:
     with pytest.raises(weekly.PublishError, match="suffix"):
         weekly.PublishNames("2026-27", 5, "decision", suffix)
+
+
+def test_a_publish_suffix_needs_publication(capsys):
+    with pytest.raises(SystemExit) as error:
+        weekly.main(["--publish-suffix", "8", "--dry-run"])
+    assert error.value.code == 2
+    assert "--publish-suffix requires --publish" in capsys.readouterr().err
+
+
+def test_a_taken_suffix_refuses_before_the_capture_stage(tmp_path_factory, capsys):
+    checkout, paths, args = _git_checkout(tmp_path_factory.mktemp("taken"))
+    _origin_develop_at_head(checkout)
+    _git(checkout, "push", "-q", "origin", "HEAD:refs/heads/feature/gw02-decision-site-8")
+    assert weekly.main([*args, "--publish", "--publish-suffix", "8", "--run-id", "taken"]) == 1
+    receipt = json.loads((paths.journal / "taken/run.json").read_bytes())
+    stages = {stage["name"]: stage["status"] for stage in receipt["stages"]}
+    assert stages["preflight"] == "failed"
+    assert stages["capture"] == "pending"
+    assert not any(state == "completed" for state in stages.values())
+    assert "choose another --publish-suffix" in capsys.readouterr().err
 
 
 def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
@@ -536,6 +576,8 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
     real_publish = weekly.publish
 
     def moved(names, **kwargs):
+        if kwargs.get("dry_run"):
+            return real_publish(names, **kwargs)
         merged = _git(checkout, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "merged")
         _git(checkout, "push", "-q", "origin", f"{merged}:refs/heads/develop")
         return real_publish(names, **kwargs)

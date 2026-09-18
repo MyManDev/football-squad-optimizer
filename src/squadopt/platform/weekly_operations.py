@@ -253,6 +253,13 @@ class WeeklyOperations:
             # refuses before it spends anything.
             try:
                 check_publication_base(self.paths.workspace, self.repository_commit)
+                publish(
+                    self.publish_names,
+                    force_branch=False,
+                    dry_run=True,
+                    workspace=self.paths.workspace,
+                    expected_commit=self.repository_commit,
+                )
             except PublishError as error:
                 raise WeekError(str(error)) from error
         return self._receipt(
@@ -534,9 +541,8 @@ class WeeklyOperations:
         )
 
     def _league(self) -> WeeklyStageResult:
-        # A run that will publish records here, from the solve whose bytes ship: the
-        # publish stage copies this preview rather than solving again, and the history
-        # documents built below read the record, so it has to exist before they do.
+        # Publication or explicit recording writes the record before history reads it.
+        # The publish stage copies this preview rather than solving again.
         record = self.request.publish or self.record_advice
         request = LeaguePublicationRequest(
             self.paths.snapshots,
@@ -942,6 +948,8 @@ def _revision(workspace: Path, supplied: str | None) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.publish_suffix and not args.publish:
+        parser.error("--publish-suffix requires --publish")
     root = args.workspace.resolve()
     out = (root / args.out).resolve() if args.out is not None else None
     paths = WeeklyPaths.under(root, out=out)

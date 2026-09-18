@@ -396,7 +396,7 @@ def publish(
     if branch_exists and not force_branch:
         raise PublishError(
             f"Branch {names.branch} already exists on origin. Re-running a publish is fine, "
-            "but say so: pass --force-branch to reuse it."
+            "but say so: pass --force-branch to reuse it or choose another --publish-suffix."
         )
     if dry_run:
         print(f"dry run: would create {names.branch} in {worktree}, build, commit, push, PR.")
