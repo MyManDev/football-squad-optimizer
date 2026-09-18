@@ -59,7 +59,7 @@ export function checkedAdvice(
     (request.managersWord !== undefined &&
       (payload.evidence !== undefined) !== request.managersWord) ||
     (request.chip !== undefined &&
-      (chosenChip !== request.chip || (request.chip !== null && payload.chip !== request.chip)))
+      (chosenChip !== request.chip || (payload.chip ?? null) !== request.chip))
   ) {
     throw new AdviceContextError("Advice does not match the selected switches.");
   }

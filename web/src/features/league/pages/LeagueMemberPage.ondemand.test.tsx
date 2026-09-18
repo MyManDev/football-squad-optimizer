@@ -359,7 +359,7 @@ describe("a published selection, with the service answering", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: PLAN_SHOWN })).toBeInTheDocument(),
     );
-    expect(container).toHaveTextContent(copy.chipNames.bboost);
+    expect(screen.getByTestId("chip-choice")).toHaveTextContent(copy.chipNames.bboost);
   });
   it("is shown at once with no request, and Hesapla can still recompute it", async () => {
     const client = new RecordingClient(() => ({ kind: "unavailable" }));

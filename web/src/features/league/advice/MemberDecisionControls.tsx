@@ -174,7 +174,9 @@ export function MemberDecisionControls({
   // the chips are off while either of those is on.
   const chipCopy = CHIP_COPY[language];
   const chip = selection.chip;
-  const chipOptions = [...new Set([...chip.options, ...(computable?.chips ?? [])])];
+  const chipOptions = [
+    ...new Set([...chip.options, ...(capabilities?.chipsByEntry?.[entryId] ?? [])]),
+  ];
   const chipsAvailable = chipOptions.length > 0;
   const chipChosen = chip.chip !== null;
   const chipApplies = chipsAvailable && strategy === "saf-puan" && windowSize === 1;

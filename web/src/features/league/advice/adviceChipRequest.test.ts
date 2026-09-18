@@ -39,7 +39,18 @@ it.each(CHIP_NAMES)("carries %s through GET and POST and keeps its job separate"
 });
 
 it("preserves the existing plain job key and distinguishes all four chips", () => {
-  expect(adviceRequestKey({ ...plain, chip: null })).toBe(adviceRequestKey(plain));
+  expect(adviceRequestKey(plain)).toBe("352490:35249001:saf-puan:1::0:::");
+  expect(adviceRequestKey({ ...plain, chip: null })).toBe("352490:35249001:saf-puan:1::0:::");
   expect(sameAdviceRequest({ ...plain, chip: null }, plain)).toBe(true);
   expect(new Set(CHIP_NAMES.map((chip) => adviceRequestKey({ ...plain, chip }))).size).toBe(4);
+});
+
+it("refuses a chip played by an answer that declares no chip choice", () => {
+  const envelope = mockEntryAdviceEnvelope(plain.entryId, "saf-puan", 1);
+  expect(() =>
+    checkedAdvice(
+      { ...envelope, payload: { ...envelope.payload, chip: "bboost" } },
+      { ...plain, chip: null },
+    ),
+  ).toThrow();
 });
