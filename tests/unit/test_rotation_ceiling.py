@@ -443,6 +443,7 @@ def test_a_measurement_binds_on_solver_work_and_not_on_the_clock() -> None:
         MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
         measurement_optimization_config,
     )
+
     from squadopt.optimization import OptimizationConfig
 
     config = measurement_optimization_config()
