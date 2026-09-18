@@ -314,8 +314,8 @@ repository **variable** so it can be changed or emptied without a commit:
 gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "https://squadopt-api.mymandev.com"
 ```
 
-The workflow change, **not applied in this PR** because workflows are a release-critical
-path:
+The workflow change, applied on its own pull request because workflows are a
+release-critical path:
 
 ```diff
 --- a/.github/workflows/ci.yml
