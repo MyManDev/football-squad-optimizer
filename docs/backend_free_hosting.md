@@ -113,9 +113,12 @@ Three things to know before relying on it:
   a job leaves it `running`. The next worker walks it back to `queued` once the claim is
   older than the 300 s lease and computes it again. Stop when `-Status` shows
   `advice_queue_depth 0`.
-- **The processes end at logoff, sleep or reboot** and nothing restarts them. A scheduled
-  task "at log on" that runs the script makes that automatic. The PC must not sleep while
-  members are expected; that is a Windows power setting for the owner to change.
+- **The processes end at logoff, sleep or reboot.** `scripts\start_backend_at_logon.ps1`
+  starts what is not running (the backend through the launcher, and one labelled tunnel
+  connector) and leaves alone what is; `-Register` puts one shortcut in the owner's own
+  Startup folder, with no elevation, no service and no registry key, and `-Unregister`
+  removes it. The owner runs `-Register`. The PC must not sleep while members are
+  expected; that is a Windows power setting for the owner to change.
 - **The answer's identity includes the commit.** After a `git pull` and a restart the cache
   starts empty for the new commit. Old entries stay on disk and stay addressable.
 
