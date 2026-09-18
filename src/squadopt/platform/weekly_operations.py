@@ -154,12 +154,18 @@ class WeeklyOperations:
         repository_commit: str,
         resume: bool = False,
         handoff: Path | None = None,
+        record_advice: bool = False,
+        publish_suffix: str = "",
     ) -> None:
         if paths.out == paths.journal / "preview":
             paths = replace(paths, out=paths.journal / run_id / "preview")
         self.request, self.paths, self.run_id = request, paths, run_id
         self.repository_commit, self.resume = repository_commit, resume
         self.supplied_handoff = handoff
+        self.record_advice = record_advice
+        self.publish_names = PublishNames(
+            request.season, request.gameweek, "decision", publish_suffix
+        )
         self.values: dict[str, dict[str, Any]] = {}
         self.plan = request.plan()
         if handoff is not None and not request.skip_top100:
@@ -198,6 +204,11 @@ class WeeklyOperations:
             "ledger_inputs": list(map(str, self.ledger_inputs)),
             "record_inputs": list(map(str, self.record_inputs)),
         }
+        if record_advice or publish_suffix:
+            declaration["publication_options"] = {
+                "record_advice": record_advice,
+                "publish_suffix": publish_suffix,
+            }
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
 
     def _receipt(
@@ -526,7 +537,7 @@ class WeeklyOperations:
         # A run that will publish records here, from the solve whose bytes ship: the
         # publish stage copies this preview rather than solving again, and the history
         # documents built below read the record, so it has to exist before they do.
-        record = self.request.publish
+        record = self.request.publish or self.record_advice
         request = LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
@@ -663,7 +674,7 @@ class WeeklyOperations:
             copied["published_files"] = len(actual)
 
         exit_code = publish(
-            PublishNames(self.request.season, self.request.gameweek, "decision"),
+            self.publish_names,
             force_branch=False,
             dry_run=False,
             workspace=self.paths.workspace,
@@ -862,6 +873,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, help="Preview root; default: private run-directory/preview"
     )
     parser.add_argument("--publish", action="store_true")
+    parser.add_argument(
+        "--record-advice", action="store_true", help="Record advice even without --publish."
+    )
+    parser.add_argument(
+        "--publish-suffix", default="", help="Suffix for the site publication branch."
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--run-id")
     parser.add_argument("--resume", action="store_true")
@@ -956,6 +973,11 @@ def main(argv: list[str] | None = None) -> int:
             args.rotation_capture,
         )
         print(request.plan().describe())
+        names = PublishNames(request.season, request.gameweek, "decision", args.publish_suffix)
+        print(
+            f"Record advice: {request.publish or args.record_advice}; "
+            f"publish suffix: {args.publish_suffix or '(none)'}; site branch: {names.branch}"
+        )
         if args.dry_run:
             print("Dry run: nothing captured, built or published.")
             return 0
@@ -973,6 +995,8 @@ def main(argv: list[str] | None = None) -> int:
             repository_commit=revision,
             resume=args.resume,
             handoff=handoff,
+            record_advice=args.record_advice,
+            publish_suffix=args.publish_suffix,
         )
         completed = operation.execute()
         print(f"Verified weekly run: {completed}")
