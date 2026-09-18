@@ -33,6 +33,7 @@ export function LeagueMemberPage() {
     client,
     capabilities,
     computeService,
+    computePending,
   } = useLeagueMemberData(entryParam, searchParams);
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
@@ -92,6 +93,7 @@ export function LeagueMemberPage() {
       client={client}
       capabilities={capabilities}
       computeService={computeService}
+      computePending={computePending}
     />
   );
 }

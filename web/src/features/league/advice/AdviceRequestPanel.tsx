@@ -41,6 +41,7 @@ export function AdviceRequestPanel({
   computable = false,
   published = true,
   chipChosen = false,
+  pending = false,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
@@ -52,6 +53,11 @@ export function AdviceRequestPanel({
   published?: boolean;
   /** A chosen chip is shown from the published tree only; the service computes none yet. */
   chipChosen?: boolean;
+  /**
+   * A service is configured and has not said yet what it computes. The static build's
+   * sentence about what Compute supports would be wrong a moment later, so it waits.
+   */
+  pending?: boolean;
 }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -67,7 +73,7 @@ export function AdviceRequestPanel({
   return (
     <Card tone="muted" title={copy.computeTitle}>
       <p className={styles.hint}>{isSelf ? copy.computeBodySelf : copy.computeBodyOther}</p>
-      {!supported && service !== "other-capture" ? (
+      {!supported && !pending && service !== "other-capture" ? (
         <p role="note">
           {service !== "ready"
             ? copy.computeUnsupportedSelection
