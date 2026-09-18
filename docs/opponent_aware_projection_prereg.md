@@ -1,7 +1,36 @@
 # Opponent-aware projection: evaluation protocol
 
-Status: pre-registered; no measurement under this protocol has run. This document changes no
-arm, gate, projection or live control.
+Status: **withdrawn on 2026-09-18, before any reading.** No measurement under this protocol
+has run and none will. This document changes no arm, gate, projection or live control.
+
+## Why it is withdrawn
+
+It was written without reading three records that had already asked its question, and the third
+of them had already answered it.
+
+- `schedule_signal_study` (stage one): over 4,403 five-week windows the calendar passes, and
+  difficulty over the calendar fails at the decision level (the published rating loses 2.6 points
+  a window; a club-strength proxy from results already played does not clear accuracy).
+- `team_rating_study` and `team_rating_cs_remeasure` (stage two): a Dixon-Coles rating fitted to
+  goals, refitted at every judged gameweek on earlier matches, with a measured prior for promoted
+  clubs. It is a better instrument than the one proposed below in every respect.
+- `opponent_projection_study` (stage three): that rating's adjustment, with coefficients fitted
+  per position on earlier seasons only, measured on the operational control's own folds and the
+  squad the solver builds from them. **It fails: 0.91 realized points a fold worse**, because the
+  attacking slope fits negative. The control's rolling form already carries the club's scoring,
+  so the rating counts it twice.
+
+`opponent_venue_v1` is a cruder rating with the same adjustment shape, so its G1 and G2 would
+re-measure a recorded failure. The lane that remains is governed elsewhere: Route A
+(`route_a_declaration`, issue #88) is frozen and waits for #43's verdict, and the published
+difficulty's admissibility is being read against the pre-season record
+(`preseason_difficulty_prereg.md`).
+
+What stays true from this document is its first section: the later weeks of a window plan are
+the first week's numbers scaled by fixture count, the 58 points of `season_chain_blind` is the
+value of that count and is already in the product, and planning ahead under this projection
+loses to the weekly decision. The text below is kept as written, so the record shows what was
+proposed and why it was dropped.
 
 It freezes **what will be read** about one candidate, before any number is read: a projection
 that knows who a player's club plays and where, built only from results that were final before
