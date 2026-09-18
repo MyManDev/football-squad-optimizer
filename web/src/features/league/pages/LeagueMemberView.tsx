@@ -52,6 +52,7 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   rivalSquad = null,
+  windowControl = null,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const [contextExpanded, setContextExpanded] = useState(
@@ -278,7 +279,13 @@ function LeagueMemberContent({
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (
-          <AdviceCard shown={shown} members={members} squad={squad} rivalSquad={rivalSquad} />
+          <AdviceCard
+            shown={shown}
+            members={members}
+            squad={squad}
+            rivalSquad={rivalSquad}
+            windowControl={windowControl}
+          />
         ) : computeOnly && !rejectedContext ? null : (
           <MissingAdviceCard
             issue={
