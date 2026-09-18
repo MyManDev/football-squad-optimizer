@@ -184,13 +184,17 @@ live on one machine.
 
 ## Season record
 
-**Not measurements.** These two are the live season's own record, appended on settle day from
+**Not measurements.** The first two are the live season's own record, appended on settle day from
 the frozen ledger entry, and they are the only rows here that describe the operational control
 scoring rather than an experiment evaluating one. They belong in this index because rule 1
 covers every committed artifact, not only experimental ones — and because the
 projection-versus-reality series is what a reader is most likely to come looking for. The
 header's claim still holds: recording what the control scored promoted nothing and changed
 nothing.
+
+The third row is an instrument and not a record of a decision: `live_projection_audit` reads
+the same live season player by player, beside the game's own forecast. It sits here because
+it is about the live season and nowhere else; it promotes nothing either.
 
 Five development experiments had accumulated under this heading by being appended to the
 last table in the file — the two corrected shadow calibrations, the two Phase 2 tail
@@ -202,6 +206,7 @@ belong to, and this section is again the two rows its first sentence describes.
 | --- | --- | --- |
 | `weekly_scorecard` (record) | Projection versus reality, one row per settled gameweek. **GW1 (`opening-carry-over-v1`): projected 56.08, realized XI 26, net 26, error −30.08.** The captain returned 4 points doubled — a 15% share of the realized XI, against a projection that had him as its largest single line. First entry of the series, so it establishes the sign convention (realized minus projected; negative means the projection was optimistic) and nothing about variance yet | #258 |
 | `season_ledger_2026-27` (record) | The `season_ledger_v1` summary of every live decision: GW1 from capture `fpl-live-20260821T143619Z-11bc603a8e1c`, solver `OPTIMAL`, 0 transfers, 0 hits, no chip, **96 players excluded as unavailable**. Settled gameweeks 1; mean realized 26.0; mean projection error −30.1. Raw entries stay local under `data/ledger/` with per-file checksums, so this file is the committed half of a record whose evidence is deliberately not committed | #258 |
+| `live_projection_audit` (instrument, regenerated after each settled gameweek; `live_projection_audit_prereg.md`; descriptive, no gate) | **What the live projection got wrong, beside the game's own `ep_next`, from the same capture.** First reading rests on **one gameweek** (GW4; GW1 is read for our decided numbers only because its capture was lost on 2026-09-10, GW2 and GW3 have no pre-deadline capture and are named as not audited), so nothing is called better than anything. GW4, 656 players, forecasts from `fpl-live-20260912T100000Z-24613792ef57`, 2.5 hours before the deadline: ours as decided MAE **1.193**, bias +0.121; the game's `ep_next` MAE **1.234**, bias -0.004; rank agreement within position 0.703 against 0.704. Over each forecast's own top 40 per position: 2.347 against 2.824, where the game's forecast ran high (bias -0.498) and ours ran low (+0.385). Availability is worth 0.078 of MAE to us (unconditional 1.271), and **15.5 per cent of our decided forecast points sat on players who did not appear**, against 11.4 for the game's: the appearance side is where the game is ahead. The elite Top 100 handoff that was live at the time and the control handoff the ledger holds as a replay differ in the third decimal. No solver runs, so the record is deterministic given the captures; it names every capture and handoff it read. Pooled readings are fixed for after GW9 and GW15 | n/a |
 
 ## Serving capacity
 
