@@ -42,5 +42,6 @@ export interface LeagueMemberViewProps {
   computeService?: ComputeService;
   /** A service is configured and has not answered yet; never true on a static build. */
   computePending?: boolean;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
 }

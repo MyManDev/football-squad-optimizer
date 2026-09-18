@@ -154,11 +154,16 @@ def _walk(node: object, path: str, offenders: list[str]) -> None:
 
 
 def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str, Any]) -> None:
-    """Pin the old product outputs before introducing multiweek rival advice."""
+    """Pin the current product outputs; the exact list ordering is pinned, not its meaning.
+
+    The deliberate regeneration command is in tests/fixtures/member_advice_baseline.md.
+    """
     picks = window_world["provider"].picks(ENTRY, SEASON, 1)
     window_world["provider"]._picks[202] = dataclasses.replace(picks, entry_id=202)
     reference = json.loads(
-        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text(),
+        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text(
+            encoding="utf-8"
+        ),
         # Runtime float summation can differ in the last binary digits (observed
         # below 2e-15 on Python 3.11). Keep every key, identity and ordering exact.
         parse_float=lambda value: pytest.approx(float(value), rel=0, abs=1e-12),

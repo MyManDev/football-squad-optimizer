@@ -45,6 +45,7 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   rivalSquad = null,
+  windowControl = null,
 }: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -228,7 +229,13 @@ function LeagueMemberContent({
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (
-          <AdviceCard shown={shown} members={members} squad={squad} rivalSquad={rivalSquad} />
+          <AdviceCard
+            shown={shown}
+            members={members}
+            squad={squad}
+            rivalSquad={rivalSquad}
+            windowControl={windowControl}
+          />
         ) : computeOnly && !rejectedContext ? null : (
           <MissingAdviceCard
             issue={

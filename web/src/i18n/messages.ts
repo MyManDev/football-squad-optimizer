@@ -645,6 +645,11 @@ const en = {
     windowTitle: (weeks: number) => `The ${weeks}-week window`,
     windowRule:
       "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan, in expected points under the limits stated here.",
+    windowComparisonTitle: "Window totals",
+    windowSelectedTotal: "Selected plan",
+    windowPureTotal: "Pure points, Top 100 at 0",
+    windowComparisonBasis:
+      "Both totals use the base projection for this member and this capture, after transfer hits. They describe the published plans and do not establish which is best.",
     windowLimitsLabel: "What this window assumes",
     // The same list on a one-week document, where "window" would name nothing the
     // reader can see. A one-week plan is handed no chip either, and until it said so a
@@ -1589,6 +1594,11 @@ const tr: MessageSchema<typeof en> = {
     windowTitle: (weeks) => `${weeks} haftalık pencere`,
     windowRule:
       "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası; beklenen puan, burada yazılı sınırlar altında.",
+    windowComparisonTitle: "Pencere toplamları",
+    windowSelectedTotal: "Seçilen plan",
+    windowPureTotal: "Saf puan, Top 100 0",
+    windowComparisonBasis:
+      "İki toplam da bu üyenin aynı veri kesitindeki temel projeksiyonunu kullanır; transfer cezaları düşülmüştür. Yayınlanan planları gösterir, hangisinin en iyi olduğunu kanıtlamaz.",
     windowLimitsLabel: "Bu pencerenin varsaydıkları",
     planLimitsLabel: "Bu planın varsaydıkları",
     windowWeek: "Hafta",
