@@ -45,6 +45,8 @@ from squadopt.application.entries import EntryError, EntryPicksProvider, held_sq
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
 from squadopt.live import Projection, RecommendationInputs, SeasonRules
+from squadopt.optimization import SolverExecutionError
+from squadopt.planning import TransferPlanningError
 
 __all__ = [
     "MANAGER_WORDS_INPUT",
@@ -58,6 +60,12 @@ __all__ = [
 
 TOP100_COUNTS_INPUT = "top100_counts"
 MANAGER_WORDS_INPUT = "manager_words"
+
+
+#: What the planner raises when it finds no plan for a selection. Their text is a solver's
+#: diagnostic (deterministic time, gaps, player ids), so a caller that serves its failures
+#: to the public names the outcome and keeps the text on its own side.
+PLAN_NOT_FOUND_ERRORS: tuple[type[Exception], ...] = (SolverExecutionError, TransferPlanningError)
 
 
 class MenuInputUnavailable(EntryError):

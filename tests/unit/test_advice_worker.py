@@ -1239,3 +1239,33 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     both = client.post(route, json={**body, "top100_weight": 5})
     assert both.status_code == 422
     assert both.json()["error"]["code"] == "TOP100_INPUTS_UNAVAILABLE"
+
+
+def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not_served(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The jobs endpoint is public: it names the outcome and carries none of the solver's text."""
+
+    from squadopt.application.advice_menu import PLAN_NOT_FOUND_ERRORS
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    diagnostic = "deterministic time used was 12.0, relative gap was 0.31"
+
+    def no_plan(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise PLAN_NOT_FOUND_ERRORS[1](diagnostic)
+
+    monkeypatch.setattr(worker_module, "advise_menu_entry", no_plan)
+    accepted = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1},
+    )
+    assert accepted.status_code == 202, accepted.text
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert job is not None and job.status == "failed"
+    assert job.error is not None and job.error.code == "PLAN_NOT_FOUND"
+    assert "deterministic" not in job.error.message and "gap" not in job.error.message
+    served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
+    assert served.json()["error_code"] == "PLAN_NOT_FOUND"
+    assert "deterministic" not in served.text

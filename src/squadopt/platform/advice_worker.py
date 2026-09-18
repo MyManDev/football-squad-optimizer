@@ -45,6 +45,7 @@ from typing import Final
 
 from squadopt.application.advice_capabilities import menu_capabilities
 from squadopt.application.advice_menu import (
+    PLAN_NOT_FOUND_ERRORS,
     ManagersWordNotSolved,
     MenuRequest,
     advise_menu_entry,
@@ -264,6 +265,15 @@ def build_advice_compute(
             # the club news, and this member's plan under the word and the setting could
             # not be produced. The same request without the word still answers.
             raise AdviceComputeRefused("MANAGERS_WORD_NOT_SOLVED", str(error)) from error
+        except PLAN_NOT_FOUND_ERRORS as error:
+            # One member's outcome, not a fault: the planner found no plan for this
+            # selection. Its own text is a solver's diagnostic and the job record travels
+            # out through the jobs endpoint, so the record names the outcome and the log
+            # line (the refusal's cause) keeps the text for the operator.
+            raise AdviceComputeRefused(
+                "PLAN_NOT_FOUND",
+                "No plan was found for this selection from this capture.",
+            ) from error
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

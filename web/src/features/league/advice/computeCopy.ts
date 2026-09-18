@@ -92,6 +92,8 @@ const en: ComputeCopy = {
       "The service's data capture changed while this was computing. Reload the page and try again.",
     ENTRY_NOT_IN_CAPTURE: "The service's data capture has no squad for this member or this rival.",
     TOO_MANY_ATTEMPTS: "The service tried this computation several times and could not finish it.",
+    PLAN_NOT_FOUND:
+      "The service found no plan for this selection. The published plan, if any, still stands.",
     SWITCH_INPUTS_CHANGED:
       "The Top 100 selections or the club news were refreshed while this was computing. Press Compute again.",
     REQUEST_UNREADABLE: "The service could not read the request. You can press Compute again.",
@@ -161,6 +163,8 @@ const tr: ComputeCopy = {
       "Hesap sürerken servisin veri kaydı değişti. Sayfayı yenileyip yeniden dene.",
     ENTRY_NOT_IN_CAPTURE: "Servisin veri kaydında bu üyenin ya da bu rakibin kadrosu yok.",
     TOO_MANY_ATTEMPTS: "Servis bu hesabı birkaç kez denedi ve bitiremedi.",
+    PLAN_NOT_FOUND:
+      "Servis bu seçim için plan bulamadı. Yayınlanmış plan varsa olduğu gibi duruyor.",
     SWITCH_INPUTS_CHANGED:
       "Hesap sürerken Top 100 seçimleri ya da kulüp haberleri yenilendi. Yeniden Hesapla'ya bas.",
     REQUEST_UNREADABLE: "Servis isteği okuyamadı. Yeniden Hesapla'ya basabilirsin.",
