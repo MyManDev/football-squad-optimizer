@@ -20,6 +20,11 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.contextDetails > summary > h2 {
+  display: inline;
+  font: inherit;
+  margin: 0;
+}
 
 @media (min-width: 641px) {
   .contextDetails > summary {
@@ -243,9 +248,17 @@
 }
 
 @media (max-width: 640px) {
+  :global(html) {
+    scroll-padding-bottom: 45dvh;
+  }
+  .squadContext > section > header > h2 {
+    display: none;
+  }
   .computeDock {
     position: sticky;
-    bottom: var(--space-2);
+    bottom: 0;
+    max-height: 45dvh;
+    overflow-y: auto;
     z-index: 5;
   }
 

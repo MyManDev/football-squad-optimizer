@@ -28,7 +28,7 @@ export function MemberResourceCards({
         </p>
       </Card>
       <details className={styles.details} open={expanded}>
-        <summary>{copy.chipsTitle}</summary>
+        <summary>{expanded ? copy.chipsTitle : <h2>{copy.chipsTitle}</h2>}</summary>
         <Card title={copy.chipsTitle} aside={copy.asOf(squad.gameweek)}>
           {!chips?.known ? (
             <p>{copy.chipsMissing}</p>

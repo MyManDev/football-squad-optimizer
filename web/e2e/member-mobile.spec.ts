@@ -1,7 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { MESSAGES } from "../src/i18n/messages";
+import { mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { installLeagueMocks } from "./leagueMocks";
+
+const apiOrigin = process.env.SQUADOPT_MOBILE_API_ORIGIN;
 
 for (const language of ["tr", "en"] as const) {
   test(`member controls fit a phone in ${language}`, async ({ page }, testInfo) => {
@@ -16,12 +19,20 @@ for (const language of ["tr", "en"] as const) {
       await expect(detail).not.toHaveAttribute("open");
       await detail.locator("summary").click();
       await expect(detail).toHaveAttribute("open", "");
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
       await detail.locator("summary").click();
     }
     const summary = page.getByTestId("member-selection-summary");
     await expect(summary).toContainText(copy.decision.week(3));
-    await expect(summary).toContainText("Top 100 0");
+    await expect(summary).not.toContainText("Top 100 0");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath(`member-top-${language}.png`) });
+    await summary.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath(`member-summary-${language}.png`) });
     const tableScroll = page.locator('div[tabindex="0"]').filter({ has: page.locator("table") });
     await tableScroll.focus();
     await page.keyboard.press("ArrowRight");
@@ -33,7 +44,17 @@ for (const language of ["tr", "en"] as const) {
     await expect(
       page.getByRole("button", { name: copy.leagueMembers.computeButton, exact: true }),
     ).toBeInViewport();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
+    await expect
+      .poll(async () => {
+        const box = await page.locator("[data-compute-dock]").boundingBox();
+        return box ? Math.abs(box.y + box.height - 812) : 999;
+      })
+      .toBeLessThanOrEqual(1);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
     const results = await new AxeBuilder({ page }).analyze();
     expect(
       results.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),
@@ -45,5 +66,58 @@ for (const language of ["tr", "en"] as const) {
     await page.screenshot({ path: testInfo.outputPath(`member-controls-${language}.png`) });
     await page.setViewportSize({ width: 1280, height: 900 });
     for (const detail of await details.all()) await expect(detail).toHaveAttribute("open", "");
+  });
+
+  test(`waiting compute dock stays compact in ${language}`, async ({ page }, testInfo) => {
+    test.skip(
+      !apiOrigin,
+      "Run with a build using SQUADOPT_MOBILE_API_ORIGIN as VITE_ADVICE_API_ORIGIN.",
+    );
+    await page.setViewportSize({ width: 375, height: 812 });
+    await installLeagueMocks(page);
+    await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    const squad = mockEntrySquadEnvelopes[35249001]!.payload;
+    await page.route(`${apiOrigin}/api/v1/**`, async (route) => {
+      const url = route.request().url();
+      const [status, body] = url.endsWith("/capabilities")
+        ? [
+            200,
+            {
+              contract_version: "league_capabilities_v1",
+              league_id: squad.league_id,
+              season: squad.season,
+              gameweek: squad.gameweek,
+              capture_snapshot_id: squad.source_snapshot_id,
+              strategies: { "saf-puan": { windows: [1, 3, 5], requires_rival: false } },
+              top100: { available: true, weights: [0, 20] },
+              managers_word: { available: false },
+            },
+          ]
+        : url.includes("/advice-jobs/")
+          ? [200, { job_id: "mobile-waiting", status: "running" }]
+          : route.request().method() === "POST"
+            ? [202, { job_id: "mobile-waiting" }]
+            : [404, { error: { code: "NOT_COMPUTED" } }];
+      await route.fulfill({
+        status: status as number,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
+    });
+    await page.goto("/league/members/35249001?window=3&top100=20");
+    const copy = MESSAGES[language].leagueMembers;
+    await page.getByRole("button", { name: copy.computeButton, exact: true }).click();
+    await expect(page.getByText(copy.computeRunning, { exact: true })).toBeVisible();
+    await page.getByRole("radio", { name: /^1 / }).scrollIntoViewIfNeeded();
+    const dock = page.locator("[data-compute-dock]");
+    const box = await dock.boundingBox();
+    expect(box!.height).toBeLessThanOrEqual(812 * 0.45 + 1);
+    expect(Math.abs(box!.y + box!.height - 812)).toBeLessThanOrEqual(1);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`member-waiting-${language}.png`) });
   });
 }

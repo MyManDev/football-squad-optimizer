@@ -10,6 +10,16 @@
   cursor: pointer;
   font-weight: 600;
 }
+.details > summary > h2 {
+  display: inline;
+  font: inherit;
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .details > section > header > h2 {
+    display: none;
+  }
+}
 @media (min-width: 641px) {
   .details > summary {
     display: none;

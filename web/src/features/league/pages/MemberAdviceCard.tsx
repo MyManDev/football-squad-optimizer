@@ -431,7 +431,12 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <div className={styles.windowScroll} tabIndex={0}>
+      <div
+        className={styles.windowScroll}
+        tabIndex={0}
+        role="region"
+        aria-label={`${title}: ${copy.windowWeek}`}
+      >
         <table className={styles.windowTable}>
           <thead>
             <tr>

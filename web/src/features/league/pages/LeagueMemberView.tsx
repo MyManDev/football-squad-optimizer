@@ -110,7 +110,7 @@ function LeagueMemberContent({
     selection.request.rivalEntryId !== null
       ? `${copy.rivalLabel}: ${selectedRival?.team_name ?? selectedRival?.manager_name ?? `#${selection.request.rivalEntryId}`}`
       : null,
-    `Top 100 ${selection.top100.weight}`,
+    selection.top100.weight !== 0 ? `Top 100 ${selection.top100.weight}` : null,
     selection.evidence.on ? EVIDENCE_COPY[language].legend : null,
     selection.chip.chip ? copy.chipNames[selection.chip.chip] : null,
   ]
@@ -170,7 +170,7 @@ function LeagueMemberContent({
 
       {view.starting_xi.length > 0 ? (
         <details className={styles.contextDetails} open={contextExpanded}>
-          <summary>{copy.memberSquad}</summary>
+          <summary>{contextExpanded ? copy.memberSquad : <h2>{copy.memberSquad}</h2>}</summary>
           <div className={styles.squadContext}>
             <Card
               tone="pitch"
@@ -245,7 +245,7 @@ function LeagueMemberContent({
           index={selection.status === "index-error" ? null : index}
           capabilities={capabilities}
         />
-        <div className={styles.computeDock}>
+        <div className={styles.computeDock} data-compute-dock>
           <AdviceRequestPanel
             request={request}
             job={job}

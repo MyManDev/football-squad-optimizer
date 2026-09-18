@@ -3,6 +3,11 @@
   font-size: 0.9rem;
   opacity: 0.85;
 }
+@media (max-width: 640px) {
+  :global([data-compute-dock]) .hint {
+    display: none;
+  }
+}
 
 .controls {
   display: flex;
