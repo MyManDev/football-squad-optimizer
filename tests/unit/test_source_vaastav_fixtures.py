@@ -17,6 +17,7 @@ from squadopt.data.errors import (
 from squadopt.data.sources.vaastav import (
     ARCHIVE_SNAPSHOT_ID,
     build_fixture_panel,
+    load_fixture_results,
     load_fixture_snapshot,
     load_team_codes,
 )
@@ -295,3 +296,58 @@ def test_two_seasons_concatenate_into_one_table(tmp_path: Path) -> None:
 
     assert sorted(frame["season"].unique().tolist()) == ["2024-25", "2025-26"]
     assert len(frame) == 4
+
+
+# --- results ----------------------------------------------------------------
+
+RESULTS_HEADER = [*FIXTURES_HEADER, "team_h_score", "team_a_score"]
+
+
+def _results_archive(tmp_path: Path, rows: list[list[Any]]) -> Path:
+    root = tmp_path / "archive"
+    _write(root / "data" / SEASON / "fixtures.csv", RESULTS_HEADER, rows)
+    _write(root / "data" / SEASON / "teams.csv", TEAMS_HEADER, DEFAULT_TEAMS)
+    return root
+
+
+def test_a_finished_fixture_gives_its_score_from_both_sides(tmp_path: Path) -> None:
+    root = _results_archive(tmp_path, [[*_fixture_row(home=1, away=2), 3, 1]])
+    results = load_fixture_results(root, SEASON)
+    assert len(results) == 2
+    home, away = results.to_dict("records")
+    # Clubs are the persistent codes, and each side reads the score its own way round.
+    assert (home["team_id"], home["opponent_team_id"], home["is_home"]) == (3, 14, True)
+    assert (home["goals_for"], home["goals_against"]) == (3, 1)
+    assert (away["team_id"], away["is_home"], away["goals_for"], away["goals_against"]) == (
+        14,
+        False,
+        1,
+        3,
+    )
+
+
+def test_an_unplayed_or_unscored_fixture_has_no_result(tmp_path: Path) -> None:
+    root = _results_archive(
+        tmp_path,
+        [
+            [*_fixture_row(1, finished="True"), 0, 0],
+            [*_fixture_row(2, finished="False"), "", ""],
+            [*_fixture_row(3, event="", finished="True"), 2, 2],
+            [*_fixture_row(4, finished="True"), "", ""],
+        ],
+    )
+    results = load_fixture_results(root, SEASON)
+    # A goalless draw is a result; an absent score is not one.
+    assert results["fixture_id"].unique().tolist() == [1]
+    assert results["goals_for"].tolist() == [0, 0]
+
+
+def test_the_fixture_table_a_decision_reads_still_carries_no_score(tmp_path: Path) -> None:
+    root = _results_archive(tmp_path, [[*_fixture_row(), 3, 1]])
+    snapshot = load_fixture_snapshot(root, SEASON)
+    assert not {"goals_for", "goals_against", "team_h_score"} & set(snapshot.columns)
+
+
+def test_an_archive_without_scores_is_refused_by_name(tmp_path: Path) -> None:
+    with pytest.raises(MissingColumnsError, match="team_h_score"):
+        load_fixture_results(_archive(tmp_path), SEASON)

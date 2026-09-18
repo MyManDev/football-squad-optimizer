@@ -34,7 +34,12 @@ import pandas as pd
 
 from squadopt.data.adapters import SourceAdapter, apply_adapter
 from squadopt.data.cleaning import clean_canonical_dataset
-from squadopt.data.errors import DataSourceError, DuplicateRecordsError, MissingColumnsError
+from squadopt.data.errors import (
+    DataSourceError,
+    DuplicateRecordsError,
+    InvalidValueError,
+    MissingColumnsError,
+)
 from squadopt.data.fixtures import validate_fixture_snapshot
 from squadopt.data.loaders import load_csv
 from squadopt.data.schema import (
@@ -549,6 +554,105 @@ def load_fixture_snapshot(root: Path | str, season: str) -> pd.DataFrame:
     ):
         frame[column] = frame[column].astype("string")
     return validate_fixture_snapshot(frame)
+
+
+#: What the score reader needs on top of the fixture table's own columns.
+_REQUIRED_RESULT_COLUMNS: tuple[str, ...] = (
+    "id",
+    "event",
+    "team_h",
+    "team_a",
+    "team_h_score",
+    "team_a_score",
+    "kickoff_time",
+    "finished",
+)
+
+FIXTURE_RESULT_COLUMNS: tuple[str, ...] = (
+    "season",
+    "gameweek",
+    "fixture_id",
+    "kickoff_time_utc",
+    "team_id",
+    "opponent_team_id",
+    "is_home",
+    "goals_for",
+    "goals_against",
+)
+
+
+def load_fixture_results(root: Path | str, season: str) -> pd.DataFrame:
+    """Return the final score of every finished fixture of one archive season, per side.
+
+    Deliberately a separate table from :func:`load_fixture_snapshot`. That table is what a
+    decision may read about a gameweek before it is played, and it carries no score for the
+    reason it carries no proven difficulty: the archive was written after the fact. **A
+    score is an outcome.** It belongs with realized points, and like them it may inform a
+    decision only about gameweeks that came after it. A caller that builds a club rating
+    from these rows is responsible for reading only fixtures of earlier gameweeks than the
+    one it decides; nothing here can enforce that, which is why this is not a column of the
+    fixture table where it would travel into every pre-match frame.
+
+    Two rows per fixture, one from each side, with clubs named by the persistent code as
+    everywhere else. A fixture that is not finished, has no gameweek, or has no score is
+    left out: an unplayed match has no result, and an absent result is not a goalless draw.
+    """
+
+    codes = load_team_codes(root, season).set_index("id")["code"]
+    path = season_directory(root, season) / FIXTURES_FILE
+    fixtures = _read_required(path, _REQUIRED_RESULT_COLUMNS, f"{season} fixtures")
+
+    rows: list[dict[str, object]] = []
+    for record in fixtures.to_dict("records"):
+        label = f"{season} fixture {record['id']}"
+        if pd.isna(record["event"]) or not _archive_flag(record["finished"], f"{label} 'finished'"):
+            continue
+        if pd.isna(record["team_h_score"]) or pd.isna(record["team_a_score"]):
+            continue
+        home_id, away_id = int(record["team_h"]), int(record["team_a"])
+        if home_id not in codes.index or away_id not in codes.index:
+            raise DataSourceError(
+                f"{label} references team ids the season's teams file does not declare: "
+                f"{sorted({home_id, away_id} - set(codes.index))!r}."
+            )
+        home_goals, away_goals = int(record["team_h_score"]), int(record["team_a_score"])
+        if home_goals < 0 or away_goals < 0:
+            raise InvalidValueError(f"{label} reports a negative score.")
+        shared = {
+            "season": season,
+            "gameweek": int(record["event"]),
+            "fixture_id": int(record["id"]),
+            "kickoff_time_utc": normalize_utc_timestamp(
+                record["kickoff_time"], label=f"{label} kickoff_time"
+            ),
+        }
+        rows.append(
+            {
+                **shared,
+                "team_id": int(codes.loc[home_id]),
+                "opponent_team_id": int(codes.loc[away_id]),
+                "is_home": True,
+                "goals_for": home_goals,
+                "goals_against": away_goals,
+            }
+        )
+        rows.append(
+            {
+                **shared,
+                "team_id": int(codes.loc[away_id]),
+                "opponent_team_id": int(codes.loc[home_id]),
+                "is_home": False,
+                "goals_for": away_goals,
+                "goals_against": home_goals,
+            }
+        )
+    frame = pd.DataFrame(rows, columns=list(FIXTURE_RESULT_COLUMNS))
+    return frame.sort_values(
+        ["gameweek", "kickoff_time_utc", "fixture_id", "is_home"],
+        ascending=[True, True, True, False],
+        kind="stable",
+        ignore_index=True,
+    )
 
 
 def build_fixture_panel(root: Path | str, *, seasons: Sequence[str] | None = None) -> pd.DataFrame:
