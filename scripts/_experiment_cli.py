@@ -13,10 +13,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from squadopt.backtest.production_benchmark import (
-    DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
-    DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
-)
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, ARCHIVE_REPOSITORY, SUPPORTED_SEASONS
 from squadopt.evaluation import EvaluationResult
 from squadopt.experiments import SCREENING_EXPERIMENT_CONTRACT_VERSION
@@ -142,6 +138,17 @@ def _bootstrap_gap_interval(
     return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
 
 
+#: The deterministic work a measurement's solve may spend. Chosen from a sweep of the rotation
+#: ceiling's 147 control folds on 2026-09-18: at 0.5 (the production benchmark's limit) 29 solves
+#: were proved and 118 returned an incumbent; at 2.0, 89 and 58; at 5.0, 117 and 30; at 15.0, 130
+#: and 17, for 1.7 times the run time of 5.0 and a mean realized score 0.007 away from it. The
+#: limit does not buy reproducibility (every value reproduces); it buys proofs, and 5.0 is where
+#: most solves are proved and the next step costs more than it returns.
+MEASUREMENT_DETERMINISTIC_TIME_LIMIT = 5.0
+#: A cap, never the binding limit: about forty times the wall time a 5.0 solve took when quiet.
+MEASUREMENT_WALL_TIME_LIMIT_SECONDS = 600.0
+
+
 def measurement_optimization_config() -> OptimizationConfig:
     """The solver limits of a run that writes a committed record.
 
@@ -149,13 +156,12 @@ def measurement_optimization_config() -> OptimizationConfig:
     solver less work, a solve that would have been proved returns an incumbent, and the same
     commit writes a different record (#590: the rotation ceiling moved from 0.959 to 0.667 and
     lost five folds under load). Deterministic time measures solver work, not elapsed seconds,
-    so it is the binding limit here and the wall clock is a cap far above it. The values are
-    the production benchmark's, so a measurement and the benchmark solve under one policy.
+    so it is the binding limit here and the wall clock is a cap far above it.
     """
 
     return OptimizationConfig(
-        solver_time_limit_seconds=DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
-        solver_deterministic_time_limit=DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
+        solver_time_limit_seconds=MEASUREMENT_WALL_TIME_LIMIT_SECONDS,
+        solver_deterministic_time_limit=MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
     )
 
 
