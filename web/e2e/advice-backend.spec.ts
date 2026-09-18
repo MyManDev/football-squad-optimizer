@@ -109,17 +109,22 @@ test("a browser computes through the worker, then reads the same answer from cac
     if (move.player_out) await expect(advice).toContainText(move.player_out.name);
   }
 
-  // The one-job worker exits after its first solve. A reload and another request
-  // must still succeed from the stored answer, without another queued computation.
-  await page.reload();
+  // The one-job worker exits after its first solve. Reload reads the stored answer.
+  const postsAfterReload: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith(route) && request.method() === "POST") {
+      postsAfterReload.push(request.url());
+    }
+  });
   const hit = page.waitForResponse(
-    (response) => response.url().startsWith(route) && response.request().method() === "POST",
+    (response) => response.url().startsWith(route) && response.request().method() === "GET",
   );
-  await compute.click();
+  await page.reload();
   const cached = await hit;
   expect(cached.status()).toBe(200);
   expect(await cached.json()).toEqual(answer);
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  expect(postsAfterReload).toEqual([]);
 });
 
 test("a bundle built with an origin is the static page when the service is down", async ({

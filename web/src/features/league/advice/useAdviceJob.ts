@@ -75,6 +75,7 @@ export interface AdviceJob {
   compute: (request: AdviceRequest) => void;
   /** Pick up a wait this tab began before a reload; false when there is none to pick up. */
   resume?: (request: AdviceRequest) => boolean;
+  readCached?: (request: AdviceRequest) => void;
   reset: () => void;
 }
 
@@ -290,6 +291,31 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
 
   const compute = useCallback((request: AdviceRequest) => start(request, null), [start]);
 
+  const readCached = useCallback(
+    (request: AdviceRequest) => {
+      const run = ++generation.current;
+      active.current?.abort();
+      const controller = new AbortController();
+      active.current = controller;
+      void withRequestDeadline(
+        async (signal) => {
+          const read = await client.readAdvice(request, { signal });
+          if (read.kind !== "advice" || signal.aborted || generation.current !== run) return;
+          checkedAdvice(read.envelope, request);
+          setState({ phase: "done", request, envelope: read.envelope, source: read.source });
+        },
+        { signal: controller.signal, timeoutMs: REQUEST_ALLOWANCE_MS },
+      )
+        .catch(() => {
+          // A cache miss or failed read leaves the ordinary Compute panel in place.
+        })
+        .finally(() => {
+          if (active.current === controller) active.current = null;
+        });
+    },
+    [client],
+  );
+
   const resume = useCallback(
     (request: AdviceRequest) => {
       const remembered = recallJob(request);
@@ -305,5 +331,5 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
     [start],
   );
 
-  return { state, compute, resume, reset };
+  return { state, compute, resume, readCached, reset };
 }

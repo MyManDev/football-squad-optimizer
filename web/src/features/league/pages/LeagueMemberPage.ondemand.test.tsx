@@ -148,6 +148,44 @@ async function pressCompute(): Promise<void> {
 describe("a selection nobody published, with the service answering", () => {
   const link = `mode=ortak-koru&window=3&rival=${OTHER_RIVAL}&top100=20`;
 
+  it.each(["hit", "miss", "failure"])("reads the cache on open: %s", async (outcome) => {
+    const client = new RecordingClient((request) => ({
+      kind: "advice",
+      envelope: computed(request),
+      source: "api-cache",
+    }));
+    const read = vi.spyOn(client, "readAdvice");
+    if (outcome === "miss") read.mockResolvedValue({ kind: "not-computed" });
+    if (outcome === "failure") read.mockRejectedValue(new Error("unreachable"));
+    const { container } = renderView(link, client, {
+      adviceIssue: "not-listed",
+      computeService: "ready",
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(client.requests).toEqual([]);
+    expect(container).not.toHaveTextContent(copy.computeFailed);
+    if (outcome === "hit") {
+      expect(container).toHaveTextContent(copy.computeDone);
+      expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
+    } else {
+      expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
+      expect(container).not.toHaveTextContent(copy.computeDone);
+    }
+  });
+
+  it("does not read the cache in a static build", async () => {
+    const client = new RecordingClient(() => ({ kind: "unavailable" }));
+    const read = vi.spyOn(client, "readAdvice");
+    renderView(link, client, { adviceIssue: "not-listed", capabilities: null });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it("is offered to Hesapla instead of ending in 'not listed'", () => {
     const { container } = renderView(link, new RecordingClient(() => ({ kind: "unavailable" })), {
       adviceIssue: "not-listed",

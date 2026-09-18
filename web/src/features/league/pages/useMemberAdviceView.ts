@@ -73,15 +73,17 @@ export function useMemberAdviceView(
   // A new selection starts clean: an earlier request's answer, wait or failure must not
   // read as this member's, strategy's, window's or rival's.
   // A wait this tab began for the same selection before a reload is picked up again.
-  const { reset, resume } = job;
+  const { reset, resume, readCached } = job;
+  const readOnOpen = computeService === "ready" && computeAvailable && advice == null;
   const resumable = useRef(request);
   useEffect(() => {
     resumable.current = request;
   });
   useEffect(() => {
     reset();
-    if (computeAvailable) resume?.(resumable.current);
-  }, [requestKey, computeAvailable, reset, resume]);
+    const resumed = computeAvailable && resume?.(resumable.current);
+    if (!resumed && readOnOpen) readCached?.(resumable.current);
+  }, [requestKey, computeAvailable, readOnOpen, reset, resume, readCached]);
 
   const current =
     (selectionAvailable || computeAvailable) &&
