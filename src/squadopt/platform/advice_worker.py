@@ -346,25 +346,29 @@ def run_advice_worker(
                 log.event("advice_worker_store_recovered")
         elapsed = time.monotonic()
         if contexts is not None:
-            context = contexts.current()
-            if context is not None and context != warmed:
-                warmed = context
-                started = time.monotonic()
-                try:
+            context = None
+            try:
+                context = contexts.current()
+                if context is not None and context != warmed:
+                    warmed = context
+                    started = time.monotonic()
                     if contexts.capture(context) is None:
                         raise ValueError("The capture changed while warming the worker.")
-                except Exception as error:
-                    if log is not None:
-                        log.event("advice_worker_warm_failed", reason=str(error))
-                else:
                     if log is not None:
                         log.event(
                             "advice_worker_warmed",
                             snapshot_id=context.capture_snapshot_id,
-                            seconds=time.monotonic() - started,
+                            seconds=round(time.monotonic() - started, 3),
                         )
-            elif context is None:
-                warmed = None
+                elif context is None:
+                    warmed = None
+            except Exception as error:
+                if log is not None:
+                    log.event(
+                        "advice_worker_warm_failed",
+                        reason=str(error),
+                        snapshot_id=None if context is None else context.capture_snapshot_id,
+                    )
         try:
             if elapsed - recovered_at >= recover_every_seconds:
                 recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)

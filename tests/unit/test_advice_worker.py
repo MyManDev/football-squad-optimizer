@@ -245,10 +245,48 @@ def test_workers_warm_before_claiming_and_again_when_the_identity_changes(
         if event == ("advice_worker_warm_failed" if fails else "advice_worker_warmed")
     ]
     assert len(reported) == 2
+    assert all(fields["snapshot_id"] == running["snapshot_id"] for fields in reported)
     if not fails:
         assert all(
             isinstance(fields["seconds"], float) and fields["seconds"] >= 0 for fields in reported
         )
+        assert all(fields["seconds"] == round(fields["seconds"], 3) for fields in reported)
+
+
+def test_a_locked_capture_directory_does_not_stop_worker_claims(running, monkeypatch):
+    backend = running["backend"]
+    claims, events = [], []
+
+    def unavailable():
+        raise PermissionError("synthetic locked capture directory")
+
+    monkeypatch.setattr(backend.contexts, "current", unavailable)
+    monkeypatch.setattr(backend.queue, "claim", lambda **kwargs: claims.append(True))
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(1),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert claims == [True]
+    assert events == [
+        (
+            "advice_worker_warm_failed",
+            {
+                "reason": "synthetic locked capture directory",
+                "snapshot_id": None,
+            },
+        )
+    ]
 
 
 @pytest.mark.parametrize(
