@@ -285,6 +285,7 @@ def _advice(record: Mapping[str, Any]) -> Mapping[str, Any]:
     documents = record.get("advice")
     if not isinstance(documents, list):
         raise SuggestionEvaluationError("missing_advice")
+    baseline_path = f"advice/{record.get('entry_id')}/saf-puan/1.json"
     found = [
         doc
         for doc in documents
@@ -293,6 +294,8 @@ def _advice(record: Mapping[str, Any]) -> Mapping[str, Any]:
         and type(doc.get("window")) is int
         and doc["window"] == 1
         and doc.get("rival_entry_id") is None
+        # Legacy records may omit the path; switched publications always carry it.
+        and doc.get("published_path", baseline_path) == baseline_path
     ]
     if not found:
         raise SuggestionEvaluationError("missing_advice")
