@@ -308,6 +308,7 @@ def run_advice_worker(
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
     heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
     store_ready: Callable[[], bool] | None = None,
+    contexts: CaptureContextProvider | None = None,
     max_jobs: int | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
@@ -328,6 +329,7 @@ def run_advice_worker(
     processed = 0
     recovered_at = 0.0
     waiting_on_store = False
+    warmed = None
     while not should_stop():
         if store_ready is not None and not store_ready():
             if not waiting_on_store and log is not None:
@@ -343,6 +345,30 @@ def run_advice_worker(
             if log is not None:
                 log.event("advice_worker_store_recovered")
         elapsed = time.monotonic()
+        if contexts is not None:
+            context = None
+            try:
+                context = contexts.current()
+                if context is not None and context != warmed:
+                    warmed = context
+                    started = time.monotonic()
+                    if contexts.capture(context) is None:
+                        raise ValueError("The capture changed while warming the worker.")
+                    if log is not None:
+                        log.event(
+                            "advice_worker_warmed",
+                            snapshot_id=context.capture_snapshot_id,
+                            seconds=round(time.monotonic() - started, 3),
+                        )
+                elif context is None:
+                    warmed = None
+            except Exception as error:
+                if log is not None:
+                    log.event(
+                        "advice_worker_warm_failed",
+                        reason=str(error),
+                        snapshot_id=None if context is None else context.capture_snapshot_id,
+                    )
         try:
             if elapsed - recovered_at >= recover_every_seconds:
                 recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
@@ -488,6 +514,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.
             store_ready=running.probe.passed,
+            contexts=running.contexts,
             idle_seconds=arguments.idle_seconds,
             max_jobs=arguments.max_jobs,
             metrics=running.metrics,

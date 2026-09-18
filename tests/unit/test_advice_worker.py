@@ -194,6 +194,101 @@ def _stop_after(rounds: int) -> Callable[[], bool]:
     return stop
 
 
+@pytest.mark.parametrize("fails", [False, True])
+def test_workers_warm_before_claiming_and_again_when_the_identity_changes(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch, fails: bool
+) -> None:
+    backend = running["backend"]
+    loaded: list[str] = []
+    events: list[tuple[str, dict[str, object]]] = []
+    capture = backend.contexts.capture
+    claim = backend.queue.claim
+    rounds = 0
+
+    def warm(context):
+        loaded.append(context.projection_handoff_fingerprint)
+        if fails:
+            raise OSError("synthetic unreadable capture")
+        return capture(context)
+
+    def checked_claim(**kwargs):
+        nonlocal rounds
+        assert len(loaded) == (1 if rounds < 2 else 2)
+        rounds += 1
+        if rounds == 2:
+            deployment_module._handoff(
+                running["handoff_root"], running["snapshot_id"], expected_points=4.0
+            )
+        return claim(**kwargs)
+
+    monkeypatch.setattr(backend.contexts, "capture", warm)
+    monkeypatch.setattr(backend.queue, "claim", checked_claim)
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(3),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert rounds == 3 and len(set(loaded)) == 2
+    reported = [
+        fields
+        for event, fields in events
+        if event == ("advice_worker_warm_failed" if fails else "advice_worker_warmed")
+    ]
+    assert len(reported) == 2
+    assert all(fields["snapshot_id"] == running["snapshot_id"] for fields in reported)
+    if not fails:
+        assert all(
+            isinstance(fields["seconds"], float) and fields["seconds"] >= 0 for fields in reported
+        )
+        assert all(fields["seconds"] == round(fields["seconds"], 3) for fields in reported)
+
+
+def test_a_locked_capture_directory_does_not_stop_worker_claims(running, monkeypatch):
+    backend = running["backend"]
+    claims, events = [], []
+
+    def unavailable():
+        raise PermissionError("synthetic locked capture directory")
+
+    monkeypatch.setattr(backend.contexts, "current", unavailable)
+    monkeypatch.setattr(backend.queue, "claim", lambda **kwargs: claims.append(True))
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(1),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert claims == [True]
+    assert events == [
+        (
+            "advice_worker_warm_failed",
+            {
+                "reason": "synthetic locked capture directory",
+                "snapshot_id": None,
+            },
+        )
+    ]
+
+
 @pytest.mark.parametrize(
     "error_code", [None, "ADVICE_FAILED", "CONTEXT_UNAVAILABLE", "DETERMINISM_DEFECT"]
 )
