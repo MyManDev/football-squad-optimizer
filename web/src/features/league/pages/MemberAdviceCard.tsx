@@ -435,7 +435,7 @@ function WindowSection({ view }: { view: EntryAdvice }) {
         className={styles.windowScroll}
         tabIndex={0}
         role="region"
-        aria-label={`${title}: ${copy.windowWeek}`}
+        aria-label={`${copy.windowWeek}: ${weeks.map((week) => week.gameweek).join(", ")}`}
       >
         <table className={styles.windowTable}>
           <thead>

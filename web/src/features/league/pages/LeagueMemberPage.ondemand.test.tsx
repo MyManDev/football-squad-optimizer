@@ -204,6 +204,7 @@ describe("a selection nobody published, with the service answering", () => {
       });
       await act(async () => {
         await Promise.resolve();
+        await read.mock.results[0]!.value;
       });
       expect(read).toHaveBeenCalledTimes(1);
       expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
@@ -340,12 +341,15 @@ describe("a selection nobody published, with the service answering", () => {
 });
 
 describe("a published selection, with the service answering", () => {
-  it("is shown at once with no request, and Hesapla can still recompute it", () => {
+  it("is shown at once with no request, and Hesapla can still recompute it", async () => {
     const client = new RecordingClient(() => ({ kind: "unavailable" }));
     const read = vi.spyOn(client, "readAdvice");
     const { container } = renderView("", client, {
       advice: mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1),
       computeService: "ready",
+    });
+    await act(async () => {
+      await Promise.resolve();
     });
     expect(read).not.toHaveBeenCalled();
     expect(client.requests).toEqual([]);
