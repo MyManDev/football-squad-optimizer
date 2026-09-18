@@ -487,11 +487,14 @@ def test_a_variant_that_fails_is_recorded_at_its_address(
         "strategy": "fark-yarat",
         "rival_entry_id": RIVAL,
         "window": 5,
-        "reason": "no plan in this window",
+        # The index is public and carries one stable code; the planner's text is the note's.
+        "reason": "not_solved_for_member",
     } in index["unavailable"]
     assert not (tmp_path / f"advice/{ENTRY}/fark-yarat/5").exists()
     note = next(member.reason for member in report.members if member.entry_id == ENTRY)
-    assert "fark-yarat 5 weeks vs 202, Top 100 influence 0 not solved" in note
+    assert (
+        "fark-yarat 5 weeks vs 202, Top 100 influence 0 not solved: no plan in this window" in note
+    )
     assert "Top 100 influence 50 not solved: The strategy's window at 0 did not solve." in note
 
 

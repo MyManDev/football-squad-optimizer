@@ -1,11 +1,15 @@
 """The queue and the worker loop: claims are exclusive, failures become records."""
 
+import json
+import logging
 from pathlib import Path
 
 import pytest
 
 from squadopt.platform.advice_cache import FileAdviceCache
+from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.advice_queue import (
+    AdviceComputeRefused,
     AdviceQueueError,
     FileJobQueue,
     run_advice_worker_once,
@@ -247,3 +251,53 @@ def test_persisted_failure_reasons_carry_no_host_paths(tmp_path: Path) -> None:
     assert "/var/" not in failed.error.message
     assert "<path>" in failed.error.message
     assert sanitize_error_message("") == "unspecified failure"
+
+
+def test_the_cause_of_a_refusal_is_logged_for_the_operator_and_not_served(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    diagnostic = "deterministic time used was 12.0, relative gap was 0.31"
+
+    def refuse(job: AdviceJob) -> bytes:
+        try:
+            raise ValueError(diagnostic)
+        except ValueError as error:
+            raise AdviceComputeRefused("WINDOW_INFEASIBLE", "WINDOW_INFEASIBLE") from error
+
+    logger = logging.getLogger("test.advice.refusal")
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        failed = run_advice_worker_once(
+            queue, cache, refuse, at_utc="2026-08-27T12:00:30Z", log=AdviceLog("worker", logger)
+        )
+
+    assert failed is not None and failed.error is not None
+    assert failed.error.code == "WINDOW_INFEASIBLE"
+    # What the api serves names the code and nothing of the solver.
+    assert "deterministic" not in failed.error.message
+    events = [json.loads(record.getMessage()) for record in caplog.records]
+    refused = next(event for event in events if event["event"] == "advice_job_refused")
+    assert refused["code"] == "WINDOW_INFEASIBLE" and refused["detail"] == diagnostic
+
+
+def test_a_crash_is_logged_with_its_type_and_text(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+
+    def explode(job: AdviceJob) -> bytes:
+        raise RuntimeError("the projection handoff is stale")
+
+    logger = logging.getLogger("test.advice.crash")
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        run_advice_worker_once(
+            queue, cache, explode, at_utc="2026-08-27T12:00:30Z", log=AdviceLog("worker", logger)
+        )
+
+    events = [json.loads(record.getMessage()) for record in caplog.records]
+    crashed = next(event for event in events if event["event"] == "advice_job_failed")
+    assert crashed["error_type"] == "RuntimeError" and "stale" in crashed["detail"]

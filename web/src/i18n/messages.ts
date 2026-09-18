@@ -724,6 +724,7 @@ const en = {
       "The advice rules belong to another season.":
         "The advice inputs belong to different seasons.",
       "A member cannot be their own rival.": "The selected member and rival are the same.",
+      not_solved_for_member: "No plan was found for this selection in this publish.",
     } as Record<string, string>,
     publicationReasonUnknown:
       "The publisher supplied a reason, but no translated explanation is available.",
@@ -1661,6 +1662,7 @@ const tr: MessageSchema<typeof en> = {
         "Önerinin girdileri farklı veri kayıtlarına ait.",
       "The advice rules belong to another season.": "Önerinin girdileri farklı sezonlara ait.",
       "A member cannot be their own rival.": "Seçilen üye ve rakip aynı kişi.",
+      not_solved_for_member: "Bu seçim için bu yayında plan bulunamadı.",
     } as Record<string, string>,
     publicationReasonUnknown:
       "Yayıncı bir neden belirtmiş; bu nedenin çevrilmiş açıklaması bulunmuyor.",

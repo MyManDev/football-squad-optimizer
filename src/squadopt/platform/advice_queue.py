@@ -182,7 +182,14 @@ def _run_advice_worker_once(
             metrics.solve_seconds(perf_counter() - started)
             metrics.increment("advice_jobs_total", outcome="refused")
         if log is not None:
-            log.event("advice_job_refused", job_id=job.job_id, code=refusal.code)
+            # The cause stays on the operator's side: the job record above is what the
+            # api serves, and it carries the code and a sanitized sentence only.
+            log.event(
+                "advice_job_refused",
+                job_id=job.job_id,
+                code=refusal.code,
+                detail=str(refusal.__cause__) if refusal.__cause__ is not None else None,
+            )
         return failed
     except Exception as error:
         failed = job.transition(
@@ -200,7 +207,13 @@ def _run_advice_worker_once(
             metrics.solve_seconds(perf_counter() - started)
             metrics.increment("advice_jobs_total", outcome="failed")
         if log is not None:
-            log.event("advice_job_failed", job_id=job.job_id, code="ADVICE_FAILED")
+            log.event(
+                "advice_job_failed",
+                job_id=job.job_id,
+                code="ADVICE_FAILED",
+                error_type=type(error).__name__,
+                detail=str(error) or None,
+            )
         return failed
     finally:
         # Every path out of the computation, including the re-raise: a heartbeat that

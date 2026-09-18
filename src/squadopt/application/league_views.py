@@ -127,6 +127,31 @@ def computable_rival_strategies() -> tuple[str, ...]:
     )
 
 
+#: The refusals the page has a sentence for. They name a member's own selection, never a
+#: solver, and the page keys its translation on them.
+PUBLIC_REASON_SENTENCES = frozenset(
+    {
+        "The advice rules belong to another capture.",
+        "The advice rules belong to another season.",
+        "A member cannot be their own rival.",
+    }
+)
+#: What the index says about a plan that did not solve, whatever the cause was.
+NOT_SOLVED_FOR_MEMBER = "not_solved_for_member"
+
+
+def public_reason(detail: str) -> str:
+    """The reason a member's index may carry for a plan that was not published.
+
+    ``detail`` is an exception's text, and a planner's text names deterministic time, gaps
+    and player ids: an operator's diagnostic, not a member's reason. The index is a public
+    file, so it carries a sentence the page translates or one stable code, and the detail
+    travels on the member's note in the run's receipt.
+    """
+
+    return detail if detail in PUBLIC_REASON_SENTENCES else NOT_SOLVED_FOR_MEMBER
+
+
 @dataclass(frozen=True, slots=True)
 class MemberRenderTask:
     """One member's unit of work: the baseline plus the rival menu, from their picks.
@@ -1677,7 +1702,11 @@ def build_league_views(
         )
         if rival_menu or task.windows:
             unavailable: list[dict[str, object]] = [
-                {"strategy": strategy, "rival_entry_id": rival_id, "reason": reason}
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "reason": public_reason(reason),
+                }
                 for strategy, rival_id, reason in render.unavailable
             ]
             # A window that did not solve is a recorded reason at the same address the
@@ -1687,7 +1716,7 @@ def build_league_views(
                     "strategy": COMPUTED_MODE,
                     "rival_entry_id": None,
                     "window": window,
-                    "reason": reason,
+                    "reason": public_reason(reason),
                 }
                 for window, reason in render.window_unavailable
             )
@@ -1697,7 +1726,7 @@ def build_league_views(
                     "strategy": strategy,
                     "rival_entry_id": rival_id,
                     "window": window,
-                    "reason": reason,
+                    "reason": public_reason(reason),
                 }
                 for strategy, window, rival_id, weight, reason in render.variant_unavailable
                 if weight == 0
@@ -1833,6 +1862,18 @@ def build_league_views(
         # What was changed about this member's own name before it was published travels
         # on their row of the report, so the operator running the publish sees it. A name
         # we altered and never mentioned would be the quiet half of this fix.
+        plan_note = "; ".join(
+            (
+                *(
+                    f"{strategy} vs {rival_id} not solved: {reason}"
+                    for strategy, rival_id, reason in render.unavailable
+                ),
+                *(
+                    f"{COMPUTED_MODE} {window} weeks not solved: {reason}"
+                    for window, reason in render.window_unavailable
+                ),
+            )
+        )
         word_note = (
             f"manager's word not solved: {render.evidence_unavailable}"
             if render.evidence_unavailable
@@ -1869,6 +1910,7 @@ def build_league_views(
             for part in (
                 *name_notes.get(entry_id, ()),
                 mode_note,
+                plan_note,
                 word_note,
                 top100_note,
                 chip_note,
