@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,42 +9,42 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 449434,
-          "name": "Anthony Elanga",
-          "short_name": "Elanga",
-          "position": "MID",
-          "team": "Newcastle"
-        },
-        "player_in": {
-          "player_id": 577725,
-          "name": "Josh King",
-          "short_name": "King",
-          "position": "MID",
+          "player_id": 551466,
+          "name": "Gonzalo Garc\u00eda",
+          "short_name": "Garc\u00eda",
+          "position": "FWD",
           "team": "Fulham"
         },
-        "expected_points_delta": 1.5795505480511238,
+        "player_in": {
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
+          "position": "FWD",
+          "team": "Leeds"
+        },
+        "expected_points_delta": 0.3399124561542948,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.5795505480511238,
-    "expected_points_cost": 3.325050808794856,
+    "expected_gain_vs_hold": 0.3399124561542948,
+    "expected_points_cost": 4.625647767461544,
     "rival_label": "entry-5081114",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 54.47353889459548,
+    "expected_own_points": 53.3610101997142,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -101,15 +101,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
-      },
-      {
-        "player_id": 577725,
-        "name": "Josh King",
-        "short_name": "King",
-        "position": "MID",
-        "team": "Fulham",
-        "expected_points": 3.513475657690736
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 514254,
@@ -120,12 +112,20 @@
         "expected_points": 3.0713366665686688
       },
       {
+        "player_id": 508395,
+        "name": "Yehor Yarmoliuk",
+        "short_name": "Yarmoliuk",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 1.9339251096396166
+      },
+      {
         "player_id": 223094,
         "name": "Erling Haaland",
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 219168,
@@ -136,12 +136,12 @@
         "expected_points": 4.897045438301909
       },
       {
-        "player_id": 551466,
-        "name": "Gonzalo Garc\u00eda",
-        "short_name": "Garc\u00eda",
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
         "position": "FWD",
-        "team": "Fulham",
-        "expected_points": 3.2956069411711413
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
       }
     ],
     "bench": [
@@ -152,14 +152,6 @@
         "position": "GK",
         "team": "Spurs",
         "expected_points": 0.10027015579447286
-      },
-      {
-        "player_id": 508395,
-        "name": "Yehor Yarmoliuk",
-        "short_name": "Yarmoliuk",
-        "position": "MID",
-        "team": "Brentford",
-        "expected_points": 1.9339251096396166
       },
       {
         "player_id": 106760,
@@ -176,6 +168,14 @@
         "position": "DEF",
         "team": "Sunderland",
         "expected_points": 0.11362215032595142
+      },
+      {
+        "player_id": 449434,
+        "name": "Anthony Elanga",
+        "short_name": "Elanga",
+        "position": "MID",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -184,11 +184,37 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
+            "player_id": 177815,
+            "name": "Dominic Calvert-Lewin",
+            "short_name": "Calvert-Lewin",
+            "position": "FWD",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 551466,
+            "name": "Gonzalo Garc\u00eda",
+            "short_name": "Garc\u00eda",
+            "position": "FWD",
             "team": "Fulham"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 53.3610101997142
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
+            "position": "MID",
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -204,59 +230,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.47353889459548
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.89933437918745
+        "expected_points": 55.633774418855026
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
             "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 489639,
-            "name": "Bart Verbruggen",
-            "short_name": "Verbruggen",
-            "position": "GK",
-            "team": "Brighton"
+            "player_id": 469142,
+            "name": "Jan Paul van Hecke",
+            "short_name": "Hecke",
+            "position": "DEF",
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.78328562665817
+        "expected_points": 55.95779448366832
       },
       {
         "gameweek": 8,
@@ -267,32 +267,6 @@
             "short_name": "Bogle",
             "position": "DEF",
             "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 167512,
-            "name": "Luke O'Nien",
-            "short_name": "O'Nien",
-            "position": "DEF",
-            "team": "Sunderland"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.21773866346572
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -308,7 +282,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.70039717702647
+        "expected_points": 57.43520821976273
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 204580,
+            "name": "Vitaly Janelt",
+            "short_name": "Janelt",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 514254,
+            "name": "Diego G\u00f3mez Amarilla",
+            "short_name": "Amarilla",
+            "position": "MID",
+            "team": "Brighton"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 54.994607332350796
       }
     ],
     "stated_limits": [
@@ -326,9 +326,9 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 42.19202807504007,
+    "expected_points_cost_ceiling": 45.305652616069324,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 35.37099999999998,
+    "control_optimality_gap": 38.678,
     "rival_entry_id": 5081114,
     "overlap_count": 3,
     "transfer_cap": 1,
@@ -336,15 +336,15 @@
     "overlap_applied": 3,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 1.6058723692071837,
+    "expected_gap_vs_rival": 3.1320290807259568,
     "captain_agreement": true,
     "top100": {
       "weight": 50,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }

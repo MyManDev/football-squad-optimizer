@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
+          "player_id": 440993,
+          "name": "Iliman Ndiaye",
+          "short_name": "Ndiaye",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 513418,
@@ -27,24 +27,24 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 0.47670112603242387,
-        "reason_code": "top100_preference"
+        "expected_points_delta": 0.5872378721103786,
+        "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.47670112603242387,
-    "expected_points_cost": 0.5220215537422632,
+    "expected_gain_vs_hold": 0.5872378721103786,
+    "expected_points_cost": 0.28247515841337645,
     "rival_label": "entry-6879786",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 56.82305589377623,
+    "expected_own_points": 57.01760993894543,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 244851,
@@ -120,20 +120,20 @@
         "expected_points": 4.206689328780451
       },
       {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 3.7460561434034036
+      },
+      {
         "player_id": 223094,
         "name": "Erling Haaland",
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
-      },
-      {
-        "player_id": 177815,
-        "name": "Dominic Calvert-Lewin",
-        "short_name": "Calvert-Lewin",
-        "position": "FWD",
-        "team": "Leeds",
-        "expected_points": 3.635519397325434
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 475168,
@@ -154,12 +154,12 @@
         "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 440993,
-        "name": "Iliman Ndiaye",
-        "short_name": "Ndiaye",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.2743887399448766
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
       },
       {
         "player_id": 219924,
@@ -193,54 +193,28 @@
         ],
         "transfers_out": [
           {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
+            "player_id": 440993,
+            "name": "Iliman Ndiaye",
+            "short_name": "Ndiaye",
             "position": "MID",
-            "team": "Liverpool"
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.823055893776235
+        "expected_points": 57.01760993894543
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 209036,
-            "name": "Marc Gu\u00e9hi",
-            "short_name": "Gu\u00e9hi",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.944972014628426
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
+            "player_id": 647850,
+            "name": "Charalampos Kostoulas",
+            "short_name": "Kostoulas",
             "position": "FWD",
-            "team": "Liverpool"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.30222073589329
+        "expected_points": 57.113332619233816
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
+            "position": "MID",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.33513518686486
       }
     ],
     "stated_limits": [
@@ -274,9 +274,9 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 19.407837551525745,
+    "expected_points_cost_ceiling": 19.239291156196884,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 16.545999999999992,
+    "control_optimality_gap": 16.61700000000002,
     "rival_entry_id": 6879786,
     "overlap_count": 4,
     "transfer_cap": 1,
@@ -284,15 +284,15 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 15.47351165660519,
+    "expected_gap_vs_rival": 15.668065701774388,
     "captain_agreement": false,
     "top100": {
       "weight": 10,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }

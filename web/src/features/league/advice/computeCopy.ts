@@ -40,9 +40,9 @@ const en: ComputeCopy = {
   chipNotComputed:
     "A plan with a chosen chip is shown as it was published; the service does not compute chips yet.",
   duration: {
-    1: "A one-week plan takes a few seconds to compute.",
-    3: "A 3-week plan takes about a minute and a half to compute.",
-    5: "A 5-week plan takes about three and a half minutes to compute.",
+    1: "A one-week plan takes between a few seconds and half a minute to compute; a rival strategy and the settings you switch on make it longer.",
+    3: "A 3-week plan takes about a minute and a half to compute, and up to two and a half minutes for a rival strategy.",
+    5: "A 5-week pure points plan takes about three and a half minutes to compute; a rival strategy was not measured.",
   },
   durationNote:
     "These times were measured once and are not a promise; other computations ahead of yours make the wait longer.",
@@ -112,9 +112,9 @@ const tr: ComputeCopy = {
   chipNotComputed:
     "Çip seçilmiş plan yayınlandığı haliyle gösterilir; servis henüz çip hesaplamıyor.",
   duration: {
-    1: "Bir haftalık planın hesabı birkaç saniye sürer.",
-    3: "3 haftalık planın hesabı yaklaşık bir buçuk dakika sürer.",
-    5: "5 haftalık planın hesabı yaklaşık üç buçuk dakika sürer.",
+    1: "Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer; rakip stratejisi ve açtığın ayarlar süreyi uzatır.",
+    3: "3 haftalık planın hesabı yaklaşık bir buçuk dakika, rakip stratejisinde iki buçuk dakikaya kadar sürer.",
+    5: "5 haftalık saf puan planının hesabı yaklaşık üç buçuk dakika sürer; rakip stratejisinde ölçülmedi.",
   },
   durationNote:
     "Bu süreler bir kez ölçüldü, söz değildir; sırada senden önce başka hesap varsa bekleme uzar.",

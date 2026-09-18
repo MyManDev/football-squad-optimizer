@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,35 +9,35 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 441164,
-          "name": "Pedro Porro Sauceda",
-          "short_name": "Sauceda",
+          "player_id": 472769,
+          "name": "Nico O'Reilly",
+          "short_name": "O'Reilly",
           "position": "DEF",
-          "team": "Spurs"
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
+          "player_id": 477424,
+          "name": "Jo\u0161ko Gvardiol",
+          "short_name": "Gvardiol",
           "position": "DEF",
-          "team": "Leeds"
+          "team": "Man City"
         },
-        "expected_points_delta": 1.547265304602675,
+        "expected_points_delta": 2.0552998945019425,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.547265304602675,
-    "expected_points_cost": 0.08814200188840005,
+    "expected_gain_vs_hold": 2.0552998945019425,
+    "expected_points_cost": 0.996100509981801,
     "rival_label": null,
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 45.5541254103407,
+    "expected_own_points": 46.01910492535781,
     "captain": {
       "player_id": 437730,
       "name": "Antoine Semenyo",
@@ -72,12 +72,12 @@
         "expected_points": 4.472528385131045
       },
       {
-        "player_id": 226182,
-        "name": "Jayden Bogle",
-        "short_name": "Bogle",
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
         "position": "DEF",
-        "team": "Leeds",
-        "expected_points": 3.5483370784121617
+        "team": "Man City",
+        "expected_points": 4.056371668311424
       },
       {
         "player_id": 231416,
@@ -133,7 +133,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       },
       {
         "player_id": 169432,
@@ -154,12 +154,12 @@
         "expected_points": 3.404906686111741
       },
       {
-        "player_id": 472769,
-        "name": "Nico O'Reilly",
-        "short_name": "O'Reilly",
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
         "position": "DEF",
-        "team": "Man City",
-        "expected_points": 2.0010717738094854
+        "team": "Spurs",
+        "expected_points": 1.9840939651002099
       },
       {
         "player_id": 106611,
@@ -184,37 +184,37 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
             "position": "DEF",
-            "team": "Leeds"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 441164,
-            "name": "Pedro Porro Sauceda",
-            "short_name": "Sauceda",
+            "player_id": 472769,
+            "name": "Nico O'Reilly",
+            "short_name": "O'Reilly",
             "position": "DEF",
-            "team": "Spurs"
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 4,
         "free_transfers_after": 4,
-        "expected_points": 45.5541254103407
+        "expected_points": 46.01910492535781
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
+            "player_id": 177815,
+            "name": "Dominic Calvert-Lewin",
+            "short_name": "Calvert-Lewin",
             "position": "FWD",
-            "team": "Liverpool"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
@@ -230,33 +230,33 @@
         "chip": null,
         "free_transfers_before": 4,
         "free_transfers_after": 4,
-        "expected_points": 47.8908457340781
+        "expected_points": 46.81772762966989
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
+            "position": "MID",
+            "team": "Chelsea"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 106611,
-            "name": "Michael Keane",
-            "short_name": "Keane",
-            "position": "DEF",
-            "team": "Everton"
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
+            "position": "MID",
+            "team": "Liverpool"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 4,
         "free_transfers_after": 4,
-        "expected_points": 48.99557005864103
+        "expected_points": 48.85098179328104
       }
     ],
     "stated_limits": [
@@ -273,16 +273,16 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 33.96039781182691,
+    "expected_points_cost_ceiling": 32.68277638776746,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 31.785999999999973,
+    "control_optimality_gap": 29.935000000000002,
     "top100": {
       "weight": 10,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }

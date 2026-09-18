@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -28,42 +28,42 @@
           "team": "Brighton"
         },
         "expected_points_delta": 3.316137754827139,
-        "reason_code": "top100_preference"
+        "reason_code": "points_gain"
       },
       {
         "move_id": "gw05-2",
         "player_out": {
-          "player_id": 572584,
-          "name": "Abdoul Ouattara",
-          "short_name": "Ouattara",
-          "position": "DEF",
-          "team": "Ipswich Town"
+          "player_id": 470313,
+          "name": "Nick Woltemade",
+          "short_name": "Woltemade",
+          "position": "FWD",
+          "team": "Newcastle"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
-          "position": "DEF",
-          "team": "Brighton"
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
+          "position": "FWD",
+          "team": "Leeds"
         },
-        "expected_points_delta": 1.0498025724710232,
+        "expected_points_delta": 1.1313267896670425,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 4.365940327298162,
-    "expected_points_cost": 0.6211204918623139,
+    "expected_gain_vs_hold": 4.447464544494181,
+    "expected_points_cost": 0.5235283340109191,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": null,
-    "expected_own_points": 55.669691311885856,
+    "expected_own_points": 55.87832492609742,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 226597,
@@ -107,14 +107,6 @@
         "expected_points": 3.555548676659022
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5539951801294207
-      },
-      {
         "player_id": 446008,
         "name": "Bryan Mbeumo",
         "short_name": "Mbeumo",
@@ -136,7 +128,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 577725,
@@ -152,7 +144,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
       },
       {
         "player_id": 475168,
@@ -181,20 +181,20 @@
         "expected_points": 2.5041926076583985
       },
       {
+        "player_id": 572584,
+        "name": "Abdoul Ouattara",
+        "short_name": "Ouattara",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 0.8905515739533116
+      },
+      {
         "player_id": 108413,
         "name": "Will Hughes",
         "short_name": "Hughes",
         "position": "MID",
         "team": "Crystal Palace",
         "expected_points": 0.6628182574567039
-      },
-      {
-        "player_id": 470313,
-        "name": "Nick Woltemade",
-        "short_name": "Woltemade",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -207,16 +207,16 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.6211204918623139,
+    "expected_points_cost_ceiling": 0.5235283340109191,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "top100": {
       "weight": 30,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     },
     "evidence": {
@@ -224,7 +224,7 @@
       "rule_version": "managers_word_rule_v1",
       "source_kind": "synthetic_fixture",
       "source_label": "club_news_v1.fixture.json",
-      "evidence_table": "rotation_evidence_v2_2026-27_gw05_d0bb92785d5c.csv",
+      "evidence_table": "rotation_evidence_v2_2026-27_gw05_cd5c04029774.csv",
       "clubs_covered": [
         "Arsenal",
         "Man Utd"

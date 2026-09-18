@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,42 +9,42 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 247348,
-          "name": "Daniel Mu\u00f1oz Mej\u00eda",
-          "short_name": "Mej\u00eda",
-          "position": "DEF",
-          "team": "Nott'm Forest"
+          "player_id": 67089,
+          "name": "Martin Dubravka",
+          "short_name": "Dubravka",
+          "position": "GK",
+          "team": "Spurs"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
-          "position": "DEF",
-          "team": "Brighton"
+          "player_id": 155465,
+          "name": "Michael Zetterer",
+          "short_name": "Zetterer",
+          "position": "GK",
+          "team": "Leeds"
         },
-        "expected_points_delta": 1.4401111385247987,
+        "expected_points_delta": 0.0,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.4401111385247987,
-    "expected_points_cost": 0.0,
+    "expected_gain_vs_hold": 0.0,
+    "expected_points_cost": 3.261240861244403,
     "rival_label": null,
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 54.743189927960756,
+    "expected_own_points": 52.342865160592865,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -64,20 +64,12 @@
         "expected_points": 3.8238320826783507
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5539951801294207
-      },
-      {
-        "player_id": 463726,
-        "name": "Amar Dedic",
-        "short_name": "Dedic",
-        "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 2.679647630609125
+        "team": "Ipswich Town",
+        "expected_points": 2.1138840416046176
       },
       {
         "player_id": 199798,
@@ -86,6 +78,14 @@
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 2.0636451338320074
+      },
+      {
+        "player_id": 247348,
+        "name": "Daniel Mu\u00f1oz Mej\u00eda",
+        "short_name": "Mej\u00eda",
+        "position": "DEF",
+        "team": "Nott'm Forest",
+        "expected_points": 1.6784717775569535
       },
       {
         "player_id": 141746,
@@ -125,7 +125,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 502500,
@@ -133,7 +133,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       },
       {
         "player_id": 177815,
@@ -146,20 +146,12 @@
     ],
     "bench": [
       {
-        "player_id": 67089,
-        "name": "Martin Dubravka",
-        "short_name": "Dubravka",
+        "player_id": 155465,
+        "name": "Michael Zetterer",
+        "short_name": "Zetterer",
         "position": "GK",
-        "team": "Spurs",
-        "expected_points": 0.10027015579447286
-      },
-      {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.1138840416046176
+        "team": "Leeds",
+        "expected_points": 1.1976225854383358
       },
       {
         "player_id": 106760,
@@ -176,12 +168,46 @@
         "position": "MID",
         "team": "Fulham",
         "expected_points": 0.11895417311970728
+      },
+      {
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
         "gameweek": 5,
+        "transfers_in": [
+          {
+            "player_id": 155465,
+            "name": "Michael Zetterer",
+            "short_name": "Zetterer",
+            "position": "GK",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "short_name": "Dubravka",
+            "position": "GK",
+            "team": "Spurs"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 52.342865160592865
+      },
+      {
+        "gameweek": 6,
         "transfers_in": [
           {
             "player_id": 465730,
@@ -204,62 +230,10 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 54.74318992796076
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 244851,
-            "name": "Cole Palmer",
-            "short_name": "Palmer",
-            "position": "MID",
-            "team": "Chelsea"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 141746,
-            "name": "Bruno Borges Fernandes",
-            "short_name": "Fernandes",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 53.521387360329705
+        "expected_points": 54.218388563165334
       },
       {
         "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
-            "position": "FWD",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 502500,
-            "name": "Igor Thiago Nascimento Rodrigues",
-            "short_name": "Rodrigues",
-            "position": "FWD",
-            "team": "Brentford"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 54.48741611599668
-      },
-      {
-        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 60307,
@@ -282,33 +256,59 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.628832260186236
+        "expected_points": 55.35980470735488
       },
       {
-        "gameweek": 9,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
+            "player_id": 232351,
+            "name": "Ryan Giles",
+            "short_name": "Giles",
             "position": "DEF",
-            "team": "Arsenal"
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 199798,
-            "name": "Ezri Konsa Ngoyo",
-            "short_name": "Ngoyo",
+            "player_id": 463726,
+            "name": "Amar Dedic",
+            "short_name": "Dedic",
             "position": "DEF",
-            "team": "Arsenal"
+            "team": "Newcastle"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.105732190281415
+        "expected_points": 55.99334802513748
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 475168,
+            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+            "short_name": "Jesus",
+            "position": "FWD",
+            "team": "Chelsea"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 502500,
+            "name": "Igor Thiago Nascimento Rodrigues",
+            "short_name": "Rodrigues",
+            "position": "FWD",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.64518313442176
       }
     ],
     "stated_limits": [
@@ -325,16 +325,16 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 46.52571112696688,
+    "expected_points_cost_ceiling": 48.2381295239141,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 46.20100000000002,
+    "control_optimality_gap": 43.331999999999994,
     "top100": {
       "weight": 50,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }

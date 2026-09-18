@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,30 +27,11 @@
           "position": "FWD",
           "team": "Man City"
         },
-        "expected_points_delta": 9.293296881686075,
+        "expected_points_delta": 9.377314180777319,
         "reason_code": "mode_tradeoff"
       },
       {
         "move_id": "gw05-2",
-        "player_out": {
-          "player_id": 226597,
-          "name": "Gabriel dos Santos Magalh\u00e3es",
-          "short_name": "Magalh\u00e3es",
-          "position": "DEF",
-          "team": "Arsenal"
-        },
-        "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
-          "position": "DEF",
-          "team": "Leeds"
-        },
-        "expected_points_delta": -0.9241913067188818,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw05-3",
         "player_out": {
           "player_id": 430871,
           "name": "Matheus Santos Carneiro da Cunha",
@@ -69,6 +50,25 @@
         "reason_code": "mode_tradeoff"
       },
       {
+        "move_id": "gw05-3",
+        "player_out": {
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 204580,
+          "name": "Vitaly Janelt",
+          "short_name": "Janelt",
+          "position": "MID",
+          "team": "Brentford"
+        },
+        "expected_points_delta": -1.1501274012831573,
+        "reason_code": "mode_tradeoff"
+      },
+      {
         "move_id": "gw05-4",
         "player_out": {
           "player_id": 472769,
@@ -78,38 +78,38 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
+          "player_id": 226182,
+          "name": "Jayden Bogle",
+          "short_name": "Bogle",
           "position": "DEF",
-          "team": "Brighton"
+          "team": "Leeds"
         },
-        "expected_points_delta": 1.552923406319934,
+        "expected_points_delta": 1.5902260038895406,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 10.174864433092893,
+    "expected_gain_vs_hold": 10.070248235189467,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6654210",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.18172453883092,
+    "expected_own_points": 54.03405326604533,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
-      "player_id": 437730,
-      "name": "Antoine Semenyo",
-      "short_name": "Semenyo",
-      "position": "MID",
-      "team": "Man City",
-      "expected_points": 4.620473859853053
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Magalh\u00e3es",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.472528385131045
     },
     "starting_xi": [
       {
@@ -121,12 +121,12 @@
         "expected_points": 3.8238320826783507
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5539951801294207
+        "team": "Arsenal",
+        "expected_points": 4.472528385131045
       },
       {
         "player_id": 226182,
@@ -134,7 +134,7 @@
         "short_name": "Bogle",
         "position": "DEF",
         "team": "Leeds",
-        "expected_points": 3.5483370784121617
+        "expected_points": 3.5912977776990163
       },
       {
         "player_id": 231416,
@@ -143,14 +143,6 @@
         "position": "DEF",
         "team": "Brighton",
         "expected_points": 2.4492708555664957
-      },
-      {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.620473859853053
       },
       {
         "player_id": 446008,
@@ -177,6 +169,14 @@
         "expected_points": 3.7460561434034036
       },
       {
+        "player_id": 204580,
+        "name": "Vitaly Janelt",
+        "short_name": "Janelt",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 3.4703464585699018
+      },
+      {
         "player_id": 84450,
         "name": "Granit Xhaka",
         "short_name": "Xhaka",
@@ -190,7 +190,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 502500,
@@ -198,7 +198,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       }
     ],
     "bench": [
@@ -224,7 +224,7 @@
         "short_name": "Sauceda",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 1.5182138705784642
+        "expected_points": 1.9840939651002099
       },
       {
         "player_id": 106611,
@@ -258,7 +258,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": -0.3097435941262674,
+    "expected_gap_vs_rival": -0.5414321660030907,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

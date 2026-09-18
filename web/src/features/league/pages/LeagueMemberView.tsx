@@ -43,6 +43,7 @@ function LeagueMemberContent({
   client,
   capabilities = null,
   computeService = "static",
+  computePending = false,
   rivalSquad = null,
 }: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
@@ -220,6 +221,7 @@ function LeagueMemberContent({
             selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
           }
           computable={computeAvailable}
+          pending={computePending}
           published={selection.status === "ready"}
           chipChosen={selection.chip.chip !== null}
         />

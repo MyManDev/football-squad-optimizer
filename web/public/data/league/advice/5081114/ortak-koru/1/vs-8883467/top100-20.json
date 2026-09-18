@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,7 +27,7 @@
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 1.820571505854609,
+        "expected_points_delta": 2.2559837699022864,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -46,24 +46,24 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 0.4050732739790135,
+        "expected_points_delta": 0.4050732739789993,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 2.2256447798336225,
-    "expected_points_cost": 0.6991583032713322,
+    "expected_gain_vs_hold": 2.6610570438812857,
+    "expected_points_cost": 0.7421190025581978,
     "rival_label": "entry-8883467",
     "solver_status": "OPTIMAL",
     "optimality_gap": null,
-    "expected_own_points": 55.52872356926958,
+    "expected_own_points": 55.00392220447415,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -91,12 +91,12 @@
         "expected_points": 3.9344555474592307
       },
       {
-        "player_id": 463726,
-        "name": "Amar Dedic",
-        "short_name": "Dedic",
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
         "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 2.679647630609125
+        "team": "Ipswich Town",
+        "expected_points": 2.1138840416046176
       },
       {
         "player_id": 199798,
@@ -144,7 +144,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 502500,
@@ -152,7 +152,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.93101668263493
+        "expected_points": 3.887961607752777
       },
       {
         "player_id": 177815,
@@ -173,14 +173,6 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.1138840416046176
-      },
-      {
         "player_id": 106760,
         "name": "Luke Shaw",
         "short_name": "Shaw",
@@ -195,6 +187,14 @@
         "position": "MID",
         "team": "Fulham",
         "expected_points": 0.11895417311970728
+      },
+      {
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -208,7 +208,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 8883467,
-    "expected_points_cost_ceiling": 0.6991583032713322,
+    "expected_points_cost_ceiling": 0.7421190025581978,
     "overlap_count": 4,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -218,20 +218,20 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 20.0,
-      "expected_points_cost": 21.298881832999058,
-      "expected_points_cost_ceiling": 21.298881832999058
+      "expected_points_cost": 20.908478891349986,
+      "expected_points_cost_ceiling": 20.908478891349986
     },
-    "expected_gap_vs_rival": 6.550821732461095,
+    "expected_gap_vs_rival": 5.984011718120051,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "top100": {
       "weight": 20,
-      "changed": true,
+      "changed": false,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }

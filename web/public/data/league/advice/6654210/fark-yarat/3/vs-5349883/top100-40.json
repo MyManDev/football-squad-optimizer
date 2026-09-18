@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,24 +27,24 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": -0.0015534965296026826,
+        "expected_points_delta": -0.0015534965295955772,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": -0.0015534965296026826,
-    "expected_points_cost": 2.887136182363605,
+    "expected_gain_vs_hold": -0.0015534965295955772,
+    "expected_points_cost": 1.0903415510724699,
     "rival_label": "entry-5349883",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 54.489914636427585,
+    "expected_own_points": 54.57393193551883,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -133,7 +133,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 475168,
@@ -204,43 +204,17 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 54.489914636427585
+        "expected_points": 54.57393193551883
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 439509,
-            "name": "Christos Tzolis",
-            "short_name": "Tzolis",
-            "position": "MID",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.16579389845012
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
             "position": "DEF",
-            "team": "Arsenal"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.12395221989411
+        "expected_points": 56.04791686134705
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 522047,
+            "name": "Tarik Muharemovi\u0107",
+            "short_name": "Muharemovi\u0107",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
+            "position": "DEF",
+            "team": "Crystal Palace"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.59803482068355
       }
     ],
     "stated_limits": [
@@ -274,9 +274,9 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 27.57124485263668,
+    "expected_points_cost_ceiling": 26.02345022134557,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 23.230999999999995,
+    "control_optimality_gap": 23.47999999999999,
     "rival_entry_id": 5349883,
     "overlap_count": 3,
     "transfer_cap": 1,
@@ -284,15 +284,15 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 6.163011951671535,
+    "expected_gap_vs_rival": 6.161928503292849,
     "captain_agreement": false,
     "top100": {
       "weight": 40,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
-      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
-      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
       "picks_gameweek": 4
     }
   }

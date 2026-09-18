@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.3792592452929995,
+        "expected_points_delta": 1.3792592452929853,
         "reason_code": "points_gain"
       },
       {
@@ -40,13 +40,13 @@
           "team": "Hull City"
         },
         "player_in": {
-          "player_id": 557012,
-          "name": "Sindre Walle Egeli",
-          "short_name": "Egeli",
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
           "position": "FWD",
-          "team": "Ipswich Town"
+          "team": "Leeds"
         },
-        "expected_points_delta": -0.2836387597034147,
+        "expected_points_delta": 0.7986227043120664,
         "reason_code": "points_gain"
       },
       {
@@ -65,17 +65,17 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": 2.9513481924949687,
+        "expected_points_delta": 2.951348192494976,
         "reason_code": "points_gain"
       },
       {
         "move_id": "gw05-4",
         "player_out": {
-          "player_id": 226597,
-          "name": "Gabriel dos Santos Magalh\u00e3es",
-          "short_name": "Magalh\u00e3es",
+          "player_id": 209036,
+          "name": "Marc Gu\u00e9hi",
+          "short_name": "Gu\u00e9hi",
           "position": "DEF",
-          "team": "Arsenal"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 17761,
@@ -84,11 +84,30 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": -0.31348065379467727,
+        "expected_points_delta": 0.2245921838771352,
         "reason_code": "points_gain"
       },
       {
         "move_id": "gw05-5",
+        "player_out": {
+          "player_id": 226597,
+          "name": "Gabriel dos Santos Magalh\u00e3es",
+          "short_name": "Magalh\u00e3es",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 108416,
+          "name": "John Egan",
+          "short_name": "Egan",
+          "position": "DEF",
+          "team": "Hull City"
+        },
+        "expected_points_delta": -1.6560649892775814,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw05-6",
         "player_out": {
           "player_id": 244851,
           "name": "Cole Palmer",
@@ -103,11 +122,11 @@
           "position": "MID",
           "team": "Nott'm Forest"
         },
-        "expected_points_delta": -0.31231526557285605,
+        "expected_points_delta": -0.31231526557286315,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-6",
+        "move_id": "gw05-7",
         "player_out": {
           "player_id": 440089,
           "name": "Mikkel Damsgaard",
@@ -122,11 +141,11 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 1.3681275101558654,
+        "expected_points_delta": 1.4103201784847954,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-7",
+        "move_id": "gw05-8",
         "player_out": {
           "player_id": 445087,
           "name": "Ronald Araujo",
@@ -141,11 +160,11 @@
           "position": "DEF",
           "team": "Leeds"
         },
-        "expected_points_delta": 0.9950791451022098,
+        "expected_points_delta": 0.774834381845551,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-8",
+        "move_id": "gw05-9",
         "player_out": {
           "player_id": 448047,
           "name": "Enzo Fern\u00e1ndez",
@@ -160,11 +179,11 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 1.145813132102596,
+        "expected_points_delta": 0.6829605523987823,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-9",
+        "move_id": "gw05-10",
         "player_out": {
           "player_id": 475168,
           "name": "Jo\u00e3o Pedro Junqueira de Jesus",
@@ -179,11 +198,11 @@
           "position": "FWD",
           "team": "Sunderland"
         },
-        "expected_points_delta": -0.46285257970382077,
+        "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-10",
+        "move_id": "gw05-11",
         "player_out": {
           "player_id": 491279,
           "name": "Micky van de Ven",
@@ -198,11 +217,11 @@
           "position": "DEF",
           "team": "Ipswich Town"
         },
-        "expected_points_delta": -0.3202910326156996,
+        "expected_points_delta": -0.26048074147976763,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-11",
+        "move_id": "gw05-12",
         "player_out": {
           "player_id": 606930,
           "name": "Nobel Mendy",
@@ -217,24 +236,24 @@
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 1.299718563593899,
+        "expected_points_delta": 1.239908272457967,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 7.44676749735207,
+    "expected_gain_vs_hold": 7.232984714834046,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 60.152511942468976,
+    "expected_own_points": 59.98055379071327,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -270,20 +289,12 @@
         "expected_points": 4.056371668311424
       },
       {
-        "player_id": 209036,
-        "name": "Marc Gu\u00e9hi",
-        "short_name": "Gu\u00e9hi",
-        "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.9344555474592307
-      },
-      {
         "player_id": 226182,
         "name": "Jayden Bogle",
         "short_name": "Bogle",
         "position": "DEF",
         "team": "Leeds",
-        "expected_points": 3.5483370784121617
+        "expected_points": 3.5912977776990163
       },
       {
         "player_id": 141746,
@@ -331,7 +342,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
       }
     ],
     "bench": [
@@ -342,6 +361,14 @@
         "position": "GK",
         "team": "Hull City",
         "expected_points": 3.1358433568150343
+      },
+      {
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.8164633958534613
       },
       {
         "player_id": 455084,
@@ -358,14 +385,6 @@
         "position": "FWD",
         "team": "Sunderland",
         "expected_points": 1.3473254086181279
-      },
-      {
-        "player_id": 557012,
-        "name": "Sindre Walle Egeli",
-        "short_name": "Egeli",
-        "position": "FWD",
-        "team": "Ipswich Town",
-        "expected_points": 0.14255503388083993
       }
     ],
     "chip": "freehit",
@@ -382,7 +401,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "freehit",
-      "gain_vs_no_chip": 5.996965050337224,
+      "gain_vs_no_chip": 5.740989599490291,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

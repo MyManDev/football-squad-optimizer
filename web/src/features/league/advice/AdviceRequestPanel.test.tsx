@@ -32,6 +32,7 @@ function renderPanel(
     computable?: boolean;
     published?: boolean;
     chipChosen?: boolean;
+    pending?: boolean;
     selectionAvailable?: boolean;
     request?: AdviceRequest;
   } = {},
@@ -49,6 +50,7 @@ function renderPanel(
         computable={props.computable}
         published={props.published}
         chipChosen={props.chipChosen}
+        pending={props.pending}
       />
     </LanguageProvider>,
   );
@@ -59,6 +61,14 @@ const tr = COMPUTE_COPY.tr;
 const messages = MESSAGES.tr.leagueMembers;
 
 describe("with no compute service", () => {
+  it("keeps the old sentence back while a configured service has not answered yet", () => {
+    // The service computes a rival strategy over three weeks; saying it does not, for the
+    // half second before its capabilities arrive, is a sentence the page takes back.
+    const { container, button } = renderPanel({ pending: true });
+    expect(button).toBeDisabled();
+    expect(container).not.toHaveTextContent(messages.computeUnsupportedSelection);
+  });
+
   it("says nothing new and keeps the old rule for what can be computed", () => {
     const { container, button } = renderPanel();
     expect(button).toBeDisabled(); // a rival strategy over three weeks, as before
