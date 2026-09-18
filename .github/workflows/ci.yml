@@ -183,6 +183,10 @@ jobs:
         run: npx vitest run
 
       - name: Build
+        env:
+          # Unset or empty is the static site, byte for byte (ADR 0006). A repository
+          # variable, not a secret: the value ships in the bundle.
+          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run build
 
       - name: Deployment assets
