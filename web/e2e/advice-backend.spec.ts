@@ -1,4 +1,5 @@
-import { cp } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { cp, readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -6,7 +7,7 @@ import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/typ
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
-test("a browser computes through the worker, then reads the same answer from cache", async ({
+test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
   page,
 }) => {
   // These are the Python fixture's captured squad and member documents. No route,
@@ -46,7 +47,11 @@ test("a browser computes through the worker, then reads the same answer from cac
     (response) =>
       response.url() === `${context.apiOrigin}/api/v1/leagues/${context.leagueId}/capabilities`,
   );
-  await page.getByRole("button", { name: "Bu benim", exact: true }).click();
+  await page
+    .getByRole("row")
+    .filter({ has: page.locator(`a[href="/league/members/${context.entryId}"]`) })
+    .getByRole("button", { name: "Bu benim", exact: true })
+    .click();
   expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
@@ -109,7 +114,7 @@ test("a browser computes through the worker, then reads the same answer from cac
     if (move.player_out) await expect(advice).toContainText(move.player_out.name);
   }
 
-  // The one-job worker exits after its first solve. Reload reads the stored answer.
+  // Reload reads the stored answer without another job. Explicit POST is also a hit.
   const postsAfterReload: string[] = [];
   page.on("request", (request) => {
     if (request.url().startsWith(route) && request.method() === "POST") {
@@ -132,16 +137,101 @@ test("a browser computes through the worker, then reads the same answer from cac
   const postedAnswer = await postedCache;
   expect(postedAnswer.status()).toBe(200);
   expect(await postedAnswer.json()).toEqual(answer);
-});
 
-test("a bundle built with an origin is the static page when the service is down", async ({
-  page,
-}) => {
-  await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
-    recursive: true,
-  });
-  // The service is unreachable for this page only: every call to its origin fails.
-  await page.route(`${context.apiOrigin}/**`, (route) => route.abort("connectionrefused"));
+  expect(context.rivalId).not.toBe(context.defaultRivalId);
+  const jobs = new Set([jobId]);
+  for (const selection of [
+    {
+      query: "top100=20",
+      body: { strategy: "saf-puan", window: 1, rival_entry_id: null, top100_weight: 20 },
+      payload: { mode: "saf-puan", top100: { weight: 20 } },
+    },
+    {
+      query: `mode=ortak-koru&rival=${context.rivalId}`,
+      body: { strategy: "ortak-koru", window: 1, rival_entry_id: context.rivalId },
+      payload: { mode: "ortak-koru", rival_entry_id: context.rivalId },
+    },
+    {
+      query: "chip=bboost",
+      body: { strategy: "saf-puan", window: 1, rival_entry_id: null, chip: "bboost" },
+      payload: { mode: "saf-puan", chip_choice: { chip: "bboost" } },
+    },
+  ]) {
+    await page.goto(`/league/members/${context.entryId}?${selection.query}`);
+    await expect(compute).toBeEnabled();
+    const queued = page.waitForResponse(
+      (response) => response.url().startsWith(route) && response.request().method() === "POST",
+    );
+    const completed = page.waitForResponse(
+      (response) =>
+        response.url().startsWith(route) &&
+        response.request().method() === "GET" &&
+        response.status() === 200,
+    );
+    await compute.click();
+    const submitted = await queued;
+    expect(submitted.request().postDataJSON()).toEqual(selection.body);
+    expect(submitted.status()).toBe(202);
+    const selectedJob = (await submitted.json()).job_id;
+    expect(jobs.has(selectedJob)).toBe(false);
+    jobs.add(selectedJob);
+    const selectedAnswer = (await (await completed).json()) as LeagueViewEnvelope<EntryAdvice>;
+    expect(selectedAnswer.payload).toMatchObject({
+      ...selection.payload,
+      entry_id: context.entryId,
+      source_snapshot_id: context.snapshotId,
+      window: 1,
+    });
+    await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+    await expect(advice).toBeVisible();
+    for (const move of selectedAnswer.payload.moves) {
+      if (move.player_in) await expect(advice).toContainText(move.player_in.name);
+    }
+  }
+  expect(jobs.size).toBe(4);
+
+  // Last step only: restore the real published plan, then stop this fixture's API tree.
+  const baseline = JSON.parse(await readFile(context.baselineCopy, "utf8"));
+  await cp(
+    context.baselineCopy,
+    `node_modules/.cache/${context.buildName}/data/league/advice/${context.entryId}/saf-puan/1.json`,
+  );
+  const origin = new URL(context.apiOrigin);
+  expect(origin.hostname).toBe("127.0.0.1");
+  expect(Number(origin.port)).toBeGreaterThan(0);
+  expect(Number(origin.port)).not.toBe(8000);
+  for (const pid of [context.apiPid, context.fixturePid]) {
+    expect(Number.isSafeInteger(pid) && pid > 0).toBe(true);
+  }
+  const parent =
+    process.platform === "win32"
+      ? execFileSync(
+          "powershell.exe",
+          [
+            "-NoProfile",
+            "-Command",
+            `(Get-CimInstance Win32_Process -Filter 'ProcessId=${context.apiPid}').ParentProcessId`,
+          ],
+          { encoding: "utf8", windowsHide: true },
+        )
+      : execFileSync("ps", ["-o", "ppid=", "-p", String(context.apiPid)], { encoding: "utf8" });
+  expect(Number(parent.trim())).toBe(context.fixturePid);
+  if (process.platform === "win32") {
+    // The venv launcher has an interpreter child. Both must stop, exactly as teardown does.
+    execFileSync("taskkill", ["/PID", String(context.apiPid), "/T", "/F"], { windowsHide: true });
+  } else {
+    process.kill(context.apiPid, "SIGTERM");
+  }
+  await expect
+    .poll(async () => {
+      try {
+        await page.request.get(`${context.apiOrigin}/ready`, { timeout: 1_000 });
+        return false;
+      } catch {
+        return true;
+      }
+    })
+    .toBe(true);
   await page.goto(`/league/members/${context.entryId}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
@@ -150,6 +240,9 @@ test("a bundle built with an origin is the static page when the service is down"
       "Hesaplama servisine şu an ulaşılamıyor. Yayınlanmış planlar her zamanki gibi aşağıda.",
     ),
   ).toBeVisible();
+  await expect(advice).toBeVisible();
+  await expect(advice).toContainText(baseline.payload.captain.name);
+  await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Hesapla", exact: true }).click();
   await expect(
