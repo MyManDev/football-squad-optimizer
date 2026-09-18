@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,35 +9,35 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 97032,
-          "name": "Virgil van Dijk",
-          "short_name": "Dijk",
-          "position": "DEF",
-          "team": "Liverpool"
+          "player_id": 195546,
+          "name": "Emiliano Buend\u00eda Stati",
+          "short_name": "Stati",
+          "position": "MID",
+          "team": "Aston Villa"
         },
         "player_in": {
-          "player_id": 477424,
-          "name": "Jo\u0161ko Gvardiol",
-          "short_name": "Gvardiol",
-          "position": "DEF",
-          "team": "Man City"
+          "player_id": 513418,
+          "name": "Kevin Schade",
+          "short_name": "Schade",
+          "position": "MID",
+          "team": "Brentford"
         },
-        "expected_points_delta": 0.5008229916523987,
+        "expected_points_delta": 1.4736315742589667,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.5008229916523987,
+    "expected_gain_vs_hold": 1.4736315742589667,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6654210",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 26.99199999999999,
-    "expected_own_points": 51.19686772105814,
+    "optimality_gap": 26.893,
+    "expected_own_points": 52.212768401589024,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -64,12 +64,12 @@
         "expected_points": 3.404906686111741
       },
       {
-        "player_id": 477424,
-        "name": "Jo\u0161ko Gvardiol",
-        "short_name": "Gvardiol",
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
         "position": "DEF",
-        "team": "Man City",
-        "expected_points": 4.056371668311424
+        "team": "Liverpool",
+        "expected_points": 3.555548676659022
       },
       {
         "player_id": 465730,
@@ -112,20 +112,20 @@
         "expected_points": 4.414905789016978
       },
       {
+        "player_id": 513418,
+        "name": "Kevin Schade",
+        "short_name": "Schade",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 4.222757269435823
+      },
+      {
         "player_id": 184029,
         "name": "Martin \u00d8degaard",
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
-      },
-      {
-        "player_id": 195546,
-        "name": "Emiliano Buend\u00eda Stati",
-        "short_name": "Stati",
-        "position": "MID",
-        "team": "Aston Villa",
-        "expected_points": 2.7491256951768515
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 219168,
@@ -184,37 +184,11 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 97032,
-            "name": "Virgil van Dijk",
-            "short_name": "Dijk",
-            "position": "DEF",
-            "team": "Liverpool"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 51.196867721058155
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Brighton"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -230,25 +204,25 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 52.65443135466175
+        "expected_points": 52.21276840158904
       },
       {
-        "gameweek": 7,
+        "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
-            "position": "MID",
-            "team": "Nott'm Forest"
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
             "team": "Arsenal"
           }
         ],
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 53.761114328334244
+        "expected_points": 52.72859500597328
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 441302,
+            "name": "Ian Maatsen",
+            "short_name": "Maatsen",
+            "position": "DEF",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 52.780096066635245
       }
     ],
     "stated_limits": [
@@ -272,17 +272,17 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 29.600559367938246,
+    "expected_points_cost_ceiling": 29.797893370948145,
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 26.99199999999999,
+    "control_optimality_gap": 26.893,
     "rival_entry_id": 6654210,
-    "overlap_count": 3,
+    "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 5,
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -3.2946004118990473,
+    "expected_gap_vs_rival": -2.3627170304594003,
     "captain_agreement": false
   }
 }

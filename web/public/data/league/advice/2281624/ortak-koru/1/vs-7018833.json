@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -33,18 +33,18 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.0,
-    "expected_points_cost": 0.7318736825587138,
+    "expected_points_cost": 0.4890338313864504,
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.90220822357879,
+    "expected_own_points": 55.02931762059434,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 244851,
@@ -117,7 +117,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.780893844188471
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 215413,
@@ -133,7 +133,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 216646,
@@ -188,7 +188,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 7018833,
-    "expected_points_cost_ceiling": 0.7318736825587138,
+    "expected_points_cost_ceiling": 0.4890338313864504,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,10 +198,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 16.914635350485142,
-      "expected_points_cost_ceiling": 16.914635350485142
+      "expected_points_cost": 16.671795499312893,
+      "expected_points_cost_ceiling": 16.671795499312893
     },
-    "expected_gap_vs_rival": 1.9848562937552998,
+    "expected_gap_vs_rival": 2.0706474986265846,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

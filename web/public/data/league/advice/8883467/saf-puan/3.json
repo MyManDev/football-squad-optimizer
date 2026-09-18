@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,24 +27,24 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.4337345063594782,
+        "expected_points_delta": 1.475927174688394,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.4337345063594782,
+    "expected_gain_vs_hold": 1.475927174688394,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 22.750999999999976,
-    "expected_own_points": 54.139478951476384,
+    "optimality_gap": 23.171999999999997,
+    "expected_own_points": 54.22349625056762,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 244851,
@@ -125,7 +125,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 475168,
@@ -159,7 +159,7 @@
         "short_name": "Damsgaard",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 2.7729548224209766
+        "expected_points": 2.730762154092055
       },
       {
         "player_id": 445087,
@@ -175,7 +175,7 @@
         "short_name": "Mendy",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 1.1597791835127527
+        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -204,7 +204,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.13947895147638
+        "expected_points": 54.22349625056762
       },
       {
         "gameweek": 6,
@@ -230,33 +230,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.36842053630036
+        "expected_points": 55.45243783539159
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
+            "position": "DEF",
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 440089,
-            "name": "Mikkel Damsgaard",
-            "short_name": "Damsgaard",
-            "position": "MID",
-            "team": "Brentford"
+            "player_id": 606930,
+            "name": "Nobel Mendy",
+            "short_name": "Mendy",
+            "position": "DEF",
+            "team": "Hull City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.754281112722815
+        "expected_points": 56.206838920077246
       }
     ],
     "stated_limits": [

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T21:15:43Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -21,30 +21,30 @@
           "team": "Brentford"
         },
         "player_in": {
-          "player_id": 647850,
-          "name": "Charalampos Kostoulas",
-          "short_name": "Kostoulas",
+          "player_id": 216646,
+          "name": "Yoane Wissa",
+          "short_name": "Wissa",
           "position": "FWD",
-          "team": "Brighton"
+          "team": "Newcastle"
         },
-        "expected_points_delta": -0.6165366058685748,
+        "expected_points_delta": -0.3242616064613202,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": -0.6165366058685748,
+    "expected_gain_vs_hold": -0.3242616064613202,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 46.20100000000002,
-    "expected_own_points": 52.68654218356738,
+    "optimality_gap": 43.331999999999994,
+    "expected_own_points": 52.018603554131545,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.37533371727625
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 141746,
@@ -64,14 +64,6 @@
         "expected_points": 3.8238320826783507
       },
       {
-        "player_id": 463726,
-        "name": "Amar Dedic",
-        "short_name": "Dedic",
-        "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 2.679647630609125
-      },
-      {
         "player_id": 219924,
         "name": "Issa Diop",
         "short_name": "Diop",
@@ -86,6 +78,14 @@
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 2.0636451338320074
+      },
+      {
+        "player_id": 247348,
+        "name": "Daniel Mu\u00f1oz Mej\u00eda",
+        "short_name": "Mej\u00eda",
+        "position": "DEF",
+        "team": "Nott'm Forest",
+        "expected_points": 1.6784717775569535
       },
       {
         "player_id": 141746,
@@ -125,7 +125,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.37533371727625
+        "expected_points": 8.417342366821867
       },
       {
         "player_id": 177815,
@@ -136,12 +136,12 @@
         "expected_points": 3.635519397325434
       },
       {
-        "player_id": 647850,
-        "name": "Charalampos Kostoulas",
-        "short_name": "Kostoulas",
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
         "position": "FWD",
-        "team": "Brighton",
-        "expected_points": 3.3144800767663556
+        "team": "Newcastle",
+        "expected_points": 3.5637000012914486
       }
     ],
     "bench": [
@@ -152,14 +152,6 @@
         "position": "GK",
         "team": "Spurs",
         "expected_points": 0.10027015579447286
-      },
-      {
-        "player_id": 247348,
-        "name": "Daniel Mu\u00f1oz Mej\u00eda",
-        "short_name": "Mej\u00eda",
-        "position": "DEF",
-        "team": "Nott'm Forest",
-        "expected_points": 1.6784717775569535
       },
       {
         "player_id": 106760,
@@ -176,6 +168,14 @@
         "position": "MID",
         "team": "Fulham",
         "expected_points": 0.11895417311970728
+      },
+      {
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -184,11 +184,11 @@
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 647850,
-            "name": "Charalampos Kostoulas",
-            "short_name": "Kostoulas",
+            "player_id": 216646,
+            "name": "Yoane Wissa",
+            "short_name": "Wissa",
             "position": "FWD",
-            "team": "Brighton"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
@@ -204,95 +204,43 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 52.68654218356738
+        "expected_points": 52.01860355413153
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
             "position": "DEF",
-            "team": "Brighton"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 106760,
-            "name": "Luke Shaw",
-            "short_name": "Shaw",
+            "player_id": 463726,
+            "name": "Amar Dedic",
+            "short_name": "Dedic",
             "position": "DEF",
-            "team": "Man Utd"
+            "team": "Newcastle"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 54.1768922298648
+        "expected_points": 53.931429554273606
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 153366,
-            "name": "Harrison Reed",
-            "short_name": "Reed",
-            "position": "MID",
-            "team": "Fulham"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 54.870105900954506
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
-            "position": "GK",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 67089,
-            "name": "Martin Dubravka",
-            "short_name": "Dubravka",
-            "position": "GK",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.31830837405435
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 193278,
-            "name": "Lewie Coyle",
-            "short_name": "Coyle",
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
             "position": "DEF",
-            "team": "Hull City"
+            "team": "Everton"
           }
         ],
         "transfers_out": [
@@ -308,7 +256,59 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.31830837405435
+        "expected_points": 56.02683215177795
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 220627,
+            "name": "James Justin",
+            "short_name": "Justin",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 106760,
+            "name": "Luke Shaw",
+            "short_name": "Shaw",
+            "position": "DEF",
+            "team": "Man Utd"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.843240553444346
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 484420,
+            "name": "Enzo Le F\u00e9e",
+            "short_name": "F\u00e9e",
+            "position": "MID",
+            "team": "Sunderland"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 58.000724638289284
       }
     ],
     "stated_limits": [
