@@ -211,6 +211,8 @@ jobs:
 
       - name: Playwright smoke
         timeout-minutes: 8
+        env:
+          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e
 
       - name: Python publication and browser API worker acceptance

@@ -248,10 +248,10 @@
 }
 
 @media (max-width: 640px) {
-  :global(html) {
+  :global(html).memberPage {
     scroll-padding-bottom: 45dvh;
   }
-  .squadContext > section > header > h2 {
+  .squadContext > section:first-child > header > h2 {
     display: none;
   }
   .computeDock {
@@ -259,7 +259,7 @@
     bottom: 0;
     max-height: 45dvh;
     overflow-y: auto;
-    z-index: 5;
+    z-index: 1;
   }
 
   .head {

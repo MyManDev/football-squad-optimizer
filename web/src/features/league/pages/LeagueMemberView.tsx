@@ -20,6 +20,10 @@ import { useMemberAdviceView } from "./useMemberAdviceView";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
+  useEffect(() => {
+    document.documentElement.classList.add(styles.memberPage);
+    return () => document.documentElement.classList.remove(styles.memberPage);
+  }, []);
   const { squad } = props;
   const contextKey = [
     squad.payload.league_id,

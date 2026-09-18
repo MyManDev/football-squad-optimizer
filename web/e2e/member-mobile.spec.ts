@@ -4,12 +4,13 @@ import { MESSAGES } from "../src/i18n/messages";
 import { mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { installLeagueMocks } from "./leagueMocks";
 
-const apiOrigin = process.env.SQUADOPT_MOBILE_API_ORIGIN;
+const apiOrigin = process.env.VITE_ADVICE_API_ORIGIN;
 
 for (const language of ["tr", "en"] as const) {
   test(`member controls fit a phone in ${language}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await installLeagueMocks(page);
+    await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.goto("/league/members/35249001?mode=saf-puan&window=3");
     const copy = MESSAGES[language];
@@ -66,18 +67,33 @@ for (const language of ["tr", "en"] as const) {
     await page.screenshot({ path: testInfo.outputPath(`member-controls-${language}.png`) });
     await page.setViewportSize({ width: 1280, height: 900 });
     for (const detail of await details.all()) await expect(detail).toHaveAttribute("open", "");
+    await page.getByRole("link", { name: copy.leagueMembers.backToMembers, exact: true }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom),
+      )
+      .toBe("auto");
   });
 
   test(`waiting compute dock stays compact in ${language}`, async ({ page }, testInfo) => {
     test.skip(
       !apiOrigin,
-      "Run with a build using SQUADOPT_MOBILE_API_ORIGIN as VITE_ADVICE_API_ORIGIN.",
+      "The build has no VITE_ADVICE_API_ORIGIN; a static build cannot enter a compute job.",
     );
-    await page.setViewportSize({ width: 375, height: 812 });
+    await page.setViewportSize({ width: 375, height: 667 });
     await installLeagueMocks(page);
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     const squad = mockEntrySquadEnvelopes[35249001]!.payload;
-    await page.route(`${apiOrigin}/api/v1/**`, async (route) => {
+    await page.route("**/api/v1/**", async (route) => {
+      const headers = {
+        "access-control-allow-origin": new URL(page.url()).origin,
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers": "content-type, idempotency-key",
+      };
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({ status: 204, headers });
+        return;
+      }
       const url = route.request().url();
       const [status, body] = url.endsWith("/capabilities")
         ? [
@@ -101,6 +117,7 @@ for (const language of ["tr", "en"] as const) {
       await route.fulfill({
         status: status as number,
         contentType: "application/json",
+        headers,
         body: JSON.stringify(body),
       });
     });
@@ -111,8 +128,17 @@ for (const language of ["tr", "en"] as const) {
     await page.getByRole("radio", { name: /^1 / }).scrollIntoViewIfNeeded();
     const dock = page.locator("[data-compute-dock]");
     const box = await dock.boundingBox();
-    expect(box!.height).toBeLessThanOrEqual(812 * 0.45 + 1);
-    expect(Math.abs(box!.y + box!.height - 812)).toBeLessThanOrEqual(1);
+    expect(box!.height).toBeLessThanOrEqual(667 * 0.45 + 1);
+    expect(Math.abs(box!.y + box!.height - 667)).toBeLessThanOrEqual(1);
+    const badge = await dock.getByText(copy.computeRunning, { exact: true }).boundingBox();
+    const state = await dock
+      .getByText(copy.computeWaitingWithFallback, { exact: false })
+      .boundingBox();
+    for (const visible of [badge, state]) {
+      expect(visible).not.toBeNull();
+      expect(visible!.y).toBeGreaterThanOrEqual(box!.y);
+      expect(visible!.y + visible!.height).toBeLessThanOrEqual(box!.y + box!.height);
+    }
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

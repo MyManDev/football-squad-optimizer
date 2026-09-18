@@ -7,6 +7,9 @@
   :global([data-compute-dock]) .hint {
     display: none;
   }
+  :global([data-compute-dock]):has(.state) .durationNote {
+    display: none;
+  }
 }
 
 .controls {
