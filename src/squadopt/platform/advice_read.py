@@ -17,6 +17,7 @@ which is a different fact.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -157,6 +158,7 @@ class FileLeagueDirectory:
 
     def __init__(self, site_data_root: Path | str) -> None:
         self._root = Path(site_data_root)
+        self.published_capture_unusable_reason: str | None = None
 
     def _read(self) -> Mapping[str, object] | None:
         path = self._root / "league" / "members.json"
@@ -218,6 +220,38 @@ class FileLeagueDirectory:
             return self._read() is not None
         except (AdviceBackendNotReadyError, OSError, UnicodeError):
             return False
+
+    def published_snapshot_id(self) -> tuple[str, str, int] | None:
+        """The agreed capture, season and week, or a reason the tree cannot name them."""
+
+        self.published_capture_unusable_reason = None
+        try:
+            payload = self._read()
+            if payload is None:
+                return None
+            identifiers = set()
+            for entry_id in _member_entry_ids(payload):
+                path = self._root / "league" / "entries" / f"{entry_id}.json"
+                document = json.loads(path.read_text(encoding="utf-8"))
+                identifier = document["payload"]["source_snapshot_id"]
+                if not isinstance(identifier, str) or not re.fullmatch(
+                    r"fpl-live-[A-Za-z0-9_-]+", identifier
+                ):
+                    raise ValueError(f"Entry {entry_id} has no usable source_snapshot_id.")
+                identifiers.add(identifier)
+            if len(identifiers) != 1:
+                raise ValueError("Published human entries are empty or disagree on the capture.")
+            return identifiers.pop(), str(payload["season"]), int(str(payload["gameweek"]))
+        except (
+            AdviceBackendNotReadyError,
+            OSError,
+            UnicodeError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as error:
+            self.published_capture_unusable_reason = str(error)
+            return None
 
     def matches(self, context: AdviceRequestContext | None) -> bool:
         """Whether the tree is there and is for ``context``'s week; never raises."""

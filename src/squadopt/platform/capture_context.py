@@ -133,19 +133,48 @@ def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
     return identifiers[-1] if identifiers else None
 
 
-def handoff_fingerprint_for(handoff_root: Path | str, season: str, gameweek: int) -> str | None:
+def _capture_handoff(
+    handoff_root: Path | str, season: str, gameweek: int, snapshot_id: str
+) -> InSeasonProjection:
+    alias = handoff_path_for(Path(handoff_root), season, gameweek)
+    retained = Path(handoff_root) / "by-capture" / snapshot_id
+    matches = {}
+    for path in (alias, *sorted(retained.glob("*.json"))):
+        try:
+            handoff = read_projection_handoff(path)
+        except (OSError, ValueError, DataError):
+            continue
+        if (handoff.source_snapshot_id, handoff.season, handoff.gameweek) != (
+            snapshot_id,
+            season,
+            gameweek,
+        ):
+            continue
+        if path == alias:
+            return handoff
+        matches[handoff.fingerprint] = handoff
+    if len(matches) == 1:
+        return next(iter(matches.values()))
+    raise DataError(
+        f"No unambiguous projection handoff for capture {snapshot_id!r}: "
+        f"gameweek handoff {alias} is absent, unreadable or mismatched; "
+        f"retained matching fingerprints: {len(matches)}."
+    )
+
+
+def handoff_fingerprint_for(
+    handoff_root: Path | str, season: str, gameweek: int, snapshot_id: str
+) -> str | None:
     """The fingerprint of the handoff a capture would be projected with, or ``None``.
 
-    Cheap on purpose: reading one small JSON is what lets a caller notice that ops
-    republished a corrected handoff for a capture it has already read, without paying for
-    the capture and its projection again. ``None`` when the file is absent or unreadable —
-    the caller treats "cannot be confirmed" as "changed", which fails toward unready rather
-    than toward serving a projection nobody can name.
+    Read the gameweek handoff and, if needed, retained handoffs for this capture, without
+    reading the capture or computing its projection. Return ``None`` if no matching
+    handoff is readable or the retained fingerprints disagree. The caller treats
+    "cannot be confirmed" as "changed" rather than serving an unidentified projection.
     """
 
-    path = handoff_path_for(Path(handoff_root), season, gameweek)
     try:
-        return read_projection_handoff(path).fingerprint
+        return _capture_handoff(handoff_root, season, gameweek, snapshot_id).fingerprint
     except Exception:
         return None
 
@@ -172,19 +201,7 @@ def load_capture_identity(
     resolved_season = season or infer_season(snapshot)
     inputs = read_inputs(snapshot, season=resolved_season, gameweek=None)
     gameweek = int(inputs.deadline.gameweek)
-    handoff_path = handoff_path_for(Path(handoff_root), resolved_season, gameweek)
-    if not handoff_path.is_file():
-        raise DataError(
-            f"No projection handoff for {resolved_season} gameweek {gameweek} at "
-            f"{handoff_path}. The backend answers from the same handoff the decision "
-            "reads; without one it has no projection whose identity it can name."
-        )
-    handoff = read_projection_handoff(handoff_path)
-    if handoff.source_snapshot_id != inputs.snapshot_id:
-        raise DataError(
-            f"The handoff at {handoff_path} was produced from capture "
-            f"{handoff.source_snapshot_id!r}, not from {inputs.snapshot_id!r}."
-        )
+    handoff = _capture_handoff(handoff_root, resolved_season, gameweek, inputs.snapshot_id)
     context = AdviceRequestContext(
         advice_contract_version=advice_contract_version,
         capture_snapshot_id=inputs.snapshot_id,
