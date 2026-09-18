@@ -28,6 +28,7 @@ from squadopt.application import horizon_plans as horizon_service
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.live import (
     HeldSquad,
+    HorizonNoSolutionError,
     build_projection_horizon,
     plan_transfer_horizon,
     read_inputs,
@@ -451,3 +452,85 @@ def test_the_horizon_path_passes_a_band_and_a_first_week_cap_to_the_planner(
     # plan is the digest of the policy the caller handed in, unchanged.
     assert config.configuration_fingerprint == uncapped.configuration_fingerprint
     assert config.max_transfers_per_gameweek is None
+
+
+def _no_solution(plan: object, status: SolverStatus, diagnostics: dict[str, object]) -> object:
+    """A plan the solver finished without a solution, in the shape the contract allows.
+
+    A plan with no solution may carry no weeks and no metrics, so the replacement clears
+    them rather than only the weeks; a half-cleared one is refused by the model itself.
+    """
+
+    return replace(
+        plan,
+        solver_status=status,
+        weeks=(),
+        total_projected_score=None,
+        total_projected_bench_points=None,
+        total_transfer_hit_points=None,
+        objective_value=None,
+        chips_played=(),
+        diagnostics=diagnostics,
+    )
+
+
+def test_a_horizon_with_no_solution_raises_a_type_that_carries_how_it_ended(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The operator needs the distinction the message alone cannot be read for.
+
+    "No solution" has two shapes. ``INFEASIBLE`` means the constraints and the squad
+    disagree and more time will not help; a solve that stopped at its limit with work left
+    means the budget was the binding thing. The status, the deterministic time used and the
+    gap travel as values so a caller can count the second kind without parsing a sentence.
+    """
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2,))
+    proven, _ = plan_transfer_horizon(inputs, horizon, held, rules)
+    empty = _no_solution(
+        proven,
+        SolverStatus.INFEASIBLE,
+        {"deterministic_time_used": 4.5, "relative_optimality_gap": 0.12},
+    )
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", lambda *_a, **_k: empty)
+
+    with pytest.raises(HorizonNoSolutionError) as refusal:
+        plan_transfer_horizon(inputs, horizon, held, rules)
+
+    assert refusal.value.status is SolverStatus.INFEASIBLE
+    assert refusal.value.deterministic_time_used == 4.5
+    assert refusal.value.relative_optimality_gap == 0.12
+
+
+def test_every_caller_that_handled_a_planning_failure_still_handles_this_one(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The public side is settled by #620, and a wider escape here would reopen it."""
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2,))
+    proven, _ = plan_transfer_horizon(inputs, horizon, held, rules)
+    empty = _no_solution(proven, SolverStatus.INFEASIBLE, {})
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", lambda *_a, **_k: empty)
+
+    with pytest.raises(DataSourceError):
+        plan_transfer_horizon(inputs, horizon, held, rules)
+
+
+def test_a_solve_that_reported_no_numbers_leaves_them_absent_rather_than_zero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A gap nobody measured is not a gap of nought."""
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2,))
+    proven, _ = plan_transfer_horizon(inputs, horizon, held, rules)
+    empty = _no_solution(proven, SolverStatus.UNKNOWN, {})
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", lambda *_a, **_k: empty)
+
+    with pytest.raises(HorizonNoSolutionError) as refusal:
+        plan_transfer_horizon(inputs, horizon, held, rules)
+
+    assert refusal.value.deterministic_time_used is None
+    assert refusal.value.relative_optimality_gap is None
