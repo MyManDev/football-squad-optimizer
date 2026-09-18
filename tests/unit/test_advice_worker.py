@@ -194,6 +194,101 @@ def _stop_after(rounds: int) -> Callable[[], bool]:
     return stop
 
 
+@pytest.mark.parametrize("fails", [False, True])
+def test_workers_warm_before_claiming_and_again_when_the_identity_changes(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch, fails: bool
+) -> None:
+    backend = running["backend"]
+    loaded: list[str] = []
+    events: list[tuple[str, dict[str, object]]] = []
+    capture = backend.contexts.capture
+    claim = backend.queue.claim
+    rounds = 0
+
+    def warm(context):
+        loaded.append(context.projection_handoff_fingerprint)
+        if fails:
+            raise OSError("synthetic unreadable capture")
+        return capture(context)
+
+    def checked_claim(**kwargs):
+        nonlocal rounds
+        assert len(loaded) == (1 if rounds < 2 else 2)
+        rounds += 1
+        if rounds == 2:
+            deployment_module._handoff(
+                running["handoff_root"], running["snapshot_id"], expected_points=4.0
+            )
+        return claim(**kwargs)
+
+    monkeypatch.setattr(backend.contexts, "capture", warm)
+    monkeypatch.setattr(backend.queue, "claim", checked_claim)
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(3),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert rounds == 3 and len(set(loaded)) == 2
+    reported = [
+        fields
+        for event, fields in events
+        if event == ("advice_worker_warm_failed" if fails else "advice_worker_warmed")
+    ]
+    assert len(reported) == 2
+    assert all(fields["snapshot_id"] == running["snapshot_id"] for fields in reported)
+    if not fails:
+        assert all(
+            isinstance(fields["seconds"], float) and fields["seconds"] >= 0 for fields in reported
+        )
+        assert all(fields["seconds"] == round(fields["seconds"], 3) for fields in reported)
+
+
+def test_a_locked_capture_directory_does_not_stop_worker_claims(running, monkeypatch):
+    backend = running["backend"]
+    claims, events = [], []
+
+    def unavailable():
+        raise PermissionError("synthetic locked capture directory")
+
+    monkeypatch.setattr(backend.contexts, "current", unavailable)
+    monkeypatch.setattr(backend.queue, "claim", lambda **kwargs: claims.append(True))
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(1),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert claims == [True]
+    assert events == [
+        (
+            "advice_worker_warm_failed",
+            {
+                "reason": "synthetic locked capture directory",
+                "snapshot_id": None,
+            },
+        )
+    ]
+
+
 @pytest.mark.parametrize(
     "error_code", [None, "ADVICE_FAILED", "CONTEXT_UNAVAILABLE", "DETERMINISM_DEFECT"]
 )
@@ -326,8 +421,10 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
+    chip: str | None,
 ) -> None:
     """POST, worker, GET — the actual request this backend exists to serve."""
 
@@ -335,6 +432,10 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     client = TestClient(app_for_backend(backend))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    if chip is not None:
+        body["chip"] = chip
+        capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+        assert chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
@@ -366,6 +467,8 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["window"] == COMPUTED_WINDOW
     assert isinstance(payload["moves"], list)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    if chip is not None:
+        assert payload["chip_choice"]["chip"] == chip
 
     # A second ask is answered from the cache and starts no second solve.
     again = client.post(route, json=body)
@@ -1241,8 +1344,11 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     assert both.json()["error"]["code"] == "TOP100_INPUTS_UNAVAILABLE"
 
 
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not_served(
-    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    running: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    chip: str | None,
 ) -> None:
     """The jobs endpoint is public: it names the outcome and carries none of the solver's text."""
 
@@ -1258,7 +1364,7 @@ def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not
     monkeypatch.setattr(worker_module, "advise_menu_entry", no_plan)
     accepted = client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
-        json={"strategy": COMPUTED_MODE, "window": 1},
+        json={"strategy": COMPUTED_MODE, "window": 1, **({"chip": chip} if chip else {})},
     )
     assert accepted.status_code == 202, accepted.text
     compute = build_advice_compute(backend.contexts, backend.job_specs)
@@ -1269,3 +1375,55 @@ def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not
     served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
     assert served.json()["error_code"] == "PLAN_NOT_FOUND"
     assert "deterministic" not in served.text
+
+
+def test_chip_entry_error_is_private_through_the_real_menu_branch(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    import squadopt.application.advice_menu as menu
+    from squadopt.platform.advice_observability import AdviceLog
+
+    diagnostic = "Entry 987654 re-adds to 123.456 points but planner counted 234.567"
+
+    def fail(*args: Any, **kwargs: Any) -> Any:
+        raise EntryError(diagnostic)
+
+    monkeypatch.setattr(menu, "advise_with_chip", fail)
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 202, response.text
+    logger = logging.getLogger("test.chip-refusal")
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        job = run_advice_worker_once(
+            backend.queue,
+            backend.cache,
+            build_advice_compute(backend.contexts, backend.job_specs),
+            at_utc=_now_stamp(),
+            log=AdviceLog("worker", logger=logger),
+        )
+    assert job is not None and job.status == "failed"
+    served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
+    assert served.json()["error_code"] == "PLAN_NOT_FOUND"
+    for detail in ("987654", "re-adds", "123.456", "234.567"):
+        assert detail not in served.text
+    assert diagnostic in caplog.text
+
+
+def test_accepted_chip_with_artifacts_does_not_prepare_a_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = _deployment(tmp_path, monkeypatch, artifact_root=tmp_path / "artifacts")
+    backend = state["backend"]
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 202, response.text
+    assert backend.contexts._context is None

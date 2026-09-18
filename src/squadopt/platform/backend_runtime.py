@@ -35,22 +35,30 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from squadopt.application.advice import AdviseEntryRequest
 from squadopt.application.advice_capabilities import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     advice_capabilities,
     menu_capabilities,
 )
+from squadopt.application.advice_menu import held_member_chips
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import SourceRevisionError
 from squadopt.data.source_revision import require_source_revision
 from squadopt.data.sources import FPL_LIVE_SOURCE
+from squadopt.live import SeasonRules, read_season_rules
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
 from squadopt.platform.advice_queue import FileJobQueue
-from squadopt.platform.advice_read import AdviceReadStore, AdviceRequestContext, FileLeagueDirectory
+from squadopt.platform.advice_read import (
+    AdviceBackendNotReadyError,
+    AdviceReadStore,
+    AdviceRequestContext,
+    FileLeagueDirectory,
+)
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
@@ -60,6 +68,7 @@ from squadopt.platform.advice_switches import (
 from squadopt.platform.capture_context import (
     AdviceCaptureContext,
     CaptureIdentity,
+    CapturePicksProvider,
     handoff_fingerprint_for,
     latest_snapshot_id,
     load_capture_context,
@@ -331,13 +340,40 @@ class CaptureContextProvider:
         self._identity: CaptureIdentity | None = None
         self._context: AdviceCaptureContext | None = None
         self._switch_signature: tuple[object, ...] | None = None
-        self._reported: str | None = None
+        self._reported: dict[tuple[str, str], str] = {}
+        self._directory = FileLeagueDirectory(config.site_data_root)
+        self._chip_identity: CaptureIdentity | None = None
+        self._chip_source: tuple[CapturePicksProvider, SeasonRules] | None = None
+        self._chip_members: dict[tuple[int, int], tuple[str, ...] | None] = {}
 
     def identity(self) -> CaptureIdentity | None:
         """The current capture's identity, reading it only when the capture changed."""
 
-        snapshot_id = latest_snapshot_id(self._config.snapshot_root)
-        if snapshot_id is None:
+        published = self._directory.published_snapshot_id()
+        published_id = None if published is None else published[0]
+        latest_id = latest_snapshot_id(self._config.snapshot_root)
+        if published is None:
+            if self._directory.published_capture_unusable_reason is not None:
+                self._report(
+                    "advice_published_capture_unusable",
+                    reason=self._directory.published_capture_unusable_reason,
+                )
+        else:
+            self._reported.pop(("advice_published_capture_unusable", ""), None)
+            held = self._identity
+            if (
+                held is None or held.context.capture_snapshot_id != published_id
+            ) and handoff_fingerprint_for(
+                self._config.handoff_root, published[1], published[2], published[0]
+            ) is None:
+                if published_id != latest_id:
+                    self._report(
+                        "advice_context_unreadable",
+                        snapshot_id=published_id,
+                        reason="The published capture has no unambiguous matching handoff.",
+                    )
+                published_id = None
+        if published_id is None and latest_id is None:
             # Names the source, because the root is shared: it can hold cohort and
             # elite-picks captures and still hold nothing this adapter can serve advice
             # from. "No capture at all" would send an operator to look at the mount.
@@ -346,11 +382,23 @@ class CaptureContextProvider:
                 reason=f"no {FPL_LIVE_SOURCE} capture under the snapshot root",
             )
             return None
+        for snapshot_id in dict.fromkeys((published_id, latest_id)):
+            if snapshot_id is None:
+                continue
+            identity = self._identity_for(snapshot_id)
+            if identity is not None:
+                return identity
+        return None
+
+    def _identity_for(self, snapshot_id: str) -> CaptureIdentity | None:
         with self._lock:
             held = self._identity
             if held is not None and held.context.capture_snapshot_id == snapshot_id:
                 published = handoff_fingerprint_for(
-                    self._config.handoff_root, held.context.season, held.context.gameweek
+                    self._config.handoff_root,
+                    held.context.season,
+                    held.context.gameweek,
+                    snapshot_id,
                 )
                 if published == held.context.projection_handoff_fingerprint:
                     return held
@@ -376,7 +424,7 @@ class CaptureContextProvider:
                 return None
             self._identity = identity
             self._context = None  # the projection belongs to the capture that produced it
-            self._reported = None
+            self._reported.pop(("advice_context_unreadable", snapshot_id), None)
             if self._log is not None:
                 self._log.event(
                     "advice_context_loaded",
@@ -480,11 +528,59 @@ class CaptureContextProvider:
             return AdviceSwitchInputs()
         return None if bundle is None else bundle.switches
 
+    def held_chips(
+        self, context: AdviceRequestContext, league_id: int, entries: tuple[int, ...]
+    ) -> Mapping[int, tuple[str, ...] | None]:
+        """Read the requested members once per identity, without projecting the capture."""
+        identity = self.identity()
+        if identity is None or identity.context != context:
+            raise AdviceBackendNotReadyError("The capture context is no longer current.")
+        with self._lock:
+            if self._chip_identity is not identity:
+                self._chip_identity = identity
+                self._chip_source = None
+                self._chip_members = {}
+                try:
+                    self._chip_source = (
+                        CapturePicksProvider(identity.snapshot, identity.inputs.snapshot_id),
+                        read_season_rules(identity.snapshot, season=identity.inputs.season),
+                    )
+                except Exception as error:
+                    self._report(
+                        "advice_chip_history_unreadable",
+                        snapshot_id=context.capture_snapshot_id,
+                        reason=str(error),
+                    )
+            if self._chip_source is None:
+                raise AdviceBackendNotReadyError("The capture's chip inputs are unreadable.")
+            provider, rules = self._chip_source
+            for entry in entries:
+                key = (league_id, entry)
+                if key in self._chip_members:
+                    continue
+                try:
+                    self._chip_members[key] = held_member_chips(
+                        AdviseEntryRequest(context.season, context.gameweek, league_id, entry),
+                        provider=provider,
+                        inputs=identity.inputs,
+                        rules=rules,
+                    )
+                except Exception as error:
+                    self._chip_members[key] = None
+                    self._report(
+                        "advice_chip_history_unreadable",
+                        snapshot_id=context.capture_snapshot_id,
+                        entry_id=entry,
+                        reason=str(error),
+                    )
+            return {entry: self._chip_members[(league_id, entry)] for entry in entries}
+
     def _report(self, event: str, **fields: object) -> None:
-        marker = f"{event}:{fields.get('snapshot_id', '')}:{fields.get('reason', '')}"
-        if marker == self._reported:
+        key = event, str(fields.get("snapshot_id", ""))
+        marker = str(fields.get("reason", ""))
+        if marker == self._reported.get(key):
             return
-        self._reported = marker
+        self._reported[key] = marker
         if self._log is not None:
             self._log.event(event, **fields)
 
@@ -607,6 +703,7 @@ def build_backend(
         computable_strategies(),
         capabilities=menu_capabilities(),
         switches=contexts,
+        chip_availability=contexts.held_chips,
     )
     submit = AdviceSubmitService(
         reader,

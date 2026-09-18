@@ -7,8 +7,10 @@ itself ready with nothing to answer from.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 import tests.unit.test_live_transfers as world_module
@@ -22,7 +24,7 @@ from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.live import InSeasonProjection, write_projection_handoff
 from squadopt.live import recommendation as live_recommendation
 from squadopt.live.tick import handoff_path_for
-from squadopt.platform import backend_runtime
+from squadopt.platform import backend_runtime, capture_context
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.backend_runtime import (
     SITE_ORIGINS,
@@ -357,11 +359,78 @@ def test_a_new_capture_replaces_the_context_without_a_restart(
     assert second != first
 
 
-def test_a_capture_a_week_ahead_of_the_tree_is_not_ready_until_the_tree_catches_up(
-    deployment: dict[str, Any],
+@pytest.mark.parametrize("retained", [False, True])
+def test_the_backend_follows_the_published_capture_without_a_restart(
+    deployment: dict[str, Any], retained: bool
 ) -> None:
-    """Both publications are readable; they are about different weeks, and /ready says so."""
+    older = deployment["snapshot_id"]
+    root = deployment["handoff_root"]
+    original = handoff_path_for(root, SEASON, 2).read_bytes()
+    newer = write_snapshot(
+        deployment["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-27T10:00:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: world_module._bootstrap(
+                events=[dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]],
+                elements=world_module._elements(event_points=3),
+            ),
+            FIXTURES_PAYLOAD: b"[]",
+        },
+    ).snapshot_id
+    if retained:
+        saved = root / "by-capture" / older / "retained.json"
+        saved.parent.mkdir(parents=True)
+        saved.write_bytes(original)
+        _handoff(root, newer)
+    entry = deployment["site_root"] / "league" / "entries" / f"{ENTRY_ID}.json"
+    entry.parent.mkdir()
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": older}}), encoding="utf-8")
+    backend = build_backend(deployment["config"])
+    first = backend.contexts.current()
+    assert first is not None and first.capture_snapshot_id == older
+    assert backend.contexts.current() == first
+    assert backend.readiness() == (
+        True,
+        {
+            "capture_context": True,
+            "league_tree": True,
+            "cache_store": True,
+            "league_tree_matches_capture": True,
+        },
+    )
+    _handoff(root, newer)
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": newer}}), encoding="utf-8")
+    second = backend.contexts.current()
+    assert second is not None and second.capture_snapshot_id == newer
+    if retained:
+        saved.unlink()
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": older}}), encoding="utf-8")
+    assert backend.contexts.current() == second
 
+
+@pytest.mark.parametrize("published", ["fpl-live-missing", "../outside", None])
+def test_an_unusable_published_capture_keeps_the_latest_live_fallback(
+    deployment: dict[str, Any], published: str | None
+) -> None:
+    entry = deployment["site_root"] / "league" / "entries" / f"{ENTRY_ID}.json"
+    entry.parent.mkdir()
+    entry.write_text(json.dumps({"payload": {"source_snapshot_id": published}}), encoding="utf-8")
+    current = build_backend(deployment["config"]).contexts.current()
+    assert current is not None and current.capture_snapshot_id == deployment["snapshot_id"]
+
+
+@pytest.mark.parametrize("published_entries", [False, True])
+def test_a_capture_a_week_ahead_follows_the_tree_when_its_entries_name_a_capture(
+    deployment: dict[str, Any],
+    published_entries: bool,
+) -> None:
+    """Published entries retain the served week; without them readiness detects the gap."""
+
+    if published_entries:
+        entry = deployment["site_root"] / "league/entries" / f"{ENTRY_ID}.json"
+        entry.parent.mkdir()
+        entry.write_text(json.dumps({"payload": {"source_snapshot_id": deployment["snapshot_id"]}}))
     backend = build_backend(deployment["config"])
     client = TestClient(app_for_backend(backend))
     assert client.get("/ready").status_code == 200
@@ -385,6 +454,12 @@ def test_a_capture_a_week_ahead_of_the_tree_is_not_ready_until_the_tree_catches_
     _handoff(deployment["handoff_root"], later.snapshot_id, gameweek=3)
 
     behind = client.get("/ready")
+    if published_entries:
+        assert behind.status_code == 200
+        current = backend.contexts.current()
+        assert current is not None and current.capture_snapshot_id == deployment["snapshot_id"]
+        assert all(behind.json()["checks"].values())
+        return
     assert behind.status_code == 503
     assert behind.json()["checks"] == {
         "capture_context": True,
@@ -407,6 +482,109 @@ def test_a_capture_a_week_ahead_of_the_tree_is_not_ready_until_the_tree_catches_
 
     _publish_members(deployment["config"].site_data_root, gameweek=3)
     assert client.get("/ready").status_code == 200
+
+
+@pytest.mark.parametrize("defect", ["disagree", "null", "malformed", "absent", "empty"])
+def test_an_inconsistent_published_tree_falls_back_and_logs_once(deployment, defect):
+    _publish_members(deployment["site_root"], 202)
+    entries = deployment["site_root"] / "league/entries"
+    entries.mkdir()
+    for entry_id in (ENTRY_ID, 202):
+        (entries / f"{entry_id}.json").write_text(
+            json.dumps(
+                {
+                    "payload": {"source_snapshot_id": deployment["snapshot_id"]},
+                }
+            )
+        )
+    second = entries / "202.json"
+    if defect in {"disagree", "null"}:
+        second.write_text(
+            json.dumps(
+                {
+                    "payload": {
+                        "source_snapshot_id": ("fpl-live-other" if defect == "disagree" else None)
+                    }
+                }
+            )
+        )
+    elif defect == "malformed":
+        second.write_text("{")
+    elif defect == "absent":
+        second.unlink()
+    else:
+        members = deployment["site_root"] / "league/members.json"
+        document = json.loads(members.read_bytes())
+        document["payload"]["members"] = []
+        members.write_text(json.dumps(document))
+    log = Mock(spec=AdviceLog)
+    backend = build_backend(deployment["config"], log=log)
+    for _ in range(3):
+        context = backend.contexts.current()
+        assert context is not None and context.capture_snapshot_id == deployment["snapshot_id"]
+    notices = [
+        call
+        for call in log.event.call_args_list
+        if call.args == ("advice_published_capture_unusable",)
+    ]
+    assert len(notices) == 1 and notices[0].kwargs["reason"]
+
+
+@pytest.mark.parametrize("retained_count", [0, 2])
+def test_fallback_does_not_reread_the_unusable_published_capture(
+    deployment, monkeypatch, retained_count
+):
+    older, root = deployment["snapshot_id"], deployment["handoff_root"]
+    retained = root / "by-capture" / older
+    retained.mkdir(parents=True)
+    for index in range(retained_count):
+        source = _handoff(root, older, expected_points=float(index + 2))
+        (retained / f"{index}.json").write_bytes(source.read_bytes())
+    newer = write_snapshot(
+        deployment["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-27T10:00:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: world_module._bootstrap(
+                events=[dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]],
+                elements=world_module._elements(event_points=3),
+            ),
+            FIXTURES_PAYLOAD: b"[]",
+        },
+    ).snapshot_id
+    _handoff(root, newer)
+    entries = deployment["site_root"] / "league/entries"
+    entries.mkdir()
+    (entries / f"{ENTRY_ID}.json").write_text(
+        json.dumps({"payload": {"source_snapshot_id": older}})
+    )
+    reads = Mock(wraps=capture_context.read_snapshot)
+    monkeypatch.setattr(capture_context, "read_snapshot", reads)
+    log = Mock(spec=AdviceLog)
+    backend = build_backend(deployment["config"], log=log)
+    for _ in range(5):
+        context = backend.contexts.current()
+        assert context is not None and context.capture_snapshot_id == newer
+    assert reads.call_count == 1
+    errors = [
+        call for call in log.event.call_args_list if call.args == ("advice_context_unreadable",)
+    ]
+    assert len(errors) == 1 and errors[0].kwargs["snapshot_id"] == older
+
+    # Both candidates can fail without their log markers evicting each other.
+    monkeypatch.setattr(backend_runtime, "handoff_fingerprint_for", lambda *args: "available")
+    monkeypatch.setattr(
+        backend_runtime, "load_capture_identity", Mock(side_effect=ValueError("bad capture"))
+    )
+    backend = build_backend(deployment["config"], log=log)
+    log.reset_mock()
+    for _ in range(3):
+        assert backend.contexts.current() is None
+    errors = [
+        call for call in log.event.call_args_list if call.args == ("advice_context_unreadable",)
+    ]
+    assert len(errors) == 2
+    assert {call.kwargs["snapshot_id"] for call in errors} == {older, newer}
 
 
 def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
@@ -442,3 +620,64 @@ def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
             window=COMPUTED_WINDOW,
         )[0]
     )
+
+
+def test_chip_capabilities_resolve_once_for_all_members_without_projecting(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _publish_members(deployment["site_root"], 202, 303)
+    backend = build_backend(deployment["config"])
+    identity = Mock(wraps=backend.contexts.identity)
+    provider = Mock(wraps=backend_runtime.CapturePicksProvider)
+    rules = Mock(wraps=backend_runtime.read_season_rules)
+    held = Mock(wraps=backend_runtime.held_member_chips)
+    monkeypatch.setattr(backend.contexts, "identity", identity)
+    monkeypatch.setattr(backend_runtime, "CapturePicksProvider", provider)
+    monkeypatch.setattr(backend_runtime, "read_season_rules", rules)
+    monkeypatch.setattr(backend_runtime, "held_member_chips", held)
+    client = TestClient(app_for_backend(backend))
+    for _ in range(2):
+        response = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities")
+        assert response.status_code == 200, response.text
+        assert response.json()["chips"]["held_by_entry"] == {}
+        assert backend.contexts._context is None
+    assert identity.call_count == 6  # current, switch inputs, one bulk chip lookup per GET
+    assert provider.call_count == rules.call_count == 1
+    assert held.call_count == 3  # absent member histories are cached too
+
+
+def test_unreadable_chip_source_stays_not_ready_without_reloading_per_member(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _publish_members(deployment["site_root"], 202, 303)
+    backend = build_backend(deployment["config"])
+    rules = Mock(side_effect=ValueError("broken captured rules"))
+    monkeypatch.setattr(backend_runtime, "read_season_rules", rules)
+    client = TestClient(app_for_backend(backend))
+    for _ in range(2):
+        response = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities")
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "NOT_READY"
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": "saf-puan", "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "NOT_READY"
+    assert rules.call_count == 1
+    assert backend.contexts._context is None
+    assert not backend.queue.jobs()
+
+
+def test_chip_refusal_with_artifact_root_never_projects(deployment: dict[str, Any]) -> None:
+    config = replace(deployment["config"], artifact_root=deployment["site_root"] / "artifacts")
+    backend = build_backend(config)
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": "saf-puan", "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "CHIP_HISTORY_UNKNOWN"
+    assert backend.contexts._context is None
+    assert not backend.queue.jobs()

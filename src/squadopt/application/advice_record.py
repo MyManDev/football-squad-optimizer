@@ -367,7 +367,18 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     bench = _lineup_ids(payload, "bench")
     captain = _player_id(payload, "captain")
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    settings: dict[str, object] = {
+        key: _number(payload, key)
+        for key in ("expected_points_cost", "expected_points_cost_ceiling")
+        if payload.get(key) is not None
+    }
+    top100 = payload.get("top100")
+    if isinstance(top100, Mapping) and top100.get("weight") is not None:
+        settings["top100_weight"] = int(str(top100["weight"]))
+    if "evidence" in payload:
+        settings["managers_word"] = True
     return {
+        **settings,
         # Which document this is. Several are published per member — the pure-points
         # baseline, each rival strategy against each rival, each solved window — and only
         # one of them is what the member's page points at, so every one carries its own
@@ -716,13 +727,14 @@ def _conflict(directory: Path, recorded: Mapping[str, object], record: Mapping[s
     """
 
     differences = _differences(*_reconciled(recorded, record))
+    differences.sort(key=lambda field: field.startswith(("advice[", "advice:")))
     shown = differences[:_DIFFERENCE_LIMIT]
     more = len(differences) - len(shown)
     lines = [
         f"An advice record already exists at {directory} and this build of the same capture "
         "advises something different. Recorded advice is immutable: it is the only evidence "
-        "of what the member was told, so it is refused rather than rewritten. The capture is "
-        "the whole input, so a difference here is a difference our own code produced. The "
+        "of what the member was told, so it is refused rather than rewritten. Check the "
+        "capture, rotation table, Top 100 export and code revision for changes. The "
         "publication's own clock is not listed; a re-publish that moved only that is a replay "
         "and would not have been refused.",
     ]

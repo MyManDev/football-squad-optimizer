@@ -171,6 +171,7 @@ class AdviceSubmitService:
         at_utc: str,
         top100_weight: int = 0,
         managers_word: bool = False,
+        chip: str | None = None,
     ) -> SubmitOutcome:
         """Validate, answer from the cache, rate-limit, dedupe, and enqueue, in that order.
 
@@ -208,6 +209,7 @@ class AdviceSubmitService:
             rival_entry_id=rival_entry_id,
             top100_weight=top100_weight,
             managers_word=managers_word,
+            chip=chip,
         )
         cache_key, context = resolved.key, resolved.context
         cached = self._reader.cached(cache_key)
@@ -240,6 +242,7 @@ class AdviceSubmitService:
             capture_snapshot_id=context.capture_snapshot_id,
             top100_weight=top100_weight,
             managers_word=managers_word,
+            chip=chip,
         )
         fingerprint = command.request_fingerprint
 

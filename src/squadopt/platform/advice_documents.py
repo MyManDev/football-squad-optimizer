@@ -377,6 +377,24 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "additionalProperties": False,
             },
             "managers_word": flag,
+            "chips": {
+                "type": "object",
+                "properties": {
+                    "held_by_entry": {
+                        "type": "object",
+                        "patternProperties": {
+                            "^[1-9][0-9]*$": {
+                                "type": "array",
+                                "items": {"enum": ["wildcard", "freehit", "bboost", "3xc"]},
+                                "uniqueItems": True,
+                            }
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["held_by_entry"],
+                "additionalProperties": False,
+            },
         },
         "required": [
             "contract_version",

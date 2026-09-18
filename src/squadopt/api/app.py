@@ -30,6 +30,7 @@ from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
     AdviceNotComputedError,
     AdviceReadStore,
+    ChipUnavailableError,
     LeagueNotConnectedError,
     ManagersWordUnavailableError,
     Top100InputsUnavailableError,
@@ -43,7 +44,11 @@ from squadopt.platform.advice_submit import (
     MalformedIdempotencyKeyError,
     RateLimitedError,
 )
-from squadopt.platform.api_contract import ADVISE_TOP100_WEIGHTS, BackendApiContractError
+from squadopt.platform.api_contract import (
+    ADVISE_CHIPS,
+    ADVISE_TOP100_WEIGHTS,
+    BackendApiContractError,
+)
 from squadopt.platform.queue_contracts import (
     AdviceQueueError,
     AdviceQueueIntegrityError,
@@ -81,7 +86,7 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
-def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
+def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, str | None]:
     """The AdviseRequestBody schema, enforced in one place.
 
     Exactly the declared keys (additionalProperties: false), a string strategy, an
@@ -95,7 +100,7 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
 
     if not isinstance(body, dict):
         raise BackendApiContractError("The POST body must be an object.")
-    allowed = {"strategy", "window", "rival_entry_id", "top100_weight", "managers_word"}
+    allowed = {"strategy", "window", "rival_entry_id", "top100_weight", "managers_word", "chip"}
     unexpected = set(body) - allowed
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
@@ -120,7 +125,10 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
     word = body.get("managers_word", False)
     if not isinstance(word, bool):
         raise BackendApiContractError("managers_word must be true or false.")
-    return strategy, window, rival, weight, word
+    chip = body.get("chip")
+    if chip is not None and chip not in ADVISE_CHIPS:
+        raise BackendApiContractError("Unknown chip choice.")
+    return strategy, window, rival, weight, word, chip
 
 
 def create_app(
@@ -243,6 +251,10 @@ def create_app(
     ) -> JSONResponse:
         return _contract_error(422, "MANAGERS_WORD_UNAVAILABLE", str(error))
 
+    @application.exception_handler(ChipUnavailableError)
+    async def chip_unavailable(_request: Request, error: ChipUnavailableError) -> JSONResponse:
+        return _contract_error(422, error.code, str(error))
+
     @application.exception_handler(MalformedIdempotencyKeyError)
     async def idempotency_key_malformed(
         _request: Request, error: MalformedIdempotencyKeyError
@@ -340,6 +352,7 @@ def create_app(
         rival: Annotated[int | None, Query(ge=1)] = None,
         top100_weight: Annotated[int, Query()] = 0,
         managers_word: Annotated[bool, Query()] = False,
+        chip: Annotated[str | None, Query()] = None,
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
@@ -360,6 +373,7 @@ def create_app(
                 rival_entry_id=rival,
                 top100_weight=top100_weight,
                 managers_word=managers_word,
+                chip=chip,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -395,7 +409,7 @@ def create_app(
         except Exception:
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
         try:
-            strategy, window, rival, top100_weight, managers_word = _parse_advise_body(body)
+            strategy, window, rival, top100_weight, managers_word, chip = _parse_advise_body(body)
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         current = datetime.now(UTC) if utc_now is None else utc_now()
@@ -413,6 +427,7 @@ def create_app(
             at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             top100_weight=top100_weight,
             managers_word=managers_word,
+            chip=chip,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:
