@@ -11,8 +11,14 @@ text = text.replace("\u2014", ": ").replace("\u2013", "-")
 lines = []
 for line in text.splitlines():
     if re.search(
-        r"co-?authored-by|generated with|claude|codex|chatgpt|openai|anthropic|\bAI\b", line, re.I
+        r"co-?authored-by|generated with|(?<![\w./-])(?:claude|codex)(?![\w/-])"
+        r"|chatgpt|openai|anthropic|\bAI\b",
+        line,
+        re.I,
     ):
         continue
     lines.append(line)
-path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+cleaned = "\n".join(lines).strip()
+if not cleaned:
+    sys.exit("body file empty after cleaning, NOT merging")
+path.write_text(cleaned + "\n", encoding="utf-8")

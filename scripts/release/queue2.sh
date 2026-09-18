@@ -2,11 +2,17 @@
 # Merge queue: rebase each PR inside its existing worktree, wait for CLEAN, squash-merge with a cleaned body.
 REPO=$(git rev-parse --show-toplevel) || exit 1
 S=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
-GH=$(command -v gh || printf '%s' '/c/Program Files/GitHub CLI/gh.exe')
-PY=$(command -v python || command -v python3) || exit 1
+GH=$(command -v gh || printf '%s' 'C:/Program Files/GitHub CLI/gh.exe')
+[ -x "$GH" ] || command -v "$GH" >/dev/null || { echo 'gh not found' >&2; exit 1; }
+if [ -x "$REPO/.venv/Scripts/python.exe" ]; then PY="$REPO/.venv/Scripts/python.exe"
+elif [ -x "$REPO/.venv/bin/python" ]; then PY="$REPO/.venv/bin/python"
+else PY=$(command -v python || command -v python3) || { echo 'python not found' >&2; exit 1; }
+fi
+"$PY" -c '' || { echo 'python could not start' >&2; exit 1; }
 cd "$REPO" || exit 1
 BODIES=$(mktemp -d) || exit 1
-trap 'rm -rf "$BODIES"' EXIT HUP INT TERM
+trap 'rm -rf "$BODIES"' EXIT
+trap 'exit 130' HUP INT TERM
 log(){ echo "$(date +%H:%M:%S) $*"; }
 for n in "$@"; do
   # A network failure must not read as "not open". Retry, then refuse to guess.
@@ -37,7 +43,7 @@ for n in "$@"; do
   else
     log "#$n already on develop tip"
   fi
-  "$GH" pr view "$n" --json body --jq .body > "$BODIES/q_body_$n.md"
+  "$GH" pr view "$n" --json body --jq .body > "$BODIES/q_body_$n.md" || { log "#$n body unreadable, NOT merging"; continue; }
   "$PY" "$S/clean_body.py" "$BODIES/q_body_$n.md" || { log "#$n body scan FAILED"; continue; }
   # A merge landing under us leaves the branch BEHIND, which never becomes CLEAN on its
   # own. Rebase again and let CI re-run rather than waiting out the poll.

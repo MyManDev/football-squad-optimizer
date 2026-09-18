@@ -15,7 +15,7 @@ cd "$REPO" || exit 1
 echo "$TAG" | grep -Eq '^site-[0-9]{4}-[0-9]{2}-gw[0-9]{2}-(decision|settled|fix[0-9]+)$' || { log "tag $TAG does not match the deploy rule"; exit 1; }
 if [ "$DRY_RUN" -eq 1 ]; then
   cat <<EOF
-Wait for site PR #$SITE_PR to be MERGED; refuse CLOSED or timeout.
+Wait up to 60 minutes for site PR #$SITE_PR to be MERGED; refuse CLOSED or timeout.
 Fetch origin and read develop plus its commit count since main.
 Refuse existing remote tag $TAG.
 Remove an existing release worktree $WT and local branch $BR.
@@ -23,18 +23,23 @@ Create $BR in $WT from origin/main.
 Merge origin/develop with two parents and set its tree to develop.
 Commit the release; verify two parents and tree equality.
 Push $BR and open a release PR against main, carrying: $SUMMARY
-Wait for CLEAN; refuse DIRTY, BEHIND or timeout.
+Wait up to 45 minutes for CLEAN; refuse DIRTY, BEHIND or timeout.
 Merge the release PR with a merge commit.
 Fetch origin; require main to have two parents and develop's tree.
-Wait for successful main push CI at that exact SHA and one unexpired site artifact.
+Wait up to 40 minutes for successful main push CI at that exact SHA and one unexpired site artifact.
 Refuse an existing tag; create annotated $TAG on main and push it.
 Dispatch deploy-pages.yml from develop with release_tag=$TAG; watch its result.
 Run ten live smoke checks and content checks generated after $LIVE_AFTER; retry once.
 EOF
   exit 0
 fi
-GH=$(command -v gh || printf '%s' '/c/Program Files/GitHub CLI/gh.exe')
-PY=$(command -v python || command -v python3) || exit 1
+GH=$(command -v gh || printf '%s' 'C:/Program Files/GitHub CLI/gh.exe')
+[ -x "$GH" ] || command -v "$GH" >/dev/null || { echo 'gh not found' >&2; exit 1; }
+if [ -x "$REPO/.venv/Scripts/python.exe" ]; then PY="$REPO/.venv/Scripts/python.exe"
+elif [ -x "$REPO/.venv/bin/python" ]; then PY="$REPO/.venv/bin/python"
+else PY=$(command -v python || command -v python3) || { echo 'python not found' >&2; exit 1; }
+fi
+"$PY" -c '' || { echo 'python could not start' >&2; exit 1; }
 i=0; st=""
 while [ $i -lt 120 ]; do
   st=$("$GH" pr view "$SITE_PR" --json state --jq .state 2>/dev/null || echo "")
@@ -55,13 +60,13 @@ git merge --no-ff --no-commit origin/develop >/dev/null 2>&1 || log "merge repor
 git read-tree -u --reset origin/develop || { log "read-tree failed"; exit 1; }
 git commit -q -m "release: bring main to the development tree at $(echo "$DEV" | cut -c1-8)
 
-A release merge: the tree is exactly origin/develop at $DEV and the commit has
+A real merge, not a squash: the tree is exactly origin/develop at $DEV and the commit has
 two parents, so the next release keeps shared ancestry." || { log "commit failed"; exit 1; }
 PARENTS=$(git rev-list --parents -n1 HEAD | wc -w)
 [ "$PARENTS" -eq 3 ] || { log "not a two-parent merge; stopping"; exit 1; }
 [ -z "$(git diff origin/develop HEAD)" ] || { log "release tree differs from develop; stopping"; exit 1; }
 git push -q -u origin "$BR" || { log "push failed"; exit 1; }
-URL=$("$GH" pr create --base main --head "$BR" --title "release: bring main to the development tree at $(echo "$DEV" | cut -c1-8)" --body "A release merge. The tree is exactly \`origin/develop\` at \`$DEV\` and the commit has two parents. Merge with **Create a merge commit**, never squash.
+URL=$("$GH" pr create --base main --head "$BR" --title "release: bring main to the development tree at $(echo "$DEV" | cut -c1-8)" --body "A real merge, not a squash. The tree is exactly \`origin/develop\` at \`$DEV\` and the commit has two parents. Merge with **Create a merge commit**, never squash.
 
 Carries $COUNT commits since the last release. $SUMMARY
 

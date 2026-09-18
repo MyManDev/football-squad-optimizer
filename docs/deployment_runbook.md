@@ -174,8 +174,9 @@ the lead-time window.
 
 ## Release in one command
 
-The release recipe is in `scripts/release/`. From a checkout with Git, GitHub CLI
-and Python on PATH (Git Bash on Windows), preview it first:
+The release recipe is in `scripts/release/`. Run it from the main checkout, not a
+linked worktree. With Git and GitHub CLI available (Git Bash on Windows), preview
+it first:
 
 ```sh
 sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
@@ -199,6 +200,12 @@ merges with `clean_body.py` removing attribution lines. It is not the release-to
 path. These are operator commands, not scheduled jobs; inspect their output and stop
 on any refusal. GitHub CLI is found on PATH, with the usual Windows installation as
 a fallback. No machine-specific repository or scratch path is required.
+The scripts prefer the checkout's `.venv/Scripts/python.exe` or `.venv/bin/python`,
+then Python on PATH, and verify that the interpreter starts before waiting or
+changing anything. Missing GitHub CLI refuses immediately. The three release waits
+are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main CI.
+Interrupting the queue stops it and cleans up its temporary bodies. A body that
+cannot be read or is empty after cleaning is never merged.
 
 ## Daily circuit breaker
 

@@ -2,9 +2,10 @@
 # Stage two of the release: verify main, wait for its push CI, tag, dispatch the trusted deploy,
 # and watch the run to completion. Every step verifies before the next, and refuses loudly.
 set -u
-REPO=$(git rev-parse --show-toplevel) || exit 1
-cd "$REPO" || exit 1
-GH=$(command -v gh || printf '%s' '/c/Program Files/GitHub CLI/gh.exe')
+ROOT=$(git rev-parse --show-toplevel) || exit 1
+cd "$ROOT" || exit 1
+GH=$(command -v gh || printf '%s' 'C:/Program Files/GitHub CLI/gh.exe')
+[ -x "$GH" ] || command -v "$GH" >/dev/null || { echo 'gh not found' >&2; exit 1; }
 REPO="MyManDev/football-squad-optimizer"
 TAG="${1:?usage: deploy.sh <site-tag>}"
 log(){ echo "$(date -u +%H:%M:%S) $*"; }

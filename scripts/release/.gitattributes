@@ -1,2 +1,0 @@
-# Keep the operator scripts runnable in Git Bash after a Windows checkout.
-*.sh text eol=lf
