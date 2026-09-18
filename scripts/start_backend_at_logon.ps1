@@ -3,9 +3,9 @@
 Start the advice backend and its Cloudflare Tunnel connector for the logged-on user.
 
 .DESCRIPTION
-The piece docs/backend_free_hosting.md left to the owner: the backend's processes end at
-logoff, sleep or reboot and nothing restarts them. This script starts what is not running
-and leaves alone what is, so it can be run at every logon and by hand.
+The piece docs/backend_free_hosting.md left to the owner: start the backend at logon after
+logoff or reboot. This script starts what is not running and leaves alone what is.
+It does not run on resume from sleep; the PC must stay awake to serve requests.
 
   powershell -ExecutionPolicy Bypass -File scripts\start_backend_at_logon.ps1
   powershell -ExecutionPolicy Bypass -File scripts\start_backend_at_logon.ps1 -Register
@@ -41,7 +41,10 @@ function Get-StartupShortcut {
 }
 
 function Find-Cloudflared {
-    if ($Cloudflared -ne "") { return $Cloudflared }
+    if ($Cloudflared -ne "") {
+        if (Test-Path -LiteralPath $Cloudflared -PathType Leaf) { return $Cloudflared }
+        return $null
+    }
     $command = Get-Command cloudflared -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
     foreach ($root in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
@@ -64,11 +67,16 @@ if ($Unregister) {
 }
 
 if ($Register) {
+    $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path.TrimEnd('\')
     $shortcut = Get-StartupShortcut
     $shell = New-Object -ComObject WScript.Shell
     $link = $shell.CreateShortcut($shortcut)
     $link.TargetPath = (Get-Command powershell.exe).Source
-    $link.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$PSCommandPath`" -RepoRoot `"$RepoRoot`" -Workers $Workers -Port $Port -TunnelName $TunnelName"
+    $link.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$PSCommandPath`" -RepoRoot `"$RepoRoot`" -Workers $Workers -Port $Port -TunnelName `"$TunnelName`""
+    if ($Cloudflared -ne "") {
+        $Cloudflared = (Resolve-Path -LiteralPath $Cloudflared).Path
+        $link.Arguments += " -Cloudflared `"$Cloudflared`""
+    }
     $link.WorkingDirectory = $RepoRoot
     $link.WindowStyle = 7
     $link.Description = "Starts the SquadOpt advice backend and its tunnel connector at logon"
@@ -106,7 +114,7 @@ if ($answers) {
     # Redirected to files: the launcher's children inherit its handles, and a pipe would
     # keep this script waiting for as long as the backend lives.
     Start-Process -FilePath "powershell.exe" -WindowStyle Hidden -WorkingDirectory $RepoRoot `
-        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $launcher, "-Workers", $Workers, "-Port", $Port) `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$launcher`"", "-Workers", $Workers, "-Port", $Port) `
         -RedirectStandardOutput (Join-Path $logRoot "launcher-$stamp.out.log") `
         -RedirectStandardError (Join-Path $logRoot "launcher-$stamp.err.log") | Out-Null
 }
@@ -125,7 +133,7 @@ if ($mine) {
 } else {
     Write-Line "starting the tunnel connector for $TunnelName"
     Start-Process -FilePath $exe -WindowStyle Hidden `
-        -ArgumentList @("tunnel", "--no-autoupdate", "--label", $ConnectorLabel, "run", $TunnelName) `
+        -ArgumentList @("tunnel", "--no-autoupdate", "--label", $ConnectorLabel, "run", "`"$TunnelName`"") `
         -RedirectStandardOutput (Join-Path $logRoot "cloudflared-$stamp.out.log") `
         -RedirectStandardError (Join-Path $logRoot "cloudflared-$stamp.err.log") | Out-Null
 }
