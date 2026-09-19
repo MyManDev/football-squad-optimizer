@@ -247,3 +247,45 @@ def test_window_summaries_use_exact_completed_samples_and_keep_legacy_counts(
     assert "window 5, retained logs only): n=1, median=50.000, slowest=50.000" in report
     assert "all windows, retained logs only): n=6, median=8.500, slowest=50.000" in report
     assert "Completions without window (retained logs): 2" in report
+
+
+def test_latest_startup_trust_reports_only_declared_fields(tmp_path: Path) -> None:
+    records = [
+        {
+            "event": "advice_forwarded_trust",
+            "component": "api",
+            "at_utc": "2026-09-19T01:00:00Z",
+            "trust_status": "enabled",
+            "trust_source": "uvicorn commandline",
+            "forwarded_allow_ips": "127.0.0.1",
+            "proxy_headers_source": "uvicorn commandline",
+            "client_address": "198.51.100.9",
+        },
+        {
+            "event": "advice_forwarded_trust",
+            "component": "api",
+            "at_utc": "2026-09-19T02:00:00Z",
+            "trust_status": "unverified",
+            "trust_source": "unknown launcher",
+        },
+    ]
+    (tmp_path / "api-1.log").write_text(
+        "\n".join(json.dumps(record) for record in records), encoding="utf-8"
+    )
+    _, report = status.status_report(
+        "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=lambda url: (200, "{}")
+    )
+    assert (
+        "Forwarded-header trust (last API startup in retained logs, not a live check): unverified"
+        in report
+    )
+    assert 'source="unknown launcher"' in report
+    assert "198.51.100.9" not in report
+    assert "configured allowlist" not in report
+    (tmp_path / "api-1.log").write_text(json.dumps(records[0]), encoding="utf-8")
+    _, report = status.status_report(
+        "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=lambda url: (200, "{}")
+    )
+    assert 'configured allowlist="127.0.0.1"' in report
+    assert 'source="uvicorn commandline"' in report
+    assert "198.51.100.9" not in report
