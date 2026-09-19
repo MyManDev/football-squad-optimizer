@@ -1,4 +1,10 @@
 {
+  "bootstrap": {
+    "block_length": 4,
+    "interval_level": 0.9,
+    "resamples": 2000,
+    "unit": "gameweek, resampled in blocks within season"
+  },
   "chains": [
     {
       "carried_blank_rows": 48,
@@ -72,6 +78,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1994.0,
       "opening_squad_ids": [
@@ -1828,6 +1835,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.2775244299674267,
       "mean_relative_gap": 0.007500660269389911,
       "net_points": 2002.0,
       "opening_squad_ids": [
@@ -3600,6 +3608,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.2915857605177993,
       "mean_relative_gap": 0.007880696230210791,
       "net_points": 2001.0,
       "opening_squad_ids": [
@@ -5371,6 +5380,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2051.0,
       "opening_squad_ids": [
@@ -7144,6 +7154,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.2115625000000001,
       "mean_relative_gap": 0.005717905405405408,
       "net_points": 2056.0,
       "opening_squad_ids": [
@@ -8851,6 +8862,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.2729090303232256,
       "mean_relative_gap": 0.007580806397867378,
       "net_points": 2013.0,
       "opening_squad_ids": [
@@ -10563,6 +10575,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2060.0,
       "opening_squad_ids": [
@@ -12290,6 +12303,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2110.0,
       "opening_squad_ids": [
@@ -14015,6 +14029,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2139.0,
       "opening_squad_ids": [
@@ -15744,6 +15759,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2139.0,
       "opening_squad_ids": [
@@ -17409,6 +17425,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1724.0,
       "opening_squad_ids": [
@@ -19165,6 +19182,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1832.0,
       "opening_squad_ids": [
@@ -20935,6 +20953,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1952.0,
       "opening_squad_ids": [
@@ -22702,6 +22721,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1804.0,
       "opening_squad_ids": [
@@ -24475,6 +24495,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1837.0,
       "opening_squad_ids": [
@@ -26183,6 +26204,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 1919.0,
       "opening_squad_ids": [
@@ -27939,6 +27961,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.46795646916565914,
       "mean_relative_gap": 0.012647472139612408,
       "net_points": 2074.0,
       "opening_squad_ids": [
@@ -29707,6 +29730,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2033.0,
       "opening_squad_ids": [
@@ -31472,6 +31496,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.0,
       "mean_relative_gap": 0.0,
       "net_points": 2037.0,
       "opening_squad_ids": [
@@ -33245,6 +33270,7 @@
         38
       ],
       "lookahead": 1,
+      "max_relative_gap": 0.33454413367235747,
       "mean_relative_gap": 0.009041733342496147,
       "net_points": 2021.0,
       "opening_squad_ids": [
@@ -34980,6 +35006,33 @@
       "weekly_advantage_standard_error": 0.5615730718324383
     },
     {
+      "baseline": "fixed",
+      "mean_season_net_advantage_points": -10.75,
+      "mean_weekly_advantage_points": -0.2925170068027211,
+      "paired_gameweeks": 147,
+      "positive_season_share": 0.5,
+      "positive_week_share": 0.3673469387755102,
+      "season_hit_points_delta": {
+        "2021-22": -4.0,
+        "2022-23": 12.0,
+        "2023-24": 12.0,
+        "2024-25": 12.0
+      },
+      "season_net_advantage_points": {
+        "2021-22": 55.0,
+        "2022-23": 29.0,
+        "2023-24": -115.0,
+        "2024-25": -12.0
+      },
+      "seasons": 4,
+      "variant": "threshold_only",
+      "weekly_advantage_block_bootstrap_interval": [
+        -1.5850340136054422,
+        1.1496598639455782
+      ],
+      "weekly_advantage_standard_error": 0.7968313203665525
+    },
+    {
       "baseline": "off",
       "mean_season_net_advantage_points": 111.5,
       "mean_weekly_advantage_points": 3.0340136054421767,
@@ -35106,6 +35159,7 @@
   "locked_holdout_accessed": false,
   "planning_hit_cost_points": 4.0,
   "protocol": "docs/chip_forecast_prereg.md",
+  "recomputed_utc": "2026-09-19T15:22:50+00:00",
   "seasons": [
     "2021-22",
     "2022-23",
