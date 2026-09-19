@@ -84,7 +84,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.13"
 strict = true
 mypy_path = "src"
-files = ["src/squadopt"]
+files = [
+    "src/squadopt",
+    "scripts/backend_status.py",
+    "scripts/release/verify_live.py",
+    "scripts/check_league_tree.py",
+    "scripts/release/clean_body.py",
+]
 
 # SciPy ships no type information and `scipy-stubs` is a separate, partial third-party
 # package; the two call sites here are wrapped in typed helpers, so the untyped import is
