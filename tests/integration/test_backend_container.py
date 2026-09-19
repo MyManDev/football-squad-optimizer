@@ -273,7 +273,9 @@ def _get(url: str, deadline: float, state: dict[str, Any], *, expect: int = 200)
     pytest.fail(f"{url} never answered {expect} within {deadline}s (last: {last})\n{_logs(state)}")
 
 
-def _post(origin: str, state: dict[str, Any]) -> tuple[int, Any]:
+def _post(
+    origin: str, state: dict[str, Any], *, expected_error: int | None = None
+) -> tuple[int, Any]:
     request = urllib.request.Request(
         f"{origin}/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         data=json.dumps({"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}).encode("utf-8"),
@@ -284,6 +286,8 @@ def _post(origin: str, state: dict[str, Any]) -> tuple[int, Any]:
         with urllib.request.urlopen(request, timeout=30) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
+        if error.code == expected_error:
+            return error.code, json.loads(error.read().decode("utf-8"))
         raise AssertionError(
             f"POST advice failed: HTTP {error.code} "
             f"{error.read().decode('utf-8', 'replace')[:300]}\n{_logs(state)}"
@@ -376,7 +380,7 @@ def test_production_factory_refuses_a_closed_gameweek(deployment: dict[str, Any]
     api = _start(deployment, "api", API_COMMAND, "--publish", "127.0.0.1::8000")
     origin = _origin(api)
     _get(f"{origin}/ready", READY_DEADLINE, deployment)
-    status, refused = _post(origin, deployment)
+    status, refused = _post(origin, deployment, expected_error=422)
     assert status == 422, (status, refused)
     assert refused["error"]["code"] == "DEADLINE_PASSED"
 
