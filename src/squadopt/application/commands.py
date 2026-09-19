@@ -222,8 +222,8 @@ def _resolve_snapshot(root: Path, requested: str | None) -> tuple[str, CapturedS
         live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
         if not live:
             raise DataError(
-                f"No {FPL_LIVE_SOURCE} snapshots under {root}. Capture one first with "
-                "'python -m scripts.capture_deadline_snapshot'."
+                f"No {FPL_LIVE_SOURCE} snapshots under {root}. Inspect due actions with "
+                "'squadopt season tick --dry-run', then execute them with 'squadopt season tick'."
             )
         snapshot_id = live[-1]
     return snapshot_id, read_snapshot(root, snapshot_id)

@@ -2,11 +2,11 @@
 
 Contract `projection_level_audit_v1`. Protocol: `docs/projection_level_audit_prereg.md`. Stage one: descriptive, nothing fitted, nothing promoted.
 
-Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation` scored, see the JSON), 95914 rows read over 139 decisions from target gameweek 4, blank rows left out (0) and so are the thin-history rows the table holds no forecast for (662). Bias is realized minus forecast, so a positive bias is a forecast that ran low. Intervals resample decisions. The two sources of a level error do not add up to it and may not be added: the forecast is a product of them, the level is a difference of sums, and the second is read only over the rows that appeared.
+Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation` scored, see the JSON), 95914 rows read over 139 decisions from target gameweek 4, blank rows left out (0) and so are the thin-history rows the table holds no forecast for (662). Bias is realized minus forecast, so a positive bias is a forecast that ran low. Intervals resample decisions. The two sources of a level error do not add up to it and may not be added, and they are not even in the same unit: the level and the conditional side are points a row, the who-plays side is appearances a row, the forecast is a product of them, the level is a difference of sums, and the second is read only over the rows that appeared.
 
 **By minutes a gameweek played before the decision**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | none | 30659 | 4735 | 1023 | -0.121 | [-0.130, -0.113] | -0.059 | [-0.062, -0.057] | -0.268 | [-0.422, -0.116] |
 | under_30 | 28315 | 22153 | 22837 | +0.024 | [+0.004, +0.045] | +0.036 | [+0.031, +0.041] | -0.133 | [-0.180, -0.089] |
@@ -15,7 +15,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By the size of the forecast**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | under_1.0 | 56581 | 13783 | 13266 | -0.009 | [-0.018, -0.001] | -0.001 | [-0.004, +0.001] | -0.061 | [-0.106, -0.017] |
 | 1.0_to_2.5 | 19868 | 36159 | 36894 | +0.037 | [+0.005, +0.068] | +0.013 | [+0.008, +0.017] | -0.007 | [-0.046, +0.033] |
@@ -24,7 +24,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **Each decision's top forty per position**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | all | 22202 | 61659 | 62908 | +0.056 | [+0.019, +0.092] | -0.003 | [-0.007, +0.001] | +0.096 | [+0.051, +0.140] |
 | GK | 5547 | 8314 | 9527 | +0.219 | [+0.170, +0.266] | -0.007 | [-0.011, -0.004] | +0.472 | [+0.376, +0.571] |
@@ -49,7 +49,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By minutes a gameweek played before the decision**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | none | 6216 | 1401 | 269 | -0.182 | [-0.207, -0.157] | -0.076 | [-0.081, -0.071] | -0.345 | [-0.841, +0.070] |
 | under_30 | 6279 | 5356 | 5564 | +0.033 | [-0.016, +0.089] | +0.025 | [+0.013, +0.038] | -0.079 | [-0.196, +0.046] |
@@ -58,7 +58,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By the size of the forecast**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | under_1.0 | 12041 | 3753 | 3334 | -0.035 | [-0.059, -0.009] | -0.015 | [-0.021, -0.008] | -0.001 | [-0.117, +0.112] |
 | 1.0_to_2.5 | 4056 | 7282 | 7800 | +0.128 | [+0.046, +0.214] | +0.019 | [+0.007, +0.031] | +0.087 | [-0.031, +0.201] |
@@ -69,7 +69,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By minutes a gameweek played before the decision**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | none | 7025 | 1067 | 253 | -0.116 | [-0.132, -0.101] | -0.058 | [-0.063, -0.052] | -0.198 | [-0.479, +0.131] |
 | under_30 | 7053 | 5904 | 5975 | +0.010 | [-0.027, +0.047] | +0.039 | [+0.031, +0.047] | -0.195 | [-0.279, -0.117] |
@@ -78,7 +78,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By the size of the forecast**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | under_1.0 | 13197 | 3234 | 3057 | -0.013 | [-0.030, +0.003] | +0.001 | [-0.004, +0.006] | -0.147 | [-0.239, -0.055] |
 | 1.0_to_2.5 | 4805 | 8779 | 9071 | +0.061 | [-0.007, +0.124] | +0.019 | [+0.007, +0.030] | +0.008 | [-0.073, +0.086] |
@@ -89,7 +89,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By minutes a gameweek played before the decision**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | none | 9640 | 1325 | 287 | -0.108 | [-0.118, -0.096] | -0.057 | [-0.061, -0.053] | -0.155 | [-0.431, +0.155] |
 | under_30 | 7415 | 5438 | 5800 | +0.049 | [+0.014, +0.087] | +0.041 | [+0.032, +0.050] | -0.076 | [-0.157, +0.006] |
@@ -98,7 +98,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By the size of the forecast**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | under_1.0 | 16690 | 3645 | 3674 | +0.002 | [-0.013, +0.017] | -0.002 | [-0.006, +0.003] | +0.022 | [-0.064, +0.112] |
 | 1.0_to_2.5 | 5339 | 9728 | 9529 | -0.037 | [-0.087, +0.016] | +0.006 | [-0.004, +0.015] | -0.079 | [-0.142, -0.013] |
@@ -109,7 +109,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By minutes a gameweek played before the decision**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | none | 7778 | 942 | 214 | -0.094 | [-0.102, -0.084] | -0.051 | [-0.056, -0.045] | -0.381 | [-0.538, -0.240] |
 | under_30 | 7568 | 5454 | 5498 | +0.006 | [-0.031, +0.043] | +0.037 | [+0.028, +0.047] | -0.171 | [-0.251, -0.095] |
@@ -118,7 +118,7 @@ Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation`
 
 **By the size of the forecast**
 
-| bucket | rows | forecast points | realized points | bias | 90% interval | who plays: bias | interval | when they play: bias | interval |
+| bucket | rows | forecast points | realized points | bias, points a row | 90% interval | who plays: bias, appearances a row | interval | when they score: bias, points a row of those who appeared | interval |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |
 | under_1.0 | 14653 | 3152 | 3201 | +0.003 | [-0.008, +0.014] | +0.007 | [+0.002, +0.013] | -0.119 | [-0.184, -0.059] |
 | 1.0_to_2.5 | 5668 | 10370 | 10494 | +0.022 | [-0.020, +0.065] | +0.009 | [+0.001, +0.017] | -0.013 | [-0.072, +0.047] |

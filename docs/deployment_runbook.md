@@ -195,8 +195,46 @@ unexpired site artifact, creates the annotated tag, dispatches the trusted workf
 and checks the live site. Existing remote tags refuse. Choose a fresh release
 branch: the recipe removes an existing local worktree and branch with that name.
 
-`deploy.sh <tag>` is the second stage. `verify_live.py <generated-after-ISO>`
-retains the ten smoke checks and content checks. `queue2.sh <PR>...` is the separate
+## The release window is closed to develop
+
+`deploy.sh` requires `origin/main`'s tree to equal `origin/develop`'s. `ship.sh` cuts the
+release from the develop it read when it started, so **nothing may merge into develop from the
+moment `ship.sh` starts until the tag is pushed.** One unrelated pull request landing in that
+window makes the trees differ and `deploy.sh` refuses with `main tree != develop tree`, at a
+point where main already carries the release tree and no tag exists yet. Neither script recovers
+from that: running `deploy.sh` again meets the same check, and running `ship.sh` again fails its
+own two-parent check because main already contains develop. The way out is another release merge
+under a fresh branch and a fresh tag.
+
+The window is not short. The waits are 60 minutes for the site pull request, 45 for the release
+pull request and 40 for main CI. Before starting, stop the develop queue and let anything already
+merging finish. Say so to anyone else merging that day.
+
+**The point of no return is the line `release PR #N merged`.** Before it, stopping `ship.sh`
+costs nothing: the worktree and the branch are local and nothing has been pushed to main. After
+it, `ship.sh` must never be run again for that release, and this is the trap: if develop has not
+moved, a rerun stops with `commit failed`, a message that does not mention the half-done release;
+if develop **has** moved, the rerun succeeds and ships a different tree than the one the site
+pull request reviewed, with no gate anywhere catching it. Recover with the second stage alone:
+
+```
+sh scripts/release/deploy.sh <tag>
+```
+
+and, once the tag has been pushed, with a re-dispatch instead, which needs neither script and
+can be repeated:
+
+```
+gh workflow run deploy-pages.yml --ref develop -f release_tag=<tag>
+```
+
+Each dispatch that reaches the upload spends one of the day's ten Cloudflare deployments,
+whatever happens after it, so a run that uploads and then fails its smoke check has still spent
+one. Previews spend from the same day and stop at eight; on a busy day the previews can be gone
+before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
+
+`deploy.sh <tag>` is the second stage. `verify_live.py <generated-after-ISO> [--settled <gameweek>]`
+retains the eleven smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
 path. These are operator commands, not scheduled jobs; inspect their output and stop
@@ -210,7 +248,14 @@ Interrupting the queue stops it and cleans up its temporary bodies. A body that
 cannot be read or is empty after cleaning is never merged.
 
 After the public release verifies, the owner runs these from PowerShell in the clean
-main checkout on `develop`. Replace `<same-ISO>` with the generated-after timestamp
+main checkout on `develop`. **First check the backend is answering**, with a single local
+`GET http://127.0.0.1:8000/ready` or `python scripts/backend_status.py`: the restart helper
+reads the launcher registry and the loopback metrics before its own error handling begins, so
+against a backend that is not running it stops on a raw exception and prints none of its
+recovery guidance. It can only replace a running backend, never start one. If it is down,
+pull develop by hand and start the backend with `run_backend_local.ps1` instead, then carry
+on. The processes belong to the logon session and nothing restarts them, so a logoff or a
+reboot between the publish and this step leaves nothing to restart. Replace `<same-ISO>` with the generated-after timestamp
 used for `ship.sh`. First preview the restart:
 
 ```powershell
@@ -257,7 +302,7 @@ The complete operator order is: accept the recorded weekly tree, release the sit
 drain the backend queue, preview then run the restart command above from clean
 `develop`, and run the [manual browser check](#post-deployment-smoke). Both `ship.sh`
 and the restart helper run `verify_live.py`; to run it again by hand, use
-`python scripts/release/verify_live.py <generated-after-ISO>`. A zero queue depth
+`python scripts/release/verify_live.py <generated-after-ISO> --settled <gameweek>`. A zero queue depth
 permits a restart; `-Force` is an explicit operator exception, not the normal command.
 `/ready` alone does not prove capture-ID or code-commit equality: its published-tree
 check is season/gameweek. `ship.sh` publishes the site only and does not restart the

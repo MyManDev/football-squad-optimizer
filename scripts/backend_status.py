@@ -228,6 +228,7 @@ def status_report(
             f"misses={_metric(samples, 'advice_cache_misses_total')}",
             f"Request refusals (API): {_labelled(samples, 'advice_rejected_total')}",
             f"Open-job refusals (API): {_metric(samples, 'advice_open_job_refused_total')}",
+            f"Deadline refusals (API): {_metric(samples, 'advice_deadline_refused_total')}",
         ]
     )
     logs = read_logs(log_dir, days=days)
