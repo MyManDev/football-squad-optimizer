@@ -1,6 +1,7 @@
 """The POST: a hit, one open job per request, idempotency, CORS, and rate limits."""
 
 import json
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
@@ -88,6 +89,7 @@ def _world(
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     submit_services: list[AdviceSubmitService] | None = None,
+    utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
     **app_kwargs: object,
 ):
     _publish_members(tmp_path / "site")
@@ -108,10 +110,96 @@ def _world(
         advice_submit=submit,
         metrics=metrics,
         allowed_origins=allowed_origins,
-        utc_now=lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
+        utc_now=utc_now,
     )
     client = TestClient(application, raise_server_exceptions=False)
     return client, cache, queue
+
+
+@pytest.mark.parametrize(
+    ("now", "status"),
+    [("2026-08-28T17:29:59Z", 202), ("2026-08-28T17:30:00Z", 422), ("2026-08-29T12:00:00Z", 422)],
+)
+def test_only_new_work_is_refused_at_the_captured_deadline(
+    tmp_path: Path, now: str, status: int
+) -> None:
+    metrics = AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)
+    services: list[AdviceSubmitService] = []
+    client, _cache, queue = _world(
+        tmp_path,
+        metrics=metrics,
+        submit_services=services,
+        specs=FileAdviceJobSpecStore(tmp_path / "specs"),
+        deadline_for=lambda context: "2026-08-28T17:30:00Z",
+        utc_now=lambda: datetime.fromisoformat(now),
+    )
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*.json")}
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == status
+    if status == 422:
+        assert response.json()["error"]["code"] == "DEADLINE_PASSED"
+        reasons = response.json()["error"]["details"]["public_reason"]
+        assert "Previously computed plans" in reasons["en"]
+        assert "Önceden hesaplanan" in reasons["tr"]
+        assert "Retry-After" not in response.headers
+        assert before == {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*.json")}
+        assert not queue.jobs()
+        assert not services[0]._client_jobs
+        assert "advice_deadline_refused_total 1\n" in metrics.render()
+    else:
+        assert len(queue.jobs()) == 1
+        assert "advice_deadline_refused_total 0\n" in metrics.render()
+
+
+def test_deadline_preserves_replays_cache_and_read_routes(tmp_path: Path) -> None:
+    now = [datetime(2026, 8, 27, 12, 0, tzinfo=UTC)]
+    client, cache, queue = _world(
+        tmp_path,
+        deadline_for=lambda context: "2026-08-28T17:30:00Z",
+        utc_now=lambda: now[0],
+    )
+    headers = {"Idempotency-Key": "before-deadline"}
+    first = client.post(ADVICE_URL, json=BODY, headers=headers)
+    assert first.status_code == 202
+    capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+    readiness = client.get("/ready").json()
+    now[0] = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
+    for replay_headers in (headers, {}):
+        replay = client.post(ADVICE_URL, json=BODY, headers=replay_headers)
+        assert replay.status_code == 202
+        assert replay.json()["job_id"] == first.json()["job_id"]
+    assert client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json() == capabilities
+    assert client.get("/ready").json() == readiness
+    run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc=now[0].isoformat()
+    )
+    assert client.post(ADVICE_URL, json=BODY).content == _valid_advice_document()
+    assert client.get(ADVICE_URL, params=BODY).content == _valid_advice_document()
+    assert len(queue.jobs()) == 1
+
+
+def test_late_cache_hit_is_served_without_checking_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unexpected_deadline(_context: AdviceRequestContext) -> str:
+        pytest.fail("a cache hit must not consult the deadline")
+
+    client, cache, queue = _world(tmp_path, deadline_for=unexpected_deadline)
+    read = cache.get
+    calls = 0
+
+    def late_hit(key: str):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            cache.put(key, _valid_advice_document())
+        return read(key)
+
+    monkeypatch.setattr(cache, "get", late_hit)
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == 200
+    assert response.content == _valid_advice_document()
+    assert not queue.jobs()
 
 
 def test_the_whole_story_get_404_post_202_worker_poll_second_post_200(
