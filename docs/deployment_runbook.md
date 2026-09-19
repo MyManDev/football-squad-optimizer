@@ -209,12 +209,23 @@ are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main
 Interrupting the queue stops it and cleans up its temporary bodies. A body that
 cannot be read or is empty after cleaning is never merged.
 
-After the public release verifies, the owner runs
-`powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter 2026-09-22T00:00:00Z -DryRun`
-from the clean main checkout on `develop`, using the same generated-after timestamp as
-`ship.sh`. Remove `-DryRun` only for the intended restart. The script verifies the public
-site, requires the public capture to match the fetched `origin/develop` publication, refuses
-open work unless `-Force`, and pulls with `--ff-only` before stopping the recorded backend.
+After the public release verifies, the owner runs these from PowerShell in the clean
+main checkout on `develop`. Replace `<same-ISO>` with the generated-after timestamp
+used for `ship.sh`. First preview the restart:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO> -DryRun
+```
+
+Only for the intended restart, run the same command without `-DryRun`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO>
+```
+
+The script verifies the public site, requires the public capture to match the fetched
+`origin/develop` publication, refuses open work unless `-Force`, and pulls with
+`--ff-only` before stopping the recorded backend.
 It keeps the recorded port and worker count, requires `/ready` and its published-week
 check, and verifies the new **launcher-recorded** commit against the pulled checkout.
 The pre-pull local capture is information only; the pulled tree must match before any
