@@ -12,8 +12,8 @@ from typing import Any
 
 import pandas as pd
 import pytest
-import scripts.run_gameweek_ops as ops
 
+import squadopt.application as ops
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
@@ -24,6 +24,8 @@ from squadopt.live import (
     project,
     read_inputs,
 )
+from squadopt.platform.cli import CliServices
+from squadopt.platform.cli import main as cli_main
 
 SEASON = "2026-27"
 HISTORY_SEASON = "2025-26"
@@ -160,7 +162,6 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             FIXTURES_PAYLOAD: b"[]",
         },
     )
-    monkeypatch.setattr(ops, "build_panel", lambda root: _panel())
     return {
         "snapshot_root": snapshot_root,
         "ledger_root": tmp_path / "ledger",
@@ -171,18 +172,36 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -> int:
+    arguments = list(extra)
+    phase_index = arguments.index("--phase")
+    phase = arguments.pop(phase_index + 1)
+    arguments.pop(phase_index)
+    root = world["snapshot_root"].parent
     argv = [
-        "run_gameweek_ops",
+        "gameweek",
+        phase,
+        "--workspace-root",
+        str(root),
+        "--archive-root",
+        str(root / "archive"),
+        "--runtime-root",
+        str(root / "runtime"),
+        "--log-root",
+        str(root / "logs"),
+        "--summary-root",
+        str(root / "docs"),
         "--snapshot-root",
         str(world["snapshot_root"]),
         "--ledger-root",
         str(world["ledger_root"]),
         "--summary-output",
         str(world["summary"]),
-        *extra,
+        *arguments,
     ]
-    monkeypatch.setattr("sys.argv", argv)
-    return ops.main()
+    return cli_main(
+        argv,
+        services=CliServices(panel_builder=lambda root: _panel(), verifier=ops.verify_decision),
+    )
 
 
 # --- decide -----------------------------------------------------------------
@@ -380,8 +399,13 @@ def test_decide_then_settle_closes_the_loop(
     assert "Settled gameweeks: 1" in summary
 
 
-def test_settle_requires_a_gameweek(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]) -> None:
-    assert _run(monkeypatch, world, "--phase", "settle") == 1
+def test_settle_requires_a_gameweek(
+    monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as error:
+        _run(monkeypatch, world, "--phase", "settle")
+    assert error.value.code == 2
+    assert "--gameweek" in capsys.readouterr().err
 
 
 def test_settle_before_decide_records_nothing(

@@ -465,6 +465,38 @@ def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
     assert result.diagnostics["wall_time_limit_seconds"] == 30.0
 
 
+def test_a_linearization_level_is_the_callers_choice_and_never_the_default(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A search parameter: it may change the work, never the model or a silent default."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    seen: list[int] = []
+    solve = planning_optimizer._solve
+
+    def recording(model: cp_model.CpModel, solver: cp_model.CpSolver) -> object:
+        seen.append(int(solver.parameters.linearization_level))
+        return solve(model, solver)
+
+    monkeypatch.setattr(planning_optimizer, "_solve", recording)
+    default = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config)
+    solver_default = seen[0]
+    assert "linearization_level" not in default.diagnostics
+    seen.clear()
+
+    chosen = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, linearization_level=2)
+
+    # The primary solve and the tie-break both run at the chosen level.
+    assert seen == [2, 2] and solver_default != 2
+    assert chosen.diagnostics["linearization_level"] == 2
+    assert chosen.solver_status is default.solver_status is SolverStatus.OPTIMAL
+    assert chosen.objective_value == default.objective_value
+    for ours, theirs in zip(chosen.weeks, default.weeks, strict=True):
+        assert_frame_equal(ours.selected_squad, theirs.selected_squad)
+
+
 def test_unknown_solver_status_is_structured(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,

@@ -19,6 +19,9 @@ Start the deployment's api with the factory:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import datetime
+
 from fastapi import FastAPI
 
 from squadopt.api.app import create_app
@@ -32,7 +35,9 @@ from squadopt.platform.backend_runtime import AdviceBackend, backend_from_enviro
 __all__ = ["app_for_backend", "build_app"]
 
 
-def app_for_backend(backend: AdviceBackend) -> FastAPI:
+def app_for_backend(
+    backend: AdviceBackend, *, utc_now: Callable[[], datetime] | None = None
+) -> FastAPI:
     """Wire one already-built backend into the application.
 
     Injected rather than constructed here so a test — or a local run against a temporary
@@ -48,6 +53,7 @@ def app_for_backend(backend: AdviceBackend) -> FastAPI:
         queue_depth=backend.queue_depth,
         jobs_by_status=backend.jobs_by_status,
         readiness=backend.readiness,
+        utc_now=utc_now,
     )
 
 

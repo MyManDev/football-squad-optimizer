@@ -7,6 +7,7 @@ from dataclasses import asdict, replace
 from numbers import Integral
 from time import perf_counter
 
+from scripts._experiment_cli import measurement_optimization_config
 from scripts._phase_e_development import select_development_candidate
 from scripts._phase_e_inputs import PhaseDBindingEvidence, draw_phase_e_fold
 from scripts.run_component_squad_calibration import BINDING_FOLD_COUNT, _decision_identity
@@ -20,7 +21,6 @@ from squadopt.experiments.phase_e_shadow import (
     evaluate_phase_e_shadow,
     score_phase_e_shadow_fold,
 )
-from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.candidates import generate_squad_candidates
 from squadopt.optimization.models import SquadOptimizationError
 from squadopt.scenarios import ScenarioError
@@ -67,7 +67,9 @@ def evaluate_phase_e_decision(
     generated_at: float | None = None
     try:
         generated = generate_squad_candidates(
-            fold.projections, OptimizationConfig(), candidate_count=frozen_candidate_count
+            fold.projections,
+            measurement_optimization_config(),
+            candidate_count=frozen_candidate_count,
         )
         generated_at = perf_counter()
         # Preserve the existing completion failure before any scenario work is attempted.

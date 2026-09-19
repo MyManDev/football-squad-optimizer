@@ -8,6 +8,7 @@ itself ready with nothing to answer from.
 
 import json
 from dataclasses import replace
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -190,6 +191,25 @@ def test_missing_configuration_names_every_variable_at_once() -> None:
     ):
         assert variable in message
     assert "SQUADOPT_BACKEND_STORE_ROOT" not in message
+
+
+@pytest.mark.parametrize("value", [None, "2", "0", "-1", "bad"])
+def test_open_job_limit_environment_is_positive_and_defaults_to_four(
+    tmp_path: Path, value: str | None
+) -> None:
+    environment = {
+        f"SQUADOPT_BACKEND_{name}_ROOT": str(tmp_path / name.lower())
+        for name in ("STORE", "SITE_DATA", "SNAPSHOT", "HANDOFF")
+    }
+    if value is not None:
+        environment["SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT"] = value
+    if value in {"0", "-1", "bad"}:
+        with pytest.raises(BackendConfigError, match="MAX_OPEN_JOBS_PER_CLIENT"):
+            BackendConfig.from_environment(environment)
+    else:
+        assert BackendConfig.from_environment(environment).max_open_jobs_per_client == (
+            4 if value is None else 2
+        )
 
 
 def test_a_wildcard_origin_is_refused_by_configuration(tmp_path: Path) -> None:
@@ -623,13 +643,68 @@ def test_fallback_does_not_reread_the_unusable_published_capture(
     assert {call.kwargs["snapshot_id"] for call in errors} == {older, newer}
 
 
+def test_wired_api_uses_the_resolved_capture_deadline(deployment: dict[str, Any]) -> None:
+    backend = build_backend(deployment["config"])
+    identity = backend.contexts.identity()
+    assert identity is not None
+    deadline = datetime.fromisoformat(identity.inputs.deadline.deadline_utc)
+    client = TestClient(app_for_backend(backend, utc_now=lambda: deadline + timedelta(seconds=1)))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    response = client.post(route, json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "DEADLINE_PASSED"
+    assert not backend.queue.jobs()
+    assert not list(deployment["config"].spec_root.glob("*.json"))
+    assert client.get("/ready").status_code == 200
+    assert client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").status_code == 200
+
+
+def test_deadline_lookup_rejects_a_changed_handoff(deployment: dict[str, Any]) -> None:
+    from squadopt.platform.advice_read import AdviceBackendNotReadyError
+
+    backend = build_backend(deployment["config"])
+    context = backend.contexts.current()
+    assert context is not None
+    with pytest.raises(AdviceBackendNotReadyError):
+        backend.contexts.deadline_for(replace(context, projection_handoff_fingerprint="0" * 64))
+
+
+def test_production_factory_refuses_a_historical_capture(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.api.runtime import build_app
+
+    config = deployment["config"]
+    for name, path in (
+        ("STORE", config.store_root),
+        ("SITE_DATA", config.site_data_root),
+        ("SNAPSHOT", config.snapshot_root),
+        ("HANDOFF", config.handoff_root),
+    ):
+        monkeypatch.setenv(f"SQUADOPT_BACKEND_{name}_ROOT", str(path))
+
+    # No injected clock: this is the exact factory used by the production server.
+    client = TestClient(build_app())
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "DEADLINE_PASSED"
+    assert not list(config.queue_root.glob("*.json"))
+    assert not list(config.spec_root.glob("*.json"))
+    assert "advice_deadline_refused_total 1" in client.get("/metrics").text
+
+
 def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
     deployment: dict[str, Any],
 ) -> None:
     """The whole point: an assembled backend queues work rather than refusing it."""
 
     backend = build_backend(deployment["config"])
-    client = TestClient(app_for_backend(backend))
+    from tests.fixtures.backend_app import app_for_capture
+
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
 
     ready = client.get("/ready")
     assert ready.status_code == 200

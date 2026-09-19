@@ -17,6 +17,8 @@ advice_queue_depth 2
 advice_cache_hits_total 7
 advice_cache_misses_total 3
 advice_rejected_total{reason="DataError"} 1
+advice_open_job_refused_total 2
+advice_deadline_refused_total 3
 advice_solve_seconds_bucket{le="300.0"} 5
 advice_solve_seconds_sum 400
 advice_solve_seconds_count 5
@@ -61,6 +63,8 @@ def test_canned_metrics_and_actual_log_shapes_are_reported_without_invented_valu
     assert "Queue depth (API): 2" in report
     assert "hits=7; misses=3" in report
     assert "reason=DataError: 1" in report
+    assert "Open-job refusals (API): 2" in report
+    assert "Deadline refusals (API): 3" in report
     assert "Jobs by status (API): unavailable" in report
     assert "window 3, retained logs only): unavailable" in report
     assert "Completions without window (retained logs): 2" in report
@@ -104,6 +108,8 @@ def test_missing_metrics_are_unknown_and_invalid_samples_do_not_become_zero(tmp_
     assert summary.unreadable == 1
     assert not summary.completed_seconds
     assert status._metric([], "advice_queue_depth") == status.UNAVAILABLE
+    assert status._metric([], "advice_open_job_refused_total") == status.UNAVAILABLE
+    assert status._metric([], "advice_deadline_refused_total") == status.UNAVAILABLE
     assert (
         status._labelled(
             status.parse_metrics('advice_jobs_total{outcome="completed"} 3'), "advice_jobs_total"
@@ -203,6 +209,8 @@ def test_job_gauges_and_initial_zero_counters_are_distinct_from_unexposed(tmp_pa
     assert "status=completed: 7" in report and "status=running: 1" in report
     assert "hits=0; misses=0" in report
     assert "Request refusals (API): 0" in report
+    assert "Open-job refusals (API): 0" in report
+    assert "Deadline refusals (API): 0" in report
     assert status._labelled([], "advice_rejected_total") == status.UNAVAILABLE
 
 
