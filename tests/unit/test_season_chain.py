@@ -312,6 +312,33 @@ def test_a_window_without_a_schedule_keeps_the_decay_and_its_reservation() -> No
     assert [week.gameweek for week in result.weeks if week.chip == "freehit"] == [8]
 
 
+def test_a_schedule_that_names_no_window_is_refused() -> None:
+    """Otherwise a mistyped window prices nothing and every week quietly falls back to the decay."""
+
+    windows = (ChipWindowRule("bboost", 5, 8),)
+    stray = ChipHoldingSchedule(
+        name="bboost", start_gameweek=4, stop_gameweek=8, values=((5, 1.0),)
+    )
+    with pytest.raises(ExperimentConfigurationError, match="names none"):
+        SeasonChainConfig(
+            season=SEASON,
+            chip_windows=windows,
+            chip_threshold="induction",
+            chip_holding_schedule=(stray,),
+        )
+    # The same schedule on the window it belongs to is accepted.
+    SeasonChainConfig(
+        season=SEASON,
+        chip_windows=windows,
+        chip_threshold="induction",
+        chip_holding_schedule=(
+            ChipHoldingSchedule(
+                name="bboost", start_gameweek=5, stop_gameweek=8, values=((5, 1.0),)
+            ),
+        ),
+    )
+
+
 def test_a_schedule_is_refused_unless_the_threshold_asks_for_one() -> None:
     holding = ChipHoldingSchedule(
         name="bboost", start_gameweek=2, stop_gameweek=8, values=((2, 1.0),)

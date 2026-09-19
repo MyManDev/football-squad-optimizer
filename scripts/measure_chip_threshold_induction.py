@@ -262,8 +262,13 @@ def _stage_two(arguments: argparse.Namespace, stage_one: Mapping[str, Any]) -> d
                 chip=str(item["chip"]),
                 start_gameweek=int(item["start_gameweek"]),
                 stop_gameweek=int(item["stop_gameweek"]),
-                gameweeks=tuple(int(week) for week in item["thresholds"]),
-                thresholds=tuple(float(value) for value in item["thresholds"].values()),
+                # Sorted by the integer gameweek, never by the string key a JSON object carries:
+                # "10" sorts before "9" as text, and the pair would keep its partner while the
+                # window read backwards.
+                gameweeks=tuple(sorted(int(week) for week in item["thresholds"])),
+                thresholds=tuple(
+                    float(item["thresholds"][key]) for key in sorted(item["thresholds"], key=int)
+                ),
                 pooled_fallback_kinds=tuple(item["pooled_fallback_kinds"]),
                 sample_seasons=tuple(item["sample_seasons"]),
                 sample_sizes=tuple(

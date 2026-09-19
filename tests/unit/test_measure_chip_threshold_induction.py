@@ -122,3 +122,36 @@ def test_a_gameweek_the_table_does_not_price_is_counted_and_not_left_silent() ->
     schedule = thin.as_schedule()
     assert schedule.value_at(4) == 9.0
     assert schedule.value_at(5) is None and schedule.value_at(6) is None
+
+
+def test_the_stage_two_reconstruction_reads_gameweeks_as_numbers_not_as_text() -> None:
+    """A JSON object keyed by gameweek must not be read in string order: "10" precedes "9"."""
+
+    record = {
+        "chip": "bboost",
+        "start_gameweek": 5,
+        "stop_gameweek": 12,
+        # Written in an order that is neither sorted as text nor as numbers.
+        "thresholds": {"12": 0.0, "9": 4.0, "10": 3.0, "5": 9.0},
+        "pooled_fallback_kinds": [],
+        "sample_seasons": ["2021-22"],
+        "sample_sizes": {"single": 20},
+    }
+    rebuilt = WindowThresholds(
+        chip=str(record["chip"]),
+        start_gameweek=int(record["start_gameweek"]),
+        stop_gameweek=int(record["stop_gameweek"]),
+        gameweeks=tuple(sorted(int(week) for week in record["thresholds"])),
+        thresholds=tuple(
+            float(record["thresholds"][key]) for key in sorted(record["thresholds"], key=int)
+        ),
+        pooled_fallback_kinds=(),
+        sample_seasons=("2021-22",),
+        sample_sizes=(("single", 20),),
+    )
+    assert rebuilt.gameweeks == (5, 9, 10, 12)
+    assert rebuilt.threshold_at(9) == 4.0 and rebuilt.threshold_at(10) == 3.0
+    assert rebuilt.threshold_at(12) == 0.0
+    # Sorting the keys as text would have paired gameweek 10 with 9's threshold.
+    as_text = tuple(float(record["thresholds"][k]) for k in sorted(record["thresholds"]))
+    assert as_text != rebuilt.thresholds

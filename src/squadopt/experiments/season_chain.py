@@ -306,6 +306,19 @@ class SeasonChainConfig:
         if any(not isinstance(window, ChipWindowRule) for window in windows):
             raise ExperimentConfigurationError("chip_windows must hold ChipWindowRule entries.")
         object.__setattr__(self, "chip_windows", windows)
+        windows_of = {(w.name, w.start_gameweek, w.stop_gameweek) for w in windows}
+        stray = [
+            item
+            for item in schedule
+            if (item.name, item.start_gameweek, item.stop_gameweek) not in windows_of
+        ]
+        if stray:
+            # A schedule that matches no window prices nothing and would be read by nobody, so a
+            # caller that mistyped a window would get the decay everywhere and no sign of it.
+            raise ExperimentConfigurationError(
+                "Every chip_holding_schedule must name a window of chip_windows; "
+                f"{[(i.name, i.start_gameweek, i.stop_gameweek) for i in stray]!r} names none."
+            )
         if self.cross_season_config is None:
             object.__setattr__(self, "cross_season_config", CrossSeasonConfig())
         if self.optimization_config is None:
