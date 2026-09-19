@@ -26,20 +26,9 @@ NOT_YET_NAMED: frozenset[str] = frozenset(
         "_phase_e_evaluation.py",
         "evaluate_phase_c_components.py",
         "measure_in_season_blend.py",
-        "measure_mode_plan_selection.py",
-        "measure_strategy_bench.py",
-        "measure_strategy_screening.py",
-        "measure_template_rival.py",
         "probe_phase_e_runtime.py",
         "run_component_squad_calibration.py",
-        "run_opening_backtest.py",
         "run_scenario_benchmark.py",
-        # These three take a deterministic limit only when the operator passes a flag, and
-        # build a bare configuration otherwise. A limit the run has to be asked for is not a
-        # limit the record can rely on, so they belong here rather than in OWN_BUDGET.
-        "run_planner_horizon_seasons.py",
-        "run_season_chain_seasons.py",
-        "run_transfer_discipline_seasons.py",
     }
 )
 
@@ -121,14 +110,22 @@ def test_the_exemption_list_names_only_runners_that_still_need_the_work() -> Non
     )
 
 
-def test_the_three_calibration_runners_name_the_measurement_configuration() -> None:
-    """The cluster this pull request converts, asserted by what it calls rather than by absence."""
+def test_the_converted_runners_name_the_measurement_configuration() -> None:
+    """Asserted by what they call rather than by the absence of the old call."""
 
     trees = _solving_runners()
     for name in (
         "measure_anchored_calibration.py",
+        "measure_mode_plan_selection.py",
         "measure_overlap_calibration.py",
         "measure_rival_calibration.py",
+        "measure_strategy_bench.py",
+        "measure_strategy_screening.py",
+        "measure_template_rival.py",
+        "run_opening_backtest.py",
+        "run_planner_horizon_seasons.py",
+        "run_season_chain_seasons.py",
+        "run_transfer_discipline_seasons.py",
     ):
         assert _calls(trees[name], "measurement_optimization_config"), name
         assert not _inherits_the_wall_clock(trees[name]), name

@@ -256,6 +256,23 @@ def test_unknown_chips_and_inverted_windows_are_refused() -> None:
         ChipWindowRule("bboost", 5, 4)
 
 
+def test_a_blank_club_without_a_row_still_makes_the_gameweek_structured() -> None:
+    """The archive's fixture table counts fixtures, so a blank club has no row and no
+    zero. Gameweek 6 blanks team 6 that way and nobody doubles: the free hit must be
+    on offer there under a reservation policy, as it is in the double of gameweek 4."""
+
+    counts = _fixture_counts()
+    counts = counts.loc[~((counts["gameweek"] == 6) & (counts["team_id"] == 6))]
+    assert not ((counts["gameweek"] == 6) & (counts["fixture_count"] != 1)).any()
+    chain = SeasonChain(
+        make_canonical_gameweeks(),
+        counts.reset_index(drop=True),
+        SeasonChainConfig(season=SEASON, **POOL),  # type: ignore[arg-type]
+    )
+    structured = [week for week in range(2, 9) if chain._is_structured_gameweek(week)]
+    assert structured == [4, 6]
+
+
 def test_a_free_hit_reverts_the_held_squad_and_reports_its_gain() -> None:
     """Gameweek 4 blanks team 6 and doubles team 1: a structured week, so under the
     reservation policy the free hit is offered there and only there. Fielding a
