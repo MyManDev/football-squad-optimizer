@@ -225,7 +225,7 @@ deployment job is running or queued and inspect the Cloudflare daily count.
 
 ## Post-deployment smoke
 
-After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts`; this manual desktop/phone check is read-only, and optional `LIVE_SMOKE_COMPUTE=1` requires an existing cached published selection using GET only (a miss fails, never submits a solve).
+After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts`; this manual desktop/phone check is read-only, and optional `LIVE_SMOKE_COMPUTE=1` checks the public backend with a browser GET, reporting a matching cached answer or `NOT_COMPUTED` (never submits a solve).
 
 The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this

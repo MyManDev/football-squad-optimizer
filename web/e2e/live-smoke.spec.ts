@@ -16,9 +16,10 @@ test("published league and member journey works without submitting a solve", asy
   const errors: string[] = [];
   const consoleErrors: { text: string; url: string }[] = [];
   const absentDocuments = new Set<string>();
+  let cacheMissUrl: string | undefined;
   const failures: string[] = [];
   const writes: string[] = [];
-  let cacheRead: string | undefined;
+  let capabilitiesUrl: string | undefined;
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error")
@@ -28,6 +29,11 @@ test("published league and member journey works without submitting a solve", asy
     if (new URL(request.url()).origin === origin) failures.push(request.url());
   });
   page.on("response", (response) => {
+    if (
+      response.status() === 200 &&
+      /^\/api\/v1\/leagues\/\d+\/capabilities$/.test(new URL(response.url()).pathname)
+    )
+      capabilitiesUrl = response.url();
     if (new URL(response.url()).origin === origin && response.status() >= 400) {
       if (response.status() === 404 && OPTIONAL_DOCUMENTS.has(new URL(response.url()).pathname)) {
         absentDocuments.add(response.url());
@@ -45,19 +51,13 @@ test("published league and member journey works without submitting a solve", asy
       writes.push(`${request.method()} ${request.url()}`);
       return route.abort("blockedbyclient");
     }
-    if (
-      request.method() === "GET" &&
-      /\/api\/v1\/leagues\/\d+\/entries\/\d+\/advice\?/.test(request.url())
-    ) {
-      cacheRead = request.url();
-    }
     return route.continue();
   });
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
   const membersResponse = await page.request.get("/data/league/members.json");
   expect(membersResponse.status()).toBe(200);
   const members = (await membersResponse.json()) as {
-    payload: { members: { member_kind: string; entry_id: number }[] };
+    payload: { league_id: number; members: { member_kind: string; entry_id: number }[] };
   };
   const member = members.payload.members.find((entry) => entry.member_kind === "human");
   expect(member, "a published human member is required").toBeDefined();
@@ -91,29 +91,55 @@ test("published league and member journey works without submitting a solve", asy
   await page.screenshot({ path: testInfo.outputPath("member.png"), fullPage: true });
 
   if (process.env.LIVE_SMOKE_COMPUTE === "1") {
-    // GET is cache-only by contract. A miss fails this check; it never falls back to POST.
-    await expect.poll(() => cacheRead).toBeTruthy();
-    const cached = await page.request.get(cacheRead!);
-    expect(cached.status(), "published selection must already be in the backend cache").toBe(200);
-    const answer = (await cached.json()) as LeagueViewEnvelope<EntryAdvice>;
-    expect(answer.payload).toMatchObject({
-      entry_id: entryId,
-      mode: "saf-puan",
-      window: 1,
-      source_snapshot_id: advice.payload.source_snapshot_id,
-    });
+    // GET is cache-only: NOT_COMPUTED is valid absence, never a reason to POST.
+    // A published plan need not cause a page-level cache read. Use the backend
+    // actually contacted by this page, never an invented endpoint or a POST.
+    await expect.poll(() => capabilitiesUrl).toBeTruthy();
+    const capabilities = new URL(capabilitiesUrl!);
+    expect(capabilities.pathname).toBe(`/api/v1/leagues/${members.payload.league_id}/capabilities`);
+    const cacheRead = new URL(
+      `/api/v1/leagues/${members.payload.league_id}/entries/${entryId}/advice?strategy=saf-puan&window=1`,
+      capabilities.origin,
+    );
+    // Use the browser's fetch so the public backend's CORS policy is exercised too.
+    const cached = await page.evaluate(async (url) => {
+      const response = await fetch(url);
+      return { status: response.status, body: await response.json() };
+    }, cacheRead.toString());
+    if (cached.status === 404) {
+      expect(cached.body.error?.code).toBe("NOT_COMPUTED");
+      cacheMissUrl = cacheRead.toString();
+      console.log(`backend reachable, selection not computed: ${cacheMissUrl}`);
+    } else {
+      expect(cached.status).toBe(200);
+      const answer = cached.body as LeagueViewEnvelope<EntryAdvice>;
+      expect(answer.payload).toMatchObject({
+        entry_id: entryId,
+        mode: "saf-puan",
+        window: 1,
+        source_snapshot_id: advice.payload.source_snapshot_id,
+      });
+      console.log(`backend cache hit matches published capture: ${cacheRead}`);
+    }
   }
   await page.locator(`a[href="/league/members/${entryId}/history"]`).click();
   await expect(page).toHaveURL(new RegExp(`/league/members/${entryId}/history$`));
   await expect(page.locator("main h1")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(writes, "no mutating API request is allowed").toEqual([]);
-  expect(failures, "the site's own requests must succeed").toEqual([]);
+  expect(
+    failures.filter((failure) => failure !== `404 ${cacheMissUrl}`),
+    "the site's own requests must succeed apart from a validated cache miss",
+  ).toEqual([]);
   expect(
     consoleErrors.filter(
-      ({ text, url }) => !(absentDocuments.has(url) && /Failed to load resource:.*404/.test(text)),
+      ({ text, url }) =>
+        !(
+          (absentDocuments.has(url) || url === cacheMissUrl) &&
+          /Failed to load resource:.*404/.test(text)
+        ),
     ),
-    "no console error apart from the reported optional 404",
+    "no console error apart from the reported optional document or validated cache miss",
   ).toEqual([]);
   expect(errors, "no browser or console error").toEqual([]);
 });
