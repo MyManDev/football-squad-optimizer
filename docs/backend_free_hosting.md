@@ -545,6 +545,8 @@ implementations drifting.
 
 ## Recommendation
 
+The `Backend uptime` workflow checks public `/health` every 15 minutes, with a 10-second timeout and one retry after 20 seconds. A failed check opens one `backend-down` issue; continuing failure is silent, and recovery comments on and closes that issue. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time and status, never a URL or response body. Scheduled Actions can be delayed and are not an exact uptime guarantee. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
+
 **Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
 coordinate publication with the backend code revision. The existing tunnel hostname is
 `squadopt-api.mymandev.com`; the build variable is already wired. With the PC off the
