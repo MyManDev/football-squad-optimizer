@@ -2,7 +2,7 @@
 
 Contract `projection_level_audit_v1`. Protocol: `docs/projection_level_audit_prereg.md`. Stage one: descriptive, nothing fitted, nothing promoted.
 
-Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation` scored, see the JSON), 95914 rows read over 139 decisions from target gameweek 4, blank rows left out (0) and so are the thin-history rows the table holds no forecast for (662). Bias is realized minus forecast, so a positive bias is a forecast that ran low. Intervals resample decisions.
+Table `167f3e6aeda0` (101447 rows; not the digest `phase_c_component_evaluation` scored, see the JSON), 95914 rows read over 139 decisions from target gameweek 4, blank rows left out (0) and so are the thin-history rows the table holds no forecast for (662). Bias is realized minus forecast, so a positive bias is a forecast that ran low. Intervals resample decisions. The two sources of a level error do not add up to it and may not be added: the forecast is a product of them, the level is a difference of sums, and the second is read only over the rows that appeared.
 
 **By minutes a gameweek played before the decision**
 

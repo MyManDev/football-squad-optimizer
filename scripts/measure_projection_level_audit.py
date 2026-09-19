@@ -175,7 +175,10 @@ def _markdown(record: Mapping[str, Any]) -> str:
         f"({record['rows_left_out_blank']}) and so are the thin-history rows the table holds "
         f"no forecast for ({record['rows_left_out_without_a_forecast']}). Bias is realized "
         "minus forecast, so a positive "
-        "bias is a forecast that ran low. Intervals resample decisions.",
+        "bias is a forecast that ran low. Intervals resample decisions. The two sources of a "
+        "level error do not add up to it and may not be added: the forecast is a product of "
+        "them, the level is a difference of sums, and the second is read only over the rows "
+        "that appeared.",
     ]
     lines += _rows("By minutes a gameweek played before the decision", pooled["by_prior_minutes"])
     lines += _rows("By the size of the forecast", pooled["by_forecast_size"])

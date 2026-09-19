@@ -2,7 +2,7 @@
   "contract_version": "projection_level_audit_v1",
   "descriptive_only": true,
   "first_target_gameweek": 4,
-  "generated_at_utc": "2026-09-19T11:59:49+00:00",
+  "generated_at_utc": "2026-09-19T13:05:01+00:00",
   "interval": {
     "level": 0.9,
     "resamples": 2000,

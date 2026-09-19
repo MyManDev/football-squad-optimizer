@@ -8,6 +8,11 @@ and what the player had been playing before the decision. It returns plain numbe
 A level error has two possible sources and they are repaired differently, so every block says
 both: **who plays** (the forecast of an appearance summed against the appearances) and **what
 they score when they play** (the conditional forecast against the points of those who appeared).
+**The two do not add up to the level, and may not be added.** The forecast is a product of the
+two components, the level is a difference of sums, and the second source is read over a
+different set of rows than the first: only those who appeared. Each says which side a fault
+sits on, and neither is a share of the other's.
+
 Intervals resample decisions, never players: players inside one decision share fixtures.
 """
 
