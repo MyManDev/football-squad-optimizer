@@ -23,8 +23,8 @@ import pytest
 import tests.unit.test_advice_worker as worker_module
 import tests.unit.test_backend_runtime as deployment_module
 from fastapi.testclient import TestClient
+from tests.fixtures.backend_app import app_for_capture as app_for_backend
 
-from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.platform.backend_runtime import BackendConfig, StoreProbeGate, build_backend
 from squadopt.platform.store_probe import StoreProbeResult, probe_store

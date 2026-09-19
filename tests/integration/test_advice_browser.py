@@ -401,7 +401,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
             "-m",
             "uvicorn",
             "--factory",
-            "squadopt.api.runtime:build_app",
+            "tests.fixtures.backend_app:build_app",
             "--host",
             "127.0.0.1",
             "--port",

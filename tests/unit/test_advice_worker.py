@@ -22,11 +22,11 @@ import tests.unit.test_live_transfers as world_module
 import tests.unit.test_source_fpl_live as payload_module
 import tests.unit.test_top100_weight as top100_tests
 from fastapi.testclient import TestClient
+from tests.fixtures.backend_app import app_for_capture as app_for_backend
 
 import squadopt.application.top100_weight as switches_module_top100
 import squadopt.platform.advice_switches as switches_module
 import squadopt.platform.advice_worker as worker_module
-from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
@@ -938,7 +938,7 @@ def test_two_concurrent_contexts_get_two_job_ids_rather_than_a_collision(
                 rival_entry_id=None,
                 idempotency_key=None,
                 client_bucket="test",
-                at_utc=_now_stamp(),
+                at_utc=world_module.GW2_CAPTURED_AT,
             )
         except Exception as error:  # recorded, so the assertion names it
             outcomes[name] = error

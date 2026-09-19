@@ -8,6 +8,7 @@ itself ready with nothing to answer from.
 
 import json
 from dataclasses import replace
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -642,13 +643,41 @@ def test_fallback_does_not_reread_the_unusable_published_capture(
     assert {call.kwargs["snapshot_id"] for call in errors} == {older, newer}
 
 
+def test_wired_api_uses_the_resolved_capture_deadline(deployment: dict[str, Any]) -> None:
+    backend = build_backend(deployment["config"])
+    identity = backend.contexts.identity()
+    assert identity is not None
+    deadline = datetime.fromisoformat(identity.inputs.deadline.deadline_utc)
+    client = TestClient(app_for_backend(backend, utc_now=lambda: deadline + timedelta(seconds=1)))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    response = client.post(route, json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "DEADLINE_PASSED"
+    assert not backend.queue.jobs()
+    assert not list(deployment["config"].spec_root.glob("*.json"))
+    assert client.get("/ready").status_code == 200
+    assert client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").status_code == 200
+
+
+def test_deadline_lookup_rejects_a_changed_handoff(deployment: dict[str, Any]) -> None:
+    from squadopt.platform.advice_read import AdviceBackendNotReadyError
+
+    backend = build_backend(deployment["config"])
+    context = backend.contexts.current()
+    assert context is not None
+    with pytest.raises(AdviceBackendNotReadyError):
+        backend.contexts.deadline_for(replace(context, projection_handoff_fingerprint="0" * 64))
+
+
 def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
     deployment: dict[str, Any],
 ) -> None:
     """The whole point: an assembled backend queues work rather than refusing it."""
 
     backend = build_backend(deployment["config"])
-    client = TestClient(app_for_backend(backend))
+    from tests.fixtures.backend_app import app_for_capture
+
+    client = TestClient(app_for_capture(backend))
 
     ready = client.get("/ready")
     assert ready.status_code == 200
