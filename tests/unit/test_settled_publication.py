@@ -52,6 +52,13 @@ def world(
                 "data_checked": True,
             },
             {
+                "id": 4,
+                "deadline_time": "2026-09-12T10:00:00Z",
+                "finished": True,
+                "data_checked": True,
+                "average_entry_score": 69,
+            },
+            {
                 "id": 5,
                 "deadline_time": "2026-09-19T10:00:00Z",
                 "finished": finished,
@@ -200,6 +207,98 @@ def no_solving(monkeypatch: pytest.MonkeyPatch) -> Iterator[Mock]:
     monkeypatch.setattr(scoreboard, "settled_scoreboard_entries", forbidden)
     yield forbidden
     forbidden.assert_not_called()
+
+
+def historical_scoreboard() -> dict[str, Any]:
+    """The three non-null GW4 evidence cells a single-week fixture missed."""
+    return {
+        "payload": {
+            "season": SEASON,
+            "league_id": 352490,
+            "cohort_snapshot_id": "prior-gw4-cohort",
+            "cohort_picks_snapshot_id": "prior-gw4-picks",
+            "gameweeks": [
+                {
+                    "gameweek": 4,
+                    "finished": True,
+                    "data_checked": True,
+                    "top100": {
+                        "gameweek": 4,
+                        "mean_score": 100.86,
+                        "basis": "net",
+                        "final": True,
+                        "cohort_size": 100,
+                        "hit_points": 4.0,
+                        "picks_snapshot_id": "prior-gw4-picks",
+                    },
+                    "comparisons": [
+                        {
+                            "kind": kind,
+                            "net": net,
+                            "scoring_basis": "official_autosub_captain_v2",
+                            "source_snapshot_id": f"prior-gw4-{kind}",
+                            "outcome_snapshot_id": "prior-gw4-outcome",
+                            "diagnostics": {"captain_shortfall": -1.25},
+                        }
+                        for kind, net in (
+                            ("base", 17.25),
+                            ("elite_xi", 58.0),
+                            ("ownership_template", 99.0),
+                        )
+                    ],
+                }
+            ],
+        }
+    }
+
+
+def test_historical_cells_keep_provenance_without_entering_new_week_or_totals(
+    tmp_path: Path,
+) -> None:
+    request = world(tmp_path)
+    # Reference totals are rendered without the independent historical evidence.
+    publication.publish_settled(replace(request, out_dir=tmp_path / "reference"))
+    reference = json.loads((tmp_path / "reference/data/league/scoreboard.json").read_bytes())
+    old = historical_scoreboard()
+    write(request.accepted_dir / "data/league/scoreboard.json", old)
+    accepted_bytes = inventory(request.accepted_dir)
+    publication.publish_settled(request)
+    result = json.loads((request.out_dir / "data/league/scoreboard.json").read_bytes())["payload"]
+    four = next(row for row in result["gameweeks"] if row["gameweek"] == 4)
+    five = next(row for row in result["gameweeks"] if row["gameweek"] == 5)
+    prior = old["payload"]["gameweeks"][0]
+    assert four["top100"] == prior["top100"]
+    for cell in prior["comparisons"]:
+        assert next(row for row in four["comparisons"] if row["kind"] == cell["kind"]) == cell
+    for key in ("cohort_snapshot_id", "cohort_picks_snapshot_id"):
+        assert result[key] == old["payload"][key]
+    assert result["source_snapshot_id"] == request.snapshot_id
+    assert five["top100"] is None
+    for cell in five["comparisons"]:
+        if cell["kind"] in {"base", "elite_xi", "ownership_template"}:
+            assert cell["net"] is None and cell["source_snapshot_id"] is None
+    assert result["cumulative"] == reference["payload"]["cumulative"]
+    assert result["cumulative"]["members_mean_total_points"] == 150
+    assert inventory(request.accepted_dir) == accepted_bytes
+
+
+@pytest.mark.parametrize("defect", ["new-week", "wrong-week", "no-cohort", "unknown-kind"])
+def test_historical_evidence_that_cannot_be_carried_refuses(tmp_path: Path, defect: str) -> None:
+    request = world(tmp_path)
+    old = historical_scoreboard()
+    row = old["payload"]["gameweeks"][0]
+    if defect == "new-week":
+        row["gameweek"] = row["top100"]["gameweek"] = 5
+    elif defect == "wrong-week":
+        row["top100"]["gameweek"] = 3
+    elif defect == "no-cohort":
+        old["payload"]["cohort_snapshot_id"] = None
+    else:
+        row["comparisons"][0]["kind"] = "unapproved-comparison"
+    write(request.accepted_dir / "data/league/scoreboard.json", old)
+    with pytest.raises(DataError, match="Cannot carry"):
+        publication.publish_settled(request)
+    assert not request.out_dir.exists()
 
 
 def test_real_publish_retains_every_protected_byte(tmp_path: Path) -> None:

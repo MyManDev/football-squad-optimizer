@@ -5,6 +5,7 @@ The ordinary publisher either solves the league again or inherits it wholesale;
 ``settled`` previously only named a publication. This path reads existing captures,
 records and an already settled ledger. It never captures, settles, solves or deploys.
 It publishes what the ledger and the capture already decided, and refuses everything else.
+It never removes evidence a previous publication carried.
 
 Only the explicitly approved outcome documents may change. Every other accepted
 byte, including entries and advice, survives. A new required path must be approved
@@ -241,6 +242,63 @@ def _preflight(
     return accepted, members, snapshot, scores
 
 
+def _carry_scoreboard_evidence(
+    request: SettledPublicationRequest, document: dict[str, Any]
+) -> None:
+    """Retain independent historical cells, with their original week and sources.
+
+    These cells do not enter the builder's system/member/game cumulative arithmetic.
+    GW5 evidence is a separate approval: never infer it from an earlier comparison.
+    """
+    name = "data/league/scoreboard.json"
+    source = request.accepted_dir / name
+    if not source.exists():
+        return
+    previous = _document(source.read_bytes(), name)["payload"]
+    if (previous.get("season"), previous.get("league_id")) != (
+        request.season,
+        request.league_id,
+    ):
+        raise DataError("Accepted scoreboard evidence belongs to another season or league.")
+    payload = document["payload"]
+    current = {row["gameweek"]: row for row in payload["gameweeks"]}
+    independent = {"base", "elite_xi", "ownership_template"}
+    ordinary = {"system", "league_mean", "game_mean"}
+    seen = set()
+    for row in previous["gameweeks"]:
+        week = row["gameweek"]
+        if type(week) is not int or week < 1 or week in seen:
+            raise DataError("Accepted scoreboard has an invalid or repeated evidence week.")
+        seen.add(week)
+        cells = {}
+        for cell in row.get("comparisons", []):
+            kind = cell["kind"]
+            if kind in ordinary:
+                continue
+            if kind not in independent or kind in cells:
+                raise DataError(f"Cannot carry scoreboard comparison {kind!r} in GW{week}.")
+            cells[kind] = cell
+        top100 = row.get("top100")
+        if week >= request.gameweek:
+            if top100 is not None or any(cell.get("net") is not None for cell in cells.values()):
+                raise DataError(f"Cannot carry unapproved scoreboard evidence for GW{week}.")
+            continue
+        if (cells or top100 is not None) and week not in current:
+            raise DataError(f"Cannot carry scoreboard evidence: GW{week} is absent from capture.")
+        if top100 is not None:
+            if top100.get("gameweek") != week or not previous.get("cohort_snapshot_id"):
+                raise DataError(f"Cannot carry Top-100 evidence with unclear GW{week} provenance.")
+            current[week]["top100"] = top100
+            # The carried cell still names its old week. These are that cohort's
+            # original identities, not claims that the new capture includes it.
+            for key in ("cohort_snapshot_id", "cohort_picks_snapshot_id"):
+                payload[key] = previous.get(key)
+        if cells:
+            current[week]["comparisons"] = [
+                cells.get(cell["kind"], cell) for cell in current[week]["comparisons"]
+            ]
+
+
 def _publish_scoreboard(
     request: SettledPublicationRequest,
     snapshot: CapturedSnapshot,
@@ -262,6 +320,7 @@ def _publish_scoreboard(
         cohort=None,
         generated_at_utc=snapshot.metadata.captured_at_utc,
     )
+    _carry_scoreboard_evidence(request, document)
     (candidate / "data/league/scoreboard.json").write_text(
         json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
