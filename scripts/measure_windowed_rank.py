@@ -13,7 +13,7 @@ for horizons one, three and five.
 Honest limits: the per-week projection inside a window repeats the origin's projection
 (the control produces one week; a calendar-aware GW2+ projection is the data side's
 deliverable), and realized outcomes are the window's actual totals. Descriptive
-measurement — no gate, nothing promoted, the locked holdout never read.
+measurement: no gate, nothing promoted, the locked holdout never read.
 """
 
 import argparse
@@ -275,7 +275,7 @@ def _to_markdown(document: dict[str, object]) -> str:
         f"{document['origins']}, horizons {document['horizons']}, "
         f"{document['scenario_count']} paths per window.",
         "- The rival is the ownership template at the origin; the squad is chosen by the "
-        "rank objective on the window's joint path totals via `as_window_scenario_set` — "
+        "rank objective on the window's joint path totals via `as_window_scenario_set`: "
         "the same solver that prices a single week, unchanged.",
         f"- {document['projection_note']}",
         f"- Rival edge: **{float(str(document.get('rival_edge_points_per_week', 0.0))):+.2f} "
