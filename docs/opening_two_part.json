@@ -1,0 +1,416 @@
+{
+  "config": {
+    "bootstrap_resamples": 2000,
+    "deterministic_seed": 0,
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "minimum_training_rows": 60,
+    "mover_shrink_grid": [
+      1.0,
+      0.9,
+      0.8,
+      0.7,
+      0.6,
+      0.5,
+      0.4,
+      0.25,
+      0.0
+    ],
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "contract_version": "opening_two_part_v1",
+  "created_utc": "2026-09-19T21:30:05+00:00",
+  "decisions": [
+    {
+      "candidate_newcomers_selected": 1,
+      "candidate_realized_points": 60.0,
+      "changed_starters": 1,
+      "control_newcomers_selected": 0,
+      "control_realized_points": 49.0,
+      "difference": 11.0,
+      "season": "2022-23"
+    },
+    {
+      "candidate_newcomers_selected": 0,
+      "candidate_realized_points": 68.0,
+      "changed_starters": 0,
+      "control_newcomers_selected": 0,
+      "control_realized_points": 68.0,
+      "difference": 0.0,
+      "season": "2023-24"
+    },
+    {
+      "candidate_newcomers_selected": 0,
+      "candidate_realized_points": 62.0,
+      "changed_starters": 0,
+      "control_newcomers_selected": 0,
+      "control_realized_points": 62.0,
+      "difference": 0.0,
+      "season": "2024-25"
+    }
+  ],
+  "elapsed_seconds": 57.292881,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "gate": {
+    "accuracy_passes": true,
+    "decision_losses": 0,
+    "decision_passes": true,
+    "mean_decision_difference": 3.6666666666666665,
+    "ordering_passes": true,
+    "ordering_tolerance": 0.01,
+    "passes": true,
+    "pooled_rank_shortfall": -0.02025799768375297,
+    "worst_season_rank_shortfall": -0.002213635746603937
+  },
+  "locked_holdout_accessed": false,
+  "ordering_tolerance": 0.01,
+  "part_one_design": [
+    "intercept",
+    "ownership_share",
+    "price_m",
+    "DEF",
+    "MID",
+    "FWD"
+  ],
+  "play_label_limit": "Part one's target is minutes above zero at the opening gameweek, which is a play label and not an availability label: the archive carries no status, news or chance-of-playing column at gameweek one, so no availability label exists to fit. Nothing here says the factor learned who was available, only who took the field.",
+  "population": {
+    "newcomer_rows": 874,
+    "opening_rows": 2401,
+    "pooled_judged_rows": 656
+  },
+  "prereg": "docs/opening_two_part_prereg.md",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 2401,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "f7ffc9c7837e0976b73b11a3ac48c8fbfd22062c",
+    "working_tree_dirty": true
+  },
+  "seasons": [
+    {
+      "calibration": [
+        {
+          "decile": 1,
+          "mean_predicted": 0.11740838747424354,
+          "realized_play_rate": 0.0,
+          "rows": 21
+        },
+        {
+          "decile": 2,
+          "mean_predicted": 0.1902060836079078,
+          "realized_play_rate": 0.2857142857142857,
+          "rows": 21
+        },
+        {
+          "decile": 3,
+          "mean_predicted": 0.26081393274680026,
+          "realized_play_rate": 0.1,
+          "rows": 20
+        },
+        {
+          "decile": 4,
+          "mean_predicted": 0.26162992524952766,
+          "realized_play_rate": 0.05,
+          "rows": 20
+        },
+        {
+          "decile": 5,
+          "mean_predicted": 0.2633125957508011,
+          "realized_play_rate": 0.25,
+          "rows": 20
+        },
+        {
+          "decile": 6,
+          "mean_predicted": 0.2906769069315924,
+          "realized_play_rate": 0.4,
+          "rows": 20
+        },
+        {
+          "decile": 7,
+          "mean_predicted": 0.3652647379043189,
+          "realized_play_rate": 0.5,
+          "rows": 20
+        },
+        {
+          "decile": 8,
+          "mean_predicted": 0.36690861583983503,
+          "realized_play_rate": 0.4,
+          "rows": 20
+        },
+        {
+          "decile": 9,
+          "mean_predicted": 0.42538459911060345,
+          "realized_play_rate": 0.75,
+          "rows": 20
+        },
+        {
+          "decile": 10,
+          "mean_predicted": 0.6223241170815722,
+          "realized_play_rate": 0.85,
+          "rows": 20
+        }
+      ],
+      "candidate_bias_on_played": 1.251910373102085,
+      "candidate_mae": 0.9881364066390657,
+      "candidate_mae_on_played": 1.5618444911987288,
+      "candidate_rank": 0.5633928589093131,
+      "coefficients": {
+        "part_one": {
+          "DEF": 1.0224808379963026,
+          "FWD": -0.2981041097460245,
+          "MID": 0.5400015913901502,
+          "intercept": -6.011800199752148,
+          "ownership_share": 4.5221182751193965,
+          "price_m": 0.984616140208537
+        },
+        "part_two_price_slope_by_position": {
+          "DEF": 0.6046277665995974,
+          "FWD": 0.5458612975391498,
+          "GK": 0.8632075471698113,
+          "MID": 0.4698512137823025
+        }
+      },
+      "control_mae": 1.3910431347741015,
+      "control_rank": 0.515231149821445,
+      "mae_improvement": 0.4029067281350358,
+      "played_rows": 72,
+      "rank_shortfall": -0.0481617090878681,
+      "rows": 202,
+      "rows_without_published_ownership": 14,
+      "season": "2022-23",
+      "training_rows": 218
+    },
+    {
+      "calibration": [
+        {
+          "decile": 1,
+          "mean_predicted": 0.09152071544701666,
+          "realized_play_rate": 0.0,
+          "rows": 26
+        },
+        {
+          "decile": 2,
+          "mean_predicted": 0.11480080803636047,
+          "realized_play_rate": 0.038461538461538464,
+          "rows": 26
+        },
+        {
+          "decile": 3,
+          "mean_predicted": 0.1815109732104146,
+          "realized_play_rate": 0.2692307692307692,
+          "rows": 26
+        },
+        {
+          "decile": 4,
+          "mean_predicted": 0.21998825540807368,
+          "realized_play_rate": 0.08,
+          "rows": 25
+        },
+        {
+          "decile": 5,
+          "mean_predicted": 0.23465466222951928,
+          "realized_play_rate": 0.12,
+          "rows": 25
+        },
+        {
+          "decile": 6,
+          "mean_predicted": 0.23623852462555384,
+          "realized_play_rate": 0.08,
+          "rows": 25
+        },
+        {
+          "decile": 7,
+          "mean_predicted": 0.23768943025450742,
+          "realized_play_rate": 0.32,
+          "rows": 25
+        },
+        {
+          "decile": 8,
+          "mean_predicted": 0.32362284639631045,
+          "realized_play_rate": 0.6,
+          "rows": 25
+        },
+        {
+          "decile": 9,
+          "mean_predicted": 0.3865577662409017,
+          "realized_play_rate": 0.4,
+          "rows": 25
+        },
+        {
+          "decile": 10,
+          "mean_predicted": 0.5786347515720146,
+          "realized_play_rate": 0.88,
+          "rows": 25
+        }
+      ],
+      "candidate_bias_on_played": 0.8428442986631501,
+      "candidate_mae": 0.7548611703988642,
+      "candidate_mae_on_played": 1.3618579974000997,
+      "candidate_rank": 0.4735541851900704,
+      "coefficients": {
+        "part_one": {
+          "DEF": 1.0224719983122263,
+          "FWD": -0.3145407771466087,
+          "MID": 0.4109954211014246,
+          "intercept": -8.065552644314606,
+          "ownership_share": 8.99343146433618,
+          "price_m": 1.4396603141257744
+        },
+        "part_two_price_slope_by_position": {
+          "DEF": 0.5904419321685511,
+          "FWD": 0.5956375838926176,
+          "GK": 0.7195622435020521,
+          "MID": 0.42766228256257943
+        }
+      },
+      "control_mae": 1.2912039185054238,
+      "control_rank": 0.4713405494434665,
+      "mae_improvement": 0.5363427481065596,
+      "played_rows": 70,
+      "rank_shortfall": -0.002213635746603937,
+      "rows": 253,
+      "rows_without_published_ownership": 14,
+      "season": "2023-24",
+      "training_rows": 420
+    },
+    {
+      "calibration": [
+        {
+          "decile": 1,
+          "mean_predicted": 0.08934248250013865,
+          "realized_play_rate": 0.0,
+          "rows": 21
+        },
+        {
+          "decile": 2,
+          "mean_predicted": 0.16445066374307027,
+          "realized_play_rate": 0.15,
+          "rows": 20
+        },
+        {
+          "decile": 3,
+          "mean_predicted": 0.21042549491703158,
+          "realized_play_rate": 0.05,
+          "rows": 20
+        },
+        {
+          "decile": 4,
+          "mean_predicted": 0.21222897325939324,
+          "realized_play_rate": 0.1,
+          "rows": 20
+        },
+        {
+          "decile": 5,
+          "mean_predicted": 0.21836900524907366,
+          "realized_play_rate": 0.15,
+          "rows": 20
+        },
+        {
+          "decile": 6,
+          "mean_predicted": 0.2274777828078803,
+          "realized_play_rate": 0.1,
+          "rows": 20
+        },
+        {
+          "decile": 7,
+          "mean_predicted": 0.2710902480473462,
+          "realized_play_rate": 0.35,
+          "rows": 20
+        },
+        {
+          "decile": 8,
+          "mean_predicted": 0.3869188999122578,
+          "realized_play_rate": 0.55,
+          "rows": 20
+        },
+        {
+          "decile": 9,
+          "mean_predicted": 0.4497908410476358,
+          "realized_play_rate": 0.6,
+          "rows": 20
+        },
+        {
+          "decile": 10,
+          "mean_predicted": 0.72308402740888,
+          "realized_play_rate": 0.75,
+          "rows": 20
+        }
+      ],
+      "candidate_bias_on_played": 0.6406223130163576,
+      "candidate_mae": 0.6800783731788465,
+      "candidate_mae_on_played": 1.08639857529916,
+      "candidate_rank": 0.5213608879858946,
+      "coefficients": {
+        "part_one": {
+          "DEF": 1.1117166119653006,
+          "FWD": -0.46917289253421596,
+          "MID": 0.20809608493288698,
+          "intercept": -9.208255387355063,
+          "ownership_share": 11.440448219008845,
+          "price_m": 1.7047832707129704
+        },
+        "part_two_price_slope_by_position": {
+          "DEF": 0.4946425434744423,
+          "FWD": 0.5541439806412581,
+          "GK": 0.7247915087187263,
+          "MID": 0.4077827320632346
+        }
+      },
+      "control_mae": 1.2271443673164637,
+      "control_rank": 0.5109622397691078,
+      "mae_improvement": 0.5470659941376173,
+      "played_rows": 56,
+      "rank_shortfall": -0.010398648216786821,
+      "rows": 201,
+      "rows_without_published_ownership": 4,
+      "season": "2024-25",
+      "training_rows": 673
+    }
+  ],
+  "solver": {
+    "binding_limit": "deterministic_time",
+    "clause_affected": "only the decision clause solves; accuracy and ordering do not",
+    "deterministic_time_limit": 5.0,
+    "wall_time_limit_seconds": 600.0
+  },
+  "summary": {
+    "improves_every_season": true,
+    "interval_90": [
+      0.46410791328758294,
+      0.5331041859990306
+    ],
+    "interval_excludes_zero": true,
+    "pooled_candidate_rank": 0.5194359773617594,
+    "pooled_control_rank": 0.5005117352746232,
+    "pooled_control_rank_over_judged_seasons": 0.4991779796780064,
+    "pooled_mae_improvement": 0.49853984630472237,
+    "pooled_rows": 656
+  }
+}
