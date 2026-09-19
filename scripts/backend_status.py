@@ -137,7 +137,8 @@ def read_logs(directory: Path, *, days: int = 7) -> LogSummary:
                     seconds = record.get("wall_seconds")
                     if (
                         event == "advice_job_completed"
-                        and type(seconds) in (int, float)
+                        and isinstance(seconds, (int, float))
+                        and not isinstance(seconds, bool)
                         and math.isfinite(seconds)
                         and seconds >= 0
                     ):
