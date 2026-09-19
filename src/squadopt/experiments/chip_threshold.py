@@ -44,7 +44,7 @@ from squadopt.experiments.config import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )
-from squadopt.experiments.season_chain import ChipWindowRule
+from squadopt.experiments.season_chain import ChipHoldingSchedule, ChipWindowRule
 
 CHIP_THRESHOLD_INDUCTION_CONTRACT_VERSION: Final = "chip_threshold_induction_v1"
 
@@ -260,6 +260,16 @@ class WindowThresholds:
         raise ExperimentExecutionError(
             f"Gameweek {gameweek} is not a classified gameweek of the {self.chip!r} window "
             f"{self.start_gameweek}-{self.stop_gameweek}."
+        )
+
+    def as_schedule(self) -> ChipHoldingSchedule:
+        """The chain's own shape of this window's thresholds."""
+
+        return ChipHoldingSchedule(
+            name=self.chip,
+            start_gameweek=self.start_gameweek,
+            stop_gameweek=self.stop_gameweek,
+            values=tuple(zip(self.gameweeks, self.thresholds, strict=True)),
         )
 
     def as_record(self) -> dict[str, object]:

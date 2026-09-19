@@ -15,6 +15,7 @@ from squadopt.experiments.chip_threshold import (
     DOUBLE_GAMEWEEK,
     GAMEWEEK_KINDS,
     SINGLE_GAMEWEEK,
+    WindowThresholds,
     classify_gameweek_kinds,
     exercise_values_by_kind,
     induction_thresholds,
@@ -49,6 +50,29 @@ def _week(
 
 
 # --- kinds -----------------------------------------------------------------------------
+
+
+def test_a_windows_thresholds_become_the_chains_own_schedule() -> None:
+    """The chain takes a table of holding values; it never learns how they were computed."""
+
+    thresholds = WindowThresholds(
+        chip="bboost",
+        start_gameweek=20,
+        stop_gameweek=22,
+        gameweeks=(20, 21, 22),
+        thresholds=(14.0, 8.0, 0.0),
+        pooled_fallback_kinds=(),
+        sample_seasons=("2021-22",),
+        sample_sizes=(("single", 12),),
+    )
+    schedule = thresholds.as_schedule()
+    assert schedule.matches(ChipWindowRule("bboost", 20, 22))
+    assert not schedule.matches(ChipWindowRule("bboost", 1, 19))
+    assert not schedule.matches(ChipWindowRule("3xc", 20, 22))
+    assert schedule.value_at(21) == 8.0
+    assert schedule.value_at(22) == 0.0
+    # A gameweek the window does not cover is not priced by the schedule.
+    assert schedule.value_at(23) is None
 
 
 def test_kinds_of_a_small_season_including_a_week_that_is_both_blank_and_double() -> None:
