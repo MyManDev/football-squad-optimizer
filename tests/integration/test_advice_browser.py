@@ -401,6 +401,8 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
             "-m",
             "tests.fixtures.backend_app",
             capture.inputs.captured_at_utc,
+            "--host",
+            "127.0.0.1",
             "--port",
             str(api_port),
         ],

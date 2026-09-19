@@ -35,6 +35,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("captured_at_utc")
+    parser.add_argument("--host", required=True)
     parser.add_argument("--port", type=int, required=True)
     args = parser.parse_args()
-    uvicorn.run(build_app(args.captured_at_utc), host="127.0.0.1", port=args.port)
+    uvicorn.run(build_app(args.captured_at_utc), host=args.host, port=args.port)
