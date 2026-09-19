@@ -50,8 +50,9 @@ conclusions.
 
 ## The open queue
 
-Strictly sequential, because both open candidates change the same component —
-`expected_points_rate` — and measuring them together would make the result unattributable.
+It was strictly sequential while both candidates were open, because both change the same
+component, `expected_points_rate`, and measuring them together would have made the result
+unattributable. One of the two is now closed.
 
 ### 1. Issue #43 — a learned rate combined with the calendar
 
@@ -64,9 +65,19 @@ three owners (`issue43_handoff_acceptance.md:45`).
 When it runs, the record must name the executing machine — `fit_learned_rate` solves a ridge
 system through LAPACK, which is not bit-identical across machines.
 
-### 2. Issue #88 — give the scoring rate the opponent it faces
+### 2. Issue #88: closed as superseded on 2026-09-19
 
-Does not start until #43's verdict is recorded. The signal evidence is already measured
+Closed on the owner's decision, not measured. The candidate adds two inputs to the ridge rate
+of the two-stage model, and since #395 the live decision is made by the Phase C component
+base, which has no such rate; a verdict would have been about a model nothing reads. The same
+fitted signals were also measured where they would have been used, as an adjustment at the
+decision, and lost 0.91 points per fold (`experiments/opponent_projection.py`). The frozen
+declaration (`route_a_declaration.md`) and the signal study stay as history. A future
+opponent-aware candidate is a new declaration against the component base, frozen before any
+fold is read, and it has to answer that decision-level negative first. With this closed,
+nothing waits on #43 any more.
+
+What was known when it was opened, kept for whoever writes that declaration. The signal evidence is already measured
 (`opponent_strength_signal.md`): attackers spread +0.162 across opponent-defence quartiles and
 are monotone across all four; goalkeepers and defenders spread +0.322 against opponent attacks
 but are not monotone.
