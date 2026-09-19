@@ -62,7 +62,8 @@ def test_canned_metrics_and_actual_log_shapes_are_reported_without_invented_valu
     assert "hits=7; misses=3" in report
     assert "reason=DataError: 1" in report
     assert "Jobs by status (API metric outcomes): unavailable" in report
-    assert "Solve median/slowest by window: unavailable" in report
+    assert "window 3, retained logs only): unavailable" in report
+    assert "Completions without window (retained logs): 2" in report
     assert "n=2, median=6.000, slowest=10.000" in report
     assert "6 records, 2026-09-19T00:00:00Z to 2026-09-19T00:00:05Z; non-JSON lines=1" in report
     assert "TIME_BUDGET_EXCEEDED=1" in report
@@ -178,3 +179,42 @@ def test_non_positive_days_rejected() -> None:
     with pytest.raises(SystemExit) as error:
         status.main(["--days", "0"])
     assert error.value.code == 2
+
+
+def test_window_summaries_use_exact_completed_samples_and_keep_legacy_counts(
+    tmp_path: Path,
+) -> None:
+    records = [
+        {"window": 1, "wall_seconds": 1},
+        {"window": 1, "wall_seconds": 9},
+        {"window": 3, "wall_seconds": 30},
+        {"window": 5, "wall_seconds": 50},
+        {"wall_seconds": 7},
+        {"window": True, "wall_seconds": 8},
+    ]
+    lines = [
+        json.dumps({"event": "advice_job_completed", "at_utc": "2026-09-19T00:00:00Z", **r})
+        for r in records
+    ]
+    lines.append(
+        json.dumps(
+            {
+                "event": "advice_job_failed",
+                "at_utc": "2026-09-19T00:00:01Z",
+                "window": 1,
+                "wall_seconds": 100,
+            }
+        )
+    )
+    (tmp_path / "worker-1.log").write_text("\n".join(lines), encoding="utf-8")
+    _, report = status.status_report(
+        "http://127.0.0.1:18764",
+        "https://public.test",
+        tmp_path,
+        transport=lambda url: (503, "{}"),
+    )
+    assert "window 1, retained logs only): n=2, median=5.000, slowest=9.000" in report
+    assert "window 3, retained logs only): n=1, median=30.000, slowest=30.000" in report
+    assert "window 5, retained logs only): n=1, median=50.000, slowest=50.000" in report
+    assert "all windows, retained logs only): n=6, median=8.500, slowest=50.000" in report
+    assert "Completions without window (retained logs): 2" in report

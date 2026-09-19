@@ -7,6 +7,7 @@ presses a button for.
 """
 
 import json
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -43,6 +44,7 @@ from squadopt.platform.advice_job_spec import (
     AdviceJobSpecConflictError,
     FileAdviceJobSpecStore,
 )
+from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.advice_queue import (
     AdviceComputeRefused,
     FileJobQueue,
@@ -293,7 +295,7 @@ def test_a_locked_capture_directory_does_not_stop_worker_claims(running, monkeyp
     "error_code", [None, "ADVICE_FAILED", "CONTEXT_UNAVAILABLE", "DETERMINISM_DEFECT"]
 )
 def test_terminal_timestamp_is_read_after_computation(
-    tmp_path: Path, error_code: str | None
+    tmp_path: Path, error_code: str | None, caplog: pytest.LogCaptureFixture
 ) -> None:
     queue = FileJobQueue(tmp_path / "jobs")
     cache = FileAdviceCache(tmp_path / "cache")
@@ -307,8 +309,10 @@ def test_terminal_timestamp_is_read_after_computation(
     finished_at = datetime(2026, 9, 1, 10, 2, tzinfo=UTC)
     clock = [claimed_at]
     claims: list[AdviceJob] = []
+    fields: dict[str, object] = {}
 
     def compute(job: AdviceJob) -> bytes:
+        fields.update(window=3, strategy="saf-puan")
         claims.append(job)
         clock[0] = finished_at
         if error_code == "ADVICE_FAILED":
@@ -317,6 +321,7 @@ def test_terminal_timestamp_is_read_after_computation(
             raise AdviceComputeRefused(error_code, "The context is no longer available.")
         return answer
 
+    caplog.set_level(logging.INFO, logger="advice.worker")
     processed = run_advice_worker(
         queue,
         cache,
@@ -325,9 +330,16 @@ def test_terminal_timestamp_is_read_after_computation(
         now=lambda: clock[0],
         max_jobs=1,
         heartbeat_seconds=None,
+        log=AdviceLog("worker"),
+        job_log_fields=fields,
     )
 
     assert processed == 1
+    events = [
+        json.loads(record.message) for record in caplog.records if record.name == "advice.worker"
+    ]
+    terminal_event = events[-1]
+    assert terminal_event["window"] == 3 and terminal_event["strategy"] == "saf-puan"
     assert len(claims) == 1 and claims[0].status == "running"
     assert claims[0].updated_at_utc == "2026-09-01T10:01:00Z"
     terminal = queue.load(queued.job_id)
@@ -408,11 +420,18 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     backend = running["backend"]
     key = "e" * 64
     backend.job_specs.put(key, _spec(context=_context("fpl-live-20250101T000000Z-deadbeef1234")))
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    fields: dict[str, object] = {}
+    compute = build_advice_compute(backend.contexts, backend.job_specs, job_log_fields=fields)
 
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job(key))
     assert refusal.value.code == "CONTEXT_UNAVAILABLE"
+    assert fields == {"window": COMPUTED_WINDOW, "strategy": COMPUTED_MODE}
+    # A following job with no readable spec must not inherit the previous coordinates.
+    with pytest.raises(AdviceComputeRefused) as unreadable:
+        compute(_job("d" * 64))
+    assert unreadable.value.code == "REQUEST_UNREADABLE"
+    assert fields == {}
     assert backend.cache.get(key) is None
 
     job = run_advice_worker_once(
@@ -442,15 +461,18 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     job_id = accepted.json()["job_id"]
     assert client.get(f"/api/v1/advice-jobs/{job_id}").json()["status"] == "queued"
 
+    fields: dict[str, object] = {}
     processed = run_advice_worker(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs),
+        build_advice_compute(backend.contexts, backend.job_specs, job_log_fields=fields),
         should_stop=_stop_after(3),
         max_jobs=1,
         metrics=backend.metrics,
+        job_log_fields=fields,
     )
     assert processed == 1
+    assert fields == {"window": COMPUTED_WINDOW, "strategy": COMPUTED_MODE}
     finished = client.get(f"/api/v1/advice-jobs/{job_id}").json()
     assert finished["status"] == "completed", finished
 

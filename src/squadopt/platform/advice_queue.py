@@ -94,6 +94,7 @@ def _run_advice_worker_once(
     heartbeat_seconds: float | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
+    job_log_fields: dict[str, object] | None = None,
 ) -> AdviceJob | None:
     """Claim one job, compute it, cache the answer, record the terminal state.
 
@@ -167,7 +168,12 @@ def _run_advice_worker_once(
             metrics.solve_seconds(perf_counter() - started)
             metrics.increment("advice_jobs_total", outcome="determinism_defect")
         if log is not None:
-            log.event("advice_job_failed", job_id=job.job_id, code="DETERMINISM_DEFECT")
+            log.event(
+                "advice_job_failed",
+                job_id=job.job_id,
+                code="DETERMINISM_DEFECT",
+                **(job_log_fields or {}),
+            )
         return failed
     except (BackendJobsContractError, AdviceLeaseLostError):
         raise
@@ -189,6 +195,7 @@ def _run_advice_worker_once(
                 job_id=job.job_id,
                 code=refusal.code,
                 detail=str(refusal.__cause__) if refusal.__cause__ is not None else None,
+                **(job_log_fields or {}),
             )
         return failed
     except Exception as error:
@@ -213,6 +220,7 @@ def _run_advice_worker_once(
                 code="ADVICE_FAILED",
                 error_type=type(error).__name__,
                 detail=str(error) or None,
+                **(job_log_fields or {}),
             )
         return failed
     finally:
@@ -240,6 +248,7 @@ def _run_advice_worker_once(
             job_id=job.job_id,
             cache_key=job.cache_key,
             wall_seconds=round(perf_counter() - started, 3),
+            **(job_log_fields or {}),
         )
     return completed
 
@@ -255,6 +264,7 @@ def run_advice_worker_once(
     heartbeat_seconds: float | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
+    job_log_fields: dict[str, object] | None = None,
 ) -> AdviceJob | None:
     """Run one attempt; a recovered attempt may no longer publish any outcome."""
     try:
@@ -268,6 +278,7 @@ def run_advice_worker_once(
             heartbeat_seconds=heartbeat_seconds,
             metrics=metrics,
             log=log,
+            job_log_fields=job_log_fields,
         )
     except AdviceLeaseLostError:
         if metrics is not None:
