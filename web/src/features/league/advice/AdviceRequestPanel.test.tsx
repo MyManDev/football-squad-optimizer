@@ -151,6 +151,8 @@ describe("with the service answering", () => {
     ["en", "TOP100_INPUTS_UNAVAILABLE"],
     ["tr", "OPEN_JOB_LIMITED"],
     ["en", "OPEN_JOB_LIMITED"],
+    ["tr", "DEADLINE_PASSED"],
+    ["en", "DEADLINE_PASSED"],
   ] as const)("says a coded failure in %s: %s", (language, reason) => {
     const copy = COMPUTE_COPY[language];
     const { container } = renderPanel(

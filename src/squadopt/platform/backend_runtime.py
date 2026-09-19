@@ -394,6 +394,14 @@ class CaptureContextProvider:
                 return identity
         return None
 
+    def deadline_for(self, context: AdviceRequestContext) -> str:
+        """The deadline of the exact capture and handoff resolved for this request."""
+
+        identity = self._identity_for(context.capture_snapshot_id)
+        if identity is None or identity.context != context:
+            raise AdviceBackendNotReadyError("The resolved capture is no longer available.")
+        return identity.inputs.deadline.deadline_utc
+
     def _identity_for(self, snapshot_id: str) -> CaptureIdentity | None:
         with self._lock:
             held = self._identity
@@ -722,6 +730,7 @@ def build_backend(
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
         max_open_jobs_per_client=config.max_open_jobs_per_client,
+        deadline_for=contexts.deadline_for,
         specs=specs,
         # Accepting work the store cannot hold is a promise the deployment cannot keep:
         # the job write would fail, or succeed onto storage nobody will read again.

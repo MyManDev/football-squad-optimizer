@@ -918,8 +918,18 @@ def optimize_transfer_plan(
     first_week_overlap: FirstWeekOverlap | None = None,
     first_week_transfer_cap: int | None = None,
     first_week_exclusion: FirstWeekExclusion | None = None,
+    linearization_level: int | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
+
+    ``linearization_level`` is CP-SAT's own parameter, left at the solver's default
+    when ``None`` so every existing caller solves exactly as before. At 2 the solver
+    linearizes more of the model (most likely the two-literal rows: starter implies
+    squad, captain implies starter; the cause was not isolated), and the effect is
+    measured in ``docs/member_window_proofs.md``: on the fifteen members of capture
+    ``fpl-live-20260918T122516Z`` it took the three-week windows from 0 to 15 proved
+    and the five-week windows from 0 to 12, inside the unchanged deterministic budget.
+    It changes how hard the solver works on the bound, never what the model says.
 
     ``chips`` names the chips that may be played in which gameweeks of this horizon
     (bench boost, triple captain, wildcard); omitted or empty, the planner is exactly
@@ -1023,6 +1033,8 @@ def optimize_transfer_plan(
         wall_limit,
         deterministic_limit,
     )
+    if linearization_level is not None:
+        primary_solver.parameters.linearization_level = linearization_level
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
     primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
@@ -1091,6 +1103,9 @@ def optimize_transfer_plan(
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if linearization_level is not None:
+        # Only when a caller chose one, so every other plan's diagnostics stay as they were.
+        diagnostics["linearization_level"] = linearization_level
     if primary_status in {SolverStatus.INFEASIBLE, SolverStatus.UNKNOWN}:
         return _empty_result(primary_status, verified_horizon, diagnostics)
 
@@ -1139,6 +1154,8 @@ def optimize_transfer_plan(
             remaining_time,
             remaining_deterministic_time,
         )
+        if linearization_level is not None:
+            tiebreak_solver.parameters.linearization_level = linearization_level
         raw_tiebreak_status = _solve(artifacts.model, tiebreak_solver)
         tiebreak_status = _map_solver_status(raw_tiebreak_status)
         tiebreak_deterministic_time = _deterministic_time_used(
