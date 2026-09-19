@@ -123,6 +123,8 @@ def _run_advice_worker_once(
     job = queue.claim(at_utc=at_utc, clock=claim_at_utc)
     if job is None:
         return None
+    if job_log_fields is not None:
+        job_log_fields.clear()
     if metrics is not None:
         from squadopt.platform.jobs_contract import _instant
 

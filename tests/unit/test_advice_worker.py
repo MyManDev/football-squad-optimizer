@@ -357,6 +357,33 @@ def test_terminal_timestamp_is_read_after_computation(
         assert cache.get(queued.cache_key) == expected
 
 
+def test_claim_clears_previous_coordinates_before_an_early_callback_failure(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(replace(_job("a" * 64), status="queued"))
+    fields: dict[str, object] = {"window": 5, "strategy": "fark-yarat"}
+
+    def compute(job: AdviceJob) -> bytes:
+        raise RuntimeError("Failed before reading a specification.")
+
+    caplog.set_level(logging.INFO, logger="advice.worker")
+    result = run_advice_worker_once(
+        queue,
+        FileAdviceCache(tmp_path / "cache"),
+        compute,
+        at_utc="2026-09-01T10:01:00Z",
+        log=AdviceLog("worker"),
+        job_log_fields=fields,
+    )
+    assert result is not None and result.status == "failed"
+    events = [
+        json.loads(record.message) for record in caplog.records if record.name == "advice.worker"
+    ]
+    assert events[-1]["event"] == "advice_job_failed"
+    assert "window" not in events[-1] and "strategy" not in events[-1]
+
+
 def test_a_spec_survives_the_round_trip_with_its_context(tmp_path: Path) -> None:
     store = FileAdviceJobSpecStore(tmp_path / "specs")
     key = "a" * 64
