@@ -311,6 +311,35 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         },
     )
     assert report.rendered_count == 3
+    # The member page reads the published calendar and withholds Compute once the advised
+    # gameweek's deadline has passed. This world's gameweek closed long ago by the wall
+    # clock, and the build would otherwise serve the real season's calendar, so the fixture
+    # publishes its own, with the week still open. It is site data like the rest: nothing is
+    # intercepted in the browser.
+    (config.site_data_root / "fixtures.json").write_text(
+        json.dumps(
+            {
+                "contract_version": "fixtures_v1",
+                "generated_at_utc": world.GW2_CAPTURED_AT,
+                "source_kind": "example",
+                "payload": {
+                    "season": capture.inputs.season,
+                    "source_snapshot_id": snapshot_id,
+                    "captured_at_utc": world.GW2_CAPTURED_AT,
+                    "current_gameweek": int(capture.inputs.deadline.gameweek),
+                    "unscheduled_count": 0,
+                    "gameweeks": [
+                        {
+                            "gameweek": int(capture.inputs.deadline.gameweek),
+                            "deadline_utc": "2999-01-01T00:00:00Z",
+                            "fixtures": [],
+                        }
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     baseline_path = (
         config.site_data_root / "league" / "advice" / str(entry_id) / "saf-puan" / "1.json"
     )
