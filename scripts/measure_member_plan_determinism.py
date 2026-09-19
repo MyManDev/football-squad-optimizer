@@ -21,10 +21,16 @@ experiment would compare four identical configurations without saying so.
 
 This is why the one-week card matters more than the window plans for this question. The window
 path, the chip path and the system's own ledger squad all refuse a plan the clock cut short
-(`wall_clock_stopped_the_search` is called at `application/advice.py:821`,
-`advice_chips.py:325`, `live/report.py:106`). The one-week card and every rival variant call it
-nowhere, and the published record carries no deterministic time at all, so a reader of a member's
-plan cannot tell which budget stopped it.
+(`wall_clock_stopped_the_search` is called at `application/advice.py:829`,
+`advice_chips.py:325`, `live/report.py:106`). The one-week card, whose solve is the
+`plan_transfers` call at `advice.py:451`, and every rival variant call it nowhere, and the
+published record carries no deterministic time at all, so a reader of a member's plan cannot
+tell which budget stopped it.
+
+What the grid found about that tie-break is reported in the record whichever way it came
+out, and it came out against the mechanism above: where the clock cut the tie-break the
+published plan did not move. Every plan that did move had its primary search cut instead,
+which is the ordinary case rather than the subtle one.
 
 Descriptive. Nothing is promoted, no default moves, and no advice is recorded or published: this
 reads a capture and solves from it.
@@ -76,12 +82,18 @@ ARMS: dict[str, float] = {
 }
 
 #: Diagnostics that echo the arm back. They differ by construction and comparing them would
-#: report a difference the experiment created itself.
+#: report a difference the experiment created itself. They are checked against the arm before
+#: the record is written, which is a stronger statement than comparing them across arms.
+#:
+#: `deterministic_budget_source` is deliberately not here. It never varies, and that is the
+#: point: it is the witness that no arm fell through the planner's defaulting at
+#: `planning/optimizer.py:1025-1028`, where a `None` deterministic limit both flips the source
+#: to `planner_default` and silently raises the wall to 300. An experiment blind to that is an
+#: experiment that cannot tell four ceilings from one.
 ARM_ECHO_KEYS = frozenset(
     {
         "solver_time_limit_seconds",
         "wall_time_limit_seconds",
-        "deterministic_budget_source",
     }
 )
 
@@ -140,8 +152,10 @@ def _published_answer(week: Any) -> dict[str, Any]:
         "captain": None if week.captain is None else int(week.captain["player_id"]),
         "chip": week.chip,
         "projected_score": float(week.projected_score),
-        # The publication helper settles bench order and the vice captain, which is what the
-        # tie-break phase decides between equal-objective plans.
+        # Bench order and the vice captain are not a second choice: `lineup_publication`
+        # completes them by a deterministic rule over the eleven and bench already chosen,
+        # so they carry no information beyond the squad and the eleven. They are recorded
+        # because they are what the page prints, not as independent evidence.
         "published": {key: fields[key] for key in sorted(fields)},
     }
 
@@ -193,9 +207,9 @@ def _differences(cells: list[dict[str, Any]], arms: list[str]) -> dict[str, Any]
         by_arm = {cell["arm"]: _comparable(cell) for cell in cells if cell["entry_id"] == entry_id}
         if len(by_arm) < 2:
             continue
-        reference_arm = arms[-1]
-        if reference_arm not in by_arm:
-            reference_arm = sorted(by_arm)[-1]
+        # By ceiling, never by the order the operator typed the arms and never by name:
+        # `wall_5s` sorts after `wall_1800s`, which would invert every reading below it.
+        reference_arm = max(by_arm, key=lambda name: ARMS[name])
         reference = by_arm[reference_arm]
         moved: dict[str, Any] = {}
         for arm, cell in by_arm.items():
@@ -215,6 +229,62 @@ def _differences(cells: list[dict[str, Any]], arms: list[str]) -> dict[str, Any]
     return per_member
 
 
+def _tiebreak_section(record: dict[str, Any], arm_order: list[str]) -> list[str]:
+    """What happened where the clock cut the tie-break rather than the primary search.
+
+    This is the mechanism the experiment was designed around, so what it did is reported
+    whichever way it came out. A cut tie-break shows as an `OPTIMAL` primary that the clock
+    still stopped: the objective was proved and the phase that chooses among equal-objective
+    plans did not finish.
+    """
+
+    cells = record["cells"]
+    per_member = record["per_member"]
+    # Only the answer counts here. A cell whose deterministic accounting differs but whose
+    # plan does not is not a cell where a member would read something else, and counting it
+    # as one would make this section contradict the table above it.
+    moved_cells = set()
+    for entry_id, value in per_member.items():
+        for field, arms in value["fields_that_moved"].items():
+            if not field.startswith("answer"):
+                continue
+            for arm in arms:
+                moved_cells.add((entry_id, arm))
+
+    lines = ["", "## What a cut tie-break did, as distinct from a cut search", ""]
+    lines += [
+        "| arm | tie-break cut by the clock | of those, answer moved |",
+        "| --- | ---: | ---: |",
+    ]
+    total_cut = 0
+    total_moved = 0
+    for arm in arm_order:
+        cut = [
+            cell
+            for cell in cells
+            if cell["arm"] == arm
+            and cell["solver_status"] == "OPTIMAL"
+            and cell["wall_clock_stopped_the_search"]
+        ]
+        moved = [c for c in cut if (str(c["entry_id"]), arm) in moved_cells]
+        total_cut += len(cut)
+        total_moved += len(moved)
+        lines.append(f"| `{arm}` | {len(cut)} | {len(moved)} |")
+    lines += [
+        "",
+        f"**{total_cut} solves had their tie-break stopped by the clock and {total_moved} of "
+        "them published a different plan.** The tie-break is the phase that chooses between "
+        "plans of equal objective value, and it is the mechanism this experiment was built "
+        "around; on this capture, cutting it changed nothing a member reads.",
+        "",
+        "Every cell whose answer did move was `FEASIBLE`, which is the ordinary case of a "
+        "primary search stopped before it proved, not the subtle one. That is the more "
+        "reassuring of the two readings and it is the better supported, so it is stated here "
+        "rather than left for a reader to derive from the cells.",
+    ]
+    return lines
+
+
 def _markdown(record: dict[str, Any]) -> str:
     # The record is written with sorted keys, so the arms come back alphabetically and
     # `wall_1800s` sorts before `wall_1s`. Read them in ceiling order instead.
@@ -223,11 +293,13 @@ def _markdown(record: dict[str, Any]) -> str:
     moved = [key for key, value in per_member.items() if value["fields_that_moved"]]
     answer_moved = [key for key, value in per_member.items() if value["answer_moved"]]
     lines = [
-        "# The one-week member plan, at four wall ceilings",
+        f"# The one-week member plan, at {len(arm_order)} wall ceilings",
         "",
         f"Contract `{record['contract_version']}`. Capture `{record['snapshot_id']}`, season "
         f"{record['season']}, gameweek {record['gameweek']}, {record['member_count']} members. "
-        f"Arms are wall ceilings in seconds: {record['arms']}. The deterministic budget is "
+        "Arms are wall ceilings in seconds: "
+        + ", ".join(f"`{name}` at {record['arms'][name]}" for name in arm_order)
+        + ". The deterministic budget is "
         f"pinned at {record['deterministic_time_limit']} in every arm, the value the planner "
         "uses in production, and is passed explicitly so the planner does not raise a low "
         "ceiling to its own default. Only the wall ceiling differs.",
@@ -250,6 +322,7 @@ def _markdown(record: dict[str, Any]) -> str:
             f"| {entry_id} | {'yes' if value['answer_moved'] else 'no'} | "
             f"{len(value['fields_that_moved'])} |"
         )
+    lines += _tiebreak_section(record, arm_order)
     lines += [
         "",
         "## What the clock cost, per arm",
@@ -399,6 +472,15 @@ def main(argv: list[str] | None = None) -> int:
                 cell["wall_clock_stopped_the_search"],
                 wall_seconds,
             )
+
+    for cell in cells:
+        arm = str(cell["arm"])
+        if cell["diagnostics.deterministic_budget_source"] != "caller":
+            print(f"control failed: {cell['entry_id']} {arm} took the planner's own budget")
+            return 1
+        if float(cell["diagnostics.wall_time_limit_seconds"]) != ARMS[arm]:
+            print(f"control failed: {cell['entry_id']} {arm} did not run at its own ceiling")
+            return 1
 
     per_arm = {
         arm: {

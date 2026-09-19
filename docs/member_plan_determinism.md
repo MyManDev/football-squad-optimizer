@@ -1,6 +1,6 @@
-# The one-week member plan, at four wall ceilings
+# The one-week member plan, at 6 wall ceilings
 
-Contract `member_plan_determinism_v1`. Capture `fpl-live-20260918T122516Z-cd5c04029774`, season 2026-27, gameweek 5, 15 members. Arms are wall ceilings in seconds: {'wall_1800s': 1800.0, 'wall_1s': 1.0, 'wall_2s': 2.0, 'wall_300s': 300.0, 'wall_30s': 30.0, 'wall_5s': 5.0}. The deterministic budget is pinned at 20.0 in every arm, the value the planner uses in production, and is passed explicitly so the planner does not raise a low ceiling to its own default. Only the wall ceiling differs.
+Contract `member_plan_determinism_v1`. Capture `fpl-live-20260918T122516Z-cd5c04029774`, season 2026-27, gameweek 5, 15 members. Arms are wall ceilings in seconds: `wall_1s` at 1.0, `wall_2s` at 2.0, `wall_5s` at 5.0, `wall_30s` at 30.0, `wall_300s` at 300.0, `wall_1800s` at 1800.0. The deterministic budget is pinned at 20.0 in every arm, the value the planner uses in production, and is passed explicitly so the planner does not raise a low ceiling to its own default. Only the wall ceiling differs.
 
 Descriptive. Nothing is promoted and no default moves.
 
@@ -26,6 +26,21 @@ Descriptive. Nothing is promoted and no default moves.
 | 7252721 | no | 5 |
 | 8548384 | no | 5 |
 | 8883467 | no | 13 |
+
+## What a cut tie-break did, as distinct from a cut search
+
+| arm | tie-break cut by the clock | of those, answer moved |
+| --- | ---: | ---: |
+| `wall_1s` | 9 | 0 |
+| `wall_2s` | 10 | 0 |
+| `wall_5s` | 5 | 0 |
+| `wall_30s` | 0 | 0 |
+| `wall_300s` | 0 | 0 |
+| `wall_1800s` | 0 | 0 |
+
+**24 solves had their tie-break stopped by the clock and 0 of them published a different plan.** The tie-break is the phase that chooses between plans of equal objective value, and it is the mechanism this experiment was built around; on this capture, cutting it changed nothing a member reads.
+
+Every cell whose answer did move was `FEASIBLE`, which is the ordinary case of a primary search stopped before it proved, not the subtle one. That is the more reassuring of the two readings and it is the better supported, so it is stated here rather than left for a reader to derive from the cells.
 
 ## What the clock cost, per arm
 
