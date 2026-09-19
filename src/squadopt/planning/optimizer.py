@@ -924,12 +924,12 @@ def optimize_transfer_plan(
 
     ``linearization_level`` is CP-SAT's own parameter, left at the solver's default
     when ``None`` so every existing caller solves exactly as before. At 2 the solver
-    also linearizes the two-literal rows (starter implies squad, captain implies
-    starter), which is what gives a multi-week model a bound tight enough to prove:
-    on the fifteen members of capture ``fpl-live-20260918T122516Z`` it took the
-    three-week windows from 0 to 15 proved and the five-week windows from 0 to 12,
-    inside the unchanged deterministic budget. It changes how hard the solver works
-    on the bound, never what the model says.
+    linearizes more of the model (most likely the two-literal rows: starter implies
+    squad, captain implies starter; the cause was not isolated), and the effect is
+    measured in ``docs/member_window_proofs.md``: on the fifteen members of capture
+    ``fpl-live-20260918T122516Z`` it took the three-week windows from 0 to 15 proved
+    and the five-week windows from 0 to 12, inside the unchanged deterministic budget.
+    It changes how hard the solver works on the bound, never what the model says.
 
     ``chips`` names the chips that may be played in which gameweeks of this horizon
     (bench boost, triple captain, wildcard); omitted or empty, the planner is exactly
