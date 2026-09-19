@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
+import { MESSAGES } from "../src/i18n/messages";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
@@ -246,8 +247,8 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Hesapla", exact: true }).click();
   await expect(
-    page.getByText(
-      "Hesaplama servisine ulaşılamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
-    ),
+    page.getByText(MESSAGES.tr.leagueMembers.computeStaticFallback, { exact: false }),
   ).toBeVisible();
+  await expect(advice).toContainText(baseline.payload.captain.name);
+  await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);
 });
