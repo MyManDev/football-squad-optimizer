@@ -71,6 +71,7 @@ backup: Git does not contain these five trees. First real backup and real restor
 **never exercised**; only disposable fixture restores have passed. Registering a daily
 backup is a separate owner action using the line in the
 [deployment runbook](deployment_runbook.md#back-up-irreplaceable-data).
+The daily backup schedule has **never been registered**.
 After an intentional older-point restore, a later backup can report newer records
 missing against its latest manifest. Inspect the loss list before using `-AcceptMissing`;
 that acknowledgement writes a new manifest and keeps all old backup files. Without it,
@@ -92,12 +93,23 @@ Copy-Item -LiteralPath C:\squadopt-site-restore\data -Destination web\public -Re
 
 Both named recovery directories must be new; the move preserves the clone's bundled
 data so it cannot leave stale files mixed into the restored publication. These steps
-are for the clean recovery checkout only. If the artifact has expired, stop:
-an accepted retained publication or an owner-approved regeneration is required. This
+are for the clean recovery checkout only. CI retains the `site` artifact for seven days.
+The same accepted tree is committed under `web/public/data` at its accepted release tag;
+use the [deployment runbook](deployment_runbook.md) to find the matching run and tag.
+If the artifact has expired, recover that exact tagged tree or stop for an owner-approved
+regeneration. This
 new-PC artifact recovery is **never exercised**. The readiness check must confirm that
 the restored publication and capture agree before the machine serves requests.
+All four checks must pass: `capture_context` (the published capture under `data/snapshots`
+with its matching handoff under `data/handoffs`), `league_tree`, `cache_store`, and
+`league_tree_matches_capture`.
 
-H1 does not back up the generated `artifacts/` directory or the reproducible public
+This recovery checkout has a detached HEAD and a replaced tracked `web/public/data` tree.
+`scripts/release/restart_backend.ps1` requires a clean checkout on `develop` and refuses
+both conditions. Before the next regular release, preserve the accepted recovered tree
+and return the checkout to a clean `develop` through the normal release procedure.
+
+`scripts/backup_data.ps1` does not back up the generated `artifacts/` directory or the reproducible public
 archive `data/raw`. Restore the exact accepted Top 100 and rotation table/manifest
 pairs into `artifacts/` from retained publication outputs, or follow the existing
 [weekly recipe](weekly_runbook.md) for an approved regeneration. Missing evidence is
@@ -119,13 +131,17 @@ create another tunnel or change DNS merely because the PC changed.
 cloudflared tunnel ingress validate
 cloudflared tunnel ingress rule https://squadopt-api.mymandev.com/metrics
 cloudflared tunnel ingress rule https://squadopt-api.mymandev.com/ready
-gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "https://squadopt-api.mymandev.com"
+gh variable get ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer
 ```
 
-The ingress rules must refuse metrics/readiness publicly. CI maps `ADVICE_API_ORIGIN`
+The `/metrics` check must report the `http_status:404` rule and the `/ready` check the
+`http://127.0.0.1:8000` rule: metrics never leave the machine, readiness is served.
+CI maps `ADVICE_API_ORIGIN`
 to `VITE_ADVICE_API_ORIGIN` when it builds the site. Setting the variable does not change
 an already published bundle; a different backend origin needs a normal approved site
-release. Reusing the current origin requires no site deployment for this recovery.
+release. Only if the hostname changed, set the new public value with
+`gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "<new-public-origin>"`.
+Reusing the current origin requires no configuration write or site deployment for this recovery.
 Credential transfer and tunnel operation on a replacement PC are **never exercised**.
 
 ## 5. Start, inspect, then register the watch
@@ -153,10 +169,11 @@ accepting recovery. Missing metrics are unknown, not zero. `-Register` writes th
 current user's Startup shortcut with `-Watch`; it starts at the next logon, not now.
 The PC must remain awake and logged in. Watch behavior is covered by mocked tests;
 replacement-PC startup and logon persistence are **never exercised**.
+`-Register` has **never been exercised on any machine**.
 
 ## 6. Prove what the member can read
 
-Use the accepted publication's real cutoff timestamp, not the verifier's historical
+Use a UTC time strictly before the accepted publication's `generated_at_utc`, not the verifier's historical
 default and not the recovery time (restoring a PC does not republish the site):
 
 ```powershell
