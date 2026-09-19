@@ -4,22 +4,22 @@ Protocol: `docs/chip_forecast_prereg.md`. Lookahead-1 chains over 2021-22, 2022-
 
 | Season | Arm | Net | Hits | Chips played | Expired unplayed |
 | --- | --- | ---: | ---: | --- | --- |
-| 2021-22 | `off` | 1994 | 216 | none | none |
+| 2021-22 | `off` | 1994 | 216 | none | n/a, no chip was offered |
 | 2021-22 | `planner` | 2002 | 200 | GW2 bboost, GW20 wildcard, GW21 bboost, GW22 freehit, GW23 3xc, GW3 3xc, GW4 wildcard, GW5 freehit | none |
 | 2021-22 | `fixed` | 2001 | 200 | GW17 freehit, GW2 3xc, GW20 wildcard, GW22 freehit, GW28 bboost, GW36 3xc, GW5 wildcard | bboost:1-19 |
 | 2021-22 | `decaying` | 2051 | 196 | GW13 freehit, GW19 bboost, GW2 3xc, GW20 wildcard, GW22 freehit, GW26 bboost, GW27 3xc, GW5 wildcard | none |
 | 2021-22 | `threshold_only` | 2056 | 196 | GW2 bboost, GW20 wildcard, GW22 freehit, GW23 bboost, GW26 3xc, GW5 wildcard, GW8 freehit, GW9 3xc | none |
-| 2022-23 | `off` | 2013 | 188 | none | none |
+| 2022-23 | `off` | 2013 | 188 | none | n/a, no chip was offered |
 | 2022-23 | `planner` | 2060 | 160 | GW2 bboost, GW20 3xc, GW21 bboost, GW22 wildcard, GW23 freehit, GW3 wildcard, GW4 3xc, GW5 freehit | none |
 | 2022-23 | `fixed` | 2110 | 112 | GW12 freehit, GW20 wildcard, GW22 3xc, GW25 freehit, GW29 bboost, GW3 wildcard | bboost:1-19, 3xc:1-19 |
 | 2022-23 | `decaying` | 2139 | 128 | GW19 bboost, GW20 wildcard, GW22 3xc, GW23 bboost, GW25 freehit, GW3 wildcard, GW8 freehit, GW9 3xc | none |
 | 2022-23 | `threshold_only` | 2139 | 124 | GW2 bboost, GW20 wildcard, GW22 3xc, GW23 bboost, GW25 freehit, GW3 wildcard, GW8 freehit, GW9 3xc | none |
-| 2023-24 | `off` | 1724 | 144 | none | none |
+| 2023-24 | `off` | 1724 | 144 | none | n/a, no chip was offered |
 | 2023-24 | `planner` | 1832 | 116 | GW2 bboost, GW20 bboost, GW21 3xc, GW22 wildcard, GW23 freehit, GW3 3xc, GW4 freehit, GW5 wildcard | none |
 | 2023-24 | `fixed` | 1952 | 84 | GW23 wildcard, GW25 freehit, GW35 3xc, GW37 bboost, GW9 wildcard | freehit:2-19, bboost:1-19, 3xc:1-19 |
 | 2023-24 | `decaying` | 1804 | 108 | GW10 3xc, GW17 freehit, GW19 bboost, GW23 wildcard, GW25 freehit, GW27 3xc, GW28 bboost, GW7 wildcard | none |
 | 2023-24 | `threshold_only` | 1837 | 96 | GW10 3xc, GW2 bboost, GW20 wildcard, GW25 freehit, GW27 3xc, GW28 bboost, GW7 wildcard, GW9 freehit | none |
-| 2024-25 | `off` | 1919 | 124 | none | none |
+| 2024-25 | `off` | 1919 | 124 | none | n/a, no chip was offered |
 | 2024-25 | `planner` | 2074 | 92 | GW2 bboost, GW20 3xc, GW21 bboost, GW22 freehit, GW23 wildcard, GW3 3xc, GW4 wildcard, GW5 freehit | none |
 | 2024-25 | `fixed` | 2033 | 72 | GW25 3xc, GW29 wildcard, GW32 freehit, GW7 wildcard | freehit:2-19, bboost:1-19, bboost:20-38, 3xc:1-19 |
 | 2024-25 | `decaying` | 2037 | 68 | GW10 3xc, GW15 freehit, GW19 bboost, GW24 bboost, GW25 3xc, GW26 wildcard, GW29 freehit, GW7 wildcard | none |

@@ -59,6 +59,10 @@ HALF_SPLIT = 19
 #: The constants of the committed chain records (``run_season_chain_seasons.py``).
 HOLDING_VALUES = {"bboost": 20.0, "3xc": 18.0, "wildcard": 12.0, "freehit": 15.0}
 HIT_COST = 4.0
+#: Keys a reading of a record may add to a chain. A walk writes them too; what matters is
+#: that comparing a record with its own rereading ignores them on both sides, or the guard
+#: below would call a record that gained one of them a record whose chains changed.
+DERIVED_CHAIN_KEYS = ("max_relative_gap", "chip_windows_offered")
 ARMS = ("off", "planner", "fixed", "decaying", "threshold_only")
 COMPARISONS = (
     ("decaying", "fixed"),
@@ -169,6 +173,18 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _expiries(chain: Mapping[str, Any]) -> str:
+    """What a chain lost, and ``n/a`` for the arm that was never offered a chip.
+
+    ``off`` runs with no windows at all, so nothing of it could expire; printing ``none`` there
+    puts it in the same cell as the arms that were offered eight chips and played every one.
+    """
+
+    if not chain.get("chip_windows_offered", True):
+        return "n/a, no chip was offered"
+    return ", ".join(chain["expired_chips"]) or "none"
+
+
 def _markdown(record: dict[str, Any]) -> str:
     lines = [
         "# The chip forecast's rule under two sets of chips",
@@ -184,7 +200,7 @@ def _markdown(record: dict[str, Any]) -> str:
         lines.append(
             f"| {chain['season']} | `{chain['variant']}` | {chain['net_points']:.0f} | "
             f"{chain['transfer_hit_points']:.0f} | {played or 'none'} | "
-            f"{', '.join(chain['expired_chips']) or 'none'} |"
+            f"{_expiries(chain)} |"
         )
     unproved = [
         (chain["season"], chain["variant"], chain["max_relative_gap"])
@@ -239,6 +255,8 @@ def recompute(record: dict[str, Any], *, resamples: int, block_length: int) -> d
     chains = [dict(chain) for chain in record["chains"]]
     for chain in chains:
         chain["max_relative_gap"] = max_relative_gap(chain)
+        # Written by the walk since this change; a record walked before it says so by its arm.
+        chain.setdefault("chip_windows_offered", chain["variant"] != "off")
     return {
         **record,
         "chains": chains,
@@ -269,7 +287,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # same chains twice, and the second read starts from a record the first one wrote.
         def walked(chains: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
             return [
-                {key: value for key, value in chain.items() if key != "max_relative_gap"}
+                {key: value for key, value in chain.items() if key not in DERIVED_CHAIN_KEYS}
                 for chain in chains
             ]
 
@@ -322,6 +340,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             started = datetime.now(UTC)
             result = SeasonChain(panel, counts, config).run()
             record = chain_record(result, arm, (datetime.now(UTC) - started).total_seconds())
+            record["chip_windows_offered"] = arm != "off"
             record["expired_chips"] = [] if arm == "off" else expired_chips(record, windows)
             chains.append(record)
             LOGGER.info(

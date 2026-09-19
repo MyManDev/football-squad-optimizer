@@ -6,7 +6,9 @@ import pytest
 from scripts.measure_chip_forecast_rule import (
     ARMS,
     COMPARISONS,
+    DERIVED_CHAIN_KEYS,
     HISTORY_SEASONS,
+    _expiries,
     expired_chips,
     max_relative_gap,
     recompute,
@@ -102,7 +104,7 @@ def test_recomputing_reads_the_chains_again_and_never_changes_one() -> None:
     assert "recomputed_utc" in again and "recomputed_utc" not in before
     # Every chain is the one that was walked, plus the derived gap and nothing else.
     for walked, read in zip(before["chains"], again["chains"], strict=True):
-        assert {k: v for k, v in read.items() if k != "max_relative_gap"} == walked
+        assert {k: v for k, v in read.items() if k not in DERIVED_CHAIN_KEYS} == walked
     assert again["chains"][0]["max_relative_gap"] == pytest.approx(0.2)
     assert again["bootstrap"] == {
         "resamples": 50,
@@ -123,3 +125,26 @@ def test_the_adopted_arm_is_compared_with_the_arm_it_displaces() -> None:
     assert ("threshold_only", "fixed") in COMPARISONS
     assert COMPARISONS[0] == ("decaying", "fixed")
     assert ("decaying", "threshold_only") in COMPARISONS
+
+
+def test_an_arm_that_was_never_offered_a_chip_does_not_read_as_one_that_lost_none() -> None:
+    """`off` runs with no windows, so `none` would put it beside the arms that played all eight."""
+
+    assert _expiries({"variant": "off", "chip_windows_offered": False, "expired_chips": []}) == (
+        "n/a, no chip was offered"
+    )
+    assert _expiries({"chip_windows_offered": True, "expired_chips": []}) == "none"
+    assert (
+        _expiries({"chip_windows_offered": True, "expired_chips": ["bboost:1-19"]}) == "bboost:1-19"
+    )
+    # A record walked before the field existed still reads correctly after a rereading.
+    record = {
+        "contract_version": "chip_forecast_rule_v1",
+        "created_utc": "2026-09-19T12:41:35+00:00",
+        "chains": [_chain("off", [0.0]), _chain("decaying", [0.0])],
+        "comparisons": [],
+    }
+    again = recompute(record, resamples=10, block_length=2)
+    assert again["chains"][0]["chip_windows_offered"] is False
+    assert again["chains"][1]["chip_windows_offered"] is True
+    assert set(DERIVED_CHAIN_KEYS) == {"max_relative_gap", "chip_windows_offered"}

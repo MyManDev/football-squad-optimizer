@@ -10,6 +10,7 @@
       "carried_blank_rows": 48,
       "carried_unexplained_rows": 0,
       "chip_realized_gains": {},
+      "chip_windows_offered": false,
       "chips_enabled": false,
       "chips_played": {},
       "decisions": 37,
@@ -1708,6 +1709,7 @@
         "freehit": 4.0,
         "wildcard": 80.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "2": "bboost",
@@ -3481,6 +3483,7 @@
         "freehit": -13.0,
         "wildcard": 72.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "17": "freehit",
@@ -5252,6 +5255,7 @@
         "freehit": 10.0,
         "wildcard": 80.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "13": "freehit",
@@ -7026,6 +7030,7 @@
         "freehit": -4.0,
         "wildcard": 72.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "2": "bboost",
@@ -8795,6 +8800,7 @@
       "carried_blank_rows": 29,
       "carried_unexplained_rows": 0,
       "chip_realized_gains": {},
+      "chip_windows_offered": false,
       "chips_enabled": false,
       "chips_played": {},
       "decisions": 36,
@@ -10449,6 +10455,7 @@
         "freehit": -3.0,
         "wildcard": 68.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "2": "bboost",
@@ -12178,6 +12185,7 @@
         "freehit": 37.0,
         "wildcard": 72.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "12": "freehit",
@@ -13902,6 +13910,7 @@
         "freehit": 9.0,
         "wildcard": 72.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "19": "bboost",
@@ -15632,6 +15641,7 @@
         "freehit": 9.0,
         "wildcard": 72.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "2": "bboost",
@@ -17357,6 +17367,7 @@
       "carried_blank_rows": 21,
       "carried_unexplained_rows": 0,
       "chip_realized_gains": {},
+      "chip_windows_offered": false,
       "chips_enabled": false,
       "chips_played": {},
       "decisions": 37,
@@ -19055,6 +19066,7 @@
         "freehit": -12.0,
         "wildcard": 64.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "2": "bboost",
@@ -20828,6 +20840,7 @@
         "freehit": 24.0,
         "wildcard": 68.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "23": "wildcard",
@@ -22593,6 +22606,7 @@
         "freehit": -11.0,
         "wildcard": 80.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "10": "3xc",
@@ -24367,6 +24381,7 @@
         "freehit": 27.0,
         "wildcard": 88.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "10": "3xc",
@@ -26136,6 +26151,7 @@
       "carried_blank_rows": 19,
       "carried_unexplained_rows": 0,
       "chip_realized_gains": {},
+      "chip_windows_offered": false,
       "chips_enabled": false,
       "chips_played": {},
       "decisions": 37,
@@ -27834,6 +27850,7 @@
         "freehit": -11.0,
         "wildcard": 60.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "2": "bboost",
@@ -29606,6 +29623,7 @@
         "freehit": 9.0,
         "wildcard": 92.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "25": "3xc",
@@ -31368,6 +31386,7 @@
         "freehit": -8.0,
         "wildcard": 76.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "10": "3xc",
@@ -33142,6 +33161,7 @@
         "freehit": -9.0,
         "wildcard": 72.0
       },
+      "chip_windows_offered": true,
       "chips_enabled": true,
       "chips_played": {
         "10": "3xc",
@@ -35159,7 +35179,7 @@
   "locked_holdout_accessed": false,
   "planning_hit_cost_points": 4.0,
   "protocol": "docs/chip_forecast_prereg.md",
-  "recomputed_utc": "2026-09-19T15:22:50+00:00",
+  "recomputed_utc": "2026-09-19T16:32:54+00:00",
   "seasons": [
     "2021-22",
     "2022-23",
