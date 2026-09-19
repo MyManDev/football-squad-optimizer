@@ -8,9 +8,49 @@ import { MESSAGES } from "../src/i18n/messages";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
+function windowsApiPids(apiPid: number, fixturePid: number, port: number): number[] {
+  const processes: {
+    ProcessId: number;
+    ParentProcessId: number;
+    Created: string;
+    CommandLine: string | null;
+  }[] = JSON.parse(
+    execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        "ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process | " +
+          "Select-Object ProcessId,ParentProcessId,CommandLine,@{Name='Created';" +
+          "Expression={$_.CreationDate.ToUniversalTime().Ticks.ToString()}})",
+      ],
+      { encoding: "utf8", windowsHide: true, timeout: 10_000 },
+    ),
+  );
+  const root = processes.find((row) => row.ProcessId === apiPid);
+  if (!root) throw new Error("The fixture API process is missing.");
+  expect(root.ParentProcessId).toBe(fixturePid);
+  const selected = [root];
+  for (const parent of selected) {
+    selected.push(
+      ...processes.filter(
+        (row) =>
+          row.ParentProcessId === parent.ProcessId &&
+          !selected.includes(row) &&
+          BigInt(row.Created) >= BigInt(parent.Created),
+      ),
+    );
+  }
+  // Windows retains stale parent PIDs on orphans. Only newer descendants belong here.
+  const portArgument = new RegExp(`(?:^|\\s)--port\\s+"?${port}"?(?=\\s|$)`);
+  expect(selected.some((row) => portArgument.test(row.CommandLine ?? ""))).toBe(true);
+  return selected.reverse().map((row) => row.ProcessId);
+}
+
 test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   // These are the Python fixture's captured squad and member documents. No route,
   // including the API, is intercepted; Chromium enforces the cross-origin request.
   await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
@@ -204,23 +244,18 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   for (const pid of [context.apiPid, context.fixturePid]) {
     expect(Number.isSafeInteger(pid) && pid > 0).toBe(true);
   }
-  const parent =
-    process.platform === "win32"
-      ? execFileSync(
-          "powershell.exe",
-          [
-            "-NoProfile",
-            "-Command",
-            `(Get-CimInstance Win32_Process -Filter 'ProcessId=${context.apiPid}').ParentProcessId`,
-          ],
-          { encoding: "utf8", windowsHide: true },
-        )
-      : execFileSync("ps", ["-o", "ppid=", "-p", String(context.apiPid)], { encoding: "utf8" });
-  expect(Number(parent.trim())).toBe(context.fixturePid);
   if (process.platform === "win32") {
-    // The venv launcher has an interpreter child. Both must stop, exactly as teardown does.
-    execFileSync("taskkill", ["/PID", String(context.apiPid), "/T", "/F"], { windowsHide: true });
+    const pids = windowsApiPids(context.apiPid, context.fixturePid, Number(origin.port));
+    execFileSync("taskkill", [...pids.flatMap((pid) => ["/PID", String(pid)]), "/F"], {
+      windowsHide: true,
+      timeout: 10_000,
+    });
   } else {
+    const parent = execFileSync("ps", ["-o", "ppid=", "-p", String(context.apiPid)], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    expect(Number(parent.trim())).toBe(context.fixturePid);
     process.kill(context.apiPid, "SIGTERM");
   }
   await expect

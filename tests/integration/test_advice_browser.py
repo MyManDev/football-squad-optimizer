@@ -28,11 +28,6 @@ from squadopt.application.weekly_plan import evidence_artifact
 from squadopt.data.snapshots import write_snapshot
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("SQUADOPT_BROWSER_SMOKE") != "1",
-    reason="Opt-in: requires web/node_modules and the Playwright Chromium browser.",
-)
-
 REPOSITORY = Path(__file__).resolve().parents[2]
 
 
@@ -40,6 +35,57 @@ def _available_port() -> int:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         return int(listener.getsockname()[1])
+
+
+def _windows_process_ids(pid: int) -> list[int]:
+    """Exclude orphaned processes whose parent PID was reused by this fixture."""
+    rows = json.loads(
+        subprocess.check_output(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process | "
+                "Select-Object ProcessId,ParentProcessId,@{Name='Created';"
+                "Expression={$_.CreationDate.ToUniversalTime().Ticks.ToString()}})",
+            ],
+            encoding="utf-8",
+            timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    )
+    root = next(row for row in rows if row["ProcessId"] == pid)
+    selected = [root]
+    for parent in selected:
+        selected.extend(
+            row
+            for row in rows
+            if row["ParentProcessId"] == parent["ProcessId"]
+            and row not in selected
+            and int(row["Created"]) >= int(parent["Created"])
+        )
+    return [row["ProcessId"] for row in reversed(selected)]
+
+
+def test_windows_process_ids_excludes_older_orphan_branches(monkeypatch):
+    rows = [
+        {"ProcessId": 10, "ParentProcessId": 1, "Created": "100"},
+        {"ProcessId": 11, "ParentProcessId": 10, "Created": "101"},
+        {"ProcessId": 12, "ParentProcessId": 11, "Created": "102"},
+        {"ProcessId": 20, "ParentProcessId": 10, "Created": "99"},
+        {"ProcessId": 21, "ParentProcessId": 20, "Created": "103"},
+        {"ProcessId": 30, "ParentProcessId": 1, "Created": "104"},
+    ]
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+    monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: json.dumps(rows))
+    assert _windows_process_ids(10) == [12, 11, 10]
+
+
+def test_windows_process_ids_refuses_a_missing_target(monkeypatch):
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+    monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: "[]")
+    with pytest.raises(StopIteration):
+        _windows_process_ids(10)
 
 
 @contextmanager
@@ -63,7 +109,15 @@ def _process(
                 # this test's entire process tree, not just its parent Node process.
                 if os.name == "nt":
                     subprocess.run(
-                        ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                        [
+                            "taskkill",
+                            *[
+                                arg
+                                for pid in _windows_process_ids(process.pid)
+                                for arg in ("/PID", str(pid))
+                            ],
+                            "/F",
+                        ],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         timeout=10,
@@ -134,6 +188,10 @@ def _top100_export(capture, bootstrap: bytes, directory: Path) -> None:
     )
 
 
+@pytest.mark.skipif(
+    os.environ.get("SQUADOPT_BROWSER_SMOKE") != "1",
+    reason="Opt-in: requires web/node_modules and the Playwright Chromium browser.",
+)
 def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -144,6 +202,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
 
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "e" * 40)
     api_port = _available_port()
+    assert api_port != 8000
     web_port = _available_port()
     api_origin = f"http://127.0.0.1:{api_port}"
     web_origin = f"http://127.0.0.1:{web_port}"
@@ -264,6 +323,13 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
             }
         ),
     )
+    for name in (
+        "SQUADOPT_BACKEND_CLUB_NEWS_SOURCE",
+        "SQUADOPT_BACKEND_SEASON",
+        "SQUADOPT_BACKEND_RATE_LIMIT",
+        "SQUADOPT_BACKEND_RATE_WINDOW_SECONDS",
+    ):
+        environment.pop(name, None)
     api_log = tmp_path / "api.log"
     worker_log = tmp_path / "worker.log"
     browser_log = tmp_path / "browser.log"
@@ -323,9 +389,8 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     jobs = fresh.queue.jobs()
     assert len(jobs) == 4
     assert all(job.status == "completed" for job in jobs)
-    assert (
-        fresh.reader.read_advice(
-            league_id=league_id, entry_id=entry_id, strategy="saf-puan", window=1
-        )
-        is not None
+    answer = fresh.reader.read_advice(
+        league_id=league_id, entry_id=entry_id, strategy="saf-puan", window=1
     )
+    assert answer is not None
+    assert sum(fresh.cache.get(job.cache_key) == answer for job in jobs) == 1
