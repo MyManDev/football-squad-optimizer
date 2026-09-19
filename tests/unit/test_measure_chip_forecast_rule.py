@@ -1,10 +1,15 @@
-"""The chip forecast runner's rule of two sets, and its count of what expired."""
+"""The chip forecast runner's rule of two sets, its count of what expired, and its rereading."""
 
+import json
+
+import pytest
 from scripts.measure_chip_forecast_rule import (
     ARMS,
     COMPARISONS,
     HISTORY_SEASONS,
     expired_chips,
+    max_relative_gap,
+    recompute,
     two_set_windows,
 )
 
@@ -53,3 +58,68 @@ def test_the_holdout_is_never_loaded_and_the_arms_are_the_protocols() -> None:
     assert ARMS == ("off", "planner", "fixed", "decaying", "threshold_only")
     assert ("decaying", "threshold_only") in COMPARISONS
     assert COMPARISONS[0] == ("decaying", "fixed")
+
+
+def _chain(variant: str, gaps: list[float | None]) -> dict[str, object]:
+    return {
+        "season": "2021-22",
+        "variant": variant,
+        "net_points": 2000.0,
+        "transfer_hit_points": 100.0,
+        "proven_share": 1.0,
+        "mean_relative_gap": 0.0,
+        "gameweeks": [2, 3, 4],
+        "chips_played": {},
+        "weeks": [
+            {"gameweek": week, "net_points": 50.0, "relative_gap": gap}
+            for week, gap in enumerate(gaps, start=2)
+        ],
+    }
+
+
+def test_the_widest_weekly_gap_is_the_one_a_reader_needs() -> None:
+    """The mean counts proved weeks as zeros, so a bad week hides inside it."""
+
+    assert max_relative_gap(_chain("fixed", [0.0, 0.0, 0.3])) == pytest.approx(0.3)
+    assert max_relative_gap(_chain("fixed", [0.0, 0.0, 0.0])) == 0.0
+    # A week that states no gap at all is absent, never a zero.
+    assert max_relative_gap(_chain("fixed", [None, None, None])) is None
+    assert max_relative_gap({"weeks": []}) is None
+
+
+def test_recomputing_reads_the_chains_again_and_never_changes_one() -> None:
+    record = {
+        "contract_version": "chip_forecast_rule_v1",
+        "created_utc": "2026-09-19T12:41:35+00:00",
+        "chains": [_chain("fixed", [0.0, 0.2, 0.0]), _chain("decaying", [0.0, 0.0, 0.0])],
+        "comparisons": [],
+    }
+    before = json.loads(json.dumps(record))
+    again = recompute(record, resamples=50, block_length=2)
+
+    # The walk keeps its own identity and the reading says it came later.
+    assert again["created_utc"] == before["created_utc"]
+    assert "recomputed_utc" in again and "recomputed_utc" not in before
+    # Every chain is the one that was walked, plus the derived gap and nothing else.
+    for walked, read in zip(before["chains"], again["chains"], strict=True):
+        assert {k: v for k, v in read.items() if k != "max_relative_gap"} == walked
+    assert again["chains"][0]["max_relative_gap"] == pytest.approx(0.2)
+    assert again["bootstrap"] == {
+        "resamples": 50,
+        "block_length": 2,
+        "interval_level": 0.90,
+        "unit": "gameweek, resampled in blocks within season",
+    }
+    # Reading a record twice reads the same chains twice.
+    twice = recompute(again, resamples=50, block_length=2)
+    assert [{k: v for k, v in c.items()} for c in twice["chains"]] == [
+        {k: v for k, v in c.items()} for c in again["chains"]
+    ]
+
+
+def test_the_adopted_arm_is_compared_with_the_arm_it_displaces() -> None:
+    """Without this pair the rule the verdicts adopt is never read against the highest net."""
+
+    assert ("threshold_only", "fixed") in COMPARISONS
+    assert COMPARISONS[0] == ("decaying", "fixed")
+    assert ("decaying", "threshold_only") in COMPARISONS

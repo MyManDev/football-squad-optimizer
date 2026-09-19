@@ -22,8 +22,9 @@ paired comparisons the protocol names. Nights only; it refuses to overwrite its 
 """
 
 import argparse
+import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -62,11 +63,60 @@ ARMS = ("off", "planner", "fixed", "decaying", "threshold_only")
 COMPARISONS = (
     ("decaying", "fixed"),
     ("decaying", "threshold_only"),
+    # The arm the two verdicts above adopt, against the arm with the highest pooled net. Without
+    # it the adopted rule is never read directly against the rule it displaces, and the reader has
+    # to chain two comparisons that were each measured with their own interval.
+    ("threshold_only", "fixed"),
     ("fixed", "off"),
     ("decaying", "off"),
     ("threshold_only", "off"),
     ("planner", "off"),
 )
+
+
+def max_relative_gap(record: Mapping[str, Any]) -> float | None:
+    """The widest optimality gap of one chain's weeks, or None when no week states one.
+
+    The chain already records ``mean_relative_gap``, and a proved week enters that mean as a
+    zero, so a chain with one week at a quarter of its objective reads under one per cent. The
+    widest week is what says whether any number in the record rests on an unproved solve.
+    """
+
+    gaps = [
+        float(str(week["relative_gap"]))
+        for week in record.get("weeks", ())
+        if week.get("relative_gap") is not None
+    ]
+    return max(gaps) if gaps else None
+
+
+def derived_blocks(
+    chains: list[dict[str, Any]], *, resamples: int, block_length: int
+) -> dict[str, Any]:
+    """Everything the record holds that is arithmetic over the chains it already walked.
+
+    Kept apart from the walk so that a committed record can be re-read without solving
+    anything again: the chains are the measurement, and these are a reading of them.
+    """
+
+    return {
+        "comparisons": [
+            comparison
+            for label, baseline in COMPARISONS
+            if (
+                comparison := chain_comparison(
+                    label, baseline, chains, resamples=resamples, block_length=block_length
+                )
+            )
+            is not None
+        ],
+        "bootstrap": {
+            "resamples": resamples,
+            "block_length": block_length,
+            "interval_level": 0.90,
+            "unit": "gameweek, resampled in blocks within season",
+        },
+    }
 
 
 def two_set_windows() -> tuple[ChipWindowRule, ...]:
@@ -107,6 +157,15 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--markdown-output", type=Path, default=REPOSITORY_ROOT / "docs" / "chip_forecast_rule.md"
     )
+    parser.add_argument(
+        "--recompute",
+        action="store_true",
+        help=(
+            "Read the committed record and rewrite only what is arithmetic over the chains it "
+            "already holds. No season is walked and no solver runs; the chains are copied "
+            "through unchanged and the run that produced them keeps its own identity."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -127,6 +186,28 @@ def _markdown(record: dict[str, Any]) -> str:
             f"{chain['transfer_hit_points']:.0f} | {played or 'none'} | "
             f"{', '.join(chain['expired_chips']) or 'none'} |"
         )
+    unproved = [
+        (chain["season"], chain["variant"], chain["max_relative_gap"])
+        for chain in record["chains"]
+        if chain.get("max_relative_gap")
+    ]
+    if unproved:
+        lines += [
+            "",
+            "Weeks that returned an incumbent rather than a proof, by the widest gap of the "
+            "chain that holds them. The mean gap each chain records counts every proved week "
+            "as a zero, so it is not the number to read here:",
+            "",
+            "| Season | Arm | Widest weekly gap | Mean over all weeks |",
+            "| --- | --- | ---: | ---: |",
+        ]
+        for season, variant, widest in unproved:
+            mean = next(
+                c["mean_relative_gap"]
+                for c in record["chains"]
+                if c["season"] == season and c["variant"] == variant
+            )
+            lines.append(f"| {season} | `{variant}` | {widest:.4f} | {mean:.4f} |")
     lines += [
         "",
         "| Comparison | Mean per season | Mean per gameweek | 90% interval, per gameweek | "
@@ -145,9 +226,60 @@ def _markdown(record: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def recompute(record: dict[str, Any], *, resamples: int, block_length: int) -> dict[str, Any]:
+    """The same record, with its derived blocks read again from the chains it already holds.
+
+    The chains are the measurement and are copied through untouched, so this cannot change a
+    net, a chip played or a week. What it may change is what the record says *about* them: the
+    comparisons it carries, the widest gap of each chain, and the bootstrap settings behind its
+    intervals. ``created_utc`` stays the walk's own, and ``recomputed_utc`` says a reading was
+    added afterwards, so the record never claims the new blocks came out of the original run.
+    """
+
+    chains = [dict(chain) for chain in record["chains"]]
+    for chain in chains:
+        chain["max_relative_gap"] = max_relative_gap(chain)
+    return {
+        **record,
+        "chains": chains,
+        "recomputed_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        **derived_blocks(chains, resamples=resamples, block_length=block_length),
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if arguments.recompute:
+        if not arguments.json_output.is_file():
+            print(f"{arguments.json_output} does not exist; there is nothing to read again.")
+            return 1
+        committed = json.loads(arguments.json_output.read_text(encoding="utf-8"))
+        if committed.get("contract_version") != CONTRACT_VERSION:
+            print(f"{arguments.json_output} is not a {CONTRACT_VERSION} record.")
+            return 1
+        reread = recompute(
+            committed,
+            resamples=int(arguments.bootstrap_resamples),
+            block_length=int(arguments.block_length),
+        )
+
+        # The one thing this mode must never do.
+        # Strip the derived key from both sides: reading a record twice must be reading the
+        # same chains twice, and the second read starts from a record the first one wrote.
+        def walked(chains: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+            return [
+                {key: value for key, value in chain.items() if key != "max_relative_gap"}
+                for chain in chains
+            ]
+
+        if not reread["chains"] or walked(reread["chains"]) != walked(committed["chains"]):
+            print("Recomputing changed a chain; that is not what this mode may do.")
+            return 1
+        write_json(arguments.json_output, reread)
+        write_text(arguments.markdown_output, _markdown(reread))
+        print(_markdown(reread))
+        return 0
     seasons = [value.strip() for value in str(arguments.seasons).split(",") if value.strip()]
     arms = [value.strip() for value in str(arguments.arms).split(",") if value.strip()]
     if LOCKED_HOLDOUT_SEASON in seasons or any(
@@ -199,20 +331,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 record["expired_chips"],
                 result.proven_share,
             )
-    comparisons = [
-        comparison
-        for label, baseline in COMPARISONS
-        if (
-            comparison := chain_comparison(
-                label,
-                baseline,
-                chains,
-                resamples=int(arguments.bootstrap_resamples),
-                block_length=int(arguments.block_length),
-            )
-        )
-        is not None
-    ]
     document: dict[str, Any] = {
         "contract_version": CONTRACT_VERSION,
         "protocol": "docs/chip_forecast_prereg.md",
@@ -232,7 +350,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "mean_proven_share": sum(float(str(c["proven_share"])) for c in chains) / len(chains),
         },
         "chains": chains,
-        "comparisons": comparisons,
+        **derived_blocks(
+            chains,
+            resamples=int(arguments.bootstrap_resamples),
+            block_length=int(arguments.block_length),
+        ),
     }
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, _markdown(document))
