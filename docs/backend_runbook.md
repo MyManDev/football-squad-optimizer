@@ -341,6 +341,35 @@ on `SQUADOPT_API_PORT`, the worker's `/health` and `/metrics` on `SQUADOPT_WORKE
 answer, and what the health checks do not prove, is in
 [operations_inventory.md](architecture/operations_inventory.md#one-command-host-deployment).
 
+### Trusted ingress for the container API
+
+The Compose and Azure templates explicitly enable Uvicorn's proxy-header handling, but
+leave `FORWARDED_ALLOW_IPS` unset: **neither platform's actual ingress peer has been
+verified**. Before public use, identify the proxy peer or network the API actually sees,
+set only that verified allowlist (in the Compose environment file, or the Azure API
+container's environment), and ensure direct callers cannot bypass the trusted ingress.
+Do not use wildcard trust. A host port bound to loopback does not prove that the peer
+inside a container is loopback. Azure's ingress boundary remains explicitly unverified
+until a real deployment confirms it.
+
+Unset means Uvicorn's loopback default. If the connecting proxy is untrusted, Uvicorn
+retains that proxy as the client address: the rate limit and open-job cap can then put
+every visitor in one bucket. A deployment that cannot name its trusted ingress peer
+should not be given a per-address cap at all, because that becomes a cap on the whole
+league. These templates are not evidence that this boundary is ready for public use.
+The PC launcher's explicit loopback trust flags are unchanged. Application code does
+not parse forwarded headers.
+
+The API writes one `advice_forwarded_trust` startup event with the declared allowlist,
+whether trust is enabled, and the configuration sources. Only configuration values are
+recorded, never observed visitor addresses. Uvicorn CLI flags take precedence over its
+environment defaults. A programmatic launcher, or a Uvicorn env-file invocation whose
+earlier CLI environment cannot be reconstructed, is reported as unverified rather than
+guessed. `python -m scripts.backend_status` prints the latest such API startup alongside
+the existing counters from retained append-only logs; this is historical evidence, not
+proof that the currently running process still has that configuration. Missing startup
+evidence is unavailable, not trusted. Capacity and real deployment remain unverified.
+
 ## Azure Container Apps
 
 ADR 0006's topology, as [`deploy/containerapp.yaml`](../deploy/containerapp.yaml): one
