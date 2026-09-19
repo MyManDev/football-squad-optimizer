@@ -56,6 +56,11 @@ dev = [
 # research engine, and this is where one goes when the weekly loop needs it.
 llm = [
     "anthropic>=1.4,<2",
+    # The second adapter speaks to its service over one REST call rather than through a
+    # vendor SDK, so the HTTP client is the dependency that adapter needs. Pinned already
+    # in constraints.txt for the dev extra; naming it here is what makes a plain
+    # `.[llm]` install able to code a week.
+    "httpx2>=2.12,<3",
 ]
 
 [tool.setuptools.packages.find]
