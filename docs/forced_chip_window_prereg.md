@@ -82,8 +82,9 @@ uses, and an unproved solve is recorded as unproved.
 ## What follows
 
 - If the first week is the same for nearly every member and chip, the record says so and the card
-  names the week only. That is the cheap outcome and it is the likely one for chips played far
-  away.
+  names the week only. The expectation written before the run: the further the named week sits
+  from the window's first gameweek, the less a forced chip should move this week's transfers, so
+  the reading is at its most interesting when the named week is the next one or the one after.
 - If the first week differs, the prepared plan becomes a product question for the owner, and the
   cost measured in item 4 is what it would cost to compute.
 
