@@ -200,11 +200,12 @@ a Git checkout; otherwise the CLI resolves `git rev-parse HEAD` without a shell.
 completed, 1 is a stated domain/preparation failure, and 2 is an unexpected runtime failure.
 
 The old `scripts.run_gameweek_ops`, `scripts.run_season_tick`, and manual capture module
-(`scripts.capture_deadline_snapshot`) were kept as thin compatibility shells "for one
-release". That release, 1.0.0, is cut (`CHANGELOG.md`, `pyproject.toml`) and the three
-shells are still in the tree; the PR that retires them is still owed. Until it lands they
-delegate to this CLI or the public platform capture adapter and are not alternate
-implementations.
+(`scripts.capture_deadline_snapshot`) have been removed after their one-release
+compatibility window ended with 1.0.0. Use `squadopt gameweek decide`,
+`squadopt gameweek settle --gameweek N`, and `squadopt season tick` instead.
+The tick calls the public platform capture adapter as needed and can also decide and
+settle. Inspect due actions with `squadopt season tick --dry-run` before executing them;
+dry-run still writes CLI request, manifest and registry bookkeeping.
 
 A tick that contacts the live FPL endpoint registers the newly captured response as an output,
 not as a pre-existing reproducibility input: a changing external response cannot honestly be

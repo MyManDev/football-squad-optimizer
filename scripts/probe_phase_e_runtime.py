@@ -56,6 +56,7 @@ from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
 )
 from scripts._phase_e_checkpoints import (
@@ -562,7 +563,8 @@ def probe_decision_point(
 ) -> Record:
     """Probe one pool for every candidate count and return its JSON-ready record."""
 
-    settings = OptimizationConfig() if config is None else config
+    # The measurement limit when no caller names one (#590, #621).
+    settings = measurement_optimization_config() if config is None else config
     warnings: list[str] = []
     runs: list[Record] = []
     pool = point.pool.loc[:, list(POOL_COLUMNS)].copy(deep=True)
@@ -1016,7 +1018,7 @@ def prepare_development_population(
     direct_control: list[str] = []
     eligible_ids: list[str] = []
     for fold_id in selected:
-        result = optimize_squad(projections[fold_id], OptimizationConfig())
+        result = optimize_squad(projections[fold_id], measurement_optimization_config())
         if not result.has_solution:
             raise ProbeError(
                 f"{fold_id}: development eligibility control could not be solved "
@@ -1496,7 +1498,10 @@ def _run_identity(
             "archive_manifest_sha256": provenance.get("archive_manifest_sha256"),
         },
         "repository_commit": provenance.get("repository_commit"),
-        "optimization_config": jsonable(OptimizationConfig()),
+        # What this probe solves under, not the dataclass default. The two were the same
+        # before and are not any more, and a record that named the wrong one would be a
+        # record about a run that did not happen.
+        "optimization_config": jsonable(measurement_optimization_config()),
         "scenario_config": jsonable(ScenarioConfig()),
         "execution": {
             "workers": int(arguments.workers),
@@ -1740,9 +1745,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "execution": {
                 "workers": arguments.workers,
                 "solver_search_workers": 1,
-                "solver_time_limit_seconds": OptimizationConfig().solver_time_limit_seconds,
+                "solver_time_limit_seconds": (
+                    measurement_optimization_config().solver_time_limit_seconds
+                ),
                 "solver_deterministic_time_limit": (
-                    OptimizationConfig().solver_deterministic_time_limit
+                    measurement_optimization_config().solver_deterministic_time_limit
                 ),
                 "blas_threads": {name: os.environ.get(name) for name in BLAS_THREAD_VARIABLES},
                 "timing_context": (

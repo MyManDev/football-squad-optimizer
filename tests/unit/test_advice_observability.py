@@ -121,6 +121,7 @@ def test_unincremented_counters_are_zero_without_invented_label_values() -> None
     assert "advice_cache_hits_total 0\n" in body
     assert "advice_rejected_total 0\n" in body
     assert "advice_open_job_refused_total 0\n" in body
+    assert "advice_deadline_refused_total 0\n" in body
     assert "advice_jobs_total" not in body
     assert "advice_jobs{" not in body  # no queue reader was supplied
     metrics.rejected("UnknownEntryError")

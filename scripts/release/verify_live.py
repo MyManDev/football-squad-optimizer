@@ -1,13 +1,19 @@
-"""Verify the live site after a deployment: the ten smoke checks, then the content.
+"""Verify the live site after a deployment: the eleven smoke checks, then the content.
 
-The ten checks mirror SMOKE_CHECKS in web/scripts/smoke-deployment.mjs. Seven routes must
+The checks mirror SMOKE_CHECKS in web/scripts/smoke-deployment.mjs, and a test holds the two
+lists equal so that adding a route there cannot leave this verifier behind. Eight routes must
 return 200 carrying the SPA document, two documents must return 200 and parse as JSON, and one
 document must be ABSENT (404), because entry 0 does not exist and a 200 there means the
-absent-document rule has been lost. Reading that tenth check as "must be 200" inverts it.
+absent-document rule has been lost. Reading that last check as "must be 200" inverts it.
 
-Then the content: the publication must be the one just deployed, not the previous one.
+Then the content. Two things can be wrong there and only one of them used to fail the run:
+the publication must be the one just deployed rather than the previous one, and it must be
+of the gameweek the release is for. The second is what ``--settled`` states. Without it the
+verifier printed the settled weeks and returned ALL GOOD whatever they were, so a release
+that published an unsettled week, or last week's, passed.
 """
 
+import argparse
 import json
 import sys
 import urllib.error
@@ -16,7 +22,18 @@ import urllib.request
 BASE = "https://squadopt.mymandev.com"
 UA = {"User-Agent": "squadopt-verify/1.0"}
 
-ROUTES = ["/", "/moves", "/rivals", "/league", "/league/members/0", "/analysis", "/status"]
+#: The HTML routes of SMOKE_CHECKS, in its order. `/fixtures` was added there and not here,
+#: which is the drift the test now refuses.
+ROUTES = [
+    "/",
+    "/moves",
+    "/rivals",
+    "/league",
+    "/league/members/0",
+    "/analysis",
+    "/status",
+    "/fixtures",
+]
 DOCUMENTS = ["/data/index.json", "/data/league/members.json"]
 ABSENT = "/data/league/entries/0.json"
 
@@ -30,10 +47,10 @@ def fetch(path: str) -> tuple[int, bytes]:
         return error.code, b""
 
 
-def main(expected_generated_after: str) -> int:
+def main(expected_generated_after: str, settled_gameweek: int | None = None) -> int:
     failures = 0
 
-    print("== ten smoke checks ==")
+    print(f"== {len(ROUTES) + len(DOCUMENTS) + 1} smoke checks ==")
     for path in ROUTES:
         status, body = fetch(path)
         ok = status == 200 and b'id="root"' in body
@@ -87,9 +104,47 @@ def main(expected_generated_after: str) -> int:
         f" deadline={status_doc.get('next_deadline_utc')}"
     )
 
+    if settled_gameweek is not None:
+        # Printing the settled weeks is not checking them: before this, a release that
+        # published an unsettled week returned ALL GOOD.
+        for label, ok in (
+            (f"scoreboard settles gameweek {settled_gameweek}", settled_gameweek in settled),
+            (
+                f"members.json scored_gameweek is {settled_gameweek}",
+                payload.get("scored_gameweek") == settled_gameweek,
+            ),
+            (
+                f"status moved past gameweek {settled_gameweek}",
+                isinstance(status_doc.get("next_gameweek"), int)
+                and int(status_doc["next_gameweek"]) > settled_gameweek,
+            ),
+        ):
+            failures += not ok
+            print(f"  {'ok ' if ok else 'BAD'} {label}")
+
     print(f"\n{'ALL GOOD' if failures == 0 else str(failures) + ' FAILURE(S)'}")
     return 1 if failures else 0
 
 
+def _arguments(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "generated_after",
+        help=(
+            "the live publication must be stamped strictly after this UTC time. Read it from the "
+            "tree being published, not from the clock: it is what build_league_site stamped, hours "
+            "before the deploy. A value below what the site serves already makes this vacuous."
+        ),
+    )
+    parser.add_argument(
+        "--settled",
+        type=int,
+        default=None,
+        help="the gameweek this release settles; asserted rather than printed",
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "2026-09-12T10:50:08Z"))
+    parsed = _arguments(sys.argv[1:])
+    sys.exit(main(parsed.generated_after, parsed.settled))
