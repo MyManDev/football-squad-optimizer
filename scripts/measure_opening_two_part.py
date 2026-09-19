@@ -103,6 +103,7 @@ def compare_decisions(
         realized = block.set_index("player_id")["total_points"].astype("float64")
         newcomer_ids = set(block.loc[~block["has_prior_record"], "player_id"].tolist())
         squads: dict[str, tuple[float, int, tuple[int, ...]]] = {}
+        statuses: dict[str, str] = {}
         for label, fallback in (("control", control_new), ("candidate", candidate_new)):
             projection = pool.copy()
             projection["expected_points"] = np.where(has_record, carried, fallback)
@@ -112,6 +113,7 @@ def compare_decisions(
             result = optimize_squad(projection, optimization)
             if not result.has_solution or result.captain is None:
                 raise ExperimentError(f"{season}: the {label} opening squad could not be built.")
+            statuses[label] = result.solver_status.name
             starters = tuple(int(value) for value in result.starting_xi["player_id"])
             captain = int(result.captain["player_id"])
             score = float(sum(realized.get(player, 0.0) for player in starters))
@@ -133,6 +135,8 @@ def compare_decisions(
                 "control_newcomers_selected": control_new_count,
                 "candidate_newcomers_selected": candidate_new_count,
                 "changed_starters": len(set(candidate_starters) - set(control_starters)),
+                # A proof and an incumbent are different evidence for an eleven-point event.
+                "solver_status": dict(statuses),
             }
         )
     return comparisons, tuple(differences)
@@ -199,16 +203,36 @@ def _markdown(record: dict[str, Any]) -> str:
             )
     lines += [
         "",
-        "| Season | Played rows | Bias on played | MAE on played | Rows with no published "
-        "ownership |",
-        "| --- | ---: | ---: | ---: | ---: |",
+        "Both arms on the newcomers who actually took the field. This is what says whether the "
+        "headline improvement is real or is bought from the players who never appear:",
+        "",
+        "| Season | Played rows | Control bias | Candidate bias | Control MAE | Candidate MAE | "
+        "Control rank | Candidate rank | No published ownership |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for season in record["seasons"]:
         lines.append(
             f"| {season['season']} | {season['played_rows']} | "
+            f"{season['control_bias_on_played']:+.4f} | "
             f"{season['candidate_bias_on_played']:+.4f} | "
+            f"{season['control_mae_on_played']:.4f} | "
             f"{season['candidate_mae_on_played']:.4f} | "
+            f"{season['control_rank_on_played']:.4f} | "
+            f"{season['candidate_rank_on_played']:.4f} | "
             f"{season['rows_without_published_ownership']} |"
+        )
+    lines += [
+        "",
+        "## The decision clause's solves",
+        "",
+        "| Season | Control | Candidate | Difference | Changed starters |",
+        "| --- | --- | --- | ---: | ---: |",
+    ]
+    for comparison in record["decisions"]:
+        status = comparison["solver_status"]
+        lines.append(
+            f"| {comparison['season']} | {status['control']} | {status['candidate']} | "
+            f"{comparison['difference']:+.0f} | {comparison['changed_starters']} |"
         )
     lines += ["", "## What this measurement cannot conclude", "", PLAY_LABEL_LIMIT, ""]
     return "\n".join(lines) + "\n"
@@ -260,7 +284,13 @@ def main(argv: list[str] | None = None) -> int:
         entry["calibration"] = [dict(cell) for cell in reading.calibration]
         seasons_record.append(entry)
     record: dict[str, Any] = {
-        **artifact_metadata(panel_rows=len(rows), created_utc=created_utc),
+        **artifact_metadata(
+            panel_rows=len(rows),
+            created_utc=created_utc,
+            # Without this the provenance names 2025-26 on the same page as
+            # locked_holdout_accessed: false, which is a record contradicting itself.
+            history_seasons=list(config.seasons),
+        ),
         "contract_version": OPENING_TWO_PART_CONTRACT_VERSION,
         "prereg": "docs/opening_two_part_prereg.md",
         "config": asdict(config),

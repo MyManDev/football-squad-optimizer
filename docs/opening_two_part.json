@@ -28,7 +28,7 @@
     ]
   },
   "contract_version": "opening_two_part_v1",
-  "created_utc": "2026-09-19T21:30:05+00:00",
+  "created_utc": "2026-09-19T21:49:45+00:00",
   "decisions": [
     {
       "candidate_newcomers_selected": 1,
@@ -37,7 +37,11 @@
       "control_newcomers_selected": 0,
       "control_realized_points": 49.0,
       "difference": 11.0,
-      "season": "2022-23"
+      "season": "2022-23",
+      "solver_status": {
+        "candidate": "OPTIMAL",
+        "control": "OPTIMAL"
+      }
     },
     {
       "candidate_newcomers_selected": 0,
@@ -46,7 +50,11 @@
       "control_newcomers_selected": 0,
       "control_realized_points": 68.0,
       "difference": 0.0,
-      "season": "2023-24"
+      "season": "2023-24",
+      "solver_status": {
+        "candidate": "FEASIBLE",
+        "control": "FEASIBLE"
+      }
     },
     {
       "candidate_newcomers_selected": 0,
@@ -55,10 +63,14 @@
       "control_newcomers_selected": 0,
       "control_realized_points": 62.0,
       "difference": 0.0,
-      "season": "2024-25"
+      "season": "2024-25",
+      "solver_status": {
+        "candidate": "FEASIBLE",
+        "control": "FEASIBLE"
+      }
     }
   ],
-  "elapsed_seconds": 57.292881,
+  "elapsed_seconds": 57.654737,
   "environment": {
     "logical_cpu_count": 32,
     "ortools": "9.15.6755",
@@ -107,10 +119,9 @@
       "2021-22",
       "2022-23",
       "2023-24",
-      "2024-25",
-      "2025-26"
+      "2024-25"
     ],
-    "repository_commit": "f7ffc9c7837e0976b73b11a3ac48c8fbfd22062c",
+    "repository_commit": "b6fcc5ef6cb40ff478fb02fc0d4aca219c6f4192",
     "working_tree_dirty": true
   },
   "seasons": [
@@ -181,6 +192,7 @@
       "candidate_mae": 0.9881364066390657,
       "candidate_mae_on_played": 1.5618444911987288,
       "candidate_rank": 0.5633928589093131,
+      "candidate_rank_on_played": 0.08634527844244837,
       "coefficients": {
         "part_one": {
           "DEF": 1.0224808379963026,
@@ -197,8 +209,11 @@
           "MID": 0.4698512137823025
         }
       },
+      "control_bias_on_played": 0.9030047878487701,
       "control_mae": 1.3910431347741015,
+      "control_mae_on_played": 1.4970075945187387,
       "control_rank": 0.515231149821445,
+      "control_rank_on_played": 0.16872602623859345,
       "mae_improvement": 0.4029067281350358,
       "played_rows": 72,
       "rank_shortfall": -0.0481617090878681,
@@ -274,6 +289,7 @@
       "candidate_mae": 0.7548611703988642,
       "candidate_mae_on_played": 1.3618579974000997,
       "candidate_rank": 0.4735541851900704,
+      "candidate_rank_on_played": 0.09661368105799752,
       "coefficients": {
         "part_one": {
           "DEF": 1.0224719983122263,
@@ -290,8 +306,11 @@
           "MID": 0.42766228256257943
         }
       },
+      "control_bias_on_played": 0.3892857142857143,
       "control_mae": 1.2912039185054238,
+      "control_mae_on_played": 1.2257535555083847,
       "control_rank": 0.4713405494434665,
+      "control_rank_on_played": 0.21959951165082814,
       "mae_improvement": 0.5363427481065596,
       "played_rows": 70,
       "rank_shortfall": -0.002213635746603937,
@@ -367,6 +386,7 @@
       "candidate_mae": 0.6800783731788465,
       "candidate_mae_on_played": 1.08639857529916,
       "candidate_rank": 0.5213608879858946,
+      "candidate_rank_on_played": 0.28171049384636987,
       "coefficients": {
         "part_one": {
           "DEF": 1.1117166119653006,
@@ -383,8 +403,11 @@
           "MID": 0.4077827320632346
         }
       },
+      "control_bias_on_played": 0.21009339842920832,
       "control_mae": 1.2271443673164637,
+      "control_mae_on_played": 0.9667533432392273,
       "control_rank": 0.5109622397691078,
+      "control_rank_on_played": 0.2933255120753991,
       "mae_improvement": 0.5470659941376173,
       "played_rows": 56,
       "rank_shortfall": -0.010398648216786821,

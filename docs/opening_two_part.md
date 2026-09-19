@@ -57,11 +57,21 @@ Calibration of part one, predicted against realized play rate by decile:
 | 2024-25 | 9 | 20 | 0.4498 | 0.6000 |
 | 2024-25 | 10 | 20 | 0.7231 | 0.7500 |
 
-| Season | Played rows | Bias on played | MAE on played | Rows with no published ownership |
-| --- | ---: | ---: | ---: | ---: |
-| 2022-23 | 72 | +1.2519 | 1.5618 | 14 |
-| 2023-24 | 70 | +0.8428 | 1.3619 | 14 |
-| 2024-25 | 56 | +0.6406 | 1.0864 | 4 |
+Both arms on the newcomers who actually took the field. This is what says whether the headline improvement is real or is bought from the players who never appear:
+
+| Season | Played rows | Control bias | Candidate bias | Control MAE | Candidate MAE | Control rank | Candidate rank | No published ownership |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2022-23 | 72 | +0.9030 | +1.2519 | 1.4970 | 1.5618 | 0.1687 | 0.0863 | 14 |
+| 2023-24 | 70 | +0.3893 | +0.8428 | 1.2258 | 1.3619 | 0.2196 | 0.0966 | 14 |
+| 2024-25 | 56 | +0.2101 | +0.6406 | 0.9668 | 1.0864 | 0.2933 | 0.2817 | 4 |
+
+## The decision clause's solves
+
+| Season | Control | Candidate | Difference | Changed starters |
+| --- | --- | --- | ---: | ---: |
+| 2022-23 | OPTIMAL | OPTIMAL | +11 | 1 |
+| 2023-24 | FEASIBLE | FEASIBLE | +0 | 0 |
+| 2024-25 | FEASIBLE | FEASIBLE | +0 | 0 |
 
 ## What this measurement cannot conclude
 

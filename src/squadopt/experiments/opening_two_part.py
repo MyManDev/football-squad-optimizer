@@ -27,6 +27,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
+from squadopt.experiments.config import ExperimentExecutionError
 from squadopt.experiments.opening_newcomers import (
     POSITIONS,
     OpeningStudyConfig,
@@ -137,16 +138,24 @@ def play_probability(rows: pd.DataFrame, coefficients: TwoPartCoefficients) -> n
 def predict_two_part(rows: pd.DataFrame, coefficients: TwoPartCoefficients) -> np.ndarray:
     """The product, clipped at zero as the shipped prior is.
 
-    A position the training rows never played has no slope, so it has no second factor and
-    predicts nothing rather than predicting zero; with the archive's four positions always
-    present in a season this does not arise, and it is written this way so that it could not
-    pass silently if it did.
+    A position no training row ever played has no slope, so it has no second factor. Pricing
+    it at zero would turn an absent number into a measured one, so it is refused instead. With
+    the archive's four positions present in every season this does not arise; it is written
+    this way so that it could not pass silently if it did.
     """
 
     probability = play_probability(rows, coefficients)
     price = rows["price_m"].to_numpy(dtype="float64")
     position = rows["position"].astype(str).to_numpy()
-    rate = np.array([coefficients.slope(str(name)) or 0.0 for name in position], dtype="float64")
+    missing = sorted({str(name) for name in position if coefficients.slope(str(name)) is None})
+    if missing:
+        raise ExperimentExecutionError(
+            f"No played training row for {missing!r}, so those positions have no scoring rate. "
+            "Pricing them at zero would publish a number nobody fitted."
+        )
+    rate = np.array(
+        [float(coefficients.slope(str(name)) or 0.0) for name in position], dtype="float64"
+    )
     return np.asarray(np.clip(probability * price * rate, 0.0, None), dtype="float64")
 
 
@@ -165,6 +174,13 @@ class SeasonReading:
     played_rows: int
     candidate_bias_on_played: float
     candidate_mae_on_played: float
+    control_bias_on_played: float
+    control_mae_on_played: float
+    candidate_rank_on_played: float
+    control_rank_on_played: float
+    """Both arms on the newcomers who actually took the field, which is what says whether the
+    headline improvement is real or is bought from the players who never appear. The protocol
+    asks for this diagnostic for both arms, as the predecessor recorded it."""
     calibration: tuple[dict[str, object], ...]
     coefficients: dict[str, object]
 
@@ -250,6 +266,18 @@ def evaluate_two_part(
                 candidate_mae_on_played=(
                     float(candidate_errors[appeared].mean()) if appeared.any() else 0.0
                 ),
+                control_bias_on_played=(
+                    float((realized[appeared] - control[appeared]).mean())
+                    if appeared.any()
+                    else 0.0
+                ),
+                control_mae_on_played=(
+                    float(control_errors[appeared].mean()) if appeared.any() else 0.0
+                ),
+                candidate_rank_on_played=_rank_correlation(
+                    block.loc[appeared], candidate[appeared]
+                ),
+                control_rank_on_played=_rank_correlation(block.loc[appeared], control[appeared]),
                 calibration=calibration_by_decile(
                     play_probability(block, coefficients), appeared.astype("float64")
                 ),
