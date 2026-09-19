@@ -22,6 +22,150 @@
           "reading": {
             "forecasts": {
               "ours_decided": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 212.2001681290821,
+                      "players": 145,
+                      "share_of_absent_forecast": 0.7599639012225072
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 43.91539366333088,
+                      "players": 14,
+                      "share_of_absent_forecast": 0.15727656667927578
+                    },
+                    "under_1.0": {
+                      "forecast_points": 23.1084484371896,
+                      "players": 133,
+                      "share_of_absent_forecast": 0.08275953209821675
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 0.0,
+                      "players": 0,
+                      "share_of_absent_forecast": 0.0
+                    },
+                    "not_named": {
+                      "forecast_points": 279.22401022960264,
+                      "players": 292,
+                      "share_of_absent_forecast": 1.0
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 87.56600786574107,
+                      "players": 90,
+                      "share_of_absent_forecast": 0.31360486440165575
+                    },
+                    "FWD": {
+                      "forecast_points": 40.65639209404128,
+                      "players": 38,
+                      "share_of_absent_forecast": 0.1456049286757611
+                    },
+                    "GK": {
+                      "forecast_points": 45.22698116202368,
+                      "players": 47,
+                      "share_of_absent_forecast": 0.1619738256922607
+                    },
+                    "MID": {
+                      "forecast_points": 105.77462910779659,
+                      "players": 117,
+                      "share_of_absent_forecast": 0.37881638123032235
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 159.0675960108769,
+                      "players": 161,
+                      "share_of_absent_forecast": 0.5696773564711627
+                    },
+                    "above_7.5": {
+                      "forecast_points": 4.799489144316731,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.017188669199221684
+                    },
+                    "under_5.0": {
+                      "forecast_points": 115.35692507440898,
+                      "players": 130,
+                      "share_of_absent_forecast": 0.41313397432961557
+                    }
+                  },
+                  "forecast_points": 279.22401022960264,
+                  "largest": [
+                    {
+                      "forecast_points": 4.799489144316731,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 178301,
+                      "position": "FWD",
+                      "price_tenths": 80
+                    },
+                    {
+                      "forecast_points": 4.081081081081081,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 200834,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 3.45945945945946,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 224117,
+                      "position": "FWD",
+                      "price_tenths": 75
+                    },
+                    {
+                      "forecast_points": 3.4409190371991247,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 232185,
+                      "position": "MID",
+                      "price_tenths": 65
+                    },
+                    {
+                      "forecast_points": 3.2,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 98980,
+                      "position": "GK",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 3.085714285714286,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 470313,
+                      "position": "FWD",
+                      "price_tenths": 60
+                    },
+                    {
+                      "forecast_points": 3.044036697247706,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 441164,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.9242091388400704,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 208706,
+                      "position": "MID",
+                      "price_tenths": 70
+                    },
+                    {
+                      "forecast_points": 2.697792869269949,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 78916,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.6905923344947738,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 222694,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    }
+                  ],
+                  "players": 292
+                },
                 "all_players": {
                   "bias": 0.03827052029110121,
                   "mean_absolute_error": 1.5969138848541944,
@@ -112,6 +256,9 @@
                     "mean_realized": 1.1182266009852218,
                     "players": 203
                   }
+                },
+                "by_prior_minutes": {
+                  "players": 0
                 },
                 "rank_agreement_within_position": {
                   "groups": {
@@ -211,6 +358,150 @@
           "reading": {
             "forecasts": {
               "game": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 60.5,
+                      "players": 42,
+                      "share_of_absent_forecast": 0.5745489078822412
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 27.0,
+                      "players": 7,
+                      "share_of_absent_forecast": 0.25641025641025644
+                    },
+                    "under_1.0": {
+                      "forecast_points": 17.8,
+                      "players": 300,
+                      "share_of_absent_forecast": 0.1690408357075024
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 11.9,
+                      "players": 178,
+                      "share_of_absent_forecast": 0.11301044634377969
+                    },
+                    "not_named": {
+                      "forecast_points": 93.4,
+                      "players": 171,
+                      "share_of_absent_forecast": 0.8869895536562205
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 43.300000000000004,
+                      "players": 109,
+                      "share_of_absent_forecast": 0.4112060778727446
+                    },
+                    "FWD": {
+                      "forecast_points": 10.5,
+                      "players": 43,
+                      "share_of_absent_forecast": 0.09971509971509972
+                    },
+                    "GK": {
+                      "forecast_points": 3.0,
+                      "players": 51,
+                      "share_of_absent_forecast": 0.02849002849002849
+                    },
+                    "MID": {
+                      "forecast_points": 48.5,
+                      "players": 146,
+                      "share_of_absent_forecast": 0.46058879392212726
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 66.4,
+                      "players": 144,
+                      "share_of_absent_forecast": 0.630579297245964
+                    },
+                    "above_7.5": {
+                      "forecast_points": 0.0,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.0
+                    },
+                    "under_5.0": {
+                      "forecast_points": 38.900000000000006,
+                      "players": 204,
+                      "share_of_absent_forecast": 0.36942070275403616
+                    }
+                  },
+                  "forecast_points": 105.3,
+                  "largest": [
+                    {
+                      "forecast_points": 6.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 449434,
+                      "position": "MID",
+                      "price_tenths": 62
+                    },
+                    {
+                      "forecast_points": 4.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 227444,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 4.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 434752,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 3.7,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 571779,
+                      "position": "MID",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 3.3,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 575458,
+                      "position": "DEF",
+                      "price_tenths": 45
+                    },
+                    {
+                      "forecast_points": 3.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 487676,
+                      "position": "DEF",
+                      "price_tenths": 44
+                    },
+                    {
+                      "forecast_points": 3.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 578153,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.3,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 205533,
+                      "position": "FWD",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.3,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 232653,
+                      "position": "MID",
+                      "price_tenths": 49
+                    },
+                    {
+                      "forecast_points": 2.2,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 624777,
+                      "position": "MID",
+                      "price_tenths": 60
+                    }
+                  ],
+                  "players": 349
+                },
                 "all_players": {
                   "bias": -0.003963414634146347,
                   "mean_absolute_error": 1.234451219512195,
@@ -302,6 +593,51 @@
                     "players": 297
                   }
                 },
+                "by_prior_minutes": {
+                  "buckets": {
+                    "30_to_60": {
+                      "appeared": 53,
+                      "bias": 0.3666666666666667,
+                      "forecast_points": 113.7,
+                      "mean_absolute_error": 1.9115942028985504,
+                      "mean_forecast": 1.6478260869565218,
+                      "mean_realized": 2.0144927536231885,
+                      "players": 69,
+                      "realized_points": 139.0
+                    },
+                    "60_and_above": {
+                      "appeared": 170,
+                      "bias": -0.2854054054054054,
+                      "forecast_points": 685.8,
+                      "mean_absolute_error": 2.789189189189189,
+                      "mean_forecast": 3.707027027027027,
+                      "mean_realized": 3.4216216216216218,
+                      "players": 185,
+                      "realized_points": 633.0
+                    },
+                    "none": {
+                      "appeared": 19,
+                      "bias": 0.00929368029739777,
+                      "forecast_points": 28.5,
+                      "mean_absolute_error": 0.15724907063197024,
+                      "mean_forecast": 0.10594795539033457,
+                      "mean_realized": 0.11524163568773234,
+                      "players": 269,
+                      "realized_points": 31.0
+                    },
+                    "under_30": {
+                      "appeared": 65,
+                      "bias": 0.16842105263157897,
+                      "forecast_points": 95.6,
+                      "mean_absolute_error": 0.899248120300752,
+                      "mean_forecast": 0.718796992481203,
+                      "mean_realized": 0.8872180451127819,
+                      "players": 133,
+                      "realized_points": 118.0
+                    }
+                  },
+                  "players": 656
+                },
                 "rank_agreement_within_position": {
                   "groups": {
                     "DEF": {
@@ -376,6 +712,150 @@
                 }
               },
               "ours_decided": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 77.64790404927277,
+                      "players": 53,
+                      "share_of_absent_forecast": 0.5938810246673004
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 25.18563987130554,
+                      "players": 9,
+                      "share_of_absent_forecast": 0.19262945725078637
+                    },
+                    "under_1.0": {
+                      "forecast_points": 27.91302117261035,
+                      "players": 287,
+                      "share_of_absent_forecast": 0.21348951808191327
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 9.775218264050313,
+                      "players": 178,
+                      "share_of_absent_forecast": 0.07476462771379958
+                    },
+                    "not_named": {
+                      "forecast_points": 120.97134682913834,
+                      "players": 171,
+                      "share_of_absent_forecast": 0.9252353722862005
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 48.21660211055258,
+                      "players": 109,
+                      "share_of_absent_forecast": 0.36877911152913695
+                    },
+                    "FWD": {
+                      "forecast_points": 12.808872356977846,
+                      "players": 43,
+                      "share_of_absent_forecast": 0.0979671806127252
+                    },
+                    "GK": {
+                      "forecast_points": 10.266783543359315,
+                      "players": 51,
+                      "share_of_absent_forecast": 0.07852430796971026
+                    },
+                    "MID": {
+                      "forecast_points": 59.454307082298925,
+                      "players": 146,
+                      "share_of_absent_forecast": 0.4547293998884277
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 70.54463272028644,
+                      "players": 144,
+                      "share_of_absent_forecast": 0.5395524744379042
+                    },
+                    "above_7.5": {
+                      "forecast_points": 0.0,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.0
+                    },
+                    "under_5.0": {
+                      "forecast_points": 60.20193237290221,
+                      "players": 204,
+                      "share_of_absent_forecast": 0.4604475255620959
+                    }
+                  },
+                  "forecast_points": 130.74656509318865,
+                  "largest": [
+                    {
+                      "forecast_points": 3.504146990235138,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 449434,
+                      "position": "MID",
+                      "price_tenths": 62
+                    },
+                    {
+                      "forecast_points": 3.0637168107477724,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 227444,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.8911738737317725,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 578153,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.7533571153979777,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 172649,
+                      "position": "GK",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.703846923268121,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 571779,
+                      "position": "MID",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.615329960798637,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 434752,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.5706978664801468,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 205533,
+                      "position": "FWD",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.5493409981641206,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 651426,
+                      "position": "DEF",
+                      "price_tenths": 49
+                    },
+                    {
+                      "forecast_points": 2.534029332481856,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 575458,
+                      "position": "DEF",
+                      "price_tenths": 45
+                    },
+                    {
+                      "forecast_points": 2.4280834263590245,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 513466,
+                      "position": "MID",
+                      "price_tenths": 50
+                    }
+                  ],
+                  "players": 349
+                },
                 "all_players": {
                   "bias": 0.12089008628736625,
                   "mean_absolute_error": 1.1934869442151363,
@@ -467,6 +947,51 @@
                     "players": 297
                   }
                 },
+                "by_prior_minutes": {
+                  "buckets": {
+                    "30_to_60": {
+                      "appeared": 53,
+                      "bias": 0.2870480043851818,
+                      "forecast_points": 119.19368769742248,
+                      "mean_absolute_error": 1.843682882392465,
+                      "mean_forecast": 1.727444749238007,
+                      "mean_realized": 2.0144927536231885,
+                      "players": 69,
+                      "realized_points": 139.0
+                    },
+                    "60_and_above": {
+                      "appeared": 170,
+                      "bias": 0.41609149468841644,
+                      "forecast_points": 556.0230734826429,
+                      "mean_absolute_error": 2.5774987744682005,
+                      "mean_forecast": 3.0055301269332046,
+                      "mean_realized": 3.4216216216216218,
+                      "players": 185,
+                      "realized_points": 633.0
+                    },
+                    "none": {
+                      "appeared": 19,
+                      "bias": -0.057812705831375204,
+                      "forecast_points": 46.55161786863993,
+                      "mean_absolute_error": 0.21557744074830631,
+                      "mean_forecast": 0.17305434151910754,
+                      "mean_realized": 0.11524163568773234,
+                      "players": 269,
+                      "realized_points": 31.0
+                    },
+                    "under_30": {
+                      "appeared": 65,
+                      "bias": -0.014494168020920352,
+                      "forecast_points": 119.92772434678241,
+                      "mean_absolute_error": 0.9089151254296085,
+                      "mean_forecast": 0.9017122131337023,
+                      "mean_realized": 0.8872180451127819,
+                      "players": 133,
+                      "realized_points": 118.0
+                    }
+                  },
+                  "players": 656
+                },
                 "rank_agreement_within_position": {
                   "groups": {
                     "DEF": {
@@ -541,6 +1066,150 @@
                 }
               },
               "ours_unconditional": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 90.31418927502813,
+                      "players": 61,
+                      "share_of_absent_forecast": 0.501194503385577
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 32.86208070909045,
+                      "players": 12,
+                      "share_of_absent_forecast": 0.1823666286927892
+                    },
+                    "under_1.0": {
+                      "forecast_points": 57.02161459951977,
+                      "players": 276,
+                      "share_of_absent_forecast": 0.316438867921634
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 59.2265377545,
+                      "players": 178,
+                      "share_of_absent_forecast": 0.3286749891173677
+                    },
+                    "not_named": {
+                      "forecast_points": 120.97134682913834,
+                      "players": 171,
+                      "share_of_absent_forecast": 0.6713250108826325
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 63.703785674416864,
+                      "players": 109,
+                      "share_of_absent_forecast": 0.35352127369091807
+                    },
+                    "FWD": {
+                      "forecast_points": 22.12173145412102,
+                      "players": 43,
+                      "share_of_absent_forecast": 0.12276354689310064
+                    },
+                    "GK": {
+                      "forecast_points": 12.558083889011101,
+                      "players": 51,
+                      "share_of_absent_forecast": 0.06969051783281231
+                    },
+                    "MID": {
+                      "forecast_points": 81.81428356608936,
+                      "players": 146,
+                      "share_of_absent_forecast": 0.4540246615831692
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 105.1529359601582,
+                      "players": 144,
+                      "share_of_absent_forecast": 0.5835414561226537
+                    },
+                    "above_7.5": {
+                      "forecast_points": 0.3868485741334956,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.0021467986432101593
+                    },
+                    "under_5.0": {
+                      "forecast_points": 74.65810004934661,
+                      "players": 204,
+                      "share_of_absent_forecast": 0.4143117452341361
+                    }
+                  },
+                  "forecast_points": 180.1978845836383,
+                  "largest": [
+                    {
+                      "forecast_points": 3.504146990235138,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 449434,
+                      "position": "MID",
+                      "price_tenths": 62
+                    },
+                    {
+                      "forecast_points": 3.0637168107477724,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 227444,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.8911738737317725,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 578153,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.7533571153979777,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 172649,
+                      "position": "GK",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.703846923268121,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 571779,
+                      "position": "MID",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.615329960798637,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 434752,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.5968451136259807,
+                      "named_by_our_availability_rule": true,
+                      "player_id": 432830,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.5706978664801468,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 205533,
+                      "position": "FWD",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.5583516409780516,
+                      "named_by_our_availability_rule": true,
+                      "player_id": 199796,
+                      "position": "DEF",
+                      "price_tenths": 45
+                    },
+                    {
+                      "forecast_points": 2.5493409981641206,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 651426,
+                      "position": "DEF",
+                      "price_tenths": 49
+                    }
+                  ],
+                  "players": 349
+                },
                 "all_players": {
                   "bias": 0.04220068868275638,
                   "mean_absolute_error": 1.2713281063305306,
@@ -631,6 +1300,51 @@
                     "mean_realized": 0.8518518518518519,
                     "players": 297
                   }
+                },
+                "by_prior_minutes": {
+                  "buckets": {
+                    "30_to_60": {
+                      "appeared": 53,
+                      "bias": 0.21393091232273895,
+                      "forecast_points": 124.23876704973104,
+                      "mean_absolute_error": 1.916799974454908,
+                      "mean_forecast": 1.8005618413004498,
+                      "mean_realized": 2.0144927536231885,
+                      "players": 69,
+                      "realized_points": 139.0
+                    },
+                    "60_and_above": {
+                      "appeared": 170,
+                      "bias": 0.3819615100982915,
+                      "forecast_points": 562.3371206318161,
+                      "mean_absolute_error": 2.6116287590583256,
+                      "mean_forecast": 3.03966011152333,
+                      "mean_realized": 3.4216216216216218,
+                      "players": 185,
+                      "realized_points": 633.0
+                    },
+                    "none": {
+                      "appeared": 19,
+                      "bias": -0.15340824698207645,
+                      "forecast_points": 72.26681843817856,
+                      "mean_absolute_error": 0.3091044224903621,
+                      "mean_forecast": 0.26864988266980877,
+                      "mean_realized": 0.11524163568773234,
+                      "players": 269,
+                      "realized_points": 31.0
+                    },
+                    "under_30": {
+                      "appeared": 65,
+                      "bias": -0.12386197070967028,
+                      "forecast_points": 134.47364210438616,
+                      "mean_absolute_error": 1.0182829281183587,
+                      "mean_forecast": 1.0110800158224522,
+                      "mean_realized": 0.8872180451127819,
+                      "players": 133,
+                      "realized_points": 118.0
+                    }
+                  },
+                  "players": 656
                 },
                 "rank_agreement_within_position": {
                   "groups": {
@@ -725,6 +1439,150 @@
           "reading": {
             "forecasts": {
               "game": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 60.5,
+                      "players": 42,
+                      "share_of_absent_forecast": 0.5745489078822412
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 27.0,
+                      "players": 7,
+                      "share_of_absent_forecast": 0.25641025641025644
+                    },
+                    "under_1.0": {
+                      "forecast_points": 17.8,
+                      "players": 300,
+                      "share_of_absent_forecast": 0.1690408357075024
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 11.9,
+                      "players": 178,
+                      "share_of_absent_forecast": 0.11301044634377969
+                    },
+                    "not_named": {
+                      "forecast_points": 93.4,
+                      "players": 171,
+                      "share_of_absent_forecast": 0.8869895536562205
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 43.300000000000004,
+                      "players": 109,
+                      "share_of_absent_forecast": 0.4112060778727446
+                    },
+                    "FWD": {
+                      "forecast_points": 10.5,
+                      "players": 43,
+                      "share_of_absent_forecast": 0.09971509971509972
+                    },
+                    "GK": {
+                      "forecast_points": 3.0,
+                      "players": 51,
+                      "share_of_absent_forecast": 0.02849002849002849
+                    },
+                    "MID": {
+                      "forecast_points": 48.5,
+                      "players": 146,
+                      "share_of_absent_forecast": 0.46058879392212726
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 66.4,
+                      "players": 144,
+                      "share_of_absent_forecast": 0.630579297245964
+                    },
+                    "above_7.5": {
+                      "forecast_points": 0.0,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.0
+                    },
+                    "under_5.0": {
+                      "forecast_points": 38.900000000000006,
+                      "players": 204,
+                      "share_of_absent_forecast": 0.36942070275403616
+                    }
+                  },
+                  "forecast_points": 105.3,
+                  "largest": [
+                    {
+                      "forecast_points": 6.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 449434,
+                      "position": "MID",
+                      "price_tenths": 62
+                    },
+                    {
+                      "forecast_points": 4.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 227444,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 4.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 434752,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 3.7,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 571779,
+                      "position": "MID",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 3.3,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 575458,
+                      "position": "DEF",
+                      "price_tenths": 45
+                    },
+                    {
+                      "forecast_points": 3.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 487676,
+                      "position": "DEF",
+                      "price_tenths": 44
+                    },
+                    {
+                      "forecast_points": 3.0,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 578153,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.3,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 205533,
+                      "position": "FWD",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.3,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 232653,
+                      "position": "MID",
+                      "price_tenths": 49
+                    },
+                    {
+                      "forecast_points": 2.2,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 624777,
+                      "position": "MID",
+                      "price_tenths": 60
+                    }
+                  ],
+                  "players": 349
+                },
                 "all_players": {
                   "bias": -0.003963414634146347,
                   "mean_absolute_error": 1.234451219512195,
@@ -816,6 +1674,51 @@
                     "players": 297
                   }
                 },
+                "by_prior_minutes": {
+                  "buckets": {
+                    "30_to_60": {
+                      "appeared": 53,
+                      "bias": 0.3666666666666667,
+                      "forecast_points": 113.7,
+                      "mean_absolute_error": 1.9115942028985504,
+                      "mean_forecast": 1.6478260869565218,
+                      "mean_realized": 2.0144927536231885,
+                      "players": 69,
+                      "realized_points": 139.0
+                    },
+                    "60_and_above": {
+                      "appeared": 170,
+                      "bias": -0.2854054054054054,
+                      "forecast_points": 685.8,
+                      "mean_absolute_error": 2.789189189189189,
+                      "mean_forecast": 3.707027027027027,
+                      "mean_realized": 3.4216216216216218,
+                      "players": 185,
+                      "realized_points": 633.0
+                    },
+                    "none": {
+                      "appeared": 19,
+                      "bias": 0.00929368029739777,
+                      "forecast_points": 28.5,
+                      "mean_absolute_error": 0.15724907063197024,
+                      "mean_forecast": 0.10594795539033457,
+                      "mean_realized": 0.11524163568773234,
+                      "players": 269,
+                      "realized_points": 31.0
+                    },
+                    "under_30": {
+                      "appeared": 65,
+                      "bias": 0.16842105263157897,
+                      "forecast_points": 95.6,
+                      "mean_absolute_error": 0.899248120300752,
+                      "mean_forecast": 0.718796992481203,
+                      "mean_realized": 0.8872180451127819,
+                      "players": 133,
+                      "realized_points": 118.0
+                    }
+                  },
+                  "players": 656
+                },
                 "rank_agreement_within_position": {
                   "groups": {
                     "DEF": {
@@ -890,6 +1793,150 @@
                 }
               },
               "ours_decided": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 77.65833276643662,
+                      "players": 53,
+                      "share_of_absent_forecast": 0.5938507571731354
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 25.199436244176738,
+                      "players": 9,
+                      "share_of_absent_forecast": 0.19269927335354983
+                    },
+                    "under_1.0": {
+                      "forecast_points": 27.91302117261035,
+                      "players": 287,
+                      "share_of_absent_forecast": 0.21344996947331477
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 9.785646981214175,
+                      "players": 178,
+                      "share_of_absent_forecast": 0.07483052574281648
+                    },
+                    "not_named": {
+                      "forecast_points": 120.98514320200954,
+                      "players": 171,
+                      "share_of_absent_forecast": 0.9251694742571835
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 48.22856268612181,
+                      "players": 109,
+                      "share_of_absent_forecast": 0.3688022578937429
+                    },
+                    "FWD": {
+                      "forecast_points": 12.808872356977846,
+                      "players": 43,
+                      "share_of_absent_forecast": 0.09794903234148283
+                    },
+                    "GK": {
+                      "forecast_points": 10.266783543359315,
+                      "players": 51,
+                      "share_of_absent_forecast": 0.07850976146106073
+                    },
+                    "MID": {
+                      "forecast_points": 59.466571596764744,
+                      "players": 146,
+                      "share_of_absent_forecast": 0.4547389483037136
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 70.55926399166783,
+                      "players": 144,
+                      "share_of_absent_forecast": 0.5395644080211403
+                    },
+                    "above_7.5": {
+                      "forecast_points": 0.0,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.0
+                    },
+                    "under_5.0": {
+                      "forecast_points": 60.211526191555876,
+                      "players": 204,
+                      "share_of_absent_forecast": 0.4604355919788598
+                    }
+                  },
+                  "forecast_points": 130.7707901832237,
+                  "largest": [
+                    {
+                      "forecast_points": 3.516411504700961,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 449434,
+                      "position": "MID",
+                      "price_tenths": 62
+                    },
+                    {
+                      "forecast_points": 3.065248669153146,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 227444,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.8911738737317725,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 578153,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.7533571153979777,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 172649,
+                      "position": "GK",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.703846923268121,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 571779,
+                      "position": "MID",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.615329960798637,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 434752,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.5706978664801468,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 205533,
+                      "position": "FWD",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.5493409981641206,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 651426,
+                      "position": "DEF",
+                      "price_tenths": 49
+                    },
+                    {
+                      "forecast_points": 2.534029332481856,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 575458,
+                      "position": "DEF",
+                      "price_tenths": 45
+                    },
+                    {
+                      "forecast_points": 2.4280834263590245,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 513466,
+                      "position": "MID",
+                      "price_tenths": 50
+                    }
+                  ],
+                  "players": 349
+                },
                 "all_players": {
                   "bias": 0.11748077220880883,
                   "mean_absolute_error": 1.1939242659767455,
@@ -981,6 +2028,51 @@
                     "players": 297
                   }
                 },
+                "by_prior_minutes": {
+                  "buckets": {
+                    "30_to_60": {
+                      "appeared": 53,
+                      "bias": 0.28538936283040894,
+                      "forecast_points": 119.30813396470178,
+                      "mean_absolute_error": 1.8452098516920525,
+                      "mean_forecast": 1.7291033907927795,
+                      "mean_realized": 2.0144927536231885,
+                      "players": 69,
+                      "realized_points": 139.0
+                    },
+                    "60_and_above": {
+                      "appeared": 170,
+                      "bias": 0.4046208797248794,
+                      "forecast_points": 558.1451372508973,
+                      "mean_absolute_error": 2.5784799755165464,
+                      "mean_forecast": 3.017000741896742,
+                      "mean_realized": 3.4216216216216218,
+                      "players": 185,
+                      "realized_points": 633.0
+                    },
+                    "none": {
+                      "appeared": 19,
+                      "bias": -0.057812705831375204,
+                      "forecast_points": 46.55161786863993,
+                      "mean_absolute_error": 0.21557744074830631,
+                      "mean_forecast": 0.17305434151910754,
+                      "mean_realized": 0.11524163568773234,
+                      "players": 269,
+                      "realized_points": 31.0
+                    },
+                    "under_30": {
+                      "appeared": 65,
+                      "bias": -0.014494168020920352,
+                      "forecast_points": 119.92772434678241,
+                      "mean_absolute_error": 0.9089151254296085,
+                      "mean_forecast": 0.9017122131337023,
+                      "mean_realized": 0.8872180451127819,
+                      "players": 133,
+                      "realized_points": 118.0
+                    }
+                  },
+                  "players": 656
+                },
                 "rank_agreement_within_position": {
                   "groups": {
                     "DEF": {
@@ -1055,6 +2147,150 @@
                 }
               },
               "ours_unconditional": {
+                "absent_forecast": {
+                  "by_forecast_size": {
+                    "1.0_to_2.5": {
+                      "forecast_points": 90.31530247304173,
+                      "players": 61,
+                      "share_of_absent_forecast": 0.5010839343935123
+                    },
+                    "2.5_and_above": {
+                      "forecast_points": 32.902951488291485,
+                      "players": 12,
+                      "share_of_absent_forecast": 0.18255090702744672
+                    },
+                    "under_1.0": {
+                      "forecast_points": 57.02161459951977,
+                      "players": 276,
+                      "share_of_absent_forecast": 0.31636515857904113
+                    }
+                  },
+                  "by_our_availability_rule": {
+                    "named": {
+                      "forecast_points": 59.25472535884342,
+                      "players": 178,
+                      "share_of_absent_forecast": 0.328754818964139
+                    },
+                    "not_named": {
+                      "forecast_points": 120.98514320200954,
+                      "players": 171,
+                      "share_of_absent_forecast": 0.6712451810358611
+                    }
+                  },
+                  "by_position": {
+                    "DEF": {
+                      "forecast_points": 63.73350513716566,
+                      "players": 109,
+                      "share_of_absent_forecast": 0.3536038149941716
+                    },
+                    "FWD": {
+                      "forecast_points": 22.12173145412102,
+                      "players": 43,
+                      "share_of_absent_forecast": 0.12273495110019032
+                    },
+                    "GK": {
+                      "forecast_points": 12.558083889011101,
+                      "players": 51,
+                      "share_of_absent_forecast": 0.06967428454804502
+                    },
+                    "MID": {
+                      "forecast_points": 81.82654808055518,
+                      "players": 146,
+                      "share_of_absent_forecast": 0.4539869493575931
+                    }
+                  },
+                  "by_price_band": {
+                    "5.0_to_7.5": {
+                      "forecast_points": 105.18212817916793,
+                      "players": 144,
+                      "share_of_absent_forecast": 0.5835674926918631
+                    },
+                    "above_7.5": {
+                      "forecast_points": 0.3868485741334956,
+                      "players": 1,
+                      "share_of_absent_forecast": 0.0021462985810094897
+                    },
+                    "under_5.0": {
+                      "forecast_points": 74.67089180755151,
+                      "players": 204,
+                      "share_of_absent_forecast": 0.4142862087271273
+                    }
+                  },
+                  "forecast_points": 180.23986856085295,
+                  "largest": [
+                    {
+                      "forecast_points": 3.516411504700961,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 449434,
+                      "position": "MID",
+                      "price_tenths": 62
+                    },
+                    {
+                      "forecast_points": 3.065248669153146,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 227444,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.8911738737317725,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 578153,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.7533571153979777,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 172649,
+                      "position": "GK",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.703846923268121,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 571779,
+                      "position": "MID",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.615329960798637,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 434752,
+                      "position": "DEF",
+                      "price_tenths": 50
+                    },
+                    {
+                      "forecast_points": 2.611127761750924,
+                      "named_by_our_availability_rule": true,
+                      "player_id": 432830,
+                      "position": "DEF",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.5711433991829415,
+                      "named_by_our_availability_rule": true,
+                      "player_id": 199796,
+                      "position": "DEF",
+                      "price_tenths": 45
+                    },
+                    {
+                      "forecast_points": 2.5706978664801468,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 205533,
+                      "position": "FWD",
+                      "price_tenths": 55
+                    },
+                    {
+                      "forecast_points": 2.5493409981641206,
+                      "named_by_our_availability_rule": false,
+                      "player_id": 651426,
+                      "position": "DEF",
+                      "price_tenths": 49
+                    }
+                  ],
+                  "players": 349
+                },
                 "all_players": {
                   "bias": 0.038716287607419825,
                   "mean_absolute_error": 1.2718405150889187,
@@ -1146,6 +2382,51 @@
                     "players": 297
                   }
                 },
+                "by_prior_minutes": {
+                  "buckets": {
+                    "30_to_60": {
+                      "appeared": 53,
+                      "bias": 0.21227227076796618,
+                      "forecast_points": 124.35321331701034,
+                      "mean_absolute_error": 1.9183269437544956,
+                      "mean_forecast": 1.8022204828552224,
+                      "mean_realized": 2.0144927536231885,
+                      "players": 69,
+                      "realized_points": 139.0
+                    },
+                    "60_and_above": {
+                      "appeared": 170,
+                      "bias": 0.3702246407029322,
+                      "forecast_points": 564.5084414699576,
+                      "mean_absolute_error": 2.6128762145384936,
+                      "mean_forecast": 3.0513969809186894,
+                      "mean_realized": 3.4216216216216218,
+                      "players": 185,
+                      "realized_points": 633.0
+                    },
+                    "none": {
+                      "appeared": 19,
+                      "bias": -0.15340824698207645,
+                      "forecast_points": 72.26681843817856,
+                      "mean_absolute_error": 0.3091044224903621,
+                      "mean_forecast": 0.26864988266980877,
+                      "mean_realized": 0.11524163568773234,
+                      "players": 269,
+                      "realized_points": 31.0
+                    },
+                    "under_30": {
+                      "appeared": 65,
+                      "bias": -0.12386197070967028,
+                      "forecast_points": 134.47364210438616,
+                      "mean_absolute_error": 1.0182829281183587,
+                      "mean_forecast": 1.0110800158224522,
+                      "mean_realized": 0.8872180451127819,
+                      "players": 133,
+                      "realized_points": 118.0
+                    }
+                  },
+                  "players": 656
+                },
                 "rank_agreement_within_position": {
                   "groups": {
                     "DEF": {
@@ -1233,7 +2514,7 @@
       ]
     }
   },
-  "generated_at_utc": "2026-09-18T20:23:35+00:00",
+  "generated_at_utc": "2026-09-19T11:11:43+00:00",
   "minimum_pooled_gameweeks": 6,
   "not_audited": {
     "2": "no capture from before its deadline survives, so neither our projection nor the game's forecast can be read",
@@ -1244,6 +2525,150 @@
     "comparison_may_be_stated": false,
     "forecasts": {
       "game": {
+        "absent_forecast": {
+          "by_forecast_size": {
+            "1.0_to_2.5": {
+              "forecast_points": 60.5,
+              "players": 42,
+              "share_of_absent_forecast": 0.5745489078822412
+            },
+            "2.5_and_above": {
+              "forecast_points": 27.0,
+              "players": 7,
+              "share_of_absent_forecast": 0.25641025641025644
+            },
+            "under_1.0": {
+              "forecast_points": 17.8,
+              "players": 300,
+              "share_of_absent_forecast": 0.1690408357075024
+            }
+          },
+          "by_our_availability_rule": {
+            "named": {
+              "forecast_points": 11.9,
+              "players": 178,
+              "share_of_absent_forecast": 0.11301044634377969
+            },
+            "not_named": {
+              "forecast_points": 93.4,
+              "players": 171,
+              "share_of_absent_forecast": 0.8869895536562205
+            }
+          },
+          "by_position": {
+            "DEF": {
+              "forecast_points": 43.300000000000004,
+              "players": 109,
+              "share_of_absent_forecast": 0.4112060778727446
+            },
+            "FWD": {
+              "forecast_points": 10.5,
+              "players": 43,
+              "share_of_absent_forecast": 0.09971509971509972
+            },
+            "GK": {
+              "forecast_points": 3.0,
+              "players": 51,
+              "share_of_absent_forecast": 0.02849002849002849
+            },
+            "MID": {
+              "forecast_points": 48.5,
+              "players": 146,
+              "share_of_absent_forecast": 0.46058879392212726
+            }
+          },
+          "by_price_band": {
+            "5.0_to_7.5": {
+              "forecast_points": 66.4,
+              "players": 144,
+              "share_of_absent_forecast": 0.630579297245964
+            },
+            "above_7.5": {
+              "forecast_points": 0.0,
+              "players": 1,
+              "share_of_absent_forecast": 0.0
+            },
+            "under_5.0": {
+              "forecast_points": 38.900000000000006,
+              "players": 204,
+              "share_of_absent_forecast": 0.36942070275403616
+            }
+          },
+          "forecast_points": 105.3,
+          "largest": [
+            {
+              "forecast_points": 6.0,
+              "named_by_our_availability_rule": false,
+              "player_id": 449434,
+              "position": "MID",
+              "price_tenths": 62
+            },
+            {
+              "forecast_points": 4.0,
+              "named_by_our_availability_rule": false,
+              "player_id": 227444,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 4.0,
+              "named_by_our_availability_rule": false,
+              "player_id": 434752,
+              "position": "DEF",
+              "price_tenths": 50
+            },
+            {
+              "forecast_points": 3.7,
+              "named_by_our_availability_rule": false,
+              "player_id": 571779,
+              "position": "MID",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 3.3,
+              "named_by_our_availability_rule": false,
+              "player_id": 575458,
+              "position": "DEF",
+              "price_tenths": 45
+            },
+            {
+              "forecast_points": 3.0,
+              "named_by_our_availability_rule": false,
+              "player_id": 487676,
+              "position": "DEF",
+              "price_tenths": 44
+            },
+            {
+              "forecast_points": 3.0,
+              "named_by_our_availability_rule": false,
+              "player_id": 578153,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.3,
+              "named_by_our_availability_rule": false,
+              "player_id": 205533,
+              "position": "FWD",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.3,
+              "named_by_our_availability_rule": false,
+              "player_id": 232653,
+              "position": "MID",
+              "price_tenths": 49
+            },
+            {
+              "forecast_points": 2.2,
+              "named_by_our_availability_rule": false,
+              "player_id": 624777,
+              "position": "MID",
+              "price_tenths": 60
+            }
+          ],
+          "players": 349
+        },
         "all_players": {
           "bias": -0.003963414634146347,
           "mean_absolute_error": 1.234451219512195,
@@ -1335,6 +2760,51 @@
             "players": 297
           }
         },
+        "by_prior_minutes": {
+          "buckets": {
+            "30_to_60": {
+              "appeared": 53,
+              "bias": 0.3666666666666667,
+              "forecast_points": 113.7,
+              "mean_absolute_error": 1.9115942028985504,
+              "mean_forecast": 1.6478260869565218,
+              "mean_realized": 2.0144927536231885,
+              "players": 69,
+              "realized_points": 139.0
+            },
+            "60_and_above": {
+              "appeared": 170,
+              "bias": -0.2854054054054054,
+              "forecast_points": 685.8,
+              "mean_absolute_error": 2.789189189189189,
+              "mean_forecast": 3.707027027027027,
+              "mean_realized": 3.4216216216216218,
+              "players": 185,
+              "realized_points": 633.0
+            },
+            "none": {
+              "appeared": 19,
+              "bias": 0.00929368029739777,
+              "forecast_points": 28.5,
+              "mean_absolute_error": 0.15724907063197024,
+              "mean_forecast": 0.10594795539033457,
+              "mean_realized": 0.11524163568773234,
+              "players": 269,
+              "realized_points": 31.0
+            },
+            "under_30": {
+              "appeared": 65,
+              "bias": 0.16842105263157897,
+              "forecast_points": 95.6,
+              "mean_absolute_error": 0.899248120300752,
+              "mean_forecast": 0.718796992481203,
+              "mean_realized": 0.8872180451127819,
+              "players": 133,
+              "realized_points": 118.0
+            }
+          },
+          "players": 656
+        },
         "rank_agreement_within_position": {
           "groups": {
             "4|DEF": {
@@ -1409,6 +2879,150 @@
         }
       },
       "ours_decided": {
+        "absent_forecast": {
+          "by_forecast_size": {
+            "1.0_to_2.5": {
+              "forecast_points": 77.64790404927277,
+              "players": 53,
+              "share_of_absent_forecast": 0.5938810246673004
+            },
+            "2.5_and_above": {
+              "forecast_points": 25.18563987130554,
+              "players": 9,
+              "share_of_absent_forecast": 0.19262945725078637
+            },
+            "under_1.0": {
+              "forecast_points": 27.91302117261035,
+              "players": 287,
+              "share_of_absent_forecast": 0.21348951808191327
+            }
+          },
+          "by_our_availability_rule": {
+            "named": {
+              "forecast_points": 9.775218264050313,
+              "players": 178,
+              "share_of_absent_forecast": 0.07476462771379958
+            },
+            "not_named": {
+              "forecast_points": 120.97134682913834,
+              "players": 171,
+              "share_of_absent_forecast": 0.9252353722862005
+            }
+          },
+          "by_position": {
+            "DEF": {
+              "forecast_points": 48.21660211055258,
+              "players": 109,
+              "share_of_absent_forecast": 0.36877911152913695
+            },
+            "FWD": {
+              "forecast_points": 12.808872356977846,
+              "players": 43,
+              "share_of_absent_forecast": 0.0979671806127252
+            },
+            "GK": {
+              "forecast_points": 10.266783543359315,
+              "players": 51,
+              "share_of_absent_forecast": 0.07852430796971026
+            },
+            "MID": {
+              "forecast_points": 59.454307082298925,
+              "players": 146,
+              "share_of_absent_forecast": 0.4547293998884277
+            }
+          },
+          "by_price_band": {
+            "5.0_to_7.5": {
+              "forecast_points": 70.54463272028644,
+              "players": 144,
+              "share_of_absent_forecast": 0.5395524744379042
+            },
+            "above_7.5": {
+              "forecast_points": 0.0,
+              "players": 1,
+              "share_of_absent_forecast": 0.0
+            },
+            "under_5.0": {
+              "forecast_points": 60.20193237290221,
+              "players": 204,
+              "share_of_absent_forecast": 0.4604475255620959
+            }
+          },
+          "forecast_points": 130.74656509318865,
+          "largest": [
+            {
+              "forecast_points": 3.504146990235138,
+              "named_by_our_availability_rule": false,
+              "player_id": 449434,
+              "position": "MID",
+              "price_tenths": 62
+            },
+            {
+              "forecast_points": 3.0637168107477724,
+              "named_by_our_availability_rule": false,
+              "player_id": 227444,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.8911738737317725,
+              "named_by_our_availability_rule": false,
+              "player_id": 578153,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.7533571153979777,
+              "named_by_our_availability_rule": false,
+              "player_id": 172649,
+              "position": "GK",
+              "price_tenths": 50
+            },
+            {
+              "forecast_points": 2.703846923268121,
+              "named_by_our_availability_rule": false,
+              "player_id": 571779,
+              "position": "MID",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.615329960798637,
+              "named_by_our_availability_rule": false,
+              "player_id": 434752,
+              "position": "DEF",
+              "price_tenths": 50
+            },
+            {
+              "forecast_points": 2.5706978664801468,
+              "named_by_our_availability_rule": false,
+              "player_id": 205533,
+              "position": "FWD",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.5493409981641206,
+              "named_by_our_availability_rule": false,
+              "player_id": 651426,
+              "position": "DEF",
+              "price_tenths": 49
+            },
+            {
+              "forecast_points": 2.534029332481856,
+              "named_by_our_availability_rule": false,
+              "player_id": 575458,
+              "position": "DEF",
+              "price_tenths": 45
+            },
+            {
+              "forecast_points": 2.4280834263590245,
+              "named_by_our_availability_rule": false,
+              "player_id": 513466,
+              "position": "MID",
+              "price_tenths": 50
+            }
+          ],
+          "players": 349
+        },
         "all_players": {
           "bias": 0.12089008628736625,
           "mean_absolute_error": 1.1934869442151363,
@@ -1500,6 +3114,51 @@
             "players": 297
           }
         },
+        "by_prior_minutes": {
+          "buckets": {
+            "30_to_60": {
+              "appeared": 53,
+              "bias": 0.2870480043851818,
+              "forecast_points": 119.19368769742248,
+              "mean_absolute_error": 1.843682882392465,
+              "mean_forecast": 1.727444749238007,
+              "mean_realized": 2.0144927536231885,
+              "players": 69,
+              "realized_points": 139.0
+            },
+            "60_and_above": {
+              "appeared": 170,
+              "bias": 0.41609149468841644,
+              "forecast_points": 556.0230734826429,
+              "mean_absolute_error": 2.5774987744682005,
+              "mean_forecast": 3.0055301269332046,
+              "mean_realized": 3.4216216216216218,
+              "players": 185,
+              "realized_points": 633.0
+            },
+            "none": {
+              "appeared": 19,
+              "bias": -0.057812705831375204,
+              "forecast_points": 46.55161786863993,
+              "mean_absolute_error": 0.21557744074830631,
+              "mean_forecast": 0.17305434151910754,
+              "mean_realized": 0.11524163568773234,
+              "players": 269,
+              "realized_points": 31.0
+            },
+            "under_30": {
+              "appeared": 65,
+              "bias": -0.014494168020920352,
+              "forecast_points": 119.92772434678241,
+              "mean_absolute_error": 0.9089151254296085,
+              "mean_forecast": 0.9017122131337023,
+              "mean_realized": 0.8872180451127819,
+              "players": 133,
+              "realized_points": 118.0
+            }
+          },
+          "players": 656
+        },
         "rank_agreement_within_position": {
           "groups": {
             "4|DEF": {
@@ -1574,6 +3233,150 @@
         }
       },
       "ours_unconditional": {
+        "absent_forecast": {
+          "by_forecast_size": {
+            "1.0_to_2.5": {
+              "forecast_points": 90.31418927502813,
+              "players": 61,
+              "share_of_absent_forecast": 0.501194503385577
+            },
+            "2.5_and_above": {
+              "forecast_points": 32.86208070909045,
+              "players": 12,
+              "share_of_absent_forecast": 0.1823666286927892
+            },
+            "under_1.0": {
+              "forecast_points": 57.02161459951977,
+              "players": 276,
+              "share_of_absent_forecast": 0.316438867921634
+            }
+          },
+          "by_our_availability_rule": {
+            "named": {
+              "forecast_points": 59.2265377545,
+              "players": 178,
+              "share_of_absent_forecast": 0.3286749891173677
+            },
+            "not_named": {
+              "forecast_points": 120.97134682913834,
+              "players": 171,
+              "share_of_absent_forecast": 0.6713250108826325
+            }
+          },
+          "by_position": {
+            "DEF": {
+              "forecast_points": 63.703785674416864,
+              "players": 109,
+              "share_of_absent_forecast": 0.35352127369091807
+            },
+            "FWD": {
+              "forecast_points": 22.12173145412102,
+              "players": 43,
+              "share_of_absent_forecast": 0.12276354689310064
+            },
+            "GK": {
+              "forecast_points": 12.558083889011101,
+              "players": 51,
+              "share_of_absent_forecast": 0.06969051783281231
+            },
+            "MID": {
+              "forecast_points": 81.81428356608936,
+              "players": 146,
+              "share_of_absent_forecast": 0.4540246615831692
+            }
+          },
+          "by_price_band": {
+            "5.0_to_7.5": {
+              "forecast_points": 105.1529359601582,
+              "players": 144,
+              "share_of_absent_forecast": 0.5835414561226537
+            },
+            "above_7.5": {
+              "forecast_points": 0.3868485741334956,
+              "players": 1,
+              "share_of_absent_forecast": 0.0021467986432101593
+            },
+            "under_5.0": {
+              "forecast_points": 74.65810004934661,
+              "players": 204,
+              "share_of_absent_forecast": 0.4143117452341361
+            }
+          },
+          "forecast_points": 180.1978845836383,
+          "largest": [
+            {
+              "forecast_points": 3.504146990235138,
+              "named_by_our_availability_rule": false,
+              "player_id": 449434,
+              "position": "MID",
+              "price_tenths": 62
+            },
+            {
+              "forecast_points": 3.0637168107477724,
+              "named_by_our_availability_rule": false,
+              "player_id": 227444,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.8911738737317725,
+              "named_by_our_availability_rule": false,
+              "player_id": 578153,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.7533571153979777,
+              "named_by_our_availability_rule": false,
+              "player_id": 172649,
+              "position": "GK",
+              "price_tenths": 50
+            },
+            {
+              "forecast_points": 2.703846923268121,
+              "named_by_our_availability_rule": false,
+              "player_id": 571779,
+              "position": "MID",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.615329960798637,
+              "named_by_our_availability_rule": false,
+              "player_id": 434752,
+              "position": "DEF",
+              "price_tenths": 50
+            },
+            {
+              "forecast_points": 2.5968451136259807,
+              "named_by_our_availability_rule": true,
+              "player_id": 432830,
+              "position": "DEF",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.5706978664801468,
+              "named_by_our_availability_rule": false,
+              "player_id": 205533,
+              "position": "FWD",
+              "price_tenths": 55
+            },
+            {
+              "forecast_points": 2.5583516409780516,
+              "named_by_our_availability_rule": true,
+              "player_id": 199796,
+              "position": "DEF",
+              "price_tenths": 45
+            },
+            {
+              "forecast_points": 2.5493409981641206,
+              "named_by_our_availability_rule": false,
+              "player_id": 651426,
+              "position": "DEF",
+              "price_tenths": 49
+            }
+          ],
+          "players": 349
+        },
         "all_players": {
           "bias": 0.04220068868275638,
           "mean_absolute_error": 1.2713281063305306,
@@ -1664,6 +3467,51 @@
             "mean_realized": 0.8518518518518519,
             "players": 297
           }
+        },
+        "by_prior_minutes": {
+          "buckets": {
+            "30_to_60": {
+              "appeared": 53,
+              "bias": 0.21393091232273895,
+              "forecast_points": 124.23876704973104,
+              "mean_absolute_error": 1.916799974454908,
+              "mean_forecast": 1.8005618413004498,
+              "mean_realized": 2.0144927536231885,
+              "players": 69,
+              "realized_points": 139.0
+            },
+            "60_and_above": {
+              "appeared": 170,
+              "bias": 0.3819615100982915,
+              "forecast_points": 562.3371206318161,
+              "mean_absolute_error": 2.6116287590583256,
+              "mean_forecast": 3.03966011152333,
+              "mean_realized": 3.4216216216216218,
+              "players": 185,
+              "realized_points": 633.0
+            },
+            "none": {
+              "appeared": 19,
+              "bias": -0.15340824698207645,
+              "forecast_points": 72.26681843817856,
+              "mean_absolute_error": 0.3091044224903621,
+              "mean_forecast": 0.26864988266980877,
+              "mean_realized": 0.11524163568773234,
+              "players": 269,
+              "realized_points": 31.0
+            },
+            "under_30": {
+              "appeared": 65,
+              "bias": -0.12386197070967028,
+              "forecast_points": 134.47364210438616,
+              "mean_absolute_error": 1.0182829281183587,
+              "mean_forecast": 1.0110800158224522,
+              "mean_realized": 0.8872180451127819,
+              "players": 133,
+              "realized_points": 118.0
+            }
+          },
+          "players": 656
         },
         "rank_agreement_within_position": {
           "groups": {
