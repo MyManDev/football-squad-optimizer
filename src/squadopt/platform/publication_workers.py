@@ -10,6 +10,7 @@ from typing import Any
 
 from squadopt.application.advice import member_horizon_builder
 from squadopt.application.capture_entries import CapturePicksProvider
+from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     load_publication_top100,
@@ -76,6 +77,7 @@ def _worker_init(
             else None
         ),
         top100_counts=top100_counts,
+        chip_forecast_source=forecast_source(snapshot),
     )
 
 
