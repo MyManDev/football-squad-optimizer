@@ -302,9 +302,13 @@ describe("a bundle built with an origin whose service is down", () => {
     stubStaticTree();
     const { container } = open();
     expect(await screen.findByText(computeCopy.serviceUnreachable)).toBeInTheDocument();
-    expect(calls).toEqual([
-      `https://squadopt-api.example/api/v1/leagues/${INDEX.league_id}/capabilities`,
+    const service = "https://squadopt-api.example";
+    expect(calls.filter((url) => url.startsWith(service))).toEqual([
+      `${service}/api/v1/leagues/${INDEX.league_id}/capabilities`,
     ]);
+    // The only other read is the site's own published calendar, which says whether the
+    // advised gameweek's deadline has passed. It is a static document, not a service.
+    expect(calls.filter((url) => !url.startsWith(service))).toEqual(["/data/fixtures.json"]);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       SQUAD.payload.entry.team_name!,
     );
@@ -326,7 +330,10 @@ describe("a bundle built with an origin whose service is down", () => {
     const { container } = open();
     await screen.findByRole("heading", { level: 1 });
     await waitFor(() => expect(container).toHaveTextContent(PLAN_SHOWN));
-    expect(fetched).not.toHaveBeenCalled();
+    // No service is asked anything. The one read is the site's own published calendar.
+    expect(fetched.mock.calls.map((call) => String((call as unknown[])[0]))).toEqual([
+      "/data/fixtures.json",
+    ]);
     expect(container).not.toHaveTextContent(computeCopy.serviceUnreachable);
   });
 

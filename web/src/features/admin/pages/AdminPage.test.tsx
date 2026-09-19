@@ -30,13 +30,16 @@ it.each(["tr", "en"] as const)(
     expect(screen.getByText(copy.notice)).toHaveTextContent(
       language === "tr" ? /menüde listelenmez, korumalı değildir/ : /unlisted, not protected/,
     );
-    expect(screen.getByRole("link", { name: copy.analysis })).toHaveAttribute("href", "/analysis");
+    // The measurement archive is no longer served from the member origin: its documents
+    // are the laboratory's record, written in the laboratory's vocabulary, and they were
+    // reachable inside the member shell.
+    expect(screen.queryByRole("link", { name: copy.analysis })).toBeNull();
     expect(screen.getByRole("link", { name: copy.status })).toHaveAttribute("href", "/status");
     expect(screen.getByRole("link", { name: copy.decisions })).toHaveAttribute(
       "href",
       "https://github.com/MyManDev/football-squad-optimizer/blob/develop/docs/decisions.md",
     );
-    expect(screen.getAllByRole("link")).toHaveLength(3);
+    expect(screen.getAllByRole("link")).toHaveLength(2);
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
     expect(fetch).not.toHaveBeenCalled();
   },

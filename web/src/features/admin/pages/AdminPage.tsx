@@ -12,9 +12,7 @@ export function AdminPage() {
       <h1>{copy.title}</h1>
       <p>{copy.notice}</p>
       <ul className={styles.links}>
-        <li>
-          <Link to="/analysis">{copy.analysis}</Link>
-        </li>
+        <li></li>
         <li>
           <Link to="/status">{copy.status}</Link>
         </li>

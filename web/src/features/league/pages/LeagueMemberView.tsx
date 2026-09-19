@@ -5,6 +5,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
@@ -45,8 +46,9 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   rivalSquad = null,
+  deadlinePassed = null,
 }: LeagueMemberViewProps) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const [searchParams] = useSearchParams();
@@ -105,6 +107,20 @@ function LeagueMemberContent({
         </div>
         <ExampleDataBadge sourceKind={squad.source_kind} />
       </header>
+
+      {deadlinePassed !== null ? (
+        <Card tone="muted" title={COMPUTE_COPY[language].deadlinePassedTitle}>
+          <p className={styles.notice} data-testid="deadline-passed">
+            {COMPUTE_COPY[language].deadlinePassedBody(
+              view.gameweek,
+              new Intl.DateTimeFormat(locale, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }).format(new Date(deadlinePassed)),
+            )}
+          </p>
+        </Card>
+      ) : null}
 
       {viewer ? (
         <Card tone="muted" title={copy.viewerTitle}>
@@ -224,6 +240,7 @@ function LeagueMemberContent({
           pending={computePending}
           published={selection.status === "ready"}
           chipChosen={selection.chip.chip !== null}
+          deadlinePassed={deadlinePassed !== null}
         />
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />

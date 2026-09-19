@@ -38,6 +38,11 @@ export interface LeagueMemberViewProps {
   client?: AdviceClient;
   /** What the compute service answers for this page; absent or null on a static build. */
   capabilities?: AdviceCapabilities | null;
+  /**
+   * The advised gameweek's deadline once it has passed, from the published fixture
+   * calendar; null while it is open or the calendar does not say.
+   */
+  deadlinePassed?: string | null;
   /** Where the page stands with that service; "static" when none is configured. */
   computeService?: ComputeService;
   /** A service is configured and has not answered yet; never true on a static build. */
