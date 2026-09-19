@@ -43,7 +43,12 @@ x-backend: &backend
 services:
   api:
     <<: *backend
-    command: [uvicorn, --factory, squadopt.api.runtime:build_app, --host, 0.0.0.0, --port, "8000"]
+    command: [uvicorn, --factory, squadopt.api.runtime:build_app, --host, 0.0.0.0, --port, "8000", --proxy-headers]
+    environment:
+      <<: *environment
+      # UNVERIFIED ingress peer: supply only the verified proxy peer/network allowlist.
+      # Unset stays unset (Uvicorn defaults to loopback); never substitute a guessed peer.
+      FORWARDED_ALLOW_IPS:
     cpus: 0.5
     mem_limit: 1g
     ports:
