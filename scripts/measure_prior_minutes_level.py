@@ -48,6 +48,7 @@ from squadopt.evaluation.prior_minutes_level import (
     corrected_forecast,
     online_factors,
     prior_bucket,
+    row_factors,
 )
 from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.experiments.statistics import season_aware_moving_block_interval
@@ -98,15 +99,16 @@ def factor_table(rows: pd.DataFrame, panel: pd.DataFrame) -> pd.DataFrame:
 
 
 def level_gate(table: pd.DataFrame, corrected: pd.Series, factors: pd.DataFrame) -> dict[str, Any]:
-    """Gate 1, over the rows a factor other than 1 applied to."""
+    """Gate 1, over the rows a factor other than 1 applied to.
+
+    The rows are taken from the correction itself (`row_factors`), never from the factor table
+    alone: a row before the first gameweek read sits in a decision whose factors are not 1 and
+    is still not corrected, and reading it here would score an untouched forecast as a
+    corrected one.
+    """
 
     bucket = prior_bucket(table["prior_minutes_per_week"])
-    applied = factors.loc[factors["factor"] != 1.0, ["fold_id", "bucket"]]
-    keys = set(map(tuple, applied.to_numpy()))
-    touched = pd.Series(
-        [(fold, label) in keys for fold, label in zip(table["fold_id"], bucket, strict=True)],
-        index=table.index,
-    )
+    touched = row_factors(table, factors) != 1.0
     rows = table.loc[touched & table["forecast"].notna()]
     buckets: dict[str, Any] = {}
     passed = True

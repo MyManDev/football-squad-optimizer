@@ -12,6 +12,7 @@ from scripts.measure_prior_minutes_level import (
 )
 
 from squadopt.evaluation.live_projection_audit import PRIOR_MINUTES_BUCKETS
+from squadopt.evaluation.prior_minutes_level import corrected_forecast
 
 
 def test_the_three_verdicts_are_the_protocols() -> None:
@@ -79,6 +80,45 @@ def _gate_inputs(after_scale: float) -> tuple[pd.DataFrame, pd.Series, pd.DataFr
     )
     corrected = table["forecast"] * np.where(table["fold_id"] == "b", after_scale, 1.0)
     return table, pd.Series(corrected, index=table.index), factors
+
+
+def test_the_level_gate_never_reads_a_row_the_correction_left_alone() -> None:
+    # A decision whose factors are not 1, in a gameweek before the correction starts. The
+    # rows are not corrected, and a gate that read them would score an untouched forecast as
+    # a corrected one. This is the defect the first run of this measurement carried: 3,650 of
+    # the 94,700 rows it read were from target gameweeks 1 to 3.
+    table = pd.DataFrame(
+        [
+            {
+                "fold_id": "2022-23-gw02",
+                "target_gameweek": 2,
+                "player_id": 1,
+                "forecast": 2.0,
+                "realized": 3.0,
+                "prior_minutes_per_week": 80.0,
+            },
+            {
+                "fold_id": "2022-23-gw06",
+                "target_gameweek": 6,
+                "player_id": 1,
+                "forecast": 2.0,
+                "realized": 3.0,
+                "prior_minutes_per_week": 80.0,
+            },
+        ]
+    )
+    factors = pd.DataFrame(
+        [
+            {"fold_id": fold, "bucket": label, "factor": 1.5}
+            for fold in ("2022-23-gw02", "2022-23-gw06")
+            for label, _, _ in PRIOR_MINUTES_BUCKETS
+        ]
+    )
+    corrected = corrected_forecast(table, factors)
+    assert corrected.tolist() == [2.0, 3.0]
+    gate = level_gate(table, corrected, factors)
+    assert gate["rows"] == 1
+    assert gate["buckets"]["60_and_above"]["rows"] == 1
 
 
 def test_the_level_gate_reads_only_rows_a_factor_touched() -> None:

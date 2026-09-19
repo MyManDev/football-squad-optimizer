@@ -101,12 +101,13 @@ def online_factors(frame: pd.DataFrame, decision_order: list[str]) -> pd.DataFra
     return pd.DataFrame.from_records(records)
 
 
-def corrected_forecast(frame: pd.DataFrame, factors: pd.DataFrame) -> pd.Series:
-    """Each row's forecast times the factor of its decision and bucket.
+def row_factors(frame: pd.DataFrame, factors: pd.DataFrame) -> pd.Series:
+    """The factor each row is corrected by, and 1 for every row the correction leaves alone.
 
-    A row before the first gameweek read, a row with no prior, and a row with no forecast keep
-    what they had: the first two are outside the correction, and an absent forecast stays
-    absent.
+    A row before the first gameweek read, and a row with no prior, are outside the correction
+    and get 1. Everything that asks which rows the correction touched has to ask this
+    function, so that a reading of the correction cannot come to a different answer than the
+    correction itself.
     """
 
     bucket = prior_bucket(frame["prior_minutes_per_week"]).where(
@@ -114,5 +115,10 @@ def corrected_forecast(frame: pd.DataFrame, factors: pd.DataFrame) -> pd.Series:
     )
     lookup = factors.set_index(["fold_id", "bucket"])["factor"]
     keys = pd.MultiIndex.from_arrays([frame["fold_id"], bucket])
-    factor = pd.Series(lookup.reindex(keys).to_numpy(), index=frame.index).fillna(1.0)
-    return frame["forecast"] * factor
+    return pd.Series(lookup.reindex(keys).to_numpy(), index=frame.index).fillna(1.0)
+
+
+def corrected_forecast(frame: pd.DataFrame, factors: pd.DataFrame) -> pd.Series:
+    """Each row's forecast times its factor; an absent forecast stays absent."""
+
+    return frame["forecast"] * row_factors(frame, factors)
