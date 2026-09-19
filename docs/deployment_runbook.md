@@ -211,14 +211,31 @@ After the public release verifies, the owner runs
 `powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter 2026-09-22T00:00:00Z -DryRun`
 from the clean main checkout on `develop`, using the same generated-after timestamp as
 `ship.sh`. Remove `-DryRun` only for the intended restart. The script verifies the public
-site, requires one matching capture across every human entry locally and publicly, refuses
+site, requires the public capture to match the fetched `origin/develop` publication, refuses
 open work unless `-Force`, and pulls with `--ff-only` before stopping the recorded backend.
 It keeps the recorded port and worker count, requires `/ready` and its published-week
 check, and verifies the new **launcher-recorded** commit against the pulled checkout.
+The pre-pull local capture is information only; the pulled tree must match before any
+process is stopped. It imports both backend entry points from the pulled source before
+stopping. The launcher resolves its commit independently of any inherited override.
 It does not claim an API-reported commit and never touches the tunnel. Dry-run performs
-the read-only checks and prints inputs without pulling or changing processes. It requires
+the read-only checks and prints inputs and `-Stop -WhatIf` targets without pulling or
+changing processes. It does run `git fetch origin develop` to check the current
+candidate publication and prints that remote-tracking state was updated; the working
+tree and backend files stay unchanged. Real execution fetches as well. The helper requires
 the launcher's creation-time-checked process walk and `-Stop -WhatIf` support. A failed
-start or readiness check exits nonzero with log paths; inspect it before another attempt.
+start or readiness check exits nonzero with a backend up/down state, the exact start
+command retaining the recorded port and worker count, the log directory and the last
+readiness body. Inspect those before another attempt: a timed-out launcher may still be
+starting, and a failed stop may have left recorded processes alive. After a successful
+stop or failed-start cleanup the PID registry may be gone; use the printed start command
+instead of rerunning the restart helper, which cannot recover the old count without it.
+For an operator-approved rollback, use that start command with
+`-SourceRoot "<existing-worktree-of-the-previous-commit>\src"`, then verify readiness and
+the recorded commit. Do not move tags or change the published tree as part of this step.
+The helper supports the default backend configuration. A backend launched with custom
+snapshot, handoff, artifact, club-news, origin, rate-limit or worker-metrics options must
+be restarted by hand with those same options; the registry does not record them.
 The first production use is the owner's operation, not part of development verification.
 
 ## Daily circuit breaker

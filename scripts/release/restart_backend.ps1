@@ -3,7 +3,8 @@
 Verify the published site, fast-forward develop, and restart the recorded backend.
 .DESCRIPTION
 The owner runs this after ship.sh. -DryRun performs read-only checks and prints the
-planned pull, stop and start. It never changes Git or processes. No tunnel is touched.
+planned pull, stop and start. It fetches the remote-tracking ref, but changes no
+working-tree file or process. No tunnel is touched.
 Windows PowerShell 5.1, ASCII only. The launcher must include Stop -WhatIf support.
 #>
 [CmdletBinding()]
@@ -49,8 +50,9 @@ function Assert-Checkout {
     if ((Git-Read -arguments @('branch', '--show-current')) -ne 'develop') { throw "Checkout must be on develop." }
     if (Git-Read -arguments @('status', '--porcelain')) { throw "Checkout must be clean, including untracked files." }
 }
-function Published-Capture([switch]$Public) {
+function Published-Capture([switch]$Public, [string]$Ref = "") {
     if ($Public) { $members = Get-Json "$publicRoot/data/league/members.json" }
+    elseif ($Ref) { $members = (Git-Read -arguments @('show', "${Ref}:web/public/data/league/members.json")) | ConvertFrom-Json }
     else { $members = Read-Json (Join-Path $SiteDataRoot 'league\members.json') }
     $identities = @()
     foreach ($member in $members.payload.members) {
@@ -58,6 +60,7 @@ function Published-Capture([switch]$Public) {
         $entry = [string]$member.entry_id
         if ($entry -notmatch '^[1-9][0-9]*$') { throw "Invalid human entry id." }
         if ($Public) { $document = Get-Json "$publicRoot/data/league/entries/$entry.json" }
+        elseif ($Ref) { $document = (Git-Read -arguments @('show', "${Ref}:web/public/data/league/entries/$entry.json")) | ConvertFrom-Json }
         else { $document = Read-Json (Join-Path $SiteDataRoot "league\entries\$entry.json") }
         $capture = [string]$document.payload.source_snapshot_id
         if ($capture -notmatch '^fpl-live-[A-Za-z0-9_-]+$') { throw "Entry $entry has no usable capture identity." }
@@ -72,6 +75,33 @@ function Queue-Depth([int]$port) {
     $rows = @($body -split "`n" | Where-Object { $_ -match '^advice_queue_depth\s+[0-9]+\s*$' })
     if ($rows.Count -ne 1) { throw "Queue depth is unavailable; refusing to stop." }
     return [long](($rows[0] -split '\s+')[1])
+}
+
+$lastReadyBody = "not queried"
+$backendUp = $false
+function Read-Readiness {
+    $script:backendUp = $false
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port/ready" -UseBasicParsing -TimeoutSec 15
+        $script:backendUp = $true
+        $script:lastReadyBody = $response.Content
+        $report = $response.Content | ConvertFrom-Json
+        return ($response.StatusCode -eq 200 -and $report.ready -eq $true -and
+            $report.checks.league_tree_matches_capture -eq $true)
+    } catch {
+        $failed = $_.Exception.Response
+        if ($null -ne $failed) {
+            $script:backendUp = $true
+            # Windows PowerShell may already have consumed the response stream.
+            if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+                $script:lastReadyBody = $_.ErrorDetails.Message
+            } else {
+                $reader = New-Object IO.StreamReader($failed.GetResponseStream())
+                try { $script:lastReadyBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            }
+        } else { $script:lastReadyBody = "No readable readiness response: $_" }
+        return $false
+    }
 }
 
 Assert-Checkout
@@ -103,15 +133,36 @@ Write-Output "Verify public release: $Python $verifier $LiveGeneratedAfter"
 & $Python $verifier $LiveGeneratedAfter
 if ($LASTEXITCODE -ne 0) { throw "Public release verification failed; backend left running." }
 $publicCapture = Published-Capture -Public
-$localCapture = Published-Capture
-Write-Output "Public capture=$publicCapture local capture=$localCapture"
-if ($publicCapture -ne $localCapture) { throw "Public/local capture mismatch; backend left running." }
+try { $localCapture = Published-Capture } catch { $localCapture = "unavailable: $_" }
+Write-Output "Public capture=$publicCapture pre-pull local capture=$localCapture (informational)"
+
+& git -C $RepoRoot fetch origin develop
+if ($LASTEXITCODE -ne 0) { throw "Fetch failed; backend left running." }
+if ($DryRun) {
+    Write-Output "DryRun fetched origin/develop: only Git remote-tracking state updated; working tree and backend files unchanged."
+}
+$remoteCapture = Published-Capture -Ref 'origin/develop'
+Write-Output "Fetched origin/develop capture=$remoteCapture"
+if ($remoteCapture -ne $publicCapture) { throw "Public/origin capture mismatch; backend left running." }
+
+$parameters = (Get-Command $launcher).Parameters
+if (-not $parameters.ContainsKey('WhatIf')) { throw "Launcher must include D1 Stop -WhatIf before restart." }
+$startArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$launcher`"",
+    '-RepoRoot', "`"$RepoRoot`"", '-StoreRoot', "`"$StoreRoot`"", '-SiteDataRoot', "`"$SiteDataRoot`"",
+    '-Python', "`"$Python`"", '-Port', $port, '-Workers', $workers)
+$startLine = 'powershell.exe ' + ($startArguments -join ' ')
+$logs = [IO.Path]::GetFullPath((Join-Path $StoreRoot 'logs'))
 
 Write-Output "Pull: git -C $RepoRoot pull --ff-only"
 Write-Output "Stop: $launcher -RepoRoot $RepoRoot -StoreRoot $StoreRoot -Stop"
-Write-Output "Start: $launcher -RepoRoot $RepoRoot -StoreRoot $StoreRoot -SiteDataRoot $SiteDataRoot -Python $Python -Port $port -Workers $workers"
+Write-Output "Start: $startLine"
 Write-Output "Then require /ready and league_tree_matches_capture; compare launcher-recorded commit with pulled HEAD."
-if ($DryRun) { Write-Output "DryRun: no pull, stop, start or files changed."; exit 0 }
+if ($DryRun) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher -RepoRoot $RepoRoot -StoreRoot $StoreRoot -Stop -WhatIf
+    if ($LASTEXITCODE -ne 0) { throw "Stop preview failed; backend left running." }
+    Write-Output "DryRun: no pull, stop, start or files changed."
+    exit 0
+}
 
 & git -C $RepoRoot pull --ff-only
 if ($LASTEXITCODE -ne 0) { throw "Fast-forward pull failed; backend left running." }
@@ -120,36 +171,34 @@ $commit = Git-Read -arguments @('rev-parse', 'HEAD')
 # Pull may replace published data; check it again before stopping anything.
 if ((Published-Capture) -ne $publicCapture) { throw "Pulled capture differs from live publication; backend left running." }
 if ((Queue-Depth $port) -gt 0 -and -not $Force) { throw "New work arrived; backend left running." }
-$parameters = (Get-Command $launcher).Parameters
-if (-not $parameters.ContainsKey('WhatIf')) { throw "Launcher must include D1 Stop -WhatIf before restart." }
+$previousPath = $env:PYTHONPATH
+try {
+    $env:PYTHONPATH = $SourceRoot
+    & $Python -c "import squadopt.api.runtime, squadopt.platform.advice_worker"
+    if ($LASTEXITCODE -ne 0) { throw "Pulled code import failed; backend left running." }
+} finally { $env:PYTHONPATH = $previousPath }
 
+try {
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher -RepoRoot $RepoRoot -StoreRoot $StoreRoot -Stop
 if ($LASTEXITCODE -ne 0) { throw "Stop failed; not starting another backend." }
-$startArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$launcher`"",
-    '-RepoRoot', "`"$RepoRoot`"", '-StoreRoot', "`"$StoreRoot`"", '-SiteDataRoot', "`"$SiteDataRoot`"",
-    '-Python', "`"$Python`"", '-Port', $port, '-Workers', $workers)
-# Force the launch identity to the code just pulled, not an inherited shell override.
+# Let the launcher independently resolve its code identity, ignoring a shell override.
 $previousCommit = $env:SQUADOPT_REPOSITORY_COMMIT
 try {
-    $env:SQUADOPT_REPOSITORY_COMMIT = $commit
-    $logs = Join-Path $StoreRoot 'logs'
+    $env:SQUADOPT_REPOSITORY_COMMIT = $null
     $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ')
     $start = Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList $startArguments `
         -RedirectStandardOutput (Join-Path $logs "restart-$stamp.out.log") `
         -RedirectStandardError (Join-Path $logs "restart-$stamp.err.log")
     # Start-Process -Wait waits for descendants too; the backend is meant to stay alive.
     $null = $start.Handle
-    if (-not $start.WaitForExit(90000)) { throw "Launcher did not finish; inspect restart-$stamp logs." }
+    if (-not $start.WaitForExit(180000)) { throw "Launcher may still be starting; inspect restart-$stamp logs before retrying." }
     if ($start.ExitCode -ne 0) { throw "Backend start failed; see restart-$stamp logs." }
 } finally { $env:SQUADOPT_REPOSITORY_COMMIT = $previousCommit }
 
 $deadline = (Get-Date).AddSeconds($ReadyTimeoutSeconds)
 $ready = $false
 do {
-    try {
-        $report = Get-Json "http://127.0.0.1:$port/ready"
-        $ready = $report.ready -eq $true -and $report.checks.league_tree_matches_capture -eq $true
-    } catch { $ready = $false }
+    $ready = Read-Readiness
     if ($ready) { break }
     Start-Sleep -Seconds 2
 } while ((Get-Date) -lt $deadline)
@@ -158,3 +207,12 @@ $started = Read-Json $registry
 Write-Output "Launcher-recorded commit=$($started.repository_commit) expected=$commit"
 if ($started.repository_commit -ne $commit) { throw "Launcher-recorded commit differs from pulled HEAD." }
 Write-Output "Backend ready on port $port with $workers workers; tunnel untouched."
+} catch {
+    $failure = $_
+    try { $null = Read-Readiness } catch { }
+    if ($backendUp) { Write-Output "BACKEND UP, NOT READY" } else { Write-Output "BACKEND DOWN" }
+    Write-Output ('Recovery start (after inspecting any remaining processes): $env:SQUADOPT_REPOSITORY_COMMIT=$null; ' + $startLine)
+    Write-Output "Logs: $logs"
+    Write-Output "Last /ready body: $lastReadyBody"
+    throw $failure
+}
