@@ -90,6 +90,8 @@ const en: ComputeCopy = {
     RATE_LIMITED: "Too many requests arrived in a short time. Wait a little and try again.",
     OPEN_JOB_LIMITED:
       "This connection already has several computations open. Wait for one to finish, then try again.",
+    DEADLINE_PASSED:
+      "This gameweek's deadline has passed. Previously computed plans remain available.",
     NOT_READY: "The compute service is not ready yet. Try again in a little while.",
     QUEUE_UNAVAILABLE:
       "The queue could not take the request just now. Try again in a little while.",
@@ -171,6 +173,8 @@ const tr: ComputeCopy = {
     RATE_LIMITED: "Kısa sürede çok fazla istek geldi. Biraz bekleyip yeniden dene.",
     OPEN_JOB_LIMITED:
       "Bu bağlantıda zaten birkaç hesaplama açık. Birinin bitmesini bekleyip yeniden dene.",
+    DEADLINE_PASSED:
+      "Bu oyun haftasının son tarihi geçti. Önceden hesaplanan planlara erişebilirsin.",
     NOT_READY: "Hesaplama servisi henüz hazır değil. Biraz sonra yeniden dene.",
     QUEUE_UNAVAILABLE: "Hesap sırası isteği şu an alamadı. Biraz sonra yeniden dene.",
     QUEUE_INTEGRITY_ERROR:

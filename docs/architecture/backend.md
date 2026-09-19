@@ -389,6 +389,7 @@ The advice routes add their own codes:
 | 409 | `REQUEST_CONFLICT` | The address already records a different request; a defect, logged |
 | 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token |
 | 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival, chip or switch combination the menu does not offer |
+| 422 | `DEADLINE_PASSED` | The resolved capture's gameweek has closed. New work is refused before the spec or job is written; cached answers and existing open-job replays remain available. `error.details.public_reason` carries English and Turkish sentences |
 | 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |
 | 422 | `MANAGERS_WORD_UNAVAILABLE` | The manager's word was asked for and the current capture has no coded club news |
 | 422 | `CHIP_HISTORY_UNKNOWN` | The capture cannot establish which chips the member holds |
@@ -416,6 +417,7 @@ do not consume slots or meet this cap. The existing request-rate limiter still c
 cache misses before deduplication or a cap refusal. A household sharing one address, or a member quickly
 changing selections, can meet the cap; server-side cancellation is not provided.
 `advice_open_job_refused_total` starts at zero in the API role and counts these refusals.
+`advice_deadline_refused_total` also starts at zero in the API role; `scripts/backend_status.py` prints it as `Deadline refusals (API)` so refusals behind the page's deadline notice remain visible to the operator.
 
 A failed job carries one of these codes in the public job view: `TOO_MANY_ATTEMPTS`,
 `REQUEST_UNREADABLE` (the spec is missing or malformed), `CONTEXT_UNAVAILABLE`,
