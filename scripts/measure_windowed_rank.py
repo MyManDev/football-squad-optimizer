@@ -13,7 +13,7 @@ for horizons one, three and five.
 Honest limits: the per-week projection inside a window repeats the origin's projection
 (the control produces one week; a calendar-aware GW2+ projection is the data side's
 deliverable), and realized outcomes are the window's actual totals. Descriptive
-measurement — no gate, nothing promoted, the locked holdout never read.
+measurement: no gate, nothing promoted, the locked holdout never read.
 """
 
 import argparse
@@ -43,6 +43,11 @@ from squadopt.scenarios.rank import RankObjectiveConfig, optimize_rank_probabili
 from squadopt.scenarios.rivals import template_rival_from_ownership
 
 LOGGER = logging.getLogger(__name__)
+
+LOCKED_HOLDOUT_SEASON = "2025-26"
+# Passed explicitly because the loader's own default is every supported season, which
+# includes the locked holdout; the first record of this measurement loaded it.
+HISTORY_SEASONS = ("2020-21", "2021-22", "2022-23", "2023-24", "2024-25")
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -80,7 +85,7 @@ def main() -> int:
     arguments = _parse_arguments()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     season = str(arguments.season)
-    if season == "2025-26":
+    if season == LOCKED_HOLDOUT_SEASON or season not in HISTORY_SEASONS:
         print("2025-26 is the locked holdout and may not be read.")
         return 1
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
@@ -88,7 +93,8 @@ def main() -> int:
     horizons = [int(v) for v in str(arguments.horizons).split(",")]
 
     LOGGER.info("Building the control's residual folds")
-    panel = build_panel(arguments.archive_root)
+    panel = build_panel(arguments.archive_root, seasons=HISTORY_SEASONS)
+    loaded_seasons = sorted(str(value) for value in panel["season"].unique())
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
     ownership = load_enrichment_rows(arguments.archive_root, (season,))
     prices = panel.loc[panel["season"] == season, ["gameweek", "player_id", "price_tenths", "name"]]
@@ -198,6 +204,12 @@ def main() -> int:
                         set(starters) & {int(str(p)) for p in rival.starter_ids}
                     ),
                     "solver_status": chosen.solver_status.name,
+                    # The stopping point is part of the claim (#590): solver work, not
+                    # elapsed seconds, and the record says which budget bound.
+                    "deterministic_budget_source": result.diagnostics.get(
+                        "deterministic_budget_source"
+                    ),
+                    "deterministic_time_limit": result.diagnostics.get("deterministic_time_limit"),
                 }
             )
             LOGGER.info(
@@ -238,8 +250,13 @@ def main() -> int:
             "Each window week repeats the origin's projection; the control produces one "
             "week and the calendar-aware GW2+ projection is the data side's deliverable."
         ),
+        "solver_statuses": {
+            name: sum(row["solver_status"] == name for row in rows)
+            for name in sorted({str(row["solver_status"]) for row in rows})
+        },
+        "loaded_seasons": loaded_seasons,
         "measurement_only": True,
-        "locked_holdout_accessed": False,
+        "locked_holdout_accessed": LOCKED_HOLDOUT_SEASON in loaded_seasons,
     }
     markdown = _to_markdown(document)
     write_json(arguments.json_output, document)
@@ -258,13 +275,17 @@ def _to_markdown(document: dict[str, object]) -> str:
         f"{document['origins']}, horizons {document['horizons']}, "
         f"{document['scenario_count']} paths per window.",
         "- The rival is the ownership template at the origin; the squad is chosen by the "
-        "rank objective on the window's joint path totals via `as_window_scenario_set` — "
+        "rank objective on the window's joint path totals via `as_window_scenario_set`: "
         "the same solver that prices a single week, unchanged.",
         f"- {document['projection_note']}",
         f"- Rival edge: **{float(str(document.get('rival_edge_points_per_week', 0.0))):+.2f} "
         "points per week** added to the rival's scenario scores (zero = the crowd priced at "
         "the projection, the historical behaviour).",
-        "- Descriptive measurement: no gate, nothing promoted, locked holdout untouched.",
+        f"- Solves: {document['solver_statuses']}. Each stops on deterministic solver work "
+        "(the rank objective's own budget), so the same commit writes the same record on a "
+        "busy machine; an incumbent is still an incumbent and is labelled as one.",
+        f"- Descriptive measurement: no gate, nothing promoted; seasons loaded "
+        f"{document['loaded_seasons']}, the locked holdout is not among them.",
         "",
         "| Horizon | Windows | Mean claimed P(ahead) | Realized ahead share | Shared starters |",
         "| ---: | ---: | ---: | ---: | ---: |",

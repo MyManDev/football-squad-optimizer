@@ -42,6 +42,7 @@ from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     IdempotencyConflictError,
     MalformedIdempotencyKeyError,
+    OpenJobLimitedError,
     RateLimitedError,
 )
 from squadopt.platform.api_contract import (
@@ -140,6 +141,7 @@ def create_app(
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     queue_depth: Callable[[], int] | None = None,
+    jobs_by_status: Callable[[], Mapping[str, int]] | None = None,
     readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
 ) -> FastAPI:
@@ -320,6 +322,31 @@ def create_app(
             429, "RATE_LIMITED", str(error), retry_after_seconds=error.retry_after_seconds
         )
 
+    @application.exception_handler(OpenJobLimitedError)
+    async def open_job_limited(_request: Request, _error: OpenJobLimitedError) -> JSONResponse:
+        if metrics is not None:
+            metrics.increment("advice_open_job_refused_total")
+        message = (
+            "This connection already has several computations open. "
+            "Wait for one to finish, then try again."
+        )
+        document = ApiErrorResponse(
+            ApiError(
+                code="OPEN_JOB_LIMITED",
+                message=message,
+                details={
+                    "public_reason": {
+                        "en": message,
+                        "tr": (
+                            "Bu bağlant\u0131da zaten birkaç hesaplama aç\u0131k. "
+                            "Birinin bitmesini bekleyip yeniden dene."
+                        ),
+                    }
+                },
+            )
+        ).to_dict()
+        return JSONResponse(status_code=429, content=document)
+
     @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
     def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
         if advice_store is None:
@@ -464,9 +491,14 @@ def create_app(
     def metrics_endpoint() -> Response:
         if metrics is None:
             return _contract_error(404, "NOT_FOUND", "Metrics are not enabled here.")
-        depth = queue_depth() if queue_depth is not None else None
+        statuses = jobs_by_status() if jobs_by_status is not None else None
+        depth: int | None
+        if statuses is not None:
+            depth = statuses.get("queued", 0) + statuses.get("running", 0)
+        else:
+            depth = queue_depth() if queue_depth is not None else None
         return Response(
-            content=metrics.render(queue_depth=depth),
+            content=metrics.render(queue_depth=depth, jobs_by_status=statuses),
             media_type="text/plain; version=0.0.4",
         )
 

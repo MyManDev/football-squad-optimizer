@@ -67,6 +67,12 @@ for (const language of ["tr", "en"] as const) {
     await page.screenshot({ path: testInfo.outputPath(`member-controls-${language}.png`) });
     await page.setViewportSize({ width: 1280, height: 900 });
     for (const detail of await details.all()) await expect(detail).toHaveAttribute("open", "");
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expect
+      .poll(() =>
+        page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom),
+      )
+      .not.toBe("auto");
     await page.getByRole("link", { name: copy.leagueMembers.backToMembers, exact: true }).click();
     await expect
       .poll(() =>

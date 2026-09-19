@@ -33,6 +33,7 @@ function renderPanel(
     published?: boolean;
     chipChosen?: boolean;
     pending?: boolean;
+    deadlinePassed?: boolean;
     selectionAvailable?: boolean;
     request?: AdviceRequest;
   } = {},
@@ -51,6 +52,7 @@ function renderPanel(
         published={props.published}
         chipChosen={props.chipChosen}
         pending={props.pending}
+        deadlinePassed={props.deadlinePassed}
       />
     </LanguageProvider>,
   );
@@ -144,18 +146,23 @@ describe("with the service answering", () => {
     expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
-  it.each(["tr", "en"] as const)("says a coded failure as a sentence in %s", (language) => {
+  it.each([
+    ["tr", "TOP100_INPUTS_UNAVAILABLE"],
+    ["en", "TOP100_INPUTS_UNAVAILABLE"],
+    ["tr", "OPEN_JOB_LIMITED"],
+    ["en", "OPEN_JOB_LIMITED"],
+  ] as const)("says a coded failure in %s: %s", (language, reason) => {
     const copy = COMPUTE_COPY[language];
     const { container } = renderPanel(
       {
         service: "ready",
         computable: true,
-        state: { phase: "failed", request: REQUEST, reason: "TOP100_INPUTS_UNAVAILABLE" },
+        state: { phase: "failed", request: REQUEST, reason },
       },
       language,
     );
-    expect(container).toHaveTextContent(copy.failures.TOP100_INPUTS_UNAVAILABLE!);
-    expect(container).not.toHaveTextContent("TOP100_INPUTS_UNAVAILABLE");
+    expect(container).toHaveTextContent(copy.failures[reason]!);
+    expect(container).not.toHaveTextContent(reason);
   });
 
   it("names the rate limit's wait, and an unknown code only generally", () => {
@@ -206,5 +213,32 @@ describe("with a service that cannot help right now", () => {
     expect(container).toHaveTextContent(tr.otherCapture);
     expect(container).not.toHaveTextContent(messages.computeUnsupportedSelection);
     expect(button).toBeDisabled();
+  });
+});
+
+describe("a gameweek whose deadline has passed", () => {
+  it("asks nothing of a ready service and says why, in both languages", () => {
+    for (const language of ["tr", "en"] as const) {
+      const { button, compute } = renderPanel(
+        { service: "ready", computable: true, deadlinePassed: true },
+        language,
+      );
+      expect(button).toBeDisabled();
+      button.click();
+      expect(compute).not.toHaveBeenCalled();
+      expect(screen.getByText(COMPUTE_COPY[language].deadlinePassedCompute)).toBeInTheDocument();
+      // The duration sentence belongs to a computation that can still be asked for.
+      expect(screen.queryByText(COMPUTE_COPY[language].durationNote, { exact: false })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("does not stack the unreachable or other-capture notes on top of it", () => {
+    renderPanel({ service: "unreachable", deadlinePassed: true });
+    expect(screen.queryByText(COMPUTE_COPY.tr.serviceUnreachable)).toBeNull();
+    cleanup();
+    renderPanel({ service: "other-capture", deadlinePassed: true });
+    expect(screen.queryByText(COMPUTE_COPY.tr.otherCapture)).toBeNull();
+    expect(screen.getAllByRole("note")).toHaveLength(1);
   });
 });

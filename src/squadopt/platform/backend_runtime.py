@@ -208,6 +208,7 @@ class BackendConfig:
     season: str | None = None
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
+    max_open_jobs_per_client: int = 4
     artifact_root: Path | None = None
     """The repository's ``artifacts/`` directory, where the weekly run leaves the Top 100
     evidence export (``phase_b/``) and the rotation table (``rotation/``). Optional: unset,
@@ -271,6 +272,9 @@ class BackendConfig:
             allowed_origins=origins,
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
+            max_open_jobs_per_client=_positive_int(
+                source, "SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT", 4
+            ),
             rate_window_seconds=_positive_float(
                 source, "SQUADOPT_BACKEND_RATE_WINDOW_SECONDS", DEFAULT_RATE_WINDOW_SECONDS
             ),
@@ -621,7 +625,7 @@ class StoreProbeGate:
         if outcome.ok:
             self._passed = outcome
             self._passed_at = self._clock()
-            if self._log is not None:
+            if self._log is not None and held is None:
                 self._log.event("advice_store_probe_passed", root=str(self._root))
         else:
             self._passed = None
@@ -657,6 +661,13 @@ class AdviceBackend:
 
         return sum(1 for job in self.queue.jobs() if not job.is_terminal)
 
+    def jobs_by_status(self) -> dict[str, int]:
+        """One current store read inside the owning API, never in the status script."""
+        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        for job in self.queue.jobs():
+            counts[job.status] += 1
+        return counts
+
     def readiness(self) -> tuple[bool, Mapping[str, bool]]:
         """Ready means this process can actually answer, checked rather than assumed."""
 
@@ -676,6 +687,7 @@ def build_backend(
     *,
     log: AdviceLog | None = None,
     probe: StoreProbeGate | None = None,
+    metrics: AdviceMetrics | None = None,
 ) -> AdviceBackend:
     """Open one store and wire every collaborator that reads or writes it.
 
@@ -685,7 +697,7 @@ def build_backend(
     """
 
     component_log = log if log is not None else AdviceLog("backend")
-    metrics = AdviceMetrics()
+    metrics = metrics if metrics is not None else AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
@@ -709,6 +721,7 @@ def build_backend(
         reader,
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
+        max_open_jobs_per_client=config.max_open_jobs_per_client,
         specs=specs,
         # Accepting work the store cannot hold is a promise the deployment cannot keep:
         # the job write would fail, or succeed onto storage nobody will read again.
@@ -728,7 +741,9 @@ def build_backend(
     )
 
 
-def backend_from_environment(environ: Mapping[str, str] | None = None) -> AdviceBackend:
+def backend_from_environment(
+    environ: Mapping[str, str] | None = None, *, metrics: AdviceMetrics | None = None
+) -> AdviceBackend:
     """The deployment's backend, read from the server's own environment."""
 
-    return build_backend(BackendConfig.from_environment(environ))
+    return build_backend(BackendConfig.from_environment(environ), metrics=metrics)

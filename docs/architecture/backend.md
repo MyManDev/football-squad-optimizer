@@ -394,6 +394,7 @@ The advice routes add their own codes:
 | 422 | `CHIP_HISTORY_UNKNOWN` | The capture cannot establish which chips the member holds |
 | 422 | `CHIP_NOT_HELD` | The member cannot play the requested chip this gameweek |
 | 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds. Only a request that needs work is charged: a POST the cache already answers spends no token |
+| 429 | `OPEN_JOB_LIMITED` | This client address already owns the allowed open jobs; wait for one to finish. `error.details.public_reason` carries English and Turkish sentences, with no estimated wait |
 | 503 | `NOT_READY` | No capture context, the published league tree is for another week than the capture (the message names both), the store probe is failing, or the queue lock stayed busy (then with `Retry-After`) |
 | 503 | `QUEUE_UNAVAILABLE` | A queue write was refused; nothing was accepted, with `Retry-After` |
 | 503 | `QUEUE_INTEGRITY_ERROR` | A stored job record cannot be trusted |
@@ -401,6 +402,20 @@ The advice routes add their own codes:
 
 `Retry-After` is listed in `Access-Control-Expose-Headers` for the allowed origins, so a
 page on another origin can read how long a 429 or a 503 asked it to wait.
+
+`SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT` defaults to four queued plus running jobs
+per client address **per API process**. The current deployment uses one API process;
+the six compute workers never admit jobs, and `containerapp.yaml` pins one replica.
+Multiple API processes each have their own cap: two processes can admit eight jobs
+from one address at the default setting, even with a shared store.
+Ownership lives only in this API process's memory and is forgotten on restart; no
+client address is written to a job, spec, log or metric. Completed, failed and missing
+owned jobs release their slots at the next admission, reading only owned job IDs.
+Failed preparation or publication removes the reservation immediately. Cache hits, idempotency replays and dedup
+do not consume slots or meet this cap. The existing request-rate limiter still charges
+cache misses before deduplication or a cap refusal. A household sharing one address, or a member quickly
+changing selections, can meet the cap; server-side cancellation is not provided.
+`advice_open_job_refused_total` starts at zero in the API role and counts these refusals.
 
 A failed job carries one of these codes in the public job view: `TOO_MANY_ATTEMPTS`,
 `REQUEST_UNREADABLE` (the spec is missing or malformed), `CONTEXT_UNAVAILABLE`,

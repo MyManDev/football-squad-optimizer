@@ -21,8 +21,9 @@ from squadopt.experiments import (
     SeasonChainResult,
 )
 from squadopt.experiments.multi_gw_rehearsal import WeekRealization
+from squadopt.experiments.season_chain import ChipHoldingSchedule, decayed_holding_value
 from squadopt.optimization import optimize_squad
-from squadopt.planning import InitialSquadState, sell_price_tenths
+from squadopt.planning import InitialSquadState, TransferPlanningConfig, sell_price_tenths
 
 POOL = {"candidate_pool_per_position": 10, "cheap_pool_per_position": 2}
 ALL_CHIPS = (
@@ -193,11 +194,191 @@ def test_the_hybrid_policy_reserves_only_the_bench_boost() -> None:
     assert result.diagnostics["chip_policy"] == "hybrid"
 
 
+def test_a_week_records_what_its_captain_and_bench_were_expected_to_score(
+    myopic: SeasonChainResult,
+) -> None:
+    """What a triple captain or a bench boost would have been expected to add, per week."""
+
+    for week in myopic.weeks:
+        record = week.as_record()
+        assert record["captain_projected_points"] is not None
+        assert float(record["captain_projected_points"]) > 0.0
+        assert float(record["bench_projected_points"]) >= 0.0
+        # The captain is one of the eleven, so the eleven's projection covers it twice.
+        assert float(record["captain_projected_points"]) * 2 <= float(record["projected_points"])
+
+
+def test_a_holding_value_decays_to_zero_at_the_end_of_its_window() -> None:
+    window = ChipWindowRule("bboost", 2, 8)
+    assert decayed_holding_value(12.0, window, 2) == pytest.approx(12.0)
+    assert decayed_holding_value(12.0, window, 5) == pytest.approx(6.0)
+    assert decayed_holding_value(12.0, window, 8) == 0.0
+    # Outside its window, or in a window of one gameweek, waiting is worth nothing.
+    assert decayed_holding_value(12.0, window, 9) == 0.0
+    assert decayed_holding_value(12.0, ChipWindowRule("bboost", 4, 4), 4) == 0.0
+
+
+def _boost_weeks(result: SeasonChainResult) -> list[int]:
+    return [week.gameweek for week in result.weeks if week.chip == "bboost"]
+
+
+def test_a_fixed_threshold_lets_a_chip_expire_and_a_decaying_one_plays_it() -> None:
+    """The window opens after the season's only double, so the reservation never fires."""
+
+    late_boost = (ChipWindowRule("bboost", 5, 8),)
+    dear = TransferPlanningConfig(chip_holding_value_points={"bboost": 500.0})
+    common = {"chip_windows": late_boost, "chip_policy": "hybrid", "transfer_config": dear}
+
+    fixed = _run(**common)
+    assert _boost_weeks(fixed) == []
+    assert "chip_threshold" not in fixed.diagnostics
+
+    decaying = _run(**common, chip_threshold="decaying")
+    # Reserved for a double that never comes, it is played when the window closes.
+    assert _boost_weeks(decaying) == [8]
+    assert decaying.diagnostics["chip_threshold"] == "decaying"
+
+
+def test_the_default_threshold_is_the_chain_as_it_always_ran() -> None:
+    config = {"lookahead": 2, "chip_windows": ALL_CHIPS, "chip_policy": "hybrid"}
+    default, named = _run(**config), _run(**config, chip_threshold="fixed")
+    assert [week.as_record() for week in default.weeks] == [
+        week.as_record() for week in named.weeks
+    ]
+    with pytest.raises(ExperimentConfigurationError, match="chip_threshold"):
+        SeasonChainConfig(season=SEASON, chip_threshold="sometimes")
+
+
+def test_an_induction_schedule_holds_a_chip_and_is_offered_every_week() -> None:
+    """The same window as above, held by a schedule instead of a constant and a reservation."""
+
+    late_boost = (ChipWindowRule("bboost", 5, 8),)
+    dear = TransferPlanningConfig(chip_holding_value_points={"bboost": 500.0})
+    # Waiting is worth a fortune until the window's last gameweek, where it is worth
+    # nothing: the chip is lost after it.
+    holding = ChipHoldingSchedule(
+        name="bboost",
+        start_gameweek=5,
+        stop_gameweek=8,
+        values=((5, 500.0), (6, 500.0), (7, 500.0), (8, 0.0)),
+    )
+    result = _run(
+        chip_windows=late_boost,
+        # Reserved for a double that never comes under hybrid; the schedule does the
+        # holding instead and the chip is offered in every week of its window.
+        chip_policy="hybrid",
+        transfer_config=dear,
+        chip_threshold="induction",
+        chip_holding_schedule=(holding,),
+    )
+    assert _boost_weeks(result) == [8]
+    assert result.diagnostics["chip_threshold"] == "induction"
+
+    # The same schedule worth nothing from the first week is not held at all.
+    cheap = ChipHoldingSchedule(
+        name="bboost",
+        start_gameweek=5,
+        stop_gameweek=8,
+        values=((5, 0.0), (6, 0.0), (7, 0.0), (8, 0.0)),
+    )
+    early = _run(
+        chip_windows=late_boost,
+        chip_policy="hybrid",
+        transfer_config=dear,
+        chip_threshold="induction",
+        chip_holding_schedule=(cheap,),
+    )
+    assert _boost_weeks(early) == [5]
+
+
+def test_a_window_without_a_schedule_keeps_the_decay_and_its_reservation() -> None:
+    """Only the chips with a weekly value on record are held by a schedule."""
+
+    windows = (ChipWindowRule("bboost", 5, 8), ChipWindowRule("freehit", 5, 8))
+    dear = TransferPlanningConfig(chip_holding_value_points={"bboost": 500.0, "freehit": 500.0})
+    holding = ChipHoldingSchedule(
+        name="bboost", start_gameweek=5, stop_gameweek=8, values=((5, 0.0),)
+    )
+    result = _run(
+        chip_windows=windows,
+        chip_policy="hybrid",
+        transfer_config=dear,
+        chip_threshold="induction",
+        chip_holding_schedule=(holding,),
+    )
+    # The bench boost is priced at nothing in gameweek 5 and played there; the free hit
+    # has no schedule, so it decays to zero and is played when its window closes.
+    assert _boost_weeks(result) == [5]
+    assert [week.gameweek for week in result.weeks if week.chip == "freehit"] == [8]
+
+
+def test_a_schedule_that_names_no_window_is_refused() -> None:
+    """Otherwise a mistyped window prices nothing and every week quietly falls back to the decay."""
+
+    windows = (ChipWindowRule("bboost", 5, 8),)
+    stray = ChipHoldingSchedule(
+        name="bboost", start_gameweek=4, stop_gameweek=8, values=((5, 1.0),)
+    )
+    with pytest.raises(ExperimentConfigurationError, match="names none"):
+        SeasonChainConfig(
+            season=SEASON,
+            chip_windows=windows,
+            chip_threshold="induction",
+            chip_holding_schedule=(stray,),
+        )
+    # The same schedule on the window it belongs to is accepted.
+    SeasonChainConfig(
+        season=SEASON,
+        chip_windows=windows,
+        chip_threshold="induction",
+        chip_holding_schedule=(
+            ChipHoldingSchedule(
+                name="bboost", start_gameweek=5, stop_gameweek=8, values=((5, 1.0),)
+            ),
+        ),
+    )
+
+
+def test_a_schedule_is_refused_unless_the_threshold_asks_for_one() -> None:
+    holding = ChipHoldingSchedule(
+        name="bboost", start_gameweek=2, stop_gameweek=8, values=((2, 1.0),)
+    )
+    with pytest.raises(ExperimentConfigurationError, match="chip_holding_schedule is read only"):
+        SeasonChainConfig(season=SEASON, chip_holding_schedule=(holding,))
+    with pytest.raises(ExperimentConfigurationError, match="needs a chip_holding_schedule"):
+        SeasonChainConfig(season=SEASON, chip_threshold="induction")
+    with pytest.raises(ExperimentConfigurationError, match="outside its window"):
+        ChipHoldingSchedule(name="bboost", start_gameweek=2, stop_gameweek=8, values=((9, 1.0),))
+    with pytest.raises(ExperimentConfigurationError, match="names a gameweek twice"):
+        ChipHoldingSchedule(
+            name="bboost", start_gameweek=2, stop_gameweek=8, values=((2, 1.0), (2, 2.0))
+        )
+    with pytest.raises(ExperimentConfigurationError, match="finite non-negative"):
+        ChipHoldingSchedule(name="bboost", start_gameweek=2, stop_gameweek=8, values=((2, -1.0),))
+
+
 def test_unknown_chips_and_inverted_windows_are_refused() -> None:
     with pytest.raises(ExperimentConfigurationError, match="Unknown chip"):
         ChipWindowRule("assistant_manager", 1, 38)
     with pytest.raises(ExperimentConfigurationError, match="may not end before"):
         ChipWindowRule("bboost", 5, 4)
+
+
+def test_a_blank_club_without_a_row_still_makes_the_gameweek_structured() -> None:
+    """The archive's fixture table counts fixtures, so a blank club has no row and no
+    zero. Gameweek 6 blanks team 6 that way and nobody doubles: the free hit must be
+    on offer there under a reservation policy, as it is in the double of gameweek 4."""
+
+    counts = _fixture_counts()
+    counts = counts.loc[~((counts["gameweek"] == 6) & (counts["team_id"] == 6))]
+    assert not ((counts["gameweek"] == 6) & (counts["fixture_count"] != 1)).any()
+    chain = SeasonChain(
+        make_canonical_gameweeks(),
+        counts.reset_index(drop=True),
+        SeasonChainConfig(season=SEASON, **POOL),  # type: ignore[arg-type]
+    )
+    structured = [week for week in range(2, 9) if chain._is_structured_gameweek(week)]
+    assert structured == [4, 6]
 
 
 def test_a_free_hit_reverts_the_held_squad_and_reports_its_gain() -> None:

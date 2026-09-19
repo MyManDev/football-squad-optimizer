@@ -176,7 +176,9 @@ the lead-time window.
 
 The release recipe is in `scripts/release/`. Run it from the main checkout, not a
 linked worktree. With Git and GitHub CLI available (Git Bash on Windows), preview
-it first:
+it first. The [weekly runbook](weekly_runbook.md#from-a-recorded-preview-to-a-release)
+describes `--record-advice`, `--publish-suffix` and unchanged resume options before
+this release stage:
 
 ```sh
 sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
@@ -207,6 +209,60 @@ are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main
 Interrupting the queue stops it and cleans up its temporary bodies. A body that
 cannot be read or is empty after cleaning is never merged.
 
+After the public release verifies, the owner runs these from PowerShell in the clean
+main checkout on `develop`. Replace `<same-ISO>` with the generated-after timestamp
+used for `ship.sh`. First preview the restart:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO> -DryRun
+```
+
+Only for the intended restart, run the same command without `-DryRun`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO>
+```
+
+The script verifies the public site, requires the public capture to match the fetched
+`origin/develop` publication, refuses open work unless `-Force`, and pulls with
+`--ff-only` before stopping the recorded backend.
+It keeps the recorded port and worker count, requires `/ready` and its published-week
+check, and verifies the new **launcher-recorded** commit against the pulled checkout.
+The pre-pull local capture is information only; the pulled tree must match before any
+process is stopped. It imports both backend entry points from the pulled source before
+stopping. The launcher resolves its commit independently of any inherited override.
+It does not claim an API-reported commit and never touches the tunnel. Dry-run performs
+the read-only checks and prints inputs and `-Stop -WhatIf` targets without pulling or
+changing processes. It does run `git fetch origin develop` to check the current
+candidate publication and prints that remote-tracking state was updated; the working
+tree and backend files stay unchanged. Real execution fetches as well. The helper requires
+the launcher's creation-time-checked process walk and `-Stop -WhatIf` support. A failed
+start or readiness check exits nonzero with a backend up/down state, the exact start
+command retaining the recorded port and worker count, the log directory and the last
+readiness body. A failed stop prints the stop command before the start command; a
+ready backend on a different revision is reported as `BACKEND UP, WRONG REVISION`
+with both hashes. Inspect those before another attempt: a timed-out launcher may still be
+starting, and a failed stop may have left recorded processes alive. After a successful
+stop or failed-start cleanup the PID registry may be gone; use the printed start command
+instead of rerunning the restart helper, which cannot recover the old count without it.
+For an operator-approved rollback, use that start command with
+`-SourceRoot "<existing-worktree-of-the-previous-commit>\src"`, then verify readiness and
+the recorded commit. Do not move tags or change the published tree as part of this step.
+The helper supports the default backend configuration. A backend launched with custom
+snapshot, handoff, artifact, club-news, origin, rate-limit or worker-metrics options must
+be restarted by hand with those same options; the registry does not record them.
+The first production use is the owner's operation, not part of development verification.
+
+The complete operator order is: accept the recorded weekly tree, release the site,
+drain the backend queue, preview then run the restart command above from clean
+`develop`, and run the [manual browser check](#post-deployment-smoke). Both `ship.sh`
+and the restart helper run `verify_live.py`; to run it again by hand, use
+`python scripts/release/verify_live.py <generated-after-ISO>`. A zero queue depth
+permits a restart; `-Force` is an explicit operator exception, not the normal command.
+`/ready` alone does not prove capture-ID or code-commit equality: its published-tree
+check is season/gameweek. `ship.sh` publishes the site only and does not restart the
+backend or tunnel.
+
 ## Daily circuit breaker
 
 The workflow queries all deployments for this Pages project in the current UTC day and
@@ -224,6 +280,10 @@ and local Wrangler uploads do not share GitHub's queue. Before a manual upload, 
 deployment job is running or queued and inspect the Cloudflare daily count.
 
 ## Post-deployment smoke
+
+After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts`; this manual desktop/phone check is read-only, and optional `LIVE_SMOKE_COMPUTE=1` checks the public backend with a browser GET, reporting a matching cached answer or `NOT_COMPUTED` (never submits a solve).
+In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
+For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
 The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
@@ -279,7 +339,21 @@ Use a new, empty `site-<run-id>` directory so retained bytes cannot mix with ano
 confirm the GitHub deployment queue is empty and Cloudflare remains below the hard daily cap.
 Run the smoke command immediately against the production alias printed by Wrangler.
 
+## Back up irreplaceable data
+
+From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries. Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; all five source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
+
+```powershell
+Register-ScheduledTask -TaskName 'SquadOptDataBackup' -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -Command "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File ''<repo>\scripts\backup_data.ps1'' -Destination ''<backup>'' *>> ''<outside-repository-log>''; exit $LASTEXITCODE"') -Trigger (New-ScheduledTaskTrigger -Daily -At '03:00')
+```
+
 ## Rollback
+
+The production workflow refuses a tag whose commit is behind or unrelated to the live
+commit. Roll back through Cloudflare's dashboard, or publish a new `fixN` tag on a commit
+ahead of live. After a dashboard rollback, the project serves that older deployment and
+the next workflow release is compared with its commit. This rollback procedure has never
+been exercised.
 
 In Cloudflare, open **Workers & Pages → project → Deployments** and select the previous
 known-good production deployment by its site tag and commit SHA. Roll it back, run the full
