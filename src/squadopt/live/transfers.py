@@ -766,6 +766,40 @@ def plan_transfers_with_exclusion(
     return plan, decision, prepared.transfer_config
 
 
+class HorizonNoSolutionError(DataSourceError):
+    """A solver that finished and produced no plan, with the numbers that say how it ended.
+
+    A subclass rather than a new exception, because every caller that already handles a
+    planning failure must keep handling this one: the public side is settled (a stable code
+    on the member's page, the text in the operator's log) and widening what escapes here
+    would reopen it.
+
+    What the subclass adds is for the operator. "No solution" has two shapes that want
+    different answers, and the message alone cannot be read by anything but a person:
+    ``INFEASIBLE`` means the constraints and the squad disagree and more time will not help,
+    while a status that stopped at a limit with work still to do means the budget was the
+    binding thing. ``status``, ``deterministic_time_used`` and ``relative_optimality_gap``
+    carry that distinction as values, so a caller can count the second kind without parsing
+    a sentence.
+
+    The three are ``None`` when the solve did not report them. Absent is not zero here
+    either: a gap nobody measured is not a gap of nought.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: SolverStatus,
+        deterministic_time_used: object = None,
+        relative_optimality_gap: object = None,
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.deterministic_time_used = deterministic_time_used
+        self.relative_optimality_gap = relative_optimality_gap
+
+
 def plan_transfer_horizon(
     inputs: RecommendationInputs,
     projection_horizon: ProjectionHorizon,
@@ -909,9 +943,12 @@ def plan_transfer_horizon(
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
         relative_gap = plan.diagnostics.get("relative_optimality_gap")
-        raise DataSourceError(
+        raise HorizonNoSolutionError(
             f"The transfer planner produced no {len(projection_horizon.target_gameweeks)}-"
             f"week solution; solver status was {plan.solver_status.name}, "
-            f"deterministic time used was {used!r}, relative gap was {relative_gap!r}."
+            f"deterministic time used was {used!r}, relative gap was {relative_gap!r}.",
+            status=plan.solver_status,
+            deterministic_time_used=used,
+            relative_optimality_gap=relative_gap,
         )
     return plan, planning_policy
