@@ -6,7 +6,6 @@ a capture: the forecast is a pure function, and these tests hold it to the rule 
 """
 
 import copy
-import importlib
 import json
 import re
 from collections.abc import Iterator, Mapping, Sequence
@@ -39,6 +38,7 @@ from squadopt.application.strategies.catalog import (
     FORBIDDEN_FIELD_PATTERN,
     FORBIDDEN_TEXT_PATTERN,
 )
+from squadopt.experiments.season_chain import ChipWindowRule, decayed_holding_value
 from squadopt.live.rules import CHIP_NAMES
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -166,19 +166,17 @@ def test_the_threshold_refuses_a_gameweek_outside_the_window_and_an_unnamed_poli
         holding_threshold("linear", 18.0, 1, 19, 5)
 
 
-def test_the_decaying_threshold_agrees_with_the_chain_where_the_chain_has_it() -> None:
-    # `decayed_holding_value` lives in the laboratory, which the product may not import;
-    # the formula is restated here. Once the chain carries it, the two are held together.
-    chain = importlib.import_module("squadopt.experiments.season_chain")
-    if not hasattr(chain, "decayed_holding_value"):
-        pytest.skip("The chain on this branch does not carry decayed_holding_value yet.")
+def test_the_decaying_threshold_agrees_with_the_chain_on_a_grid() -> None:
+    # `decayed_holding_value` lives in the laboratory, which the product may not import,
+    # so the formula is restated in the product. A test may import both, and this one
+    # holds them together: the rule that is measured is the rule that is stated.
     for first, last in ((1, 19), (2, 19), (20, 38), (19, 19)):
-        window = chain.ChipWindowRule("3xc", first, last)
+        window = ChipWindowRule("3xc", first, last)
         for week in range(first, last + 1):
             for constant in (0.0, 12.0, 18.5):
                 assert holding_threshold(
                     "decaying", constant, first, last, week
-                ) == chain.decayed_holding_value(constant, window, week)
+                ) == decayed_holding_value(constant, window, week)
 
 
 # Play now, or hold.
