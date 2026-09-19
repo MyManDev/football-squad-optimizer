@@ -33,7 +33,9 @@ from squadopt.platform.club_news_gemini import (
 from squadopt.platform.club_news_provider import (
     KEY_ENVIRONMENT_VARIABLE,
     PROVIDER_ENVIRONMENT_VARIABLE,
+    CodingProviderConfig,
     build_coding_provider,
+    code_week_by_club,
     registered_providers,
 )
 
@@ -372,15 +374,23 @@ def test_no_refusal_message_carries_the_key(reply: _Reply) -> None:
     assert SENTINEL_KEY not in str(refusal.value)
 
 
-def test_a_failure_the_service_described_is_quoted_by_its_own_fields_only() -> None:
-    """Its status and message; never the body, which a gateway can fill with our request."""
+def test_a_failure_is_quoted_by_its_status_and_never_by_its_sentence() -> None:
+    """The service's own message is free text from a remote system, and it can name the key.
+
+    This is the second review's finding and it is the sharpest one in the file: a real
+    ``PERMISSION_DENIED`` reads "Consumer 'api_key:...' has been suspended", and that sentence
+    lands in the refused tuple `club_news_acquire` prints. The status says what to do about
+    the failure; the sentence after it is not ours to vouch for.
+    """
 
     provider, _ = _provider(
         _Reply(
             403,
             {
-                "error": {"status": "PERMISSION_DENIED", "message": "API key not valid"},
-                # What a gateway can put beside it, and what must not be quoted back.
+                "error": {
+                    "status": "PERMISSION_DENIED",
+                    "message": f"Consumer 'api_key:{SENTINEL_KEY}' has been suspended.",
+                },
                 "requestEcho": {"headers": {KEY_HEADER: SENTINEL_KEY}},
             },
         )
@@ -389,10 +399,68 @@ def test_a_failure_the_service_described_is_quoted_by_its_own_fields_only() -> N
     with pytest.raises(ClubNewsGeminiError) as refusal:
         provider.code(DOCUMENTS, ROSTER)
 
+    assert "403" in str(refusal.value)
     assert "PERMISSION_DENIED" in str(refusal.value)
-    assert "API key not valid" in str(refusal.value)
+    assert "suspended" not in str(refusal.value)
     assert "requestEcho" not in str(refusal.value)
     assert SENTINEL_KEY not in str(refusal.value)
+
+
+def test_the_key_is_taken_out_even_if_a_refusal_puts_it_in() -> None:
+    """The second layer, tested on its own rather than trusted because the first one holds.
+
+    The scrubber exists for the case the rule above is broken later, so the test breaks the
+    rule on purpose: a refusal assembled with the key in it comes out without it.
+    """
+
+    provider, _ = _provider(_answered())
+    leaky = ClubNewsGeminiError(f"the service said {SENTINEL_KEY} is bad")
+
+    scrubbed = provider._scrubbed(leaky)
+
+    assert SENTINEL_KEY not in str(scrubbed)
+    assert "[key withheld]" in str(scrubbed)
+
+
+def test_the_lane_does_not_print_the_key_when_a_club_is_refused() -> None:
+    """What is printed is the refused tuple, so that is what the assertion has to read.
+
+    `code_week_by_club` turns a club's failure into `(club, str(error))` and
+    `club_news_acquire` prints it line by line. A refusal that is clean in the exception and
+    dirty in the tuple would be clean in the wrong place.
+    """
+
+    provider, _ = _provider(
+        _Reply(
+            403,
+            {
+                "error": {
+                    "status": "PERMISSION_DENIED",
+                    "message": f"Consumer 'api_key:{SENTINEL_KEY}' has been suspended.",
+                }
+            },
+        )
+    )
+    config = CodingProviderConfig(
+        provider=GEMINI_PROVIDER, model_identifier=DEFAULT_GEMINI_MODEL, api_key=SENTINEL_KEY
+    )
+
+    coded, refused = code_week_by_club(provider, config, DOCUMENTS, ROSTER)
+
+    assert coded == ()
+    assert [club for club, _reason in refused] == ["Arsenal"]
+    assert all(SENTINEL_KEY not in reason for _club, reason in refused)
+
+
+def test_a_model_identifier_that_cannot_be_a_url_is_refused_here() -> None:
+    """``httpx2.InvalidURL`` is not an ``HTTPError``, so it would escape the catch entirely.
+
+    A newline in ``SQUADOPT_LLM_MODEL`` would then cost the whole week its capture instead of
+    costing one club its answer, which is the opposite of how this lane fails.
+    """
+
+    with pytest.raises(ClubNewsGeminiError, match="not a model identifier"):
+        GeminiClubNewsProvider(api_key=SENTINEL_KEY, model_identifier="gemini\n2.5-flash")
 
 
 def test_a_transport_failure_is_named_by_type_and_costs_one_club() -> None:

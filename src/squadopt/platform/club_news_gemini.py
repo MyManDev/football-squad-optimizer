@@ -20,6 +20,17 @@ anybody remembering to copy it.
 adapter is longer than the call it makes: a declined answer, a truncated one, an empty one and
 one that will not say which model produced it are four different facts, and a week that
 records the wrong one of them is worse than a week that records nothing.
+
+**What the prompt digest covers here, and what it does not.**
+:func:`~squadopt.data.sources.club_news_coding.coding_prompt_sha256` hashes the system prompt,
+the response schema as the contract writes it, the effort setting and the model identifier. Of
+those, this adapter sends the prompt and the model; it does not send an effort setting, and the
+schema it sends is the translated one. Four settings it does send are outside the digest
+altogether: the temperature, the thinking budget, the output ceiling and the endpoint version.
+So two weeks coded by different models are distinguishable, which is what the digest exists
+for, and two weeks coded by this adapter under different values of those four are not. Changing
+any of them is therefore a change to the instrument that the digest will not announce, and the
+place to announce it is the coding contract version.
 """
 
 import json
@@ -62,6 +73,12 @@ KEY_HEADER: Final = "x-goog-api-key"
 #: escapes as a traceback and prints the key into the run log. Refusing here keeps the secret
 #: inside the process, and the refusal below never echoes what it refused.
 _HEADER_SAFE: Final = re.compile(r"[\x21-\x7e]+")
+
+#: What a model identifier may hold. It is interpolated into the request path, and a URL
+#: this client cannot build raises ``httpx2.InvalidURL``, which is not an ``HTTPError`` and
+#: so escapes the catch below as a traceback: a stray newline in ``SQUADOPT_LLM_MODEL``
+#: would cost the whole week its capture rather than one club its answer.
+_MODEL_SAFE: Final = re.compile(r"[A-Za-z0-9._-]+")
 
 _ENDPOINT: Final = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -212,6 +229,13 @@ class GeminiClubNewsProvider:
         so the identifier recorded in the capture is the one actually asked for.
         """
 
+        if not _MODEL_SAFE.fullmatch(str(model_identifier)):
+            raise ClubNewsGeminiError(
+                f"{model_identifier!r} is not a model identifier this adapter can ask for: it "
+                "may hold letters, digits, dots, underscores and hyphens only. The name goes "
+                "into the request path, and one this client cannot build would escape as a "
+                "traceback rather than as a refused club."
+            )
         self._model_identifier = model_identifier
         self._timeout = timeout
         self._api_key = "" if api_key is None else _checked_key(api_key)
@@ -283,6 +307,14 @@ class GeminiClubNewsProvider:
             },
         }
         try:
+            return self._ask(body)
+        except ClubNewsGeminiError as error:
+            raise self._scrubbed(error) from None
+
+    def _ask(self, body: Mapping[str, object]) -> ClaimResponse:
+        """The call itself, so every refusal it can raise passes one scrubber on the way out."""
+
+        try:
             reply = self._transport.post(
                 _ENDPOINT.format(model=self._model_identifier),
                 headers={KEY_HEADER: self._api_key, "Content-Type": "application/json"},
@@ -299,13 +331,30 @@ class GeminiClubNewsProvider:
             ) from None
         return _claim_response(reply, asked_for=self._model_identifier)
 
+    def _scrubbed(self, error: ClubNewsGeminiError) -> ClubNewsGeminiError:
+        """The same refusal with the key taken out of it, whatever put it there.
+
+        A second layer rather than the only one. Every refusal this adapter raises is written
+        not to carry the key, and this is here because one of them is assembled from text a
+        remote service wrote: the first line of defence is a rule somebody has to keep, and
+        this one holds even when they do not.
+        """
+
+        text = str(error)
+        if self._api_key and self._api_key in text:
+            return ClubNewsGeminiError(text.replace(self._api_key, "[key withheld]"))
+        return error
+
 
 def _why(reply: Reply) -> str:
-    """The service's own status and message, and nothing else from the body.
+    """The service's own status code, and nothing else it wrote.
 
-    This API states a failure as ``{"error": {"status": ..., "message": ...}}``. Those two
-    fields are the service describing itself; the rest of a body can be a gateway echoing the
-    request that failed, headers included, so it is never quoted.
+    An earlier version quoted ``error.message`` as well, on the reasoning that a service
+    describing itself is safer than a body a gateway may have filled. It is not. That message
+    is free text from a remote system, it can name the credential it is complaining about
+    ("Consumer 'api_key:...' has been suspended"), and it lands in the refused tuple that
+    ``club_news_acquire`` prints. A status like ``PERMISSION_DENIED`` says what to do about it;
+    the sentence after it is not ours to vouch for.
     """
 
     try:
@@ -315,8 +364,8 @@ def _why(reply: Reply) -> str:
     error = document.get("error") if isinstance(document, Mapping) else None
     if not isinstance(error, Mapping):
         return ""
-    stated = [str(error[key]) for key in ("status", "message") if isinstance(error.get(key), str)]
-    return f" ({'; '.join(stated)})" if stated else ""
+    status = error.get("status")
+    return f" ({status})" if isinstance(status, str) and status.strip() else ""
 
 
 def _payload(reply: Reply) -> Mapping[str, Any]:
