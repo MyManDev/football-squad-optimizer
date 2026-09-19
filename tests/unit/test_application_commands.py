@@ -20,9 +20,11 @@ from squadopt.application import (
     settle,
 )
 from squadopt.application.build import recommendation_view_from_ledger
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import load_ledger
+from squadopt.platform.cli import main as cli_main
 
 
 @pytest.fixture(name="world")
@@ -67,6 +69,20 @@ def _decide_request(world: dict[str, Any]) -> DecideRequest:
         ledger_root=world["ledger_root"],
         archive_root=world["archive_root"],
     )
+
+
+def test_missing_capture_names_an_existing_season_command(
+    world: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    request = replace(_decide_request(world), snapshot_root=tmp_path / "empty", snapshot_id=None)
+    with pytest.raises(DataError) as error:
+        decide(request, panel_builder=lambda root: gameweek_world._panel())
+    assert "squadopt season tick --dry-run" in str(error.value)
+    assert "'squadopt season tick'" in str(error.value)
+    with pytest.raises(SystemExit) as help_exit:
+        cli_main(["season", "tick", "--help"])
+    assert help_exit.value.code == 0
+    assert "--dry-run" in capsys.readouterr().out
 
 
 def test_decide_returns_a_typed_result_and_every_published_output(world: dict[str, Any]) -> None:

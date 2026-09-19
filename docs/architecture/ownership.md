@@ -116,7 +116,7 @@ claim that everything about it is known.
 
 No merge touching `live/`, `optimization/`, `planning/`, `prediction/` or `scenarios/` inside
 **24 hours either side of a deadline**. The deadline is whatever the current capture publishes,
-not a date written here — `run_season_tick` resolves it from the snapshot.
+not a date written here: `squadopt season tick` resolves it from the snapshot.
 
 `planning/` joined this list when the season did: the opening week's only decision was a squad
 from scratch through `optimization/`, but every deadline since is a transfer plan through
