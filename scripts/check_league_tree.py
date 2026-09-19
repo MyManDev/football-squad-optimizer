@@ -6,7 +6,9 @@ import re
 import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN, FORBIDDEN_TEXT_PATTERN
 
@@ -28,7 +30,7 @@ class Tree:
         self.live = self.root.startswith(("https://", "http://"))
         self.word_files: dict[str, str] = {}
 
-    def read(self, relative: str):
+    def read(self, relative: str) -> Any:
         if self.live:
             request = urllib.request.Request(
                 f"{self.root}/data/league/{relative}",
@@ -56,7 +58,7 @@ class Tree:
             raise ValueError(f"{path} exists and does not parse as JSON") from error
 
 
-def walk(node, where, problems):
+def walk(node: object, where: str, problems: list[str]) -> None:
     if isinstance(node, dict):
         for key, value in node.items():
             if FORBIDDEN_FIELD_PATTERN.search(str(key)):
@@ -69,11 +71,11 @@ def walk(node, where, problems):
         problems.append(f"{where}: forbidden text {node[:80]!r}")
 
 
-def check_variants(read):
-    problems = []
-    kinds = Counter()
-    statuses = Counter()
-    ceilings = {}
+def check_variants(read: Callable[[str], Any]) -> list[str]:
+    problems: list[str] = []
+    kinds: Counter[tuple[str, int, bool]] = Counter()
+    statuses: Counter[tuple[int, str | None]] = Counter()
+    ceilings: dict[int, list[float]] = {}
     members = read("members.json")["payload"]["members"]
     humans = [m["entry_id"] for m in members if m.get("member_kind") == "human"]
     for entry in humans:
@@ -153,12 +155,12 @@ def check_variants(read):
     return problems
 
 
-def check_top100(read):
+def check_top100(read: Callable[[str], Any]) -> list[str]:
     problems: list[str] = []
-    changed = defaultdict(int)
-    costs = defaultdict(list)
-    statuses = defaultdict(lambda: defaultdict(int))
-    reasons = defaultdict(int)
+    changed: defaultdict[int, int] = defaultdict(int)
+    costs: defaultdict[int, list[float]] = defaultdict(list)
+    statuses: defaultdict[str, defaultdict[str | None, int]] = defaultdict(lambda: defaultdict(int))
+    reasons: defaultdict[tuple[str, str | None], int] = defaultdict(int)
     files = 0
     members = read("members.json")["payload"]["members"]
     humans = [m["entry_id"] for m in members if m.get("member_kind") == "human"]
@@ -214,11 +216,8 @@ def check_top100(read):
                 ):
                     problems.append(f"{entry}: {path} cost {cost} ceiling {ceiling}")
                 limits = payload.get("stated_limits") or []
-                if (
-                    not limits
-                    or not LIMIT.match(limits[-1])
-                    or LIMIT.match(limits[-1]).group(1) != weight
-                ):
+                limit = LIMIT.match(limits[-1]) if limits else None
+                if limit is None or limit.group(1) != weight:
                     problems.append(f"{entry}: {path} stated limit {limits[-1:]}")
                 if any(str(k).startswith("_") for k in payload):
                     problems.append(f"{entry}: {path} private key")
@@ -230,10 +229,10 @@ def check_top100(read):
                     costs[int(weight)].append(cost)
 
     print(f"members {len(humans)}, weighted documents {files}")
-    for weight in sorted(changed) or sorted(costs):
-        values = costs[weight]
+    for weight_value in sorted(changed) or sorted(costs):
+        values = costs[weight_value]
         print(
-            f"  weight {weight:>2}: changed {changed[weight]}/{len(values)}, "
+            f"  weight {weight_value:>2}: changed {changed[weight_value]}/{len(values)}, "
             f"mean price {sum(values) / len(values):.3f}, max {max(values):.3f}"
         )
     print(f"  solver status {dict((k, dict(v)) for k, v in statuses.items())}")
@@ -245,11 +244,11 @@ def check_top100(read):
     return problems
 
 
-def check_word(tree):
+def check_word(tree: Tree) -> list[str]:
     read = tree.read
-    problems = []
+    problems: list[str] = []
 
-    def check(ok, label):
+    def check(ok: object, label: str) -> None:
         print(f"  {'ok ' if ok else 'BAD'} {label}")
         if not ok:
             problems.append(label)
@@ -353,7 +352,7 @@ def check_word(tree):
     return problems
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
     args = parser.parse_args(argv)
@@ -365,11 +364,12 @@ def main(argv=None):
         )
         return 1
     findings = []
-    for name, check in (
+    checks: tuple[tuple[str, Callable[[], list[str]]], ...] = (
         ("variants", lambda: check_variants(tree.read)),
         ("top100", lambda: check_top100(tree.read)),
         ("word", lambda: check_word(tree)),
-    ):
+    )
+    for name, check in checks:
         print(f"Checking {name}")
         try:
             findings.extend(check())
