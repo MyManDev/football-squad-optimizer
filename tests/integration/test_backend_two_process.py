@@ -23,7 +23,7 @@ import pytest
 import tests.unit.test_advice_worker as worker_module
 import tests.unit.test_backend_runtime as deployment_module
 from fastapi.testclient import TestClient
-from tests.fixtures.backend_app import app_for_capture as app_for_backend
+from tests.fixtures.backend_app import app_for_capture
 
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.platform.backend_runtime import BackendConfig, StoreProbeGate, build_backend
@@ -153,7 +153,7 @@ def test_a_failed_store_stops_the_api_accepting_work(
     config = deployed["config"]
     # A gate that holds nothing, so the store's failure is observed rather than waited out.
     backend = build_backend(config, probe=StoreProbeGate(config.store_root, recheck_seconds=0.0))
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, worker_module.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
     assert client.post(route, json=body).status_code == 202
@@ -174,7 +174,7 @@ def test_a_separate_worker_process_computes_what_the_api_accepted(
 ) -> None:
     config = deployed["config"]
     backend = build_backend(config)
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, worker_module.world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
 

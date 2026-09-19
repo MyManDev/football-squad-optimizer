@@ -84,11 +84,8 @@ def test_real_worker_capacity(tmp_path: Path, users: int, replicas: int) -> None
                     [
                         sys.executable,
                         "-m",
-                        "uvicorn",
-                        "--factory",
-                        "squadopt.api.runtime:build_app",
-                        "--host",
-                        "127.0.0.1",
+                        "tests.fixtures.backend_app",
+                        seed.metadata.captured_at_utc,
                         "--port",
                         str(api_port),
                     ],

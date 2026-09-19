@@ -669,6 +669,33 @@ def test_deadline_lookup_rejects_a_changed_handoff(deployment: dict[str, Any]) -
         backend.contexts.deadline_for(replace(context, projection_handoff_fingerprint="0" * 64))
 
 
+def test_production_factory_refuses_a_historical_capture(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.api.runtime import build_app
+
+    config = deployment["config"]
+    for name, path in (
+        ("STORE", config.store_root),
+        ("SITE_DATA", config.site_data_root),
+        ("SNAPSHOT", config.snapshot_root),
+        ("HANDOFF", config.handoff_root),
+    ):
+        monkeypatch.setenv(f"SQUADOPT_BACKEND_{name}_ROOT", str(path))
+
+    # No injected clock: this is the exact factory used by the production server.
+    client = TestClient(build_app())
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "DEADLINE_PASSED"
+    assert not list(config.queue_root.glob("*.json"))
+    assert not list(config.spec_root.glob("*.json"))
+    assert "advice_deadline_refused_total 1" in client.get("/metrics").text
+
+
 def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
     deployment: dict[str, Any],
 ) -> None:
@@ -677,7 +704,7 @@ def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
     backend = build_backend(deployment["config"])
     from tests.fixtures.backend_app import app_for_capture
 
-    client = TestClient(app_for_capture(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
 
     ready = client.get("/ready")
     assert ready.status_code == 200

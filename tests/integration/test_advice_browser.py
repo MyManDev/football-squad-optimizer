@@ -399,11 +399,8 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         [
             sys.executable,
             "-m",
-            "uvicorn",
-            "--factory",
-            "tests.fixtures.backend_app:build_app",
-            "--host",
-            "127.0.0.1",
+            "tests.fixtures.backend_app",
+            capture.inputs.captured_at_utc,
             "--port",
             str(api_port),
         ],
