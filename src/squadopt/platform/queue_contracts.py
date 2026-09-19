@@ -28,7 +28,12 @@ class JobQueue(Protocol):
     def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]: ...
 
     def submit_unless_cached(
-        self, job: AdviceJob, *, read_cached: Callable[[str], bytes | None]
+        self,
+        job: AdviceJob,
+        *,
+        read_cached: Callable[[str], bytes | None],
+        admit: Callable[[frozenset[str]], None] | None = None,
+        prepare: Callable[[], None] | None = None,
     ) -> AdviceJob | bytes: ...
 
     def claim(

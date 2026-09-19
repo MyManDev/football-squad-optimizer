@@ -172,13 +172,22 @@ class FileJobQueue:
             index.unlink(missing_ok=True)
 
     def submit_unless_cached(
-        self, job: AdviceJob, *, read_cached: Callable[[str], bytes | None]
+        self,
+        job: AdviceJob,
+        *,
+        read_cached: Callable[[str], bytes | None],
+        admit: Callable[[frozenset[str]], None] | None = None,
+        prepare: Callable[[], None] | None = None,
     ) -> AdviceJob | bytes:
         """Recheck the validated cache and reserve work atomically with completion.
 
         A POST's earlier miss can outlive a worker's cache publication and open-index
         cleanup. The read callback only reads and validates immutable answer bytes;
         computation stays outside this short metadata transaction.
+
+        For genuinely new work, ``admit`` makes a memory-only decision from open job
+        IDs, then ``prepare`` writes its request spec before any worker can claim it.
+        Neither callback receives a client identity from this adapter.
         """
 
         if job.status != "queued":
@@ -187,6 +196,14 @@ class FileJobQueue:
             cached = read_cached(job.cache_key)
             if cached is not None:
                 return cached
+            if admit is not None or prepare is not None:
+                existing = self._index_job(self._open_index(job.cache_key), repair=True)
+                if existing is not None and not existing.is_terminal:
+                    return existing
+                if admit is not None:
+                    admit(frozenset(one.job_id for one in self.jobs() if not one.is_terminal))
+                if prepare is not None:
+                    prepare()
             winner, _created = self.submit_unique(job)
             return winner
 

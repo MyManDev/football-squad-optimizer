@@ -64,6 +64,10 @@ class RateLimitedError(ValueError):
         self.retry_after_seconds = max(1, int(retry_after_seconds))
 
 
+class OpenJobLimitedError(ValueError):
+    """This address already owns the allowed queued and running work."""
+
+
 class MalformedIdempotencyKeyError(ValueError):
     """The ``Idempotency-Key`` header is not one the contract accepts."""
 
@@ -127,12 +131,19 @@ class AdviceSubmitService:
         rate_limiter: RateLimiter | None = None,
         specs: AdviceJobSpecStore | None = None,
         store_ready: Callable[[], bool] | None = None,
+        max_open_jobs_per_client: int = 4,
     ) -> None:
+        if max_open_jobs_per_client < 1:
+            raise ValueError("max_open_jobs_per_client must be at least 1.")
         self._reader = reader
         self._queue = queue
         self._limiter = rate_limiter
         self._specs = specs
         self._store_ready = store_ready
+        self._max_open_jobs_per_client = max_open_jobs_per_client
+        # Only the admission callback accesses this map, under the queue transaction.
+        # Addresses never enter queue/spec documents; process restart forgets ownership.
+        self._client_jobs: dict[str, str] = {}
 
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
@@ -287,31 +298,51 @@ class AdviceSubmitService:
             updated_at_utc=at_utc,
             idempotency_key=command.idempotency_key,
         )
-        if self._specs is not None:
-            # Before the job exists, never after: a worker may claim the instant the
-            # record lands, and a claimed job whose request cannot be read is a job
-            # nobody can answer. The rival is normalized exactly as the cache key
-            # normalizes it, so requests that share an address share a meaning.
-            self._specs.put(
-                cache_key,
-                AdviceJobSpec(
-                    league_id=int(league_id),
-                    entry_id=int(entry_id),
-                    strategy=strategy,
-                    window=int(window),
-                    context=context,
-                    rival_entry_id=(
-                        rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+
+        def admit(open_job_ids: frozenset[str]) -> None:
+            self._client_jobs = {
+                identifier: owner
+                for identifier, owner in self._client_jobs.items()
+                if identifier in open_job_ids
+            }
+            if (
+                sum(owner == client_bucket for owner in self._client_jobs.values())
+                >= self._max_open_jobs_per_client
+            ):
+                raise OpenJobLimitedError(
+                    "This connection already has the allowed open computations."
+                )
+            self._client_jobs[record.job_id] = client_bucket
+
+        def prepare() -> None:
+            if self._specs is not None:
+                # Before the job exists, never after: a worker may claim the instant the
+                # record lands, and a claimed job whose request cannot be read is a job
+                # nobody can answer. The rival is normalized exactly as the cache key
+                # normalizes it, so requests that share an address share a meaning.
+                self._specs.put(
+                    cache_key,
+                    AdviceJobSpec(
+                        league_id=int(league_id),
+                        entry_id=int(entry_id),
+                        strategy=strategy,
+                        window=int(window),
+                        context=context,
+                        rival_entry_id=(
+                            rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+                        ),
+                        # Exactly what entered the key: the switch values and the identity
+                        # of the inputs they were accepted against.
+                        switches=resolved.switches,
                     ),
-                    # Exactly what entered the key: the switch values and the identity
-                    # of the inputs they were accepted against.
-                    switches=resolved.switches,
-                ),
-            )
+                )
+
         # Completion publishes cache bytes and removes the open reservation under the
         # same lock as this final cache check and enqueue decision. An earlier miss must
         # not create a second job after another worker has already answered it.
-        winner = self._queue.submit_unless_cached(record, read_cached=self._reader.cached)
+        winner = self._queue.submit_unless_cached(
+            record, read_cached=self._reader.cached, admit=admit, prepare=prepare
+        )
         if isinstance(winner, bytes):
             return SubmitOutcome(kind="hit", payload=winner)
         return SubmitOutcome(kind="job", job=winner)
