@@ -1,49 +1,50 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 4,
+    "gameweek": 5,
     "entry_id": 6879786,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
-        "move_id": "gw04-1",
+        "move_id": "gw05-1",
         "player_out": {
-          "player_id": 195546,
-          "name": "Emiliano Buend\u00eda Stati",
-          "short_name": "Stati",
+          "player_id": 244851,
+          "name": "Cole Palmer",
+          "short_name": "Palmer",
           "position": "MID",
-          "team": "Aston Villa"
+          "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 503139,
-          "name": "Alex Scott",
-          "short_name": "Scott",
+          "player_id": 141746,
+          "name": "Bruno Borges Fernandes",
+          "short_name": "Fernandes",
           "position": "MID",
-          "team": "Bournemouth"
+          "team": "Man Utd"
         },
-        "expected_points_delta": 1.0934022134501915,
+        "expected_points_delta": 2.4436051352621107,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 2.4436051352621107,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 37.781000000000006,
-    "expected_own_points": 54.86167693015611,
+    "optimality_gap": 50.911,
+    "expected_own_points": 50.13964106594459,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 7.066032835980204
+      "expected_points": 6.421694651064867
     },
     "vice_captain": {
       "player_id": 219168,
@@ -51,7 +52,7 @@
       "short_name": "Isak",
       "position": "FWD",
       "team": "Liverpool",
-      "expected_points": 5.621733713745486
+      "expected_points": 4.897045438301909
     },
     "starting_xi": [
       {
@@ -60,7 +61,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.450579897041415
+        "expected_points": 3.8238320826783507
       },
       {
         "player_id": 226597,
@@ -68,7 +69,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.305863646230902
+        "expected_points": 4.472528385131045
       },
       {
         "player_id": 466075,
@@ -76,15 +77,15 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.6111564244775165
+        "expected_points": 3.54054506392718
       },
       {
-        "player_id": 437499,
-        "name": "Maxence Lacroix",
-        "short_name": "Lacroix",
+        "player_id": 83299,
+        "name": "Lewis Dunk",
+        "short_name": "Dunk",
         "position": "DEF",
-        "team": "Chelsea",
-        "expected_points": 3.397932275866678
+        "team": "Brighton",
+        "expected_points": 3.160898124780986
       },
       {
         "player_id": 141746,
@@ -92,7 +93,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 7.066032835980204
+        "expected_points": 6.421694651064867
       },
       {
         "player_id": 466052,
@@ -100,23 +101,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.389550689692313
-      },
-      {
-        "player_id": 503139,
-        "name": "Alex Scott",
-        "short_name": "Scott",
-        "position": "MID",
-        "team": "Bournemouth",
-        "expected_points": 4.2494672646892955
-      },
-      {
-        "player_id": 449434,
-        "name": "Anthony Elanga",
-        "short_name": "Elanga",
-        "position": "MID",
-        "team": "Newcastle",
-        "expected_points": 3.516411504700961
+        "expected_points": 4.301528232026531
       },
       {
         "player_id": 249231,
@@ -124,7 +109,15 @@
         "short_name": "Lewis-Potter",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 3.3779501799701594
+        "expected_points": 3.247252023463506
+      },
+      {
+        "player_id": 195546,
+        "name": "Emiliano Buend\u00eda Stati",
+        "short_name": "Stati",
+        "position": "MID",
+        "team": "Aston Villa",
+        "expected_points": 2.7491256951768515
       },
       {
         "player_id": 219168,
@@ -132,7 +125,15 @@
         "short_name": "Isak",
         "position": "FWD",
         "team": "Liverpool",
-        "expected_points": 5.621733713745486
+        "expected_points": 4.897045438301909
+      },
+      {
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 3.5637000012914486
       },
       {
         "player_id": 475168,
@@ -140,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.8089656617809755
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -150,15 +151,15 @@
         "short_name": "Pickford",
         "position": "GK",
         "team": "Everton",
-        "expected_points": 3.009371278665004
+        "expected_points": 3.354651247440729
       },
       {
-        "player_id": 169432,
-        "name": "Oli McBurnie",
-        "short_name": "McBurnie",
-        "position": "FWD",
-        "team": "Hull City",
-        "expected_points": 2.846724371266304
+        "player_id": 437499,
+        "name": "Maxence Lacroix",
+        "short_name": "Lacroix",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 2.6023752192649856
       },
       {
         "player_id": 441302,
@@ -166,80 +167,54 @@
         "short_name": "Maatsen",
         "position": "DEF",
         "team": "Aston Villa",
-        "expected_points": 2.5908352756752766
+        "expected_points": 0.5764566869383193
       },
       {
-        "player_id": 83299,
-        "name": "Lewis Dunk",
-        "short_name": "Dunk",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 2.5352963471480967
+        "player_id": 449434,
+        "name": "Anthony Elanga",
+        "short_name": "Elanga",
+        "position": "MID",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
-        "gameweek": 4,
-        "transfers_in": [
-          {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
-            "position": "MID",
-            "team": "Bournemouth"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 195546,
-            "name": "Emiliano Buend\u00eda Stati",
-            "short_name": "Stati",
-            "position": "MID",
-            "team": "Aston Villa"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 54.8616769301561
-      },
-      {
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
-            "position": "GK",
-            "team": "Hull City"
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
+            "position": "MID",
+            "team": "Man Utd"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 111234,
-            "name": "Jordan Pickford",
-            "short_name": "Pickford",
-            "position": "GK",
-            "team": "Everton"
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
+            "position": "MID",
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 54.865702188261295
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 50.13964106594459
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 446008,
-            "name": "Bryan Mbeumo",
-            "short_name": "Mbeumo",
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Man Utd"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -253,12 +228,38 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.283970151226825
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 51.61327264020357
       },
       {
         "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 441302,
+            "name": "Ian Maatsen",
+            "short_name": "Maatsen",
+            "position": "DEF",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 52.043672293121595
+      },
+      {
+        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 17761,
@@ -279,42 +280,41 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.65887799493284
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 52.95546800099445
       },
       {
-        "gameweek": 8,
+        "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 84450,
-            "name": "Granit Xhaka",
-            "short_name": "Xhaka",
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
             "position": "MID",
-            "team": "Sunderland"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 249231,
-            "name": "Keane Lewis-Potter",
-            "short_name": "Lewis-Potter",
+            "player_id": 195546,
+            "name": "Emiliano Buend\u00eda Stati",
+            "short_name": "Stati",
             "position": "MID",
-            "team": "Brentford"
+            "team": "Aston Villa"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.959609399008954
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 53.62236061273786
       }
     ],
     "stated_limits": [
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
-      "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
       "Prices are held at the captured values; no price change is modelled.",
       "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
     ],

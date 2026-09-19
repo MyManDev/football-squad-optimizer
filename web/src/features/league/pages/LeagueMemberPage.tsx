@@ -6,6 +6,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { LeagueDataMissing } from "../data";
+import { useDeadlinePassed } from "../advice/deadline";
 import { LeagueMemberView } from "./LeagueMemberView";
 import type { AdviceIssue } from "./memberPageTypes";
 import { useLeagueMemberData } from "./useLeagueMemberData";
@@ -30,7 +31,16 @@ export function LeagueMemberPage() {
     adviceEnabled,
     advice,
     rival,
+    windowControl,
+    client,
+    capabilities,
+    computeService,
+    computePending,
   } = useLeagueMemberData(entryParam, searchParams);
+  const deadlinePassed = useDeadlinePassed(
+    squad.data?.payload.season,
+    squad.data?.payload.gameweek,
+  );
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
@@ -73,6 +83,7 @@ export function LeagueMemberPage() {
       squad={squad.data}
       advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
       rivalSquad={rival.data ?? null}
+      windowControl={windowControl.isError ? null : (windowControl.data ?? null)}
       adviceIssue={adviceIssue}
       adviceLoading={indexQuery.isPending || (adviceEnabled && advice.isPending)}
       membersIssue={
@@ -86,6 +97,11 @@ export function LeagueMemberPage() {
       onRetryIndex={() => void indexQuery.refetch()}
       members={members}
       index={index}
+      client={client}
+      capabilities={capabilities}
+      computeService={computeService}
+      computePending={computePending}
+      deadlinePassed={deadlinePassed}
     />
   );
 }

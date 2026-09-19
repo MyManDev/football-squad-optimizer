@@ -33,7 +33,9 @@ import numpy as np
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
+    _bootstrap_gap_interval,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -42,7 +44,7 @@ from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments.control_residuals import build_control_residual_table
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
-from squadopt.optimization import OptimizationConfig, optimize_squad
+from squadopt.optimization import optimize_squad
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
 from squadopt.scenarios import ScenarioConfig
 from squadopt.scenarios.evaluation import compare_fixed_decisions
@@ -70,18 +72,6 @@ def _edge_series(root: Path) -> dict[str, list[float]]:
 def _leave_one_out(series: dict[str, list[float]], season: str) -> tuple[float, ...]:
     pooled = [v for other, values in series.items() if other != season for v in values]
     return tuple(pooled)
-
-
-def _bootstrap_gap_interval(
-    claimed: np.ndarray, realized: np.ndarray, seed: int
-) -> tuple[float, float]:
-    generator = np.random.default_rng(seed)
-    gaps = []
-    n = len(claimed)
-    for _ in range(BOOTSTRAP_DRAWS):
-        pick = generator.integers(0, n, size=n)
-        gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
-    return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -117,7 +107,11 @@ def main() -> int:
     LOGGER.info("Building the control's residual folds")
     panel = build_panel(arguments.archive_root)
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
-    optimization = OptimizationConfig()
+    # Named rather than inherited. The dataclass default binds on ten wall-clock seconds,
+    # so a busy machine gives the solver less work and the same commit writes a different
+    # record (#590). The measurement limit is deterministic, so the record is the run's
+    # and not the machine's.
+    optimization = measurement_optimization_config()
     provenance_seed = PredictionProvenance(
         model_name="deterministic_baseline",
         model_version="form_window_05_v1",

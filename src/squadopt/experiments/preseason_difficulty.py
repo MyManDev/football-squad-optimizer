@@ -23,7 +23,7 @@ which is the part that cannot be recovered afterwards.
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -334,6 +334,85 @@ def record_to_dict(record: PreseasonDifficultyRecord) -> dict[str, object]:
     }
 
 
+def record_from_dict(document: Mapping[str, object]) -> PreseasonDifficultyRecord:
+    """Read a committed record back, so a later reading does not need the capture it was made from.
+
+    The record exists because the evidence expires. The capture can expire too: the 2026-27
+    pre-season capture was lost on 2026-09-10 with the rest of the early snapshot store, and
+    a comparison that insisted on rebuilding the record from it could never run again. The
+    committed JSON carries every fixture side in full, which is all a comparison reads. What
+    cannot be re-verified from it is the capture's own payload checksum, and nothing here
+    pretends otherwise: the fingerprint and checksums are carried as recorded.
+    """
+
+    if document.get("contract_version") != PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION:
+        raise ExperimentExecutionError(
+            f"The stored record is not {PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION!r}."
+        )
+    rows = document.get("difficulty")
+    strength = document.get("team_strength")
+    checksums = document.get("checksums")
+    diagnostics = document.get("diagnostics")
+    if not isinstance(rows, list) or not rows or not isinstance(strength, list):
+        raise ExperimentExecutionError("The stored record carries no difficulty table.")
+    if not isinstance(checksums, Mapping) or not isinstance(diagnostics, Mapping):
+        raise ExperimentExecutionError("The stored record carries no checksums or diagnostics.")
+    text = {
+        name: document.get(name)
+        for name in (
+            "snapshot_id",
+            "source",
+            "captured_at_utc",
+            "fingerprint",
+            "season",
+            "first_deadline_utc",
+            "first_kickoff_utc",
+        )
+    }
+    absent = sorted(name for name, value in text.items() if not isinstance(value, str))
+    if absent:
+        raise ExperimentExecutionError(f"The stored record lacks {absent!r}.")
+    return PreseasonDifficultyRecord(
+        contract_version=PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION,
+        snapshot_id=str(text["snapshot_id"]),
+        source=str(text["source"]),
+        captured_at_utc=str(text["captured_at_utc"]),
+        fingerprint=str(text["fingerprint"]),
+        checksums={str(key): str(value) for key, value in checksums.items()},
+        season=str(text["season"]),
+        first_deadline_utc=str(text["first_deadline_utc"]),
+        first_kickoff_utc=str(text["first_kickoff_utc"]),
+        difficulty=pd.DataFrame(rows),
+        team_strength=pd.DataFrame(strength),
+        diagnostics=dict(diagnostics),
+    )
+
+
+def later_difficulty(root: Path | str, snapshot_id: str, *, season: str) -> pd.DataFrame:
+    """The published difficulty in any capture, in season or not, for a drift reading.
+
+    ``build_preseason_record`` refuses a capture at or after the first kickoff, and it must:
+    that refusal is what makes the record trustworthy. A *later* reading is the opposite
+    case, a capture that is supposed to come after, so it is read here without that refusal
+    and is never turned into a record.
+    """
+
+    snapshot = read_snapshot(Path(root), snapshot_id)
+    fixtures = snapshot.payloads.get(FIXTURES_PAYLOAD)
+    bootstrap = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
+    if fixtures is None or bootstrap is None:
+        raise ExperimentExecutionError(
+            f"{snapshot_id} holds no fixtures or no bootstrap payload to read difficulty from."
+        )
+    return fixture_snapshot(
+        fixtures,
+        bootstrap,
+        season=season,
+        snapshot_id=snapshot_id,
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+    )
+
+
 def drift_to_dict(drift: DifficultyDrift) -> dict[str, object]:
     return {
         "compared_rows": drift.compared_rows,
@@ -355,7 +434,9 @@ def _number(diagnostics: Mapping[str, object], key: str) -> float:
 
 
 def record_to_markdown(
-    record: PreseasonDifficultyRecord, drift: DifficultyDrift | None = None
+    record: PreseasonDifficultyRecord,
+    drift: DifficultyDrift | None = None,
+    readings: Sequence[Mapping[str, object]] = (),
 ) -> str:
     """The artifact a reader can check without running anything."""
 
@@ -424,6 +505,20 @@ def record_to_markdown(
             ),
             "",
         ]
+    if readings:
+        lines += [
+            "## Every reading so far",
+            "",
+            "| Later capture | Captured | Sides compared | Missing | Changed |",
+            "| --- | --- | ---: | ---: | ---: |",
+        ]
+        for reading in readings:
+            lines.append(
+                f"| `{reading['snapshot_id']}` | {reading['captured_at_utc']} | "
+                f"{reading['compared_rows']} | {reading['missing_rows']} | "
+                f"{reading['changed_rows']} |"
+            )
+        lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -437,6 +532,8 @@ __all__ = [
     "build_preseason_record",
     "compare_to_later",
     "drift_to_dict",
+    "later_difficulty",
+    "record_from_dict",
     "record_to_dict",
     "record_to_markdown",
 ]

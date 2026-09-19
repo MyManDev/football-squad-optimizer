@@ -7,6 +7,7 @@ presses a button for.
 """
 
 import json
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -19,10 +20,23 @@ import pytest
 import tests.unit.test_backend_runtime as deployment_module
 import tests.unit.test_live_transfers as world_module
 import tests.unit.test_source_fpl_live as payload_module
+import tests.unit.test_top100_weight as top100_tests
 from fastapi.testclient import TestClient
 
+import squadopt.application.top100_weight as switches_module_top100
+import squadopt.platform.advice_switches as switches_module
+import squadopt.platform.advice_worker as worker_module
 from squadopt.api.runtime import app_for_backend
-from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW, EntryError
+from squadopt.application.advice import (
+    COMPUTED_MODE,
+    COMPUTED_WINDOW,
+    AdviseEntryRequest,
+    EntryError,
+    advise_entry,
+    advise_with_top100,
+)
+from squadopt.application.advice_menu import ManagersWordNotSolved
+from squadopt.application.weekly_plan import rotation_artifact
 from squadopt.data.snapshots import write_snapshot
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import (
@@ -30,6 +44,7 @@ from squadopt.platform.advice_job_spec import (
     AdviceJobSpecConflictError,
     FileAdviceJobSpecStore,
 )
+from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.advice_queue import (
     AdviceComputeRefused,
     FileJobQueue,
@@ -39,6 +54,7 @@ from squadopt.platform.advice_read import AdviceRequestContext
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.queue_contracts import QueueLockTimeout
 
 SEASON = deployment_module.SEASON
 LEAGUE_ID = deployment_module.LEAGUE_ID
@@ -85,6 +101,12 @@ def _capture_with_entries(snapshot_root: Path) -> str:
 def _running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """A deployment whose capture actually holds the member's squad."""
 
+    return _deployment(tmp_path, monkeypatch)
+
+
+def _deployment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **configured: Any
+) -> dict[str, Any]:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
     snapshot_root = tmp_path / "snapshots"
     handoff_root = tmp_path / "handoffs"
@@ -100,6 +122,7 @@ def _running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             site_data_root=site_root,
             snapshot_root=snapshot_root,
             handoff_root=handoff_root,
+            **configured,
         )
     )
     return {
@@ -173,11 +196,106 @@ def _stop_after(rounds: int) -> Callable[[], bool]:
     return stop
 
 
+@pytest.mark.parametrize("fails", [False, True])
+def test_workers_warm_before_claiming_and_again_when_the_identity_changes(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch, fails: bool
+) -> None:
+    backend = running["backend"]
+    loaded: list[str] = []
+    events: list[tuple[str, dict[str, object]]] = []
+    capture = backend.contexts.capture
+    claim = backend.queue.claim
+    rounds = 0
+
+    def warm(context):
+        loaded.append(context.projection_handoff_fingerprint)
+        if fails:
+            raise OSError("synthetic unreadable capture")
+        return capture(context)
+
+    def checked_claim(**kwargs):
+        nonlocal rounds
+        assert len(loaded) == (1 if rounds < 2 else 2)
+        rounds += 1
+        if rounds == 2:
+            deployment_module._handoff(
+                running["handoff_root"], running["snapshot_id"], expected_points=4.0
+            )
+        return claim(**kwargs)
+
+    monkeypatch.setattr(backend.contexts, "capture", warm)
+    monkeypatch.setattr(backend.queue, "claim", checked_claim)
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(3),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert rounds == 3 and len(set(loaded)) == 2
+    reported = [
+        fields
+        for event, fields in events
+        if event == ("advice_worker_warm_failed" if fails else "advice_worker_warmed")
+    ]
+    assert len(reported) == 2
+    assert all(fields["snapshot_id"] == running["snapshot_id"] for fields in reported)
+    if not fails:
+        assert all(
+            isinstance(fields["seconds"], float) and fields["seconds"] >= 0 for fields in reported
+        )
+        assert all(fields["seconds"] == round(fields["seconds"], 3) for fields in reported)
+
+
+def test_a_locked_capture_directory_does_not_stop_worker_claims(running, monkeypatch):
+    backend = running["backend"]
+    claims, events = [], []
+
+    def unavailable():
+        raise PermissionError("synthetic locked capture directory")
+
+    monkeypatch.setattr(backend.contexts, "current", unavailable)
+    monkeypatch.setattr(backend.queue, "claim", lambda **kwargs: claims.append(True))
+    monkeypatch.setattr(
+        backend.log, "event", lambda event, **fields: events.append((event, fields))
+    )
+    assert (
+        run_advice_worker(
+            backend.queue,
+            backend.cache,
+            lambda job: b"unused",
+            contexts=backend.contexts,
+            log=backend.log,
+            should_stop=_stop_after(1),
+            idle_seconds=0,
+        )
+        == 0
+    )
+    assert claims == [True]
+    assert events == [
+        (
+            "advice_worker_warm_failed",
+            {
+                "reason": "synthetic locked capture directory",
+                "snapshot_id": None,
+            },
+        )
+    ]
+
+
 @pytest.mark.parametrize(
     "error_code", [None, "ADVICE_FAILED", "CONTEXT_UNAVAILABLE", "DETERMINISM_DEFECT"]
 )
 def test_terminal_timestamp_is_read_after_computation(
-    tmp_path: Path, error_code: str | None
+    tmp_path: Path, error_code: str | None, caplog: pytest.LogCaptureFixture
 ) -> None:
     queue = FileJobQueue(tmp_path / "jobs")
     cache = FileAdviceCache(tmp_path / "cache")
@@ -191,8 +309,10 @@ def test_terminal_timestamp_is_read_after_computation(
     finished_at = datetime(2026, 9, 1, 10, 2, tzinfo=UTC)
     clock = [claimed_at]
     claims: list[AdviceJob] = []
+    fields: dict[str, object] = {}
 
     def compute(job: AdviceJob) -> bytes:
+        fields.update(window=3, strategy="saf-puan")
         claims.append(job)
         clock[0] = finished_at
         if error_code == "ADVICE_FAILED":
@@ -201,6 +321,7 @@ def test_terminal_timestamp_is_read_after_computation(
             raise AdviceComputeRefused(error_code, "The context is no longer available.")
         return answer
 
+    caplog.set_level(logging.INFO, logger="advice.worker")
     processed = run_advice_worker(
         queue,
         cache,
@@ -209,9 +330,16 @@ def test_terminal_timestamp_is_read_after_computation(
         now=lambda: clock[0],
         max_jobs=1,
         heartbeat_seconds=None,
+        log=AdviceLog("worker"),
+        job_log_fields=fields,
     )
 
     assert processed == 1
+    events = [
+        json.loads(record.message) for record in caplog.records if record.name == "advice.worker"
+    ]
+    terminal_event = events[-1]
+    assert terminal_event["window"] == 3 and terminal_event["strategy"] == "saf-puan"
     assert len(claims) == 1 and claims[0].status == "running"
     assert claims[0].updated_at_utc == "2026-09-01T10:01:00Z"
     terminal = queue.load(queued.job_id)
@@ -227,6 +355,33 @@ def test_terminal_timestamp_is_read_after_computation(
         assert terminal.error is not None and terminal.error.code == error_code
         expected = original if error_code == "DETERMINISM_DEFECT" else None
         assert cache.get(queued.cache_key) == expected
+
+
+def test_claim_clears_previous_coordinates_before_an_early_callback_failure(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(replace(_job("a" * 64), status="queued"))
+    fields: dict[str, object] = {"window": 5, "strategy": "fark-yarat"}
+
+    def compute(job: AdviceJob) -> bytes:
+        raise RuntimeError("Failed before reading a specification.")
+
+    caplog.set_level(logging.INFO, logger="advice.worker")
+    result = run_advice_worker_once(
+        queue,
+        FileAdviceCache(tmp_path / "cache"),
+        compute,
+        at_utc="2026-09-01T10:01:00Z",
+        log=AdviceLog("worker"),
+        job_log_fields=fields,
+    )
+    assert result is not None and result.status == "failed"
+    events = [
+        json.loads(record.message) for record in caplog.records if record.name == "advice.worker"
+    ]
+    assert events[-1]["event"] == "advice_job_failed"
+    assert "window" not in events[-1] and "strategy" not in events[-1]
 
 
 def test_a_spec_survives_the_round_trip_with_its_context(tmp_path: Path) -> None:
@@ -292,11 +447,18 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     backend = running["backend"]
     key = "e" * 64
     backend.job_specs.put(key, _spec(context=_context("fpl-live-20250101T000000Z-deadbeef1234")))
-    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    fields: dict[str, object] = {}
+    compute = build_advice_compute(backend.contexts, backend.job_specs, job_log_fields=fields)
 
     with pytest.raises(AdviceComputeRefused) as refusal:
         compute(_job(key))
     assert refusal.value.code == "CONTEXT_UNAVAILABLE"
+    assert fields == {"window": COMPUTED_WINDOW, "strategy": COMPUTED_MODE}
+    # A following job with no readable spec must not inherit the previous coordinates.
+    with pytest.raises(AdviceComputeRefused) as unreadable:
+        compute(_job("d" * 64))
+    assert unreadable.value.code == "REQUEST_UNREADABLE"
+    assert fields == {}
     assert backend.cache.get(key) is None
 
     job = run_advice_worker_once(
@@ -305,8 +467,10 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
+    chip: str | None,
 ) -> None:
     """POST, worker, GET — the actual request this backend exists to serve."""
 
@@ -314,21 +478,28 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     client = TestClient(app_for_backend(backend))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    if chip is not None:
+        body["chip"] = chip
+        capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+        assert chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
     job_id = accepted.json()["job_id"]
     assert client.get(f"/api/v1/advice-jobs/{job_id}").json()["status"] == "queued"
 
+    fields: dict[str, object] = {}
     processed = run_advice_worker(
         backend.queue,
         backend.cache,
-        build_advice_compute(backend.contexts, backend.job_specs),
+        build_advice_compute(backend.contexts, backend.job_specs, job_log_fields=fields),
         should_stop=_stop_after(3),
         max_jobs=1,
         metrics=backend.metrics,
+        job_log_fields=fields,
     )
     assert processed == 1
+    assert fields == {"window": COMPUTED_WINDOW, "strategy": COMPUTED_MODE}
     finished = client.get(f"/api/v1/advice-jobs/{job_id}").json()
     assert finished["status"] == "completed", finished
 
@@ -345,6 +516,8 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["window"] == COMPUTED_WINDOW
     assert isinstance(payload["moves"], list)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    if chip is not None:
+        assert payload["chip_choice"]["chip"] == chip
 
     # A second ask is answered from the cache and starts no second solve.
     again = client.post(route, json=body)
@@ -850,3 +1023,456 @@ def test_a_store_that_breaks_later_stops_the_worker_taking_new_work(
     )
     assert len(claims) == before_claims, "a broken store was still claimed against"
     assert len(recoveries) == before_recoveries, "a broken store was still recovered from"
+
+
+# --- the worker survives a busy queue and names what it cannot read ----------------------
+
+
+class _BusyThenFine:
+    """A queue whose lock is held by someone else for its first two transactions."""
+
+    def __init__(self, queue: FileJobQueue) -> None:
+        self._queue = queue
+        self.refused: list[str] = []
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._queue, name)
+
+    def recover(self, **kwargs: Any) -> Any:
+        if "recover" not in self.refused:
+            self.refused.append("recover")
+            raise QueueLockTimeout("Queue metadata transaction is busy.")
+        return self._queue.recover(**kwargs)
+
+    def claim(self, **kwargs: Any) -> Any:
+        if "claim" not in self.refused:
+            self.refused.append("claim")
+            raise QueueLockTimeout("Queue metadata transaction is busy.")
+        return self._queue.claim(**kwargs)
+
+
+def test_a_busy_queue_lock_does_not_end_the_worker(running: dict[str, Any]) -> None:
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    assert client.post(route, json={"strategy": COMPUTED_MODE, "window": 1}).status_code == 202
+    queue = _BusyThenFine(backend.queue)
+    waits: list[float] = []
+
+    processed = run_advice_worker(
+        queue,
+        backend.cache,
+        lambda _job: b'{"computed":true}',
+        should_stop=_stop_after(40),
+        sleep=waits.append,
+        idle_seconds=0.5,
+        poll_seconds=0.5,
+        max_jobs=1,
+        metrics=backend.metrics,
+    )
+
+    # Both refusals were waited out, a recovery that could not run was tried again on the
+    # next round, and the job was still computed by the same process.
+    assert queue.refused == ["recover", "claim"]
+    assert processed == 1
+    assert len(waits) >= 2
+    assert "advice_worker_queue_busy_total 2" in backend.metrics.render(queue_depth=0)
+
+
+def test_an_unreadable_spec_is_a_request_unreadable_refusal(running: dict[str, Any]) -> None:
+    backend = running["backend"]
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    store = running["backend"].config.spec_root
+    for key, stored in (
+        ("a" * 64, b"not json at all"),
+        ("b" * 64, b'{"contract_version":"advice_job_spec_v1","league_id":1}'),
+        ("c" * 64, json.dumps({**_spec().as_payload(), "switches": {"top100": {}}}).encode()),
+    ):
+        path = store / key[:2] / f"{key}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(stored)
+        with pytest.raises(AdviceComputeRefused) as refusal:
+            compute(_job(key))
+        assert refusal.value.code == "REQUEST_UNREADABLE", stored
+
+
+def test_a_member_the_capture_does_not_hold_is_named_not_a_generic_failure(
+    running: dict[str, Any],
+) -> None:
+    """The member directory lists the rival; the capture holds only the member's squad."""
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    for entry, body in (
+        (RIVAL_ID, {"strategy": COMPUTED_MODE, "window": 1}),
+        (ENTRY_ID, {"strategy": "ortak-koru", "window": 1, "rival_entry_id": RIVAL_ID}),
+    ):
+        accepted = client.post(f"/api/v1/leagues/{LEAGUE_ID}/entries/{entry}/advice", json=body)
+        assert accepted.status_code == 202, accepted.text
+        job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+        assert job is not None and job.status == "failed"
+        assert job.error is not None and job.error.code == "ENTRY_NOT_IN_CAPTURE"
+        view = client.get(f"/api/v1/advice-jobs/{job.job_id}").json()
+        assert view["error_code"] == "ENTRY_NOT_IN_CAPTURE"
+
+
+def test_a_word_not_solved_for_one_member_is_named_not_a_generic_failure(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The menu says the word could not be applied; the job carries that, not a fault."""
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+
+    def not_solved(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise ManagersWordNotSolved("The manager's word could not be applied to this plan.")
+
+    monkeypatch.setattr(worker_module, "advise_menu_entry", not_solved)
+    accepted = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1},
+    )
+    assert accepted.status_code == 202, accepted.text
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert job is not None and job.status == "failed"
+    assert job.error is not None and job.error.code == "MANAGERS_WORD_NOT_SOLVED"
+    assert job.error.message == "The manager's word could not be applied to this plan."
+    view = client.get(f"/api/v1/advice-jobs/{job.job_id}").json()
+    assert (view["status"], view["error_code"]) == ("failed", "MANAGERS_WORD_NOT_SOLVED")
+    # Any other refusal from the menu is still the unexpected failure it was.
+    monkeypatch.setattr(
+        worker_module,
+        "advise_menu_entry",
+        lambda *_a, **_k: (_ for _ in ()).throw(EntryError("something else")),
+    )
+    again = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1},
+    )
+    assert again.status_code == 202, again.text
+    other = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert other is not None and other.error is not None
+    assert other.error.code == "ADVICE_FAILED"
+
+
+# --- the member menu's switches, through the real solver ---------------------------------
+
+
+def _served_bytes(backend: Any, advice: dict[str, Any], captured_at_utc: str) -> bytes:
+    document = {
+        "contract_version": "provisional_league_ui_v1",
+        "generated_at_utc": captured_at_utc,
+        "source_kind": "live",
+        "payload": advice,
+    }
+    return json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str, Any]) -> None:
+    """The default path through ``advise_menu_entry`` moves no byte of what is served."""
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    job_id = client.post(route, json=body).json()["job_id"]
+    compute = build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache)
+    done = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert done is not None and done.status == "completed", done
+
+    job = backend.queue.load(job_id)
+    spec = backend.job_specs.get(job.cache_key)
+    assert spec.switches == {} and "switches" not in spec.as_payload()
+    capture = backend.contexts.capture(spec.context)
+    expected = advise_entry(
+        AdviseEntryRequest(season=SEASON, gameweek=2, league_id=LEAGUE_ID, entry_id=ENTRY_ID),
+        provider=capture.provider,
+        inputs=capture.inputs,
+        projection=capture.projection,
+        rules=capture.rules,
+        horizon_builder=capture.horizon_builder,
+    )
+    assert backend.cache.get(job.cache_key) == _served_bytes(
+        backend, expected, capture.inputs.captured_at_utc
+    )
+
+
+def _work(backend: Any, jobs: int = 1) -> int:
+    return run_advice_worker(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache),
+        should_stop=_stop_after(3 * jobs + 3),
+        max_jobs=jobs,
+        idle_seconds=0.0,
+        metrics=backend.metrics,
+    )
+
+
+def _export_top100(
+    running: dict[str, Any], artifact_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = running["backend"]
+    context = backend.contexts.current()
+    assert context is not None
+    capture = backend.contexts.capture(context)
+    directory = artifact_root / "phase_b"
+    directory.mkdir(parents=True, exist_ok=True)
+    top100_tests._artifact(
+        directory,
+        monkeypatch,
+        capture.inputs,
+        capture.projection,
+        top100_tests._favoured(capture.projection, list(SQUAD_CODES)),
+    )
+
+
+def test_a_member_asks_for_a_top100_setting_and_gets_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """POST with a setting, worker, GET with the same query: the switched-on button."""
+
+    artifact_root = tmp_path / "artifacts"
+    running = _deployment(tmp_path, monkeypatch, artifact_root=artifact_root)
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW, "top100_weight": 20}
+    capabilities = f"/api/v1/leagues/{LEAGUE_ID}/capabilities"
+
+    # Configured, but the week's export has not landed: refused by name, nothing queued.
+    early = client.post(route, json=body)
+    assert early.status_code == 422
+    assert early.json()["error"]["code"] == "TOP100_INPUTS_UNAVAILABLE"
+    assert client.get(capabilities).json()["top100"] == {"available": False, "weights": [0]}
+    assert backend.queue.jobs() == ()
+
+    # The export lands and both processes notice without a restart.
+    _export_top100(running, artifact_root, monkeypatch)
+    assert client.get(capabilities).json()["top100"]["available"] is True
+
+    accepted = client.post(route, json=body)
+    assert accepted.status_code == 202, accepted.text
+    assert _work(backend) == 1
+    finished = client.get(f"/api/v1/advice-jobs/{accepted.json()['job_id']}").json()
+    assert finished["status"] == "completed", finished
+
+    served = client.get(route, params=body)
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["top100"]["weight"] == 20
+    assert payload["top100"]["table_sha256"] == "c" * 64
+    assert payload["mode"] == COMPUTED_MODE and payload["window"] == COMPUTED_WINDOW
+    assert payload["expected_points_cost"] >= 0
+
+    # The same ask again is a hit; the plain plan is a different address, still uncomputed.
+    again = client.post(route, json=body)
+    assert again.status_code == 200 and again.content == served.content
+    plain = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    assert client.get(route, params=plain).status_code == 404
+
+    # It is the batch's document: the same producer, the same inputs, the same payload.
+    context = backend.contexts.current()
+    capture = backend.contexts.capture(context)
+    assert capture.top100_counts is not None
+    direct = advise_with_top100(
+        AdviseEntryRequest(season=SEASON, gameweek=2, league_id=LEAGUE_ID, entry_id=ENTRY_ID),
+        weight=20,
+        counts=capture.top100_counts,
+        provider=capture.provider,
+        inputs=capture.inputs,
+        projection=capture.projection,
+        rules=capture.rules,
+    ).payload
+    assert payload == json.loads(json.dumps(direct))
+
+
+def test_without_the_inputs_configured_a_setting_is_refused_by_name(
+    running: dict[str, Any],
+) -> None:
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    for body, code in (
+        ({"top100_weight": 20}, "TOP100_INPUTS_UNAVAILABLE"),
+        ({"managers_word": True}, "MANAGERS_WORD_UNAVAILABLE"),
+    ):
+        refused = client.post(route, json={"strategy": COMPUTED_MODE, "window": 1, **body})
+        assert refused.status_code == 422
+        assert refused.json()["error"]["code"] == code
+        read = client.get(route, params={"strategy": COMPUTED_MODE, "window": 1, **body})
+        assert read.status_code == 422 and read.json()["error"]["code"] == code
+    assert backend.queue.jobs() == ()
+    # Nothing was projected to find that out: the api stays the reader it was.
+    assert backend.contexts._context is None
+
+
+def test_a_job_accepted_against_one_export_is_not_computed_from_another(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    running = _deployment(tmp_path, monkeypatch, artifact_root=artifact_root)
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW, "top100_weight": 20}
+    _export_top100(running, artifact_root, monkeypatch)
+    first = client.post(route, json=body)
+    assert first.status_code == 202
+
+    # Ops replaces the week's export before the worker reaches the job.
+    patched = switches_module_top100.read_player_evidence_artifact
+
+    def replaced(*paths: Any) -> Any:
+        evidence = patched(*paths).copy()
+        evidence.attrs.update({**patched(*paths).attrs, "table_sha256": "9" * 64})
+        return evidence
+
+    monkeypatch.setattr(switches_module_top100, "read_player_evidence_artifact", replaced)
+    table = next((artifact_root / "phase_b").glob("*.csv"))
+    table.write_text("replaced", encoding="utf-8")
+
+    assert _work(backend) == 1
+    view = client.get(f"/api/v1/advice-jobs/{first.json()['job_id']}").json()
+    assert (view["status"], view["error_code"]) == ("failed", "SWITCH_INPUTS_CHANGED")
+    # Asking again is answered from the export that is there now, at its own address.
+    second = client.post(route, json=body)
+    assert second.status_code == 202 and second.json()["job_id"] != first.json()["job_id"]
+    assert _work(backend) == 1
+    assert client.get(route, params=body).json()["payload"]["top100"]["table_sha256"] == "9" * 64
+
+
+def test_a_member_switches_the_managers_word_on_and_gets_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    fixture = tmp_path / "club_news.fixture.json"
+    fixture.write_text("{}", encoding="utf-8")
+    running = _deployment(
+        tmp_path, monkeypatch, artifact_root=artifact_root, club_news_source=fixture
+    )
+    backend = running["backend"]
+    table, manifest = rotation_artifact(
+        artifact_root / "rotation", SEASON, 2, running["snapshot_id"]
+    )
+    table.parent.mkdir(parents=True)
+    table.write_text("rows", encoding="utf-8")
+    manifest.write_text(json.dumps({"table_sha256": "7" * 64}), encoding="utf-8")
+    words = top100_tests._words(STARTING_ELEVEN[-1])
+    monkeypatch.setattr(switches_module, "load_manager_words", lambda *_a, **_k: words)
+
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW, "managers_word": True}
+    capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+    assert capabilities["managers_word"] == {"available": True}
+    assert capabilities["top100"]["available"] is False
+
+    accepted = client.post(route, json=body)
+    assert accepted.status_code == 202, accepted.text
+    job = backend.queue.load(accepted.json()["job_id"])
+    assert backend.job_specs.get(job.cache_key).switches == {
+        "managers_word": {
+            "rule_version": "managers_word_rule_v1",
+            "rotation_table_sha256": "7" * 64,
+            "source_kind": words.source_kind,
+            "source_label": words.source_label,
+        }
+    }
+    assert _work(backend) == 1
+    served = client.get(route, params={**body, "managers_word": "true"})
+    assert served.status_code == 200, served.text
+    payload = served.json()["payload"]
+    assert payload["evidence"]["kind"] == "managers_word"
+    assert STARTING_ELEVEN[-1] not in {p["player_id"] for p in payload["starting_xi"]}
+    # With the word and a setting together there are no counts here: refused by name.
+    both = client.post(route, json={**body, "top100_weight": 5})
+    assert both.status_code == 422
+    assert both.json()["error"]["code"] == "TOP100_INPUTS_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("chip", [None, "bboost"])
+def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not_served(
+    running: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    chip: str | None,
+) -> None:
+    """The jobs endpoint is public: it names the outcome and carries none of the solver's text."""
+
+    from squadopt.application.advice_menu import PLAN_NOT_FOUND_ERRORS
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    diagnostic = "deterministic time used was 12.0, relative gap was 0.31"
+
+    def no_plan(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise PLAN_NOT_FOUND_ERRORS[1](diagnostic)
+
+    monkeypatch.setattr(worker_module, "advise_menu_entry", no_plan)
+    accepted = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, **({"chip": chip} if chip else {})},
+    )
+    assert accepted.status_code == 202, accepted.text
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert job is not None and job.status == "failed"
+    assert job.error is not None and job.error.code == "PLAN_NOT_FOUND"
+    assert "deterministic" not in job.error.message and "gap" not in job.error.message
+    served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
+    assert served.json()["error_code"] == "PLAN_NOT_FOUND"
+    assert "deterministic" not in served.text
+
+
+def test_chip_entry_error_is_private_through_the_real_menu_branch(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    import squadopt.application.advice_menu as menu
+    from squadopt.platform.advice_observability import AdviceLog
+
+    diagnostic = "Entry 987654 re-adds to 123.456 points but planner counted 234.567"
+
+    def fail(*args: Any, **kwargs: Any) -> Any:
+        raise EntryError(diagnostic)
+
+    monkeypatch.setattr(menu, "advise_with_chip", fail)
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 202, response.text
+    logger = logging.getLogger("test.chip-refusal")
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        job = run_advice_worker_once(
+            backend.queue,
+            backend.cache,
+            build_advice_compute(backend.contexts, backend.job_specs),
+            at_utc=_now_stamp(),
+            log=AdviceLog("worker", logger=logger),
+        )
+    assert job is not None and job.status == "failed"
+    served = client.get(f"/api/v1/advice-jobs/{job.job_id}")
+    assert served.json()["error_code"] == "PLAN_NOT_FOUND"
+    for detail in ("987654", "re-adds", "123.456", "234.567"):
+        assert detail not in served.text
+    assert diagnostic in caplog.text
+
+
+def test_accepted_chip_with_artifacts_does_not_prepare_a_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = _deployment(tmp_path, monkeypatch, artifact_root=tmp_path / "artifacts")
+    backend = state["backend"]
+    client = TestClient(app_for_backend(backend))
+    response = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
+    )
+    assert response.status_code == 202, response.text
+    assert backend.contexts._context is None

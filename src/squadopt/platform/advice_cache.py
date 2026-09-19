@@ -29,6 +29,7 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final, Protocol
 
@@ -60,6 +61,7 @@ def advice_cache_key(
     configuration_fingerprint: str,
     rival_entry_id: int | None = None,
     strategy_uses_rival: bool = False,
+    switches: Mapping[str, Mapping[str, str | int | bool | None]] | None = None,
 ) -> str:
     """The complete address of one advice answer, as a SHA-256 digest.
 
@@ -68,6 +70,13 @@ def advice_cache_key(
     before hashing, so the ignored parameter cannot split the cache. When the strategy
     uses one, the rival is part of the identity and ``None`` means the server's own
     default choice.
+
+    ``switches`` is the switched-on part of a request: one entry per switch that is on,
+    holding its value and the identity of the per-capture input it is computed from
+    (``advice_switches.switch_identity``). With every switch off it is empty and the
+    field is **left out of the hashed document**, so a plain request's key is the key it
+    has always had and nothing already cached or queued is orphaned. A further switch
+    is one more entry in the same mapping, never a new parameter here.
     """
 
     for label, value in (
@@ -95,7 +104,19 @@ def advice_cache_key(
         or rival_entry_id < 1
     ):
         raise AdviceCacheError("rival_entry_id must be None or a positive integer.")
-    payload = {
+    switched: dict[str, dict[str, str | int | bool | None]] = {}
+    for name, identity in (switches or {}).items():
+        if not isinstance(name, str) or not name.strip() or not isinstance(identity, Mapping):
+            raise AdviceCacheError("A switch must be a name mapped to its identity.")
+        if not identity:
+            raise AdviceCacheError(f"Switch {name!r} carries no identity; leave it out when off.")
+        for part, scalar in identity.items():
+            if not isinstance(part, str) or (
+                scalar is not None and not isinstance(scalar, str | int | bool)
+            ):
+                raise AdviceCacheError(f"Switch {name!r} identity must hold JSON scalars only.")
+        switched[name] = dict(identity)
+    payload: dict[str, object] = {
         "cache_contract_version": ADVICE_CACHE_CONTRACT_VERSION,
         "advice_contract_version": advice_contract_version,
         "capture_snapshot_id": capture_snapshot_id,
@@ -110,6 +131,8 @@ def advice_cache_key(
         "repository_commit": repository_commit,
         "configuration_fingerprint": configuration_fingerprint,
     }
+    if switched:
+        payload["switches"] = switched
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import indexFixture from "../public/data/index.json" with { type: "json" };
 import { installLeagueMocks } from "./leagueMocks";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
@@ -11,15 +12,14 @@ const PAGES = [
   { heading: "Rakip Analizi", path: "/rivals" },
   { heading: "Lig Analizi", path: "/league" },
   { heading: "Analiz Merkezi", path: "/analysis" },
+  { heading: "Yönetim", path: "/admin" },
 ] as const;
 
 test.beforeEach(async ({ page }) => {
   await installLeagueMocks(page);
 });
 
-test("visitor navigation reaches league entry and analysis without browser errors", async ({
-  page,
-}) => {
+test("visitor navigation reaches league entry without browser errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
@@ -27,19 +27,44 @@ test("visitor navigation reaches league entry and analysis without browser error
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto("/");
-  for (const destination of [
-    { link: "Lig", heading: "Ligini bul", path: "/" },
-    { link: "Analiz", heading: "Analiz Merkezi", path: "/analysis" },
-  ]) {
-    await page.getByRole("link", { name: destination.link, exact: true }).click();
-    await expect(page).toHaveURL(destination.path);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
-  }
+  await page.getByRole("link", { name: "Lig", exact: true }).click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
 
   expect(errors).toEqual([]);
 });
 
 for (const language of ["tr", "en"] as const) {
+  test(`the unlisted ${language} admin page links to analysis without fetching system data`, async ({
+    page,
+  }) => {
+    await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
+    const systemDataRequests: string[] = [];
+    page.on("request", (request) => {
+      // The shell's fixture list is the game's schedule, not a view of the system squad.
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith("/data/") && path !== "/data/fixtures.json") {
+        systemDataRequests.push(request.url());
+      }
+    });
+
+    await page.goto("/admin");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      language === "tr" ? "Yönetim" : "Admin",
+    );
+    await expect(page.locator('header a[href="/admin"], footer a[href="/admin"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/league"]')).toHaveCount(0);
+    expect(systemDataRequests).toEqual([]);
+
+    await page
+      .getByRole("link", { name: language === "tr" ? "Ölçüm arşivi" : "Measurement archive" })
+      .click();
+    await expect(page).toHaveURL("/analysis");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      language === "tr" ? "Analiz Merkezi" : "Analysis Center",
+    );
+  });
+
   test(`a cold ${language} visitor finds the published member list without system-squad links`, async ({
     page,
   }) => {
@@ -81,7 +106,7 @@ for (const language of ["tr", "en"] as const) {
       await page
         .locator("header nav a, footer a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/analysis", "/status"]);
+    ).toEqual(["/", "/status"]);
     await expect(
       page.locator(
         'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
@@ -147,8 +172,12 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   for (const destination of [
     { heading: "Lig Üyeleri", path: "/league/members" },
     { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
-    { heading: "Oyun haftası 1", path: "/league/members/squadopt" },
-  ] as const) {
+    // The virtual member shows the week the shipped index names.
+    {
+      heading: `Oyun haftası ${indexFixture.payload.latest.gameweek}`,
+      path: "/league/members/squadopt",
+    },
+  ]) {
     await page.goto(destination.path);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
     const dimensions = await page.evaluate(() => ({

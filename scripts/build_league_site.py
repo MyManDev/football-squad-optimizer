@@ -146,6 +146,27 @@ def main() -> int:
         help="publish without recording what was published; a week built this way can "
         "never be reviewed",
     )
+    parser.add_argument(
+        "--rotation-evidence",
+        type=Path,
+        help="this week's rotation evidence table (rotation_evidence_v2 csv, its manifest "
+        "beside it); with --club-news-source, the manager's word is solved for every "
+        "member as a switchable, priced constraint",
+    )
+    parser.add_argument(
+        "--club-news-source",
+        type=Path,
+        help="what the evidence was coded from: the committed fixture file (example data, "
+        "labelled as such) or a club-news capture directory under the snapshot root",
+    )
+    parser.add_argument(
+        "--top100-evidence",
+        type=Path,
+        help="this week's Top 100 evidence export (player_evidence_v1 csv, its manifest "
+        "beside it); every member then gets the Top 100 influence menu, priced against "
+        "their own pure-points plan. Refused, with the reason in the index, when the "
+        "handoff already carries the uplift or the export fails the handoff's own gate",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
     if arguments.workers < 1:
@@ -167,6 +188,9 @@ def main() -> int:
             record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
             history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
+            rotation_evidence=arguments.rotation_evidence,
+            club_news_source=arguments.club_news_source,
+            top100_evidence=arguments.top100_evidence,
         )
         prepared = prepare_league_publication(request)
         _capture_note(prepared)
@@ -192,6 +216,8 @@ def main() -> int:
         # would serve a finished gameweek's advice under this week's league.
         for path in report.removed:
             print(f"  removed       {path}  (not produced by this run)")
+        if result.top100_note:
+            print(f"  top100        {result.top100_note}")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(
@@ -208,8 +234,8 @@ def main() -> int:
             "  This is one capture rebuilt into different advice, not a second publish and "
             "not a re-run at a later minute: a publish from a fresh capture writes its own "
             "record, and a re-publish of this one that says the same thing is a replay. "
-            "Both are accepted. So the difference above came from our own code, and it is "
-            "worth a minute before "
+            "Both are accepted. Check the capture, rotation table, Top 100 export and code "
+            "revision for changes before "
             "the deadline. If the deadline will not wait, re-run with --no-advice-record "
             "(scripts.publish_gameweek_site takes the same flag and passes it through): the "
             "recorded capture is kept as it stands and the difference above is what to "

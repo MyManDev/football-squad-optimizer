@@ -24,9 +24,15 @@ from typing import Any, Final
 
 import jsonschema
 
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
+LEAGUE_CAPABILITIES_CONTRACT_VERSION: Final = "league_capabilities_v1"
 ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
 LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.schema.json"
+LEAGUE_CAPABILITIES_SCHEMA_PATH: Final = (
+    Path("docs") / "contracts" / "league_capabilities_v1.schema.json"
+)
 
 
 class AdviceDocumentError(ValueError):
@@ -95,6 +101,100 @@ def advice_read_schema() -> dict[str, Any]:
             "control_solver_status": {"type": ["string", "null"]},
             "optimality_gap": nullable_number,
             "control_optimality_gap": nullable_number,
+            # The manager's word as it entered this plan: present on the switched-on
+            # document only. The words are the source's, cut from captured bytes; the
+            # category is the model's; the role is the declared rule's. No probability.
+            "evidence": {
+                "type": "object",
+                "properties": {
+                    "kind": {"const": "managers_word"},
+                    "rule_version": {"type": "string"},
+                    "source_kind": {"type": "string"},
+                    "source_label": {"type": "string"},
+                    "evidence_table": {"type": "string"},
+                    "clubs_covered": {"type": "array", "items": {"type": "string"}},
+                    "binding": {"type": "boolean"},
+                    "applied": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "player_id": {"type": "integer", "minimum": 1},
+                                "name": {"type": ["string", "null"]},
+                                "disposition": {"type": "string"},
+                                "role": {"enum": ["not_starting", "not_captain", None]},
+                                "speaker": {"type": ["string", "null"]},
+                                "published_at_utc": {"type": ["string", "null"]},
+                                "published_precision": {"type": ["string", "null"]},
+                                "club": {"type": ["string", "null"]},
+                                "source_url": {"type": ["string", "null"]},
+                                "fetched_at_utc": {"type": ["string", "null"]},
+                                "words": {"type": ["string", "null"]},
+                                "words_status": {
+                                    "enum": ["shown", "unresolved", "withheld_figure"]
+                                },
+                            },
+                            "required": ["player_id", "disposition", "role", "words"],
+                        },
+                    },
+                },
+                "required": ["kind", "source_kind", "clubs_covered", "applied"],
+            },
+            # The Top 100 influence a weighted document was chosen under. The weight is a
+            # setting, not a share; every expected-points number in the document is the
+            # base model's.
+            "top100": {
+                "type": "object",
+                "properties": {
+                    "weight": {"enum": [5, 10, 20, 30, 40, 50]},
+                    "changed": {"type": "boolean"},
+                    "price_basis": {"const": "base_model_pure_points_v1"},
+                    "cohort_snapshot_id": {"type": "string"},
+                    "picks_snapshot_id": {"type": "string"},
+                    "table_sha256": {"type": "string"},
+                    "picks_gameweek": {"type": "integer", "minimum": 1},
+                },
+                "required": ["weight", "changed", "price_basis"],
+            },
+            # A chip the member chose to play: the chip, the chip week's expected points
+            # above the member's own no-chip plan net of hits, and the chip's windows as
+            # the member stands before this gameweek. One gameweek's difference, never a
+            # reading of when the chip is best played.
+            "chip_choice": {
+                "type": "object",
+                "properties": {
+                    "chip": {"enum": ["bboost", "3xc", "wildcard", "freehit"]},
+                    "gain_vs_no_chip": {"type": "number"},
+                    "basis": {"const": "one_week_expected_points_v1"},
+                    "windows_left": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "anyOf": [
+                                {"type": "null"},
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "state": {
+                                            "enum": [
+                                                "used",
+                                                "expired",
+                                                "not_yet",
+                                                "available",
+                                                "unknown",
+                                            ]
+                                        },
+                                        "gameweek": {"type": ["integer", "null"]},
+                                        "start_event": {"type": "integer", "minimum": 1},
+                                        "stop_event": {"type": "integer", "minimum": 1},
+                                    },
+                                    "required": ["state", "start_event", "stop_event"],
+                                },
+                            ]
+                        },
+                    },
+                },
+                "required": ["chip", "gain_vs_no_chip", "basis"],
+            },
             "expected_own_points": nullable_number,
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
@@ -133,7 +233,7 @@ def advice_read_schema() -> dict[str, Any]:
         "title": "SquadOpt served advice document",
         "type": "object",
         "properties": {
-            "contract_version": {"type": "string", "const": "provisional_league_ui_v1"},
+            "contract_version": {"type": "string", "const": LEAGUE_VIEW_CONTRACT_VERSION},
             "generated_at_utc": {"type": "string", "pattern": "Z$"},
             "source_kind": {"enum": ["live", "example"]},
             "payload": {
@@ -157,7 +257,13 @@ def advice_read_schema() -> dict[str, Any]:
                                 # not be measured; the row still names the swap.
                                 "expected_points_delta": nullable_number,
                                 "reason_code": {
-                                    "enum": ["window_value", "mode_tradeoff", "points_gain"]
+                                    "enum": [
+                                        "window_value",
+                                        "mode_tradeoff",
+                                        "points_gain",
+                                        "manager_word",
+                                        "top100_preference",
+                                    ]
                                 },
                             },
                             "required": [
@@ -214,8 +320,103 @@ def league_state_schema() -> dict[str, Any]:
     }
 
 
+def league_capabilities_schema() -> dict[str, Any]:
+    """The strict shape of what may be asked for a league right now.
+
+    A page reads this before it enables a control: the strategies and their windows are
+    the deployment's, and each switch is ``available`` only while the current capture has
+    the input it is computed from. ``weights`` are the Top 100 settings that would be
+    accepted now, so zero (off) is always among them.
+    """
+
+    flag = {
+        "type": "object",
+        "properties": {"available": {"type": "boolean"}},
+        "required": ["available"],
+        "additionalProperties": False,
+    }
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://squadopt.dev/contracts/league_capabilities_v1.schema.json",
+        "title": "SquadOpt league advice capabilities",
+        "type": "object",
+        "properties": {
+            "contract_version": {
+                "type": "string",
+                "const": LEAGUE_CAPABILITIES_CONTRACT_VERSION,
+            },
+            "league_id": {"type": "integer", "minimum": 1},
+            "capture_snapshot_id": {"type": "string", "minLength": 1},
+            "season": {"type": "string", "minLength": 1},
+            "gameweek": {"type": "integer", "minimum": 1},
+            "strategies": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "windows": {
+                            "type": "array",
+                            "items": {"type": "integer", "enum": [1, 3, 5]},
+                            "uniqueItems": True,
+                        },
+                        "requires_rival": {"type": "boolean"},
+                    },
+                    "required": ["windows", "requires_rival"],
+                    "additionalProperties": False,
+                },
+            },
+            "top100": {
+                "type": "object",
+                "properties": {
+                    "available": {"type": "boolean"},
+                    "weights": {
+                        "type": "array",
+                        "items": {"type": "integer", "minimum": 0, "maximum": 100},
+                        "uniqueItems": True,
+                    },
+                },
+                "required": ["available", "weights"],
+                "additionalProperties": False,
+            },
+            "managers_word": flag,
+            "chips": {
+                "type": "object",
+                "properties": {
+                    "held_by_entry": {
+                        "type": "object",
+                        "patternProperties": {
+                            "^[1-9][0-9]*$": {
+                                "type": "array",
+                                "items": {"enum": ["wildcard", "freehit", "bboost", "3xc"]},
+                                "uniqueItems": True,
+                            }
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["held_by_entry"],
+                "additionalProperties": False,
+            },
+        },
+        "required": [
+            "contract_version",
+            "league_id",
+            "capture_snapshot_id",
+            "season",
+            "gameweek",
+            "strategies",
+            "top100",
+            "managers_word",
+        ],
+        "additionalProperties": False,
+    }
+
+
 _ADVICE_VALIDATOR: Final = jsonschema.Draft202012Validator(advice_read_schema())
 _LEAGUE_STATE_VALIDATOR: Final = jsonschema.Draft202012Validator(league_state_schema())
+_LEAGUE_CAPABILITIES_VALIDATOR: Final = jsonschema.Draft202012Validator(
+    league_capabilities_schema()
+)
 
 
 def validate_advice_document(raw: bytes) -> None:
@@ -249,12 +450,21 @@ def validate_league_state(document: dict[str, object]) -> None:
         raise AdviceDocumentError(f"The league state violates league_state_v1: {errors[0].message}")
 
 
-def write_public_read_schemas() -> tuple[Path, Path]:
-    """Commit both schemas, the same way the other wire contracts are committed."""
+def validate_league_capabilities(document: dict[str, object]) -> None:
+    errors = sorted(_LEAGUE_CAPABILITIES_VALIDATOR.iter_errors(document), key=str)
+    if errors:
+        raise AdviceDocumentError(
+            f"The capabilities violate league_capabilities_v1: {errors[0].message}"
+        )
+
+
+def write_public_read_schemas() -> tuple[Path, ...]:
+    """Commit the read schemas, the same way the other wire contracts are committed."""
 
     for path, schema in (
         (ADVICE_READ_SCHEMA_PATH, advice_read_schema()),
         (LEAGUE_STATE_SCHEMA_PATH, league_state_schema()),
+        (LEAGUE_CAPABILITIES_SCHEMA_PATH, league_capabilities_schema()),
     ):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -262,4 +472,4 @@ def write_public_read_schemas() -> tuple[Path, Path]:
             encoding="utf-8",
             newline="\n",
         )
-    return ADVICE_READ_SCHEMA_PATH, LEAGUE_STATE_SCHEMA_PATH
+    return ADVICE_READ_SCHEMA_PATH, LEAGUE_STATE_SCHEMA_PATH, LEAGUE_CAPABILITIES_SCHEMA_PATH

@@ -46,6 +46,42 @@ class WeekError(RuntimeError):
     """A step refused; the message says which and why."""
 
 
+def _require_capture_name(value: str) -> None:
+    """Refuse a club-news capture that is not a capture name.
+
+    The runner joins this value onto the snapshot root and hands the result to the journal,
+    which walks the directory and digests every file it finds. A snapshot identifier is a
+    single directory name by construction (``build_snapshot_id`` composes source, stamp and
+    digest), so anything that is not one directory name is a typo rather than a request, and
+    the shapes it takes are not harmless: ``../../..`` resolves clean out of the repository,
+    and an empty string silently becomes the snapshot root itself, which would digest every
+    capture we hold.
+
+    The rule is stated as "one directory name" rather than as the identifier's own format,
+    because the format belongs to ``snapshots`` and a new source name must not have to come
+    back and change this refusal too.
+
+    Both separators are named explicitly rather than left to ``Path``. A backslash is a
+    separator on Windows and an ordinary filename character on Linux, so ``Path(value).name``
+    alone refuses ``nested\\name`` on the operator's machine and accepts it in CI. A refusal
+    that depends on where it runs is not a refusal, and this runner is meant to execute on
+    either.
+    """
+
+    if not value or value.strip() != value:
+        raise WeekError(
+            "A club-news capture name must not be empty or padded with spaces. An empty name "
+            "reads as the snapshot root, which is every capture we hold rather than the one "
+            "the week was read from."
+        )
+    if value in {".", ".."} or "/" in value or "\\" in value or Path(value).name != value:
+        raise WeekError(
+            f"A club-news capture must be named by its own directory name, not by a path: "
+            f"{value!r}. The runner joins this onto the snapshot root, so a separator or a "
+            "parent reference points the week's evidence somewhere that is not a capture."
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class WeekPlan:
     """What one run will do, decided before anything runs."""
@@ -79,12 +115,23 @@ class WeeklyRequest:
     rotation: bool = False
     workers: int = 8
     publish: bool = False
+    #: A club-news capture to export the rotation evidence from. ``None`` keeps the committed
+    #: synthetic fixture, which is what every run did before an acquisition command existed.
+    rotation_capture: str | None = None
 
     def plan(self) -> WeekPlan:
         if self.workers < 1 or self.league_id < 1:
             raise WeekError("League id and worker count must be positive.")
         if self.projection not in {"component", "component-only"}:
             raise WeekError("Unknown weekly projection selection.")
+        if self.rotation_capture is not None and not self.rotation:
+            raise WeekError(
+                "A club-news capture was named without --rotation, so the stage that would "
+                "read it is not in this week's plan. Naming a source for a step nobody asked "
+                "for is the kind of silence that looks like a run and is not one."
+            )
+        if self.rotation_capture is not None:
+            _require_capture_name(self.rotation_capture)
         return plan_week(
             season=self.season,
             gameweek=self.gameweek,
@@ -238,6 +285,23 @@ def evidence_artifact(
 
     name = f"player_evidence_v1_{season}_gw{gameweek:02d}_top100_{elite_snapshot[-12:]}"
     return root / f"{name}.csv", root / f"{name}.manifest.json"
+
+
+def rotation_source_capture(decision_snapshot: str, club_news_snapshot: str | None) -> str:
+    """Which capture names the week's rotation artifact.
+
+    The export names its file after the capture the *claims* came from, because that is what
+    a second run within one week actually changes. Read from a club-news capture that is the
+    club-news capture; read from the fixture the claims are fixed, so the decision capture is
+    what varies and names it instead.
+
+    It is a function rather than an ``or`` at the call site because the weekly stage has to
+    agree with ``rotation_export._artifact_name`` exactly -- the stage computes the pair's
+    path before the export runs, to reuse one already on disk, and a disagreement would not
+    fail, it would quietly stop finding anything.
+    """
+
+    return club_news_snapshot or decision_snapshot
 
 
 def rotation_artifact(

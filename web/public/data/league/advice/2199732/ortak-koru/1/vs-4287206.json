@@ -1,68 +1,50 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 4,
+    "gameweek": 5,
     "entry_id": 2199732,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
-        "move_id": "gw04-1",
+        "move_id": "gw05-1",
         "player_out": {
-          "player_id": 60307,
-          "name": "Pascal Gro\u00df",
-          "short_name": "Gro\u00df",
-          "position": "MID",
-          "team": "Brighton"
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
+          "position": "DEF",
+          "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 244851,
-          "name": "Cole Palmer",
-          "short_name": "Palmer",
-          "position": "MID",
-          "team": "Chelsea"
+          "player_id": 455084,
+          "name": "Leif Davis",
+          "short_name": "Davis",
+          "position": "DEF",
+          "team": "Ipswich Town"
         },
-        "expected_points_delta": 2.2874615540519985,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw04-2",
-        "player_out": {
-          "player_id": 141746,
-          "name": "Bruno Borges Fernandes",
-          "short_name": "Fernandes",
-          "position": "MID",
-          "team": "Man Utd"
-        },
-        "player_in": {
-          "player_id": 446008,
-          "name": "Bryan Mbeumo",
-          "short_name": "Mbeumo",
-          "position": "MID",
-          "team": "Man Utd"
-        },
-        "expected_points_delta": -2.13135336831371,
+        "expected_points_delta": 0.0,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.7541305561930045,
+    "expected_gain_vs_hold": 0.0,
+    "expected_points_cost": 0.6829605523987681,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.253418964536976,
+    "expected_own_points": 56.43037206683505,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.360382282553875
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
       "player_id": 244851,
@@ -70,7 +52,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.626690076810005
+      "expected_points": 5.199892083433812
     },
     "starting_xi": [
       {
@@ -79,7 +61,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.450579897041415
+        "expected_points": 3.8238320826783507
       },
       {
         "player_id": 209036,
@@ -87,15 +69,7 @@
         "short_name": "Gu\u00e9hi",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 3.721627814273059
-      },
-      {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.6111564244775165
+        "expected_points": 3.9344555474592307
       },
       {
         "player_id": 465730,
@@ -103,7 +77,15 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.237246793437091
+        "expected_points": 3.5539951801294207
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.54054506392718
       },
       {
         "player_id": 244851,
@@ -111,15 +93,23 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.626690076810005
+        "expected_points": 5.199892083433812
       },
       {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
         "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.934679467666494
+        "team": "Chelsea",
+        "expected_points": 4.414905789016978
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 424876,
@@ -127,23 +117,7 @@
         "short_name": "Szoboszlai",
         "position": "MID",
         "team": "Liverpool",
-        "expected_points": 4.232677554424536
-      },
-      {
-        "player_id": 484420,
-        "name": "Enzo Le F\u00e9e",
-        "short_name": "F\u00e9e",
-        "position": "MID",
-        "team": "Sunderland",
-        "expected_points": 3.4728706842808976
-      },
-      {
-        "player_id": 440993,
-        "name": "Iliman Ndiaye",
-        "short_name": "Ndiaye",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.436160025237239
+        "expected_points": 3.7460561434034036
       },
       {
         "player_id": 223094,
@@ -151,7 +125,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.360382282553875
+        "expected_points": 8.417342366821867
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
       },
       {
         "player_id": 475168,
@@ -159,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.8089656617809755
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -172,12 +154,20 @@
         "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 177815,
-        "name": "Dominic Calvert-Lewin",
-        "short_name": "Calvert-Lewin",
-        "position": "FWD",
-        "team": "Leeds",
-        "expected_points": 3.3708129722259215
+        "player_id": 440993,
+        "name": "Iliman Ndiaye",
+        "short_name": "Ndiaye",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 3.2743887399448766
+      },
+      {
+        "player_id": 455084,
+        "name": "Leif Davis",
+        "short_name": "Davis",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.7566531047175307
       },
       {
         "player_id": 219924,
@@ -185,38 +175,33 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.166625794419491
-      },
-      {
-        "player_id": 199798,
-        "name": "Ezri Konsa Ngoyo",
-        "short_name": "Ngoyo",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 1.1462964306360883
+        "expected_points": 2.1138840416046176
       }
     ],
     "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
     "data_quality": "partial",
     "missing_fields": [
       "purchase_prices"
     ],
     "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 0.7541305561930045,
-    "overlap_count": 6,
-    "transfer_cap": 2,
+    "expected_points_cost_ceiling": 0.6829605523987681,
+    "overlap_count": 7,
+    "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 6,
+    "overlap_applied": 7,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 12.0,
-      "expected_points_cost": 13.030998546365339,
-      "expected_points_cost_ceiling": 13.030998546365339
+      "transfer_hit_points": 8.0,
+      "expected_points_cost": 8.605030753689391,
+      "expected_points_cost_ceiling": 8.605030753689391
     },
-    "expected_gap_vs_rival": 5.944635253495065,
+    "expected_gap_vs_rival": 6.319094822337725,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

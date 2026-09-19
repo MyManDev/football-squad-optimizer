@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 4,
+    "gameweek": 5,
     "entry_id": 8548384,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "moves": [
       {
-        "move_id": "gw04-1",
+        "move_id": "gw05-1",
         "player_out": {
           "player_id": 209244,
           "name": "Phil Foden",
@@ -27,31 +27,51 @@
           "position": "MID",
           "team": "Sunderland"
         },
-        "expected_points_delta": 0.12725898607606956,
+        "expected_points_delta": 2.174721610637576,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 470313,
+          "name": "Nick Woltemade",
+          "short_name": "Woltemade",
+          "position": "FWD",
+          "team": "Newcastle"
+        },
+        "player_in": {
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
+          "position": "FWD",
+          "team": "Leeds"
+        },
+        "expected_points_delta": 1.1313267896670425,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.7765965804083947,
+    "expected_gain_vs_hold": 3.3060484003046184,
+    "expected_points_cost": 1.6649444782004963,
     "rival_label": "entry-5081114",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.88486086257325,
+    "expected_own_points": 54.73690878190786,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.360382282553875
+      "expected_points": 8.417342366821867
     },
     "vice_captain": {
-      "player_id": 446008,
-      "name": "Bryan Mbeumo",
-      "short_name": "Mbeumo",
-      "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 4.934679467666494
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Magalh\u00e3es",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.472528385131045
     },
     "starting_xi": [
       {
@@ -60,7 +80,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.450579897041415
+        "expected_points": 3.8238320826783507
       },
       {
         "player_id": 226597,
@@ -68,15 +88,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.305863646230902
-      },
-      {
-        "player_id": 97032,
-        "name": "Virgil van Dijk",
-        "short_name": "Dijk",
-        "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 3.666932155533569
+        "expected_points": 4.472528385131045
       },
       {
         "player_id": 477424,
@@ -84,15 +96,15 @@
         "short_name": "Gvardiol",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 3.64230933799311
+        "expected_points": 4.056371668311424
       },
       {
-        "player_id": 445087,
-        "name": "Ronald Araujo",
-        "short_name": "Araujo",
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 2.4227121059294436
+        "expected_points": 3.555548676659022
       },
       {
         "player_id": 446008,
@@ -100,7 +112,7 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.934679467666494
+        "expected_points": 4.415892336727386
       },
       {
         "player_id": 184029,
@@ -108,15 +120,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 4.010137596984558
-      },
-      {
-        "player_id": 484420,
-        "name": "Enzo Le F\u00e9e",
-        "short_name": "F\u00e9e",
-        "position": "MID",
-        "team": "Sunderland",
-        "expected_points": 3.4728706842808976
+        "expected_points": 3.823985942112784
       },
       {
         "player_id": 577725,
@@ -124,7 +128,15 @@
         "short_name": "King",
         "position": "MID",
         "team": "Fulham",
-        "expected_points": 3.449045744024133
+        "expected_points": 3.513475657690736
+      },
+      {
+        "player_id": 484420,
+        "name": "Enzo Le F\u00e9e",
+        "short_name": "F\u00e9e",
+        "position": "MID",
+        "team": "Sunderland",
+        "expected_points": 3.065273184590894
       },
       {
         "player_id": 223094,
@@ -132,7 +144,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.360382282553875
+        "expected_points": 8.417342366821867
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
       },
       {
         "player_id": 475168,
@@ -140,7 +160,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.8089656617809755
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -153,12 +173,20 @@
         "expected_points": 0.10027015579447286
       },
       {
+        "player_id": 445087,
+        "name": "Ronald Araujo",
+        "short_name": "Araujo",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 2.5041926076583985
+      },
+      {
         "player_id": 572584,
         "name": "Abdoul Ouattara",
         "short_name": "Ouattara",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 0.9242137214081952
+        "expected_points": 0.8905515739533116
       },
       {
         "player_id": 108413,
@@ -166,38 +194,33 @@
         "short_name": "Hughes",
         "position": "MID",
         "team": "Crystal Palace",
-        "expected_points": 0.3967341204745354
-      },
-      {
-        "player_id": 470313,
-        "name": "Nick Woltemade",
-        "short_name": "Woltemade",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 0.0
+        "expected_points": 0.6628182574567039
       }
     ],
     "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
     "data_quality": "partial",
     "missing_fields": [
       "purchase_prices"
     ],
     "squad_basis": "captured",
     "rival_entry_id": 5081114,
-    "expected_points_cost_ceiling": 0.7765965804083947,
-    "overlap_count": 4,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 1.6649444782004963,
+    "overlap_count": 5,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 19.97648855717631,
-      "expected_points_cost_ceiling": 19.97648855717631
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 17.804678414217705,
+      "expected_points_cost_ceiling": 17.804678414217705
     },
-    "expected_gap_vs_rival": 3.290293372004811,
+    "expected_gap_vs_rival": 4.507927662919613,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

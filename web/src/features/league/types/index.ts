@@ -196,8 +196,129 @@ export interface AdviceMove {
    * not the same fact as a swap that gains nothing.
    */
   expected_points_delta: number | null;
-  reason_code: "window_value" | "mode_tradeoff" | "points_gain";
+  reason_code:
+    "window_value" | "mode_tradeoff" | "points_gain" | "manager_word" | "top100_preference";
 }
+
+/**
+ * One coded statement from a club's own page, as the producer applied it to this plan:
+ * the category the model coded it into, the role the declared rule gave it, and the
+ * words themselves, cut from the captured bytes by digest and span so the member reads
+ * the source and not a paraphrase. `words` is null when the bytes could not be resolved.
+ */
+export interface AdviceEvidenceItem {
+  player_id: number;
+  name: string | null;
+  disposition: string;
+  role: "not_starting" | "not_captain" | null;
+  speaker: string | null;
+  published_at_utc: string | null;
+  published_precision: string | null;
+  club: string | null;
+  source_url: string | null;
+  fetched_at_utc: string | null;
+  words: string | null;
+  /** `shown`, or why no words are: `unresolved`, or `withheld_figure` (wording the site never publishes). */
+  words_status?: "shown" | "unresolved" | "withheld_figure";
+}
+
+/** The manager's word as it entered a plan: a declared, priced constraint, never a projection input. */
+export interface AdviceEvidence {
+  kind: "managers_word";
+  rule_version: string;
+  /** `synthetic_fixture` is example data and every surface says so; `club_news_capture` is a real read. */
+  source_kind: string;
+  source_label: string;
+  evidence_table: string;
+  clubs_covered: string[];
+  /** Whether the word changed the member's pure-points plan; false means the plan is the control itself. */
+  binding?: boolean;
+  applied: AdviceEvidenceItem[];
+}
+
+/** Whether the producer solved the switched-on plan for a member, and where it is. */
+export type IndexEvidence =
+  | {
+      available: true;
+      path: string;
+      applied_count: number;
+      source_kind: string | null;
+      source_label: string | null;
+      clubs_covered: string[];
+      rule_version: string | null;
+      binding?: boolean;
+    }
+  | { available: false; reason: string };
+
+/**
+ * The Top 100 influence a weighted document was chosen under. Every expected-points
+ * number in the document is the base model's; `changed` says whether the setting moved
+ * the member's pure-points plan.
+ */
+export interface AdviceTop100 {
+  weight: number;
+  changed: boolean;
+  price_basis: string;
+  cohort_snapshot_id?: string;
+  picks_snapshot_id?: string;
+  table_sha256?: string;
+  picks_gameweek?: number;
+}
+
+/** Which Top 100 weights the producer solved for a member, and where, or why none. */
+export type IndexTop100 =
+  | {
+      available: true;
+      published_weight: number;
+      weights: number[];
+      paths: Record<string, string>;
+      word_paths: Record<string, string>;
+      unavailable: { weight: number; word: boolean; reason: string }[];
+      /**
+       * The settings beyond the one-week pure-points plan: pure-points windows, and the
+       * rival strategies against the default rival at every window. Absent before they existed.
+       */
+      documents?: {
+        strategy: string;
+        window: number;
+        rival_entry_id: number | null;
+        weight: number;
+        path: string;
+      }[];
+      source?: Record<string, unknown>;
+    }
+  | { available: false; reason: string };
+
+/**
+ * A chip the member chose to play: which one, what the chip week is expected to score
+ * above the member's own no-chip plan net of hits, how that was measured, and the chip's
+ * windows as the member stands. One gameweek's difference; what the chip would be worth
+ * in a later gameweek is not measured.
+ */
+export interface AdviceChipChoice {
+  chip: AdviceChip;
+  gain_vs_no_chip: number;
+  basis: string;
+  windows_left?: Partial<Record<ChipHalf, ChipWindowState | null>>;
+}
+
+/**
+ * Which chips the producer solved for a member, and where; every chip with no document
+ * and why; and the chips the member can still play this gameweek. Or why there are none.
+ */
+export type IndexChips =
+  | {
+      available: true;
+      paths: Record<string, string>;
+      unavailable: { chip: string; reason: string }[];
+      held: string[];
+    }
+  | {
+      available: false;
+      reason: string;
+      unavailable?: { chip: string; reason: string }[];
+      held?: string[];
+    };
 
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
@@ -215,6 +336,12 @@ export interface EntryAdviceIndex {
   strategies: string[];
   rival_entry_ids: number[];
   default_rival_entry_id: number | null;
+  /** The manager's word for this member: solved and where, or not and why. Absent before it existed. */
+  evidence?: IndexEvidence;
+  /** The Top 100 influence menu for this member. Absent before it existed. */
+  top100?: IndexTop100;
+  /** The chips the member may choose to play this gameweek. Absent before they existed. */
+  chips?: IndexChips;
   /**
    * The declared rule's pick among the three strategies, and the two numbers it read:
    * the member's league points against their default rival (signed, negative when
@@ -236,7 +363,8 @@ export interface EntryAdviceIndex {
     gameweeks_remaining: number;
     band_edge_points: number;
   } | null;
-  computed: { strategy: string; rival_entry_id: number; path: string }[];
+  /** A row without `window` is the one-week file; a rival strategy's longer windows name theirs. */
+  computed: { strategy: string; rival_entry_id: number; window?: WindowSize; path: string }[];
   /**
    * A (strategy, rival) pair with no plan, or — with `rival_entry_id` null and the
    * `window` named — a pure-points window that did not solve, each with its reason.
@@ -321,6 +449,12 @@ export interface EntryAdvice {
   /** The control the price tag anchors on, with its own proof status and bound gap. */
   control_solver_status?: string | null;
   control_optimality_gap?: number | null;
+  /** Present on the switched-on document only; absent on every plan solved without the word. */
+  evidence?: AdviceEvidence;
+  /** Present on a Top 100 weighted document only. */
+  top100?: AdviceTop100;
+  /** Present only on a document solved with a chip the member chose. */
+  chip_choice?: AdviceChipChoice;
   /**
    * The transfer rule the strategy played under: the free transfers it could spend
    * without hits, the overlap it asked for, the overlap it applied, and which of the

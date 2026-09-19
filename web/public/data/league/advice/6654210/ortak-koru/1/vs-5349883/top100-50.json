@@ -1,0 +1,238 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 5,
+    "entry_id": 6654210,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "moves": [
+      {
+        "move_id": "gw05-1",
+        "player_out": {
+          "player_id": 97032,
+          "name": "Virgil van Dijk",
+          "short_name": "Dijk",
+          "position": "DEF",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "expected_points_delta": -0.015003612731845806,
+        "reason_code": "top100_preference"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 439509,
+          "name": "Christos Tzolis",
+          "short_name": "Tzolis",
+          "position": "MID",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 184029,
+          "name": "Martin \u00d8degaard",
+          "short_name": "\u00d8degaard",
+          "position": "MID",
+          "team": "Arsenal"
+        },
+        "expected_points_delta": 0.7538090607319106,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 0.7388054480000648,
+    "expected_points_cost": 1.42268597527071,
+    "rival_label": "entry-5349883",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": null,
+    "expected_own_points": 55.31429088004849,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.417342366821867
+    },
+    "vice_captain": {
+      "player_id": 141746,
+      "name": "Bruno Borges Fernandes",
+      "short_name": "Fernandes",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 6.421694651064867
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.8238320826783507
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.54054506392718
+      },
+      {
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
+        "position": "DEF",
+        "team": "Brentford",
+        "expected_points": 2.780518913256247
+      },
+      {
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
+        "position": "DEF",
+        "team": "Crystal Palace",
+        "expected_points": 2.582386742483201
+      },
+      {
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 6.421694651064867
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.415892336727386
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 4.206689328780451
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 3.823985942112784
+      },
+      {
+        "player_id": 513545,
+        "name": "Mamadou Sangar\u00e9",
+        "short_name": "Sangar\u00e9",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 3.3442643683372464
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.417342366821867
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.539796717037047
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 67089,
+        "name": "Martin Dubravka",
+        "short_name": "Dubravka",
+        "position": "GK",
+        "team": "Spurs",
+        "expected_points": 0.10027015579447286
+      },
+      {
+        "player_id": 95658,
+        "name": "Harry Maguire",
+        "short_name": "Maguire",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 2.4986285568677755
+      },
+      {
+        "player_id": 449429,
+        "name": "Jacob Greaves",
+        "short_name": "Greaves",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 1.8900683591077632
+      },
+      {
+        "player_id": 631786,
+        "name": "Jonah Kusi-Asare",
+        "short_name": "Kusi-Asare",
+        "position": "FWD",
+        "team": "Fulham",
+        "expected_points": 0.1239557013485021
+      }
+    ],
+    "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The plan was chosen with the Top 100 influence at 50; every expected-points number in this document is the base model's, without it."
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "purchase_prices"
+    ],
+    "squad_basis": "captured",
+    "rival_entry_id": 5349883,
+    "expected_points_cost_ceiling": 1.42268597527071,
+    "overlap_count": 5,
+    "transfer_cap": 2,
+    "overlap_target": 9,
+    "overlap_applied": 5,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 18.31319693140297,
+      "expected_points_cost_ceiling": 18.31319693140297
+    },
+    "expected_gap_vs_rival": 6.902287447822509,
+    "captain_agreement": false,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
+    "top100": {
+      "weight": 50,
+      "changed": false,
+      "price_basis": "base_model_pure_points_v1",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
+      "picks_gameweek": 4
+    }
+  }
+}

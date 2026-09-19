@@ -36,6 +36,7 @@ from squadopt.live import (
 from squadopt.live import transfers as live_transfers
 from squadopt.optimization import SolverStatus
 from squadopt.planning import (
+    FirstWeekExclusion,
     FirstWeekOverlap,
     ProjectionHorizon,
     TransferPlanningValidationError,
@@ -360,6 +361,49 @@ def test_concurrent_identical_writers_publish_once_and_replay_the_same_bytes(
     assert outcomes.count(False) == 7
     assert json.loads(destination.read_text(encoding="utf-8")) == document
     assert not list(tmp_path.glob(".plan.json.*.tmp"))
+
+
+def test_the_horizon_path_keeps_excluded_players_out_of_the_eleven_and_the_captaincy(
+    tmp_path: Path,
+) -> None:
+    """The exclusion reaches the solver and does only what it says.
+
+    A player kept out of the eleven is not in it and is not captain; a player kept out
+    of the captaincy only may still start. The squad is not constrained: the solver may
+    keep, bench or sell him. A caller naming no exclusion gets the planner it had.
+    """
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2,))
+    silent, _ = plan_transfer_horizon(inputs, horizon, held, rules)
+    assert silent.diagnostics["first_week_exclusion"] is None
+    week = silent.weeks[0]
+    captain = int(week.captain["player_id"])
+    assert captain in {int(player) for player in week.starting_xi["player_id"]}
+
+    benched, _ = plan_transfer_horizon(
+        inputs,
+        horizon,
+        held,
+        rules,
+        first_week_exclusion=FirstWeekExclusion(not_starting=frozenset({captain})),
+    )
+    starters = {int(player) for player in benched.weeks[0].starting_xi["player_id"]}
+    assert captain not in starters
+    assert int(benched.weeks[0].captain["player_id"]) != captain
+    assert benched.diagnostics["first_week_exclusion"] == {"not_starting": 1, "not_captain": 1}
+
+    uncaptained, _ = plan_transfer_horizon(
+        inputs,
+        horizon,
+        held,
+        rules,
+        first_week_exclusion=FirstWeekExclusion(not_captain=frozenset({captain})),
+    )
+    assert int(uncaptained.weeks[0].captain["player_id"]) != captain
+    assert uncaptained.diagnostics["first_week_exclusion"] == {"not_starting": 0, "not_captain": 1}
+
+    with pytest.raises(TransferPlanningValidationError, match="at least one player"):
+        FirstWeekExclusion()
 
 
 def test_the_horizon_path_passes_a_band_and_a_first_week_cap_to_the_planner(

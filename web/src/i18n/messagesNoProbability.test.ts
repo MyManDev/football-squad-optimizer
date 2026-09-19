@@ -16,6 +16,11 @@
 import { describe, expect, it } from "vitest";
 
 import { AS_A_CHANCE } from "../testSupport/honesty";
+import { CHIP_COPY } from "../features/league/advice/chipCopy";
+import { COMPUTE_COPY } from "../features/league/advice/computeCopy";
+import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
+import { TOP100_COPY } from "../features/league/advice/top100Copy";
+import { FIXTURES_COPY } from "../features/fixtures/fixturesCopy";
 import { MESSAGES, type Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
@@ -71,6 +76,14 @@ function collect(node: unknown, path: string, into: Map<string, string>): void {
 
 const catalogue = new Map<string, string>();
 for (const language of LANGUAGES) collect(MESSAGES[language], language, catalogue);
+// Page-scoped copy kept out of the first visit's bundle is walked as if it were here.
+for (const language of LANGUAGES) {
+  collect(EVIDENCE_COPY[language], `${language}.evidenceCopy`, catalogue);
+  collect(TOP100_COPY[language], `${language}.top100Copy`, catalogue);
+  collect(CHIP_COPY[language], `${language}.chipCopy`, catalogue);
+  collect(COMPUTE_COPY[language], `${language}.computeCopy`, catalogue);
+  collect(FIXTURES_COPY[language], `${language}.fixturesCopy`, catalogue);
+}
 
 describe("every string in both message catalogues", () => {
   it("was actually walked, both languages, strings and called functions alike", () => {
@@ -92,6 +105,35 @@ describe("every string in both message catalogues", () => {
       .filter(([, text]) => AS_A_CHANCE.test(text))
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
+  });
+
+  it("never writes the Top 100 setting as a share, a winner or a gain", () => {
+    const top100 = [...catalogue].filter(([path]) => path.includes(".top100Copy."));
+    expect(top100.length).toBeGreaterThan(40);
+    const offenders = top100
+      .filter(([, text]) =>
+        /per\s?cent|\bbest\b|optimal|likely|uplift|boost|recommended|\/\s*100|önerilen|en iyi|artış|getiri/i.test(
+          text,
+        ),
+      )
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+  });
+
+  it("never words a chosen chip's gain as a recommendation or names a week to play it", () => {
+    const chip = [...catalogue].filter(([path]) => path.includes(".chipCopy."));
+    expect(chip.length).toBeGreaterThan(60);
+    const offenders = chip
+      .filter(([, text]) =>
+        /recommend|\bbest\b|optimal|likely|should play|right week|öner|en iyi|en uygun|oynamalısın/i.test(
+          text,
+        ),
+      )
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    // The one sentence about advice is the denial, in both languages.
+    expect(catalogue.get("en.chipCopy.honesty")).toMatch(/not advice to play it now/);
+    expect(catalogue.get("tr.chipCopy.honesty")).toMatch(/tavsiyesi değildir/);
   });
 
   it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {

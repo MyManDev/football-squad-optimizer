@@ -146,6 +146,73 @@
             "freehit"
           ]
         },
+        "chip_choice": {
+          "properties": {
+            "basis": {
+              "const": "one_week_expected_points_v1"
+            },
+            "chip": {
+              "enum": [
+                "bboost",
+                "3xc",
+                "wildcard",
+                "freehit"
+              ]
+            },
+            "gain_vs_no_chip": {
+              "type": "number"
+            },
+            "windows_left": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "properties": {
+                      "gameweek": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "start_event": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "state": {
+                        "enum": [
+                          "used",
+                          "expired",
+                          "not_yet",
+                          "available",
+                          "unknown"
+                        ]
+                      },
+                      "stop_event": {
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "start_event",
+                      "stop_event"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "chip",
+            "gain_vs_no_chip",
+            "basis"
+          ],
+          "type": "object"
+        },
         "control_optimality_gap": {
           "type": [
             "number",
@@ -168,6 +235,124 @@
         "entry_id": {
           "minimum": 1,
           "type": "integer"
+        },
+        "evidence": {
+          "properties": {
+            "applied": {
+              "items": {
+                "properties": {
+                  "club": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "disposition": {
+                    "type": "string"
+                  },
+                  "fetched_at_utc": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "published_at_utc": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "published_precision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "enum": [
+                      "not_starting",
+                      "not_captain",
+                      null
+                    ]
+                  },
+                  "source_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "speaker": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "words": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "words_status": {
+                    "enum": [
+                      "shown",
+                      "unresolved",
+                      "withheld_figure"
+                    ]
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "disposition",
+                  "role",
+                  "words"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "binding": {
+              "type": "boolean"
+            },
+            "clubs_covered": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "evidence_table": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "managers_word"
+            },
+            "rule_version": {
+              "type": "string"
+            },
+            "source_kind": {
+              "type": "string"
+            },
+            "source_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_kind",
+            "clubs_covered",
+            "applied"
+          ],
+          "type": "object"
         },
         "expected_gain_vs_hold": {
           "type": [
@@ -309,7 +494,9 @@
                 "enum": [
                   "window_value",
                   "mode_tradeoff",
-                  "points_gain"
+                  "points_gain",
+                  "manager_word",
+                  "top100_preference"
                 ]
               }
             },
@@ -549,6 +736,45 @@
             "array",
             "null"
           ]
+        },
+        "top100": {
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "cohort_snapshot_id": {
+              "type": "string"
+            },
+            "picks_gameweek": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "picks_snapshot_id": {
+              "type": "string"
+            },
+            "price_basis": {
+              "const": "base_model_pure_points_v1"
+            },
+            "table_sha256": {
+              "type": "string"
+            },
+            "weight": {
+              "enum": [
+                5,
+                10,
+                20,
+                30,
+                40,
+                50
+              ]
+            }
+          },
+          "required": [
+            "weight",
+            "changed",
+            "price_basis"
+          ],
+          "type": "object"
         },
         "transfer_cap": {
           "type": "number"

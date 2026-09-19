@@ -51,7 +51,13 @@ const move: Predicate = (value) =>
     player_out: nullable(player),
     player_in: nullable(player),
     expected_points_delta: nullable(finite),
-    reason_code: oneOf("window_value", "mode_tradeoff", "points_gain"),
+    reason_code: oneOf(
+      "window_value",
+      "mode_tradeoff",
+      "points_gain",
+      "manager_word",
+      "top100_preference",
+    ),
   });
 const planWeek: Predicate = (value) =>
   fields(value, {
@@ -74,6 +80,41 @@ const alternative: Predicate = (value) =>
       expected_points_cost: finite,
     },
     { expected_points_cost_ceiling: finite },
+  );
+
+const evidence: Predicate = (value) =>
+  fields(value, {
+    kind: oneOf("managers_word"),
+    source_kind: text,
+    clubs_covered: array(text),
+    applied: array(record),
+  });
+
+const top100: Predicate = (value) =>
+  fields(
+    value,
+    {
+      weight: oneOf(5, 10, 20, 30, 40, 50),
+      changed: oneOf(true, false),
+      price_basis: text,
+    },
+    {
+      cohort_snapshot_id: text,
+      picks_snapshot_id: text,
+      table_sha256: text,
+      picks_gameweek: identity,
+    },
+  );
+
+const chipChoice: Predicate = (value) =>
+  fields(
+    value,
+    {
+      chip: oneOf("bboost", "3xc", "wildcard", "freehit"),
+      gain_vs_no_chip: finite,
+      basis: text,
+    },
+    { windows_left: record },
   );
 
 export function isAdvicePayload(value: unknown): boolean {
@@ -108,6 +149,9 @@ export function isAdvicePayload(value: unknown): boolean {
       control_solver_status: nullable(text),
       optimality_gap: nullable(finite),
       control_optimality_gap: nullable(finite),
+      evidence,
+      top100,
+      chip_choice: chipChoice,
       expected_own_points: nullable(finite),
       captain: nullable(player),
       vice_captain: nullable(player),

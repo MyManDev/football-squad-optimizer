@@ -402,7 +402,8 @@ def _ledger_entry(gameweek: int, squad: list[int], *, chip: str | None, bank: in
 def _held_from_ledger(
     monkeypatch: pytest.MonkeyPatch, entries: tuple[LedgerEntry, ...], *, before: int
 ) -> Any:
-    monkeypatch.setattr(ledger, "load_ledger", lambda root, season: entries)
+    # The walk asks for rolls too (include_rolls=True); the double takes what it is asked.
+    monkeypatch.setattr(ledger, "load_ledger", lambda root, season, **_: entries)
     return ledger.held_squad_from_ledger(
         Path("recorded"), "2026-27", before_gameweek=before, budget_tenths=1000
     )

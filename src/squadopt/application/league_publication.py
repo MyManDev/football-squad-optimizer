@@ -19,7 +19,13 @@ from squadopt.application.league_views import (
     MemberStanding,
     build_league_views,
 )
+from squadopt.application.manager_words import ManagerWords, load_manager_words
 from squadopt.application.mode_selection import build_mode_paths
+from squadopt.application.top100_weight import (
+    Top100Counts,
+    Top100InputsRefused,
+    load_top100_counts,
+)
 from squadopt.application.weekly_suggestion_eval import (
     SUPPORTED_LEAGUE_ID,
     publish_suggestion_histories,
@@ -30,11 +36,13 @@ from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     EntryGameweekPoints,
     fpl_entry_history_points,
+    fpl_league_name,
     fpl_league_standings,
     scored_gameweeks,
 )
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
+    Projection,
     RecommendationInputs,
     load_residual_history,
     project,
@@ -61,6 +69,16 @@ class LeaguePublicationRequest:
     rival_menu: bool = True
     now: datetime | None = None
     history_record_root: Path | None = None
+    #: The week's rotation evidence table (its manifest beside it) and the club-news
+    #: source it was coded from: the fixture file, or a capture directory. Both or
+    #: neither; one without the other is refused, because words without their evidence
+    #: are a paraphrase and evidence without its words is a claim nobody can read.
+    rotation_evidence: Path | None = None
+    club_news_source: Path | None = None
+    #: The week's Top 100 evidence export (``player_evidence_v1`` csv, its manifest
+    #: beside it). With it, every member gets the Top 100 influence menu; a table the
+    #: handoff's own gate refuses turns the menu off with the reason, never the publish.
+    top100_evidence: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +91,8 @@ class PreparedLeaguePublication:
     standings: Mapping[int, MemberStanding]
     scored_gameweek: int | None
     scored_members: int
+    #: The league's own name from the capture's standings; ``None`` when it states none.
+    league_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +109,9 @@ class LeaguePublicationResult:
     gameweek: int
     report: LeagueViewsReport
     output_paths: tuple[Path, ...]
+    #: Why the Top 100 menu is off this run, for the operator; empty when it is on or
+    #: was not asked for.
+    top100_note: str = ""
 
 
 def member_points(
@@ -159,6 +182,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
     standings_name = f"league-{request.league_id}-standings.json"
     payloads = getattr(snapshot, "payloads", {})
     standings: dict[int, MemberStanding] = {}
+    league_name: str | None = None
     registered = [int(entry.entry_id) for entry in registry.entries]
     scored = last_scored_gameweek(
         payloads["bootstrap-static.json"], before=int(inputs.deadline.gameweek)
@@ -166,6 +190,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
     scores = member_points(payloads, registered, gameweek=scored) if scored is not None else {}
     if standings_name in payloads:
         rows = fpl_league_standings(payloads[standings_name], league_id=request.league_id)
+        league_name = fpl_league_name(payloads[standings_name], league_id=request.league_id)
         standings = {
             row.entry_id: MemberStanding(
                 entry_id=row.entry_id,
@@ -192,6 +217,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
         standings=standings,
         scored_gameweek=scored,
         scored_members=len(scores),
+        league_name=league_name,
     )
 
 
@@ -208,6 +234,44 @@ def publish_league(
     if on_prepared is not None:
         on_prepared(prepared)
     return publish_prepared_league(prepared, mapper=mapper, on_mode_paths=on_mode_paths)
+
+
+def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
+    """The manager's word for this publication, or ``None`` when it names no evidence."""
+
+    if request.rotation_evidence is None and request.club_news_source is None:
+        return None
+    if request.rotation_evidence is None or request.club_news_source is None:
+        raise DataError(
+            "The manager's word needs both the rotation evidence table and the club-news "
+            "source it was coded from; one without the other is refused."
+        )
+    return load_manager_words(
+        request.rotation_evidence,
+        club_news_source=request.club_news_source,
+        snapshot_root=request.snapshot_root,
+    )
+
+
+def load_publication_top100(
+    request: LeaguePublicationRequest,
+    inputs: RecommendationInputs,
+    projection: Projection,
+) -> tuple[Top100Counts | None, str | None, str]:
+    """The week's Top 100 counts, or ``None`` with the index reason and the operator's note.
+
+    ``(None, None, "")`` when the request names no evidence: the index then says the run
+    read none. A refusal is a reason, not an error: the menu is an addition to the week,
+    and the plans every member already gets do not depend on it.
+    """
+
+    if request.top100_evidence is None:
+        return None, None, ""
+    try:
+        counts = load_top100_counts(request.top100_evidence, inputs=inputs, projection=projection)
+    except Top100InputsRefused as refusal:
+        return None, refusal.reason, f"Top 100 menu off ({refusal.reason}): {refusal}"
+    return counts, None, ""
 
 
 def publish_prepared_league(
@@ -241,6 +305,17 @@ def publish_prepared_league(
                 )
             )
     out_dir = request.out_dir / "data" / "league"
+    manager_words = load_publication_manager_words(request)
+    if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
+        season,
+        int(inputs.deadline.gameweek),
+    ):
+        raise DataError(
+            f"The rotation evidence is for {manager_words.season} gameweek "
+            f"{manager_words.gameweek}; this publication is {season} gameweek "
+            f"{int(inputs.deadline.gameweek)}. Refused before any member is solved."
+        )
+    top100_counts, top100_reason, top100_note = load_publication_top100(request, inputs, projection)
     report = build_league_views(
         CapturePicksProvider(snapshot, request.snapshot_id),
         prepared.registrations,
@@ -248,7 +323,9 @@ def publish_prepared_league(
         projection,
         read_season_rules(snapshot, season=season),
         league_id=request.league_id,
-        league_name=f"League {request.league_id}",
+        # The members know their league by its name. The number stands in only when the
+        # capture states no name.
+        league_name=prepared.league_name or f"League {request.league_id}",
         out_dir=out_dir,
         standings=prepared.standings,
         scored_gameweek=prepared.scored_gameweek,
@@ -263,6 +340,9 @@ def publish_prepared_league(
         ),
         advice_record_root=request.record_root,
         now=request.now,
+        manager_words=manager_words,
+        top100_counts=top100_counts,
+        top100_unavailable_reason=top100_reason,
     )
     outputs = [out_dir / name for name in report.files]
     history_root = request.history_record_root or request.record_root
@@ -295,4 +375,5 @@ def publish_prepared_league(
         gameweek=report.gameweek,
         report=report,
         output_paths=tuple(sorted(outputs)),
+        top100_note=top100_note,
     )

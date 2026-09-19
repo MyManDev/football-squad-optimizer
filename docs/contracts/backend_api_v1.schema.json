@@ -7,6 +7,15 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
           "type": "string"
         },
+        "chip": {
+          "enum": [
+            null,
+            "wildcard",
+            "freehit",
+            "bboost",
+            "3xc"
+          ]
+        },
         "contract_version": {
           "const": "backend_api_v1",
           "type": "string"
@@ -26,6 +35,9 @@
         "league_id": {
           "minimum": 1,
           "type": "integer"
+        },
+        "managers_word": {
+          "type": "boolean"
         },
         "operation": {
           "const": "league.advise",
@@ -53,6 +65,18 @@
         "strategy": {
           "pattern": "^[a-z][a-z0-9._-]{0,63}$",
           "type": "string"
+        },
+        "top100_weight": {
+          "enum": [
+            0,
+            5,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "type": "integer"
         },
         "window": {
           "enum": [
@@ -82,6 +106,18 @@
     "AdviseRequestBody": {
       "additionalProperties": false,
       "properties": {
+        "chip": {
+          "enum": [
+            null,
+            "wildcard",
+            "freehit",
+            "bboost",
+            "3xc"
+          ]
+        },
+        "managers_word": {
+          "type": "boolean"
+        },
         "rival_entry_id": {
           "anyOf": [
             {
@@ -96,6 +132,18 @@
         "strategy": {
           "pattern": "^[a-z][a-z0-9._-]{0,63}$",
           "type": "string"
+        },
+        "top100_weight": {
+          "enum": [
+            0,
+            5,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "type": "integer"
         },
         "window": {
           "enum": [

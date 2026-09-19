@@ -15,6 +15,7 @@ import tests.unit.test_live_transfers as world_module
 import squadopt.live.transfers as live_transfers
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
+from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import read_inputs, read_season_rules
 from squadopt.live.recommendation import project, read_projection_handoff
@@ -1118,7 +1119,8 @@ def test_a_window_the_calendar_cannot_reach_is_recorded_not_dropped(
 ) -> None:
     """This world publishes three gameweeks, so no three- or five-week window exists
     from its GW2 deadline: the index says which windows solved (one), records each
-    missing window with the horizon builder's own reason, and the one-week bytes are
+    missing window with one stable code (the builder's own reason goes to the operator),
+    and the one-week bytes are
     the same as without any builder — the replay pin above still holds."""
 
     import datetime
@@ -1131,8 +1133,9 @@ def test_a_window_the_calendar_cannot_reach_is_recorded_not_dropped(
     builder = member_horizon_builder(snapshot, season=SEASON, in_season=handoff)
     squad = _legal_squad(world)
     when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    reports = {}
     for name, horizon_builder in (("plain", None), ("windows", builder)):
-        build_league_views(
+        reports[name] = build_league_views(
             _Provider({101: _member_picks(world, 101, squad)}),
             (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
             inputs,
@@ -1158,8 +1161,12 @@ def test_a_window_the_calendar_cannot_reach_is_recorded_not_dropped(
         ("saf-puan", None, 3),
         ("saf-puan", None, 5),
     ]
-    for entry in missing:
-        assert "absent from the captured season" in entry["reason"]
+    # The index carries one stable code; the horizon builder's own reason is the
+    # operator's, on the member's note.
+    assert {entry["reason"] for entry in missing} == {"not_solved_for_member"}
+    note = next(m.reason for m in reports["windows"].members if m.entry_id == 101)
+    assert "saf-puan 3 weeks not solved" in note
+    assert "absent from the captured season" in note
 
 
 def test_without_a_rival_only_the_baseline_is_published(
@@ -1605,7 +1612,10 @@ def test_a_rival_that_cannot_be_priced_is_recorded_not_fatal(
     )["payload"]
     assert index["computed"] == []
     assert len(index["unavailable"]) == 4
-    assert all("missing" in entry["reason"] for entry in index["unavailable"])
+    # The index is a public file: it says the pair was not solved, with one stable code.
+    # Which players the projection lacks is the operator's to read, on the member's note.
+    assert {entry["reason"] for entry in index["unavailable"]} == {"not_solved_for_member"}
+    assert "missing" in by_id[101].reason and "vs 202 not solved" in by_id[101].reason
     assert {entry["rival_entry_id"] for entry in index["unavailable"]} == {202, 303}
     assert not (tmp_path / "gap" / "advice" / "101" / "fark-yarat").exists()
 
@@ -1785,3 +1795,112 @@ def test_files_the_rule_does_not_understand_are_left_alone(
 
     assert (out / "scoreboard.json").is_file()
     assert (out / "entries" / "README.json").is_file()
+
+
+def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """With evidence, the switched-on plan is a file of its own and the index says where
+    it is and what it came from; without, the index says there is none, so the page's
+    switch never points at a document nobody solved."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    provider = _Provider({101: _member_picks(world, 101, squad)})
+    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
+    words = ManagerWords(
+        season="2026-27",
+        gameweek=2,
+        source_kind="synthetic_fixture",
+        source_label="club_news_v1.fixture.json",
+        evidence_table="rotation_evidence_v2_2026-27_gw02.csv",
+        clubs_covered=("Club 1",),
+        words=(
+            ManagerWord(
+                player_id=squad[0],
+                disposition="stated_expected_absent",
+                speaker="the manager",
+                published_at_utc="2026-08-21T10:00:00Z",
+                published_precision="instant",
+                club="Club 1",
+                source_url="https://club.example/club-1/news",
+                fetched_at_utc="2026-08-22T11:00:00Z",
+                words="He will not travel.",
+            ),
+        ),
+    )
+
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "with",
+        manager_words=words,
+    )
+    index = json.loads(
+        (tmp_path / "with" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["evidence"]["available"] is True
+    assert index["evidence"]["path"] == "advice/101/saf-puan/1/hoca-sozu.json"
+    assert index["evidence"]["applied_count"] == 1
+    assert index["evidence"]["source_kind"] == "synthetic_fixture"
+    assert index["evidence"]["binding"] in (True, False)
+    published = json.loads(
+        (tmp_path / "with" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json").read_text(
+            encoding="utf-8"
+        )
+    )["payload"]
+    assert published["evidence"]["applied"][0]["player_id"] == squad[0]
+    assert squad[0] not in {int(str(p["player_id"])) for p in published["starting_xi"]}
+
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "without",
+    )
+    index = json.loads(
+        (tmp_path / "without" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["evidence"] == {"available": False, "reason": "no_evidence_this_run"}
+    # The one-week directory holds the chips the member may choose, and nothing of the word.
+    assert not (
+        tmp_path / "without" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json"
+    ).exists()
+
+    # The operational case: the next publish runs without evidence into the tree the
+    # previous one wrote. The switched-on document goes, and the report says so.
+    report = build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "with",
+    )
+    assert not (tmp_path / "with" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json").exists()
+    assert "advice/101/saf-puan/1/hoca-sozu.json" in report.removed
+    index = json.loads(
+        (tmp_path / "with" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["evidence"]["available"] is False
+
+
+def test_the_public_reason_is_a_sentence_the_page_knows_or_one_code() -> None:
+    from squadopt.application.league_views import PUBLIC_REASON_SENTENCES, public_reason
+
+    for sentence in PUBLIC_REASON_SENTENCES:
+        assert public_reason(sentence) == sentence
+    diagnostic = "No plan within the limit: deterministic time used was 12.0, relative gap 0.31"
+    assert public_reason(diagnostic) == "not_solved_for_member"
+    assert public_reason("") == "not_solved_for_member"

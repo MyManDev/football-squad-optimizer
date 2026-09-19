@@ -1,6 +1,8 @@
 import { withRequestDeadline, type RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
+import { chipPath, isMemberChip } from "./advice/chipChoice";
+import { isTop100Weight, top100TargetPath, type Top100Target } from "./advice/top100";
 import type { WindowSize } from "../moves/modePrices";
 import type {
   EntryAdvice,
@@ -118,6 +120,78 @@ export async function loadEntryAdvice(
   return readOrExample<EntryAdvice>(
     relative,
     async () => (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window, rivalEntryId),
+    options,
+  );
+}
+
+/**
+ * The manager's-word plan, read only at the path an index may name for this member: the
+ * one-week pure-points plan with the club's word switched on. Any other path is refused
+ * rather than fetched, so a malformed index cannot point the page at another document.
+ */
+export async function loadEntryAdviceEvidence(
+  entryId: number,
+  path: string,
+  options?: RequestOptions,
+): Promise<LeagueViewEnvelope<EntryAdvice>> {
+  const expected = `advice/${entryId}/saf-puan/1/hoca-sozu.json`;
+  if (path !== expected) {
+    throw new LeagueDataError(`The manager's-word plan for ${entryId} is not at ${path}.`);
+  }
+  return readOrExample<EntryAdvice>(
+    expected,
+    async () => (await mockModule()).mockEntryAdviceEvidenceEnvelope(entryId),
+    options,
+  );
+}
+
+/**
+ * A Top 100 weighted plan, read only at the one path the producer writes for this member,
+ * weight and switch. Any other path is refused rather than fetched, so a malformed index
+ * cannot point the page at another document.
+ */
+/** A chosen chip's document, read only from the one path such a document may live at. */
+export async function loadEntryAdviceChip(
+  entryId: number,
+  path: string,
+  chip: string,
+  options?: RequestOptions,
+): Promise<LeagueViewEnvelope<EntryAdvice>> {
+  if (!isMemberChip(chip)) {
+    throw new LeagueDataError(`No chip document exists for ${chip}.`);
+  }
+  const expected = chipPath(entryId, chip);
+  if (path !== expected) {
+    throw new LeagueDataError(`The ${chip} plan for ${entryId} is not at ${path}.`);
+  }
+  return readOrExample<EntryAdvice>(
+    expected,
+    async () => (await mockModule()).mockEntryAdviceChipEnvelope(entryId, chip),
+    options,
+  );
+}
+
+export async function loadEntryAdviceTop100(
+  entryId: number,
+  path: string,
+  weight: number,
+  word: boolean,
+  options?: RequestOptions,
+  target: Top100Target = { strategy: "saf-puan", window: 1, rivalEntryId: null },
+): Promise<LeagueViewEnvelope<EntryAdvice>> {
+  if (!isTop100Weight(weight) || weight === 0) {
+    throw new LeagueDataError(`No Top 100 document exists for setting ${weight}.`);
+  }
+  if (![1, 3, 5].includes(target.window) || !/^[a-z][a-z0-9-]{0,63}$/.test(target.strategy)) {
+    throw new LeagueDataError("No Top 100 document exists for that plan.");
+  }
+  const expected = top100TargetPath(entryId, target, weight, word);
+  if (expected === null || path !== expected) {
+    throw new LeagueDataError(`The Top 100 plan for ${entryId} is not at ${path}.`);
+  }
+  return readOrExample<EntryAdvice>(
+    expected,
+    async () => (await mockModule()).mockEntryAdviceTop100Envelope(entryId, weight, word, target),
     options,
   );
 }

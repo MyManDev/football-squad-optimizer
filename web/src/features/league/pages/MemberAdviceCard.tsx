@@ -1,8 +1,12 @@
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { points, signedPoints } from "../../../lib/format";
+import { points, signedPoints, utcShort } from "../../../lib/format";
+import { CHIP_COPY, chipLimit, chipRescores } from "../advice/chipCopy";
+import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { publishedPrice } from "../advice/publishedPrice";
+import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
   AdviceMove,
@@ -101,13 +105,15 @@ export function AdviceCard({
   members = [],
   squad,
   rivalSquad,
+  windowControl = null,
 }: {
   shown: ShownAdvice;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   members?: EntryView[];
   squad: LeagueViewEnvelope<EntrySquad>;
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
 }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
@@ -127,9 +133,23 @@ export function AdviceCard({
   // and a price below zero is a giveaway no constrained plan can hand out, so no
   // producer's number is rendered as one.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
-  const priceCeiling = view.expected_points_cost_ceiling;
-  const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
-  const showsPrice = view.mode !== "saf-puan" && finiteNumber(price) && price >= 0;
+  // The pure-points plan has no price of its own; switched on, the manager's word does,
+  // and it is priced against the same pure-points control a rival band is.
+  const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
+  // A Top 100 weight is priced the same way, in base-model points against the plan at 0;
+  // with the word on as well, the one number is the pair's.
+  const top100Priced = view.top100 !== undefined;
+  const strategyPriced = top100Priced && view.mode !== "saf-puan";
+  const price = publishedPrice({
+    strategy: view.mode,
+    word: wordPriced,
+    top100: top100Priced,
+    unproven,
+    expected_points_cost: view.expected_points_cost,
+    expected_points_cost_ceiling: view.expected_points_cost_ceiling,
+  });
+  const evidenceCopy = EVIDENCE_COPY[language];
+  const top100Copy = TOP100_COPY[language];
   const alternative = view.alternative_plan;
   const alternativePrice = unproven
     ? alternative?.expected_points_cost_ceiling
@@ -142,6 +162,13 @@ export function AdviceCard({
   // carries a different quantity on those rows, the raw difference between the two
   // players' own projections, so its numbers are not printed under this label.
   const rowsAreShares = view.expected_gain_vs_hold !== undefined;
+  // A Triple Captain or Bench Boost week scores on its own basis, and the producer states
+  // the rows, the gain and the lineup total on it; the sentences name that basis.
+  const chipCopy = CHIP_COPY[language];
+  const chipBasis =
+    view.chip_choice && chipRescores(view.chip_choice.chip)
+      ? chipCopy.basis[view.chip_choice.chip]
+      : null;
   return (
     <Card
       title={copy.advice}
@@ -174,22 +201,40 @@ export function AdviceCard({
             ? planWeeks > 1
               ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
               : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
-            : copy.unprovenPlanGapUnknown}
+            : top100Priced
+              ? top100Copy.unproven
+              : copy.unprovenPlanGapUnknown}
         </p>
       ) : null}
-      {showsPrice && price != null ? (
+      {price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
-            {unproven
-              ? copy.planCostAtMost(points(price, 1, locale))
-              : copy.planCost(points(price, 1, locale))}
+            {strategyPriced
+              ? unproven
+                ? top100Copy.strategyCostAtMost(points(price, 1, locale))
+                : top100Copy.strategyCost(points(price, 1, locale))
+              : top100Priced
+                ? wordPriced
+                  ? unproven
+                    ? top100Copy.combinedCostAtMost(points(price, 1, locale))
+                    : top100Copy.combinedCost(points(price, 1, locale))
+                  : unproven
+                    ? top100Copy.costAtMost(points(price, 1, locale))
+                    : top100Copy.cost(points(price, 1, locale))
+                : wordPriced
+                  ? unproven
+                    ? evidenceCopy.costAtMost(points(price, 1, locale))
+                    : evidenceCopy.cost(points(price, 1, locale))
+                  : unproven
+                    ? copy.planCostAtMost(points(price, 1, locale))
+                    : copy.planCost(points(price, 1, locale))}
           </strong>
           {(rivalName ?? view.rival_label) ? (
             <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
           ) : null}
         </p>
       ) : null}
-      {view.control_solver_status === "FEASIBLE" ? (
+      {view.control_solver_status === "FEASIBLE" && !view.chip_choice ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
           {finiteNumber(view.control_optimality_gap)
@@ -238,13 +283,20 @@ export function AdviceCard({
         <>
           <div className={styles.moves}>
             {view.moves.map((move) => (
-              <AdviceRow key={move.move_id} move={move} measured={rowsAreShares} />
+              <AdviceRow
+                key={move.move_id}
+                move={move}
+                measured={rowsAreShares}
+                chipBasis={chipBasis}
+              />
             ))}
           </div>
           {/* Each row is conditional on the rows above it, which is what makes them add
               up. Said once, and only where there is more than one row to read in order. */}
           {rowsAreShares && view.moves.length > 1 ? (
-            <p className={styles.muted}>{copy.moveRowsBasis}</p>
+            <p className={styles.muted}>
+              {chipBasis !== null ? chipCopy.moveRowsBasis(chipBasis) : copy.moveRowsBasis}
+            </p>
           ) : null}
           {/* The week's hit charge, once, because the game charges the week and not any
               one move. Absent on documents published before the producer stated it. */}
@@ -262,17 +314,32 @@ export function AdviceCard({
         <p className={styles.planCost}>
           <strong className="num">
             {finiteNumber(view.transfer_hit_points) && view.transfer_hit_points > 0
-              ? copy.planGainVsHoldBeforeCost(
-                  signedPoints(view.expected_gain_vs_hold, 1, locale),
-                  points(view.transfer_hit_points, 1, locale),
-                )
-              : copy.planGainVsHold(signedPoints(view.expected_gain_vs_hold, 1, locale))}
+              ? chipBasis !== null
+                ? chipCopy.planGainVsHoldBeforeCost(
+                    signedPoints(view.expected_gain_vs_hold, 1, locale),
+                    points(view.transfer_hit_points, 1, locale),
+                    chipBasis,
+                  )
+                : copy.planGainVsHoldBeforeCost(
+                    signedPoints(view.expected_gain_vs_hold, 1, locale),
+                    points(view.transfer_hit_points, 1, locale),
+                  )
+              : chipBasis !== null
+                ? chipCopy.planGainVsHold(
+                    signedPoints(view.expected_gain_vs_hold, 1, locale),
+                    chipBasis,
+                  )
+                : copy.planGainVsHold(signedPoints(view.expected_gain_vs_hold, 1, locale))}
           </strong>
         </p>
       ) : null}
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
-      <LineupSection view={view} />
+      <EvidenceSection view={view} />
+      <Top100Section view={view} />
+      <ChipChoiceSection view={view} />
+      <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
+      <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
@@ -321,7 +388,8 @@ function RivalPlayers({
  * weighed and turned down.
  */
 function StatedLimits({ view }: { view: EntryAdvice }) {
-  const copy = useLanguage().messages.leagueMembers;
+  const { language, messages } = useLanguage();
+  const copy = messages.leagueMembers;
   const limits = view.stated_limits ?? [];
   if (limits.length === 0) return null;
   const weeks = view.plan_weeks?.length ?? 1;
@@ -330,13 +398,23 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
     <section className={styles.lineup} aria-label={label}>
       <h4 className={styles.lineupSub}>{label}</h4>
       <ul className={styles.limits}>
-        {limits.map((sentence) => (
-          <li key={sentence}>
-            {Object.hasOwn(copy.statedLimits, sentence)
-              ? copy.statedLimits[sentence]
-              : copy.statedLimitUnknown}
-          </li>
-        ))}
+        {limits.map((sentence) => {
+          const weight = top100LimitWeight(sentence);
+          const chipSentence = chipLimit(CHIP_COPY[language], sentence);
+          return (
+            <li key={sentence}>
+              {chipSentence !== null
+                ? chipSentence
+                : weight !== null
+                  ? TOP100_COPY[language].limit(weight)
+                  : variantLimit(TOP100_COPY[language], sentence) !== null
+                    ? variantLimit(TOP100_COPY[language], sentence)
+                    : Object.hasOwn(copy.statedLimits, sentence)
+                      ? copy.statedLimits[sentence]
+                      : copy.statedLimitUnknown}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -361,7 +439,12 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <div className={styles.windowScroll}>
+      <div
+        className={styles.windowScroll}
+        tabIndex={0}
+        role="region"
+        aria-label={`${copy.windowWeek}: ${weeks.map((week) => week.gameweek).join(", ")}`}
+      >
         <table className={styles.windowTable}>
           <thead>
             <tr>
@@ -404,8 +487,155 @@ function WindowSection({ view }: { view: EntryAdvice }) {
  * when the producer published them — a document from before the producer carried the
  * plan week, or a decision handed over without it, shows the moves alone.
  */
-function LineupSection({ view }: { view: EntryAdvice }) {
-  const { locale, messages } = useLanguage();
+/**
+ * What the club's own page said, as the producer applied it. The words are the source's,
+ * cut from the captured bytes; the category is the model's; the role is the declared
+ * rule's. Example data says so on the section itself, not only in a badge elsewhere.
+ */
+/** A source link only for a web address: a capture's final URL is data, not markup. */
+function webAddress(url: string | null): string | null {
+  return url && /^https?:\/\//i.test(url) ? url : null;
+}
+
+/** The source's own dateline, to the day when that is all the source said. */
+function dateline(iso: string | null, precision: string | null, locale: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  if (precision === "day") {
+    return date.toLocaleDateString(locale, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return utcShort(iso, locale);
+}
+
+function EvidenceSection({ view }: { view: EntryAdvice }) {
+  const { language, locale, messages } = useLanguage();
+  const copy = EVIDENCE_COPY[language];
+  const evidence = view.evidence;
+  if (!evidence) return null;
+  const real = evidence.source_kind === "club_news_capture";
+  return (
+    <section className={styles.adviceSection} data-testid="managers-word">
+      <h3 className={styles.lineupTitle}>{copy.title}</h3>
+      {real ? (
+        <p className={styles.honesty}>{copy.sourceCapture}</p>
+      ) : (
+        <p className={styles.honesty}>
+          <Badge tone="warn">{messages.leagueMembers.exampleData}</Badge> {copy.sourceExample}
+        </p>
+      )}
+      <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
+      {evidence.binding === undefined ? null : (
+        <p className={styles.muted}>{evidence.binding ? copy.changed : copy.unchanged}</p>
+      )}
+      {evidence.applied.length > 0 ? (
+        <ul className={styles.assumptionList}>
+          {evidence.applied.map((item) => {
+            const declared = item.words_status ?? (item.words ? "shown" : "unresolved");
+            const status =
+              declared === "shown" && item.words && QUOTE_WITHHELD.test(item.words)
+                ? "withheld_figure"
+                : declared;
+            const href = webAddress(item.source_url);
+            const speaker = item.speaker
+              ? (copy.speakers[item.speaker] ?? copy.speakerUnknown)
+              : copy.speakerUnknown;
+            return (
+              <li key={item.player_id}>
+                <strong>{item.name ?? `#${item.player_id}`}</strong>{" "}
+                {item.role && copy.roles[item.role] ? (
+                  <Badge tone="neutral">{copy.roles[item.role]}</Badge>
+                ) : null}
+                {status === "shown" && item.words ? (
+                  <blockquote>{item.words}</blockquote>
+                ) : (
+                  <p className={styles.muted}>
+                    {status === "withheld_figure" ? copy.wordsWithheld : copy.wordsUnresolved}
+                  </p>
+                )}
+                <p className={styles.muted}>
+                  {copy.said(
+                    speaker,
+                    dateline(item.published_at_utc, item.published_precision, locale),
+                  )}{" "}
+                  {href ? (
+                    <a href={href} rel="noopener noreferrer">
+                      {copy.source}
+                    </a>
+                  ) : null}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * A Top 100 weighted plan: the setting the member chose, whether it moved their plan, and
+ * what it is and is not. Rendered only on a weighted document.
+ */
+function Top100Section({ view }: { view: EntryAdvice }) {
+  const { language } = useLanguage();
+  const copy = TOP100_COPY[language];
+  const top100 = view.top100;
+  if (!top100) return null;
+  return (
+    <section className={styles.adviceSection} data-testid="top100-influence">
+      <h3 className={styles.lineupTitle}>{copy.title}</h3>
+      <p className={styles.muted}>
+        {copy.weightLine(top100.weight)} {top100.changed ? copy.changed : copy.unchanged}
+      </p>
+      <p className={styles.honesty}>{copy.honesty}</p>
+      <p className={styles.muted}>{copy.notStart}</p>
+      <p className={styles.muted}>{copy.saturation}</p>
+      {view.moves.some((move) => (move.expected_points_delta ?? 0) < 0) ? (
+        <p className={styles.muted}>{copy.negativeRow}</p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * A chip the member chose: which chip, what the chip week is expected to score above the
+ * member's own plan without it, and that the number is one gameweek's and nothing more.
+ * A gain, so it is never worded as something given up, and never as a reason to play the
+ * chip now. Rendered only on a chip document.
+ */
+function ChipChoiceSection({ view }: { view: EntryAdvice }) {
+  const { language, locale, messages } = useLanguage();
+  const copy = CHIP_COPY[language];
+  const choice = view.chip_choice;
+  if (!choice) return null;
+  const name = messages.leagueMembers.chipNames[choice.chip] ?? choice.chip;
+  const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
+  return (
+    <section className={styles.adviceSection} data-testid="chip-choice">
+      <h3 className={styles.lineupTitle}>{copy.title}</h3>
+      <p className={styles.muted}>{copy.chosen(name)}</p>
+      {finiteNumber(choice.gain_vs_no_chip) ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {copy.gain(signedPoints(choice.gain_vs_no_chip, 1, locale))}
+          </strong>
+        </p>
+      ) : null}
+      {unproven ? <p className={styles.muted}>{copy.unproven}</p> : null}
+      <p className={styles.honesty}>{copy.honesty}</p>
+      {choice.chip === "freehit" ? <p className={styles.muted}>{copy.freeHit}</p> : null}
+    </section>
+  );
+}
+
+function LineupSection({ view, chipBasis }: { view: EntryAdvice; chipBasis: string | null }) {
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
   if (!captain || !vice || !eleven || !bench) return null;
@@ -419,7 +649,12 @@ function LineupSection({ view }: { view: EntryAdvice }) {
       {finiteNumber(view.expected_own_points) ? (
         <p className={styles.planCost}>
           <strong className="num">
-            {copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
+            {chipBasis !== null
+              ? CHIP_COPY[language].expectedOwnPoints(
+                  points(view.expected_own_points, 1, locale),
+                  chipBasis,
+                )
+              : copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
           </strong>
         </p>
       ) : null}
@@ -504,9 +739,23 @@ function reasonFor(copy: MemberCopy, code: AdviceMove["reason_code"]): string {
   return copy.modeTradeoffReason;
 }
 
-function AdviceRow({ move, measured }: { move: AdviceMove; measured: boolean }) {
-  const { locale, messages } = useLanguage();
+function AdviceRow({
+  move,
+  measured,
+  chipBasis,
+}: {
+  move: AdviceMove;
+  measured: boolean;
+  chipBasis: string | null;
+}) {
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const reason =
+    move.reason_code === "manager_word"
+      ? EVIDENCE_COPY[language].moveReason
+      : move.reason_code === "top100_preference"
+        ? TOP100_COPY[language].moveReason
+        : reasonFor(copy, move.reason_code);
   return (
     <article className={styles.move}>
       <div className={styles.movePlayers}>
@@ -520,11 +769,77 @@ function AdviceRow({ move, measured }: { move: AdviceMove; measured: boolean }) 
       <div className={styles.moveNumbers}>
         <span>
           {measured && finiteNumber(move.expected_points_delta)
-            ? copy.projectedGain(signedPoints(move.expected_points_delta, 1, locale))
+            ? chipBasis !== null
+              ? CHIP_COPY[language].projectedGain(
+                  signedPoints(move.expected_points_delta, 1, locale),
+                  chipBasis,
+                )
+              : copy.projectedGain(signedPoints(move.expected_points_delta, 1, locale))
             : copy.projectedGainUnknown}
         </span>
       </div>
-      <p className={styles.muted}>{reasonFor(copy, move.reason_code)}</p>
+      <p className={styles.muted}>{reason}</p>
     </article>
+  );
+}
+
+function WindowComparison({ view, control }: { view: EntryAdvice; control: EntryAdvice | null }) {
+  const { locale, language, messages } = useLanguage();
+  const copy = TOP100_COPY[language];
+  if (
+    !control ||
+    view.window <= 1 ||
+    (view.mode === "saf-puan" && !view.top100) ||
+    !view.source_snapshot_id ||
+    view.source_snapshot_id !== control.source_snapshot_id ||
+    view.entry_id !== control.entry_id ||
+    view.league_id !== control.league_id ||
+    view.window !== control.window ||
+    view.season !== control.season ||
+    view.gameweek !== control.gameweek ||
+    control.mode !== "saf-puan" ||
+    control.top100 !== undefined ||
+    control.evidence !== undefined ||
+    control.chip != null
+  )
+    return null;
+  const total = (plan: EntryAdvice): number | null => {
+    const weeks = plan.plan_weeks;
+    if (
+      !weeks ||
+      weeks.length !== plan.window ||
+      weeks.some(
+        (week, index) =>
+          week.gameweek !== plan.gameweek + index ||
+          !finiteNumber(week.expected_points) ||
+          !finiteNumber(week.transfer_hit_points),
+      )
+    )
+      return null;
+    const value = weeks.reduce(
+      (sum, week) => sum + week.expected_points - week.transfer_hit_points,
+      0,
+    );
+    return Number.isFinite(value) ? value : null;
+  };
+  const selected = total(view),
+    pure = total(control);
+  if (selected === null || pure === null) return null;
+  return (
+    <section aria-label={copy.windowComparisonTitle}>
+      <h3 className={styles.lineupTitle}>{copy.windowComparisonTitle}</h3>
+      <dl className={styles.armband}>
+        <div>
+          <dt>{copy.windowSelectedTotal}</dt>
+          <dd className="num">{points(selected, 1, locale)}</dd>
+        </div>
+        <div>
+          <dt>{copy.windowPureTotal}</dt>
+          <dd className="num">{points(pure, 1, locale)}</dd>
+        </div>
+      </dl>
+      <p className={styles.honesty}>{copy.windowComparisonBasis}</p>
+      <p className={styles.honesty}>{messages.leagueMembers.windowLimits}</p>
+    </section>
   );
 }

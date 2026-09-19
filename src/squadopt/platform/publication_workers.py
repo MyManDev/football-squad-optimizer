@@ -10,13 +10,17 @@ from typing import Any
 
 from squadopt.application.advice import member_horizon_builder
 from squadopt.application.capture_entries import CapturePicksProvider
-from squadopt.application.league_publication import LeaguePublicationRequest
+from squadopt.application.league_publication import (
+    LeaguePublicationRequest,
+    load_publication_top100,
+)
 from squadopt.application.league_views import (
     MemberMapper,
     MemberRender,
     MemberRenderTask,
     render_member,
 )
+from squadopt.application.manager_words import load_manager_words
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
@@ -37,22 +41,41 @@ def _worker_init(
     handoff: str | None,
     archive_root: str,
     gameweek: int | None = None,
+    rotation_evidence: str | None = None,
+    club_news_source: str | None = None,
+    request: LeaguePublicationRequest | None = None,
 ) -> None:
     snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
     season = season or infer_season(snapshot)
     inputs = read_inputs(snapshot, season=season, gameweek=gameweek)
     panel = build_panel(Path(archive_root))
     in_season = read_projection_handoff(Path(handoff)) if handoff else None
+    projection = project(inputs, panel, in_season=in_season)
+    # The same gate the parent ran, on the same capture and handoff: a table the parent
+    # refused is refused here too, so no worker solves a menu the index calls absent.
+    top100_counts = (
+        load_publication_top100(request, inputs, projection)[0] if request is not None else None
+    )
     _WORKER_CONTEXT.update(
         provider=CapturePicksProvider(snapshot, snapshot_id),
         inputs=inputs,
-        projection=project(inputs, panel, in_season=in_season),
+        projection=projection,
         rules=read_season_rules(snapshot, season=season),
         # The multi-week horizon is built once per window in each worker and shared by
         # every member the worker renders; it is the same bytes in every process.
         horizon_builder=member_horizon_builder(
             snapshot, season=season, panel=panel, in_season=in_season
         ),
+        manager_words=(
+            load_manager_words(
+                Path(rotation_evidence),
+                club_news_source=Path(club_news_source),
+                snapshot_root=Path(snapshot_root),
+            )
+            if rotation_evidence and club_news_source
+            else None
+        ),
+        top100_counts=top100_counts,
     )
 
 
@@ -105,6 +128,9 @@ def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterat
             str(request.handoff_path) if request.handoff_path else None,
             str(request.archive_root),
             request.gameweek,
+            str(request.rotation_evidence) if request.rotation_evidence else None,
+            str(request.club_news_source) if request.club_news_source else None,
+            request,
         ),
     ) as executor:
         yield pool_mapper(executor)

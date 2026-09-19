@@ -16,7 +16,6 @@ is not in the season list this run loads.
 """
 
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -30,7 +29,10 @@ import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
+    _sha256,
     artifact_metadata,
+    measurement_optimization_config,
+    solver_record,
     write_text,
 )
 
@@ -161,6 +163,14 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--allow-dropped-folds",
+        action="store_true",
+        help=(
+            "record a population smaller than the declared one instead of refusing; the "
+            "record names every dropped fold"
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help=(
@@ -225,17 +235,12 @@ def _oracle_arm(
 def _evaluate(folds: Sequence[EvaluationFold], *, arm: str) -> EvaluationResult:
     config = EvaluationConfig(
         scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2,
+        # Named, not inherited: the default binds on the wall clock and the record then
+        # depends on how busy the machine was (#590).
+        optimization_config=measurement_optimization_config(),
         run_metadata={"study": ROTATION_CEILING_CONTRACT_VERSION, "arm": arm},
     )
     return evaluate_prepared_folds(folds, config)
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _write_evidence(
@@ -464,6 +469,27 @@ def _autosub_reading(comparison: Mapping[str, object]) -> str:
     )
 
 
+def _solver_reading(document: Mapping[str, object]) -> str:
+    """What the record rests on: the binding limit and how many solves were proved."""
+
+    solver = document.get("solver")
+    if not isinstance(solver, Mapping):
+        # A record written before the solver block existed solved under the default config,
+        # which binds on the wall clock, and it cannot say how many solves were proved.
+        return (
+            "**Solves:** this record predates the solver block. It was solved under the "
+            "default wall-clock limit, so a re-run on a busier machine may move it (#590)."
+        )
+    counts = cast(Mapping[str, int], solver["solver_status_counts"])
+    told = ", ".join(f"{count} {status}" for status, count in counts.items())
+    return (
+        f"**Solves:** {told}. The binding limit is `{solver['binding_limit']}` "
+        f"({solver['solver_deterministic_time_limit']} deterministic, wall cap "
+        f"{solver['solver_time_limit_seconds']} s), so the record does not depend on how busy "
+        "the machine was."
+    )
+
+
 def _markdown(document: Mapping[str, object]) -> str:
     comparison = cast(Mapping[str, object], document["comparison"])
     verdict = cast(Mapping[str, object], document["verdict"])
@@ -485,6 +511,8 @@ def _markdown(document: Mapping[str, object]) -> str:
         f"{comparison['comparable_folds']}/{comparison['attempted_folds']} paired folds.",
         "",
         f"**Claim tested:** {verdict['claim']}",
+        "",
+        _solver_reading(document),
         "",
         _interval_reading(comparison, verdict),
         "",
@@ -634,6 +662,16 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
     comparison = compare_rotation_ceiling(
         control_details, oracle_details, attempted_folds=len(control)
     )
+    if comparison.dropped_fold_ids and not arguments.allow_dropped_folds:
+        # The population is declared and asserted at EXPECTED_FOLD_COUNT. A record over
+        # fewer decisions is a different measurement under the same name, and the field
+        # that says so is one nobody reads before quoting the headline.
+        raise BacktestConfigurationError(
+            f"{len(comparison.dropped_fold_ids)} of {len(control)} folds produced nothing "
+            f"comparable ({', '.join(comparison.dropped_fold_ids)}), so no record is written. "
+            "Re-run on a quiet machine, or pass --allow-dropped-folds to record the smaller "
+            "population on purpose."
+        )
     interval: tuple[float, float] | None = None
     if comparison.differences:
         lower, upper = season_aware_moving_block_interval(
@@ -655,6 +693,7 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         applied,
     )
     return {
+        "solver": solver_record(control_result, oracle_result),
         "panel_rows": len(panel),
         "oracle": {
             "version": flags.version,

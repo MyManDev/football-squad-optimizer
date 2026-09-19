@@ -204,7 +204,7 @@ packages fall into five groups, each importing only groups below it:
 | data | `data`, `contracts` |
 
 The measurement **laboratory** — `experiments`, `backtest`, `bayesopt`, `recalibration`,
-`preflight` — is a side tree, not a group in that column. It may import domain and data, and no
+`preflight`, `risk`, `uncertainty` — is a side tree, not a group in that column. It may import domain and data, and no
 product group (adapters, runtime, use cases, or domain) may import it. The linear order alone
 could not say this: it placed the laboratory below `application`, so the deployed advice worker
 was loading 43 laboratory modules, and a product decision (`plan_selection`) was living in the
@@ -215,3 +215,12 @@ That contract started with eight `ignore_imports` entries, all in `application`,
 with the follow-up PR that removed it. The last (`mode_selection` to `experiments.plan_selection`)
 left with the `plan_selection` move to `live`, and the list is gone: like the layers contract, it
 carries **zero** `ignore_imports` entries, and a new violation fails the gate.
+
+`risk` and `uncertainty` joined the forbidden list on 2026-09-15, and they joined it while it
+cost nothing. Measured at the time: outside its own package **nothing** under `src/` imports
+`risk`, and `uncertainty` is imported only by `risk/config.py`, `risk/evaluation.py`,
+`risk/optimizer.py` and `experiments/shadow_calibration.py`. Both are research surfaces the
+contract had classified as product, so the gate would have allowed a product import of either
+and said nothing. Adding them changed no import and left all three contracts green. The reason
+to do it early is the one the eight `ignore_imports` entries recorded: a boundary is cheap to
+state while nothing crosses it, and expensive once nine statements do.

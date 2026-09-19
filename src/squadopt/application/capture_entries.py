@@ -75,6 +75,21 @@ class CapturePicksProvider:
             source_snapshot_id=self._snapshot_id,
         )
 
+    def holds(self, entry_id: int, gameweek: int) -> bool:
+        """Whether the capture carries this entry's picks and history for ``gameweek``.
+
+        A question rather than a caught error, so a caller can tell "this member was not
+        captured" apart from every other way reading a squad can fail.
+        """
+
+        return all(
+            name in self._payloads
+            for name in (
+                f"entry-{entry_id}-picks-gw{gameweek:02d}.json",
+                f"entry-{entry_id}-history.json",
+            )
+        )
+
     def _banked(self, record: EntryPicksRecord) -> BankedFreeTransfers:
         """The free transfers the member holds at the deadline after the captured week.
 

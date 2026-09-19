@@ -3,23 +3,104 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, expect, it } from "vitest";
 import fixture from "../../../fixtures/weeklySuggestionHistory.json";
+import planRows from "../../../fixtures/recordedPlanRows.json";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { type Language, MESSAGES } from "../../../i18n/messages";
 import type { SuggestionHistory } from "../history/historyData";
 import { LeagueMemberHistoryView } from "./LeagueMemberHistoryPage";
 import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOverview";
+import { TOP100_COPY } from "../advice/top100Copy";
+import { mockMembers } from "../../../fixtures/league";
+import type { EntryView } from "../types";
 
 afterEach(cleanup);
+it.each<Language>(["tr", "en"])(
+  "keeps archived plans collapsed and old prices absent in %s",
+  async (language) => {
+    const value = history();
+    Object.assign(value.payload.weeks[0], { recorded_plans: planRows });
+    show(value, language);
+    const copy = MESSAGES[language].suggestionHistory;
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    const summary = screen.getByText(copy.recordedPlans);
+    const section = summary.closest("details")!;
+    expect(section).not.toHaveAttribute("open");
+    await userEvent.click(summary);
+    expect(section).toHaveAttribute("open");
+    expect(section).toHaveTextContent("Player 8");
+    expect(section).toHaveTextContent("Player 1");
+    expect(section).toHaveTextContent("#17");
+    expect(section).toHaveTextContent(`${TOP100_COPY[language].legend} 20`);
+    expect(section).toHaveTextContent(
+      TOP100_COPY[language].combinedCostAtMost(language === "tr" ? "4,0" : "4.0"),
+    );
+    expect(section).not.toHaveTextContent(language === "tr" ? "2,5" : "2.5");
+    const rows = section.querySelectorAll(":scope > ul > li");
+    for (const index of [0, 2])
+      expect(rows[index]).not.toHaveTextContent(language === "tr" ? "0,0" : "0.0");
+  },
+);
+it.each<Language>(["tr", "en"])(
+  "uses the plain price sentence when the recorded ceiling equals the cost in %s",
+  async (language) => {
+    const value = history();
+    Object.assign(value.payload.weeks[0], {
+      recorded_plans: [
+        { ...planRows[1], expected_points_cost: 4, expected_points_cost_ceiling: 4 },
+      ],
+    });
+    show(value, language);
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    await userEvent.click(screen.getByText(MESSAGES[language].suggestionHistory.recordedPlans));
+    const price = language === "tr" ? "4,0" : "4.0";
+    expect(screen.getByText(TOP100_COPY[language].combinedCost(price))).toBeVisible();
+    expect(
+      screen.queryByText(TOP100_COPY[language].combinedCostAtMost(price)),
+    ).not.toBeInTheDocument();
+  },
+);
+it("does not display negative archived prices", async () => {
+  const value = history();
+  Object.assign(value.payload.weeks[0], {
+    recorded_plans: [
+      { ...planRows[1], expected_points_cost: -2, expected_points_cost_ceiling: undefined },
+    ],
+  });
+  show(value, "en");
+  await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+  await userEvent.click(screen.getByText(MESSAGES.en.suggestionHistory.recordedPlans));
+  expect(screen.queryByText(/gives? up/)).not.toBeInTheDocument();
+});
 const history = () => structuredClone(fixture) as SuggestionHistory;
-function show(value = history(), language: Language = "tr") {
+function show(value = history(), language: Language = "tr", members: EntryView[] = []) {
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter>
-        <LeagueMemberHistoryView history={value} />
+        <LeagueMemberHistoryView history={value} members={members} />
       </MemoryRouter>
     </LanguageProvider>,
   );
 }
+
+it.each([true, false])(
+  "uses the published rival name with an id fallback (available: %s)",
+  async (available) => {
+    const rival = mockMembers.find((member) => member.member_kind === "human")!;
+    const value = history();
+    Object.assign(value.payload.weeks[0], {
+      recorded_plans: [{ ...planRows[0], strategy: "ortak-koru", rival_entry_id: rival.entry_id }],
+    });
+    show(value, "en", available ? [rival] : []);
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    const details = screen
+      .getByText(MESSAGES.en.suggestionHistory.recordedPlans)
+      .closest("details")!;
+    await userEvent.click(within(details).getByText(MESSAGES.en.suggestionHistory.recordedPlans));
+    expect(details).toHaveTextContent(
+      available ? (rival.team_name ?? rival.manager_name)! : `#${rival.entry_id}`,
+    );
+  },
+);
 
 it.each<Language>(["tr", "en"])(
   "shows gross, costs, net and a signed comparison in %s",

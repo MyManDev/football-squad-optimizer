@@ -368,6 +368,7 @@ def test_two_containers_from_one_image_answer_through_the_shared_volume(
         "capture_context": True,
         "league_tree": True,
         "cache_store": True,
+        "league_tree_matches_capture": True,
     }, ready
 
     status, accepted = _post(origin, deployment)

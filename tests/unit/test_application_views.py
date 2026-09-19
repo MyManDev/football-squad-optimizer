@@ -286,6 +286,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
     assert first.files == second.files
     assert set(first.files) == {
         "index.json",
+        "fixtures.json",
         f"{SEASON}/gw01/recommendation.json",
         f"{SEASON}/gw01/pool.json",
         f"{SEASON}/gw01/live.json",
@@ -294,6 +295,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
         f"{SEASON}/status.json",
         f"schema/{UI_VIEW_CONTRACT_VERSION}.schema.json",
         "schema/live_score_v1.schema.json",
+        "schema/fixtures_v1.schema.json",
     }
     for relative in first.files:
         a = (tmp_path / "one" / "data" / relative).read_bytes()
@@ -316,6 +318,13 @@ def test_build_site_writes_a_deterministic_validated_tree(
             jsonschema.validate(document, live_schema)
             assert document["payload"]["status"] == "unavailable"
             continue
+        if relative == "fixtures.json":
+            fixtures_schema = json.loads(
+                (tmp_path / "one/data/schema/fixtures_v1.schema.json").read_text("utf-8")
+            )
+            jsonschema.validate(document, fixtures_schema)
+            assert document["payload"]["source_snapshot_id"] == snapshot.metadata.snapshot_id
+            continue
         jsonschema.validate(document, schema)
         assert document["contract_version"] == UI_VIEW_CONTRACT_VERSION
     index = json.loads((tmp_path / "one" / "data" / "index.json").read_text("utf-8"))["payload"]
@@ -334,7 +343,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
     assert "projection_handoff_path" not in public_text
     assert "risk_residuals_path" not in public_text
     assert first.status_written is True and first.decided_gameweeks == (1,)
-    assert first.league_written is True
+    assert first.league_written is True and first.fixtures_written is True
     # No leftover temporary files from the atomic writes.
     assert not [p for p in (tmp_path / "one").rglob(".*.tmp-*")]
 

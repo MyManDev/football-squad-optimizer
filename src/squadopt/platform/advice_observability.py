@@ -20,6 +20,8 @@ requests by reason.
 touches no dependency; ``/ready`` answers "can this deployment serve" — is the cache
 store writable, is a capture context loaded, is the league tree readable. Folded into
 one endpoint, a full disk looks healthy; that is the failure this split exists for.
+A fourth check asks whether the tree and the capture are for the same week: each is
+published on its own, and both being readable says nothing about that.
 
 The structured log needs somewhere to go, which is why ``configure_advice_logging`` is
 here. Nothing under ``squadopt.api`` or ``squadopt.platform`` attached a handler, and
@@ -37,10 +39,23 @@ import sys
 import threading
 import time
 from bisect import bisect_left
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Final
 
 ADVICE_LOGGER_NAME: Final[str] = "advice"
+
+API_COUNTER_FAMILIES: Final = (
+    "advice_cache_hits_total",
+    "advice_cache_misses_total",
+    "advice_jobs_submitted_total",
+    "advice_rejected_total",
+    "advice_open_job_refused_total",
+)
+WORKER_COUNTER_FAMILIES: Final = (
+    "advice_jobs_total",
+    "advice_solver_status_total",
+    "advice_worker_queue_busy_total",
+)
 
 _HISTOGRAM_BUCKETS: Final[tuple[float, ...]] = (
     0.1,
@@ -114,7 +129,8 @@ class _Histogram:
 class AdviceMetrics:
     """In-process counters and histograms, rendered as Prometheus text on demand."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, zero_counters: Iterable[str] = ()) -> None:
+        self._zero_counters = frozenset(zero_counters)
         self._counters: dict[tuple[str, tuple[tuple[str, str], ...]], int] = {}
         self._histograms: dict[str, _Histogram] = {}
         self._lock = threading.RLock()
@@ -146,11 +162,15 @@ class AdviceMetrics:
     def solve_seconds(self, seconds: float) -> None:
         self.observe("advice_solve_seconds", seconds)
 
-    def render(self, *, queue_depth: int | None = None) -> str:
+    def render(
+        self, *, queue_depth: int | None = None, jobs_by_status: Mapping[str, int] | None = None
+    ) -> str:
         with self._lock:
-            return self._render(queue_depth=queue_depth)
+            return self._render(queue_depth=queue_depth, jobs_by_status=jobs_by_status)
 
-    def _render(self, *, queue_depth: int | None = None) -> str:
+    def _render(
+        self, *, queue_depth: int | None = None, jobs_by_status: Mapping[str, int] | None = None
+    ) -> str:
         """The scrape body. Queue depth is read at scrape time by the caller that has
         the queue, because a gauge that counts events drifts from the store."""
 
@@ -158,8 +178,21 @@ class AdviceMetrics:
         if queue_depth is not None:
             lines.append("# TYPE advice_queue_depth gauge")
             lines.append(f"advice_queue_depth {queue_depth}")
+        if jobs_by_status is not None:
+            lines.append(
+                "# HELP advice_jobs Jobs held in the store by status, not all-time totals."
+            )
+            lines.append("# TYPE advice_jobs gauge")
+            for status, count in sorted(jobs_by_status.items()):
+                lines.append(f'advice_jobs{{status="{status}"}} {count}')
         seen_families: set[str] = set()
-        for (name, labels), count in sorted(self._counters.items()):
+        counters = dict(self._counters)
+        # Before the first labelled observation, report a known zero without
+        # inventing a reason/status. Once observed, only the actual label sets remain.
+        present = {name for name, _ in counters}
+        for name in self._zero_counters - present:
+            counters[(name, ())] = 0
+        for (name, labels), count in sorted(counters.items()):
             rendered_labels = (
                 "{" + ",".join(f'{key}="{value}"' for key, value in labels) + "}" if labels else ""
             )
@@ -187,12 +220,20 @@ def readiness_report(
     context_loaded: bool,
     league_tree_readable: bool,
     cache_writable: bool,
+    league_tree_matches_capture: bool | None = None,
 ) -> tuple[bool, Mapping[str, bool]]:
-    """One place decides what "ready" means, so the endpoint cannot drift from it."""
+    """One place decides what "ready" means, so the endpoint cannot drift from it.
+
+    ``league_tree_matches_capture`` is whether the published tree is for the week the
+    capture targets. A caller that does not ask leaves it out and the report is the three
+    checks it always was: a check nobody made is absent, not passed.
+    """
 
     checks = {
         "capture_context": context_loaded,
         "league_tree": league_tree_readable,
         "cache_store": cache_writable,
     }
+    if league_tree_matches_capture is not None:
+        checks["league_tree_matches_capture"] = league_tree_matches_capture
     return all(checks.values()), checks

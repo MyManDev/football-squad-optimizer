@@ -35,6 +35,7 @@ deadline escape, and it prints both paths so the published tree can be attribute
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
@@ -97,6 +98,12 @@ class LeaguePublish:
     #: capture differs from that capture's record and the deadline will not wait for the
     #: difference to be reconciled. The first record is kept; this publish adds none.
     record_advice: bool = True
+    #: The week's rotation evidence and the club-news source it was coded from, both or
+    #: neither, passed through to the league build as the manager's word.
+    rotation_evidence: Path | None = None
+    club_news_source: Path | None = None
+    #: The week's Top 100 evidence export, passed through as the Top 100 menu.
+    top100_evidence: Path | None = None
 
     def __post_init__(self) -> None:
         if self.league_id < 1:
@@ -183,6 +190,12 @@ class LeaguePublish:
             arguments += ["--in-season-projection", str(self.in_season_projection)]
         if not self.record_advice:
             arguments.append("--no-advice-record")
+        if self.rotation_evidence is not None:
+            arguments += ["--rotation-evidence", str(self.rotation_evidence)]
+        if self.club_news_source is not None:
+            arguments += ["--club-news-source", str(self.club_news_source)]
+        if self.top100_evidence is not None:
+            arguments += ["--top100-evidence", str(self.top100_evidence)]
         return arguments
 
 
@@ -197,8 +210,11 @@ class PublishNames:
     season: str
     gameweek: int
     kind: str
+    suffix: str = ""
 
     def __post_init__(self) -> None:
+        if self.suffix and not re.fullmatch(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", self.suffix):
+            raise PublishError("Publish suffix must contain letters, digits or single hyphens.")
         if self.kind not in KINDS:
             raise PublishError(f"kind must be one of {KINDS}, got {self.kind!r}.")
         if not 1 <= int(self.gameweek) <= 38:
@@ -209,11 +225,13 @@ class PublishNames:
 
     @property
     def branch(self) -> str:
-        return f"feature/gw{self.gameweek:02d}-{self.kind}-site"
+        suffix = f"-{self.suffix}" if self.suffix else ""
+        return f"feature/gw{self.gameweek:02d}-{self.kind}-site{suffix}"
 
     @property
     def worktree_directory(self) -> str:
-        return f".codex-tmp/publications/gw{self.gameweek:02d}-{self.kind}"
+        suffix = f"-{self.suffix}" if self.suffix else ""
+        return f".codex-tmp/publications/gw{self.gameweek:02d}-{self.kind}{suffix}"
 
     @property
     def site_tag(self) -> str:
@@ -378,7 +396,7 @@ def publish(
     if branch_exists and not force_branch:
         raise PublishError(
             f"Branch {names.branch} already exists on origin. Re-running a publish is fine, "
-            "but say so: pass --force-branch to reuse it."
+            "but say so: pass --force-branch to reuse it or choose another --publish-suffix."
         )
     if dry_run:
         print(f"dry run: would create {names.branch} in {worktree}, build, commit, push, PR.")
@@ -528,6 +546,23 @@ def main() -> int:
         "Top-100 mean is published gross of transfer costs and labelled gross",
     )
     parser.add_argument(
+        "--rotation-evidence",
+        type=Path,
+        help="the week's rotation evidence table; with --club-news-source, the "
+        "manager's word is built for every member",
+    )
+    parser.add_argument(
+        "--club-news-source",
+        type=Path,
+        help="the fixture file or club-news capture the evidence was coded from",
+    )
+    parser.add_argument(
+        "--top100-evidence",
+        type=Path,
+        help="the week's Top 100 evidence export (csv, manifest beside it); every member "
+        "then gets the Top 100 influence menu",
+    )
+    parser.add_argument(
         "--no-advice-record",
         action="store_true",
         help="publish without recording what was published; the escape when a rebuild of "
@@ -553,11 +588,32 @@ def main() -> int:
             league = LeaguePublish(
                 league_id=arguments.league,
                 snapshot_id=arguments.snapshot_id,
-                in_season_projection=arguments.in_season_projection,
+                # Resolved here: the build runs with its working directory inside the
+                # publication worktree, where a relative path names nothing.
+                in_season_projection=(
+                    arguments.in_season_projection.resolve()
+                    if arguments.in_season_projection is not None
+                    else None
+                ),
                 workers=arguments.workers,
                 cohort_snapshot=arguments.cohort_snapshot,
                 elite_snapshot=arguments.elite_snapshot,
                 record_advice=not arguments.no_advice_record,
+                rotation_evidence=(
+                    arguments.rotation_evidence.resolve()
+                    if arguments.rotation_evidence is not None
+                    else None
+                ),
+                club_news_source=(
+                    arguments.club_news_source.resolve()
+                    if arguments.club_news_source is not None
+                    else None
+                ),
+                top100_evidence=(
+                    arguments.top100_evidence.resolve()
+                    if arguments.top100_evidence is not None
+                    else None
+                ),
             )
         return publish(
             names,

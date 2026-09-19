@@ -4,6 +4,11 @@ export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
   suggestionHistory: {
+    recordedPlans: "Recorded Plans and Settings",
+    recordedPlansNote:
+      "One-week plans. Window plans and other rivals are in the week's own record and are not listed here. This does not show what you chose, and these alternatives have not been scored against results here.",
+    unknownPlayer: "Player Not Recorded",
+    noRecordedMoves: "No Moves Listed",
     title: "Weekly Suggestion History",
     overview: "Overview",
     systemNet: "System Suggestion · Net",
@@ -101,6 +106,13 @@ const en = {
     operations: "Operations Status",
     notFound: "There is no page here.",
     metaDescription: "SquadOpt: a weekly FPL decision, and what it rests on.",
+  },
+  admin: {
+    title: "Admin",
+    notice: "This admin page is unlisted, not protected; anyone with its address can open it.",
+    analysis: "Measurement archive",
+    status: "Operational state",
+    decisions: "Decision log (GitHub)",
   },
   language: {
     label: "Language",
@@ -717,6 +729,7 @@ const en = {
       "The advice rules belong to another season.":
         "The advice inputs belong to different seasons.",
       "A member cannot be their own rival.": "The selected member and rival are the same.",
+      not_solved_for_member: "No plan was found for this selection in this publish.",
     } as Record<string, string>,
     publicationReasonUnknown:
       "The publisher supplied a reason, but no translated explanation is available.",
@@ -766,17 +779,6 @@ const en = {
     publicDataBody:
       "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
-    incompleteTitle: "Incomplete Source Record",
-    missingFieldLabels: {
-      free_transfers: "free-transfer allowance",
-      purchase_prices: "purchase prices",
-    } as Record<string, string>,
-    missingFieldUnknown: "other missing data",
-    incompleteBody: (fields: string) =>
-      `The source did not provide: ${fields}. Nothing is invented to fill it.`,
-    entryAssumptionsTitle: "Public-data limits",
-    currentPriceFallback:
-      "Purchase prices are not public, so what each player alone would sell for is unknown. What the whole squad sells for is published, and the plan spends that and the bank, never more.",
     memberSquad: "Member Squad",
     heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
     starterCount: (count: number) => `${count} starters`,
@@ -846,7 +848,7 @@ const en = {
     } as Record<string, string>,
     linkTitle: "Classic league 352490",
     linkBody:
-      "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
+      "Every member row opens that member's public post-deadline squad and the moves suggested from it.",
     linkLabel: "Open league members →",
   },
   reasonCodes: {
@@ -905,7 +907,9 @@ const en = {
     kicker: (contract: string, time: string) => `season tick · ${contract} · as of ${time}`,
     title: "Status",
     nextGameweek: "next gameweek",
+    publishedGameweek: "gameweek in this publication",
     deadline: (time: string) => `deadline ${time}`,
+    deadlineClosedAt: (time: string) => `deadline ${time}, already passed`,
     noDeadline: "no open deadline in the latest capture",
     timeToDeadline: "time to deadline",
     deadlinePassed: "deadline passed",
@@ -968,6 +972,11 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    recordedPlans: "Kaydedilmiş Planlar ve Ayarlar",
+    recordedPlansNote:
+      "Bir haftalık planlar. Çok haftalık planlar ve diğer rakipler haftanın kendi kaydında bulunur, burada listelenmez. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
+    unknownPlayer: "Oyuncu Kaydedilmemiş",
+    noRecordedMoves: "Listelenen Hamle Yok",
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",
     systemNet: "Sistem Tavsiyesi · Net",
@@ -984,7 +993,7 @@ const tr: MessageSchema<typeof en> = {
     back: "Üyeye Dön",
     week: "Kayıtlı Hafta",
     gameweek: (week) => `Oyun Haftası ${week}`,
-    scope: "Lig 352490 · Deadline öncesinde kaydedilmiş son bir haftalık saf puan önerisi.",
+    scope: "Lig 352490 · Son tarihten önce kaydedilmiş son bir haftalık saf puan önerisi.",
     method:
       "Kayıtlı kadroyu kesinleşmiş oyuncu sonuçları, kaptan ve otomatik yedek kurallarıyla puanlıyoruz. Geçmiş önerileri yeniden hesaplatmıyoruz. Puan farkı bir karşılaştırmadır; öneriyi uyguladığınızı veya bu puanı kazanacağınızı kanıtlamaz.",
     empty: "Kayıt Yok",
@@ -993,7 +1002,7 @@ const tr: MessageSchema<typeof en> = {
     retry: "Yeniden Dene",
     unsettled: "Sonuç Kesinleşmedi",
     unavailable: "Karşılaştırma Yapılamıyor",
-    noEligible: "Deadline öncesinde kaydedilmiş öneri yok.",
+    noEligible: "Son tarihten önce kaydedilmiş öneri yok.",
     missingOutcomes: "Hafta kesinleşmiş ancak oyuncu sonuçlarının kaydı bulunmuyor.",
     invalid: "Kayıtlı veriler doğrulanmış bir karşılaştırma için yeterli değil.",
     pending: "Hafta tamamlanıp sonuçlar kontrol edilene kadar puanlar gösterilmez.",
@@ -1025,7 +1034,7 @@ const tr: MessageSchema<typeof en> = {
       "Beklenen ve gerçekleşen değerler oyuncunun çarpansız puanıdır. Uygulanan çarpan kaptan etiketinde gösterilir.",
     evidence: "Kayıt Ayrıntıları",
     published: "Kayıtlı Yayın",
-    deadline: "Deadline",
+    deadline: "Son Tarih",
     captured: "Öneri Verisinin Alındığı An",
     settledAt: "Sonuçların Alındığı An",
     outcomeAsOf: "Sonuç Verisinin Tarihi",
@@ -1062,6 +1071,14 @@ const tr: MessageSchema<typeof en> = {
     operations: "Operasyon Durumu",
     notFound: "Burada bir sayfa yok.",
     metaDescription: "SquadOpt: haftalık FPL kararı ve dayandığı kanıt.",
+  },
+  admin: {
+    title: "Yönetim",
+    notice:
+      "Bu yönetim sayfası menüde listelenmez, korumalı değildir; adresini bilen herkes açabilir.",
+    analysis: "Ölçüm arşivi",
+    status: "Operasyon durumu",
+    decisions: "Karar kaydı (GitHub)",
   },
   language: { label: "Dil", tr: "Türkçe", en: "English" },
   theme: {
@@ -1655,6 +1672,7 @@ const tr: MessageSchema<typeof en> = {
         "Önerinin girdileri farklı veri kayıtlarına ait.",
       "The advice rules belong to another season.": "Önerinin girdileri farklı sezonlara ait.",
       "A member cannot be their own rival.": "Seçilen üye ve rakip aynı kişi.",
+      not_solved_for_member: "Bu seçim için bu yayında plan bulunamadı.",
     } as Record<string, string>,
     publicationReasonUnknown:
       "Yayıncı bir neden belirtmiş; bu nedenin çevrilmiş açıklaması bulunmuyor.",
@@ -1703,17 +1721,6 @@ const tr: MessageSchema<typeof en> = {
     publicDataBody:
       "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
-    incompleteTitle: "Eksik Kaynak Kaydı",
-    missingFieldLabels: {
-      free_transfers: "ücretsiz transfer hakkı",
-      purchase_prices: "satın alma fiyatları",
-    },
-    missingFieldUnknown: "diğer eksik veri",
-    incompleteBody: (fields) =>
-      `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
-    entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
-    currentPriceFallback:
-      "Satın alma fiyatları herkese açık değil, yani tek bir oyuncunun kaça satılacağı bilinmiyor. Kadronun tamamının satış değeri ise yayımlanıyor; plan onu ve bankayı harcar, fazlasını değil.",
     memberSquad: "Üye kadrosu",
     heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     starterCount: (count) => `${count} ilk 11 oyuncusu`,
@@ -1777,7 +1784,7 @@ const tr: MessageSchema<typeof en> = {
     },
     linkTitle: "Klasik lig 352490",
     linkBody:
-      "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",
+      "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",
   },
   reasonCodes: {
@@ -1835,7 +1842,9 @@ const tr: MessageSchema<typeof en> = {
     kicker: (contract, time) => `sezon tick'i · ${contract} · ${time} itibarıyla`,
     title: "Durum",
     nextGameweek: "sıradaki oyun haftası",
+    publishedGameweek: "bu yayının oyun haftası",
     deadline: (time) => `son tarih ${time}`,
+    deadlineClosedAt: (time) => `son tarih ${time}, geçti`,
     noDeadline: "son capture'da açık son tarih yok",
     timeToDeadline: "son tarihe kalan süre",
     deadlinePassed: "son tarih geçti",

@@ -48,10 +48,12 @@ from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.club_news import ClaimResponse, FixtureClubNewsProvider, RawDocument
 from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
+from squadopt.data.sources.club_news_claims import parse_claim_response
 from squadopt.data.sources.club_news_coding import (
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     CodingFixture,
     coding_prompt_sha256,
+    locate_claims_reporting,
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.platform.club_news_fetch import (
@@ -132,14 +134,15 @@ class _Host:
 def _answer_about(documents: Sequence[RawDocument]) -> str:
     """The committed coding response, narrowed to the documents that were handed over.
 
-    Not a convenience. The registry admits **one page per club** -- `load_club_sources`
-    refuses a club twice, because "which page is this club's" cannot have two answers --
-    while the committed fixture carries two pages for Man Utd and a response citing both.
-    So a week read through the registry sees fewer documents than the fixture file
-    describes, and the prompt's own first rule is "read only those documents": a model
-    handed two pages cannot cite a third.
+    Not a convenience. The prompt's own first rule is "read only those documents", so a
+    model handed two pages may not cite a third, and a week's registry decides how many it
+    is handed. `_registry` below names one page per club even though the registry now
+    admits several, so most tests here read one page for Man Utd while the committed
+    fixture carries two and a response citing both -- and the response has to be narrowed
+    to match, or the answer would cite bytes that were never fetched.
 
-    That gap is real and is recorded in its own test below rather than smoothed over here.
+    The registry's own limit is gone: a club may register every page it publishes, which
+    `test_a_club_whose_news_is_split_across_two_pages_is_read_in_full` drives end to end.
     """
 
     fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
@@ -188,7 +191,12 @@ class _Message:
 
 
 def _registry(path: Path, *, clubs: tuple[str, ...] | None = None) -> Path:
-    """Write a source registry naming the fixture's pages, one entry per club."""
+    """Write a source registry naming one of the fixture's pages per club.
+
+    One per club by choice, not by constraint -- the registry takes several now. These tests
+    are about the seams the chain walks, and holding the document count still keeps a failure
+    here pointing at the seam rather than at how many pages a club happened to publish.
+    """
 
     provider = FixtureClubNewsProvider(FIXTURE)
     declared = provider.clubs_declared() if clubs is None else clubs
@@ -467,21 +475,22 @@ def test_an_empty_registry_is_refused_rather_than_read_as_a_quiet_week(
         load_club_sources(path)
 
 
-def test_a_club_can_register_only_one_page_though_the_lane_carries_several(
+def test_a_club_whose_news_is_split_across_two_pages_is_read_in_full(
     tmp_path: Path,
 ) -> None:
-    """A limitation this chain found, pinned so it is a known shape rather than a surprise.
+    """Both of one club's pages are registered, fetched and coded in the same week.
 
-    Everything downstream of the fetch handles several documents per club: `RawDocument`
-    carries a club, the capture stores one payload per document, and the committed fixture
-    has two pages for Man Utd with claims citing both. The registry cannot express that --
-    `load_club_sources` refuses a club twice, deliberately, because "which page is this
-    club's" may not have two answers when the evidence table joins on the club.
+    This chain found the limit from the other side: everything below the registry already
+    handled several documents per club -- `RawDocument` carries a club, the capture stores
+    one payload per document, the call assembles a list of documents, and the committed
+    fixture has two pages for Man Utd with claims citing both -- while `load_club_sources`
+    refused to register the second one. The reason it gave, that "which page is this club's"
+    may not have two answers, was answering a question nothing asks: a claim cites a
+    document by digest and byte span, not a club.
 
-    So a club whose news is split across a press conference and an injury update can be read
-    through this path only in part. Whether the registry should take a list of pages per
-    club is a decision, not a defect to fix in a test; this records the shape as it is, and
-    fails if somebody changes it without meaning to.
+    So the assertion is the whole round trip rather than the registry read alone. Both pages
+    are requested, both reach the model in one call, and the located claims cite both
+    digests -- which is what "read in full" has to mean here.
     """
 
     path = tmp_path / "club_news_sources.json"
@@ -506,5 +515,28 @@ def test_a_club_can_register_only_one_page_though_the_lane_carries_several(
         encoding="utf-8",
     )
 
-    with pytest.raises(ClubNewsFetchError, match="Man Utd"):
-        load_club_sources(path)
+    sources = load_club_sources(path)
+    assert [source.url for source in sources] == [
+        "https://club.example/united/press-conference-gw4",
+        "https://club.example/united/squad-update",
+    ]
+
+    host = _Host()
+    documents, refused = fetch_registered_documents(
+        sources, opener=host, now=lambda: FETCHED_AT, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert {document.club for document in documents} == {"Man Utd"}
+    assert len(documents) == 2, "one club's second page was dropped somewhere below"
+
+    provider = AnthropicClubNewsProvider(client=_Model(documents))
+    response = provider.code(documents, FixtureClubNewsProvider(FIXTURE).roster())
+    located, dropped = locate_claims_reporting(response, documents)
+    claims = parse_claim_response(located, documents)
+
+    assert dropped == ()
+    cited = {claim.source_sha256 for claim in claims}
+    assert cited == {hashlib.sha256(document.content).hexdigest() for document in documents}, (
+        "a claim from each page is what makes the second page worth registering"
+    )

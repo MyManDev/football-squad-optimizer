@@ -13,6 +13,7 @@ after the fact, and it is the only reason a model is allowed anywhere near this 
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -78,7 +79,7 @@ def _coded() -> tuple[CodedClub, ...]:
     )
 
 
-def _write(root: Path) -> str:
+def _write(root: Path, *, partially_covered: tuple[str, ...] = ()) -> str:
     provider = FixtureClubNewsProvider(FIXTURE)
     metadata = write_club_news_capture(
         root,
@@ -87,6 +88,7 @@ def _write(root: Path) -> str:
         clubs_declared=provider.clubs_declared(),
         clubs_covered=provider.clubs_covered(),
         captured_at_utc=CAPTURED_AT,
+        clubs_partially_covered=partially_covered,
     )
     return metadata.snapshot_id
 
@@ -151,6 +153,61 @@ def test_what_was_asked_for_and_what_answered_both_survive(tmp_path: Path) -> No
     assert {entry.response.model_version for entry in coded} == {"fixture-1"}
 
 
+def test_a_club_read_in_part_is_recorded_as_such(tmp_path: Path) -> None:
+    """Covered, and not covered in full -- a distinction the payloads cannot make.
+
+    A club whose second page was refused arrives with one document, exactly like a club that
+    only ever registered one. Only the run that read the registry knows which it was, so it
+    says so in the index rather than leaving a later reader to assume the flattering one.
+    """
+
+    covered = FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    identifier = _write(tmp_path, partially_covered=(covered[0],))
+
+    _declared, read, partial = read_captured_coverage(read_snapshot(tmp_path, identifier))
+
+    assert partial == (covered[0],)
+    assert set(partial) <= set(read), "partial coverage narrows coverage, it does not replace it"
+    assert covered[0] in read
+
+
+def test_a_club_nobody_read_cannot_be_partly_read(tmp_path: Path) -> None:
+    """Unread and partly read are different facts about different weeks."""
+
+    provider = FixtureClubNewsProvider(FIXTURE)
+    uncovered = sorted(set(provider.clubs_declared()) - set(provider.clubs_covered()))
+
+    with pytest.raises(ClubNewsError, match="unread, not partly read"):
+        write_club_news_capture(
+            tmp_path,
+            documents=_documents(),
+            coded=_coded(),
+            clubs_declared=provider.clubs_declared(),
+            clubs_covered=provider.clubs_covered(),
+            captured_at_utc=CAPTURED_AT,
+            clubs_partially_covered=(uncovered[0],),
+        )
+
+
+def test_a_capture_written_before_the_field_reads_as_none_partly_read(tmp_path: Path) -> None:
+    """An absent list is empty, not a refusal.
+
+    Captures written when a club could register only one page cannot have a partly-read
+    club, so demanding the field would make a true statement about those weeks unreadable.
+    """
+
+    identifier = _write(tmp_path)
+    snapshot = read_snapshot(tmp_path, identifier)
+    index = json.loads(snapshot.payloads[INDEX_PAYLOAD].decode("utf-8"))
+    del index["clubs_partially_covered"]
+    older = replace(
+        snapshot,
+        payloads={**snapshot.payloads, INDEX_PAYLOAD: json.dumps(index).encode("utf-8")},
+    )
+
+    assert read_captured_coverage(older)[2] == ()
+
+
 def test_declared_and_covered_stay_apart(tmp_path: Path) -> None:
     """The one distinction this lane exists to keep, recorded while it is still known.
 
@@ -160,7 +217,7 @@ def test_declared_and_covered_stay_apart(tmp_path: Path) -> None:
 
     identifier = _write(tmp_path)
 
-    declared, covered = read_captured_coverage(read_snapshot(tmp_path, identifier))
+    declared, covered, _partial = read_captured_coverage(read_snapshot(tmp_path, identifier))
 
     assert set(covered) < set(declared)
     assert "Everton" in declared
@@ -181,7 +238,7 @@ def test_the_evidence_replays_from_the_capture_alone(tmp_path: Path) -> None:
 
     identifier = _write(tmp_path)
 
-    documents, coded, _declared, _covered = read_club_news_capture(
+    documents, coded, _declared, _covered, _partial = read_club_news_capture(
         read_snapshot(tmp_path, identifier)
     )
     located = locate_claim_response(coded[0].response, documents)
@@ -223,7 +280,7 @@ def test_the_replayed_claims_match_the_in_memory_ones(tmp_path: Path) -> None:
     )
     identifier = _write(tmp_path)
 
-    documents, coded, _declared, _covered = read_club_news_capture(
+    documents, coded, _declared, _covered, _partial = read_club_news_capture(
         read_snapshot(tmp_path, identifier)
     )
 

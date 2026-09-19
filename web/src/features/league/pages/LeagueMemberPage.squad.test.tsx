@@ -50,34 +50,25 @@ function sectionFor(title: string): HTMLElement {
 }
 
 describe("the member's published squad", () => {
-  it.each(["tr", "en"] as const)("translates known missing fields in %s", (language) => {
-    const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
-    squad.payload.data_quality = "partial";
-    squad.payload.missing_fields = ["free_transfers", "purchase_prices"];
-    render(memberSurface(squad, language));
-
-    const card = sectionFor(MESSAGES[language].leagueMembers.incompleteTitle);
-    expect(card).toHaveTextContent(
-      language === "tr"
-        ? "ücretsiz transfer hakkı, satın alma fiyatları"
-        : "free-transfer allowance, purchase prices",
-    );
-    expect(card).not.toHaveTextContent(/free_transfers|purchase_prices/);
-    expect(squad.payload.missing_fields).toEqual(["free_transfers", "purchase_prices"]);
-  });
-
   it.each(["tr", "en"] as const)(
-    "keeps unknown and inherited missing-field names neutral in %s",
+    "carries no source-record or public-data notice on a partial record in %s",
     (language) => {
       const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
       squad.payload.data_quality = "partial";
-      const raw = ["__proto__", "toString", "probability 97% chance"];
+      squad.payload.purchase_prices_known = false;
+      const raw = ["free_transfers", "purchase_prices", "probability 97% chance"];
       squad.payload.missing_fields = raw;
-      render(memberSurface(squad, language));
+      const { container } = render(memberSurface(squad, language));
 
-      const card = sectionFor(MESSAGES[language].leagueMembers.incompleteTitle);
-      expect(card).toHaveTextContent(language === "tr" ? "diğer eksik veri" : "other missing data");
-      for (const field of raw) expect(card).not.toHaveTextContent(field);
+      // The member page is the squad and the plan. The notices left it; the record keeps
+      // the fields, and a raw field name never reaches the page.
+      expect(
+        screen.queryByRole("heading", {
+          level: 2,
+          name: MESSAGES[language].leagueMembers.publicDataTitle,
+        }),
+      ).toBeNull();
+      for (const field of raw) expect(container).not.toHaveTextContent(field);
       expect(squad.payload.missing_fields).toEqual(raw);
     },
   );

@@ -1,0 +1,200 @@
+import type { Language } from "../../../i18n/messages";
+
+/**
+ * The Top 100 influence copy, in both languages.
+ *
+ * It lives beside the components that read it, like the manager's-word copy, so it loads
+ * with the member page and not with every first visit. The honesty sweep
+ * (`i18n/messagesNoProbability.test.ts`) walks it entry by entry, functions called.
+ *
+ * What it may say: the setting is a preference, what it does to the points the plan is
+ * chosen on, what it gives up in the base model, and that no gain from it was measured.
+ * It never writes the weight as a share, never names a best setting, and never states a
+ * weighted number as the member's own.
+ */
+export interface Top100Copy {
+  windowComparisonTitle: string;
+  windowSelectedTotal: string;
+  windowPureTotal: string;
+  windowComparisonBasis: string;
+  legend: string;
+  zero: string;
+  help: string;
+  published: string;
+  onlyBaseline: string;
+  notOffered: string;
+  unavailableReasons: Record<string, string> & { unknown: string };
+  notSolved: string;
+  notForSelection: string;
+  rivalWindows: string;
+  strategyCost: (points: string) => string;
+  strategyCostAtMost: (points: string) => string;
+  variantLimits: Record<string, string>;
+  title: string;
+  weightLine: (weight: number) => string;
+  notStart: string;
+  saturation: string;
+  negativeRow: string;
+  honesty: string;
+  unchanged: string;
+  changed: string;
+  cost: (points: string) => string;
+  costAtMost: (points: string) => string;
+  combinedCost: (points: string) => string;
+  combinedCostAtMost: (points: string) => string;
+  unproven: string;
+  moveReason: string;
+  limit: (weight: number) => string;
+}
+
+const en: Top100Copy = {
+  windowComparisonTitle: "Window totals",
+  windowSelectedTotal: "Selected plan",
+  windowPureTotal: "Pure-points plan at 0",
+  windowComparisonBasis:
+    "Both totals use the base model for this member, after transfer hits. They describe the plan above and the published pure-points plan of the same capture. Read them with the proof status and limits shown here.",
+  legend: "Top 100 influence",
+  zero: "0 (off)",
+  help: "Players in last week's Top 100 starting elevens count for more in proportion to how many of those teams started them: at setting 20, a player all 100 teams started counts 1.2 times their base points, and one that 50 teams started counts 1.1 times. The plan is chosen on those points and every number on the card is the base model's. 0 switches it off.",
+  published: "This week's published plan carries no Top 100 influence (0).",
+  onlyBaseline: "One-week pure-points plan only.",
+  notOffered:
+    "The setting in the link is not offered for this member in this publish; the plan at 0 is shown.",
+  unavailableReasons: {
+    no_top100_this_run: "This publish read no Top 100 selections; only 0 is available.",
+    top100_inputs_refused:
+      "This publish could not verify the Top 100 selections; only 0 is available.",
+    published_plan_carries_top100:
+      "This publish's plan already carries a Top 100 influence; the settings are off.",
+    not_solved_for_member: "No setting was solved for this member in this publish.",
+    unknown:
+      "No Top 100 setting can be shown for this member from this publish; only 0 is available.",
+  },
+  notSolved:
+    "Settings with no plan solved for this member, with the switches as they stand, are off.",
+  notForSelection:
+    "No setting was solved for this selection. Settings exist on the pure-points plans and, for a strategy, against the default rival.",
+  rivalWindows: "A strategy's 3- and 5-week plans are solved against the default rival only.",
+  strategyCost: (points) =>
+    `This strategy and this setting together give up ~${points} expected points in the base model against the pure-points plan at 0, hits included.`,
+  strategyCostAtMost: (points) =>
+    `This strategy and this setting together give up at most ${points} expected points in the base model against the pure-points plan at 0, hits included.`,
+  variantLimits: {
+    "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.":
+      "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.",
+    "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.":
+      "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.",
+  },
+  title: "Top 100 influence",
+  weightLine: (weight) => `Setting: ${weight} (your choice).`,
+  notStart:
+    "This is the Top 100 teams' previous-week choice of eleven, not a measurement of whether a player will start.",
+  saturation: "A higher setting can return the same plan.",
+  negativeRow:
+    "The eleven is chosen with the setting, so a row can read below zero on the base model's points.",
+  honesty:
+    "This is the price of a preference; no points gain from this setting has been measured. The points on the card are the base model's, without the setting.",
+  unchanged: "This setting did not change your plan this week.",
+  changed: "This setting changed your plan; the price is stated above.",
+  cost: (points) =>
+    `This setting gives up ~${points} expected points in the base model against the pure-points plan at 0, hits included.`,
+  costAtMost: (points) =>
+    `This setting gives up at most ${points} expected points in the base model against the pure-points plan at 0, hits included.`,
+  combinedCost: (points) =>
+    `The manager's word and this setting together give up ~${points} expected points in the base model against the pure-points plan with both off, hits included.`,
+  combinedCostAtMost: (points) =>
+    `The manager's word and this setting together give up at most ${points} expected points in the base model against the pure-points plan with both off, hits included.`,
+  unproven:
+    "The solver found this plan without finishing its proof, so the price below is stated as at most.",
+  moveReason: "In the plan because of the Top 100 influence.",
+  limit: (weight) =>
+    `The plan was chosen with the Top 100 influence at ${weight}; every expected-points number here is the base model's, without it.`,
+};
+
+const tr: Top100Copy = {
+  windowComparisonTitle: "Pencere toplamları",
+  windowSelectedTotal: "Seçilen plan",
+  windowPureTotal: "0 ayarlı saf puan planı",
+  windowComparisonBasis:
+    "İki toplam da bu üyenin temel model puanlarını kullanır; transfer cezaları düşülmüştür. Yukarıdaki planı ve aynı veri kesitinin yayınlanmış saf puan planını gösterir. Buradaki kanıt durumu ve sınırlarla birlikte okunmalı.",
+  legend: "Top 100 etkisi",
+  zero: "0 (kapalı)",
+  help: "Önceki haftada Top 100 takımlarının ilk 11'ine aldığı oyuncular, onları ilk 11'ine alan takım sayısıyla orantılı olarak daha değerli sayılır: 20 ayarında, 100 takımın hepsinin ilk 11'ine aldığı bir oyuncu temel puanının 1,2 katı, 50 takımın aldığı bir oyuncu 1,1 katı sayılır. Plan bu puanlarla seçilir, karttaki her sayı temel modelindir. 0 etkiyi kapatır.",
+  published: "Bu hafta yayınlanan plan Top 100 etkisi içermez (0).",
+  onlyBaseline: "Yalnız bir haftalık saf puan planında.",
+  notOffered: "Bağlantıdaki ayar bu yayında bu üye için sunulmuyor; 0 ayarlı plan gösteriliyor.",
+  unavailableReasons: {
+    no_top100_this_run: "Bu yayında Top 100 seçimleri okunmadı; yalnız 0 var.",
+    top100_inputs_refused: "Bu yayında Top 100 seçimleri doğrulanamadı; yalnız 0 var.",
+    published_plan_carries_top100:
+      "Bu yayının planı zaten bir Top 100 etkisi içeriyor; ayarlar kapalı.",
+    not_solved_for_member: "Bu yayında bu üye için hiçbir ayar çözülmedi.",
+    unknown: "Bu yayından bu üye için Top 100 ayarı gösterilemiyor; yalnız 0 var.",
+  },
+  notSolved: "Bu üye için mevcut seçimlerle çözülmüş planı olmayan ayarlar kapalı.",
+  notForSelection:
+    "Bu seçim için ayar çözülmedi. Ayarlar saf puan planlarında ve bir stratejide varsayılan rakibe karşı var.",
+  rivalWindows: "Bir stratejinin 3 ve 5 haftalık planları yalnız varsayılan rakibe karşı çözülür.",
+  strategyCost: (points) =>
+    `Bu strateji ve bu ayar birlikte, 0 ayarlı saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  strategyCostAtMost: (points) =>
+    `Bu strateji ve bu ayar birlikte, 0 ayarlı saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  variantLimits: {
+    "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.":
+      "Top 100 sayıları önceki haftanındır ve pencerenin her haftasında aynen tekrarlanır; sonraki haftanın seçimleri okununca yeniden hesaplanır.",
+    "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.":
+      "Rakibe karşı bant, örtüşme ve beklenen fark ilk haftaya aittir ve tek transferle ulaşılan düzeydir; sonraki haftalar yalnız puan için planlanır, çünkü rakibin sonraki kadroları bilinmiyor.",
+  },
+  title: "Top 100 etkisi",
+  weightLine: (weight) => `Ayar: ${weight} (senin seçimin).`,
+  notStart:
+    "Bu, Top 100 takımlarının önceki haftaki ilk 11 tercihidir; oyuncunun maçta başlayıp başlamayacağının ölçümü değildir.",
+  saturation: "Daha yüksek bir ayar aynı planı verebilir.",
+  negativeRow:
+    "İlk 11 bu ayarla seçilir; bu yüzden bir satır temel modelin puanlarında sıfırın altında görünebilir.",
+  honesty:
+    "Bu bir tercihin bedelidir; bu ayarın puan kazandırdığı ölçülmedi. Karttaki puanlar ayarsız temel modelin puanlarıdır.",
+  unchanged: "Bu ayar bu hafta planını değiştirmedi.",
+  changed: "Bu ayar planını değiştirdi; bedeli yukarıda yazılı.",
+  cost: (points) =>
+    `Bu ayar, 0 ayarlı saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  costAtMost: (points) =>
+    `Bu ayar, 0 ayarlı saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  combinedCost: (points) =>
+    `Hocanın sözü ve bu ayar birlikte, ikisinin de kapalı olduğu saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  combinedCostAtMost: (points) =>
+    `Hocanın sözü ve bu ayar birlikte, ikisinin de kapalı olduğu saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  unproven:
+    "Çözücü bu planın ispatını bitirmeden buldu; bu nedenle aşağıdaki bedel en fazla olarak yazılı.",
+  moveReason: "Top 100 etkisi nedeniyle planda.",
+  limit: (weight) =>
+    `Plan Top 100 etkisi ${weight} iken seçildi; buradaki her beklenen puan, etki olmadan temel modelindir.`,
+};
+
+export const TOP100_COPY: Record<Language, Top100Copy> = { tr, en };
+
+/** The sentence for an index reason; a reason this page does not know claims nothing. */
+export function top100Unavailable(copy: Top100Copy, reason: string | null): string {
+  return (
+    (reason !== null && Object.hasOwn(copy.unavailableReasons, reason)
+      ? copy.unavailableReasons[reason]
+      : undefined) ?? copy.unavailableReasons.unknown
+  );
+}
+
+/**
+ * The producer's stated limit for a weighted document, with its weight read back. The
+ * sentence carries a number, so it cannot be a key in the fixed stated-limits table.
+ */
+const TOP100_LIMIT =
+  /^The plan was chosen with the Top 100 influence at (5|10|20|30|40|50); every expected-points number in this document is the base model's, without it\.$/;
+
+/** A producer sentence this menu added, in the member's language; null for any other. */
+export function variantLimit(copy: Top100Copy, sentence: string): string | null {
+  return Object.hasOwn(copy.variantLimits, sentence) ? copy.variantLimits[sentence]! : null;
+}
+
+export function top100LimitWeight(sentence: string): number | null {
+  const match = TOP100_LIMIT.exec(sentence);
+  return match ? Number(match[1]) : null;
+}

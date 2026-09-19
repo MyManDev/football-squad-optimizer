@@ -25,7 +25,7 @@ itself unready rather than answering from whatever it can find.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from squadopt.application.advice import HorizonBuilder, member_horizon_builder
@@ -35,6 +35,8 @@ from squadopt.application.capture_entries import (
 from squadopt.application.capture_entries import (
     capture_element_codes as capture_element_codes,
 )
+from squadopt.application.manager_words import ManagerWords
+from squadopt.application.top100_weight import Top100Counts
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -51,6 +53,7 @@ from squadopt.live import (
 )
 from squadopt.live.tick import handoff_path_for
 from squadopt.platform.advice_read import AdviceRequestContext
+from squadopt.platform.advice_switches import AdviceSwitchInputs
 
 __all__ = [
     "AdviceCaptureContext",
@@ -84,7 +87,15 @@ class CaptureIdentity:
 @dataclass(frozen=True, slots=True)
 class AdviceCaptureContext:
     """One capture, read once, as the collaborators ``advise_entry`` requires: the four
-    every request needs, and the horizon builder a multi-week window needs."""
+    every request needs, and the horizon builder a multi-week window needs.
+
+    ``switches`` holds what the member menu's switches are computed from for this capture
+    (the Top 100 counts, the manager's words). Both are optional, and both are absent
+    unless the deployment names an artifact root: a backend configured as it always was
+    answers exactly what it always did. They are not read here. The context provider
+    fills them in, and reads them again when an export lands, because they can change
+    within one capture while the projection cannot.
+    """
 
     context: AdviceRequestContext
     inputs: RecommendationInputs
@@ -92,6 +103,15 @@ class AdviceCaptureContext:
     rules: SeasonRules
     provider: CapturePicksProvider
     horizon_builder: HorizonBuilder
+    switches: AdviceSwitchInputs = field(default_factory=AdviceSwitchInputs)
+
+    @property
+    def top100_counts(self) -> Top100Counts | None:
+        return self.switches.top100_counts
+
+    @property
+    def manager_words(self) -> ManagerWords | None:
+        return self.switches.manager_words
 
 
 def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
@@ -113,19 +133,48 @@ def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
     return identifiers[-1] if identifiers else None
 
 
-def handoff_fingerprint_for(handoff_root: Path | str, season: str, gameweek: int) -> str | None:
+def _capture_handoff(
+    handoff_root: Path | str, season: str, gameweek: int, snapshot_id: str
+) -> InSeasonProjection:
+    alias = handoff_path_for(Path(handoff_root), season, gameweek)
+    retained = Path(handoff_root) / "by-capture" / snapshot_id
+    matches = {}
+    for path in (alias, *sorted(retained.glob("*.json"))):
+        try:
+            handoff = read_projection_handoff(path)
+        except (OSError, ValueError, DataError):
+            continue
+        if (handoff.source_snapshot_id, handoff.season, handoff.gameweek) != (
+            snapshot_id,
+            season,
+            gameweek,
+        ):
+            continue
+        if path == alias:
+            return handoff
+        matches[handoff.fingerprint] = handoff
+    if len(matches) == 1:
+        return next(iter(matches.values()))
+    raise DataError(
+        f"No unambiguous projection handoff for capture {snapshot_id!r}: "
+        f"gameweek handoff {alias} is absent, unreadable or mismatched; "
+        f"retained matching fingerprints: {len(matches)}."
+    )
+
+
+def handoff_fingerprint_for(
+    handoff_root: Path | str, season: str, gameweek: int, snapshot_id: str
+) -> str | None:
     """The fingerprint of the handoff a capture would be projected with, or ``None``.
 
-    Cheap on purpose: reading one small JSON is what lets a caller notice that ops
-    republished a corrected handoff for a capture it has already read, without paying for
-    the capture and its projection again. ``None`` when the file is absent or unreadable —
-    the caller treats "cannot be confirmed" as "changed", which fails toward unready rather
-    than toward serving a projection nobody can name.
+    Read the gameweek handoff and, if needed, retained handoffs for this capture, without
+    reading the capture or computing its projection. Return ``None`` if no matching
+    handoff is readable or the retained fingerprints disagree. The caller treats
+    "cannot be confirmed" as "changed" rather than serving an unidentified projection.
     """
 
-    path = handoff_path_for(Path(handoff_root), season, gameweek)
     try:
-        return read_projection_handoff(path).fingerprint
+        return _capture_handoff(handoff_root, season, gameweek, snapshot_id).fingerprint
     except Exception:
         return None
 
@@ -152,19 +201,7 @@ def load_capture_identity(
     resolved_season = season or infer_season(snapshot)
     inputs = read_inputs(snapshot, season=resolved_season, gameweek=None)
     gameweek = int(inputs.deadline.gameweek)
-    handoff_path = handoff_path_for(Path(handoff_root), resolved_season, gameweek)
-    if not handoff_path.is_file():
-        raise DataError(
-            f"No projection handoff for {resolved_season} gameweek {gameweek} at "
-            f"{handoff_path}. The backend answers from the same handoff the decision "
-            "reads; without one it has no projection whose identity it can name."
-        )
-    handoff = read_projection_handoff(handoff_path)
-    if handoff.source_snapshot_id != inputs.snapshot_id:
-        raise DataError(
-            f"The handoff at {handoff_path} was produced from capture "
-            f"{handoff.source_snapshot_id!r}, not from {inputs.snapshot_id!r}."
-        )
+    handoff = _capture_handoff(handoff_root, resolved_season, gameweek, inputs.snapshot_id)
     context = AdviceRequestContext(
         advice_contract_version=advice_contract_version,
         capture_snapshot_id=inputs.snapshot_id,
@@ -182,7 +219,10 @@ def load_capture_context(identity: CaptureIdentity) -> AdviceCaptureContext:
 
     Separated from the identity because this is the expensive half and only the worker
     runs it; separated *from* rather than duplicated so the api and the worker cannot
-    disagree about which capture an answer belongs to.
+    disagree about which capture an answer belongs to. The one exception is a deployment
+    that configures an artifact root: there the api projects too, once per context and
+    only when a request first asks about a switch, because the Top 100 gate is the
+    handoff's own and needs the projected table.
     """
 
     inputs = identity.inputs

@@ -23,7 +23,6 @@ Population, edge series and leave-one-season-out pools are identical to
 """
 
 import argparse
-import json
 import logging
 import sys
 from datetime import UTC, datetime
@@ -33,7 +32,11 @@ import numpy as np
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
+    _bootstrap_gap_interval,
+    _edge_series,
+    _leave_one_out,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -42,7 +45,7 @@ from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments.control_residuals import build_control_residual_table
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
-from squadopt.optimization import OptimizationConfig, OptimizationResult, optimize_squad
+from squadopt.optimization import OptimizationResult, optimize_squad
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
 from squadopt.scenarios import ScenarioConfig
 from squadopt.scenarios.evaluation import anchored_probability_ahead, rival_edge_draws
@@ -57,33 +60,6 @@ GAP_TOLERANCE = 0.10
 IDENTITY_TOLERANCE = 0.02
 BOOTSTRAP_DRAWS = 2_000
 MINIMUM_HISTORY_FOLDS = 8
-
-
-def _edge_series(root: Path) -> dict[str, list[float]]:
-    series: dict[str, list[float]] = {}
-    for season in DEVELOPMENT_SEASONS:
-        suffix = "" if season == "2024-25" else f"_{season}"
-        document = json.loads(
-            (root / f"template_rival_strength{suffix}.json").read_text(encoding="utf-8")
-        )
-        series[season] = [float(row["difference"]) for row in document["rows"]]
-    return series
-
-
-def _leave_one_out(series: dict[str, list[float]], season: str) -> tuple[float, ...]:
-    return tuple(v for other, values in series.items() if other != season for v in values)
-
-
-def _bootstrap_gap_interval(
-    claimed: np.ndarray, realized: np.ndarray, seed: int
-) -> tuple[float, float]:
-    generator = np.random.default_rng(seed)
-    gaps = []
-    n = len(claimed)
-    for _ in range(BOOTSTRAP_DRAWS):
-        pick = generator.integers(0, n, size=n)
-        gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
-    return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -116,7 +92,11 @@ def main() -> int:
     series = _edge_series(REPOSITORY_ROOT / "docs")
     panel = build_panel(arguments.archive_root)
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
-    optimization = OptimizationConfig()
+    # Named rather than inherited. The dataclass default binds on ten wall-clock seconds,
+    # so a busy machine gives the solver less work and the same commit writes a different
+    # record (#590). The measurement limit is deterministic, so the record is the run's
+    # and not the machine's.
+    optimization = measurement_optimization_config()
     provenance_seed = PredictionProvenance(
         model_name="deterministic_baseline",
         model_version="form_window_05_v1",

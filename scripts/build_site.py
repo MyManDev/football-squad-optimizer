@@ -105,6 +105,7 @@ def main() -> int:
         f"gameweeks {list(report.decided_gameweeks)} (settled {list(report.settled_gameweeks)})"
         f"{'; status.json' if report.status_written else ''}"
         f"{'; league.json' if report.league_written else ''}"
+        f"{'; fixtures.json' if report.fixtures_written else ''}"
         f"{horizon_note}"
         f"{kept_note}"
     )

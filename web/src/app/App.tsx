@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
+import { Component, lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
@@ -43,6 +43,35 @@ const LeagueMemberHistoryPage = lazy(() =>
 const AnalysisPage = lazy(() =>
   import("../features/analysis/pages/AnalysisPage").then((m) => ({ default: m.AnalysisPage })),
 );
+const AdminPage = lazy(() =>
+  import("../features/admin/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
+
+const FixturesPage = lazy(() =>
+  import("../features/fixtures/FixturesPage").then((m) => ({ default: m.FixturesPage })),
+);
+const FixturePanels = lazy(() =>
+  import("../features/fixtures/FixturePanels").then((m) => ({ default: m.FixturePanels })),
+);
+
+/** The fixture rails are a convenience: if their chunk fails to load, the page stays whole. */
+class Optional extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+const rails = (
+  <Optional>
+    <Suspense fallback={null}>
+      <FixturePanels />
+    </Suspense>
+  </Optional>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -61,7 +90,7 @@ function LocalizedApp({ basename }: { basename: string }) {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
-        <PageShell>
+        <PageShell rails={rails}>
           <Suspense fallback={<EmptyState title={messages.common.loading} />}>
             <Routes>
               <Route path="/" element={<LeagueEntryPage />} />
@@ -77,7 +106,9 @@ function LocalizedApp({ basename }: { basename: string }) {
                 path="/league/members/:entryId/history"
                 element={<LeagueMemberHistoryPage />}
               />
+              <Route path="/fixtures" element={<FixturesPage />} />
               <Route path="/status" element={<StatusPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/:slug" element={<AnalysisPage />} />
               <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />

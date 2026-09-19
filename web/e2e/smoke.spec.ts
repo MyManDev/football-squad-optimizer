@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import indexFixture from "../public/data/index.json" with { type: "json" };
+
 test("the legacy squad remains reachable by its direct gameweek URL", async ({ page }) => {
   await page.goto("/gw/2026-27/1");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(/Oyun haftası/);
@@ -7,10 +9,20 @@ test("the legacy squad remains reachable by its direct gameweek URL", async ({ p
   await expect(page.getByText(/Bu sayılar neyi söylemiyor/)).toBeVisible();
 });
 
-test("suggested moves states the opening week honestly", async ({ page }) => {
+test("suggested moves states the published week honestly", async ({ page }) => {
   await page.goto("/moves");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Önerilen Hamleler");
-  await expect(page.getByText(/Açılış kadrosu — yapılacak transfer yok/)).toBeVisible();
+  // The page reads the week the shipped index names, which moves with every publish: the
+  // opening week says there is nothing to transfer, a later week lists who goes and comes.
+  const opening = page.getByText(/Açılış kadrosu — yapılacak transfer yok/);
+  if (Number(indexFixture.payload.latest.gameweek) === 1) {
+    await expect(opening).toBeVisible();
+  } else {
+    await expect(opening).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Bu öneri neye dayanıyor" }),
+    ).toBeVisible();
+  }
   await expect(page.getByText("canlı kontrol")).toBeVisible();
 
   await page.getByRole("radio", { name: "3 hafta" }).click();
@@ -63,8 +75,8 @@ test("language selection switches the full frame and persists across routes", as
   await expect(page).toHaveURL(/mode=garantici&window=3/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
-  await page.getByRole("link", { name: "Analysis" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analysis Center");
+  await page.getByRole("link", { name: "League", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find your league");
   await page.reload();
   await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
     "href",

@@ -68,6 +68,12 @@ MAXIMUM_DOCUMENT_BYTES: Final = 2 * 1024 * 1024
 #: Where ``robots.txt`` lives, by definition rather than by convention.
 ROBOTS_PATH: Final = "/robots.txt"
 
+#: Seconds to wait before contacting a host this run has already contacted. Declared, not
+#: searched, and deliberately applied to the whole run rather than per club: politeness is
+#: owed to the machine answering, and one host can serve several clubs' pages as easily as
+#: one club can publish on several paths.
+PER_ORIGIN_DELAY_SECONDS: Final = 1.0
+
 #: The registry's own contract. Bumped when the entry shape moves, because a registry read
 #: under one shape is not the same statement about permission as one read under another.
 CLUB_NEWS_SOURCES_CONTRACT_VERSION: Final = "club_news_sources_v1"
@@ -112,6 +118,23 @@ class ClubSource:
         parsed = urllib.parse.urlsplit(self.url)
         return f"{parsed.scheme}://{parsed.netloc}"
 
+    @property
+    def address(self) -> str:
+        """The URL under the one normalisation the standards actually license.
+
+        Used to tell two registry entries apart. Host names are case-insensitive, so
+        ``Club.example`` and ``club.example`` are one address; paths are case-sensitive, so
+        ``/team-news`` and ``/Team-News`` are two, and folding them would refuse a registry
+        that is telling the truth. Nothing else is normalised -- no trailing slash, no query
+        reordering -- because a guess about which of two spellings a host considers the same
+        page is exactly the kind of guess this module does not make.
+        """
+
+        parsed = urllib.parse.urlsplit(self.url)
+        return urllib.parse.urlunsplit(
+            (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, "")
+        )
+
 
 def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
     """Read the registry of pages this project may fetch, or refuse it.
@@ -122,8 +145,21 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
     configuration. The pointer is required to exist and is not followed here -- checking
     that a human wrote something is this function's job; judging what they wrote is not.
 
-    A club may appear once. Two entries for one club would make "which page is this club's"
-    a question with two answers, and the evidence table joins on the club.
+    **A club may register more than one page; an address may be registered once.** The
+    earlier rule was the other way round, and its reason -- that two entries for one club
+    would make "which page is this club's" a question with two answers -- asked the wrong
+    question. Nothing downstream joins a claim to a club's page: a claim cites a *document*,
+    by digest and byte span (:class:`~squadopt.data.sources.club_news_claims.ParsedClaim`),
+    and that pointer has one answer however many pages the club publishes. The end-to-end
+    test found the limit from the other side: a club that puts its team news and its injury
+    table on separate pages could not be registered at all, though every layer below here
+    already carries several documents and codes them in one call.
+
+    The real duplicate is a repeated address. The same page registered twice is fetched
+    twice, offered to the model twice, and yields the same claim twice from two identical
+    digests -- a duplication the registry created, about a club that said something once.
+    Hosts are compared case-insensitively because host names are; paths are not, because
+    they are not.
     """
 
     location = Path(path)
@@ -168,13 +204,15 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
                 "registered only after somebody read that host's terms and wrote down what "
                 "they said; without that pointer this entry is a permission nobody gave."
             )
-        if club.casefold() in seen:
+        source = ClubSource(club=club, url=url)
+        if source.address in seen:
             raise ClubNewsFetchError(
-                f"{location} registers {club!r} twice. One club has one page here, or "
-                "'which page is this club's' has two answers."
+                f"{location} registers {url!r} twice. A club may have several pages, but one "
+                "page registered twice is read twice and coded twice, which would put the "
+                "same sentence in the evidence table as two claims."
             )
-        seen.add(club.casefold())
-        sources.append(ClubSource(club=club, url=url))
+        seen.add(source.address)
+        sources.append(source)
     return tuple(sources)
 
 
@@ -192,7 +230,7 @@ class _Read:
 Opener = Callable[[urllib.request.Request, float], Any]
 
 
-def _default_opener(request: urllib.request.Request, timeout: float) -> Any:
+def default_opener(request: urllib.request.Request, timeout: float) -> Any:
     return urllib.request.urlopen(request, timeout=timeout)
 
 
@@ -235,7 +273,7 @@ def _read_once(url: str, *, opener: Opener) -> _Read:
 def read_url(
     url: str,
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     attempts: int = RETRY_ATTEMPTS,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> _Read:
@@ -271,11 +309,79 @@ def read_url(
     raise ClubNewsFetchError(f"{url} was not read and no failure was reported.")
 
 
+class HostManners:
+    """One run's memory of the hosts it has spoken to, so it speaks to each of them once.
+
+    Two things are remembered, and both became necessary when a club gained the right to
+    register more than one page.
+
+    **The host's ``robots.txt``, parsed.** It used to be fetched once per document, so a club
+    with three pages asked one host the same question three times. What is remembered is the
+    parsed file rather than the answer, because the answer is about a *path*: one
+    ``robots.txt`` decides every page of its host, and deciding them locally is exactly what
+    removes the extra requests without changing a single verdict.
+
+    A host whose ``robots.txt`` could not be read is remembered too, as the failure it was.
+    Re-asking would not make the answer less unknown; it would only ask a struggling server
+    the same question once per page.
+
+    **Whether this run has already contacted the host**, so the second request waits. The
+    wait is the full declared interval rather than a measured remainder: inside one run the
+    requests are back to back, and a conservative constant needs no clock to be right.
+
+    The memory lives for one call and is passed in, not stored on the module. A cache that
+    outlived the run would answer this week's question with last week's file, and a host's
+    stated preference is not a thing to remember across weeks.
+    """
+
+    def __init__(self, *, delay_seconds: float = PER_ORIGIN_DELAY_SECONDS) -> None:
+        self._delay = float(delay_seconds)
+        self._robots: dict[str, urllib.robotparser.RobotFileParser] = {}
+        self._refusals: dict[str, ClubNewsFetchError] = {}
+        self._contacted: set[str] = set()
+
+    def before_request(self, origin: str, sleeper: Callable[[float], None]) -> None:
+        """Wait, if this run has already asked this host for something."""
+
+        if origin in self._contacted:
+            sleeper(self._delay)
+        self._contacted.add(origin)
+
+    def robots(
+        self, origin: str, read: Callable[[], urllib.robotparser.RobotFileParser]
+    ) -> urllib.robotparser.RobotFileParser:
+        """The host's parsed ``robots.txt``, read at most once per run.
+
+        A recorded refusal is re-raised rather than retried, so every page of a host whose
+        preference could not be read refuses for the same stated reason.
+
+        What is remembered is the **host-level** reason and nothing else. Caching the whole
+        composed refusal was a defect: the message names the page that could not be fetched,
+        so every later page of that host inherited the first page's URL and a club was told
+        its own page was refused under another club's address.
+        """
+
+        refusal = self._refusals.get(origin)
+        if refusal is not None:
+            raise refusal
+        cached = self._robots.get(origin)
+        if cached is not None:
+            return cached
+        try:
+            parser = read()
+        except ClubNewsFetchError as error:
+            self._refusals[origin] = error
+            raise
+        self._robots[origin] = parser
+        return parser
+
+
 def robots_allows(
     source: ClubSource,
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     sleeper: Callable[[float], None] = time.sleep,
+    manners: HostManners | None = None,
 ) -> bool:
     """Ask the host's own machine-readable preference about this path.
 
@@ -290,27 +396,42 @@ def robots_allows(
     """
 
     robots_url = f"{source.origin}{ROBOTS_PATH}"
+
+    def _read() -> urllib.robotparser.RobotFileParser:
+        parser = urllib.robotparser.RobotFileParser()
+        if manners is not None:
+            manners.before_request(source.origin, sleeper)
+        try:
+            read = read_url(robots_url, opener=opener, attempts=1, sleeper=sleeper)
+        except ClubNewsFetchError as error:
+            if "404" in str(error) or "410" in str(error):
+                # Silence, and a host that states no preference states it for every path,
+                # so an empty file is remembered exactly like a served one.
+                parser.parse([])
+                return parser
+            # Host-level only. The page this refusal costs is added by the caller below, so a
+            # remembered reason cannot carry the first page's URL to the second page's club.
+            raise ClubNewsFetchError(f"{robots_url} could not be read: {error}") from error
+        parser.parse(read.content.decode("utf-8", errors="replace").splitlines())
+        return parser
+
     try:
-        read = read_url(robots_url, opener=opener, attempts=1, sleeper=sleeper)
+        parser = _read() if manners is None else manners.robots(source.origin, _read)
     except ClubNewsFetchError as error:
-        if "404" in str(error) or "410" in str(error):
-            return True
         raise ClubNewsFetchError(
-            f"{robots_url} could not be read, so this host's preference is unknown and "
-            f"{source.url} is not fetched: {error}"
+            f"This host's preference is unknown, so {source.url} is not fetched: {error}"
         ) from error
-    parser = urllib.robotparser.RobotFileParser()
-    parser.parse(read.content.decode("utf-8", errors="replace").splitlines())
     return bool(parser.can_fetch(USER_AGENT, source.url))
 
 
 def fetch_club_document(
     source: ClubSource,
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
+    manners: HostManners | None = None,
 ) -> RawDocument:
     """Read one registered club page into a :class:`RawDocument`, or refuse.
 
@@ -320,13 +441,15 @@ def fetch_club_document(
     the response header or stays absent.
     """
 
-    if check_robots and not robots_allows(source, opener=opener, sleeper=sleeper):
+    if check_robots and not robots_allows(source, opener=opener, sleeper=sleeper, manners=manners):
         raise ClubNewsFetchError(
             f"{source.origin}{ROBOTS_PATH} disallows {source.url} for this client, so "
             f"{source.club} is recorded as not covered rather than read anyway. A club "
             "nobody read is a state this lane carries; overriding a stated preference is "
             "not."
         )
+    if manners is not None:
+        manners.before_request(source.origin, sleeper)
     read = read_url(source.url, opener=opener, sleeper=sleeper)
     if len(read.content) > MAXIMUM_DOCUMENT_BYTES:
         raise ClubNewsFetchError(
@@ -370,7 +493,7 @@ def fetch_club_document(
 def fetch_registered_documents(
     sources: Sequence[ClubSource],
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
@@ -391,6 +514,7 @@ def fetch_registered_documents(
         raise ClubNewsFetchError("No source was registered, so there is nothing to read.")
     documents: list[RawDocument] = []
     refused: list[tuple[str, str]] = []
+    manners = HostManners()
     for source in sources:
         try:
             documents.append(
@@ -400,6 +524,7 @@ def fetch_registered_documents(
                     now=now,
                     sleeper=sleeper,
                     check_robots=check_robots,
+                    manners=manners,
                 )
             )
         except ClubNewsFetchError as error:
@@ -410,10 +535,13 @@ def fetch_registered_documents(
 __all__ = [
     "CLUB_NEWS_SOURCES_CONTRACT_VERSION",
     "MAXIMUM_DOCUMENT_BYTES",
+    "PER_ORIGIN_DELAY_SECONDS",
     "READABLE_CONTENT_TYPES",
     "ROBOTS_PATH",
     "ClubNewsFetchError",
     "ClubSource",
+    "HostManners",
+    "default_opener",
     "fetch_club_document",
     "fetch_registered_documents",
     "load_club_sources",

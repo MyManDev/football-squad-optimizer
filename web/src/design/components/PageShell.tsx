@@ -6,17 +6,15 @@ import { useLanguage } from "../../i18n/context";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
-const NAV = [
-  { to: "/", key: "league", end: true },
-  { to: "/analysis", key: "analysis", end: false },
-] as const;
+const NAV = [{ to: "/", key: "league", end: true }] as const;
 
 type NavKey = (typeof NAV)[number]["key"];
 
 const navLabel = (messages: ReturnType<typeof useLanguage>["messages"], key: NavKey) =>
   messages.shell[key];
 
-export function PageShell({ children }: { children: ReactNode }) {
+/** `rails` is whatever sits beside the column on a wide screen and under it on a narrow one. */
+export function PageShell({ children, rails }: { children: ReactNode; rails?: ReactNode }) {
   const { messages } = useLanguage();
   return (
     <div className={styles.shell}>
@@ -45,9 +43,12 @@ export function PageShell({ children }: { children: ReactNode }) {
           <ThemeToggle />
         </div>
       </header>
-      <main id="main" className={styles.main}>
-        {children}
-      </main>
+      <div className={styles.body}>
+        <main id="main" className={styles.main}>
+          {children}
+        </main>
+        {rails}
+      </div>
       <footer className={styles.footer}>
         <span>{messages.shell.footer}</span>
         <NavLink to="/status" className={styles.footerLink}>

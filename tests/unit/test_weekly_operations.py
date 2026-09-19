@@ -339,9 +339,8 @@ def test_missing_reused_rotation_refuses_before_capture_or_export(tmp_path: Path
 def test_the_preview_records_advice_only_when_it_is_the_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The record is written by the build whose bytes ship. Without --publish the preview
-    is a preview and records nothing; with it, the preview is the publication and records
-    into the private root, and the records history already reads are declared inputs."""
+    """Publication records its preview before history reads it; a default preview does not.
+    Explicit recording without publication is covered separately below."""
 
     week = tmp_path / "data/advice_records/2026-27/gw02/entry-101"
     earlier = week / "fpl-live-20260820T120000Z-earlier"
@@ -354,10 +353,18 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
 
     def publish(request, **kwargs):
         calls.append(request)
-        return SimpleNamespace(output_paths=(), snapshot_id=request.snapshot_id, gameweek=2)
+        return SimpleNamespace(
+            output_paths=(),
+            snapshot_id=request.snapshot_id,
+            gameweek=2,
+            report=SimpleNamespace(members=(), removed=()),
+            top100_note="",
+        )
 
     monkeypatch.setattr(weekly, "publish_league", publish)
     assert operation._league().value["advice_recorded"] is False
+    # No evidence stage ran, so no Top 100 table reaches the league build.
+    assert calls[0].top100_evidence is None
     publishing = weekly.WeeklyOperations(
         replace(operation.request, publish=True),
         operation.paths,
@@ -372,6 +379,13 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
     assert calls[1].out_dir == operation.paths.out
     assert operation.record_inputs == publishing.record_inputs == [earlier]
     assert "rotation" not in operation.stages
+
+    # When the evidence stage ran, its table reaches the league build; the loader's own
+    # gate decides whether the menu is offered.
+    table = tmp_path / "player_evidence_v1_2026-27_gw02_top100_111111111111.csv"
+    publishing.values["top100_evidence"] = {"table": str(table), "manifest": str(table)}
+    assert publishing._league().value["top100_note"] == ""
+    assert calls[2].top100_evidence == table
 
 
 def _origin_develop_at_head(checkout: Path) -> Path:
@@ -404,8 +418,9 @@ def _fake_gh(monkeypatch: pytest.MonkeyPatch, pr_url: str) -> None:
     monkeypatch.setattr(weekly_publish, "_run", run)
 
 
+@pytest.mark.parametrize("suffix", ["", "8"])
 def test_the_publication_is_the_preview_byte_for_byte(
-    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch, suffix: str
 ) -> None:
     """The publish stage commits the tree the preview built rather than solving again, so
     the published documents, the history document included, are the previewed bytes."""
@@ -416,7 +431,8 @@ def test_the_publication_is_the_preview_byte_for_byte(
     origin = _origin_develop_at_head(checkout)
     _fake_gh(monkeypatch, "https://example.invalid/pr/1")
 
-    assert weekly.main([*args, "--publish", "--run-id", "shipped"]) == 0
+    assert weekly.main([*args, "--publish", "--publish-suffix", suffix, "--run-id", "shipped"]) == 0
+    names = weekly.PublishNames("2026-27", 2, "decision", suffix)
 
     preview = paths.journal / "shipped/preview/data"
     published = tmp_path / "published"
@@ -428,7 +444,7 @@ def test_the_publication_is_the_preview_byte_for_byte(
         "clone",
         "-q",
         "--branch",
-        "feature/gw02-decision-site",
+        names.branch,
         str(origin),
         str(published),
     )
@@ -446,7 +462,102 @@ def test_the_publication_is_the_preview_byte_for_byte(
     assert [row["path"] for row in stages["publish"]["inputs"]] == [str(preview)]
     assert stages["publish"]["value"]["status"] == "pr_open"
     assert stages["publish"]["value"]["published_files"] == len(weekly.tree_digests(preview))
-    assert not (checkout / ".codex-tmp/publications/gw02-decision").exists()
+    assert not (checkout / names.worktree_directory).exists()
+    with pytest.raises(weekly.PublishError, match="already exists on origin"):
+        weekly.publish(names, workspace=checkout, force_branch=False, dry_run=True)
+
+
+def test_record_advice_without_publish_records_every_rendered_member(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    _, paths, args = _git_checkout(tmp_path_factory.mktemp("rec"))
+    assert weekly.main([*args, "--record-advice", "--run-id", "recorded"]) == 0
+    receipt = json.loads((paths.journal / "recorded/run.json").read_bytes())
+    assert "publish" not in [stage["name"] for stage in receipt["stages"]]
+    entries = paths.journal / "recorded/preview/data/league/entries"
+    rendered = list(entries.glob("*.json"))
+    assert rendered
+    snapshot = args[args.index("--snapshot-id") + 1]
+    for entry in rendered:
+        record = paths.records / "2026-27/gw02" / f"entry-{entry.stem}" / snapshot / "advice.json"
+        assert record.is_file()
+    assert weekly.main([*args, "--record-advice", "--run-id", "recorded", "--resume"]) == 0
+    history = json.loads((entries.parent / "history/101.json").read_bytes())
+    assert [week["gameweek"] for week in history["payload"]["weeks"]] == [2]
+    assert weekly.main([*args, "--run-id", "recorded", "--resume"]) == 1
+    assert (
+        weekly.main(
+            [
+                *args,
+                "--record-advice",
+                "--publish",
+                "--publish-suffix",
+                "9",
+                "--run-id",
+                "recorded",
+                "--resume",
+            ]
+        )
+        == 1
+    )
+
+
+def test_dry_run_prints_recording_and_the_suffixed_branch_without_writing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        weekly.main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "--season",
+                "2026-27",
+                "--gameweek",
+                "5",
+                "--league",
+                "352490",
+                "--dry-run",
+                "--record-advice",
+                "--publish",
+                "--publish-suffix",
+                "8",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "Record advice: True" in output
+    assert "publish suffix: 8" in output
+    assert "feature/gw05-decision-site-8" in output
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "suffix", ["../branch", "space here", "x..y", "--", "x/lock", "-x", "x-", "8\n", "a;b"]
+)
+def test_invalid_publish_suffix_is_refused(suffix: str) -> None:
+    with pytest.raises(weekly.PublishError, match="suffix"):
+        weekly.PublishNames("2026-27", 5, "decision", suffix)
+
+
+def test_a_publish_suffix_needs_publication(capsys):
+    with pytest.raises(SystemExit) as error:
+        weekly.main(["--publish-suffix", "8", "--dry-run"])
+    assert error.value.code == 2
+    assert "--publish-suffix requires --publish" in capsys.readouterr().err
+
+
+def test_a_taken_suffix_refuses_before_the_capture_stage(tmp_path_factory, capsys):
+    checkout, paths, args = _git_checkout(tmp_path_factory.mktemp("taken"))
+    _origin_develop_at_head(checkout)
+    _git(checkout, "push", "-q", "origin", "HEAD:refs/heads/feature/gw02-decision-site-8")
+    assert weekly.main([*args, "--publish", "--publish-suffix", "8", "--run-id", "taken"]) == 1
+    receipt = json.loads((paths.journal / "taken/run.json").read_bytes())
+    stages = {stage["name"]: stage["status"] for stage in receipt["stages"]}
+    assert stages["preflight"] == "failed"
+    assert stages["capture"] == "pending"
+    assert not any(state == "completed" for state in stages.values())
+    assert "choose another --publish-suffix" in capsys.readouterr().err
 
 
 def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
@@ -465,6 +576,8 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
     real_publish = weekly.publish
 
     def moved(names, **kwargs):
+        if kwargs.get("dry_run"):
+            return real_publish(names, **kwargs)
         merged = _git(checkout, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "merged")
         _git(checkout, "push", "-q", "origin", f"{merged}:refs/heads/develop")
         return real_publish(names, **kwargs)
@@ -490,6 +603,7 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
     [
         [],
         ["--decide", "--chip", "bboost", "--rotation", "--publish"],
+        ["--rotation", "--rotation-capture", "club-news-abc123456789"],
         ["--snapshot-id", "capture", "--skip-top100", "--projection", "component-only"],
     ],
 )
@@ -544,3 +658,63 @@ def test_a_weekly_run_leaves_the_same_kind_of_run_log_record_a_tick_does(tmp_pat
     plan = next(event for event in events if event.message == "tick.week.plan")
     assert plan.fields["season"] == "2026-27" and plan.fields["gameweek"] == 2
     assert plan.level == "INFO" and plan.ts
+
+
+# --- the rotation stage's source --------------------------------------------
+
+
+def test_a_named_capture_reaches_the_export_and_names_its_artifact() -> None:
+    """The eighth field, finally set.
+
+    `RotationExportRequest` has carried `club_news_snapshot` and its exactly-one-source
+    refusal since the capture path landed, and the weekly stage never set it -- because it
+    built the request positionally and the eighth field was never reached. The artifact name
+    follows the capture the claims came from, so it has to move with it.
+    """
+
+    from squadopt.application.weekly_plan import (
+        WeeklyRequest,
+        rotation_artifact,
+        rotation_source_capture,
+    )
+
+    capture = "club-news-abcdef012345"
+    decision = "decision-999999999999"
+    request = WeeklyRequest(
+        season="2026-27", gameweek=5, league_id=1, rotation=True, rotation_capture=capture
+    )
+
+    assert request.rotation_capture == capture
+    assert rotation_source_capture(decision, capture) == capture
+    assert rotation_source_capture(decision, None) == decision
+
+    named, _manifest = rotation_artifact(
+        Path("out"), "2026-27", 5, rotation_source_capture(decision, capture)
+    )
+    from_fixture, _unused = rotation_artifact(
+        Path("out"), "2026-27", 5, rotation_source_capture(decision, None)
+    )
+    assert named != from_fixture
+    assert capture[-12:] in named.name
+
+
+def test_a_capture_without_the_rotation_stage_is_refused() -> None:
+    """Naming a source for a step nobody asked for looks like a run and is not one."""
+
+    from squadopt.application.weekly_plan import WeekError, WeeklyRequest
+
+    with pytest.raises(WeekError, match="without --rotation"):
+        WeeklyRequest(
+            season="2026-27", gameweek=5, league_id=1, rotation_capture="club-news-abc"
+        ).plan()
+
+
+def test_no_capture_keeps_todays_behaviour_exactly() -> None:
+    """With no flag the fixture is read and the plan says so, as it always did."""
+
+    from squadopt.application.weekly_plan import WeeklyRequest
+
+    plan = WeeklyRequest(season="2026-27", gameweek=5, league_id=1, rotation=True).plan()
+
+    assert "rotation" in plan.steps
+    assert WeeklyRequest(season="2026-27", gameweek=5, league_id=1).rotation_capture is None

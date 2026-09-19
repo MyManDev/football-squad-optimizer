@@ -105,6 +105,48 @@ def _table(provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]) -
     return _build(provider, claims)
 
 
+# --- coverage is not the same as coverage in full ----------------------------
+
+
+def test_a_partly_read_club_reaches_the_manifest(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """Covered, and named as not covered in full.
+
+    Column 15 still says his club was read, because one refused page must not cost a club
+    its coverage. What the manifest adds is the club-level fact the column cannot carry:
+    that something the week set out to read was not read.
+    """
+
+    partly = provider.clubs_covered()[0]
+
+    table = _build(provider, claims, clubs_partially_covered=(partly,))
+
+    assert table.attrs["clubs_partially_covered"] == (partly,)
+    assert partly in table.attrs["clubs_covered"]
+    covered_players = table.set_index("player_id")["club_source_covered"]
+    assert all(bool(covered_players.loc[player]) for player in _players_of(partly))
+
+
+def test_a_week_with_every_page_read_names_nobody_as_partly_read(
+    table: pd.DataFrame,
+) -> None:
+    """The default is empty rather than absent, so "none" is stated instead of assumed."""
+
+    assert table.attrs["clubs_partially_covered"] == ()
+
+
+def test_a_club_nobody_read_cannot_be_partly_read(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """Unread and partly read are different facts, and the table refuses to confuse them."""
+
+    uncovered = sorted(set(provider.clubs_declared()) - set(provider.clubs_covered()))
+
+    with pytest.raises(InvalidValueError, match="unread, not partly read"):
+        _build(provider, claims, clubs_partially_covered=(uncovered[0],))
+
+
 # --- shape and completeness -------------------------------------------------
 
 

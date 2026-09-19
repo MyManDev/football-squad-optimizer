@@ -1,14 +1,56 @@
-import { cp } from "node:fs/promises";
+import { execFileSync, spawnSync } from "node:child_process";
+import { cp, readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
+import { MESSAGES } from "../src/i18n/messages";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
-test("a browser computes through the worker, then reads the same answer from cache", async ({
+function windowsApiPids(apiPid: number, fixturePid: number, port: number): number[] {
+  const processes: {
+    ProcessId: number;
+    ParentProcessId: number;
+    Created: string;
+    CommandLine: string | null;
+  }[] = JSON.parse(
+    execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        "ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process | " +
+          "Select-Object ProcessId,ParentProcessId,CommandLine,@{Name='Created';" +
+          "Expression={$_.CreationDate.ToUniversalTime().Ticks.ToString()}})",
+      ],
+      { encoding: "utf8", windowsHide: true, timeout: 10_000 },
+    ),
+  );
+  const root = processes.find((row) => row.ProcessId === apiPid);
+  if (!root) throw new Error("The fixture API process is missing.");
+  expect(root.ParentProcessId).toBe(fixturePid);
+  const selected = [root];
+  for (const parent of selected) {
+    selected.push(
+      ...processes.filter(
+        (row) =>
+          row.ParentProcessId === parent.ProcessId &&
+          !selected.includes(row) &&
+          BigInt(row.Created) >= BigInt(parent.Created),
+      ),
+    );
+  }
+  // Windows retains stale parent PIDs on orphans. Only newer descendants belong here.
+  const portArgument = new RegExp(`(?:^|\\s)--port\\s+"?${port}"?(?=\\s|$)`);
+  expect(selected.some((row) => portArgument.test(row.CommandLine ?? ""))).toBe(true);
+  return selected.reverse().map((row) => row.ProcessId);
+}
+
+test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   // These are the Python fixture's captured squad and member documents. No route,
   // including the API, is intercepted; Chromium enforces the cross-origin request.
   await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
@@ -25,6 +67,9 @@ test("a browser computes through the worker, then reads the same answer from cac
   await page.goto("/");
   const leagueRequests: string[] = [];
   page.on("request", (request) => {
+    // The shell reads the fixture list on every page, whenever its chunk lands; it is not
+    // a league lookup, and counting it made this assertion depend on timing.
+    if (request.url().endsWith("/data/fixtures.json")) return;
     if (["fetch", "xhr"].includes(request.resourceType())) leagueRequests.push(request.url());
   });
   const leagueField = page.getByLabel("Lig numarası");
@@ -38,7 +83,23 @@ test("a browser computes through the worker, then reads the same answer from cac
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
   await expect(page).toHaveURL("/league/members");
-  await page.getByRole("button", { name: "Bu benim", exact: true }).click();
+  // The member page asks the service what it computes, once, and says about how long.
+  const capabilities = page.waitForResponse(
+    (response) =>
+      response.url() === `${context.apiOrigin}/api/v1/leagues/${context.leagueId}/capabilities`,
+  );
+  await page
+    .getByRole("row")
+    .filter({ has: page.locator(`a[href="/league/members/${context.entryId}"]`) })
+    .getByRole("button", { name: "Bu benim", exact: true })
+    .click();
+  expect(await (await capabilities).json()).toMatchObject({
+    contract_version: "league_capabilities_v1",
+    capture_snapshot_id: context.snapshotId,
+  });
+  await expect(
+    page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer"),
+  ).toBeVisible();
   await expect(page).toHaveURL(`/league/members/${context.entryId}`);
   expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
@@ -64,6 +125,9 @@ test("a browser computes through the worker, then reads the same answer from cac
     rival_entry_id: null,
   });
   expect(post.headers()["access-control-allow-origin"]).toBe(context.webOrigin);
+  expect(post.request().headers()["idempotency-key"]).toMatch(
+    /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/,
+  );
   const { job_id: jobId } = await post.json();
   expect(jobId).toBeTruthy();
   await expect(compute).toBeDisabled();
@@ -91,15 +155,140 @@ test("a browser computes through the worker, then reads the same answer from cac
     if (move.player_out) await expect(advice).toContainText(move.player_out.name);
   }
 
-  // The one-job worker exits after its first solve. A reload and another request
-  // must still succeed from the stored answer, without another queued computation.
-  await page.reload();
+  // Reload reads the stored answer without another job. Explicit POST is also a hit.
+  const postsAfterReload: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith(route) && request.method() === "POST") {
+      postsAfterReload.push(request.url());
+    }
+  });
   const hit = page.waitForResponse(
-    (response) => response.url().startsWith(route) && response.request().method() === "POST",
+    (response) => response.url().startsWith(route) && response.request().method() === "GET",
   );
-  await compute.click();
+  await page.reload();
   const cached = await hit;
   expect(cached.status()).toBe(200);
   expect(await cached.json()).toEqual(answer);
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  expect(postsAfterReload).toEqual([]);
+  const postedCache = page.waitForResponse(
+    (response) => response.url().startsWith(route) && response.request().method() === "POST",
+  );
+  await compute.click();
+  const postedAnswer = await postedCache;
+  expect(postedAnswer.status()).toBe(200);
+  expect(await postedAnswer.json()).toEqual(answer);
+
+  expect(context.rivalId).not.toBe(context.defaultRivalId);
+  const jobs = new Set([jobId]);
+  for (const selection of [
+    {
+      query: "top100=20",
+      body: { strategy: "saf-puan", window: 1, rival_entry_id: null, top100_weight: 20 },
+      payload: { mode: "saf-puan", top100: { weight: 20 } },
+    },
+    {
+      query: `mode=ortak-koru&rival=${context.rivalId}`,
+      body: { strategy: "ortak-koru", window: 1, rival_entry_id: context.rivalId },
+      payload: { mode: "ortak-koru", rival_entry_id: context.rivalId },
+    },
+    {
+      query: "chip=bboost",
+      body: { strategy: "saf-puan", window: 1, rival_entry_id: null, chip: "bboost" },
+      payload: { mode: "saf-puan", chip_choice: { chip: "bboost" } },
+    },
+  ]) {
+    await page.goto(`/league/members/${context.entryId}?${selection.query}`);
+    await expect(compute).toBeEnabled();
+    const queued = page.waitForResponse(
+      (response) => response.url().startsWith(route) && response.request().method() === "POST",
+    );
+    const completed = page.waitForResponse(
+      (response) =>
+        response.url().startsWith(route) &&
+        response.request().method() === "GET" &&
+        response.status() === 200,
+    );
+    await compute.click();
+    const submitted = await queued;
+    expect(submitted.request().postDataJSON()).toEqual(selection.body);
+    expect(submitted.status()).toBe(202);
+    const selectedJob = (await submitted.json()).job_id;
+    expect(jobs.has(selectedJob)).toBe(false);
+    jobs.add(selectedJob);
+    const selectedAnswer = (await (await completed).json()) as LeagueViewEnvelope<EntryAdvice>;
+    expect(selectedAnswer.payload).toMatchObject({
+      ...selection.payload,
+      entry_id: context.entryId,
+      source_snapshot_id: context.snapshotId,
+      window: 1,
+    });
+    await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+    await expect(advice).toBeVisible();
+    for (const move of selectedAnswer.payload.moves) {
+      if (move.player_in) await expect(advice).toContainText(move.player_in.name);
+    }
+  }
+  expect(jobs.size).toBe(4);
+
+  // Last step only: restore the real published plan, then stop this fixture's API tree.
+  const baseline = JSON.parse(await readFile(context.baselineCopy, "utf8"));
+  await cp(
+    context.baselineCopy,
+    `node_modules/.cache/${context.buildName}/data/league/advice/${context.entryId}/saf-puan/1.json`,
+  );
+  const origin = new URL(context.apiOrigin);
+  expect(origin.hostname).toBe("127.0.0.1");
+  expect(Number(origin.port)).toBeGreaterThan(0);
+  expect(Number(origin.port)).not.toBe(8000);
+  for (const pid of [context.apiPid, context.fixturePid]) {
+    expect(Number.isSafeInteger(pid) && pid > 0).toBe(true);
+  }
+  if (process.platform === "win32") {
+    const pids = windowsApiPids(context.apiPid, context.fixturePid, Number(origin.port));
+    const stopped = spawnSync("taskkill", [...pids.flatMap((pid) => ["/PID", String(pid)]), "/F"], {
+      windowsHide: true,
+      timeout: 10_000,
+    });
+    if (stopped.error) throw stopped.error;
+    // A child can exit with its launcher before taskkill reaches it. Check /ready below.
+  } else {
+    const parent = execFileSync("ps", ["-o", "ppid=", "-p", String(context.apiPid)], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    expect(Number(parent.trim())).toBe(context.fixturePid);
+    process.kill(context.apiPid, "SIGTERM");
+  }
+  await expect
+    .poll(async () => {
+      try {
+        await page.request.get(`${context.apiOrigin}/ready`, {
+          timeout: 1_000,
+          headers: { Connection: "close" },
+        });
+        return false;
+      } catch {
+        return true;
+      }
+    })
+    .toBe(true);
+  await page.goto(`/league/members/${context.entryId}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
+  await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
+  await expect(
+    page.getByText(
+      "Hesaplama servisine şu an ulaşılamıyor. Yayınlanmış planlar her zamanki gibi aşağıda.",
+    ),
+  ).toBeVisible();
+  await expect(advice).toBeVisible();
+  await expect(advice).toContainText(baseline.payload.captain.name);
+  await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "Hesapla", exact: true }).click();
+  await expect(
+    page.getByText(MESSAGES.tr.leagueMembers.computeStaticFallback, { exact: false }),
+  ).toBeVisible();
+  await expect(advice).toContainText(baseline.payload.captain.name);
+  await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);
 });

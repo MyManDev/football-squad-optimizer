@@ -39,8 +39,11 @@ from squadopt.features.rotation_evidence import (
 )
 
 #: The export's own contract, separate from the table's. The table is what the rows mean; this
-#: is how the pair on disk is shaped, and either can move without the other.
-ARTIFACT_CONTRACT_VERSION: Final = "rotation_evidence_export_v1"
+#: is how the pair on disk is shaped, and either can move without the other. It moved to v2
+#: when the manifest gained ``clubs_partially_covered``; the table's own version did not,
+#: because no column changed -- partial coverage is a club-level fact and the manifest is
+#: where club-level facts live.
+ARTIFACT_CONTRACT_VERSION: Final = "rotation_evidence_export_v2"
 
 #: Every manifest field the reader requires. A missing one refuses the pair: the manifest is
 #: what makes the table checkable, and a manifest with a hole in it checks less than it claims.
@@ -61,6 +64,7 @@ REQUIRED_MANIFEST_FIELDS: Final[frozenset[str]] = frozenset(
         "source_snapshot_ids",
         "clubs_declared",
         "clubs_covered",
+        "clubs_partially_covered",
         "documents_read",
         "document_sha256s",
         "model_identifier",
@@ -273,6 +277,17 @@ def _validate_manifest_and_table(
             f"Manifest clubs_covered {sorted(covered - declared_clubs)!r} were never declared; "
             "coverage cannot exceed what the week set out to read."
         )
+    # Partly covered narrows coverage and never replaces it, which is the contract's own
+    # sentence: a club none of whose pages were read is unread, not partly read. The export
+    # holds to it when it writes; this is the reader holding to it when it reads, so an
+    # artifact that arrives from anywhere else cannot claim a club is partly covered and
+    # uncovered at once.
+    partial = set(_string_list(manifest, "clubs_partially_covered"))
+    if not partial <= covered:
+        raise DataValidationError(
+            f"Manifest clubs_partially_covered {sorted(partial - covered)!r} are not among the "
+            "covered clubs; partial coverage narrows coverage and never stands in for it."
+        )
     for key in ("documents_read", "claims_coded", "claims_ambiguous", "players_not_addressed"):
         _whole_number(manifest, key)
     _string_list(manifest, "document_sha256s")
@@ -320,6 +335,10 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "source_snapshot_ids": _string_list(manifest, "source_snapshot_ids"),
             "clubs_declared": _string_list(manifest, "clubs_declared"),
             "clubs_covered": _string_list(manifest, "clubs_covered"),
+            # Required of the manifest since the export contract gained it, and carried here
+            # because a consumer cannot recompute it: from the payloads alone a club whose
+            # second page was refused is indistinguishable from one that only registered one.
+            "clubs_partially_covered": _string_list(manifest, "clubs_partially_covered"),
             "documents_read": manifest["documents_read"],
             "document_sha256s": _string_list(manifest, "document_sha256s"),
             "model_identifier": manifest["model_identifier"],

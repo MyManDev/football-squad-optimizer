@@ -1,0 +1,128 @@
+{
+  "$id": "https://squadopt.dev/contracts/league_capabilities_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capture_snapshot_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "chips": {
+      "additionalProperties": false,
+      "properties": {
+        "held_by_entry": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[1-9][0-9]*$": {
+              "items": {
+                "enum": [
+                  "wildcard",
+                  "freehit",
+                  "bboost",
+                  "3xc"
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "held_by_entry"
+      ],
+      "type": "object"
+    },
+    "contract_version": {
+      "const": "league_capabilities_v1",
+      "type": "string"
+    },
+    "gameweek": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "league_id": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "managers_word": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "available"
+      ],
+      "type": "object"
+    },
+    "season": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "strategies": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "requires_rival": {
+            "type": "boolean"
+          },
+          "windows": {
+            "items": {
+              "enum": [
+                1,
+                3,
+                5
+              ],
+              "type": "integer"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "windows",
+          "requires_rival"
+        ],
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "top100": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "weights": {
+          "items": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "available",
+        "weights"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "contract_version",
+    "league_id",
+    "capture_snapshot_id",
+    "season",
+    "gameweek",
+    "strategies",
+    "top100",
+    "managers_word"
+  ],
+  "title": "SquadOpt league advice capabilities",
+  "type": "object"
+}

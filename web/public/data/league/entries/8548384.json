@@ -1,23 +1,23 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 4,
-    "scored_gameweek": 3,
+    "gameweek": 5,
+    "scored_gameweek": 4,
     "entry": {
       "member_kind": "human",
       "entry_id": 8548384,
       "manager_name": "Efe D\u00f6nmez",
       "team_name": "efedb",
-      "rank": 8,
+      "rank": 7,
       "gameweek_points": 84,
       "transfer_cost": 0,
-      "total_points": 206,
-      "movement": "unknown",
-      "movement_places": null,
+      "total_points": 290,
+      "movement": "up",
+      "movement_places": 1,
       "data_quality": "partial"
     },
     "starting_xi": [
@@ -28,9 +28,10 @@
         "position": "GK",
         "team": "Arsenal",
         "price_tenths": 60,
-        "expected_points": 3.450579897041415,
+        "expected_points": 3.8238320826783507,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": true,
         "bench_order": null,
         "role": "starter"
       },
@@ -40,10 +41,11 @@
         "short_name": "Gvardiol",
         "position": "DEF",
         "team": "Man City",
-        "price_tenths": 56,
-        "expected_points": 3.64230933799311,
+        "price_tenths": 57,
+        "expected_points": 4.056371668311424,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -54,9 +56,10 @@
         "position": "DEF",
         "team": "Liverpool",
         "price_tenths": 65,
-        "expected_points": 3.666932155533569,
+        "expected_points": 3.555548676659022,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -67,9 +70,10 @@
         "position": "DEF",
         "team": "Arsenal",
         "price_tenths": 80,
-        "expected_points": 4.305863646230902,
+        "expected_points": 4.472528385131045,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -80,9 +84,10 @@
         "position": "DEF",
         "team": "Liverpool",
         "price_tenths": 54,
-        "expected_points": 2.4227121059294436,
+        "expected_points": 2.5041926076583985,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -93,9 +98,10 @@
         "position": "MID",
         "team": "Fulham",
         "price_tenths": 55,
-        "expected_points": 3.449045744024133,
+        "expected_points": 3.513475657690736,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -105,10 +111,11 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "price_tenths": 67,
-        "expected_points": 4.010137596984558,
+        "price_tenths": 68,
+        "expected_points": 3.823985942112784,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -119,9 +126,10 @@
         "position": "MID",
         "team": "Man Utd",
         "price_tenths": 79,
-        "expected_points": 4.934679467666494,
+        "expected_points": 4.415892336727386,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -131,10 +139,11 @@
         "short_name": "Foden",
         "position": "MID",
         "team": "Man City",
-        "price_tenths": 70,
-        "expected_points": 3.345611698204828,
+        "price_tenths": 69,
+        "expected_points": 0.0,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -144,10 +153,11 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "price_tenths": 155,
-        "expected_points": 8.360382282553875,
+        "price_tenths": 156,
+        "expected_points": 8.417342366821867,
         "event_points": null,
         "is_captain": true,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       },
@@ -157,10 +167,11 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "price_tenths": 77,
-        "expected_points": 4.8089656617809755,
+        "price_tenths": 78,
+        "expected_points": 3.539796717037047,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": null,
         "role": "starter"
       }
@@ -176,6 +187,7 @@
         "expected_points": 0.10027015579447286,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": 1,
         "role": "bench"
       },
@@ -186,9 +198,10 @@
         "position": "DEF",
         "team": "Ipswich Town",
         "price_tenths": 40,
-        "expected_points": 0.9242137214081952,
+        "expected_points": 0.8905515739533116,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": 2,
         "role": "bench"
       },
@@ -198,10 +211,11 @@
         "short_name": "Hughes",
         "position": "MID",
         "team": "Crystal Palace",
-        "price_tenths": 45,
-        "expected_points": 0.3967341204745354,
+        "price_tenths": 44,
+        "expected_points": 0.6628182574567039,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": 3,
         "role": "bench"
       },
@@ -215,12 +229,13 @@
         "expected_points": 0.0,
         "event_points": null,
         "is_captain": false,
+        "is_vice_captain": false,
         "bench_order": 4,
         "role": "bench"
       }
     ],
     "bank_tenths": 0,
-    "free_transfers": 1,
+    "free_transfers": 2,
     "free_transfers_known": true,
     "chips_used": {
       "3xc": [
@@ -229,7 +244,7 @@
     },
     "chips": {
       "known": true,
-      "gameweek": 4,
+      "gameweek": 5,
       "states": {
         "wildcard": {
           "first_half": {
@@ -289,8 +304,12 @@
         }
       }
     },
+    "squad_basis": "captured",
+    "active_chip": null,
     "purchase_prices_known": false,
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "squad_sell_value_tenths": 1002,
+    "spendable_budget_tenths": 1002,
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
@@ -5,19 +6,25 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
-import { canComputeAdvice } from "../advice/adviceSelection";
+import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
+import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { Pitch } from "../../squad/components/Pitch";
 import { MemberResourceCards } from "../components/MemberResourceCards";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
+import { isMemberStrategy } from "../types";
 import { AdviceCard, MissingAdviceCard } from "./MemberAdviceCard";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
+  useEffect(() => {
+    document.documentElement.classList.add(styles.memberPage);
+    return () => document.documentElement.classList.remove(styles.memberPage);
+  }, []);
   const { squad } = props;
   const contextKey = [
     squad.payload.league_id,
@@ -42,9 +49,24 @@ function LeagueMemberContent({
   members = [],
   index = null,
   client,
+  capabilities = null,
+  computeService = "static",
+  computePending = false,
   rivalSquad = null,
+  windowControl = null,
+  deadlinePassed = null,
 }: LeagueMemberViewProps) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
+  const [contextExpanded, setContextExpanded] = useState(
+    () => window.matchMedia?.("(min-width: 641px)").matches ?? true,
+  );
+  useEffect(() => {
+    const media = window.matchMedia?.("(min-width: 641px)");
+    if (!media) return;
+    const update = () => setContextExpanded(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const [searchParams] = useSearchParams();
@@ -56,15 +78,51 @@ function LeagueMemberContent({
     selection,
     indexReadable,
     selectionAvailable,
+    computeAvailable,
     job,
     request,
     shown,
     rejectedContext,
     rejectedUnreadable,
   } = useMemberAdviceView(
-    { squad, advice, adviceIssue, adviceLoading, members, index, client },
+    {
+      squad,
+      advice,
+      adviceIssue,
+      adviceLoading,
+      members,
+      index,
+      client,
+      capabilities,
+      computeService,
+    },
     searchParams,
   );
+  // With the service answering, a selection it computes and nobody published is not a
+  // dead end: the panel offers the computation and no "not listed" card stands beside it.
+  const computeOnly =
+    computeAvailable && selection.computable !== undefined && selection.status === "not-listed";
+  const selectedRival = members.find(
+    (member) => member.entry_id === selection.request.rivalEntryId,
+  );
+  const selectionSummary = [
+    isMemberStrategy(selection.request.strategy)
+      ? copy.strategies[selection.request.strategy].name
+      : {
+          garantici: messages.decision.modes.safe,
+          agresif: messages.decision.modes.aggressive,
+          "asiri-agresif": messages.decision.modes.extreme,
+        }[selection.request.strategy],
+    messages.decision.week(selection.request.window),
+    selection.request.rivalEntryId !== null
+      ? `${copy.rivalLabel}: ${selectedRival?.team_name ?? selectedRival?.manager_name ?? `#${selection.request.rivalEntryId}`}`
+      : null,
+    selection.top100.weight !== 0 ? `Top 100 ${selection.top100.weight}` : null,
+    selection.evidence.on ? EVIDENCE_COPY[language].legend : null,
+    selection.chip.chip ? copy.chipNames[selection.chip.chip] : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className={styles.page}>
@@ -88,10 +146,6 @@ function LeagueMemberContent({
         </div>
         <ExampleDataBadge sourceKind={squad.source_kind} />
       </header>
-
-      <Card tone="muted" title={copy.publicDataTitle}>
-        <p className={styles.notice}>{copy.publicDataBody}</p>
-      </Card>
 
       {viewer ? (
         <Card tone="muted" title={copy.viewerTitle}>
@@ -119,64 +173,44 @@ function LeagueMemberContent({
         </Card>
       ) : null}
 
-      {view.data_quality !== "complete" ? (
-        <Card tone="muted" title={copy.incompleteTitle}>
-          <p className={styles.notice}>
-            {copy.incompleteBody(
-              view.missing_fields
-                .map((field) =>
-                  Object.hasOwn(copy.missingFieldLabels, field)
-                    ? copy.missingFieldLabels[field]
-                    : copy.missingFieldUnknown,
-                )
-                .join(", ") || copy.unknown,
-            )}
-          </p>
-        </Card>
-      ) : null}
-
-      <MemberResourceCards squad={view} />
-      {!view.purchase_prices_known ? (
-        <Card tone="muted" title={copy.entryAssumptionsTitle}>
-          <ul className={styles.assumptionList}>
-            <li>{copy.currentPriceFallback}</li>
-          </ul>
-        </Card>
-      ) : null}
+      <MemberResourceCards squad={view} expanded={contextExpanded} />
 
       {view.starting_xi.length > 0 ? (
-        <>
-          <Card
-            tone="pitch"
-            title={copy.memberSquad}
-            aside={copy.starterCount(view.starting_xi.length)}
-          >
-            <Pitch starters={view.starting_xi} />
-            <p className={styles.notice}>{copy.heldViceCaptainUnavailable}</p>
-          </Card>
-          <Card title={copy.bench} aside={copy.benchCount(view.bench.length)}>
-            <div className={styles.bench}>
-              {[...view.bench]
-                .sort(
-                  (left, right) =>
-                    (left.bench_order ?? Number.MAX_SAFE_INTEGER) -
-                    (right.bench_order ?? Number.MAX_SAFE_INTEGER),
-                )
-                .map((player) => (
-                  <div className={styles.benchRow} key={player.player_id}>
-                    <span className="num">{player.bench_order ?? "—"}</span>
-                    <strong>{player.name}</strong>
-                    <span className={styles.muted}>
-                      {player.team} · {player.position}
-                    </span>
-                    <span className={`${styles.benchPoints} num`}>
-                      {points(player.expected_points, 1, locale)} xP
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </Card>
-        </>
+        <details className={styles.contextDetails} open={contextExpanded}>
+          <summary>{contextExpanded ? copy.memberSquad : <h2>{copy.memberSquad}</h2>}</summary>
+          <div className={styles.squadContext}>
+            <Card
+              tone="pitch"
+              title={copy.memberSquad}
+              aside={copy.starterCount(view.starting_xi.length)}
+            >
+              <Pitch starters={view.starting_xi} />
+              <p className={styles.notice}>{copy.heldViceCaptainUnavailable}</p>
+            </Card>
+            <Card title={copy.bench} aside={copy.benchCount(view.bench.length)}>
+              <div className={styles.bench}>
+                {[...view.bench]
+                  .sort(
+                    (left, right) =>
+                      (left.bench_order ?? Number.MAX_SAFE_INTEGER) -
+                      (right.bench_order ?? Number.MAX_SAFE_INTEGER),
+                  )
+                  .map((player) => (
+                    <div className={styles.benchRow} key={player.player_id}>
+                      <span className="num">{player.bench_order ?? "—"}</span>
+                      <strong>{player.name}</strong>
+                      <span className={styles.muted}>
+                        {player.team} · {player.position}
+                      </span>
+                      <span className={`${styles.benchPoints} num`}>
+                        {points(player.expected_points, 1, locale)} xP
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </Card>
+          </div>
+        </details>
       ) : (
         <EmptyState title={copy.emptySquad}>{copy.emptySquadBody}</EmptyState>
       )}
@@ -194,6 +228,19 @@ function LeagueMemberContent({
         <h2 className="visually-hidden" id="entry-advice-title">
           {copy.advice}
         </h2>
+        {deadlinePassed !== null ? (
+          <Card tone="muted" title={COMPUTE_COPY[language].deadlinePassedTitle}>
+            <p className={styles.notice} data-testid="deadline-passed">
+              {COMPUTE_COPY[language].deadlinePassedBody(
+                view.gameweek,
+                new Intl.DateTimeFormat(locale, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(deadlinePassed)),
+              )}
+            </p>
+          </Card>
+        ) : null}
         {viewer !== null && viewer.entryId !== entryId ? (
           <Card tone="muted" title={copy.notYourPageTitle}>
             <p className={styles.notice}>
@@ -203,21 +250,59 @@ function LeagueMemberContent({
           </Card>
         ) : null}
         <TemplatePicker
-          canApply={(params) =>
-            !adviceLoading && indexReadable && resolve(params).status === "ready"
-          }
+          canApply={(params) => {
+            const offered = resolve(params);
+            return (
+              !adviceLoading &&
+              indexReadable &&
+              (offered.status === "ready" || offered.computable?.selection === true)
+            );
+          }}
         />
         <MemberDecisionControls
           entryId={entryId}
           members={members}
           index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
         />
-        <AdviceRequestPanel request={request} job={job} selectionAvailable={selectionAvailable} />
+        <div className={styles.computeDock} data-compute-dock>
+          <AdviceRequestPanel
+            request={request}
+            job={job}
+            selectionAvailable={
+              selectionAvailable &&
+              !selection.evidence.on &&
+              selection.top100.weight === 0 &&
+              selection.chip.chip === null
+            }
+            service={
+              selection.computable
+                ? "ready"
+                : computeService === "ready"
+                  ? "static"
+                  : computeService
+            }
+            computable={computeAvailable}
+            pending={computePending}
+            published={selection.status === "ready"}
+            chipChosen={selection.chip.chip !== null}
+            deadlinePassed={deadlinePassed !== null}
+          />
+        </div>
+        <p className={styles.selectionSummary} data-testid="member-selection-summary">
+          {selectionSummary}
+        </p>
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (
-          <AdviceCard shown={shown} members={members} squad={squad} rivalSquad={rivalSquad} />
-        ) : (
+          <AdviceCard
+            shown={shown}
+            members={members}
+            squad={squad}
+            rivalSquad={rivalSquad}
+            windowControl={windowControl}
+          />
+        ) : computeOnly && !rejectedContext ? null : (
           <MissingAdviceCard
             issue={
               rejectedContext
@@ -238,7 +323,7 @@ function LeagueMemberContent({
                   ? onRetryAdvice
                   : undefined
             }
-            canCompute={selectionAvailable && canComputeAdvice(request)}
+            canCompute={computeAvailable}
           />
         )}
       </section>

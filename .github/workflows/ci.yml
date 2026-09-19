@@ -57,8 +57,8 @@ jobs:
       - name: Ruff format
         run: python -m ruff format --check .
 
-      - name: Mypy (strict, src)
-        run: python -m mypy --strict src
+      - name: Mypy (strict, source and operator scripts)
+        run: python -m mypy
 
       - name: Import boundaries
         run: lint-imports
@@ -183,6 +183,10 @@ jobs:
         run: npx vitest run
 
       - name: Build
+        env:
+          # Unset or empty is the static site, byte for byte (ADR 0006). A repository
+          # variable, not a secret: the value ships in the bundle.
+          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run build
 
       - name: Deployment assets
@@ -207,6 +211,8 @@ jobs:
 
       - name: Playwright smoke
         timeout-minutes: 8
+        env:
+          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e
 
       - name: Python publication and browser API worker acceptance

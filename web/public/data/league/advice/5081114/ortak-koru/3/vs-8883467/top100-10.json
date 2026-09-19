@@ -1,0 +1,299 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-18T12:26:35Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 5,
+    "entry_id": 5081114,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 3,
+    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "moves": [
+      {
+        "move_id": "gw05-1",
+        "player_out": {
+          "player_id": 247348,
+          "name": "Daniel Mu\u00f1oz Mej\u00eda",
+          "short_name": "Mej\u00eda",
+          "position": "DEF",
+          "team": "Nott'm Forest"
+        },
+        "player_in": {
+          "player_id": 491279,
+          "name": "Micky van de Ven",
+          "short_name": "Ven",
+          "position": "DEF",
+          "team": "Spurs"
+        },
+        "expected_points_delta": 1.398472359776278,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 1.398472359776278,
+    "expected_points_cost": 1.2946048345347663,
+    "rival_label": "entry-8883467",
+    "solver_status": "FEASIBLE",
+    "optimality_gap": null,
+    "expected_own_points": 53.74133752036914,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.417342366821867
+    },
+    "vice_captain": {
+      "player_id": 141746,
+      "name": "Bruno Borges Fernandes",
+      "short_name": "Fernandes",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 6.421694651064867
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.8238320826783507
+      },
+      {
+        "player_id": 491279,
+        "name": "Micky van de Ven",
+        "short_name": "Ven",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 3.076944137333225
+      },
+      {
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.1138840416046176
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 2.0636451338320074
+      },
+      {
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 6.421694651064867
+      },
+      {
+        "player_id": 223340,
+        "name": "Bukayo Saka",
+        "short_name": "Saka",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 5.304422892852496
+      },
+      {
+        "player_id": 577725,
+        "name": "Josh King",
+        "short_name": "King",
+        "position": "MID",
+        "team": "Fulham",
+        "expected_points": 3.513475657690736
+      },
+      {
+        "player_id": 484420,
+        "name": "Enzo Le F\u00e9e",
+        "short_name": "F\u00e9e",
+        "position": "MID",
+        "team": "Sunderland",
+        "expected_points": 3.065273184590894
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.417342366821867
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 3.887961607752777
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.635519397325434
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 67089,
+        "name": "Martin Dubravka",
+        "short_name": "Dubravka",
+        "position": "GK",
+        "team": "Spurs",
+        "expected_points": 0.10027015579447286
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.0851965732879876
+      },
+      {
+        "player_id": 153366,
+        "name": "Harrison Reed",
+        "short_name": "Reed",
+        "position": "MID",
+        "team": "Fulham",
+        "expected_points": 0.11895417311970728
+      },
+      {
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 0.0
+      }
+    ],
+    "chip": null,
+    "plan_weeks": [
+      {
+        "gameweek": 5,
+        "transfers_in": [
+          {
+            "player_id": 491279,
+            "name": "Micky van de Ven",
+            "short_name": "Ven",
+            "position": "DEF",
+            "team": "Spurs"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 247348,
+            "name": "Daniel Mu\u00f1oz Mej\u00eda",
+            "short_name": "Mej\u00eda",
+            "position": "DEF",
+            "team": "Nott'm Forest"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 53.74133752036913
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 463726,
+            "name": "Amar Dedic",
+            "short_name": "Dedic",
+            "position": "DEF",
+            "team": "Newcastle"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.18144865889394
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
+            "position": "MID",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 484420,
+            "name": "Enzo Le F\u00e9e",
+            "short_name": "F\u00e9e",
+            "position": "MID",
+            "team": "Sunderland"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.32286480308349
+      }
+    ],
+    "stated_limits": [
+      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
+      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
+      "Prices are held at the captured values; no price change is modelled.",
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.",
+      "The plan was chosen with the Top 100 influence at 10; every expected-points number in this document is the base model's, without it.",
+      "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in."
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "purchase_prices"
+    ],
+    "squad_basis": "captured",
+    "expected_points_cost_ceiling": 26.405295618578634,
+    "control_solver_status": "FEASIBLE",
+    "control_optimality_gap": 24.513000000000005,
+    "rival_entry_id": 8883467,
+    "overlap_count": 3,
+    "transfer_cap": 1,
+    "overlap_target": 9,
+    "overlap_applied": 3,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": null,
+    "expected_gap_vs_rival": 4.7214270340150435,
+    "captain_agreement": false,
+    "top100": {
+      "weight": 10,
+      "changed": true,
+      "price_basis": "base_model_pure_points_v1",
+      "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
+      "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
+      "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
+      "picks_gameweek": 4
+    }
+  }
+}

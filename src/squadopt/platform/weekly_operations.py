@@ -39,6 +39,7 @@ from squadopt.application.weekly_plan import (
     new_snapshot,
     prepare_week,
     rotation_artifact,
+    rotation_source_capture,
 )
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -153,12 +154,18 @@ class WeeklyOperations:
         repository_commit: str,
         resume: bool = False,
         handoff: Path | None = None,
+        record_advice: bool = False,
+        publish_suffix: str = "",
     ) -> None:
         if paths.out == paths.journal / "preview":
             paths = replace(paths, out=paths.journal / run_id / "preview")
         self.request, self.paths, self.run_id = request, paths, run_id
         self.repository_commit, self.resume = repository_commit, resume
         self.supplied_handoff = handoff
+        self.record_advice = record_advice
+        self.publish_names = PublishNames(
+            request.season, request.gameweek, "decision", publish_suffix
+        )
         self.values: dict[str, dict[str, Any]] = {}
         self.plan = request.plan()
         if handoff is not None and not request.skip_top100:
@@ -197,6 +204,11 @@ class WeeklyOperations:
             "ledger_inputs": list(map(str, self.ledger_inputs)),
             "record_inputs": list(map(str, self.record_inputs)),
         }
+        if record_advice or publish_suffix:
+            declaration["publication_options"] = {
+                "record_advice": record_advice,
+                "publish_suffix": publish_suffix,
+            }
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
 
     def _receipt(
@@ -241,6 +253,13 @@ class WeeklyOperations:
             # refuses before it spends anything.
             try:
                 check_publication_base(self.paths.workspace, self.repository_commit)
+                publish(
+                    self.publish_names,
+                    force_branch=False,
+                    dry_run=True,
+                    workspace=self.paths.workspace,
+                    expected_commit=self.repository_commit,
+                )
             except PublishError as error:
                 raise WeekError(str(error)) from error
         return self._receipt(
@@ -384,21 +403,44 @@ class WeeklyOperations:
             result.output_paths,
         )
 
+    def _rotation_source(self) -> Path:
+        """What the rotation stage reads from, as a path the journal can fingerprint.
+
+        A capture is a directory in the snapshot store and the fixture is a file; both are
+        paths, which is what the stage's input list needs. Naming the source rather than
+        always naming the fixture is what makes a resumed run notice that the week was read
+        from somewhere else.
+        """
+
+        if self.request.rotation_capture is None:
+            return self.paths.club_news_fixture
+        return self.paths.snapshots / self.request.rotation_capture
+
     def _rotation(self) -> WeeklyStageResult:
         identifier = self._capture_id()
+        news = self.request.rotation_capture
+        # The export names its artifact after whichever capture the *claims* came from, so a
+        # week read from a club-news capture is a different file from the same week read from
+        # the fixture. This has to agree with `rotation_export._artifact_name` or the reuse
+        # check silently stops finding anything.
+        distinguishing = rotation_source_capture(identifier, news)
         table, manifest = rotation_artifact(
-            self.paths.rotation, self.request.season, self.request.gameweek, identifier
+            self.paths.rotation, self.request.season, self.request.gameweek, distinguishing
         )
         if not (table.is_file() and manifest.is_file()):
             export_rotation_evidence(
+                # Keyword arguments, deliberately. Positionally the eighth field is never
+                # reached, which is why this stage could not name a capture at all: the field
+                # and its refusal have existed since the capture path landed.
                 RotationExportRequest(
-                    self.request.season,
-                    self.request.gameweek,
-                    str(self.values["capture"]["deadline_utc"]),
-                    identifier,
-                    self.paths.snapshots,
-                    self.paths.club_news_fixture,
-                    self.paths.rotation,
+                    season=self.request.season,
+                    target_gameweek=self.request.gameweek,
+                    deadline_utc=str(self.values["capture"]["deadline_utc"]),
+                    snapshot=identifier,
+                    snapshot_root=self.paths.snapshots,
+                    club_news_fixture=None if news else self.paths.club_news_fixture,
+                    output_dir=self.paths.rotation,
+                    club_news_snapshot=news,
                     table_name=table.stem,
                 ),
                 repository_commit=self.repository_commit,
@@ -499,10 +541,9 @@ class WeeklyOperations:
         )
 
     def _league(self) -> WeeklyStageResult:
-        # A run that will publish records here, from the solve whose bytes ship: the
-        # publish stage copies this preview rather than solving again, and the history
-        # documents built below read the record, so it has to exist before they do.
-        record = self.request.publish
+        # Publication or explicit recording writes the record before history reads it.
+        # The publish stage copies this preview rather than solving again.
+        record = self.request.publish or self.record_advice
         request = LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
@@ -515,6 +556,21 @@ class WeeklyOperations:
             handoff_path=Path(self.values["handoff"]["path"]),
             record_root=self.paths.records if record else None,
             history_record_root=self.paths.records,
+            # The manager's word rides on the rotation stage: when it ran, its table and
+            # the source the claims came from reach every member's menu as a switchable,
+            # priced constraint; when it did not, the index says there is none.
+            rotation_evidence=(
+                Path(str(self.values["rotation"]["table"])) if "rotation" in self.values else None
+            ),
+            club_news_source=self._rotation_source() if "rotation" in self.values else None,
+            # The Top 100 menu rides on the evidence stage. The loader's own gate refuses a
+            # handoff that already carries the uplift (``--projection component``), and the
+            # index then says so; the published plans do not depend on the menu.
+            top100_evidence=(
+                Path(str(self.values["top100_evidence"]["table"]))
+                if "top100_evidence" in self.values
+                else None
+            ),
         )
         with league_mapper(request, self.request.workers) as mapper:
             result = publish_league(request, mapper=mapper)
@@ -524,6 +580,17 @@ class WeeklyOperations:
                 "snapshot_id": result.snapshot_id,
                 "gameweek": result.gameweek,
                 "advice_recorded": record,
+                # What the build told the operator about individual members (a name it
+                # changed, a mode or the manager's word it could not solve) and the files
+                # it removed from the tree, so a run is not "completed" in silence.
+                "member_notes": {
+                    str(member.entry_id): member.reason
+                    for member in result.report.members
+                    if member.reason
+                },
+                "removed": list(result.report.removed),
+                # Empty when the Top 100 menu was offered or never asked for.
+                "top100_note": result.top100_note,
             },
         )
 
@@ -613,7 +680,7 @@ class WeeklyOperations:
             copied["published_files"] = len(actual)
 
         exit_code = publish(
-            PublishNames(self.request.season, self.request.gameweek, "decision"),
+            self.publish_names,
             force_branch=False,
             dry_run=False,
             workspace=self.paths.workspace,
@@ -703,7 +770,9 @@ class WeeklyOperations:
             if self.request.rotation:
                 self.values["rotation"] = dict(
                     self._stage(
-                        "rotation", inputs=[selected, p.club_news_fixture], operation=self._rotation
+                        "rotation",
+                        inputs=[selected, self._rotation_source()],
+                        operation=self._rotation,
                     ).value
                 )
             handoff_inputs = [selected]
@@ -729,13 +798,18 @@ class WeeklyOperations:
                 )
             self._seed_preview()
             common = [selected, held_handoff, p.registry, self._published_tree()]
+            top100_inputs = (
+                [Path(self.values["top100_evidence"][key]) for key in ("table", "manifest")]
+                if "top100_evidence" in self.values
+                else []
+            )
             # The history documents read every record of the season; the record this run
             # writes for its own capture is the stage's output, so a week whose records
             # moved between runs is visible as changed inputs rather than as changed bytes.
             self.values["league"] = dict(
                 self._stage(
                     "league",
-                    inputs=[*common, p.archive, *self.record_inputs],
+                    inputs=[*common, p.archive, *self.record_inputs, *top100_inputs],
                     operation=self._league,
                 ).value
             )
@@ -793,11 +867,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decide", action="store_true")
     parser.add_argument("--chip", choices=CHIP_CHOICES)
     parser.add_argument("--rotation", action="store_true")
+    parser.add_argument(
+        "--rotation-capture",
+        help=(
+            "a club-news capture id to export the rotation evidence from; without it the "
+            "committed synthetic fixture is read, which is what every run did before"
+        ),
+    )
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument(
         "--out", type=Path, help="Preview root; default: private run-directory/preview"
     )
     parser.add_argument("--publish", action="store_true")
+    parser.add_argument(
+        "--record-advice", action="store_true", help="Record advice even without --publish."
+    )
+    parser.add_argument(
+        "--publish-suffix", default="", help="Suffix for the site publication branch."
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--run-id")
     parser.add_argument("--resume", action="store_true")
@@ -861,6 +948,8 @@ def _revision(workspace: Path, supplied: str | None) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.publish_suffix and not args.publish:
+        parser.error("--publish-suffix requires --publish")
     root = args.workspace.resolve()
     out = (root / args.out).resolve() if args.out is not None else None
     paths = WeeklyPaths.under(root, out=out)
@@ -889,8 +978,14 @@ def main(argv: list[str] | None = None) -> int:
             args.rotation,
             args.workers,
             args.publish,
+            args.rotation_capture,
         )
         print(request.plan().describe())
+        names = PublishNames(request.season, request.gameweek, "decision", args.publish_suffix)
+        print(
+            f"Record advice: {request.publish or args.record_advice}; "
+            f"publish suffix: {args.publish_suffix or '(none)'}; site branch: {names.branch}"
+        )
         if args.dry_run:
             print("Dry run: nothing captured, built or published.")
             return 0
@@ -908,6 +1003,8 @@ def main(argv: list[str] | None = None) -> int:
             repository_commit=revision,
             resume=args.resume,
             handoff=handoff,
+            record_advice=args.record_advice,
+            publish_suffix=args.publish_suffix,
         )
         completed = operation.execute()
         print(f"Verified weekly run: {completed}")

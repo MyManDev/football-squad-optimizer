@@ -285,6 +285,7 @@ def _advice(record: Mapping[str, Any]) -> Mapping[str, Any]:
     documents = record.get("advice")
     if not isinstance(documents, list):
         raise SuggestionEvaluationError("missing_advice")
+    baseline_path = f"advice/{record.get('entry_id')}/saf-puan/1.json"
     found = [
         doc
         for doc in documents
@@ -293,6 +294,8 @@ def _advice(record: Mapping[str, Any]) -> Mapping[str, Any]:
         and type(doc.get("window")) is int
         and doc["window"] == 1
         and doc.get("rival_entry_id") is None
+        # Legacy records may omit the path; switched publications always carry it.
+        and doc.get("published_path", baseline_path) == baseline_path
     ]
     if not found:
         raise SuggestionEvaluationError("missing_advice")
@@ -309,6 +312,7 @@ def evaluate_week(
     entry_id: int,
     deadline_utc: str,
     captures: Sequence[CapturedSnapshot],
+    selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
 ) -> WeekReview:
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
@@ -329,6 +333,8 @@ def evaluate_week(
                 else _number(advice["expected_own_points"])
             ),
         )
+        if selected_records is not None:
+            selected_records[entry_id, gameweek] = record
     except (DataError, ValueError, TypeError, KeyError, OSError) as error:
         reason = (
             str(error) if str(error) in ("ambiguous_record", "missing_advice") else "invalid_record"
@@ -400,6 +406,7 @@ def review_member_weeks(
     season: str,
     league_id: int,
     entry_ids: Sequence[int],
+    selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
@@ -444,6 +451,7 @@ def review_member_weeks(
                         entry_id=entry_id,
                         deadline_utc=deadlines[week],
                         captures=captures,
+                        selected_records=selected_records,
                     )
                 )
         reviews[entry_id] = tuple(weeks)
@@ -626,6 +634,76 @@ def live_series_reading(
     return read_live_series(settled_member_week_comparisons(reviews, season=season), policy=policy)
 
 
+def _history_week(week: WeekReview, record: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Add only recorded decisions from the exact publication already selected for this week."""
+    result = asdict(week)
+    if record is None:
+        return result
+    documents = cast(list[dict[str, Any]], record.get("advice", []))
+    fields = (
+        "expected_points_cost",
+        "expected_points_cost_ceiling",
+        "top100_weight",
+        "managers_word",
+    )
+    # Older archives did not retain settings. Missing evidence cannot mean switches off.
+    if not any(any(field in doc for field in fields) for doc in documents):
+        return result
+    players = cast(dict[str, dict[str, Any]], record.get("players", {}))
+    entry_id = record["entry_id"]
+    # The unsuffixed one-week documents name the publication's default rival.
+    default_rivals = {
+        doc["rival_entry_id"]
+        for doc in documents
+        if doc.get("rival_entry_id") is not None
+        and doc.get("published_path") == f"advice/{entry_id}/{doc['strategy']}/1.json"
+    }
+    by_path = {doc.get("published_path"): doc for doc in documents}
+
+    def listed(doc: dict[str, Any]) -> bool:
+        if doc.get("window") != 1 or "published_path" not in doc:
+            return False
+        rival = doc.get("rival_entry_id")
+        if rival is not None and rival not in default_rivals:
+            return False
+        alias = f"advice/{entry_id}/{doc['strategy']}/1.json"
+        twin = by_path.get(f"advice/{entry_id}/{doc['strategy']}/1/vs-{rival}.json")
+        return not (
+            rival is not None
+            and doc["published_path"] == alias
+            and twin is not None
+            and doc.get("advice_sha256") is not None
+            and twin.get("advice_sha256") == doc["advice_sha256"]
+        )
+
+    def name(player_id: object) -> str | None:
+        if player_id is None:
+            return None
+        return str(players.get(str(player_id), {}).get("name", f"#{player_id}"))
+
+    result["recorded_plans"] = [
+        {
+            "published_path": doc["published_path"],
+            "strategy": doc["strategy"],
+            "window": doc["window"],
+            "rival_entry_id": doc.get("rival_entry_id"),
+            "chip": doc.get("chip"),
+            "captain": name(doc.get("captain")),
+            "moves": [
+                {
+                    "player_out": name(move.get("player_out")),
+                    "player_in": name(move.get("player_in")),
+                }
+                for move in doc.get("moves", [])
+            ],
+            **{field: doc[field] for field in fields if field in doc},
+        }
+        for doc in documents
+        if listed(doc)
+    ]
+    return result
+
+
 def publish_suggestion_histories(
     *,
     record_root: Path,
@@ -645,6 +723,7 @@ def publish_suggestion_histories(
     walks could return two sets that no reader could reconcile. A record that supports no
     horizon publishes histories and no horizon file.
     """
+    selected_records: dict[tuple[int, int], dict[str, Any]] = {}
     reviews = review_member_weeks(
         record_root=record_root,
         snapshot_root=snapshot_root,
@@ -652,9 +731,17 @@ def publish_suggestion_histories(
         season=season,
         league_id=league_id,
         entry_ids=entry_ids,
+        selected_records=selected_records,
     )
     written = []
     for entry_id in entry_ids:
+        weeks = []
+        for week in reviews[entry_id]:
+            try:
+                weeks.append(_history_week(week, selected_records.get((entry_id, week.gameweek))))
+            except (DataError, ValueError, TypeError, KeyError, OSError):
+                # Malformed optional rows cannot erase the independently reviewed baseline.
+                weeks.append(asdict(week))
         document = {
             "contract_version": CONTRACT_VERSION,
             "generated_at_utc": as_of_snapshot.metadata.captured_at_utc,
@@ -663,7 +750,7 @@ def publish_suggestion_histories(
                 "entry_id": entry_id,
                 "season": season,
                 "as_of_snapshot_id": as_of_snapshot.metadata.snapshot_id,
-                "weeks": [asdict(week) for week in reviews[entry_id]],
+                "weeks": weeks,
             },
         }
         path = out_dir / "history" / f"{entry_id}.json"
