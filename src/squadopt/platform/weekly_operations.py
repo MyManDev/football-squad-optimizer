@@ -41,18 +41,19 @@ from squadopt.application.weekly_plan import (
     rotation_artifact,
     rotation_source_capture,
 )
+from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.source_revision import source_revision
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
-from squadopt.live.runlog import LOG_ROOT_NAME, RunLog, configure_run_logging
 from squadopt.platform import cohort_capture, elite_capture
 from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.fpl_capture import capture
 from squadopt.platform.projection_retention import publish_retained_handoff, retained_handoff_path
 from squadopt.platform.publication_workers import league_mapper
+from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.weekly_journal import (
     WeeklyJournalError,
     WeeklyRun,

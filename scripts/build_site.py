@@ -28,9 +28,9 @@ from squadopt.application.site_publication import (
     SiteSeasonUnavailableError,
     publish_site,
 )
+from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError
 from squadopt.live import LedgerError
-from squadopt.live.runlog import LOG_ROOT_NAME
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
