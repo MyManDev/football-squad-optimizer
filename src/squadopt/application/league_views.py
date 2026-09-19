@@ -1240,8 +1240,8 @@ def build_league_views(
     envelopes below are stamped with ``generated``, which moves whenever ``now`` is not
     passed — and no caller here passes it — so the same advice re-published is never the
     same bytes. What is still refused is a rebuild of one capture that produces different
-    *advice*: the capture is the whole input, so that is our own non-determinism, and it
-    raises ``AdviceRecordConflictError`` naming the difference.
+    *advice*: the handoff, switch artifacts, settings and code also affect that advice.
+    The immutable address still raises ``AdviceRecordConflictError`` naming the difference.
 
     The records are written after every member's files are on disk, so a refusal can never
     stop the advice being published; the refusal is raised once, after every writable record

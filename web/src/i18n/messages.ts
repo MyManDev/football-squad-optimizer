@@ -4,6 +4,11 @@ export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
   suggestionHistory: {
+    recordedPlans: "Recorded Plans and Settings",
+    recordedPlansNote:
+      "One-week plans. Window plans and other rivals are in the week's own record and are not listed here. This does not show what you chose, and these alternatives have not been scored against results here.",
+    unknownPlayer: "Player Not Recorded",
+    noRecordedMoves: "No Moves Listed",
     title: "Weekly Suggestion History",
     overview: "Overview",
     systemNet: "System Suggestion · Net",
@@ -967,6 +972,11 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    recordedPlans: "Kaydedilmiş Planlar ve Ayarlar",
+    recordedPlansNote:
+      "Bir haftalık planlar. Çok haftalık planlar ve diğer rakipler haftanın kendi kaydında bulunur, burada listelenmez. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
+    unknownPlayer: "Oyuncu Kaydedilmemiş",
+    noRecordedMoves: "Listelenen Hamle Yok",
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",
     systemNet: "Sistem Tavsiyesi · Net",

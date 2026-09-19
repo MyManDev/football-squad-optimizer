@@ -904,9 +904,9 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
     that can be rewritten proves nothing about what was published.
 
     A rebuild of that same capture that produces *different advice* is the case that
-    matters: the capture is the whole input, so the same capture solving to different
-    advice is a non-determinism in our own code, and it has been. So it is refused, with
-    the difference named — and a clock that moved alongside it does not soften that.
+    matters: advice also depends on the projection handoff, switch artifacts, settings
+    and code revision. Changed advice at the same capture's address is refused with
+    the difference named; a changed publication clock does not soften that refusal.
 
     A *different* capture is not that. It is the next publish of the week — the mid-week
     build and the one taken shortly before the deadline are both real advice — and it lands
