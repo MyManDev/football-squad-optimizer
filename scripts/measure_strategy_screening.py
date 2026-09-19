@@ -13,7 +13,7 @@ itself too rarely proven), by the pre-registered rule and nothing else.
 import argparse
 import logging
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean
@@ -22,8 +22,10 @@ from time import perf_counter
 import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
+    MEASUREMENT_WALL_TIME_LIMIT_SECONDS,
     REPOSITORY_ROOT,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -36,7 +38,7 @@ from squadopt.experiments.design import DesignKind, ExperimentDesign, StrategyOb
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
 from squadopt.experiments.statistics import season_aware_moving_block_interval
-from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
+from squadopt.optimization import SolverStatus, optimize_squad
 from squadopt.planning import (
     InitialSquadState,
     PlanningHorizon,
@@ -83,7 +85,13 @@ class LevelSweep:
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
-    parser.add_argument("--solver-time-limit", type=float, default=30.0)
+    parser.add_argument(
+        "--solver-time-limit",
+        type=float,
+        default=MEASUREMENT_WALL_TIME_LIMIT_SECONDS,
+        help="wall-clock cap per solve; the binding limit is deterministic work, and a "
+        "cap below it would make the machine the thing that decides",
+    )
     parser.add_argument("--pool-per-position", type=int, default=15)
     parser.add_argument("--cheap-per-position", type=int, default=5)
     parser.add_argument(
@@ -141,7 +149,13 @@ def _build_fold(
     pool["ownership"] = pool["selected"].fillna(0.0)
     rival = template_rival_from_ownership(pool.loc[:, ["player_id", "position", "ownership"]])
 
-    optimization = OptimizationConfig(solver_time_limit_seconds=float(arguments.solver_time_limit))
+    # Named rather than inherited (#590, #621): deterministic time is the binding limit so
+    # the record is the run's and not the machine's, and the operator's flag stays what it
+    # always was, a wall-clock cap above it.
+    optimization = replace(
+        measurement_optimization_config(),
+        solver_time_limit_seconds=float(arguments.solver_time_limit),
+    )
     full_projection = pool.loc[
         :, ["player_id", "name", "team_id", "position", "price_tenths"]
     ].copy()
@@ -222,7 +236,13 @@ def main() -> int:
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
     ownership = load_enrichment_rows(arguments.archive_root, DEVELOPMENT_SEASONS)
 
-    optimization = OptimizationConfig(solver_time_limit_seconds=float(arguments.solver_time_limit))
+    # Named rather than inherited (#590, #621): deterministic time is the binding limit so
+    # the record is the run's and not the machine's, and the operator's flag stays what it
+    # always was, a wall-clock cap above it.
+    optimization = replace(
+        measurement_optimization_config(),
+        solver_time_limit_seconds=float(arguments.solver_time_limit),
+    )
     folds: list[Fold] = []
     for season in DEVELOPMENT_SEASONS:
         for origin in ORIGINS:
