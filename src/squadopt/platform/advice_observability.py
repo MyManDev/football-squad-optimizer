@@ -49,6 +49,7 @@ API_COUNTER_FAMILIES: Final = (
     "advice_cache_misses_total",
     "advice_jobs_submitted_total",
     "advice_rejected_total",
+    "advice_open_job_refused_total",
 )
 WORKER_COUNTER_FAMILIES: Final = (
     "advice_jobs_total",

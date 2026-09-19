@@ -1,0 +1,4839 @@
+{
+  "arms": {
+    "as_it_stands": {
+      "mean_realized_points": 63.414965986394556,
+      "proven_share": 0.7210884353741497,
+      "scored_decisions": 147,
+      "zero_minute_starters": 83
+    },
+    "corrected": {
+      "mean_realized_points": 63.197278911564624,
+      "proven_share": 0.7278911564625851,
+      "scored_decisions": 147,
+      "zero_minute_starters": 83
+    }
+  },
+  "candidate": {
+    "buckets": [
+      "none",
+      "under_30",
+      "30_to_60",
+      "60_and_above"
+    ],
+    "factor_bounds": [
+      0.0,
+      2.0
+    ],
+    "minimum_earlier_decisions": 8
+  },
+  "contract_version": "prior_minutes_level_v1",
+  "decision_gate": {
+    "block_length": 4,
+    "by_season": {
+      "2021-22": -1.1891891891891893,
+      "2022-23": 1.1388888888888888,
+      "2023-24": 0.0,
+      "2024-25": -0.7837837837837838
+    },
+    "decisions_with_a_different_squad": 51,
+    "interval": [
+      -0.8302721088435376,
+      0.3129251700680272
+    ],
+    "interval_level": 0.9,
+    "losses": 19,
+    "mean_difference": -0.21768707482993196,
+    "no_harm_floor": -0.25,
+    "paired_decisions": 147,
+    "resamples": 2000,
+    "ties": 107,
+    "wins": 21
+  },
+  "elapsed_seconds": 1786.021623,
+  "factor_paths": [
+    {
+      "bucket": "none",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw02"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw02"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw02"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw02"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw03"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw03"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw03"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw03"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw04"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw04"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw04"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 0,
+      "earlier_forecast_points": 0.0,
+      "earlier_realized_points": 0.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw04"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 1,
+      "earlier_forecast_points": 47.354063100000005,
+      "earlier_realized_points": 41.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw05"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 1,
+      "earlier_forecast_points": 68.021552148,
+      "earlier_realized_points": 93.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw05"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 1,
+      "earlier_forecast_points": 103.01162989600002,
+      "earlier_realized_points": 112.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw05"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 1,
+      "earlier_forecast_points": 568.461700878,
+      "earlier_realized_points": 583.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw05"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 2,
+      "earlier_forecast_points": 94.61612202299999,
+      "earlier_realized_points": 87.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw06"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 2,
+      "earlier_forecast_points": 166.08197591600003,
+      "earlier_realized_points": 239.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw06"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 2,
+      "earlier_forecast_points": 218.863946122,
+      "earlier_realized_points": 260.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw06"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 2,
+      "earlier_forecast_points": 1122.0123272249998,
+      "earlier_realized_points": 1092.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw06"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 3,
+      "earlier_forecast_points": 143.988719802,
+      "earlier_realized_points": 94.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw07"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 3,
+      "earlier_forecast_points": 262.06584672,
+      "earlier_realized_points": 360.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw07"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 3,
+      "earlier_forecast_points": 390.90099258500004,
+      "earlier_realized_points": 392.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw07"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 3,
+      "earlier_forecast_points": 1626.8490167930001,
+      "earlier_realized_points": 1608.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw07"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 4,
+      "earlier_forecast_points": 187.38275919,
+      "earlier_realized_points": 110.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw08"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 4,
+      "earlier_forecast_points": 363.35906926300004,
+      "earlier_realized_points": 529.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw08"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 4,
+      "earlier_forecast_points": 542.356836119,
+      "earlier_realized_points": 522.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw08"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 4,
+      "earlier_forecast_points": 2136.779186173,
+      "earlier_realized_points": 2052.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw08"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 5,
+      "earlier_forecast_points": 228.88173729000002,
+      "earlier_realized_points": 152.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw09"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 5,
+      "earlier_forecast_points": 473.692681139,
+      "earlier_realized_points": 715.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw09"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 5,
+      "earlier_forecast_points": 710.922733773,
+      "earlier_realized_points": 697.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw09"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 5,
+      "earlier_forecast_points": 2610.238102838,
+      "earlier_realized_points": 2512.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw09"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 6,
+      "earlier_forecast_points": 271.443159464,
+      "earlier_realized_points": 152.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw10"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 6,
+      "earlier_forecast_points": 576.130872725,
+      "earlier_realized_points": 908.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw10"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 6,
+      "earlier_forecast_points": 923.4790197730001,
+      "earlier_realized_points": 934.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw10"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 6,
+      "earlier_forecast_points": 3055.916031504,
+      "earlier_realized_points": 2911.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw10"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 7,
+      "earlier_forecast_points": 314.155717963,
+      "earlier_realized_points": 157.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw11"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 7,
+      "earlier_forecast_points": 685.586550604,
+      "earlier_realized_points": 1043.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw11"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 7,
+      "earlier_forecast_points": 1140.27684515,
+      "earlier_realized_points": 1149.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw11"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 7,
+      "earlier_forecast_points": 3495.099830237,
+      "earlier_realized_points": 3380.0,
+      "factor": 1.0,
+      "fold_id": "2021-22-gw11"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 8,
+      "earlier_forecast_points": 355.14835701500004,
+      "earlier_realized_points": 159.0,
+      "factor": 0.44770022684712707,
+      "fold_id": "2021-22-gw12"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 8,
+      "earlier_forecast_points": 811.755022629,
+      "earlier_realized_points": 1153.0,
+      "factor": 1.4203792620411795,
+      "fold_id": "2021-22-gw12"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 8,
+      "earlier_forecast_points": 1360.008080976,
+      "earlier_realized_points": 1338.0,
+      "factor": 0.9838176836712573,
+      "fold_id": "2021-22-gw12"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 8,
+      "earlier_forecast_points": 3919.39622044,
+      "earlier_realized_points": 3851.0,
+      "factor": 0.9825492967301168,
+      "fold_id": "2021-22-gw12"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 9,
+      "earlier_forecast_points": 393.53814067999997,
+      "earlier_realized_points": 164.0,
+      "factor": 0.41673216150440245,
+      "fold_id": "2021-22-gw13"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 9,
+      "earlier_forecast_points": 935.8786375969999,
+      "earlier_realized_points": 1288.0,
+      "factor": 1.3762468211766445,
+      "fold_id": "2021-22-gw13"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 9,
+      "earlier_forecast_points": 1564.438344057,
+      "earlier_realized_points": 1541.0,
+      "factor": 0.9850180455202739,
+      "fold_id": "2021-22-gw13"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 9,
+      "earlier_forecast_points": 4355.972991922,
+      "earlier_realized_points": 4379.0,
+      "factor": 1.0052863064396182,
+      "fold_id": "2021-22-gw13"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 10,
+      "earlier_forecast_points": 427.83933522800004,
+      "earlier_realized_points": 169.0,
+      "factor": 0.39500809318979085,
+      "fold_id": "2021-22-gw14"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 10,
+      "earlier_forecast_points": 1051.876536202,
+      "earlier_realized_points": 1408.0,
+      "factor": 1.3385601366143707,
+      "fold_id": "2021-22-gw14"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 10,
+      "earlier_forecast_points": 1740.305475169,
+      "earlier_realized_points": 1736.0,
+      "factor": 0.9975260233157734,
+      "fold_id": "2021-22-gw14"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 10,
+      "earlier_forecast_points": 4762.055306202,
+      "earlier_realized_points": 4821.0,
+      "factor": 1.0123779943759226,
+      "fold_id": "2021-22-gw14"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 11,
+      "earlier_forecast_points": 464.392139593,
+      "earlier_realized_points": 173.0,
+      "factor": 0.3725299918978381,
+      "fold_id": "2021-22-gw15"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 11,
+      "earlier_forecast_points": 1181.20439014,
+      "earlier_realized_points": 1532.0,
+      "factor": 1.296981295352638,
+      "fold_id": "2021-22-gw15"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 11,
+      "earlier_forecast_points": 1940.2686922920002,
+      "earlier_realized_points": 1947.0,
+      "factor": 1.0034692657438327,
+      "fold_id": "2021-22-gw15"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 11,
+      "earlier_forecast_points": 5208.388455833,
+      "earlier_realized_points": 5260.0,
+      "factor": 1.0099093116046671,
+      "fold_id": "2021-22-gw15"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 12,
+      "earlier_forecast_points": 499.07620748899996,
+      "earlier_realized_points": 178.0,
+      "factor": 0.3566589577482979,
+      "fold_id": "2021-22-gw16"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 12,
+      "earlier_forecast_points": 1305.087472013,
+      "earlier_realized_points": 1692.0,
+      "factor": 1.2964648242237866,
+      "fold_id": "2021-22-gw16"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 12,
+      "earlier_forecast_points": 2147.581287933,
+      "earlier_realized_points": 2183.0,
+      "factor": 1.0164923731949116,
+      "fold_id": "2021-22-gw16"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 12,
+      "earlier_forecast_points": 5648.166825554001,
+      "earlier_realized_points": 5666.0,
+      "factor": 1.0031573384775598,
+      "fold_id": "2021-22-gw16"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 13,
+      "earlier_forecast_points": 529.938083542,
+      "earlier_realized_points": 178.0,
+      "factor": 0.3358882962520521,
+      "fold_id": "2021-22-gw17"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 13,
+      "earlier_forecast_points": 1420.988102298,
+      "earlier_realized_points": 1843.0,
+      "factor": 1.2969848213503892,
+      "fold_id": "2021-22-gw17"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 13,
+      "earlier_forecast_points": 2339.329085117,
+      "earlier_realized_points": 2348.0,
+      "factor": 1.0037065819162276,
+      "fold_id": "2021-22-gw17"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 13,
+      "earlier_forecast_points": 6035.897951677,
+      "earlier_realized_points": 6124.0,
+      "factor": 1.0145963449064812,
+      "fold_id": "2021-22-gw17"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 14,
+      "earlier_forecast_points": 553.786536876,
+      "earlier_realized_points": 193.0,
+      "factor": 0.3485097364207234,
+      "fold_id": "2021-22-gw18"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 14,
+      "earlier_forecast_points": 1508.9029393320002,
+      "earlier_realized_points": 1945.0,
+      "factor": 1.2890159792922549,
+      "fold_id": "2021-22-gw18"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 14,
+      "earlier_forecast_points": 2499.573414522,
+      "earlier_realized_points": 2535.0,
+      "factor": 1.014173052598567,
+      "fold_id": "2021-22-gw18"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 14,
+      "earlier_forecast_points": 6332.005714149001,
+      "earlier_realized_points": 6432.0,
+      "factor": 1.015791881808881,
+      "fold_id": "2021-22-gw18"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 15,
+      "earlier_forecast_points": 567.824839156,
+      "earlier_realized_points": 195.0,
+      "factor": 0.3434157623147358,
+      "fold_id": "2021-22-gw19"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 15,
+      "earlier_forecast_points": 1556.5597884009999,
+      "earlier_realized_points": 2003.0,
+      "factor": 1.2868121192168358,
+      "fold_id": "2021-22-gw19"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 15,
+      "earlier_forecast_points": 2619.64607496,
+      "earlier_realized_points": 2645.0,
+      "factor": 1.0096783780382954,
+      "fold_id": "2021-22-gw19"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 15,
+      "earlier_forecast_points": 6503.032887125,
+      "earlier_realized_points": 6629.0,
+      "factor": 1.019370517581788,
+      "fold_id": "2021-22-gw19"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 16,
+      "earlier_forecast_points": 590.949718747,
+      "earlier_realized_points": 198.0,
+      "factor": 0.3350538865130903,
+      "fold_id": "2021-22-gw20"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 16,
+      "earlier_forecast_points": 1674.27862448,
+      "earlier_realized_points": 2124.0,
+      "factor": 1.2686060545386675,
+      "fold_id": "2021-22-gw20"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 16,
+      "earlier_forecast_points": 2824.622814502,
+      "earlier_realized_points": 2900.0,
+      "factor": 1.0266857525581834,
+      "fold_id": "2021-22-gw20"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 16,
+      "earlier_forecast_points": 6735.951041283,
+      "earlier_realized_points": 6846.0,
+      "factor": 1.0163375532337655,
+      "fold_id": "2021-22-gw20"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 17,
+      "earlier_forecast_points": 616.124860515,
+      "earlier_realized_points": 205.0,
+      "factor": 0.33272476593242273,
+      "fold_id": "2021-22-gw21"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 17,
+      "earlier_forecast_points": 1812.2512136950002,
+      "earlier_realized_points": 2266.0,
+      "factor": 1.2503785252707051,
+      "fold_id": "2021-22-gw21"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 17,
+      "earlier_forecast_points": 3017.064183431,
+      "earlier_realized_points": 3089.0,
+      "factor": 1.0238429851655309,
+      "fold_id": "2021-22-gw21"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 17,
+      "earlier_forecast_points": 6963.679574142,
+      "earlier_realized_points": 7063.0,
+      "factor": 1.0142626358379272,
+      "fold_id": "2021-22-gw21"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 18,
+      "earlier_forecast_points": 651.342208226,
+      "earlier_realized_points": 209.0,
+      "factor": 0.3208758734816738,
+      "fold_id": "2021-22-gw22"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 18,
+      "earlier_forecast_points": 1977.79367995,
+      "earlier_realized_points": 2462.0,
+      "factor": 1.244821451781685,
+      "fold_id": "2021-22-gw22"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 18,
+      "earlier_forecast_points": 3252.125129413,
+      "earlier_realized_points": 3376.0,
+      "factor": 1.0380904379928821,
+      "fold_id": "2021-22-gw22"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 18,
+      "earlier_forecast_points": 7264.306300795,
+      "earlier_realized_points": 7377.0,
+      "factor": 1.0155133462905697,
+      "fold_id": "2021-22-gw22"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 19,
+      "earlier_forecast_points": 710.492875718,
+      "earlier_realized_points": 217.0,
+      "factor": 0.30542178171837,
+      "fold_id": "2021-22-gw23"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 19,
+      "earlier_forecast_points": 2184.645625999,
+      "earlier_realized_points": 2664.0,
+      "factor": 1.2194197394288144,
+      "fold_id": "2021-22-gw23"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 19,
+      "earlier_forecast_points": 3592.760992288,
+      "earlier_realized_points": 3698.0,
+      "factor": 1.0292919590080998,
+      "fold_id": "2021-22-gw23"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 19,
+      "earlier_forecast_points": 7622.344846867,
+      "earlier_realized_points": 7683.0,
+      "factor": 1.0079575451323133,
+      "fold_id": "2021-22-gw23"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 20,
+      "earlier_forecast_points": 755.153417349,
+      "earlier_realized_points": 219.0,
+      "factor": 0.2900072951650134,
+      "fold_id": "2021-22-gw24"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 20,
+      "earlier_forecast_points": 2408.233390496,
+      "earlier_realized_points": 2898.0,
+      "factor": 1.2033717377380635,
+      "fold_id": "2021-22-gw24"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 20,
+      "earlier_forecast_points": 3895.0330613139995,
+      "earlier_realized_points": 4017.0,
+      "factor": 1.0313134540236366,
+      "fold_id": "2021-22-gw24"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 20,
+      "earlier_forecast_points": 7972.3294479510005,
+      "earlier_realized_points": 8043.0,
+      "factor": 1.008864479636772,
+      "fold_id": "2021-22-gw24"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 21,
+      "earlier_forecast_points": 788.336583213,
+      "earlier_realized_points": 221.0,
+      "factor": 0.2803371107037515,
+      "fold_id": "2021-22-gw25"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 21,
+      "earlier_forecast_points": 2582.72065861,
+      "earlier_realized_points": 3032.0,
+      "factor": 1.173955839897838,
+      "fold_id": "2021-22-gw25"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 21,
+      "earlier_forecast_points": 4166.545184684,
+      "earlier_realized_points": 4271.0,
+      "factor": 1.0250698866053274,
+      "fold_id": "2021-22-gw25"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 21,
+      "earlier_forecast_points": 8268.892186027999,
+      "earlier_realized_points": 8355.0,
+      "factor": 1.0104134643474367,
+      "fold_id": "2021-22-gw25"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 22,
+      "earlier_forecast_points": 827.257290339,
+      "earlier_realized_points": 223.0,
+      "factor": 0.2695654696601312,
+      "fold_id": "2021-22-gw26"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 22,
+      "earlier_forecast_points": 2776.695351063,
+      "earlier_realized_points": 3166.0,
+      "factor": 1.1402043075370019,
+      "fold_id": "2021-22-gw26"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 22,
+      "earlier_forecast_points": 4455.160927282,
+      "earlier_realized_points": 4637.0,
+      "factor": 1.0408153769720137,
+      "fold_id": "2021-22-gw26"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 22,
+      "earlier_forecast_points": 8584.86937827,
+      "earlier_realized_points": 8719.0,
+      "factor": 1.01562407251874,
+      "fold_id": "2021-22-gw26"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 23,
+      "earlier_forecast_points": 896.701689849,
+      "earlier_realized_points": 226.0,
+      "factor": 0.25203476536110603,
+      "fold_id": "2021-22-gw27"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 23,
+      "earlier_forecast_points": 3050.937550366,
+      "earlier_realized_points": 3428.0,
+      "factor": 1.1235890421909052,
+      "fold_id": "2021-22-gw27"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 23,
+      "earlier_forecast_points": 4836.11200476,
+      "earlier_realized_points": 4979.0,
+      "factor": 1.029546047547981,
+      "fold_id": "2021-22-gw27"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 23,
+      "earlier_forecast_points": 9027.983042794,
+      "earlier_realized_points": 9261.0,
+      "factor": 1.0258105222508134,
+      "fold_id": "2021-22-gw27"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 24,
+      "earlier_forecast_points": 928.906636607,
+      "earlier_realized_points": 229.0,
+      "factor": 0.2465263902478553,
+      "fold_id": "2021-22-gw28"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 24,
+      "earlier_forecast_points": 3223.282289029,
+      "earlier_realized_points": 3591.0,
+      "factor": 1.114081758281796,
+      "fold_id": "2021-22-gw28"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 24,
+      "earlier_forecast_points": 5096.1574783900005,
+      "earlier_realized_points": 5257.0,
+      "factor": 1.0315615289150786,
+      "fold_id": "2021-22-gw28"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 24,
+      "earlier_forecast_points": 9333.352417544,
+      "earlier_realized_points": 9591.0,
+      "factor": 1.0276050416752396,
+      "fold_id": "2021-22-gw28"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 25,
+      "earlier_forecast_points": 995.2369978329999,
+      "earlier_realized_points": 239.0,
+      "factor": 0.24014380546582537,
+      "fold_id": "2021-22-gw29"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 25,
+      "earlier_forecast_points": 3479.832257987,
+      "earlier_realized_points": 3826.0,
+      "factor": 1.0994782841093753,
+      "fold_id": "2021-22-gw29"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 25,
+      "earlier_forecast_points": 5552.693930454,
+      "earlier_realized_points": 5746.0,
+      "factor": 1.034813024446711,
+      "fold_id": "2021-22-gw29"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 25,
+      "earlier_forecast_points": 9780.530268445,
+      "earlier_realized_points": 10062.0,
+      "factor": 1.0287785757857228,
+      "fold_id": "2021-22-gw29"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 26,
+      "earlier_forecast_points": 1053.457537956,
+      "earlier_realized_points": 239.0,
+      "factor": 0.22687198239022177,
+      "fold_id": "2021-22-gw30"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 26,
+      "earlier_forecast_points": 3720.10304713,
+      "earlier_realized_points": 3990.0,
+      "factor": 1.0725509345979598,
+      "fold_id": "2021-22-gw30"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 26,
+      "earlier_forecast_points": 5984.289186056,
+      "earlier_realized_points": 6162.0,
+      "factor": 1.0296962276418866,
+      "fold_id": "2021-22-gw30"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 26,
+      "earlier_forecast_points": 10232.124358624002,
+      "earlier_realized_points": 10570.0,
+      "factor": 1.0330210647890752,
+      "fold_id": "2021-22-gw30"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 27,
+      "earlier_forecast_points": 1067.43327686,
+      "earlier_realized_points": 242.0,
+      "factor": 0.22671206270791547,
+      "fold_id": "2021-22-gw31"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 27,
+      "earlier_forecast_points": 3789.995668379,
+      "earlier_realized_points": 4049.0,
+      "factor": 1.068338951883757,
+      "fold_id": "2021-22-gw31"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 27,
+      "earlier_forecast_points": 6097.968474708,
+      "earlier_realized_points": 6264.0,
+      "factor": 1.0272273505480776,
+      "fold_id": "2021-22-gw31"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 27,
+      "earlier_forecast_points": 10405.149898109,
+      "earlier_realized_points": 10710.0,
+      "factor": 1.0292980019390592,
+      "fold_id": "2021-22-gw31"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 28,
+      "earlier_forecast_points": 1106.6582876129999,
+      "earlier_realized_points": 244.0,
+      "factor": 0.2204835970878548,
+      "fold_id": "2021-22-gw32"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 28,
+      "earlier_forecast_points": 3983.456174112,
+      "earlier_realized_points": 4238.0,
+      "factor": 1.0639002451043016,
+      "fold_id": "2021-22-gw32"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 28,
+      "earlier_forecast_points": 6477.025979338,
+      "earlier_realized_points": 6620.0,
+      "factor": 1.0220740230343515,
+      "fold_id": "2021-22-gw32"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 28,
+      "earlier_forecast_points": 10813.485948238998,
+      "earlier_realized_points": 11071.0,
+      "factor": 1.0238141569696992,
+      "fold_id": "2021-22-gw32"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 29,
+      "earlier_forecast_points": 1138.574448056,
+      "earlier_realized_points": 250.0,
+      "factor": 0.21957281794515024,
+      "fold_id": "2021-22-gw33"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 29,
+      "earlier_forecast_points": 4155.959586778001,
+      "earlier_realized_points": 4384.0,
+      "factor": 1.0548707003666493,
+      "fold_id": "2021-22-gw33"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 29,
+      "earlier_forecast_points": 6818.136729436,
+      "earlier_realized_points": 6963.0,
+      "factor": 1.0212467535211756,
+      "fold_id": "2021-22-gw33"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 29,
+      "earlier_forecast_points": 11184.102861745001,
+      "earlier_realized_points": 11426.0,
+      "factor": 1.0216286582165122,
+      "fold_id": "2021-22-gw33"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 30,
+      "earlier_forecast_points": 1185.023926802,
+      "earlier_realized_points": 250.0,
+      "factor": 0.21096620443324712,
+      "fold_id": "2021-22-gw34"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 30,
+      "earlier_forecast_points": 4346.023195284,
+      "earlier_realized_points": 4592.0,
+      "factor": 1.056598134354855,
+      "fold_id": "2021-22-gw34"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 30,
+      "earlier_forecast_points": 7228.7245312860005,
+      "earlier_realized_points": 7322.0,
+      "factor": 1.0129034476705125,
+      "fold_id": "2021-22-gw34"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 30,
+      "earlier_forecast_points": 11550.238871018999,
+      "earlier_realized_points": 11830.0,
+      "factor": 1.0242212418379464,
+      "fold_id": "2021-22-gw34"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 31,
+      "earlier_forecast_points": 1220.288946895,
+      "earlier_realized_points": 251.0,
+      "factor": 0.20568898918462247,
+      "fold_id": "2021-22-gw35"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 31,
+      "earlier_forecast_points": 4517.477832927,
+      "earlier_realized_points": 4759.0,
+      "factor": 1.0534639407220978,
+      "fold_id": "2021-22-gw35"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 31,
+      "earlier_forecast_points": 7606.437540273,
+      "earlier_realized_points": 7675.0,
+      "factor": 1.0090137412374702,
+      "fold_id": "2021-22-gw35"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 31,
+      "earlier_forecast_points": 11928.881065139,
+      "earlier_realized_points": 12265.0,
+      "factor": 1.0281769038542328,
+      "fold_id": "2021-22-gw35"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 32,
+      "earlier_forecast_points": 1250.760535839,
+      "earlier_realized_points": 252.0,
+      "factor": 0.20147741536389333,
+      "fold_id": "2021-22-gw36"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 32,
+      "earlier_forecast_points": 4677.315156071,
+      "earlier_realized_points": 4931.0,
+      "factor": 1.0542372783240241,
+      "fold_id": "2021-22-gw36"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 32,
+      "earlier_forecast_points": 7919.761092639999,
+      "earlier_realized_points": 7950.0,
+      "factor": 1.0038181590336233,
+      "fold_id": "2021-22-gw36"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 32,
+      "earlier_forecast_points": 12298.363556396002,
+      "earlier_realized_points": 12637.0,
+      "factor": 1.02753508156196,
+      "fold_id": "2021-22-gw36"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 33,
+      "earlier_forecast_points": 1327.5172149129999,
+      "earlier_realized_points": 257.0,
+      "factor": 0.1935944762997614,
+      "fold_id": "2021-22-gw37"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 33,
+      "earlier_forecast_points": 4969.82418148,
+      "earlier_realized_points": 5229.0,
+      "factor": 1.0521498968687495,
+      "fold_id": "2021-22-gw37"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 33,
+      "earlier_forecast_points": 8393.522808684,
+      "earlier_realized_points": 8494.0,
+      "factor": 1.0119708010100414,
+      "fold_id": "2021-22-gw37"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 33,
+      "earlier_forecast_points": 12792.789455238999,
+      "earlier_realized_points": 13185.0,
+      "factor": 1.0306587195961692,
+      "fold_id": "2021-22-gw37"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 34,
+      "earlier_forecast_points": 1371.497065976,
+      "earlier_realized_points": 262.0,
+      "factor": 0.19103212576947998,
+      "fold_id": "2021-22-gw38"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 34,
+      "earlier_forecast_points": 5176.705333365,
+      "earlier_realized_points": 5410.0,
+      "factor": 1.045066244186503,
+      "fold_id": "2021-22-gw38"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 34,
+      "earlier_forecast_points": 8757.008999488,
+      "earlier_realized_points": 8805.0,
+      "factor": 1.0054802958995253,
+      "fold_id": "2021-22-gw38"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 34,
+      "earlier_forecast_points": 13228.339937767001,
+      "earlier_realized_points": 13559.0,
+      "factor": 1.0249963384512792,
+      "fold_id": "2021-22-gw38"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 1400.53911419,
+      "earlier_realized_points": 269.0,
+      "factor": 0.19206889495233828,
+      "fold_id": "2022-23-gw02"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 5356.189753125,
+      "earlier_realized_points": 5564.0,
+      "factor": 1.0387981487686757,
+      "fold_id": "2022-23-gw02"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 9090.30084749,
+      "earlier_realized_points": 9133.0,
+      "factor": 1.0046972210520173,
+      "fold_id": "2022-23-gw02"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 13607.245402643,
+      "earlier_realized_points": 13899.0,
+      "factor": 1.021441121161843,
+      "fold_id": "2022-23-gw02"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 1400.53911419,
+      "earlier_realized_points": 269.0,
+      "factor": 0.19206889495233828,
+      "fold_id": "2022-23-gw03"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 5356.189753125,
+      "earlier_realized_points": 5564.0,
+      "factor": 1.0387981487686757,
+      "fold_id": "2022-23-gw03"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 9090.30084749,
+      "earlier_realized_points": 9133.0,
+      "factor": 1.0046972210520173,
+      "fold_id": "2022-23-gw03"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 13607.245402643,
+      "earlier_realized_points": 13899.0,
+      "factor": 1.021441121161843,
+      "fold_id": "2022-23-gw03"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 1400.53911419,
+      "earlier_realized_points": 269.0,
+      "factor": 0.19206889495233828,
+      "fold_id": "2022-23-gw04"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 5356.189753125,
+      "earlier_realized_points": 5564.0,
+      "factor": 1.0387981487686757,
+      "fold_id": "2022-23-gw04"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 9090.30084749,
+      "earlier_realized_points": 9133.0,
+      "factor": 1.0046972210520173,
+      "fold_id": "2022-23-gw04"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 35,
+      "earlier_forecast_points": 13607.245402643,
+      "earlier_realized_points": 13899.0,
+      "factor": 1.021441121161843,
+      "fold_id": "2022-23-gw04"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 36,
+      "earlier_forecast_points": 1435.266016074,
+      "earlier_realized_points": 291.0,
+      "factor": 0.2027498712719444,
+      "fold_id": "2022-23-gw05"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 36,
+      "earlier_forecast_points": 5450.367571111,
+      "earlier_realized_points": 5655.0,
+      "factor": 1.0375447024845863,
+      "fold_id": "2022-23-gw05"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 36,
+      "earlier_forecast_points": 9202.146900738999,
+      "earlier_realized_points": 9280.0,
+      "factor": 1.0084603191082235,
+      "fold_id": "2022-23-gw05"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 36,
+      "earlier_forecast_points": 14175.804537330001,
+      "earlier_realized_points": 14484.0,
+      "factor": 1.0217409503537107,
+      "fold_id": "2022-23-gw05"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 37,
+      "earlier_forecast_points": 1467.4956881960002,
+      "earlier_realized_points": 309.0,
+      "factor": 0.21056279925418742,
+      "fold_id": "2022-23-gw06"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 37,
+      "earlier_forecast_points": 5552.963930762,
+      "earlier_realized_points": 5766.0,
+      "factor": 1.038364389161225,
+      "fold_id": "2022-23-gw06"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 37,
+      "earlier_forecast_points": 9324.542280491,
+      "earlier_realized_points": 9406.0,
+      "factor": 1.00873584108031,
+      "fold_id": "2022-23-gw06"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 37,
+      "earlier_forecast_points": 14727.838041453,
+      "earlier_realized_points": 14992.0,
+      "factor": 1.0179362346193304,
+      "fold_id": "2022-23-gw06"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 38,
+      "earlier_forecast_points": 1499.124796236,
+      "earlier_realized_points": 319.0,
+      "factor": 0.21279082355314557,
+      "fold_id": "2022-23-gw08"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 38,
+      "earlier_forecast_points": 5662.843490489,
+      "earlier_realized_points": 5882.0,
+      "factor": 1.0387007887255022,
+      "fold_id": "2022-23-gw08"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 38,
+      "earlier_forecast_points": 9444.709251248001,
+      "earlier_realized_points": 9536.0,
+      "factor": 1.0096658082661396,
+      "fold_id": "2022-23-gw08"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 38,
+      "earlier_forecast_points": 15265.662079871,
+      "earlier_realized_points": 15543.0,
+      "factor": 1.0181674347747218,
+      "fold_id": "2022-23-gw08"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 39,
+      "earlier_forecast_points": 1519.716609715,
+      "earlier_realized_points": 336.0,
+      "factor": 0.22109385253281646,
+      "fold_id": "2022-23-gw09"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 39,
+      "earlier_forecast_points": 5745.528592943,
+      "earlier_realized_points": 5981.0,
+      "factor": 1.0409834192359986,
+      "fold_id": "2022-23-gw09"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 39,
+      "earlier_forecast_points": 9540.417660727999,
+      "earlier_realized_points": 9602.0,
+      "factor": 1.0064548892367153,
+      "fold_id": "2022-23-gw09"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 39,
+      "earlier_forecast_points": 15620.049248344001,
+      "earlier_realized_points": 15970.0,
+      "factor": 1.0224039467540795,
+      "fold_id": "2022-23-gw09"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 40,
+      "earlier_forecast_points": 1550.478596059,
+      "earlier_realized_points": 369.0,
+      "factor": 0.2379910312453991,
+      "fold_id": "2022-23-gw10"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 40,
+      "earlier_forecast_points": 5882.320636235,
+      "earlier_realized_points": 6113.0,
+      "factor": 1.0392157072064414,
+      "fold_id": "2022-23-gw10"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 40,
+      "earlier_forecast_points": 9679.24657559,
+      "earlier_realized_points": 9764.0,
+      "factor": 1.0087562005728565,
+      "fold_id": "2022-23-gw10"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 40,
+      "earlier_forecast_points": 16117.282615656002,
+      "earlier_realized_points": 16517.0,
+      "factor": 1.024800544476134,
+      "fold_id": "2022-23-gw10"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 41,
+      "earlier_forecast_points": 1579.4707233479999,
+      "earlier_realized_points": 375.0,
+      "factor": 0.23742130478057455,
+      "fold_id": "2022-23-gw11"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 41,
+      "earlier_forecast_points": 6031.014793381,
+      "earlier_realized_points": 6320.0,
+      "factor": 1.0479165143047169,
+      "fold_id": "2022-23-gw11"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 41,
+      "earlier_forecast_points": 9828.312716461,
+      "earlier_realized_points": 9953.0,
+      "factor": 1.0126865401148832,
+      "fold_id": "2022-23-gw11"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 41,
+      "earlier_forecast_points": 16599.612450166,
+      "earlier_realized_points": 16929.0,
+      "factor": 1.019843086748131,
+      "fold_id": "2022-23-gw11"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 42,
+      "earlier_forecast_points": 1607.2991816859999,
+      "earlier_realized_points": 379.0,
+      "factor": 0.2357992863546676,
+      "fold_id": "2022-23-gw12"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 42,
+      "earlier_forecast_points": 6177.80852022,
+      "earlier_realized_points": 6479.0,
+      "factor": 1.048753773898009,
+      "fold_id": "2022-23-gw12"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 42,
+      "earlier_forecast_points": 10007.687301189,
+      "earlier_realized_points": 10113.0,
+      "factor": 1.0105231803953834,
+      "fold_id": "2022-23-gw12"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 42,
+      "earlier_forecast_points": 17050.532580158,
+      "earlier_realized_points": 17468.0,
+      "factor": 1.0244841278640067,
+      "fold_id": "2022-23-gw12"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 43,
+      "earlier_forecast_points": 1632.396414999,
+      "earlier_realized_points": 383.0,
+      "factor": 0.23462438197049987,
+      "fold_id": "2022-23-gw13"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 43,
+      "earlier_forecast_points": 6303.571890626,
+      "earlier_realized_points": 6641.0,
+      "factor": 1.0535296678183026,
+      "fold_id": "2022-23-gw13"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 43,
+      "earlier_forecast_points": 10184.947848966,
+      "earlier_realized_points": 10296.0,
+      "factor": 1.010903556177293,
+      "fold_id": "2022-23-gw13"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 43,
+      "earlier_forecast_points": 17434.623280741,
+      "earlier_realized_points": 17922.0,
+      "factor": 1.0279545311310152,
+      "fold_id": "2022-23-gw13"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 44,
+      "earlier_forecast_points": 1659.538080665,
+      "earlier_realized_points": 386.0,
+      "factor": 0.23259484340686198,
+      "fold_id": "2022-23-gw14"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 44,
+      "earlier_forecast_points": 6435.77232208,
+      "earlier_realized_points": 6766.0,
+      "factor": 1.0513112741398647,
+      "fold_id": "2022-23-gw14"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 44,
+      "earlier_forecast_points": 10394.545458248,
+      "earlier_realized_points": 10515.0,
+      "factor": 1.0115882452230194,
+      "fold_id": "2022-23-gw14"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 44,
+      "earlier_forecast_points": 17877.873465491,
+      "earlier_realized_points": 18424.0,
+      "factor": 1.0305476227675046,
+      "fold_id": "2022-23-gw14"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 45,
+      "earlier_forecast_points": 1686.0291223180002,
+      "earlier_realized_points": 412.0,
+      "factor": 0.2443611409472992,
+      "fold_id": "2022-23-gw15"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 45,
+      "earlier_forecast_points": 6564.858254498,
+      "earlier_realized_points": 6876.0,
+      "factor": 1.0473950439506927,
+      "fold_id": "2022-23-gw15"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 45,
+      "earlier_forecast_points": 10602.096517766999,
+      "earlier_realized_points": 10730.0,
+      "factor": 1.0120639801777565,
+      "fold_id": "2022-23-gw15"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 45,
+      "earlier_forecast_points": 18327.561240419,
+      "earlier_realized_points": 18942.0,
+      "factor": 1.0335253966155593,
+      "fold_id": "2022-23-gw15"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 46,
+      "earlier_forecast_points": 1712.646138233,
+      "earlier_realized_points": 415.0,
+      "factor": 0.2423150881758743,
+      "fold_id": "2022-23-gw16"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 46,
+      "earlier_forecast_points": 6680.725116845,
+      "earlier_realized_points": 7003.0,
+      "factor": 1.0482395065682923,
+      "fold_id": "2022-23-gw16"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 46,
+      "earlier_forecast_points": 10822.553290081,
+      "earlier_realized_points": 10952.0,
+      "factor": 1.0119608290621807,
+      "fold_id": "2022-23-gw16"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 46,
+      "earlier_forecast_points": 18772.730380809,
+      "earlier_realized_points": 19389.0,
+      "factor": 1.0328279161682843,
+      "fold_id": "2022-23-gw16"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 47,
+      "earlier_forecast_points": 1739.221606668,
+      "earlier_realized_points": 420.0,
+      "factor": 0.24148734030773444,
+      "fold_id": "2022-23-gw17"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 47,
+      "earlier_forecast_points": 6804.934820113,
+      "earlier_realized_points": 7125.0,
+      "factor": 1.0470342756173063,
+      "fold_id": "2022-23-gw17"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 47,
+      "earlier_forecast_points": 11029.189050481,
+      "earlier_realized_points": 11182.0,
+      "factor": 1.0138551391965065,
+      "fold_id": "2022-23-gw17"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 47,
+      "earlier_forecast_points": 19220.160381496,
+      "earlier_realized_points": 19852.0,
+      "factor": 1.0328737953254696,
+      "fold_id": "2022-23-gw17"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 48,
+      "earlier_forecast_points": 1766.423667563,
+      "earlier_realized_points": 432.0,
+      "factor": 0.24456194056548022,
+      "fold_id": "2022-23-gw18"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 48,
+      "earlier_forecast_points": 6927.343267167001,
+      "earlier_realized_points": 7258.0,
+      "factor": 1.0477321131753623,
+      "fold_id": "2022-23-gw18"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 48,
+      "earlier_forecast_points": 11245.454418577001,
+      "earlier_realized_points": 11406.0,
+      "factor": 1.0142764867872112,
+      "fold_id": "2022-23-gw18"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 48,
+      "earlier_forecast_points": 19655.978933554,
+      "earlier_realized_points": 20329.0,
+      "factor": 1.0342400176923832,
+      "fold_id": "2022-23-gw18"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 49,
+      "earlier_forecast_points": 1793.394469973,
+      "earlier_realized_points": 433.0,
+      "factor": 0.24144158312617017,
+      "fold_id": "2022-23-gw19"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 49,
+      "earlier_forecast_points": 7054.527010198,
+      "earlier_realized_points": 7395.0,
+      "factor": 1.048263049997514,
+      "fold_id": "2022-23-gw19"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 49,
+      "earlier_forecast_points": 11470.727439040998,
+      "earlier_realized_points": 11645.0,
+      "factor": 1.015192808118329,
+      "fold_id": "2022-23-gw19"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 49,
+      "earlier_forecast_points": 20070.648735501,
+      "earlier_realized_points": 20765.0,
+      "factor": 1.0345953573125333,
+      "fold_id": "2022-23-gw19"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 50,
+      "earlier_forecast_points": 1828.04576583,
+      "earlier_realized_points": 436.0,
+      "factor": 0.23850606377025796,
+      "fold_id": "2022-23-gw20"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 50,
+      "earlier_forecast_points": 7207.829838926999,
+      "earlier_realized_points": 7568.0,
+      "factor": 1.0499692929941056,
+      "fold_id": "2022-23-gw20"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 50,
+      "earlier_forecast_points": 11726.446298738,
+      "earlier_realized_points": 11932.0,
+      "factor": 1.017529070276314,
+      "fold_id": "2022-23-gw20"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 50,
+      "earlier_forecast_points": 20500.378480708,
+      "earlier_realized_points": 21220.0,
+      "factor": 1.0351028406606835,
+      "fold_id": "2022-23-gw20"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 51,
+      "earlier_forecast_points": 1870.040937156,
+      "earlier_realized_points": 447.0,
+      "factor": 0.23903220037514666,
+      "fold_id": "2022-23-gw21"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 51,
+      "earlier_forecast_points": 7400.025651053,
+      "earlier_realized_points": 7719.0,
+      "factor": 1.0431044923339707,
+      "fold_id": "2022-23-gw21"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 51,
+      "earlier_forecast_points": 11999.809299083,
+      "earlier_realized_points": 12226.0,
+      "factor": 1.0188495246282194,
+      "fold_id": "2022-23-gw21"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 51,
+      "earlier_forecast_points": 20961.920351016,
+      "earlier_realized_points": 21732.0,
+      "factor": 1.0367370754248035,
+      "fold_id": "2022-23-gw21"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 52,
+      "earlier_forecast_points": 1897.768302791,
+      "earlier_realized_points": 449.0,
+      "factor": 0.2365936870900768,
+      "fold_id": "2022-23-gw22"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 52,
+      "earlier_forecast_points": 7566.900647874,
+      "earlier_realized_points": 7903.0,
+      "factor": 1.044417043088894,
+      "fold_id": "2022-23-gw22"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 52,
+      "earlier_forecast_points": 12230.249444841,
+      "earlier_realized_points": 12448.0,
+      "factor": 1.0178042611592728,
+      "fold_id": "2022-23-gw22"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 52,
+      "earlier_forecast_points": 21391.493795494,
+      "earlier_realized_points": 22208.0,
+      "factor": 1.0381696674534246,
+      "fold_id": "2022-23-gw22"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 53,
+      "earlier_forecast_points": 1933.779741323,
+      "earlier_realized_points": 454.0,
+      "factor": 0.2347733768735186,
+      "fold_id": "2022-23-gw23"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 53,
+      "earlier_forecast_points": 7774.14165418,
+      "earlier_realized_points": 8064.0,
+      "factor": 1.0372849323711704,
+      "fold_id": "2022-23-gw23"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 53,
+      "earlier_forecast_points": 12480.850006928002,
+      "earlier_realized_points": 12706.0,
+      "factor": 1.0180396361583561,
+      "fold_id": "2022-23-gw23"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 53,
+      "earlier_forecast_points": 21834.069397199997,
+      "earlier_realized_points": 22652.0,
+      "factor": 1.037461207433228,
+      "fold_id": "2022-23-gw23"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 54,
+      "earlier_forecast_points": 1969.310763159,
+      "earlier_realized_points": 467.0,
+      "factor": 0.2371388044672434,
+      "fold_id": "2022-23-gw24"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 54,
+      "earlier_forecast_points": 7988.434006531001,
+      "earlier_realized_points": 8259.0,
+      "factor": 1.0338697162983128,
+      "fold_id": "2022-23-gw24"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 54,
+      "earlier_forecast_points": 12732.292209282,
+      "earlier_realized_points": 12922.0,
+      "factor": 1.014899735852724,
+      "fold_id": "2022-23-gw24"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 54,
+      "earlier_forecast_points": 22288.096822449,
+      "earlier_realized_points": 23072.0,
+      "factor": 1.035171382455654,
+      "fold_id": "2022-23-gw24"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 55,
+      "earlier_forecast_points": 1998.542317287,
+      "earlier_realized_points": 476.0,
+      "factor": 0.23817359076297415,
+      "fold_id": "2022-23-gw25"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 55,
+      "earlier_forecast_points": 8191.815163662,
+      "earlier_realized_points": 8437.0,
+      "factor": 1.029930464914005,
+      "fold_id": "2022-23-gw25"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 55,
+      "earlier_forecast_points": 12956.52741077,
+      "earlier_realized_points": 13161.0,
+      "factor": 1.0157814345424094,
+      "fold_id": "2022-23-gw25"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 55,
+      "earlier_forecast_points": 22689.694554445,
+      "earlier_realized_points": 23497.0,
+      "factor": 1.0355802694310332,
+      "fold_id": "2022-23-gw25"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 56,
+      "earlier_forecast_points": 2033.0224139410002,
+      "earlier_realized_points": 477.0,
+      "factor": 0.23462604087838793,
+      "fold_id": "2022-23-gw26"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 56,
+      "earlier_forecast_points": 8404.663519028,
+      "earlier_realized_points": 8645.0,
+      "factor": 1.0285956100952625,
+      "fold_id": "2022-23-gw26"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 56,
+      "earlier_forecast_points": 13173.750959089999,
+      "earlier_realized_points": 13391.0,
+      "factor": 1.0164910541868182,
+      "fold_id": "2022-23-gw26"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 56,
+      "earlier_forecast_points": 23046.785864416,
+      "earlier_realized_points": 23951.0,
+      "factor": 1.0392338498263265,
+      "fold_id": "2022-23-gw26"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 57,
+      "earlier_forecast_points": 2061.442901756,
+      "earlier_realized_points": 484.0,
+      "factor": 0.23478700263185268,
+      "fold_id": "2022-23-gw27"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 57,
+      "earlier_forecast_points": 8620.657591517001,
+      "earlier_realized_points": 8876.0,
+      "factor": 1.0296198295515488,
+      "fold_id": "2022-23-gw27"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 57,
+      "earlier_forecast_points": 13402.763375333001,
+      "earlier_realized_points": 13652.0,
+      "factor": 1.0185959132223212,
+      "fold_id": "2022-23-gw27"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 57,
+      "earlier_forecast_points": 23439.866899044002,
+      "earlier_realized_points": 24335.0,
+      "factor": 1.038188489073396,
+      "fold_id": "2022-23-gw27"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 58,
+      "earlier_forecast_points": 2102.533678099,
+      "earlier_realized_points": 488.0,
+      "factor": 0.23210091951593556,
+      "fold_id": "2022-23-gw28"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 58,
+      "earlier_forecast_points": 8877.356907491001,
+      "earlier_realized_points": 9121.0,
+      "factor": 1.0274454542098455,
+      "fold_id": "2022-23-gw28"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 58,
+      "earlier_forecast_points": 13652.692737514,
+      "earlier_realized_points": 13927.0,
+      "factor": 1.0200918066318359,
+      "fold_id": "2022-23-gw28"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 58,
+      "earlier_forecast_points": 23880.117346227,
+      "earlier_realized_points": 24838.0,
+      "factor": 1.0401121418243089,
+      "fold_id": "2022-23-gw28"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 59,
+      "earlier_forecast_points": 2123.418035237,
+      "earlier_realized_points": 492.0,
+      "factor": 0.23170190317474942,
+      "fold_id": "2022-23-gw29"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 59,
+      "earlier_forecast_points": 9033.553945650001,
+      "earlier_realized_points": 9259.0,
+      "factor": 1.024956518299042,
+      "fold_id": "2022-23-gw29"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 59,
+      "earlier_forecast_points": 13792.159716418,
+      "earlier_realized_points": 14064.0,
+      "factor": 1.0197097691131292,
+      "fold_id": "2022-23-gw29"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 59,
+      "earlier_forecast_points": 24158.478435771,
+      "earlier_realized_points": 25104.0,
+      "factor": 1.0391382912107985,
+      "fold_id": "2022-23-gw29"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 60,
+      "earlier_forecast_points": 2190.986776849,
+      "earlier_realized_points": 494.0,
+      "factor": 0.22546918366639046,
+      "fold_id": "2022-23-gw30"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 60,
+      "earlier_forecast_points": 9407.130878104,
+      "earlier_realized_points": 9579.0,
+      "factor": 1.018270089374013,
+      "fold_id": "2022-23-gw30"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 60,
+      "earlier_forecast_points": 14125.233508295,
+      "earlier_realized_points": 14421.0,
+      "factor": 1.0209388744994066,
+      "fold_id": "2022-23-gw30"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 60,
+      "earlier_forecast_points": 24697.001946395,
+      "earlier_realized_points": 25735.0,
+      "factor": 1.0420293141595882,
+      "fold_id": "2022-23-gw30"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 61,
+      "earlier_forecast_points": 2218.499403943,
+      "earlier_realized_points": 498.0,
+      "factor": 0.22447605760672776,
+      "fold_id": "2022-23-gw31"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 61,
+      "earlier_forecast_points": 9627.656350865998,
+      "earlier_realized_points": 9750.0,
+      "factor": 1.0127075214024437,
+      "fold_id": "2022-23-gw31"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 61,
+      "earlier_forecast_points": 14354.34390233,
+      "earlier_realized_points": 14626.0,
+      "factor": 1.0189250097056617,
+      "fold_id": "2022-23-gw31"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 61,
+      "earlier_forecast_points": 25137.902928029,
+      "earlier_realized_points": 26154.0,
+      "factor": 1.0404209163699984,
+      "fold_id": "2022-23-gw31"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 62,
+      "earlier_forecast_points": 2245.792893202,
+      "earlier_realized_points": 498.0,
+      "factor": 0.2217479632727678,
+      "fold_id": "2022-23-gw32"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 62,
+      "earlier_forecast_points": 9833.441256899,
+      "earlier_realized_points": 10005.0,
+      "factor": 1.0174464603610296,
+      "fold_id": "2022-23-gw32"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 62,
+      "earlier_forecast_points": 14597.677328806001,
+      "earlier_realized_points": 14820.0,
+      "factor": 1.0152300031153096,
+      "fold_id": "2022-23-gw32"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 62,
+      "earlier_forecast_points": 25554.811964376,
+      "earlier_realized_points": 26547.0,
+      "factor": 1.038825878938461,
+      "fold_id": "2022-23-gw32"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 63,
+      "earlier_forecast_points": 2267.612580549,
+      "earlier_realized_points": 498.0,
+      "factor": 0.21961423405025904,
+      "fold_id": "2022-23-gw33"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 63,
+      "earlier_forecast_points": 9992.792069996,
+      "earlier_realized_points": 10166.0,
+      "factor": 1.017333286712136,
+      "fold_id": "2022-23-gw33"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 63,
+      "earlier_forecast_points": 14773.424823265,
+      "earlier_realized_points": 14997.0,
+      "factor": 1.0151336050651516,
+      "fold_id": "2022-23-gw33"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 63,
+      "earlier_forecast_points": 25888.7673415,
+      "earlier_realized_points": 26881.0,
+      "factor": 1.0383267633182922,
+      "fold_id": "2022-23-gw33"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 64,
+      "earlier_forecast_points": 2295.15015188,
+      "earlier_realized_points": 501.0,
+      "factor": 0.21828637206573243,
+      "fold_id": "2022-23-gw34"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 64,
+      "earlier_forecast_points": 10184.072203742,
+      "earlier_realized_points": 10347.0,
+      "factor": 1.0159982954753732,
+      "fold_id": "2022-23-gw34"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 64,
+      "earlier_forecast_points": 15025.197574764,
+      "earlier_realized_points": 15230.0,
+      "factor": 1.0136305978152313,
+      "fold_id": "2022-23-gw34"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 64,
+      "earlier_forecast_points": 26264.354142621,
+      "earlier_realized_points": 27271.0,
+      "factor": 1.038327455223635,
+      "fold_id": "2022-23-gw34"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 65,
+      "earlier_forecast_points": 2339.8469280940003,
+      "earlier_realized_points": 508.0,
+      "factor": 0.21710821930296448,
+      "fold_id": "2022-23-gw35"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 65,
+      "earlier_forecast_points": 10433.915729391,
+      "earlier_realized_points": 10613.0,
+      "factor": 1.0171636684878087,
+      "fold_id": "2022-23-gw35"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 65,
+      "earlier_forecast_points": 15333.004448652,
+      "earlier_realized_points": 15555.0,
+      "factor": 1.0144782812847561,
+      "fold_id": "2022-23-gw35"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 65,
+      "earlier_forecast_points": 26723.059001927,
+      "earlier_realized_points": 27755.0,
+      "factor": 1.038616125421816,
+      "fold_id": "2022-23-gw35"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 66,
+      "earlier_forecast_points": 2366.667712499,
+      "earlier_realized_points": 510.0,
+      "factor": 0.21549286251997046,
+      "fold_id": "2022-23-gw36"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 66,
+      "earlier_forecast_points": 10620.023990134,
+      "earlier_realized_points": 10817.0,
+      "factor": 1.018547604981777,
+      "fold_id": "2022-23-gw36"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 66,
+      "earlier_forecast_points": 15585.500387485,
+      "earlier_realized_points": 15812.0,
+      "factor": 1.0145327135403928,
+      "fold_id": "2022-23-gw36"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 66,
+      "earlier_forecast_points": 27104.528422384,
+      "earlier_realized_points": 28161.0,
+      "factor": 1.0389776778681574,
+      "fold_id": "2022-23-gw36"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 67,
+      "earlier_forecast_points": 2400.123952206,
+      "earlier_realized_points": 514.0,
+      "factor": 0.21415560622507548,
+      "fold_id": "2022-23-gw37"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 67,
+      "earlier_forecast_points": 10827.854661807,
+      "earlier_realized_points": 11011.0,
+      "factor": 1.0169142774735431,
+      "fold_id": "2022-23-gw37"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 67,
+      "earlier_forecast_points": 15865.930403012999,
+      "earlier_realized_points": 16114.0,
+      "factor": 1.0156353639960436,
+      "fold_id": "2022-23-gw37"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 67,
+      "earlier_forecast_points": 27504.726314109,
+      "earlier_realized_points": 28603.0,
+      "factor": 1.0399303622711424,
+      "fold_id": "2022-23-gw37"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 68,
+      "earlier_forecast_points": 2440.193853839,
+      "earlier_realized_points": 515.0,
+      "factor": 0.21104880630273845,
+      "fold_id": "2022-23-gw38"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 68,
+      "earlier_forecast_points": 11066.65874128,
+      "earlier_realized_points": 11293.0,
+      "factor": 1.020452538025386,
+      "fold_id": "2022-23-gw38"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 68,
+      "earlier_forecast_points": 16209.648039317999,
+      "earlier_realized_points": 16476.0,
+      "factor": 1.0164316930284938,
+      "fold_id": "2022-23-gw38"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 68,
+      "earlier_forecast_points": 27909.152355267,
+      "earlier_realized_points": 28937.0,
+      "factor": 1.0368283361547175,
+      "fold_id": "2022-23-gw38"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 2467.859302056,
+      "earlier_realized_points": 522.0,
+      "factor": 0.21151935183870335,
+      "fold_id": "2023-24-gw02"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 11260.298638129,
+      "earlier_realized_points": 11539.0,
+      "factor": 1.0247507966553637,
+      "fold_id": "2023-24-gw02"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 16494.805375695,
+      "earlier_realized_points": 16707.0,
+      "factor": 1.0128643302828944,
+      "fold_id": "2023-24-gw02"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 28256.127177289,
+      "earlier_realized_points": 29267.0,
+      "factor": 1.0357753494089414,
+      "fold_id": "2023-24-gw02"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 2467.859302056,
+      "earlier_realized_points": 522.0,
+      "factor": 0.21151935183870335,
+      "fold_id": "2023-24-gw03"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 11260.298638129,
+      "earlier_realized_points": 11539.0,
+      "factor": 1.0247507966553637,
+      "fold_id": "2023-24-gw03"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 16494.805375695,
+      "earlier_realized_points": 16707.0,
+      "factor": 1.0128643302828944,
+      "fold_id": "2023-24-gw03"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 28256.127177289,
+      "earlier_realized_points": 29267.0,
+      "factor": 1.0357753494089414,
+      "fold_id": "2023-24-gw03"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 2467.8593020559997,
+      "earlier_realized_points": 522.0,
+      "factor": 0.2115193518387034,
+      "fold_id": "2023-24-gw04"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 11260.298638129,
+      "earlier_realized_points": 11539.0,
+      "factor": 1.0247507966553637,
+      "fold_id": "2023-24-gw04"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 16494.805375695003,
+      "earlier_realized_points": 16707.0,
+      "factor": 1.0128643302828941,
+      "fold_id": "2023-24-gw04"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 69,
+      "earlier_forecast_points": 28256.127177289,
+      "earlier_realized_points": 29267.0,
+      "factor": 1.0357753494089414,
+      "fold_id": "2023-24-gw04"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 70,
+      "earlier_forecast_points": 2511.028004848,
+      "earlier_realized_points": 547.0,
+      "factor": 0.21783906788132837,
+      "fold_id": "2023-24-gw05"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 70,
+      "earlier_forecast_points": 11367.343164658,
+      "earlier_realized_points": 11683.0,
+      "factor": 1.0277687433879363,
+      "fold_id": "2023-24-gw05"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 70,
+      "earlier_forecast_points": 16611.497283805,
+      "earlier_realized_points": 16862.0,
+      "factor": 1.0150800804957671,
+      "fold_id": "2023-24-gw05"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 70,
+      "earlier_forecast_points": 28790.826170324002,
+      "earlier_realized_points": 29762.0,
+      "factor": 1.0337320583970262,
+      "fold_id": "2023-24-gw05"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 71,
+      "earlier_forecast_points": 2552.608463555,
+      "earlier_realized_points": 591.0,
+      "factor": 0.23152786979986675,
+      "fold_id": "2023-24-gw06"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 71,
+      "earlier_forecast_points": 11493.203619766,
+      "earlier_realized_points": 11860.0,
+      "factor": 1.031914198370521,
+      "fold_id": "2023-24-gw06"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 71,
+      "earlier_forecast_points": 16734.600114261,
+      "earlier_realized_points": 16981.0,
+      "factor": 1.0147239781086266,
+      "fold_id": "2023-24-gw06"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 71,
+      "earlier_forecast_points": 29304.4609381,
+      "earlier_realized_points": 30225.0,
+      "factor": 1.0314129327901462,
+      "fold_id": "2023-24-gw06"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 72,
+      "earlier_forecast_points": 2593.094672906,
+      "earlier_realized_points": 600.0,
+      "factor": 0.23138376175351852,
+      "fold_id": "2023-24-gw07"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 72,
+      "earlier_forecast_points": 11624.85637526,
+      "earlier_realized_points": 11983.0,
+      "factor": 1.0308084343736237,
+      "fold_id": "2023-24-gw07"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 72,
+      "earlier_forecast_points": 16892.177054681997,
+      "earlier_realized_points": 17133.0,
+      "factor": 1.014256477690142,
+      "fold_id": "2023-24-gw07"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 72,
+      "earlier_forecast_points": 29777.844771982,
+      "earlier_realized_points": 30774.0,
+      "factor": 1.03345289881272,
+      "fold_id": "2023-24-gw07"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 73,
+      "earlier_forecast_points": 2644.481643659,
+      "earlier_realized_points": 624.0,
+      "factor": 0.23596306727870162,
+      "fold_id": "2023-24-gw08"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 73,
+      "earlier_forecast_points": 11771.737012120999,
+      "earlier_realized_points": 12119.0,
+      "factor": 1.0294997235770247,
+      "fold_id": "2023-24-gw08"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 73,
+      "earlier_forecast_points": 17102.472553677002,
+      "earlier_realized_points": 17304.0,
+      "factor": 1.0117835269543918,
+      "fold_id": "2023-24-gw08"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 73,
+      "earlier_forecast_points": 30249.985711948,
+      "earlier_realized_points": 31312.0,
+      "factor": 1.0351079269314343,
+      "fold_id": "2023-24-gw08"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 74,
+      "earlier_forecast_points": 2681.42865292,
+      "earlier_realized_points": 635.0,
+      "factor": 0.23681405780030843,
+      "fold_id": "2023-24-gw09"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 74,
+      "earlier_forecast_points": 11894.627806874,
+      "earlier_realized_points": 12280.0,
+      "factor": 1.0323988441995042,
+      "fold_id": "2023-24-gw09"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 74,
+      "earlier_forecast_points": 17282.997845807997,
+      "earlier_realized_points": 17487.0,
+      "factor": 1.0118036324491868,
+      "fold_id": "2023-24-gw09"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 74,
+      "earlier_forecast_points": 30713.432210073,
+      "earlier_realized_points": 31741.0,
+      "factor": 1.0334566251957342,
+      "fold_id": "2023-24-gw09"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 75,
+      "earlier_forecast_points": 2718.773245218,
+      "earlier_realized_points": 640.0,
+      "factor": 0.23540028618631004,
+      "fold_id": "2023-24-gw10"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 75,
+      "earlier_forecast_points": 12018.570440214,
+      "earlier_realized_points": 12443.0,
+      "factor": 1.0353144795296005,
+      "fold_id": "2023-24-gw10"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 75,
+      "earlier_forecast_points": 17477.565808768,
+      "earlier_realized_points": 17684.0,
+      "factor": 1.011811381143731,
+      "fold_id": "2023-24-gw10"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 75,
+      "earlier_forecast_points": 31156.945688318,
+      "earlier_realized_points": 32179.0,
+      "factor": 1.0328034179571461,
+      "fold_id": "2023-24-gw10"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 76,
+      "earlier_forecast_points": 2755.058238134,
+      "earlier_realized_points": 656.0,
+      "factor": 0.23810748931547399,
+      "fold_id": "2023-24-gw11"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 76,
+      "earlier_forecast_points": 12149.405909455001,
+      "earlier_realized_points": 12582.0,
+      "factor": 1.0356061929092633,
+      "fold_id": "2023-24-gw11"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 76,
+      "earlier_forecast_points": 17674.018389046,
+      "earlier_realized_points": 17881.0,
+      "factor": 1.0117110668551914,
+      "fold_id": "2023-24-gw11"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 76,
+      "earlier_forecast_points": 31594.701419432,
+      "earlier_realized_points": 32639.0,
+      "factor": 1.0330529656446037,
+      "fold_id": "2023-24-gw11"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 77,
+      "earlier_forecast_points": 2790.349531516,
+      "earlier_realized_points": 663.0,
+      "factor": 0.23760464146575622,
+      "fold_id": "2023-24-gw12"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 77,
+      "earlier_forecast_points": 12282.27508343,
+      "earlier_realized_points": 12743.0,
+      "factor": 1.037511366049077,
+      "fold_id": "2023-24-gw12"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 77,
+      "earlier_forecast_points": 17875.481458315,
+      "earlier_realized_points": 18142.0,
+      "factor": 1.0149097266166796,
+      "fold_id": "2023-24-gw12"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 77,
+      "earlier_forecast_points": 32019.39345503,
+      "earlier_realized_points": 33019.0,
+      "factor": 1.0312187845273806,
+      "fold_id": "2023-24-gw12"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 78,
+      "earlier_forecast_points": 2825.099789677,
+      "earlier_realized_points": 670.0,
+      "factor": 0.23715976421371035,
+      "fold_id": "2023-24-gw13"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 78,
+      "earlier_forecast_points": 12409.863975673,
+      "earlier_realized_points": 12873.0,
+      "factor": 1.0373199920027232,
+      "fold_id": "2023-24-gw13"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 78,
+      "earlier_forecast_points": 18089.847029664,
+      "earlier_realized_points": 18369.0,
+      "factor": 1.015431472133415,
+      "fold_id": "2023-24-gw13"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 78,
+      "earlier_forecast_points": 32433.652214242004,
+      "earlier_realized_points": 33455.0,
+      "factor": 1.03149037237655,
+      "fold_id": "2023-24-gw13"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 79,
+      "earlier_forecast_points": 2860.291403648,
+      "earlier_realized_points": 679.0,
+      "factor": 0.23738840005392706,
+      "fold_id": "2023-24-gw14"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 79,
+      "earlier_forecast_points": 12534.619880369,
+      "earlier_realized_points": 13016.0,
+      "factor": 1.0384040460919688,
+      "fold_id": "2023-24-gw14"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 79,
+      "earlier_forecast_points": 18302.382154658,
+      "earlier_realized_points": 18621.0,
+      "factor": 1.0174085451090262,
+      "fold_id": "2023-24-gw14"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 79,
+      "earlier_forecast_points": 32846.33164447,
+      "earlier_realized_points": 33823.0,
+      "factor": 1.0297344728203288,
+      "fold_id": "2023-24-gw14"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 80,
+      "earlier_forecast_points": 2894.947011778,
+      "earlier_realized_points": 694.0,
+      "factor": 0.23972804931367758,
+      "fold_id": "2023-24-gw15"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 80,
+      "earlier_forecast_points": 12667.913273957,
+      "earlier_realized_points": 13193.0,
+      "factor": 1.0414501358422217,
+      "fold_id": "2023-24-gw15"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 80,
+      "earlier_forecast_points": 18512.589840787998,
+      "earlier_realized_points": 18822.0,
+      "factor": 1.0167134994008398,
+      "fold_id": "2023-24-gw15"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 80,
+      "earlier_forecast_points": 33247.591704457,
+      "earlier_realized_points": 34242.0,
+      "factor": 1.0299091827276527,
+      "fold_id": "2023-24-gw15"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 81,
+      "earlier_forecast_points": 2928.976679448,
+      "earlier_realized_points": 704.0,
+      "factor": 0.24035698370008088,
+      "fold_id": "2023-24-gw16"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 81,
+      "earlier_forecast_points": 12805.909963453001,
+      "earlier_realized_points": 13362.0,
+      "factor": 1.0434244843305969,
+      "fold_id": "2023-24-gw16"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 81,
+      "earlier_forecast_points": 18718.411363319,
+      "earlier_realized_points": 19045.0,
+      "factor": 1.0174474548262675,
+      "fold_id": "2023-24-gw16"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 81,
+      "earlier_forecast_points": 33648.144402274,
+      "earlier_realized_points": 34718.0,
+      "factor": 1.0317953817879388,
+      "fold_id": "2023-24-gw16"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 82,
+      "earlier_forecast_points": 2962.979899985,
+      "earlier_realized_points": 706.0,
+      "factor": 0.23827363796952322,
+      "fold_id": "2023-24-gw17"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 82,
+      "earlier_forecast_points": 12952.720012166,
+      "earlier_realized_points": 13532.0,
+      "factor": 1.0447226518669364,
+      "fold_id": "2023-24-gw17"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 82,
+      "earlier_forecast_points": 18925.936804793,
+      "earlier_realized_points": 19259.0,
+      "factor": 1.0175982409030686,
+      "fold_id": "2023-24-gw17"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 82,
+      "earlier_forecast_points": 34043.232632029,
+      "earlier_realized_points": 35155.0,
+      "factor": 1.0326575146369916,
+      "fold_id": "2023-24-gw17"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 83,
+      "earlier_forecast_points": 2993.2033699199997,
+      "earlier_realized_points": 709.0,
+      "factor": 0.23686997252677477,
+      "fold_id": "2023-24-gw18"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 83,
+      "earlier_forecast_points": 13093.931340137,
+      "earlier_realized_points": 13750.0,
+      "factor": 1.0501047884566146,
+      "fold_id": "2023-24-gw18"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 83,
+      "earlier_forecast_points": 19102.794567327,
+      "earlier_realized_points": 19452.0,
+      "factor": 1.0182803323064717,
+      "fold_id": "2023-24-gw18"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 83,
+      "earlier_forecast_points": 34407.875562511996,
+      "earlier_realized_points": 35520.0,
+      "factor": 1.0323217989866158,
+      "fold_id": "2023-24-gw18"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 84,
+      "earlier_forecast_points": 3025.035966699,
+      "earlier_realized_points": 727.0,
+      "factor": 0.2403277210595687,
+      "fold_id": "2023-24-gw19"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 84,
+      "earlier_forecast_points": 13234.940316156,
+      "earlier_realized_points": 13915.0,
+      "factor": 1.0513836607947409,
+      "fold_id": "2023-24-gw19"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 84,
+      "earlier_forecast_points": 19306.585499549998,
+      "earlier_realized_points": 19604.0,
+      "factor": 1.0154048213474587,
+      "fold_id": "2023-24-gw19"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 84,
+      "earlier_forecast_points": 34741.061402442,
+      "earlier_realized_points": 35879.0,
+      "factor": 1.0327548598580818,
+      "fold_id": "2023-24-gw19"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 85,
+      "earlier_forecast_points": 3059.387322707,
+      "earlier_realized_points": 731.0,
+      "factor": 0.2389367291203908,
+      "fold_id": "2023-24-gw20"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 85,
+      "earlier_forecast_points": 13394.365914917,
+      "earlier_realized_points": 14132.0,
+      "factor": 1.0550704743896473,
+      "fold_id": "2023-24-gw20"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 85,
+      "earlier_forecast_points": 19524.099220561002,
+      "earlier_realized_points": 19856.0,
+      "factor": 1.0169995437786687,
+      "fold_id": "2023-24-gw20"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 85,
+      "earlier_forecast_points": 35117.450912003995,
+      "earlier_realized_points": 36218.0,
+      "factor": 1.0313390937956664,
+      "fold_id": "2023-24-gw20"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 86,
+      "earlier_forecast_points": 3093.486033309,
+      "earlier_realized_points": 733.0,
+      "factor": 0.2369495100696912,
+      "fold_id": "2023-24-gw21"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 86,
+      "earlier_forecast_points": 13547.199837192,
+      "earlier_realized_points": 14311.0,
+      "factor": 1.0563806670003562,
+      "fold_id": "2023-24-gw21"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 86,
+      "earlier_forecast_points": 19765.247521571,
+      "earlier_realized_points": 20150.0,
+      "factor": 1.0194661097974662,
+      "fold_id": "2023-24-gw21"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 86,
+      "earlier_forecast_points": 35472.242211335004,
+      "earlier_realized_points": 36588.0,
+      "factor": 1.0314543913524716,
+      "fold_id": "2023-24-gw21"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 87,
+      "earlier_forecast_points": 3127.428075832,
+      "earlier_realized_points": 753.0,
+      "factor": 0.24077292322691607,
+      "fold_id": "2023-24-gw22"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 87,
+      "earlier_forecast_points": 13697.962757082,
+      "earlier_realized_points": 14487.0,
+      "factor": 1.0576025250550531,
+      "fold_id": "2023-24-gw22"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 87,
+      "earlier_forecast_points": 20017.813239059,
+      "earlier_realized_points": 20450.0,
+      "factor": 1.0215901085587966,
+      "fold_id": "2023-24-gw22"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 87,
+      "earlier_forecast_points": 35822.352276706995,
+      "earlier_realized_points": 36955.0,
+      "factor": 1.0316184630909762,
+      "fold_id": "2023-24-gw22"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 88,
+      "earlier_forecast_points": 3161.912265778,
+      "earlier_realized_points": 763.0,
+      "factor": 0.24130966828463252,
+      "fold_id": "2023-24-gw23"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 88,
+      "earlier_forecast_points": 13849.543265913,
+      "earlier_realized_points": 14652.0,
+      "factor": 1.0579410251067294,
+      "fold_id": "2023-24-gw23"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 88,
+      "earlier_forecast_points": 20276.611555328,
+      "earlier_realized_points": 20773.0,
+      "factor": 1.0244808380984922,
+      "fold_id": "2023-24-gw23"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 88,
+      "earlier_forecast_points": 36167.779023147,
+      "earlier_realized_points": 37291.0,
+      "factor": 1.031055846037274,
+      "fold_id": "2023-24-gw23"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 89,
+      "earlier_forecast_points": 3196.80063468,
+      "earlier_realized_points": 763.0,
+      "factor": 0.23867612879036368,
+      "fold_id": "2023-24-gw24"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 89,
+      "earlier_forecast_points": 14009.506289482,
+      "earlier_realized_points": 14814.0,
+      "factor": 1.057424843809235,
+      "fold_id": "2023-24-gw24"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 89,
+      "earlier_forecast_points": 20536.504714462,
+      "earlier_realized_points": 21052.0,
+      "factor": 1.0251014129573366,
+      "fold_id": "2023-24-gw24"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 89,
+      "earlier_forecast_points": 36505.693746517005,
+      "earlier_realized_points": 37650.0,
+      "factor": 1.0313459665067226,
+      "fold_id": "2023-24-gw24"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 90,
+      "earlier_forecast_points": 3231.738192515,
+      "earlier_realized_points": 766.0,
+      "factor": 0.23702415058686555,
+      "fold_id": "2023-24-gw25"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 90,
+      "earlier_forecast_points": 14188.249394138,
+      "earlier_realized_points": 14976.0,
+      "factor": 1.0555213391010356,
+      "fold_id": "2023-24-gw25"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 90,
+      "earlier_forecast_points": 20777.712113862,
+      "earlier_realized_points": 21288.0,
+      "factor": 1.0245593876429522,
+      "fold_id": "2023-24-gw25"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 90,
+      "earlier_forecast_points": 36858.040452018,
+      "earlier_realized_points": 38079.0,
+      "factor": 1.0331260027122562,
+      "fold_id": "2023-24-gw25"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 91,
+      "earlier_forecast_points": 3283.675356022,
+      "earlier_realized_points": 768.0,
+      "factor": 0.23388426587042138,
+      "fold_id": "2023-24-gw26"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 91,
+      "earlier_forecast_points": 14394.208677108,
+      "earlier_realized_points": 15137.0,
+      "factor": 1.0516034843980904,
+      "fold_id": "2023-24-gw26"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 91,
+      "earlier_forecast_points": 21081.324432305002,
+      "earlier_realized_points": 21609.0,
+      "factor": 1.0250304751672237,
+      "fold_id": "2023-24-gw26"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 91,
+      "earlier_forecast_points": 37267.767080541,
+      "earlier_realized_points": 38547.0,
+      "factor": 1.0343254511786122,
+      "fold_id": "2023-24-gw26"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 92,
+      "earlier_forecast_points": 3309.306067608,
+      "earlier_realized_points": 770.0,
+      "factor": 0.23267717892185288,
+      "fold_id": "2023-24-gw27"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 92,
+      "earlier_forecast_points": 14527.337844673,
+      "earlier_realized_points": 15249.0,
+      "factor": 1.0496761459699668,
+      "fold_id": "2023-24-gw27"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 92,
+      "earlier_forecast_points": 21259.801971458,
+      "earlier_realized_points": 21818.0,
+      "factor": 1.0262560314198317,
+      "fold_id": "2023-24-gw27"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 92,
+      "earlier_forecast_points": 37568.408813037,
+      "earlier_realized_points": 38907.0,
+      "factor": 1.0356307660945832,
+      "fold_id": "2023-24-gw27"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 93,
+      "earlier_forecast_points": 3345.02602192,
+      "earlier_realized_points": 773.0,
+      "factor": 0.23108938314217012,
+      "fold_id": "2023-24-gw28"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 93,
+      "earlier_forecast_points": 14689.472528732002,
+      "earlier_realized_points": 15406.0,
+      "factor": 1.0487782981905238,
+      "fold_id": "2023-24-gw28"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 93,
+      "earlier_forecast_points": 21513.933996789998,
+      "earlier_realized_points": 22077.0,
+      "factor": 1.0261721544415825,
+      "fold_id": "2023-24-gw28"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 93,
+      "earlier_forecast_points": 37943.153243586,
+      "earlier_realized_points": 39355.0,
+      "factor": 1.0372095262444394,
+      "fold_id": "2023-24-gw28"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 94,
+      "earlier_forecast_points": 3390.518340474,
+      "earlier_realized_points": 775.0,
+      "factor": 0.22857861901188056,
+      "fold_id": "2023-24-gw29"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 94,
+      "earlier_forecast_points": 14866.313626286,
+      "earlier_realized_points": 15585.0,
+      "factor": 1.0483432807742767,
+      "fold_id": "2023-24-gw29"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 94,
+      "earlier_forecast_points": 21796.176435715002,
+      "earlier_realized_points": 22339.0,
+      "factor": 1.02490453157626,
+      "fold_id": "2023-24-gw29"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 94,
+      "earlier_forecast_points": 38348.36400469,
+      "earlier_realized_points": 39761.0,
+      "factor": 1.036836929865828,
+      "fold_id": "2023-24-gw29"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 95,
+      "earlier_forecast_points": 3406.065204401,
+      "earlier_realized_points": 778.0,
+      "factor": 0.22841606173444387,
+      "fold_id": "2023-24-gw30"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 95,
+      "earlier_forecast_points": 14926.733840014998,
+      "earlier_realized_points": 15651.0,
+      "factor": 1.048521409154052,
+      "fold_id": "2023-24-gw30"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 95,
+      "earlier_forecast_points": 21913.002483738997,
+      "earlier_realized_points": 22458.0,
+      "factor": 1.0248709649289471,
+      "fold_id": "2023-24-gw30"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 95,
+      "earlier_forecast_points": 38478.198877562,
+      "earlier_realized_points": 39872.0,
+      "factor": 1.0362231383769571,
+      "fold_id": "2023-24-gw30"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 96,
+      "earlier_forecast_points": 3441.643905849,
+      "earlier_realized_points": 783.0,
+      "factor": 0.22750755784737298,
+      "fold_id": "2023-24-gw31"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 96,
+      "earlier_forecast_points": 15094.408953858001,
+      "earlier_realized_points": 15820.0,
+      "factor": 1.0480701860112611,
+      "fold_id": "2023-24-gw31"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 96,
+      "earlier_forecast_points": 22175.682462937,
+      "earlier_realized_points": 22769.0,
+      "factor": 1.0267553225500334,
+      "fold_id": "2023-24-gw31"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 96,
+      "earlier_forecast_points": 38838.816501773,
+      "earlier_realized_points": 40186.0,
+      "factor": 1.0346865229059052,
+      "fold_id": "2023-24-gw31"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 97,
+      "earlier_forecast_points": 3477.257708426,
+      "earlier_realized_points": 784.0,
+      "factor": 0.2254650261038265,
+      "fold_id": "2023-24-gw32"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 97,
+      "earlier_forecast_points": 15269.457823814,
+      "earlier_realized_points": 16002.0,
+      "factor": 1.0479743409778137,
+      "fold_id": "2023-24-gw32"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 97,
+      "earlier_forecast_points": 22437.168261040002,
+      "earlier_realized_points": 23050.0,
+      "factor": 1.027313238989437,
+      "fold_id": "2023-24-gw32"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 97,
+      "earlier_forecast_points": 39184.26305279601,
+      "earlier_realized_points": 40549.0,
+      "factor": 1.0348287001178298,
+      "fold_id": "2023-24-gw32"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 98,
+      "earlier_forecast_points": 3512.832703801,
+      "earlier_realized_points": 784.0,
+      "factor": 0.22318170721642572,
+      "fold_id": "2023-24-gw33"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 98,
+      "earlier_forecast_points": 15451.076068066,
+      "earlier_realized_points": 16200.0,
+      "factor": 1.0484706649967157,
+      "fold_id": "2023-24-gw33"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 98,
+      "earlier_forecast_points": 22702.279181751,
+      "earlier_realized_points": 23302.0,
+      "factor": 1.026416766944311,
+      "fold_id": "2023-24-gw33"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 98,
+      "earlier_forecast_points": 39512.095294689,
+      "earlier_realized_points": 40915.0,
+      "factor": 1.035505702617081,
+      "fold_id": "2023-24-gw33"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 99,
+      "earlier_forecast_points": 3548.3457873939997,
+      "earlier_realized_points": 786.0,
+      "factor": 0.22151166968911998,
+      "fold_id": "2023-24-gw34"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 99,
+      "earlier_forecast_points": 15640.824070794,
+      "earlier_realized_points": 16382.0,
+      "factor": 1.047387268461768,
+      "fold_id": "2023-24-gw34"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 99,
+      "earlier_forecast_points": 22961.819627689,
+      "earlier_realized_points": 23604.0,
+      "factor": 1.027967311943197,
+      "fold_id": "2023-24-gw34"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 99,
+      "earlier_forecast_points": 39835.424507150994,
+      "earlier_realized_points": 41284.0,
+      "factor": 1.0363640029137626,
+      "fold_id": "2023-24-gw34"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 100,
+      "earlier_forecast_points": 3608.850019181,
+      "earlier_realized_points": 797.0,
+      "factor": 0.22084597469109365,
+      "fold_id": "2023-24-gw35"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 100,
+      "earlier_forecast_points": 15898.389058225,
+      "earlier_realized_points": 16603.0,
+      "factor": 1.0443196439082278,
+      "fold_id": "2023-24-gw35"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 100,
+      "earlier_forecast_points": 23297.697319550003,
+      "earlier_realized_points": 24024.0,
+      "factor": 1.0311748697945582,
+      "fold_id": "2023-24-gw35"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 100,
+      "earlier_forecast_points": 40223.899681767,
+      "earlier_realized_points": 41787.0,
+      "factor": 1.0388599894739081,
+      "fold_id": "2023-24-gw35"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 101,
+      "earlier_forecast_points": 3657.783203473,
+      "earlier_realized_points": 800.0,
+      "factor": 0.218711704739749,
+      "fold_id": "2023-24-gw36"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 101,
+      "earlier_forecast_points": 16115.152770044999,
+      "earlier_realized_points": 16816.0,
+      "factor": 1.0434899525903187,
+      "fold_id": "2023-24-gw36"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 101,
+      "earlier_forecast_points": 23605.475266155998,
+      "earlier_realized_points": 24323.0,
+      "factor": 1.0303965383350169,
+      "fold_id": "2023-24-gw36"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 101,
+      "earlier_forecast_points": 40591.299691593,
+      "earlier_realized_points": 42146.0,
+      "factor": 1.0383013187609018,
+      "fold_id": "2023-24-gw36"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 102,
+      "earlier_forecast_points": 3693.5040634800002,
+      "earlier_realized_points": 801.0,
+      "factor": 0.2168672312885726,
+      "fold_id": "2023-24-gw37"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 102,
+      "earlier_forecast_points": 16302.151215719,
+      "earlier_realized_points": 17004.0,
+      "factor": 1.0430525257061938,
+      "fold_id": "2023-24-gw37"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 102,
+      "earlier_forecast_points": 23896.500180801,
+      "earlier_realized_points": 24677.0,
+      "factor": 1.0326616790447865,
+      "fold_id": "2023-24-gw37"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 102,
+      "earlier_forecast_points": 40937.80534596,
+      "earlier_realized_points": 42529.0,
+      "factor": 1.0388685871309666,
+      "fold_id": "2023-24-gw37"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 103,
+      "earlier_forecast_points": 3758.0498301549997,
+      "earlier_realized_points": 806.0,
+      "factor": 0.21447294113360832,
+      "fold_id": "2023-24-gw38"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 103,
+      "earlier_forecast_points": 16541.900899057,
+      "earlier_realized_points": 17203.0,
+      "factor": 1.0399651228100808,
+      "fold_id": "2023-24-gw38"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 103,
+      "earlier_forecast_points": 24300.599875623,
+      "earlier_realized_points": 25103.0,
+      "factor": 1.0330197661162235,
+      "fold_id": "2023-24-gw38"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 103,
+      "earlier_forecast_points": 41355.601129605,
+      "earlier_realized_points": 42969.0,
+      "factor": 1.0390128259854994,
+      "fold_id": "2023-24-gw38"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 3792.884118099,
+      "earlier_realized_points": 809.0,
+      "factor": 0.21329415157705167,
+      "fold_id": "2024-25-gw02"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 16698.616702974,
+      "earlier_realized_points": 17339.0,
+      "factor": 1.038349481781443,
+      "fold_id": "2024-25-gw02"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 24622.887963913,
+      "earlier_realized_points": 25454.0,
+      "factor": 1.0337536375629484,
+      "fold_id": "2024-25-gw02"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 41718.308570894,
+      "earlier_realized_points": 43324.0,
+      "factor": 1.0384888909476608,
+      "fold_id": "2024-25-gw02"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 3792.884118099,
+      "earlier_realized_points": 809.0,
+      "factor": 0.21329415157705167,
+      "fold_id": "2024-25-gw03"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 16698.616702974,
+      "earlier_realized_points": 17339.0,
+      "factor": 1.038349481781443,
+      "fold_id": "2024-25-gw03"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 24622.887963913,
+      "earlier_realized_points": 25454.0,
+      "factor": 1.0337536375629484,
+      "fold_id": "2024-25-gw03"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 41718.308570894,
+      "earlier_realized_points": 43324.0,
+      "factor": 1.0384888909476608,
+      "fold_id": "2024-25-gw03"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 3792.8841180990003,
+      "earlier_realized_points": 809.0,
+      "factor": 0.21329415157705164,
+      "fold_id": "2024-25-gw04"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 16698.616702974,
+      "earlier_realized_points": 17339.0,
+      "factor": 1.038349481781443,
+      "fold_id": "2024-25-gw04"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 24622.887963913,
+      "earlier_realized_points": 25454.0,
+      "factor": 1.0337536375629484,
+      "fold_id": "2024-25-gw04"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 104,
+      "earlier_forecast_points": 41718.308570894,
+      "earlier_realized_points": 43324.0,
+      "factor": 1.0384888909476608,
+      "fold_id": "2024-25-gw04"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 105,
+      "earlier_forecast_points": 3827.909820656,
+      "earlier_realized_points": 855.0,
+      "factor": 0.22335949383820022,
+      "fold_id": "2024-25-gw05"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 105,
+      "earlier_forecast_points": 16818.458590214002,
+      "earlier_realized_points": 17481.0,
+      "factor": 1.0393937058043776,
+      "fold_id": "2024-25-gw05"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 105,
+      "earlier_forecast_points": 24740.819502058002,
+      "earlier_realized_points": 25544.0,
+      "factor": 1.0324637790544968,
+      "fold_id": "2024-25-gw05"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 105,
+      "earlier_forecast_points": 42269.416545657,
+      "earlier_realized_points": 43855.0,
+      "factor": 1.0375113636269464,
+      "fold_id": "2024-25-gw05"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 106,
+      "earlier_forecast_points": 3859.4316154919998,
+      "earlier_realized_points": 874.0,
+      "factor": 0.22645821640982297,
+      "fold_id": "2024-25-gw06"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 106,
+      "earlier_forecast_points": 16946.735643526998,
+      "earlier_realized_points": 17615.0,
+      "factor": 1.0394332200920509,
+      "fold_id": "2024-25-gw06"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 106,
+      "earlier_forecast_points": 24884.342595572,
+      "earlier_realized_points": 25682.0,
+      "factor": 1.0320545902052456,
+      "fold_id": "2024-25-gw06"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 106,
+      "earlier_forecast_points": 42786.885163068,
+      "earlier_realized_points": 44365.0,
+      "factor": 1.036883143769815,
+      "fold_id": "2024-25-gw06"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 107,
+      "earlier_forecast_points": 3889.161614322,
+      "earlier_realized_points": 878.0,
+      "factor": 0.22575559646755958,
+      "fold_id": "2024-25-gw07"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 107,
+      "earlier_forecast_points": 17069.026346983,
+      "earlier_realized_points": 17702.0,
+      "factor": 1.0370831727686027,
+      "fold_id": "2024-25-gw07"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 107,
+      "earlier_forecast_points": 25066.392237093,
+      "earlier_realized_points": 25888.0,
+      "factor": 1.0327772642802258,
+      "fold_id": "2024-25-gw07"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 107,
+      "earlier_forecast_points": 43267.762454427,
+      "earlier_realized_points": 44826.0,
+      "factor": 1.0360138231602398,
+      "fold_id": "2024-25-gw07"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 108,
+      "earlier_forecast_points": 3918.757808033,
+      "earlier_realized_points": 889.0,
+      "factor": 0.22685760221712423,
+      "fold_id": "2024-25-gw08"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 108,
+      "earlier_forecast_points": 17197.38811207,
+      "earlier_realized_points": 17812.0,
+      "factor": 1.0357386763574077,
+      "fold_id": "2024-25-gw08"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 108,
+      "earlier_forecast_points": 25249.488704641,
+      "earlier_realized_points": 26091.0,
+      "factor": 1.0333278548806544,
+      "fold_id": "2024-25-gw08"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 108,
+      "earlier_forecast_points": 43738.337010734,
+      "earlier_realized_points": 45375.0,
+      "factor": 1.037419415120066,
+      "fold_id": "2024-25-gw08"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 109,
+      "earlier_forecast_points": 3946.594520268,
+      "earlier_realized_points": 894.0,
+      "factor": 0.22652441121295924,
+      "fold_id": "2024-25-gw09"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 109,
+      "earlier_forecast_points": 17318.846767608,
+      "earlier_realized_points": 17932.0,
+      "factor": 1.035403814158042,
+      "fold_id": "2024-25-gw09"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 109,
+      "earlier_forecast_points": 25429.487193025998,
+      "earlier_realized_points": 26276.0,
+      "factor": 1.0332886306573321,
+      "fold_id": "2024-25-gw09"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 109,
+      "earlier_forecast_points": 44217.19304918,
+      "earlier_realized_points": 45843.0,
+      "factor": 1.0367686603039619,
+      "fold_id": "2024-25-gw09"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 110,
+      "earlier_forecast_points": 3974.1000218790005,
+      "earlier_realized_points": 902.0,
+      "factor": 0.2269696270939663,
+      "fold_id": "2024-25-gw10"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 110,
+      "earlier_forecast_points": 17440.532002234002,
+      "earlier_realized_points": 18086.0,
+      "factor": 1.0370096507195605,
+      "fold_id": "2024-25-gw10"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 110,
+      "earlier_forecast_points": 25614.097797797,
+      "earlier_realized_points": 26426.0,
+      "factor": 1.0316974741258633,
+      "fold_id": "2024-25-gw10"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 110,
+      "earlier_forecast_points": 44690.860111487,
+      "earlier_realized_points": 46302.0,
+      "factor": 1.036050769318241,
+      "fold_id": "2024-25-gw10"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 111,
+      "earlier_forecast_points": 4000.692853281,
+      "earlier_realized_points": 905.0,
+      "factor": 0.22621081727326361,
+      "fold_id": "2024-25-gw11"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 111,
+      "earlier_forecast_points": 17563.044242869,
+      "earlier_realized_points": 18200.0,
+      "factor": 1.0362668195970421,
+      "fold_id": "2024-25-gw11"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 111,
+      "earlier_forecast_points": 25802.228899797,
+      "earlier_realized_points": 26581.0,
+      "factor": 1.0301823188697132,
+      "fold_id": "2024-25-gw11"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 111,
+      "earlier_forecast_points": 45158.581649503,
+      "earlier_realized_points": 46805.0,
+      "factor": 1.0364585930372132,
+      "fold_id": "2024-25-gw11"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 112,
+      "earlier_forecast_points": 4027.911440198,
+      "earlier_realized_points": 916.0,
+      "factor": 0.22741314291531994,
+      "fold_id": "2024-25-gw12"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 112,
+      "earlier_forecast_points": 17684.866704187,
+      "earlier_realized_points": 18327.0,
+      "factor": 1.0363097617049595,
+      "fold_id": "2024-25-gw12"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 112,
+      "earlier_forecast_points": 25988.460204768,
+      "earlier_realized_points": 26775.0,
+      "factor": 1.0302649633350613,
+      "fold_id": "2024-25-gw12"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 112,
+      "earlier_forecast_points": 45623.94372974,
+      "earlier_realized_points": 47287.0,
+      "factor": 1.0364513922801446,
+      "fold_id": "2024-25-gw12"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 113,
+      "earlier_forecast_points": 4054.337873905,
+      "earlier_realized_points": 922.0,
+      "factor": 0.2274107458912794,
+      "fold_id": "2024-25-gw13"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 113,
+      "earlier_forecast_points": 17807.991017738,
+      "earlier_realized_points": 18491.0,
+      "factor": 1.0383540727071163,
+      "fold_id": "2024-25-gw13"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 113,
+      "earlier_forecast_points": 26177.169538228998,
+      "earlier_realized_points": 26957.0,
+      "factor": 1.0297904806183167,
+      "fold_id": "2024-25-gw13"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 113,
+      "earlier_forecast_points": 46084.474184238,
+      "earlier_realized_points": 47775.0,
+      "factor": 1.036683196362479,
+      "fold_id": "2024-25-gw13"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 114,
+      "earlier_forecast_points": 4081.067396516,
+      "earlier_realized_points": 935.0,
+      "factor": 0.22910672849907057,
+      "fold_id": "2024-25-gw14"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 114,
+      "earlier_forecast_points": 17932.83247516,
+      "earlier_realized_points": 18604.0,
+      "factor": 1.0374267436987257,
+      "fold_id": "2024-25-gw14"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 114,
+      "earlier_forecast_points": 26381.82992624,
+      "earlier_realized_points": 27202.0,
+      "factor": 1.031088445193267,
+      "fold_id": "2024-25-gw14"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 114,
+      "earlier_forecast_points": 46527.692383652,
+      "earlier_realized_points": 48232.0,
+      "factor": 1.0366299622662316,
+      "fold_id": "2024-25-gw14"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 115,
+      "earlier_forecast_points": 4106.524199382,
+      "earlier_realized_points": 945.0,
+      "factor": 0.23012161967588432,
+      "fold_id": "2024-25-gw15"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 115,
+      "earlier_forecast_points": 18065.155309349,
+      "earlier_realized_points": 18797.0,
+      "factor": 1.0405113976668807,
+      "fold_id": "2024-25-gw15"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 115,
+      "earlier_forecast_points": 26593.88376845,
+      "earlier_realized_points": 27391.0,
+      "factor": 1.0299736675729805,
+      "fold_id": "2024-25-gw15"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 115,
+      "earlier_forecast_points": 46957.569316495996,
+      "earlier_realized_points": 48705.0,
+      "factor": 1.037212971389687,
+      "fold_id": "2024-25-gw15"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 116,
+      "earlier_forecast_points": 4129.788246501,
+      "earlier_realized_points": 946.0,
+      "factor": 0.22906743482586717,
+      "fold_id": "2024-25-gw16"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 116,
+      "earlier_forecast_points": 18209.042994996,
+      "earlier_realized_points": 18940.0,
+      "factor": 1.0401425272709208,
+      "fold_id": "2024-25-gw16"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 116,
+      "earlier_forecast_points": 26786.733952265,
+      "earlier_realized_points": 27596.0,
+      "factor": 1.030211449039556,
+      "fold_id": "2024-25-gw16"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 116,
+      "earlier_forecast_points": 47318.882936623,
+      "earlier_realized_points": 49066.0,
+      "factor": 1.0369221958539685,
+      "fold_id": "2024-25-gw16"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 117,
+      "earlier_forecast_points": 4155.099586838,
+      "earlier_realized_points": 956.0,
+      "factor": 0.2300787213448015,
+      "fold_id": "2024-25-gw17"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 117,
+      "earlier_forecast_points": 18360.161403316,
+      "earlier_realized_points": 19064.0,
+      "factor": 1.0383350985442252,
+      "fold_id": "2024-25-gw17"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 117,
+      "earlier_forecast_points": 27015.148538366,
+      "earlier_realized_points": 27854.0,
+      "factor": 1.0310511511881082,
+      "fold_id": "2024-25-gw17"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 117,
+      "earlier_forecast_points": 47725.397938254,
+      "earlier_realized_points": 49492.0,
+      "factor": 1.0370159734242885,
+      "fold_id": "2024-25-gw17"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 118,
+      "earlier_forecast_points": 4180.098714131001,
+      "earlier_realized_points": 959.0,
+      "factor": 0.22942041936905938,
+      "fold_id": "2024-25-gw18"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 118,
+      "earlier_forecast_points": 18510.693761275998,
+      "earlier_realized_points": 19237.0,
+      "factor": 1.0392371160201148,
+      "fold_id": "2024-25-gw18"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 118,
+      "earlier_forecast_points": 27235.824367495,
+      "earlier_realized_points": 28113.0,
+      "factor": 1.0322066856016254,
+      "fold_id": "2024-25-gw18"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 118,
+      "earlier_forecast_points": 48137.867021965,
+      "earlier_realized_points": 49977.0,
+      "factor": 1.0382055353054138,
+      "fold_id": "2024-25-gw18"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 119,
+      "earlier_forecast_points": 4205.324127095,
+      "earlier_realized_points": 965.0,
+      "factor": 0.229471015987206,
+      "fold_id": "2024-25-gw19"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 119,
+      "earlier_forecast_points": 18649.003853239,
+      "earlier_realized_points": 19368.0,
+      "factor": 1.038554131492451,
+      "fold_id": "2024-25-gw19"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 119,
+      "earlier_forecast_points": 27474.470132041,
+      "earlier_realized_points": 28377.0,
+      "factor": 1.0328497642946883,
+      "fold_id": "2024-25-gw19"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 119,
+      "earlier_forecast_points": 48544.982397033,
+      "earlier_realized_points": 50447.0,
+      "factor": 1.039180518954792,
+      "fold_id": "2024-25-gw19"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 120,
+      "earlier_forecast_points": 4229.744598278,
+      "earlier_realized_points": 968.0,
+      "factor": 0.22885542554840996,
+      "fold_id": "2024-25-gw20"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 120,
+      "earlier_forecast_points": 18796.345547618,
+      "earlier_realized_points": 19554.0,
+      "factor": 1.0403086041625798,
+      "fold_id": "2024-25-gw20"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 120,
+      "earlier_forecast_points": 27705.369240344,
+      "earlier_realized_points": 28615.0,
+      "factor": 1.0328322915231685,
+      "fold_id": "2024-25-gw20"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 120,
+      "earlier_forecast_points": 48950.586209765,
+      "earlier_realized_points": 50854.0,
+      "factor": 1.0388843921516775,
+      "fold_id": "2024-25-gw20"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 121,
+      "earlier_forecast_points": 4254.842411284,
+      "earlier_realized_points": 972.0,
+      "factor": 0.2284455935247378,
+      "fold_id": "2024-25-gw21"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 121,
+      "earlier_forecast_points": 18950.591299064003,
+      "earlier_realized_points": 19697.0,
+      "factor": 1.039387092949066,
+      "fold_id": "2024-25-gw21"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 121,
+      "earlier_forecast_points": 27950.303961504,
+      "earlier_realized_points": 28838.0,
+      "factor": 1.0317597990962326,
+      "fold_id": "2024-25-gw21"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 121,
+      "earlier_forecast_points": 49339.298558843,
+      "earlier_realized_points": 51252.0,
+      "factor": 1.0387662876657209,
+      "fold_id": "2024-25-gw21"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 122,
+      "earlier_forecast_points": 4279.119642062,
+      "earlier_realized_points": 974.0,
+      "factor": 0.22761691223259511,
+      "fold_id": "2024-25-gw22"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 122,
+      "earlier_forecast_points": 19096.709833509,
+      "earlier_realized_points": 19839.0,
+      "factor": 1.0388700552588646,
+      "fold_id": "2024-25-gw22"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 122,
+      "earlier_forecast_points": 28202.488772728,
+      "earlier_realized_points": 29061.0,
+      "factor": 1.0304409739931246,
+      "fold_id": "2024-25-gw22"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 122,
+      "earlier_forecast_points": 49720.467522485,
+      "earlier_realized_points": 51695.0,
+      "factor": 1.0397126691663159,
+      "fold_id": "2024-25-gw22"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 123,
+      "earlier_forecast_points": 4304.255460415,
+      "earlier_realized_points": 979.0,
+      "factor": 0.22744932520933794,
+      "fold_id": "2024-25-gw23"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 123,
+      "earlier_forecast_points": 19255.124786737,
+      "earlier_realized_points": 19965.0,
+      "factor": 1.0368668196714033,
+      "fold_id": "2024-25-gw23"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 123,
+      "earlier_forecast_points": 28434.717076503002,
+      "earlier_realized_points": 29354.0,
+      "factor": 1.0323295962827304,
+      "fold_id": "2024-25-gw23"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 123,
+      "earlier_forecast_points": 50106.702214048,
+      "earlier_realized_points": 52122.0,
+      "factor": 1.0402201241930265,
+      "fold_id": "2024-25-gw23"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 124,
+      "earlier_forecast_points": 4329.906298809,
+      "earlier_realized_points": 983.0,
+      "factor": 0.2270256980550336,
+      "fold_id": "2024-25-gw24"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 124,
+      "earlier_forecast_points": 19406.847670032002,
+      "earlier_realized_points": 20066.0,
+      "factor": 1.033964935530764,
+      "fold_id": "2024-25-gw24"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 124,
+      "earlier_forecast_points": 28668.525651608,
+      "earlier_realized_points": 29648.0,
+      "factor": 1.034165494253,
+      "fold_id": "2024-25-gw24"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 124,
+      "earlier_forecast_points": 50493.101366405004,
+      "earlier_realized_points": 52524.0,
+      "factor": 1.0402213090231418,
+      "fold_id": "2024-25-gw24"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 125,
+      "earlier_forecast_points": 4359.872880348001,
+      "earlier_realized_points": 988.0,
+      "factor": 0.22661211166348016,
+      "fold_id": "2024-25-gw25"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 125,
+      "earlier_forecast_points": 19578.380689565,
+      "earlier_realized_points": 20272.0,
+      "factor": 1.035427818134351,
+      "fold_id": "2024-25-gw25"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 125,
+      "earlier_forecast_points": 28928.203056056,
+      "earlier_realized_points": 29911.0,
+      "factor": 1.0339736603078862,
+      "fold_id": "2024-25-gw25"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 125,
+      "earlier_forecast_points": 50909.040168315994,
+      "earlier_realized_points": 52981.0,
+      "factor": 1.0406992515441986,
+      "fold_id": "2024-25-gw25"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 126,
+      "earlier_forecast_points": 4392.805139315999,
+      "earlier_realized_points": 989.0,
+      "factor": 0.22514087664585014,
+      "fold_id": "2024-25-gw26"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 126,
+      "earlier_forecast_points": 19762.116970296,
+      "earlier_realized_points": 20482.0,
+      "factor": 1.0364274247939145,
+      "fold_id": "2024-25-gw26"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 126,
+      "earlier_forecast_points": 29165.930686837,
+      "earlier_realized_points": 30163.0,
+      "factor": 1.0341860962322382,
+      "fold_id": "2024-25-gw26"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 126,
+      "earlier_forecast_points": 51350.083248863,
+      "earlier_realized_points": 53407.0,
+      "factor": 1.0400567364451654,
+      "fold_id": "2024-25-gw26"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 127,
+      "earlier_forecast_points": 4418.327250386,
+      "earlier_realized_points": 990.0,
+      "factor": 0.22406669852567174,
+      "fold_id": "2024-25-gw27"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 127,
+      "earlier_forecast_points": 19948.819868655,
+      "earlier_realized_points": 20635.0,
+      "factor": 1.0343970287898172,
+      "fold_id": "2024-25-gw27"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 127,
+      "earlier_forecast_points": 29381.741156501,
+      "earlier_realized_points": 30406.0,
+      "factor": 1.0348603861848524,
+      "fold_id": "2024-25-gw27"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 127,
+      "earlier_forecast_points": 51761.102880782,
+      "earlier_realized_points": 53870.0,
+      "factor": 1.0407428938304366,
+      "fold_id": "2024-25-gw27"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 128,
+      "earlier_forecast_points": 4444.924995005,
+      "earlier_realized_points": 992.0,
+      "factor": 0.22317586935994724,
+      "fold_id": "2024-25-gw28"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 128,
+      "earlier_forecast_points": 20139.76498819,
+      "earlier_realized_points": 20828.0,
+      "factor": 1.0341729415518792,
+      "fold_id": "2024-25-gw28"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 128,
+      "earlier_forecast_points": 29599.129138382,
+      "earlier_realized_points": 30631.0,
+      "factor": 1.0348615277427182,
+      "fold_id": "2024-25-gw28"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 128,
+      "earlier_forecast_points": 52163.438996842,
+      "earlier_realized_points": 54297.0,
+      "factor": 1.0409014636340823,
+      "fold_id": "2024-25-gw28"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 129,
+      "earlier_forecast_points": 4471.342733292,
+      "earlier_realized_points": 993.0,
+      "factor": 0.22208094061018435,
+      "fold_id": "2024-25-gw29"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 129,
+      "earlier_forecast_points": 20325.176554101,
+      "earlier_realized_points": 20975.0,
+      "factor": 1.0319713555338286,
+      "fold_id": "2024-25-gw29"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 129,
+      "earlier_forecast_points": 29819.367867559,
+      "earlier_realized_points": 30870.0,
+      "factor": 1.0352332127598183,
+      "fold_id": "2024-25-gw29"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 129,
+      "earlier_forecast_points": 52557.816645158004,
+      "earlier_realized_points": 54731.0,
+      "factor": 1.0413484328984621,
+      "fold_id": "2024-25-gw29"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 130,
+      "earlier_forecast_points": 4491.990091912,
+      "earlier_realized_points": 994.0,
+      "factor": 0.2212827676957113,
+      "fold_id": "2024-25-gw30"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 130,
+      "earlier_forecast_points": 20468.182784327,
+      "earlier_realized_points": 21114.0,
+      "factor": 1.0315522497760532,
+      "fold_id": "2024-25-gw30"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 130,
+      "earlier_forecast_points": 30016.464693162,
+      "earlier_realized_points": 31060.0,
+      "factor": 1.0347654301565943,
+      "fold_id": "2024-25-gw30"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 130,
+      "earlier_forecast_points": 52831.159233142,
+      "earlier_realized_points": 55057.0,
+      "factor": 1.042131211943229,
+      "fold_id": "2024-25-gw30"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 131,
+      "earlier_forecast_points": 4518.3471965319995,
+      "earlier_realized_points": 1003.0,
+      "factor": 0.22198382646863438,
+      "fold_id": "2024-25-gw31"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 131,
+      "earlier_forecast_points": 20648.180825233,
+      "earlier_realized_points": 21299.0,
+      "factor": 1.0315194437842035,
+      "fold_id": "2024-25-gw31"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 131,
+      "earlier_forecast_points": 30246.860162137,
+      "earlier_realized_points": 31310.0,
+      "factor": 1.0351487669187507,
+      "fold_id": "2024-25-gw31"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 131,
+      "earlier_forecast_points": 53213.929115813,
+      "earlier_realized_points": 55422.0,
+      "factor": 1.0414942275617616,
+      "fold_id": "2024-25-gw31"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 132,
+      "earlier_forecast_points": 4543.896126584,
+      "earlier_realized_points": 1004.0,
+      "factor": 0.22095575515604599,
+      "fold_id": "2024-25-gw32"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 132,
+      "earlier_forecast_points": 20815.301337916,
+      "earlier_realized_points": 21489.0,
+      "factor": 1.0323655493210098,
+      "fold_id": "2024-25-gw32"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 132,
+      "earlier_forecast_points": 30482.802462210002,
+      "earlier_realized_points": 31565.0,
+      "factor": 1.0355019043649814,
+      "fold_id": "2024-25-gw32"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 132,
+      "earlier_forecast_points": 53593.585780813,
+      "earlier_realized_points": 55793.0,
+      "factor": 1.0410387584100484,
+      "fold_id": "2024-25-gw32"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 133,
+      "earlier_forecast_points": 4575.3440500940005,
+      "earlier_realized_points": 1006.0,
+      "factor": 0.21987417535940967,
+      "fold_id": "2024-25-gw33"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 133,
+      "earlier_forecast_points": 21015.736887344,
+      "earlier_realized_points": 21689.0,
+      "factor": 1.0320361411196317,
+      "fold_id": "2024-25-gw33"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 133,
+      "earlier_forecast_points": 30736.139855761998,
+      "earlier_realized_points": 31855.0,
+      "factor": 1.0364021035005881,
+      "fold_id": "2024-25-gw33"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 133,
+      "earlier_forecast_points": 53995.277214383,
+      "earlier_realized_points": 56218.0,
+      "factor": 1.0411651333280851,
+      "fold_id": "2024-25-gw33"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 134,
+      "earlier_forecast_points": 4614.359773733,
+      "earlier_realized_points": 1016.0,
+      "factor": 0.22018222458151757,
+      "fold_id": "2024-25-gw34"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 134,
+      "earlier_forecast_points": 21247.429828112,
+      "earlier_realized_points": 21919.0,
+      "factor": 1.0316071250650496,
+      "fold_id": "2024-25-gw34"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 134,
+      "earlier_forecast_points": 31042.778028628,
+      "earlier_realized_points": 32135.0,
+      "factor": 1.0351844145638236,
+      "fold_id": "2024-25-gw34"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 134,
+      "earlier_forecast_points": 54412.598117415,
+      "earlier_realized_points": 56692.0,
+      "factor": 1.0418910686394052,
+      "fold_id": "2024-25-gw34"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 135,
+      "earlier_forecast_points": 4634.6974333709995,
+      "earlier_realized_points": 1016.0,
+      "factor": 0.21921603612881863,
+      "fold_id": "2024-25-gw35"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 135,
+      "earlier_forecast_points": 21386.953187584997,
+      "earlier_realized_points": 22038.0,
+      "factor": 1.030441307216819,
+      "fold_id": "2024-25-gw35"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 135,
+      "earlier_forecast_points": 31223.679258484,
+      "earlier_realized_points": 32308.0,
+      "factor": 1.0347275134534752,
+      "fold_id": "2024-25-gw35"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 135,
+      "earlier_forecast_points": 54710.899569798,
+      "earlier_realized_points": 57072.0,
+      "factor": 1.043155942394802,
+      "fold_id": "2024-25-gw35"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 136,
+      "earlier_forecast_points": 4660.2127278180005,
+      "earlier_realized_points": 1017.0,
+      "factor": 0.21823038118609203,
+      "fold_id": "2024-25-gw36"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 136,
+      "earlier_forecast_points": 21573.281059797,
+      "earlier_realized_points": 22196.0,
+      "factor": 1.0288652865772687,
+      "fold_id": "2024-25-gw36"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 136,
+      "earlier_forecast_points": 31482.232085814,
+      "earlier_realized_points": 32565.0,
+      "factor": 1.0343929843104707,
+      "fold_id": "2024-25-gw36"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 136,
+      "earlier_forecast_points": 55093.180247737,
+      "earlier_realized_points": 57425.0,
+      "factor": 1.0423250163046955,
+      "fold_id": "2024-25-gw36"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 137,
+      "earlier_forecast_points": 4685.32829096,
+      "earlier_realized_points": 1018.0,
+      "factor": 0.2172739959255698,
+      "fold_id": "2024-25-gw37"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 137,
+      "earlier_forecast_points": 21767.96497008,
+      "earlier_realized_points": 22350.0,
+      "factor": 1.0267381462033776,
+      "fold_id": "2024-25-gw37"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 137,
+      "earlier_forecast_points": 31729.546388333,
+      "earlier_realized_points": 32827.0,
+      "factor": 1.0345877497974738,
+      "fold_id": "2024-25-gw37"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 137,
+      "earlier_forecast_points": 55468.741261740994,
+      "earlier_realized_points": 57881.0,
+      "factor": 1.0434886150900062,
+      "fold_id": "2024-25-gw37"
+    },
+    {
+      "bucket": "none",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 4710.61853797,
+      "earlier_realized_points": 1020.0,
+      "factor": 0.21653207360737814,
+      "fold_id": "2024-25-gw38"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 21954.710464398002,
+      "earlier_realized_points": 22591.0,
+      "factor": 1.028981914229013,
+      "fold_id": "2024-25-gw38"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 31982.806218442,
+      "earlier_realized_points": 33043.0,
+      "factor": 1.0331488667478674,
+      "fold_id": "2024-25-gw38"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 55843.520527548004,
+      "earlier_realized_points": 58260.0,
+      "factor": 1.0432723340080239,
+      "fold_id": "2024-25-gw38"
+    }
+  ],
+  "final_factors": [
+    {
+      "bucket": "none",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 4710.61853797,
+      "earlier_realized_points": 1020.0,
+      "factor": 0.21653207360737814,
+      "fold_id": "2024-25-gw38"
+    },
+    {
+      "bucket": "under_30",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 21954.710464398002,
+      "earlier_realized_points": 22591.0,
+      "factor": 1.028981914229013,
+      "fold_id": "2024-25-gw38"
+    },
+    {
+      "bucket": "30_to_60",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 31982.806218442,
+      "earlier_realized_points": 33043.0,
+      "factor": 1.0331488667478674,
+      "fold_id": "2024-25-gw38"
+    },
+    {
+      "bucket": "60_and_above",
+      "earlier_decisions": 138,
+      "earlier_forecast_points": 55843.520527548004,
+      "earlier_realized_points": 58260.0,
+      "factor": 1.0432723340080239,
+      "fold_id": "2024-25-gw38"
+    }
+  ],
+  "generated_at_utc": "2026-09-19T13:01:34+00:00",
+  "level_gate": {
+    "buckets": {
+      "30_to_60": {
+        "bias_corrected": 0.024264503993165723,
+        "bias_uncorrected": 0.06595454682264879,
+        "passes": true,
+        "rows": 16566
+      },
+      "60_and_above": {
+        "bias_corrected": 0.04462655811332684,
+        "bias_uncorrected": 0.1362527409941832,
+        "passes": true,
+        "rows": 18223
+      },
+      "none": {
+        "bias_corrected": -0.00655040982189618,
+        "bias_uncorrected": -0.12097485286719421,
+        "passes": true,
+        "rows": 29065
+      },
+      "under_30": {
+        "bias_corrected": -0.03753275042825135,
+        "bias_uncorrected": 0.012602638126636267,
+        "passes": false,
+        "rows": 27196
+      }
+    },
+    "mean_absolute_error_corrected": 1.0606712917078265,
+    "mean_absolute_error_not_worse": true,
+    "mean_absolute_error_uncorrected": 1.0795396694088741,
+    "passes": false,
+    "rows": 91050
+  },
+  "locked_holdout_accessed": false,
+  "manifest_sha256": "f2bf78473673f3422dfc879e1d4cb5e6eb2b44435f0d32f442c30b64fee3ea20",
+  "operational_control_changed": false,
+  "prereg": "docs/prior_minutes_level_prereg.md",
+  "producer_repository_commit": "aab12b3f6e0558d8721da885cf9293a21cfbd99a",
+  "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+  "solver": {
+    "deterministic_time_limit": 5.0,
+    "wall_time_limit_seconds": 600.0
+  },
+  "table_sha256": "167f3e6aeda0ab109140db3ffee60b6d196e07ab5ae4f8459921db66840af45d",
+  "verdict": "failed"
+}

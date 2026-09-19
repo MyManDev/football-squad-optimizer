@@ -29,12 +29,6 @@ NOT_YET_NAMED: frozenset[str] = frozenset(
         "probe_phase_e_runtime.py",
         "run_component_squad_calibration.py",
         "run_scenario_benchmark.py",
-        # These three take a deterministic limit only when the operator passes a flag, and
-        # build a bare configuration otherwise. A limit the run has to be asked for is not a
-        # limit the record can rely on, so they belong here rather than in OWN_BUDGET.
-        "run_planner_horizon_seasons.py",
-        "run_season_chain_seasons.py",
-        "run_transfer_discipline_seasons.py",
     }
 )
 
@@ -129,6 +123,9 @@ def test_the_converted_runners_name_the_measurement_configuration() -> None:
         "measure_strategy_screening.py",
         "measure_template_rival.py",
         "run_opening_backtest.py",
+        "run_planner_horizon_seasons.py",
+        "run_season_chain_seasons.py",
+        "run_transfer_discipline_seasons.py",
     ):
         assert _calls(trees[name], "measurement_optimization_config"), name
         assert not _inherits_the_wall_clock(trees[name]), name

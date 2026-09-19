@@ -146,18 +146,23 @@ describe("with the service answering", () => {
     expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
-  it.each(["tr", "en"] as const)("says a coded failure as a sentence in %s", (language) => {
+  it.each([
+    ["tr", "TOP100_INPUTS_UNAVAILABLE"],
+    ["en", "TOP100_INPUTS_UNAVAILABLE"],
+    ["tr", "OPEN_JOB_LIMITED"],
+    ["en", "OPEN_JOB_LIMITED"],
+  ] as const)("says a coded failure in %s: %s", (language, reason) => {
     const copy = COMPUTE_COPY[language];
     const { container } = renderPanel(
       {
         service: "ready",
         computable: true,
-        state: { phase: "failed", request: REQUEST, reason: "TOP100_INPUTS_UNAVAILABLE" },
+        state: { phase: "failed", request: REQUEST, reason },
       },
       language,
     );
-    expect(container).toHaveTextContent(copy.failures.TOP100_INPUTS_UNAVAILABLE!);
-    expect(container).not.toHaveTextContent("TOP100_INPUTS_UNAVAILABLE");
+    expect(container).toHaveTextContent(copy.failures[reason]!);
+    expect(container).not.toHaveTextContent(reason);
   });
 
   it("names the rate limit's wait, and an unknown code only generally", () => {
