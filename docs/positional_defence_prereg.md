@@ -12,9 +12,11 @@ Two records, measured independently, put goalkeepers in the same place.
 - `participation_calibration`: goalkeepers are the worst-calibrated slice of
   `q_start_given_appearance` by a distance, 738 rows predicted **0.8921** against **0.9864**
   observed, a bias of -0.0943, against defenders at -0.0349 and midfielders at +0.0338.
-- `projection_level_audit`: over each decision's top forty per position, goalkeepers read
-  **+0.219**, and **+0.472** of that is in what they score when they play rather than in whether
-  they play.
+- `projection_level_audit`: over each decision's top forty per position, goalkeepers read a
+  bias of **+0.219 points a row**, and its separate conditional reading, over the keepers who
+  appeared, is **+0.472 points a row**. Those are two readings in different units over different
+  row sets, not a share of one another; that record forbids treating one as a decomposition of
+  the other, and an earlier draft of this document did exactly that.
 
 A goalkeeper who appears has almost certainly played ninety minutes, and part of his appearance
 is priced as a substitute's. The same shape applies to a defender for a different reason: his
@@ -42,28 +44,52 @@ here as such.
 For goalkeepers and defenders only:
 
 ```
-expected points = P(appearance) x (appearance points + 4 x P(clean sheet) + expected bonus)
+long(row) = 1 if expected_minutes_if_appearance >= 60 else 0
+expected points = appearance_probability
+                  x ( (1 + long) + 4 x long x P(clean sheet) + bonus(position) )
 ```
 
 - **P(appearance)** is the shipped component model's own `appearance_probability`, unchanged and
   not refitted. This candidate replaces the conditional points term and nothing else.
-- **Appearance points** are the game's: 1 for appearing, 2 for sixty minutes or more. The split
-  is priced by the shipped `expected_minutes_if_appearance`, as `1 + P(60+ | appearance)` where
-  that probability is the fraction of the conditional minutes distribution the model already
-  carries; no new minutes model is fitted.
+- **`long`** is an indicator on the shipped scalar `expected_minutes_if_appearance`, one when it
+  reaches sixty and zero below. **There is no distribution to take a probability from**: the
+  model carries a point estimate (`prediction/minutes.py`, and `production.py` divides expected
+  minutes by the probability to recover it), so `P(60+ | appearance)` names an object that does
+  not exist and an earlier draft of this document used it. The indicator is crude and it is
+  **fixed here with its alternatives named and refused**: `q_start_given_appearance` would import
+  the very bias this study exists to close (0.8921 predicted against 0.9864 observed for
+  keepers), `min(expected minutes / 90, 1)` is a proportion and not a threshold, and the
+  archive's `starts` exists for only two of the three judged seasons. Over goalkeeper rows the
+  choice moves the appearance term between 1.0 and 2.0 points, which is larger than the bias the
+  study is about, so it may not be left to the runner.
+- **Appearance points** are the game's: `1 + long`, one for appearing and two at sixty minutes.
+- **The clean-sheet term is paid only when the sixty minutes are**, `4 x long x P(clean sheet)`.
+  The game pays a goalkeeper or defender four points for a clean sheet at sixty minutes and
+  nothing below it, so multiplying by the appearance probability alone would pay a twenty-minute
+  substitute in full. An earlier draft did that.
 - **P(clean sheet)** is `TeamRating.clean_sheet_probability` after the recalibration
   `fit_clean_sheet_calibration` already performs, walked forward over the seasons before the
   judged one and never the judged one itself. **The recalibration is not optional and is fixed
   here**: the handoff records that the raw probability breaks at the top of its range, promising
   better than an even chance on 40 judged fixtures where the clean sheet happened a third of the
   time (0.534 against 0.325). An uncalibrated by-product may not price a defender.
-- **Expected bonus** is the per-position mean realized bonus on clean-sheet matches, fitted
-  through the same walk-forward split, on played rows only. One number per position, no features.
+- **`bonus(position)`** is the per-position mean realized bonus **over played rows**, fitted on
+  the same walk-forward split. Not over clean-sheet matches: a mean taken on clean sheets and
+  then added to every row would over-price every defender, in the same direction the level audit
+  already finds keepers mispriced. An earlier draft did that too.
 
 Nothing else enters. Goals conceded, saves, attacking returns and cards are **deliberately
 excluded**, and this is a real limitation rather than a simplification: the candidate prices only
 the part of a defender's points that the structure names. The record will say so, and a failure
 on that account is a failure of this candidate and not a licence to add terms and re-run.
+
+**And the structure is dated.** 2026-27 introduces defensive-contribution points, which make a
+clean sheet a smaller share of a defender's points than it was in any season judged here. So a
+candidate built on this structure and fitted on these seasons would arrive already out of date
+for the season it would be used in, and that cannot be added to this document later either. What
+a pass here would establish is that the **shape** prices the group better on the seasons the
+archive holds; whether it still does under the new rule is a separate question with its own
+population, and the live season is the only place it can be asked.
 
 ## The population, fixed
 
@@ -90,21 +116,50 @@ are the rows a decision can act on, and the all-rows figures are reported beside
 shape of the population stays visible. That choice is made here, before the numbers, and it makes
 this gate harder to pass than `opening_two_part`'s, deliberately.
 
-**1. Accuracy.** Mean absolute error against the shipped composition, **on appeared rows**,
-pooled improvement with the 90 per cent paired bootstrap lower bound above zero, and an
-improvement in **every** judged season. Reported beside it and not gated: the same figures over
-all rows.
+**An appeared row** is a row with `appearance_target == 1` in the out-of-fold table. The table
+carries both that and `minutes_target`, so the column is named here rather than left to a reader
+or to the runner.
 
-**2. Ordering.** Within-position Spearman **on appeared rows**, separately for GK and for DEF,
-must not fall below the shipped composition's by more than **0.010** in any judged season nor
-pooled. The tolerance is the one `opening_two_part_prereg` fixed and is carried unchanged so the
-two are comparable; it is not re-derived here and it will not be moved. Reported and not gated:
-the same correlation over all rows.
+**1. Accuracy, with a floor on the whole population.** Mean absolute error against the shipped
+composition:
 
-**3. Decision.** The squads a decision would build, both ways, over the same folds, scored on
-what happened. Mean realized difference **at least zero** with **at most one** losing season.
+- **Binding, on appeared rows:** pooled improvement with the 90 per cent interval's lower bound
+  above zero, and an improvement in **every** judged season.
+- **Floor, over all goalkeeper and defender rows:** the pooled mean absolute error must **not be
+  worse** than the shipped composition's. Not an improvement, a floor.
+
+The interval is a **paired block bootstrap over decisions**, 2,000 resamples, seed 0, block
+length 4. The unit is the decision and not the row: players inside one gameweek share fixtures,
+and this repository has both conventions live with about an order of magnitude between their
+widths, so leaving it unstated would leave the width to be chosen once it is visible.
+
+**2. Ordering, on appeared rows.** Within-position Spearman, separately for GK and for DEF, must
+not fall below the shipped composition's by more than **0.010** in any judged season nor pooled.
+The tolerance is the one `opening_two_part_prereg` fixed and is carried unchanged so the two are
+comparable; it is not re-derived here and it will not be moved.
+
+**3. Decision.** The 147 walk-forward folds and the harness
+`prepare_phase_c_component_folds` uses, with the goalkeeper and defender rows' expected points
+replaced by the candidate's and every other row left exactly as the table has it, scored against
+the unmodified table with the official autosub and vice-captain policy. Mean realized difference
+**at least zero** with **at most one** losing season, paired by decision, with a 90 per cent
+season-aware moving block interval (2,000 resamples, seed 0, block length 4) reported beside it.
 Both arms solve under `measurement_optimization_config()` and the record carries each solve's
 status, because a proof and an incumbent are different evidence.
+
+### Why there is a floor, and what it costs
+
+Restricting the binding clauses to appeared rows closes the failure `opening_two_part` walked
+into and opens its inverse: the product prices **every** goalkeeper and defender row, not only
+the ones that appeared, so a candidate that is better on the appeared rows and worse over the
+whole population would pass a clause that only looks at the former. "Reported beside it" is not
+a defence, because nothing can be added once this document merges.
+
+The floor is the answer, and it is deliberately weaker than the binding clause. Requiring an
+improvement over all rows would re-admit the thing being avoided, since those rows are mostly
+players who did not appear and predicting near zero for them is what a candidate can win on
+without helping a decision. Requiring only that it is **not worse** says the candidate may not
+pay for its gains with the rest of the population.
 
 ## Reported, not gated
 
