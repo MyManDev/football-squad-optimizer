@@ -54,6 +54,34 @@ forecast (where the solver buys):
 5. the paired difference in absolute error, ours as decided minus `ep_next`, with the number of
    players and of gameweeks it rests on stated beside it.
 
+### Added on 2026-09-19, before any outcome of gameweek 5 was captured
+
+The first reading (gameweek 4) showed a larger share of our forecast points than of the
+game's sitting on players who did not appear. Item 3 says how much; it does not say on
+whom. So a sixth reading is added, for every forecast, over the players with zero realized
+minutes:
+
+6. the forecast points they carried and how many they were, split by position, by price
+   band, by the size of the forecast (under 1.0, 1.0 to 2.5, 2.5 and above), and by whether
+   our availability rule had named the player before the deadline (our decided forecast
+   below our unconditional one); and the ten largest such forecasts by player id.
+
+7. the same error and bias, with the forecast and the realized points summed beside them and
+   the number who appeared, by the minutes a gameweek the player had played this season
+   before the deadline (none, under 30, 30 to 60, 60 and above), read from the same
+   pre-deadline capture and divided by the gameweeks that capture had scored. It asks where
+   a forecast's level is off: on players the season has not seen, on the rotation, or on
+   the regulars. Blank and double gameweeks make the divisor approximate for the clubs they
+   touch. Where a capture has scored no gameweek the reading is absent.
+
+The last split of reading 6 is the reason for that reading. Points on players the rule named say the rule
+discounts too little. Points on players nobody named say the projection expected somebody to
+play who was not going to, which no availability flag repairs and which belongs to the
+minutes side of the projection. The two call for different candidates, and this reading only
+says which of the two the record points at. The newest capture on disk when this was added
+was from before the gameweek 5 deadline, and the gameweek 4 record was regenerated in the
+same change with no other number moving.
+
 ## What will not be claimed
 
 - No statement that one forecast is better than the other before six gameweeks are pooled. Until
