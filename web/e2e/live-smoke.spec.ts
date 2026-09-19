@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
+import { points } from "../src/lib/format";
 
 // publish_series_horizon in application/weekly_suggestion_eval.py omits this
 // document until the settled series supports a horizon. Only its 404 is absence.
@@ -67,7 +68,40 @@ test("published league and member journey works without submitting a solve", asy
   const advice = (await published.json()) as LeagueViewEnvelope<EntryAdvice>;
   expect(advice.payload.starting_xi).toHaveLength(11);
 
-  await page.goto("/league");
+  const pendingDocuments = new Set([
+    "/data/league/series-horizon.json",
+    ...members.payload.members
+      .filter((entry) => entry.member_kind === "human")
+      .map((entry) => `/data/league/history/${entry.entry_id}.json`),
+  ]);
+  // Register before navigation; a fast table must not hide late document failures.
+  const documentReads = [...pendingDocuments].map(async (path) => {
+    const response = await page.waitForResponse((item) => item.url() === `${origin}${path}`, {
+      timeout: 0,
+    });
+    if (!(OPTIONAL_DOCUMENTS.has(path) && response.status() === 404)) {
+      expect(response.status(), path).toBe(200);
+      expect(await response.finished(), path).toBeNull();
+    }
+    pendingDocuments.delete(path);
+  });
+  let documentTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.all([page.goto("/league"), ...documentReads]),
+      new Promise<never>((_, reject) => {
+        documentTimer = setTimeout(
+          () =>
+            reject(
+              new Error(`League documents did not complete: ${[...pendingDocuments].join(", ")}`),
+            ),
+          30_000,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(documentTimer);
+  }
   await expect(page.locator("main h1")).toBeVisible();
   await expect(page.locator("main table").first()).toBeVisible();
   await page.goto("/league/members");
@@ -81,6 +115,18 @@ test("published league and member journey works without submitting a solve", asy
   await expect(plan).toBeVisible();
   for (const player of advice.payload.starting_xi ?? [])
     await expect(plan).toContainText(player.name);
+  expect(advice.payload.captain).toBeTruthy();
+  await expect(
+    plan
+      .locator("dl > div")
+      .filter({ has: page.getByText(MESSAGES.en.leagueMembers.captainLabel, { exact: true }) }),
+  ).toContainText(advice.payload.captain!.name);
+  expect(Number.isFinite(advice.payload.expected_own_points)).toBe(true);
+  await expect(plan).toContainText(
+    MESSAGES.en.leagueMembers.expectedOwnPoints(
+      points(advice.payload.expected_own_points!, 1, "en-GB"),
+    ),
+  );
   for (const selector of [
     'input[name="strategy"][value="saf-puan"]',
     'input[name="window"][value="1"]',
@@ -126,6 +172,19 @@ test("published league and member journey works without submitting a solve", asy
   await expect(page).toHaveURL(new RegExp(`/league/members/${entryId}/history$`));
   await expect(page.locator("main h1")).toBeVisible();
   await page.waitForLoadState("networkidle");
+  const historyResponse = await page.request.get(`/data/league/history/${entryId}.json`);
+  expect(historyResponse.status()).toBe(200);
+  const history = (await historyResponse.json()) as { payload: { weeks: { gameweek: number }[] } };
+  if (history.payload.weeks.length) {
+    await expect(page.getByRole("combobox")).toContainText(
+      MESSAGES.en.suggestionHistory.gameweek(history.payload.weeks[0]!.gameweek),
+    );
+    await expect(page.getByRole("table").first()).toBeVisible();
+  } else {
+    await expect(
+      page.getByText(MESSAGES.en.suggestionHistory.emptyBody, { exact: true }),
+    ).toBeVisible();
+  }
   expect(writes, "no mutating API request is allowed").toEqual([]);
   expect(
     failures.filter((failure) => failure !== `404 ${cacheMissUrl}`),
