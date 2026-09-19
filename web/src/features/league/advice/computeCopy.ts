@@ -25,6 +25,10 @@ export interface ComputeCopy {
   leaveOpen: string;
   serviceUnreachable: string;
   otherCapture: string;
+  /** The gameweek this page advises on has closed; `when` is the formatted deadline. */
+  deadlinePassedTitle: string;
+  deadlinePassedBody: (gameweek: number, when: string) => string;
+  deadlinePassedCompute: string;
   controlsNote: string;
   wordComputable: string;
   top100Computable: string;
@@ -54,6 +58,10 @@ const en: ComputeCopy = {
     "The compute service cannot be reached right now. The published plans are below, as always.",
   otherCapture:
     "The compute service is working from a different data capture than this page, so only the published plans are shown.",
+  deadlinePassedTitle: "This gameweek's deadline has passed",
+  deadlinePassedBody: (gameweek, when) =>
+    `The deadline of gameweek ${gameweek} passed on ${when}. The plan below was made for that deadline and can no longer be applied. The next gameweek's plan appears here when it is published.`,
+  deadlinePassedCompute: "Nothing is computed for a gameweek whose deadline has passed.",
   controlsNote:
     "A selection that was not published can still be chosen; Compute below works it out now.",
   wordComputable: "Not solved in this publish. Switch it on and Compute works it out now.",
@@ -132,6 +140,10 @@ const tr: ComputeCopy = {
     "Hesaplama servisine şu an ulaşılamıyor. Yayınlanmış planlar her zamanki gibi aşağıda.",
   otherCapture:
     "Hesaplama servisi şu an bu sayfadakinden farklı bir veri kaydıyla çalışıyor; bu yüzden yalnız yayınlanmış planlar gösteriliyor.",
+  deadlinePassedTitle: "Bu oyun haftasının son tarihi geçti",
+  deadlinePassedBody: (gameweek, when) =>
+    `Oyun haftası ${gameweek} için son tarih ${when} itibarıyla geçti. Aşağıdaki plan o son tarih için hazırlanmıştı ve artık uygulanamaz. Sıradaki haftanın planı yayınlandığında burada görünür.`,
+  deadlinePassedCompute: "Son tarihi geçmiş bir oyun haftası için hesap yapılmaz.",
   controlsNote: "Yayınlanmamış bir seçimi de seçebilirsin; aşağıdaki Hesapla onu şimdi hesaplar.",
   wordComputable: "Bu yayında çözülmedi. Açarsan Hesapla onu şimdi hesaplar.",
   top100Computable: "Yayınlanmış planı olmayan bir ayarı Hesapla şimdi hesaplar.",

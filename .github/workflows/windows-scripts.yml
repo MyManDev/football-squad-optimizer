@@ -1,0 +1,82 @@
+name: Windows scripts
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "scripts/**/*.ps1"
+      - "scripts/release/**"
+      - "tests/unit/test_backend_logon_watch.py"
+      - "tests/unit/test_run_backend_local_script.py"
+      - "tests/unit/test_backup_data_script.py"
+      - "tests/unit/test_release_recipe.py"
+      - ".github/workflows/windows-scripts.yml"
+  push:
+    branches: [develop, main]
+    paths:
+      - "scripts/**/*.ps1"
+      - "scripts/release/**"
+      - "tests/unit/test_backend_logon_watch.py"
+      - "tests/unit/test_run_backend_local_script.py"
+      - "tests/unit/test_backup_data_script.py"
+      - "tests/unit/test_release_recipe.py"
+      - ".github/workflows/windows-scripts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-scripts-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows:
+    name: PowerShell parser and mocked operator tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+      - name: Parse every tracked PowerShell script
+        run: |
+          $failed = $false
+          $scripts = @(git ls-files '*.ps1')
+          if ($LASTEXITCODE -ne 0 -or $scripts.Count -eq 0) { throw 'No tracked PowerShell scripts found.' }
+          foreach ($path in $scripts) {
+            $tokens = $null
+            $errors = $null
+            $null = [Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $path), [ref]$tokens, [ref]$errors)
+            foreach ($parseIssue in $errors) {
+              Write-Output ($path + ':' + $parseIssue.Extent.StartLineNumber + ': ' + $parseIssue.Message)
+              $failed = $true
+            }
+          }
+          if ($failed) { throw 'PowerShell parse errors.' }
+          Write-Output ('Parsed ' + $scripts.Count + ' scripts with Windows PowerShell ' + $PSVersionTable.PSVersion)
+      - name: Install test dependencies
+        run: python -m pip install -c constraints.txt -e ".[api,dev]"
+      # These tests parse scripts or use disposable files and mocked process/network
+      # operations. Do not add the browser/backend acceptance suites to this job.
+      - name: Mocked operator tests
+        run: |
+          $operatorTests = @(
+            'tests/unit/test_backend_logon_watch.py',
+            'tests/unit/test_run_backend_local_script.py',
+            'tests/unit/test_release_recipe.py'
+          )
+          # H1 is a separate PR; include its regressions as soon as that script lands.
+          if (Test-Path -LiteralPath 'scripts/backup_data.ps1') {
+            $operatorTests += 'tests/unit/test_backup_data_script.py'
+          }
+          python -m pytest -q -p no:cacheprovider @operatorTests

@@ -6,6 +6,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { useViewerEntry } from "../identity/useViewerEntry";
@@ -53,6 +54,7 @@ function LeagueMemberContent({
   computePending = false,
   rivalSquad = null,
   windowControl = null,
+  deadlinePassed = null,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const [contextExpanded, setContextExpanded] = useState(
@@ -226,6 +228,19 @@ function LeagueMemberContent({
         <h2 className="visually-hidden" id="entry-advice-title">
           {copy.advice}
         </h2>
+        {deadlinePassed !== null ? (
+          <Card tone="muted" title={COMPUTE_COPY[language].deadlinePassedTitle}>
+            <p className={styles.notice} data-testid="deadline-passed">
+              {COMPUTE_COPY[language].deadlinePassedBody(
+                view.gameweek,
+                new Intl.DateTimeFormat(locale, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(deadlinePassed)),
+              )}
+            </p>
+          </Card>
+        ) : null}
         {viewer !== null && viewer.entryId !== entryId ? (
           <Card tone="muted" title={copy.notYourPageTitle}>
             <p className={styles.notice}>
@@ -271,6 +286,7 @@ function LeagueMemberContent({
             pending={computePending}
             published={selection.status === "ready"}
             chipChosen={selection.chip.chip !== null}
+            deadlinePassed={deadlinePassed !== null}
           />
         </div>
         <p className={styles.selectionSummary} data-testid="member-selection-summary">
