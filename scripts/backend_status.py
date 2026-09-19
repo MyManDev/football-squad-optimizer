@@ -7,10 +7,12 @@ not necessarily the running process. Missing metrics are unknown, never zero.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import math
 import re
 import statistics
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -73,6 +75,8 @@ def _labelled(samples: list[Metric], name: str) -> str:
 @dataclass
 class LogSummary:
     records: int = 0
+    files: int = 0
+    skipped_old: int = 0
     ignored: int = 0
     unreadable: int = 0
     first: str = ""
@@ -82,9 +86,10 @@ class LogSummary:
     refusals: Counter[str] = field(default_factory=Counter)
 
 
-def read_logs(directory: Path) -> LogSummary:
+def read_logs(directory: Path, *, days: int = 7) -> LogSummary:
     """Only append-only api/worker logs; never walk into the store or follow links."""
     summary = LogSummary()
+    cutoff = time.time() - days * 86400
     try:
         paths = sorted(directory.iterdir())
     except OSError:
@@ -96,7 +101,11 @@ def read_logs(directory: Path) -> LogSummary:
         if path.suffix not in (".log", ".jsonl"):
             continue
         try:
+            if path.stat().st_mtime < cutoff:
+                summary.skipped_old += 1
+                continue
             with path.open("r", encoding="utf-8-sig", errors="replace") as stream:
+                summary.files += 1
                 for line in stream:
                     try:
                         record = json.loads(line)
@@ -140,10 +149,11 @@ def read_logs(directory: Path) -> LogSummary:
 
 
 def status_report(
-    base_url: str, public_url: str, log_dir: Path, *, transport: Transport = get_text
-) -> tuple[bool, str]:
+    base_url: str, public_url: str, log_dir: Path, *, days: int = 7, transport: Transport = get_text
+) -> tuple[int, str]:
     lines: list[str] = []
     ready = False
+    public_healthy = False
     samples: list[Metric] = []
     for name, url in (
         ("Loopback ready", base_url.rstrip("/") + "/ready"),
@@ -171,11 +181,11 @@ def status_report(
                 )
             elif name == "Loopback metrics" and code == 200:
                 samples = parse_metrics(body)
-            elif name == "Public health" and code != 200:
-                ready = False
-        except (OSError, ValueError) as error:
+            elif name == "Public health":
+                public_healthy = code == 200
+        except (OSError, ValueError, http.client.HTTPException) as error:
             lines.append(f"{name}: unavailable ({type(error).__name__})")
-            if name != "Loopback metrics":
+            if name == "Loopback ready":
                 ready = False
     lines.extend(
         [
@@ -186,10 +196,11 @@ def status_report(
             f"Request refusals (API): {_labelled(samples, 'advice_rejected_total')}",
         ]
     )
-    logs = read_logs(log_dir)
+    logs = read_logs(log_dir, days=days)
     lines.append(
         f"Logs: {logs.records} records, {logs.first or 'unknown'} to {logs.last or 'unknown'}; "
-        f"ignored={logs.ignored}, unreadable={logs.unreadable}"
+        f"non-JSON lines={logs.ignored}, unreadable={logs.unreadable}; "
+        f"files read={logs.files}, skipped old={logs.skipped_old} (modified in last {days} days)"
     )
     lines.append(
         "Last logged capture (historical): "
@@ -214,8 +225,9 @@ def status_report(
             or "none observed"
         )
     )
-    lines.insert(0, "READY" if ready else "NOT READY")
-    return ready, "\n".join(lines)
+    code = 0 if ready and public_healthy else (2 if ready else 1)
+    lines.insert(0, {0: "READY", 1: "NOT READY", 2: "READY, public check failed"}[code])
+    return code, "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -223,13 +235,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--public-url", default="https://squadopt-api.mymandev.com")
     parser.add_argument("--log-dir", type=Path, default=DEFAULT_LOG_DIR)
+    parser.add_argument("--days", type=int, default=7, help="Read logs modified in the last N days")
     args = parser.parse_args(argv)
     base = urllib.parse.urlsplit(args.base_url)
     if base.hostname not in ("127.0.0.1", "localhost", "::1") or base.scheme != "http":
         parser.error("--base-url must use HTTP on loopback")
-    ready, report = status_report(args.base_url, args.public_url, args.log_dir)
+    if args.days < 1:
+        parser.error("--days must be a positive integer")
+    code, report = status_report(args.base_url, args.public_url, args.log_dir, days=args.days)
     print(report)
-    return 0 if ready else 1
+    return code
 
 
 if __name__ == "__main__":
