@@ -1,13 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   verifyCanonicalDeployment,
   verifyDeploymentRecord,
   verifyPreviewAlias,
+  verifyProductionAdvance,
 } from "./verify-cloudflare-deployment.mjs";
 
 const commitSha = "a".repeat(40);
-const deploymentId = "f64788e9-fccd-4d4a-a28a-cb84f88f6";
+const deploymentId = "f64788e9-fccd-4d4a-a28a-000cb84f88f6";
 const valid = {
   id: deploymentId,
   project_name: "squadopt",
@@ -120,5 +121,103 @@ describe("production canonical deployment", () => {
     expect(() => verifyCanonicalDeployment(project, deploymentId)).toThrow(
       "reports no canonical_deployment.id",
     );
+  });
+});
+
+describe("production advance before upload", () => {
+  const liveTag = "site-2026-27-gw05-decision";
+  const releaseTag = "site-2026-27-gw05-fix1";
+  const nextSha = "b".repeat(40);
+  const live = {
+    ...valid,
+    deployment_trigger: {
+      metadata: {
+        branch: "main",
+        commit_hash: commitSha,
+        commit_message: `release:${liveTag}`,
+      },
+    },
+  };
+  function api(project, deployment = live, status = "ahead") {
+    const fetchImpl = vi.fn(
+      async (url) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            result: url.pathname.endsWith(`/deployments/${deploymentId}`) ? deployment : project,
+          }),
+        ),
+    );
+    const compareCommits = vi.fn(async () => ({ data: { status } }));
+    return {
+      accountId: "c".repeat(32),
+      project: "squadopt",
+      apiToken: "fixture",
+      fetchImpl,
+      compareCommits,
+      releaseTag,
+      commitSha: nextSha,
+    };
+  }
+  it("allows first ever only after an explicit null identity and an empty production history", async () => {
+    const args = api({ canonical_deployment: null });
+    args.fetchImpl.mockImplementation(
+      async (url) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            result: url.pathname.endsWith("/deployments") ? [] : { canonical_deployment: null },
+          }),
+        ),
+    );
+    await expect(verifyProductionAdvance(args)).resolves.toContain("First production deployment");
+    expect(args.compareCommits).not.toHaveBeenCalled();
+  });
+  it.each(["ahead", "identical", "behind", "diverged"])(
+    "compares candidate to actual live: %s",
+    async (status) => {
+      const args = api({ canonical_deployment: { id: deploymentId } }, live, status);
+      if (status === "identical") args.commitSha = commitSha;
+      const result = verifyProductionAdvance(args);
+      if (["ahead", "identical"].includes(status)) {
+        await expect(result).resolves.toContain(`is ${status} relative to live`);
+      } else {
+        await expect(result).rejects.toThrow(
+          `${releaseTag} (${nextSha}) is ${status} relative to live ${liveTag} (${commitSha})`,
+        );
+      }
+      expect(args.compareCommits).toHaveBeenCalledExactlyOnceWith({
+        base: commitSha,
+        head: args.commitSha,
+      });
+      expect(args.fetchImpl).toHaveBeenCalledTimes(2);
+    },
+  );
+  it.each([{}, { canonical_deployment: {} }])("refuses unreadable project %j", async (project) => {
+    await expect(verifyProductionAdvance(api(project))).rejects.toThrow("identity unreadable");
+  });
+  it("refuses an unavailable API instead of treating it as first ever", async () => {
+    const args = api({});
+    args.fetchImpl.mockRejectedValue(new Error("fixture unavailable"));
+    await expect(verifyProductionAdvance(args)).rejects.toThrow("fixture unavailable");
+    expect(args.compareCommits).not.toHaveBeenCalled();
+  });
+  it("refuses a null identity if any production deployment exists", async () => {
+    const args = api({});
+    args.fetchImpl.mockImplementation(
+      async (url) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            result: url.pathname.endsWith("/deployments") ? [live] : { canonical_deployment: null },
+          }),
+        ),
+    );
+    await expect(verifyProductionAdvance(args)).rejects.toThrow("deployments exist");
+  });
+  it("refuses missing commit metadata", async () => {
+    await expect(
+      verifyProductionAdvance(api({ canonical_deployment: { id: deploymentId } }, valid)),
+    ).rejects.toThrow("commit or release tag is missing");
   });
 });
