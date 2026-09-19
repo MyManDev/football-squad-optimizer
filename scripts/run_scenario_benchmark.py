@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+from scripts._experiment_cli import measurement_optimization_config
+
 from squadopt.backtest import (
     DecisionPoint,
     build_residual_history,
@@ -17,7 +19,7 @@ from squadopt.data.sources.vaastav import (
     ARCHIVE_REPOSITORY,
     build_panel,
 )
-from squadopt.optimization import OptimizationConfig, optimize_squad
+from squadopt.optimization import optimize_squad
 from squadopt.prediction import PredictionSnapshot, RidgeProjectionConfig
 from squadopt.scenarios import (
     ScenarioConfig,
@@ -97,7 +99,7 @@ def main() -> int:
             min_player_observations=max(2, min(8, len(history_gameweeks))),
         ),
     )
-    decision = optimize_squad(built.table, OptimizationConfig())
+    decision = optimize_squad(built.table, measurement_optimization_config())
     evaluation = evaluate_fixed_decision(
         decision,
         scenarios,

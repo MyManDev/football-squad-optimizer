@@ -82,6 +82,7 @@ class LogSummary:
     first: str = ""
     last: str = ""
     capture: tuple[str, str] | None = None
+    forwarded_trust: tuple[str, str] | None = None
     completed_seconds: list[float] = field(default_factory=list)
     window_seconds: dict[int, list[float]] = field(default_factory=dict)
     completions_without_window: int = 0
@@ -127,6 +128,30 @@ def read_logs(directory: Path, *, days: int = 7) -> LogSummary:
                     summary.first = min(summary.first or stamp, stamp)
                     summary.last = max(summary.last, stamp)
                     event = record.get("event")
+                    if event == "advice_forwarded_trust" and record.get("component") == "api":
+                        trust = record.get("trust_status")
+                        source = record.get("trust_source")
+                        allowlist_set = record.get("forwarded_allow_ips_set")
+                        allowlist_count = record.get("forwarded_allow_ips_count")
+                        proxy_source = record.get("proxy_headers_source")
+                        if (
+                            trust in ("enabled", "disabled", "unverified")
+                            and isinstance(source, str)
+                            and (
+                                summary.forwarded_trust is None
+                                or stamp > summary.forwarded_trust[0]
+                            )
+                        ):
+                            description = f"{trust}; source={json.dumps(source)}"
+                            if isinstance(allowlist_set, bool):
+                                description += (
+                                    f"; allowlist explicitly set={json.dumps(allowlist_set)}"
+                                )
+                            if type(allowlist_count) is int and allowlist_count >= 0:
+                                description += f"; allowlist entries={allowlist_count}"
+                            if isinstance(proxy_source, str):
+                                description += f"; proxy-header source={json.dumps(proxy_source)}"
+                            summary.forwarded_trust = (stamp, description)
                     capture = record.get("snapshot_id")
                     if (
                         event in ("advice_worker_warmed", "advice_context_loaded")
@@ -202,9 +227,19 @@ def status_report(
             f"Cache (API): hits={_metric(samples, 'advice_cache_hits_total')}; "
             f"misses={_metric(samples, 'advice_cache_misses_total')}",
             f"Request refusals (API): {_labelled(samples, 'advice_rejected_total')}",
+            f"Open-job refusals (API): {_metric(samples, 'advice_open_job_refused_total')}",
+            f"Deadline refusals (API): {_metric(samples, 'advice_deadline_refused_total')}",
         ]
     )
     logs = read_logs(log_dir, days=days)
+    lines.append(
+        "Forwarded-header trust (last API startup in retained logs, not a live check): "
+        + (
+            f"{logs.forwarded_trust[1]} at {logs.forwarded_trust[0]}"
+            if logs.forwarded_trust
+            else UNAVAILABLE
+        )
+    )
     lines.append(
         f"Logs: {logs.records} records, {logs.first or 'unknown'} to {logs.last or 'unknown'}; "
         f"non-JSON lines={logs.ignored}, unreadable={logs.unreadable}; "

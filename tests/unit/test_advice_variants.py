@@ -23,6 +23,7 @@ import squadopt.application.advice_variants as variants
 import squadopt.application.league_views as views
 from squadopt.application.advice import (
     TOP100_LIMIT,
+    WINDOW_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     advise_entry,
     solve_member_control,
@@ -554,6 +555,15 @@ def test_rows_that_do_not_land_on_the_published_total_are_not_published() -> Non
         )
         is None
     )
+
+
+def test_a_member_window_is_solved_at_the_window_linearization_level(
+    world: dict[str, Any],
+) -> None:
+    mine = world["provider"].picks(ENTRY, SEASON, 1)
+    horizon = window_horizon(world["inputs"], 3, world["builder"])
+    plan = solve_window_plan(mine, world["inputs"], world["rules"], horizon, window=3)
+    assert plan.diagnostics["linearization_level"] == WINDOW_LINEARIZATION_LEVEL == 2
 
 
 def test_an_unproven_ceiling_carries_the_bench_the_bound_leaves_out(

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:analysis && tsc -b && vite build",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "oxlint src e2e",
     "typecheck": "tsc -b",

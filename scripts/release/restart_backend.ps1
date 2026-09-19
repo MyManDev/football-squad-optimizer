@@ -3,13 +3,18 @@
 Verify the published site, fast-forward develop, and restart the recorded backend.
 .DESCRIPTION
 The owner runs this after ship.sh. -DryRun performs read-only checks and prints the
-planned pull, stop and start. It fetches the remote-tracking ref, but changes no
+planned pull, stop and start. -AcceptedGeneratedAt is the exact generated_at_utc
+stamp from the accepted publication; the legacy -LiveGeneratedAfter alias has the
+same meaning. It fetches the remote-tracking ref, but changes no
 working-tree file or process. No tunnel is touched.
 Windows PowerShell 5.1, ASCII only. The launcher must include Stop -WhatIf support.
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$true)][string]$LiveGeneratedAfter,
+    [Parameter(Mandatory=$true)][Alias("LiveGeneratedAfter")][string]$AcceptedGeneratedAt,
+    # The gameweek this release settles, asserted by the verifier rather than printed. Omit it
+    # for a decision release, which settles nothing.
+    [int]$SettledGameweek,
     [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
     [string]$StoreRoot = "",
     [string]$SiteDataRoot = "",
@@ -107,9 +112,9 @@ function Read-Readiness {
 
 Assert-Checkout
 $parsed = [datetimeoffset]::MinValue
-if ($LiveGeneratedAfter -notmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$' -or
-    -not [datetimeoffset]::TryParse($LiveGeneratedAfter, [ref]$parsed)) {
-    throw "LiveGeneratedAfter must be an ISO UTC timestamp ending in Z."
+if ($AcceptedGeneratedAt -notmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$' -or
+    -not [datetimeoffset]::TryParse($AcceptedGeneratedAt, [ref]$parsed)) {
+    throw "AcceptedGeneratedAt must be an ISO UTC timestamp ending in Z."
 }
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) { throw "Python not found: $Python" }
 $state = Read-Json $registry
@@ -130,8 +135,12 @@ Write-Output "Current launcher-recorded commit=$($state.repository_commit)"
 if ($depth -gt 0 -and -not $Force) { throw "Jobs are queued or running; drain them or explicitly use -Force." }
 
 $verifier = Join-Path $RepoRoot 'scripts\release\verify_live.py'
-Write-Output "Verify public release: $Python $verifier $LiveGeneratedAfter"
-& $Python $verifier $LiveGeneratedAfter
+$verifierArgs = @($verifier, $AcceptedGeneratedAt)
+if ($PSBoundParameters.ContainsKey('SettledGameweek')) {
+    $verifierArgs += @('--settled', "$SettledGameweek")
+}
+Write-Output "Verify public release: $Python $($verifierArgs -join ' ')"
+& $Python @verifierArgs
 if ($LASTEXITCODE -ne 0) { throw "Public release verification failed; backend left running." }
 $publicCapture = Published-Capture -Public
 try { $localCapture = Published-Capture } catch { $localCapture = "unavailable: $_" }

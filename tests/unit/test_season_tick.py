@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import scripts.run_season_tick as tick_script
 import tests.unit.test_live_transfers as world_module
 
 from squadopt.application.season import TickRequest, plan_season_tick
@@ -27,6 +26,8 @@ from squadopt.live import (
     handoff_path_for,
     plan_tick,
 )
+from squadopt.platform.cli import CliServices
+from squadopt.platform.cli import main as cli_main
 
 SEASON = "2026-27"
 GW1_DEADLINE = "2026-08-21T17:30:00Z"
@@ -183,7 +184,6 @@ def test_timing_config_is_validated() -> None:
 
 @pytest.fixture(name="world")
 def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    monkeypatch.setattr(tick_script, "build_panel", lambda root: world_module._panel())
     # The world's handoff carries the really pinned in-season version; no monkeypatch,
     # so the runner exercises the real allowlist.
     state: dict[str, Any] = {
@@ -212,13 +212,23 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         )
         return metadata
 
-    monkeypatch.setattr(tick_script, "capture_snapshot", fake_capture)
+    state["capture"] = fake_capture
     return state
 
 
 def _tick(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -> int:
+    root = world["snapshot_root"].parent
     argv = [
-        "run_season_tick",
+        "season",
+        "tick",
+        "--workspace-root",
+        str(root),
+        "--archive-root",
+        str(root / "archive"),
+        "--runtime-root",
+        str(root / "runtime"),
+        "--summary-root",
+        str(root / "docs"),
         "--snapshot-root",
         str(world["snapshot_root"]),
         "--ledger-root",
@@ -233,8 +243,12 @@ def _tick(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -
         world["clock"],
         *extra,
     ]
-    monkeypatch.setattr("sys.argv", argv)
-    return tick_script.main()
+    return cli_main(
+        argv,
+        services=CliServices(
+            panel_builder=lambda root: world_module._panel(), capture=world["capture"]
+        ),
+    )
 
 
 def test_the_runner_captures_and_decides_the_opening_gameweek_in_one_tick(

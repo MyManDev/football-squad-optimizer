@@ -107,6 +107,7 @@ and N `python -m squadopt.platform.advice_worker` processes from `.venv`, with:
 | `SQUADOPT_BACKEND_HANDOFF_ROOT` | `data\handoffs` |
 | `SQUADOPT_BACKEND_ALLOWED_ORIGINS` | `SITE_ORIGINS` from `platform/backend_runtime.py`; a test holds the two together |
 | `SQUADOPT_BACKEND_RATE_LIMIT`, `..._RATE_WINDOW_SECONDS` | 30 per 60 s, the code's defaults, settable with `-RateLimit` and `-RateWindowSeconds` |
+| `SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT` | 4 queued plus running jobs per client address per API process; set in the environment before starting |
 | `SQUADOPT_REPOSITORY_COMMIT` | `git rev-parse HEAD`, stamped once so the api and every worker file answers under one identity |
 | `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` | 1 |
 | `SQUADOPT_BACKEND_ARTIFACT_ROOT`, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE` | `<repo>/artifacts` and the committed example fixture; the inputs of the Top 100 setting and the manager's word (`-ArtifactRoot`, `-ClubNewsSource` override) |
@@ -544,6 +545,8 @@ implementations drifting.
 | (f) Cloudflare Worker front + PC worker | 100,000 requests, 10,000 queue operations a day | 10 ms CPU per request; no native wheels; solver still needs a machine | no | no, api rewrite and new adapters | two api implementations |
 
 ## Recommendation
+
+The `Backend uptime` workflow checks public `/health` every 15 minutes, with a 10-second timeout and one retry after 20 seconds. A failed check opens one `backend-down` issue; continuing failure is silent, and recovery comments on and closes that issue. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time and status, never a URL or response body. Scheduled Actions can be delayed and are not an exact uptime guarantee. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
 
 **Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
 coordinate publication with the backend code revision. The existing tunnel hostname is

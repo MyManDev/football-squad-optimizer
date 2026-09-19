@@ -208,6 +208,7 @@ class BackendConfig:
     season: str | None = None
     rate_limit: int = DEFAULT_RATE_LIMIT
     rate_window_seconds: float = DEFAULT_RATE_WINDOW_SECONDS
+    max_open_jobs_per_client: int = 4
     artifact_root: Path | None = None
     """The repository's ``artifacts/`` directory, where the weekly run leaves the Top 100
     evidence export (``phase_b/``) and the rotation table (``rotation/``). Optional: unset,
@@ -271,6 +272,9 @@ class BackendConfig:
             allowed_origins=origins,
             season=season,
             rate_limit=_positive_int(source, "SQUADOPT_BACKEND_RATE_LIMIT", DEFAULT_RATE_LIMIT),
+            max_open_jobs_per_client=_positive_int(
+                source, "SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT", 4
+            ),
             rate_window_seconds=_positive_float(
                 source, "SQUADOPT_BACKEND_RATE_WINDOW_SECONDS", DEFAULT_RATE_WINDOW_SECONDS
             ),
@@ -389,6 +393,14 @@ class CaptureContextProvider:
             if identity is not None:
                 return identity
         return None
+
+    def deadline_for(self, context: AdviceRequestContext) -> str:
+        """The deadline of the exact capture and handoff resolved for this request."""
+
+        identity = self._identity_for(context.capture_snapshot_id)
+        if identity is None or identity.context != context:
+            raise AdviceBackendNotReadyError("The resolved capture is no longer available.")
+        return identity.inputs.deadline.deadline_utc
 
     def _identity_for(self, snapshot_id: str) -> CaptureIdentity | None:
         with self._lock:
@@ -717,6 +729,8 @@ def build_backend(
         reader,
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
+        max_open_jobs_per_client=config.max_open_jobs_per_client,
+        deadline_for=contexts.deadline_for,
         specs=specs,
         # Accepting work the store cannot hold is a promise the deployment cannot keep:
         # the job write would fail, or succeed onto storage nobody will read again.

@@ -134,6 +134,38 @@ def test_preparation_carries_the_captured_previous_rank(
     ).snapshot_id
     prepared = prepare_league_publication(replace(request, snapshot_id=snapshot_id))
     assert prepared.standings[member_fixture.ENTRY_ID].last_rank == (previous or None)
+    # This payload states no league name, and none is made up at this level.
+    assert prepared.league_name is None
+
+
+def test_preparation_calls_the_league_by_the_name_its_standings_state(tmp_path: Path) -> None:
+    request = publication_world(tmp_path)
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    payloads["league-352490-standings.json"] = json.dumps(
+        {
+            "league": {"id": 352490, "name": "  Friends of the solver  "},
+            "standings": {
+                "has_next": False,
+                "results": [
+                    {
+                        "entry": member_fixture.ENTRY_ID,
+                        "entry_name": "Synthetic member",
+                        "player_name": "Manager",
+                        "rank": 1,
+                    }
+                ],
+            },
+        }
+    ).encode("utf-8")
+    snapshot_id = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    prepared = prepare_league_publication(replace(request, snapshot_id=snapshot_id))
+    assert prepared.league_name == "Friends of the solver"
 
 
 def test_installed_member_publication_and_pool_write_the_same_contracts(

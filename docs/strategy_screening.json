@@ -1,7 +1,7 @@
 {
   "contract_version": "strategy_screening_v1",
-  "created_utc": "2026-08-28T17:41:44+00:00",
-  "elapsed_seconds": 67.8,
+  "created_utc": "2026-09-19T19:49:10+00:00",
+  "elapsed_seconds": 85.2,
   "feasibility_floor": 0.75,
   "holdout_untouched": true,
   "interval_policy": {
@@ -11,7 +11,7 @@
     "moving_block_length": 2
   },
   "metadata": {
-    "created_utc": "2026-08-28T17:41:44+00:00",
+    "created_utc": "2026-09-19T19:49:10+00:00",
     "environment": {
       "logical_cpu_count": 32,
       "ortools": "9.15.6755",
@@ -22,7 +22,7 @@
     },
     "provenance": {
       "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
-      "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+      "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
       "archive_repository": "vaastav/Fantasy-Premier-League",
       "experiment_contract_version": "screening_doe_v1",
       "feature_generation_contract_version": "form_window_v1",
@@ -34,8 +34,8 @@
         "2023-24",
         "2024-25"
       ],
-      "repository_commit": "df6c3e32870209ac7577844155a19d3664b69eae",
-      "working_tree_dirty": false
+      "repository_commit": "1ee87ce31d7fb6485a542639a48e702e6b6b69a6",
+      "working_tree_dirty": true
     }
   },
   "population": {
@@ -57,6 +57,13 @@
     ]
   },
   "prereg": "docs/strategy_screening_prereg.md",
+  "solver": {
+    "absent_folds_are_not_split": "infeasible band and unproved solve are one count",
+    "binding_limit": "deterministic_time",
+    "deterministic_time_limit": 5.0,
+    "values_are_proved_optimal": true,
+    "wall_time_limit_seconds": 600.0
+  },
   "strategies": {
     "fark-yarat": {
       "default_feasibility_share": 1.0,

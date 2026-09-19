@@ -19,11 +19,19 @@ Start the deployment's api with the factory:
 
 from __future__ import annotations
 
+import os
+import sys
+from collections.abc import Callable
+from datetime import datetime
+from pathlib import Path
+
 from fastapi import FastAPI
+from uvicorn.main import main as uvicorn_cli
 
 from squadopt.api.app import create_app
 from squadopt.platform.advice_observability import (
     API_COUNTER_FAMILIES,
+    AdviceLog,
     AdviceMetrics,
     configure_advice_logging,
 )
@@ -32,7 +40,53 @@ from squadopt.platform.backend_runtime import AdviceBackend, backend_from_enviro
 __all__ = ["app_for_backend", "build_app"]
 
 
-def app_for_backend(backend: AdviceBackend) -> FastAPI:
+def _forwarded_trust() -> dict[str, object]:
+    """Describe declared Uvicorn CLI settings, never an observed request address.
+
+    A programmatic server can override its environment. Its settings are unknown to an
+    app factory, so do not report the environment as the effective configuration there.
+    """
+    unknown: dict[str, object] = {"trust_status": "unverified", "trust_source": "unknown launcher"}
+    executable = Path(sys.argv[0])
+    if not (
+        executable.name.lower() in ("uvicorn", "uvicorn.exe")
+        or (executable.name == "__main__.py" and executable.parent.name == "uvicorn")
+    ):
+        return unknown
+    # Use Uvicorn's own option parser so CLI flags and UVICORN_* precedence match it.
+    # Parsing a context does not invoke the command or start a server.
+    with uvicorn_cli.make_context("uvicorn", sys.argv[1:]) as context:
+        if context.params["env_file"] is not None:
+            # An env file may have changed the environment since CLI parsing. Without
+            # that earlier environment we cannot reconstruct its effective options.
+            return unknown
+        enabled = context.params["proxy_headers"]
+        allowed = context.params["forwarded_allow_ips"]
+        allow_source = context.get_parameter_source("forwarded_allow_ips")
+        source = f"uvicorn {allow_source.name.lower()}" if allow_source else "unknown"
+        if allowed is None:
+            allowed = os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1")
+            source = (
+                "FORWARDED_ALLOW_IPS" if "FORWARDED_ALLOW_IPS" in os.environ else "uvicorn default"
+            )
+        proxy_source = context.get_parameter_source("proxy_headers")
+        return {
+            "trust_status": "enabled"
+            if enabled and any(peer.strip() for peer in allowed.split(","))
+            else "disabled",
+            "trust_source": source,
+            "forwarded_allow_ips_set": source != "uvicorn default",
+            "forwarded_allow_ips_count": sum(bool(peer.strip()) for peer in allowed.split(",")),
+            "proxy_headers": enabled,
+            "proxy_headers_source": f"uvicorn {proxy_source.name.lower()}"
+            if proxy_source
+            else "unknown",
+        }
+
+
+def app_for_backend(
+    backend: AdviceBackend, *, utc_now: Callable[[], datetime] | None = None
+) -> FastAPI:
     """Wire one already-built backend into the application.
 
     Injected rather than constructed here so a test — or a local run against a temporary
@@ -48,6 +102,7 @@ def app_for_backend(backend: AdviceBackend) -> FastAPI:
         queue_depth=backend.queue_depth,
         jobs_by_status=backend.jobs_by_status,
         readiness=backend.readiness,
+        utc_now=utc_now,
     )
 
 
@@ -60,6 +115,7 @@ def build_app() -> FastAPI:
     # for. uvicorn configures only its own loggers, so without this the advice events —
     # every accepted request, every rejection reason — go nowhere.
     configure_advice_logging()
+    AdviceLog("api").event("advice_forwarded_trust", **_forwarded_trust())
     return app_for_backend(
         backend_from_environment(metrics=AdviceMetrics(zero_counters=API_COUNTER_FAMILIES))
     )

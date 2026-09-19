@@ -17,6 +17,8 @@ advice_queue_depth 2
 advice_cache_hits_total 7
 advice_cache_misses_total 3
 advice_rejected_total{reason="DataError"} 1
+advice_open_job_refused_total 2
+advice_deadline_refused_total 3
 advice_solve_seconds_bucket{le="300.0"} 5
 advice_solve_seconds_sum 400
 advice_solve_seconds_count 5
@@ -61,6 +63,8 @@ def test_canned_metrics_and_actual_log_shapes_are_reported_without_invented_valu
     assert "Queue depth (API): 2" in report
     assert "hits=7; misses=3" in report
     assert "reason=DataError: 1" in report
+    assert "Open-job refusals (API): 2" in report
+    assert "Deadline refusals (API): 3" in report
     assert "Jobs by status (API): unavailable" in report
     assert "window 3, retained logs only): unavailable" in report
     assert "Completions without window (retained logs): 2" in report
@@ -104,6 +108,8 @@ def test_missing_metrics_are_unknown_and_invalid_samples_do_not_become_zero(tmp_
     assert summary.unreadable == 1
     assert not summary.completed_seconds
     assert status._metric([], "advice_queue_depth") == status.UNAVAILABLE
+    assert status._metric([], "advice_open_job_refused_total") == status.UNAVAILABLE
+    assert status._metric([], "advice_deadline_refused_total") == status.UNAVAILABLE
     assert (
         status._labelled(
             status.parse_metrics('advice_jobs_total{outcome="completed"} 3'), "advice_jobs_total"
@@ -203,6 +209,8 @@ def test_job_gauges_and_initial_zero_counters_are_distinct_from_unexposed(tmp_pa
     assert "status=completed: 7" in report and "status=running: 1" in report
     assert "hits=0; misses=0" in report
     assert "Request refusals (API): 0" in report
+    assert "Open-job refusals (API): 0" in report
+    assert "Deadline refusals (API): 0" in report
     assert status._labelled([], "advice_rejected_total") == status.UNAVAILABLE
 
 
@@ -243,3 +251,49 @@ def test_window_summaries_use_exact_completed_samples_and_keep_legacy_counts(
     assert "window 5, retained logs only): n=1, median=50.000, slowest=50.000" in report
     assert "all windows, retained logs only): n=6, median=8.500, slowest=50.000" in report
     assert "Completions without window (retained logs): 2" in report
+
+
+def test_latest_startup_trust_reports_only_declared_fields(tmp_path: Path) -> None:
+    records = [
+        {
+            "event": "advice_forwarded_trust",
+            "component": "api",
+            "at_utc": "2026-09-19T01:00:00Z",
+            "trust_status": "enabled",
+            "trust_source": "uvicorn commandline",
+            "forwarded_allow_ips": "192.0.2.20",
+            "forwarded_allow_ips_set": True,
+            "forwarded_allow_ips_count": 1,
+            "proxy_headers_source": "uvicorn commandline",
+            "client_address": "198.51.100.9",
+        },
+        {
+            "event": "advice_forwarded_trust",
+            "component": "api",
+            "at_utc": "2026-09-19T02:00:00Z",
+            "trust_status": "unverified",
+            "trust_source": "unknown launcher",
+        },
+    ]
+    (tmp_path / "api-1.log").write_text(
+        "\n".join(json.dumps(record) for record in records), encoding="utf-8"
+    )
+    _, report = status.status_report(
+        "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=lambda url: (200, "{}")
+    )
+    assert (
+        "Forwarded-header trust (last API startup in retained logs, not a live check): unverified"
+        in report
+    )
+    assert 'source="unknown launcher"' in report
+    assert "198.51.100.9" not in report
+    assert "configured allowlist" not in report
+    (tmp_path / "api-1.log").write_text(json.dumps(records[0]), encoding="utf-8")
+    _, report = status.status_report(
+        "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=lambda url: (200, "{}")
+    )
+    assert "allowlist explicitly set=true" in report
+    assert "allowlist entries=1" in report
+    assert "192.0.2.20" not in report
+    assert 'source="uvicorn commandline"' in report
+    assert "198.51.100.9" not in report

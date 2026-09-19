@@ -40,8 +40,10 @@ from squadopt.platform.advice_read import (
 )
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
+    DeadlinePassedError,
     IdempotencyConflictError,
     MalformedIdempotencyKeyError,
+    OpenJobLimitedError,
     RateLimitedError,
 )
 from squadopt.platform.api_contract import (
@@ -320,6 +322,53 @@ def create_app(
         return _contract_error(
             429, "RATE_LIMITED", str(error), retry_after_seconds=error.retry_after_seconds
         )
+
+    @application.exception_handler(OpenJobLimitedError)
+    async def open_job_limited(_request: Request, _error: OpenJobLimitedError) -> JSONResponse:
+        if metrics is not None:
+            metrics.increment("advice_open_job_refused_total")
+        message = (
+            "This connection already has several computations open. "
+            "Wait for one to finish, then try again."
+        )
+        document = ApiErrorResponse(
+            ApiError(
+                code="OPEN_JOB_LIMITED",
+                message=message,
+                details={
+                    "public_reason": {
+                        "en": message,
+                        "tr": (
+                            "Bu bağlant\u0131da zaten birkaç hesaplama aç\u0131k. "
+                            "Birinin bitmesini bekleyip yeniden dene."
+                        ),
+                    }
+                },
+            )
+        ).to_dict()
+        return JSONResponse(status_code=429, content=document)
+
+    @application.exception_handler(DeadlinePassedError)
+    async def deadline_passed(_request: Request, _error: DeadlinePassedError) -> JSONResponse:
+        if metrics is not None:
+            metrics.increment("advice_deadline_refused_total")
+        message = "This gameweek's deadline has passed. Previously computed plans remain available."
+        document = ApiErrorResponse(
+            ApiError(
+                code="DEADLINE_PASSED",
+                message=message,
+                details={
+                    "public_reason": {
+                        "en": message,
+                        "tr": (
+                            "Bu oyun haftas\u0131n\u0131n son tarihi geçti. "
+                            "Önceden hesaplanan planlara erişebilirsin."
+                        ),
+                    }
+                },
+            )
+        ).to_dict()
+        return JSONResponse(status_code=422, content=document)
 
     @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
     def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
