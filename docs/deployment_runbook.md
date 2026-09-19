@@ -176,7 +176,9 @@ the lead-time window.
 
 The release recipe is in `scripts/release/`. Run it from the main checkout, not a
 linked worktree. With Git and GitHub CLI available (Git Bash on Windows), preview
-it first:
+it first. The [weekly runbook](weekly_runbook.md#from-a-recorded-preview-to-a-release)
+describes `--record-advice`, `--publish-suffix` and unchanged resume options before
+this release stage:
 
 ```sh
 sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
@@ -207,12 +209,23 @@ are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main
 Interrupting the queue stops it and cleans up its temporary bodies. A body that
 cannot be read or is empty after cleaning is never merged.
 
-After the public release verifies, the owner runs
-`powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter 2026-09-22T00:00:00Z -DryRun`
-from the clean main checkout on `develop`, using the same generated-after timestamp as
-`ship.sh`. Remove `-DryRun` only for the intended restart. The script verifies the public
-site, requires the public capture to match the fetched `origin/develop` publication, refuses
-open work unless `-Force`, and pulls with `--ff-only` before stopping the recorded backend.
+After the public release verifies, the owner runs these from PowerShell in the clean
+main checkout on `develop`. Replace `<same-ISO>` with the generated-after timestamp
+used for `ship.sh`. First preview the restart:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO> -DryRun
+```
+
+Only for the intended restart, run the same command without `-DryRun`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO>
+```
+
+The script verifies the public site, requires the public capture to match the fetched
+`origin/develop` publication, refuses open work unless `-Force`, and pulls with
+`--ff-only` before stopping the recorded backend.
 It keeps the recorded port and worker count, requires `/ready` and its published-week
 check, and verifies the new **launcher-recorded** commit against the pulled checkout.
 The pre-pull local capture is information only; the pulled tree must match before any
@@ -240,6 +253,16 @@ snapshot, handoff, artifact, club-news, origin, rate-limit or worker-metrics opt
 be restarted by hand with those same options; the registry does not record them.
 The first production use is the owner's operation, not part of development verification.
 
+The complete operator order is: accept the recorded weekly tree, release the site,
+drain the backend queue, preview then run the restart command above from clean
+`develop`, and run the [manual browser check](#post-deployment-smoke). Both `ship.sh`
+and the restart helper run `verify_live.py`; to run it again by hand, use
+`python scripts/release/verify_live.py <generated-after-ISO>`. A zero queue depth
+permits a restart; `-Force` is an explicit operator exception, not the normal command.
+`/ready` alone does not prove capture-ID or code-commit equality: its published-tree
+check is season/gameweek. `ship.sh` publishes the site only and does not restart the
+backend or tunnel.
+
 ## Daily circuit breaker
 
 The workflow queries all deployments for this Pages project in the current UTC day and
@@ -260,6 +283,7 @@ deployment job is running or queued and inspect the Cloudflare daily count.
 
 After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts`; this manual desktop/phone check is read-only, and optional `LIVE_SMOKE_COMPUTE=1` checks the public backend with a browser GET, reporting a matching cached answer or `NOT_COMPUTED` (never submits a solve).
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
+For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
 The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
