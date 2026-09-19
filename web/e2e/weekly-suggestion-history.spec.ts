@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import fixture from "../src/fixtures/weeklySuggestionHistory.json" with { type: "json" };
 import recordedPlans from "../src/fixtures/recordedPlanRows.json" with { type: "json" };
+import { TOP100_COPY } from "../src/features/league/advice/top100Copy";
 import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
@@ -17,8 +18,8 @@ for (const language of ["tr", "en"] as const) {
   test(`recorded settings expand without inventing settled scores in ${language}`, async ({
     page,
   }) => {
-    const document = structuredClone(fixture);
-    Object.assign(document.payload.weeks[0], {
+    const historyDocument = structuredClone(fixture);
+    Object.assign(historyDocument.payload.weeks[0], {
       status: "unsettled",
       reason: "not_settled",
       suggested: null,
@@ -31,7 +32,7 @@ for (const language of ["tr", "en"] as const) {
     });
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.route("**/data/league/history/101.json", (route) =>
-      route.fulfill({ json: document }),
+      route.fulfill({ json: historyDocument }),
     );
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/league/members/101/history");
@@ -43,11 +44,11 @@ for (const language of ["tr", "en"] as const) {
     await expect(details).not.toHaveAttribute("open");
     await expect(page.getByRole("table")).toHaveCount(0);
     await details.locator("summary").click();
-    await expect(details.getByText(/Top 100 20/)).toBeVisible();
+    await expect(details.getByText(new RegExp(`${TOP100_COPY[language].legend} 20`))).toBeVisible();
     await expect(details.getByText(/Player 1/)).toBeVisible();
     await expect(details).toContainText("#17");
     await expect(details).toContainText(
-      copy.recordedCost + (language === "tr" ? ": 2,5" : ": 2.5"),
+      TOP100_COPY[language].combinedCostAtMost(language === "tr" ? "4,0" : "4.0"),
     );
     await expect(details).toContainText(MESSAGES[language].leagueMembers.chipNames.bboost);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

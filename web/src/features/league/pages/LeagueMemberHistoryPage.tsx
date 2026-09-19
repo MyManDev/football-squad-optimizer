@@ -15,6 +15,10 @@ import {
 import styles from "./LeagueMemberHistoryPage.module.css";
 import { summarizeHistory } from "../history/historySummary";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
+import { TOP100_COPY } from "../advice/top100Copy";
+import { publishedPrice } from "../advice/publishedPrice";
+import { loadLeagueMembers } from "../data";
+import type { EntryView } from "../types";
 
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
@@ -22,6 +26,12 @@ export function LeagueMemberHistoryPage() {
   const parameter = useParams().entryId ?? "";
   const entryId = Number(parameter);
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
+  const members = useQuery({
+    queryKey: ["provisional-league-members"],
+    queryFn: loadLeagueMembers,
+    enabled: valid,
+    staleTime: 60_000,
+  });
   const query = useQuery({
     queryKey: ["suggestion-history", entryId],
     queryFn: ({ signal }) => loadSuggestionHistory(entryId, { signal }),
@@ -46,10 +56,22 @@ export function LeagueMemberHistoryPage() {
       </EmptyState>
     );
   }
-  return <LeagueMemberHistoryView key={entryId} history={query.data} />;
+  return (
+    <LeagueMemberHistoryView
+      key={entryId}
+      history={query.data}
+      members={members.data?.payload.members}
+    />
+  );
 }
 
-export function LeagueMemberHistoryView({ history }: { history: SuggestionHistory }) {
+export function LeagueMemberHistoryView({
+  history,
+  members = [],
+}: {
+  history: SuggestionHistory;
+  members?: EntryView[];
+}) {
   const { messages, locale } = useLanguage();
   const copy = messages.suggestionHistory;
   const { entry_id: entryId, weeks, season } = history.payload;
@@ -92,7 +114,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
             </select>
           </label>
           {week ? (
-            <WeekResult week={week} />
+            <WeekResult week={week} members={members} />
           ) : (
             <HistoryOverview weeks={weeks} onSelect={setSelected} />
           )}
@@ -182,7 +204,7 @@ function HistoryOverview({
   );
 }
 
-function WeekResult({ week }: { week: WeekReview }) {
+function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] }) {
   const { messages, locale } = useLanguage();
   const copy = messages.suggestionHistory;
   const format = (value: number | null | undefined) =>
@@ -266,7 +288,7 @@ function WeekResult({ week }: { week: WeekReview }) {
           </>
         )}
       </Card>
-      <RecordedPlans week={week} />
+      <RecordedPlans week={week} members={members} />
       {week.status === "available" && (
         <Card title={copy.players}>
           <p className={styles.muted}>{copy.playerNote}</p>
@@ -351,7 +373,7 @@ function WeekResult({ week }: { week: WeekReview }) {
   );
 }
 
-function RecordedPlans({ week }: { week: WeekReview }) {
+function RecordedPlans({ week, members }: { week: WeekReview; members: EntryView[] }) {
   const { messages, language, locale } = useLanguage();
   const copy = messages.suggestionHistory;
   if (!week.recorded_plans?.length) return null;
@@ -368,53 +390,79 @@ function RecordedPlans({ week }: { week: WeekReview }) {
       <summary>{copy.recordedPlans}</summary>
       <p>{copy.recordedPlansNote}</p>
       <ul>
-        {week.recorded_plans.map((plan) => (
-          <li key={plan.published_path}>
-            <p>
-              <strong>
-                {[
-                  labels[plan.strategy],
-                  messages.decision.week(plan.window),
-                  plan.rival_entry_id === null
-                    ? null
-                    : `${messages.leagueMembers.rivalLabel}: #${plan.rival_entry_id}`,
-                  plan.top100_weight === undefined ? null : `Top 100 ${plan.top100_weight}`,
-                  plan.managers_word === true ? EVIDENCE_COPY[language].legend : null,
-                  plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-              </strong>
-            </p>
-            {plan.captain !== null && (
+        {week.recorded_plans.map((plan) => {
+          const price = publishedPrice({
+            ...plan,
+            word: plan.managers_word === true,
+            top100: plan.top100_weight !== undefined,
+          });
+          const capped = plan.expected_points_cost_ceiling !== undefined;
+          const top100Copy = TOP100_COPY[language];
+          const evidenceCopy = EVIDENCE_COPY[language];
+          const priceText =
+            plan.top100_weight !== undefined
+              ? plan.strategy !== "saf-puan"
+                ? capped
+                  ? top100Copy.strategyCostAtMost
+                  : top100Copy.strategyCost
+                : plan.managers_word
+                  ? capped
+                    ? top100Copy.combinedCostAtMost
+                    : top100Copy.combinedCost
+                  : capped
+                    ? top100Copy.costAtMost
+                    : top100Copy.cost
+              : plan.managers_word
+                ? capped
+                  ? evidenceCopy.costAtMost
+                  : evidenceCopy.cost
+                : capped
+                  ? messages.leagueMembers.planCostAtMost
+                  : messages.leagueMembers.planCost;
+          const rival = members.find(
+            (member) => member.member_kind === "human" && member.entry_id === plan.rival_entry_id,
+          );
+          return (
+            <li key={plan.published_path}>
               <p>
-                {copy.captain}: {plan.captain}
+                <strong>
+                  {[
+                    labels[plan.strategy],
+                    messages.decision.week(plan.window),
+                    plan.rival_entry_id === null
+                      ? null
+                      : `${messages.leagueMembers.rivalLabel}: ${rival?.team_name ?? rival?.manager_name ?? `#${plan.rival_entry_id}`}`,
+                    plan.top100_weight === undefined
+                      ? null
+                      : `${TOP100_COPY[language].legend} ${plan.top100_weight}`,
+                    plan.managers_word === true ? EVIDENCE_COPY[language].legend : null,
+                    plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </strong>
               </p>
-            )}
-            {plan.expected_points_cost !== undefined && (
-              <p>
-                {copy.recordedCost}: {points(plan.expected_points_cost, 1, locale)}
-              </p>
-            )}
-            {plan.expected_points_cost_ceiling !== undefined && (
-              <p>
-                {copy.recordedCeiling}: {points(plan.expected_points_cost_ceiling, 1, locale)}
-              </p>
-            )}
-            {plan.moves.length ? (
-              <ul>
-                {plan.moves.map((move, index) => (
-                  <li key={index}>
-                    {messages.leagueMembers.out}: {move.player_out ?? copy.unknownPlayer};{" "}
-                    {messages.leagueMembers.in}: {move.player_in ?? copy.unknownPlayer}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>{copy.noRecordedMoves}</p>
-            )}
-          </li>
-        ))}
+              {plan.captain !== null && (
+                <p>
+                  {copy.captain}: {plan.captain}
+                </p>
+              )}
+              {price !== undefined && <p>{priceText(points(price, 1, locale))}</p>}
+              {plan.moves.length ? (
+                <ul>
+                  {plan.moves.map((move, index) => (
+                    <li key={index}>
+                      {messages.leagueMembers.out}: {move.player_out ?? copy.unknownPlayer};{" "}
+                      {messages.leagueMembers.in}: {move.player_in ?? copy.unknownPlayer}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{copy.noRecordedMoves}</p>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </details>
   );

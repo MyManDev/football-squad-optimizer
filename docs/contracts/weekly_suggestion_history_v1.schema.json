@@ -283,9 +283,12 @@
                         "saf-puan",
                         "ortak-koru",
                         "fark-yarat",
-                        "garantici",
-                        "agresif",
-                        "asiri-agresif"
+                        "kaptan-ayris",
+                        "sablon-uzakligi",
+                        "takvim-onceligi",
+                        "cip-yerlesimi",
+                        "transfer-disiplini",
+                        "fiyat-yakala"
                       ]
                     },
                     "top100_weight": {
@@ -300,11 +303,7 @@
                       ]
                     },
                     "window": {
-                      "enum": [
-                        1,
-                        3,
-                        5
-                      ]
+                      "const": 1
                     }
                   },
                   "required": [

@@ -6,7 +6,8 @@
     "rival_entry_id": null,
     "chip": null,
     "captain": "Player 8",
-    "moves": []
+    "moves": [],
+    "expected_points_cost": 0
   },
   {
     "published_path": "advice/101/saf-puan/1/top100-20-hoca-sozu.json",
@@ -15,7 +16,12 @@
     "rival_entry_id": null,
     "chip": null,
     "captain": "Player 8",
-    "moves": [{ "player_out": "Player 1", "player_in": "#17" }],
+    "moves": [
+      {
+        "player_out": "Player 1",
+        "player_in": "#17"
+      }
+    ],
     "top100_weight": 20,
     "managers_word": true,
     "expected_points_cost": 2.5,
@@ -28,6 +34,7 @@
     "rival_entry_id": null,
     "chip": "bboost",
     "captain": "Player 8",
-    "moves": []
+    "moves": [],
+    "expected_points_cost": 0
   }
 ]

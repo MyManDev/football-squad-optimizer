@@ -4,6 +4,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from squadopt.application.advice_capabilities import TOP100_WEIGHTS
+from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION, SUPPORTED_LEAGUE_ID
+from squadopt.live.rules import CHIP_NAMES
+
 
 def history_schema() -> dict[str, Any]:
     text = {"type": "string", "minLength": 1}
@@ -11,7 +16,7 @@ def history_schema() -> dict[str, Any]:
     number = {"type": "number"}
     nullable_number = {"type": ["number", "null"]}
     identifier = {"type": "integer", "minimum": 1}
-    chip = {"enum": [None, "wildcard", "freehit", "bboost", "3xc"]}
+    chip = {"enum": [None, *CHIP_NAMES]}
     score: dict[str, Any] = {
         "type": "object",
         "properties": {
@@ -45,17 +50,8 @@ def history_schema() -> dict[str, Any]:
     }
     plan = {
         "published_path": {"type": "string", "pattern": "^advice/[1-9][0-9]*/"},
-        "strategy": {
-            "enum": [
-                "saf-puan",
-                "ortak-koru",
-                "fark-yarat",
-                "garantici",
-                "agresif",
-                "asiri-agresif",
-            ]
-        },
-        "window": {"enum": [1, 3, 5]},
+        "strategy": {"enum": list(STRATEGY_CATALOG)},
+        "window": {"const": 1},
         "rival_entry_id": {"type": ["integer", "null"], "minimum": 1},
         "chip": chip,
         "captain": nullable_text,
@@ -68,7 +64,7 @@ def history_schema() -> dict[str, Any]:
                 "additionalProperties": False,
             },
         },
-        "top100_weight": {"enum": [0, 5, 10, 20, 30, 40, 50]},
+        "top100_weight": {"enum": list(TOP100_WEIGHTS)},
         "managers_word": {"const": True},
         "expected_points_cost": number,
         "expected_points_cost_ceiling": number,
@@ -118,7 +114,7 @@ def history_schema() -> dict[str, Any]:
         },
     }
     payload = {
-        "league_id": {"const": 352490},
+        "league_id": {"const": SUPPORTED_LEAGUE_ID},
         "entry_id": identifier,
         "season": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
         "as_of_snapshot_id": text,
@@ -132,7 +128,7 @@ def history_schema() -> dict[str, Any]:
         "$id": "https://squadopt.dev/contracts/weekly_suggestion_history_v1.schema.json",
         "type": "object",
         "properties": {
-            "contract_version": {"const": "weekly_suggestion_history_v1"},
+            "contract_version": {"const": CONTRACT_VERSION},
             "generated_at_utc": {"type": "string", "pattern": "Z$"},
             "payload": {"type": "object", "properties": payload, "required": list(payload)},
         },

@@ -5,6 +5,7 @@ import { points, signedPoints, utcShort } from "../../../lib/format";
 import { CHIP_COPY, chipLimit, chipRescores } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { publishedPrice } from "../advice/publishedPrice";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
@@ -132,8 +133,6 @@ export function AdviceCard({
   // and a price below zero is a giveaway no constrained plan can hand out, so no
   // producer's number is rendered as one.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
-  const priceCeiling = view.expected_points_cost_ceiling;
-  const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
@@ -141,8 +140,14 @@ export function AdviceCard({
   // with the word on as well, the one number is the pair's.
   const top100Priced = view.top100 !== undefined;
   const strategyPriced = top100Priced && view.mode !== "saf-puan";
-  const showsPrice =
-    (view.mode !== "saf-puan" || wordPriced || top100Priced) && finiteNumber(price) && price >= 0;
+  const price = publishedPrice({
+    strategy: view.mode,
+    word: wordPriced,
+    top100: top100Priced,
+    unproven,
+    expected_points_cost: view.expected_points_cost,
+    expected_points_cost_ceiling: view.expected_points_cost_ceiling,
+  });
   const evidenceCopy = EVIDENCE_COPY[language];
   const top100Copy = TOP100_COPY[language];
   const alternative = view.alternative_plan;
@@ -201,7 +206,7 @@ export function AdviceCard({
               : copy.unprovenPlanGapUnknown}
         </p>
       ) : null}
-      {showsPrice && price != null ? (
+      {price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
             {strategyPriced

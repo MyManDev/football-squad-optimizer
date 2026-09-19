@@ -15,12 +15,11 @@ describe("recorded weekly history", () => {
     expect(plans).toEqual(rows);
     expect(plans[0].top100_weight).toBeUndefined();
     expect(plans[0].managers_word).toBeUndefined();
-    expect(plans[0].expected_points_cost).toBeUndefined();
+    expect(plans[0].expected_points_cost).toBe(0);
   });
   it.each([
     { expected_points_cost: null },
     { expected_points_cost: Infinity },
-    { top100_weight: 7 },
     { managers_word: false },
     { moves: [{ player_out: 12, player_in: null }] },
     { published_path: "advice/202/saf-puan/1.json" },
@@ -34,6 +33,18 @@ describe("recorded weekly history", () => {
     expect(result.payload.weeks[0].net_difference).toBe(-2);
     expect(result.payload.weeks[0].players).toHaveLength(15);
   });
+  it.each([{ top100_weight: 7 }, { strategy: "future-strategy" }])(
+    "drops only an unsupported plan %j",
+    (change) => {
+      const value = document();
+      Object.assign(value.payload.weeks[0], {
+        recorded_plans: [rows[0], { ...rows[1], ...change }],
+      });
+      const result = checkedHistory(value, 101);
+      expect(result.payload.weeks[0].recorded_plans).toEqual([rows[0]]);
+      expect(result.payload.weeks[0].suggested).toEqual(fixture.payload.weeks[0].suggested);
+    },
+  );
 
   it.each<(value: SuggestionHistory) => void>([
     (value) => {

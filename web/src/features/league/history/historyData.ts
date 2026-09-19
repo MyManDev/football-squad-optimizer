@@ -1,5 +1,8 @@
 import { withRequestDeadline, type RequestOptions } from "../../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
+import { isMemberStrategy } from "../types";
+import { isMemberChip } from "../advice/chipChoice";
+import { isTop100Weight } from "../advice/top100";
 
 export interface WeeklyScore {
   gross_points: number;
@@ -150,8 +153,17 @@ export function checkedHistory(value: unknown, entryId: number): SuggestionHisto
     requireThat(Array.isArray(row.players));
     if (row.recorded_plans !== undefined) {
       requireThat(Array.isArray(row.recorded_plans));
+      const supportedPlans = row.recorded_plans.filter((item) => {
+        const plan = object(item);
+        return (
+          (isMemberStrategy(plan.strategy) ||
+            ["garantici", "agresif", "asiri-agresif"].includes(String(plan.strategy))) &&
+          (plan.top100_weight === undefined || isTop100Weight(plan.top100_weight))
+        );
+      });
+      row.recorded_plans = supportedPlans;
       const paths = new Set<string>();
-      for (const item of row.recorded_plans) {
+      for (const item of supportedPlans) {
         const plan = object(item);
         requireThat(
           text(plan.published_path) &&
@@ -159,29 +171,13 @@ export function checkedHistory(value: unknown, entryId: number): SuggestionHisto
             !paths.has(plan.published_path),
         );
         paths.add(plan.published_path);
-        requireThat(
-          [
-            "saf-puan",
-            "fark-yarat",
-            "ortak-koru",
-            "garantici",
-            "agresif",
-            "asiri-agresif",
-          ].includes(String(plan.strategy)),
-        );
-        requireThat([1, 3, 5].includes(plan.window as number));
+        requireThat(plan.window === 1);
         requireThat(
           plan.rival_entry_id === null ||
             (Number.isSafeInteger(plan.rival_entry_id) && Number(plan.rival_entry_id) > 0),
         );
-        requireThat(
-          [null, "wildcard", "freehit", "bboost", "3xc"].includes(plan.chip as string | null),
-        );
+        requireThat(plan.chip === null || isMemberChip(plan.chip));
         requireThat(plan.captain === null || text(plan.captain));
-        requireThat(
-          plan.top100_weight === undefined ||
-            [0, 5, 10, 20, 30, 40, 50].includes(plan.top100_weight as number),
-        );
         requireThat(plan.managers_word === undefined || plan.managers_word === true);
         for (const key of ["expected_points_cost", "expected_points_cost_ceiling"])
           requireThat(plan[key] === undefined || number(plan[key]));

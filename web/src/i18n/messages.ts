@@ -6,9 +6,7 @@ const en = {
   suggestionHistory: {
     recordedPlans: "Recorded Plans and Settings",
     recordedPlansNote:
-      "These plans were recorded in the publication. This does not show what you chose, and these alternatives have not been scored against results here.",
-    recordedCost: "Cost in Expected Points",
-    recordedCeiling: "Recorded Cost Limit",
+      "One-week plans. Window plans and other rivals are in the week's own record and are not listed here. This does not show what you chose, and these alternatives have not been scored against results here.",
     unknownPlayer: "Player Not Recorded",
     noRecordedMoves: "No Moves Listed",
     title: "Weekly Suggestion History",
@@ -976,9 +974,7 @@ const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
     recordedPlans: "Kaydedilmiş Planlar ve Ayarlar",
     recordedPlansNote:
-      "Bu planlar yayında kaydedildi. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
-    recordedCost: "Beklenen Puan Maliyeti",
-    recordedCeiling: "Kaydedilen Maliyet Tavanı",
+      "Bir haftalık planlar. Çok haftalık planlar ve diğer rakipler haftanın kendi kaydında bulunur, burada listelenmez. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
     unknownPlayer: "Oyuncu Kaydedilmemiş",
     noRecordedMoves: "Listelenen Hamle Yok",
     title: "Haftalık Öneri Geçmişi",
