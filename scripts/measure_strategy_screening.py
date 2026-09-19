@@ -378,6 +378,22 @@ def main() -> int:
             "control_proven_folds": sum(1 for value in controls.values() if value is not None),
         },
         "feasibility_floor": FEASIBILITY_FLOOR,
+        "solver": {
+            "deterministic_time_limit": optimization.solver_deterministic_time_limit,
+            "wall_time_limit_seconds": optimization.solver_time_limit_seconds,
+            "binding_limit": (
+                "deterministic_time"
+                if optimization.solver_deterministic_time_limit is not None
+                else "wall_clock"
+            ),
+            # Every number in this record comes from a solve that was proved optimal:
+            # `solve_strategy_plan` returns nothing otherwise. What the record cannot say is
+            # why a fold produced nothing, because an infeasible band and a band whose solve
+            # ran out of budget both arrive here as an absence. `feasibility_share` counts
+            # the folds that produced a proved plan and nothing finer than that.
+            "values_are_proved_optimal": True,
+            "absent_folds_are_not_split": "infeasible band and unproved solve are one count",
+        },
         "interval_policy": {
             "confidence_level": 0.90,
             "bootstrap_resamples": 5000,
