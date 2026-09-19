@@ -21,8 +21,9 @@ from squadopt.experiments import (
     SeasonChainResult,
 )
 from squadopt.experiments.multi_gw_rehearsal import WeekRealization
+from squadopt.experiments.season_chain import decayed_holding_value
 from squadopt.optimization import optimize_squad
-from squadopt.planning import InitialSquadState, sell_price_tenths
+from squadopt.planning import InitialSquadState, TransferPlanningConfig, sell_price_tenths
 
 POOL = {"candidate_pool_per_position": 10, "cheap_pool_per_position": 2}
 ALL_CHIPS = (
@@ -191,6 +192,47 @@ def test_the_hybrid_policy_reserves_only_the_bench_boost() -> None:
                 assert planned_week == 4
     # Triple captain is not reserved: with two lookahead weeks it may be planned anywhere.
     assert result.diagnostics["chip_policy"] == "hybrid"
+
+
+def test_a_holding_value_decays_to_zero_at_the_end_of_its_window() -> None:
+    window = ChipWindowRule("bboost", 2, 8)
+    assert decayed_holding_value(12.0, window, 2) == pytest.approx(12.0)
+    assert decayed_holding_value(12.0, window, 5) == pytest.approx(6.0)
+    assert decayed_holding_value(12.0, window, 8) == 0.0
+    # Outside its window, or in a window of one gameweek, waiting is worth nothing.
+    assert decayed_holding_value(12.0, window, 9) == 0.0
+    assert decayed_holding_value(12.0, ChipWindowRule("bboost", 4, 4), 4) == 0.0
+
+
+def _boost_weeks(result: SeasonChainResult) -> list[int]:
+    return [week.gameweek for week in result.weeks if week.chip == "bboost"]
+
+
+def test_a_fixed_threshold_lets_a_chip_expire_and_a_decaying_one_plays_it() -> None:
+    """The window opens after the season's only double, so the reservation never fires."""
+
+    late_boost = (ChipWindowRule("bboost", 5, 8),)
+    dear = TransferPlanningConfig(chip_holding_value_points={"bboost": 500.0})
+    common = {"chip_windows": late_boost, "chip_policy": "hybrid", "transfer_config": dear}
+
+    fixed = _run(**common)
+    assert _boost_weeks(fixed) == []
+    assert "chip_threshold" not in fixed.diagnostics
+
+    decaying = _run(**common, chip_threshold="decaying")
+    # Reserved for a double that never comes, it is played when the window closes.
+    assert _boost_weeks(decaying) == [8]
+    assert decaying.diagnostics["chip_threshold"] == "decaying"
+
+
+def test_the_default_threshold_is_the_chain_as_it_always_ran() -> None:
+    config = {"lookahead": 2, "chip_windows": ALL_CHIPS, "chip_policy": "hybrid"}
+    default, named = _run(**config), _run(**config, chip_threshold="fixed")
+    assert [week.as_record() for week in default.weeks] == [
+        week.as_record() for week in named.weeks
+    ]
+    with pytest.raises(ExperimentConfigurationError, match="chip_threshold"):
+        SeasonChainConfig(season=SEASON, chip_threshold="sometimes")
 
 
 def test_unknown_chips_and_inverted_windows_are_refused() -> None:
