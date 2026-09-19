@@ -29,8 +29,17 @@ indexed by the same thing, this season's minutes, and the solver reads one numbe
 forecast. So the candidate corrects that number, by that index, and the decomposition keeps its
 use for later: it says where a repair inside the model would go (the appearance model for the
 unseen, the conditional points model for the regulars). A recalibration of the appearance
-forecast by its own value, which stage one's text allowed, is not opened: the level by the size of
-the forecast is flat, so there is nothing for it to fix.
+forecast by its own value, which stage one's text allowed, is not opened here.
+
+**Correction, 2026-09-19, after this measurement had run and failed.** The sentence that stood here
+said the level by the size of the forecast is flat, so there was nothing for such a candidate to fix.
+That misread stage one's own record: two of its four forecast-size bands have intervals excluding
+zero, and its `stage_two_rule` opens a candidate on the 1.0 to 2.5 band in three seasons of four.
+The accurate reason for opening one candidate and not two is the first paragraph of this section,
+which does not depend on it: both faults are indexed by the same thing and the solver reads one
+number. Nothing operative changes. The candidate, the two gates, the three verdicts and the floor
+are untouched, and the measurement's verdict of `failed` stands on gate 1 exactly as before. A
+candidate by the forecast's own size remains unopened and would need its own protocol.
 
 ## What a neighbouring record says this can be worth
 
