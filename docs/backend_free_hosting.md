@@ -134,12 +134,14 @@ Three things to know before relying on it:
   The first pass starts missing components immediately; subsequent passes require three
   consecutive failures for that component before a start attempt.
   A successful check resets its counter. One watcher per port and connector label holds
-  a named mutex; another instance exits without starting anything. The watcher avoids
+  a machine-wide named mutex; another non-dry instance exits without starting anything.
+  A dry run takes no mutex, so it can report health while the watcher runs and cannot
+  prevent a real watcher from starting. The watcher avoids
   launcher attempts while verified recorded processes are alive. An unhealthy backend needs the owner to
   investigate; watch mode never kills or restarts it. A failed connector process listing
   or an unavailable command line is unknown, so it does not trigger another connector.
   Repeated conditions are logged only when they change; a log failure does not end the
-  watcher. Actions go to the same backend
+  watcher. Every launch attempt is logged. Actions go to the same backend
   log directory. `-Register` puts one shortcut using `-Watch` in the owner's own
   Startup folder, with no elevation, no service and no registry key, and `-Unregister`
   removes it. The owner runs `-Register` from the main checkout; a shortcut into a removed
@@ -154,8 +156,8 @@ Three things to know before relying on it:
   once for the API and all workers; updating files under running processes does not update
   that identity. Publish from the intended release, drain open jobs, then have the owner
   run `powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop`,
-  then the start command from section 1 on that code revision. D2 will replace this
-  manual sequence with a release restart command when it lands. Verify `/ready` and the public health
+  then the start command from section 1 on that code revision. A release restart command
+  (#663) will replace this manual sequence when it lands. Verify `/ready` and the public health
   endpoint before relying on compute. New requests address the new revision's cache;
   old entries remain on disk. A capture-only update is detected without restarting, but
   that does not make an old process a new-code deployment. See the
