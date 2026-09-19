@@ -42,7 +42,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from squadopt.live.runlog import LOG_ROOT_NAME
+from squadopt.contracts.run_logs import LOG_ROOT_NAME
 
 KINDS = ("decision", "settled")
 

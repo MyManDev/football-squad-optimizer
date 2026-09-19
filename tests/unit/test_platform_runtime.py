@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from squadopt.application import UI_VIEW_CONTRACT_VERSION, write_ui_view_schema
-from squadopt.live.runlog import configure_run_logging
 from squadopt.platform import (
     FileArtifactRegistry,
     RuntimeArtifact,
@@ -21,6 +20,7 @@ from squadopt.platform import (
     read_run_manifest,
 )
 from squadopt.platform.context import RunContext
+from squadopt.platform.runlog import configure_run_logging
 
 NOW = datetime(2026, 8, 19, 15, 0, tzinfo=UTC)
 
