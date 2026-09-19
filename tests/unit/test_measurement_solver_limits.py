@@ -23,12 +23,9 @@ SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 #: list only when its runner names the configuration, never by being quietly deleted.
 NOT_YET_NAMED: frozenset[str] = frozenset(
     {
-        "_phase_e_evaluation.py",
         "evaluate_phase_c_components.py",
         "measure_in_season_blend.py",
-        "probe_phase_e_runtime.py",
         "run_component_squad_calibration.py",
-        "run_scenario_benchmark.py",
     }
 )
 
@@ -126,6 +123,8 @@ def test_the_converted_runners_name_the_measurement_configuration() -> None:
         "run_planner_horizon_seasons.py",
         "run_season_chain_seasons.py",
         "run_transfer_discipline_seasons.py",
+        "probe_phase_e_runtime.py",
+        "run_scenario_benchmark.py",
     ):
         assert _calls(trees[name], "measurement_optimization_config"), name
         assert not _inherits_the_wall_clock(trees[name]), name
