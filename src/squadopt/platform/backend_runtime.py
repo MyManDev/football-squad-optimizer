@@ -621,7 +621,7 @@ class StoreProbeGate:
         if outcome.ok:
             self._passed = outcome
             self._passed_at = self._clock()
-            if self._log is not None:
+            if self._log is not None and held is None:
                 self._log.event("advice_store_probe_passed", root=str(self._root))
         else:
             self._passed = None
