@@ -1,0 +1,97 @@
+# Standard hosted-runner minutes are free for this public repository. Private copies
+# consume their plan's allowance: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+name: Backend uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the issue transition without changing issues
+        type: boolean
+        default: true
+      health_url:
+        description: Optional test URL, accepted only for a dry run
+        type: string
+        default: ""
+
+permissions:
+  issues: write
+
+concurrency:
+  group: backend-uptime
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe health and update the incident
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DRY_RUN: ${{ inputs.dry_run || false }}
+          TEST_HEALTH_URL: ${{ inputs.health_url }}
+        with:
+          script: |
+            const dryRun = process.env.DRY_RUN === "true";
+            const testUrl = process.env.TEST_HEALTH_URL?.trim();
+            if (testUrl && !dryRun) {
+              core.setFailed("A test URL is allowed only in a dry run.");
+              return;
+            }
+            const url = testUrl || "https://squadopt-api.mymandev.com/health";
+            let healthy = false;
+            let status;
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+              try {
+                const response = await fetch(url, {
+                  method: "GET",
+                  headers: { "User-Agent": "squadopt-backend-uptime/1" },
+                  signal: AbortSignal.timeout(10_000),
+                  redirect: "error",
+                });
+                status = `HTTP ${response.status}`;
+                healthy = response.status === 200;
+                await response.body?.cancel();
+              } catch (error) {
+                healthy = false;
+                status = ["TimeoutError", "AbortError"].includes(error.name)
+                  ? "request timed out" : "request failed";
+              }
+              if (healthy) break;
+              if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 20_000));
+            }
+            const label = "backend-down";
+            const incidents = (await github.paginate(github.rest.issues.listForRepo, {
+              ...context.repo, state: "open", labels: label, per_page: 100,
+            })).filter((issue) => !issue.pull_request);
+            if (incidents.length > 1) {
+              core.setFailed("Multiple backend-down issues exist; reconcile them before the next run.");
+              return;
+            }
+            const incident = incidents[0];
+            const action = healthy ? (incident ? "recover and close" : "no change")
+              : (incident ? "no change" : "open incident");
+            core.info(`${dryRun ? "Dry run: would " : "Health: "}${action}; ${status}`);
+            if (dryRun) return;
+            const at = new Date().toISOString();
+            if (!healthy && !incident) {
+              try {
+                await github.rest.issues.getLabel({ ...context.repo, name: label });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ ...context.repo, name: label, color: "d73a4a" });
+              }
+              await github.rest.issues.create({
+                ...context.repo, title: "Backend health check failed", labels: [label],
+                body: `The health check failed twice. Observed at ${at}. Result: ${status}.`,
+              });
+            } else if (healthy && incident) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: incident.number,
+                body: `Health recovered at ${at}. Result: ${status}.`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number: incident.number, state: "closed" });
+            }
