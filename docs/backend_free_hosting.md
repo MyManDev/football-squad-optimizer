@@ -72,8 +72,9 @@ Other things the run showed:
 - Memory per process was not measured.
 
 In that run a window-5 request held a worker for about three and a
-half minutes. The site gives up on a job after 300 s (`useAdviceJob.ts`, 150 polls at
-2 s). With one worker a second member who asks during that time waits behind it and can run
+half minutes. The site's wait budgets are 180 s, 360 s and 600 s for windows 1, 3 and 5
+(`useAdviceJob.ts`, `PATIENCE_MS`). It polls every 2 s for the first minute and every 5 s
+afterwards. With one worker a second member waits behind the first and can run
 out of patience before their job starts. Start several workers. Each busy worker is one
 core; `-Workers 6` is the owner's current launch setting, not a capacity guarantee.
 
@@ -82,8 +83,8 @@ verifies warm-before-claim ordering but reports no production latency measuremen
 The [browser acceptance record](https://github.com/MyManDev/football-squad-optimizer/pull/650)
 reports 49.42 s before and 47.45 s after for the complete local synthetic test call,
 including publication, build and startup. That is not a chip latency or a speedup claim.
-Chosen-chip production timings remain unmeasured. Updated window timings await the
-[reviewer's post-release measurement](https://github.com/MyManDev/football-squad-optimizer/issues/632#issuecomment-5739078896);
+Chosen-chip production timings remain unmeasured. Updated window timings will be posted on
+[#632](https://github.com/MyManDev/football-squad-optimizer/issues/632);
 do not use an offline solver record as public endpoint latency or update the site's
 duration copy from it.
 
@@ -130,16 +131,20 @@ Three things to know before relying on it:
   `advice_queue_depth 0`.
 - **The shortcut watches after logon.** `scripts\start_backend_at_logon.ps1 -Watch`
   checks loopback `/health` and the connector carrying its label every 60 seconds.
-  Three consecutive failures for a component trigger a start attempt for that component;
-  a successful check resets its counter. The existing launcher refuses to start while
-  recorded processes are alive. An unhealthy but running backend needs the owner to
+  The first pass starts missing components immediately; subsequent passes require three
+  consecutive failures for that component before a start attempt.
+  A successful check resets its counter. One watcher per port and connector label holds
+  a named mutex; another instance exits without starting anything. The watcher avoids
+  launcher attempts while verified recorded processes are alive. An unhealthy backend needs the owner to
   investigate; watch mode never kills or restarts it. A failed connector process listing
-  is unknown, so it does not trigger another connector. Actions go to the same backend
+  or an unavailable command line is unknown, so it does not trigger another connector.
+  Repeated conditions are logged only when they change; a log failure does not end the
+  watcher. Actions go to the same backend
   log directory. `-Register` puts one shortcut using `-Watch` in the owner's own
   Startup folder, with no elevation, no service and no registry key, and `-Unregister`
   removes it. The owner runs `-Register` from the main checkout; a shortcut into a removed
-  worktree cannot start the backend. `-DryRun` probes once and prints what it would start
-  after the failure threshold, without starting anything or writing logs. `-ConnectorLabel`
+  worktree cannot start the backend. `-DryRun` probes once and prints component status
+  and planned starts, without starting anything or writing logs. `-ConnectorLabel`
   and `-Port` allow isolated checks. Running without `-Watch` retains one-time startup.
   The shortcut does not make sleeping or logged-off Windows serve requests.
   The PC must not sleep while members are expected; that is a Windows power setting
@@ -148,11 +153,14 @@ Three things to know before relying on it:
   belong to the same release procedure. The launcher stamps `SQUADOPT_REPOSITORY_COMMIT`
   once for the API and all workers; updating files under running processes does not update
   that identity. Publish from the intended release, drain open jobs, then have the owner
-  stop and start the backend on that code revision. Verify `/ready` and the public health
+  run `powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop`,
+  then the start command from section 1 on that code revision. D2 will replace this
+  manual sequence with a release restart command when it lands. Verify `/ready` and the public health
   endpoint before relying on compute. New requests address the new revision's cache;
   old entries remain on disk. A capture-only update is detected without restarting, but
   that does not make an old process a new-code deployment. See the
-  [release recipe](../scripts/release/ship.sh).
+  [publishing recipe](../scripts/release/ship.sh), which publishes the site and does not
+  restart the backend.
 
 Then prove it locally:
 
@@ -171,10 +179,13 @@ newest live capture and log the reason. See [capture selection](backend_runbook.
 
 | Check | Holds when | Code |
 | --- | --- | --- |
-| `capture_context` | the selected published capture, or fallback newest live capture, has a valid identity and matching handoff | `backend_runtime.py`, `RefreshingCaptureContext.identity` |
+| `capture_context` | the selected published capture, or fallback newest live capture, has a valid identity and matching handoff | `backend_runtime.py`, `CaptureContextProvider.identity` |
 | `league_tree` | `web\public\data\league\members.json` is readable | `advice_read.py`, `FileLeagueDirectory.readable` |
 | `cache_store` | the store root exists and passes the probe | `store_probe.py` |
 | `league_tree_matches_capture` | the published tree's season and gameweek agree with the selected context | `advice_read.py`, `FileLeagueDirectory.matches` |
+
+`league_tree_matches_capture` compares season and gameweek, not capture IDs. Republishing
+the same gameweek from a newer capture can leave this check true.
 
 A newer unpublished capture no longer displaces a usable published capture. Replacing the
 published tree is noticed on the next context resolution; an unreadable or inconsistent
