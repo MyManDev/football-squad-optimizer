@@ -207,6 +207,20 @@ are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main
 Interrupting the queue stops it and cleans up its temporary bodies. A body that
 cannot be read or is empty after cleaning is never merged.
 
+After the public release verifies, the owner runs
+`powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter 2026-09-22T00:00:00Z -DryRun`
+from the clean main checkout on `develop`, using the same generated-after timestamp as
+`ship.sh`. Remove `-DryRun` only for the intended restart. The script verifies the public
+site, requires one matching capture across every human entry locally and publicly, refuses
+open work unless `-Force`, and pulls with `--ff-only` before stopping the recorded backend.
+It keeps the recorded port and worker count, requires `/ready` and its published-week
+check, and verifies the new **launcher-recorded** commit against the pulled checkout.
+It does not claim an API-reported commit and never touches the tunnel. Dry-run performs
+the read-only checks and prints inputs without pulling or changing processes. It requires
+the launcher's creation-time-checked process walk and `-Stop -WhatIf` support. A failed
+start or readiness check exits nonzero with log paths; inspect it before another attempt.
+The first production use is the owner's operation, not part of development verification.
+
 ## Daily circuit breaker
 
 The workflow queries all deployments for this Pages project in the current UTC day and
