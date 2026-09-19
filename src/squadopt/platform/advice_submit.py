@@ -34,11 +34,16 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Final, Protocol
 
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
-from squadopt.platform.advice_read import AdviceBackendNotReadyError, AdviceReadStore
+from squadopt.platform.advice_read import (
+    AdviceBackendNotReadyError,
+    AdviceReadStore,
+    AdviceRequestContext,
+)
 from squadopt.platform.api_contract import (
     ApiCommandRequest,
     BackendApiContractError,
@@ -67,6 +72,10 @@ class RateLimitedError(ValueError):
 
 class OpenJobLimitedError(ValueError):
     """This address already owns the allowed queued and running work."""
+
+
+class DeadlinePassedError(ValueError):
+    """The resolved capture's gameweek no longer accepts new work."""
 
 
 class MalformedIdempotencyKeyError(ValueError):
@@ -133,6 +142,7 @@ class AdviceSubmitService:
         specs: AdviceJobSpecStore | None = None,
         store_ready: Callable[[], bool] | None = None,
         max_open_jobs_per_client: int = 4,
+        deadline_for: Callable[[AdviceRequestContext], str] | None = None,
     ) -> None:
         if max_open_jobs_per_client < 1:
             raise ValueError("max_open_jobs_per_client must be at least 1.")
@@ -142,6 +152,7 @@ class AdviceSubmitService:
         self._specs = specs
         self._store_ready = store_ready
         self._max_open_jobs_per_client = max_open_jobs_per_client
+        self._deadline_for = deadline_for
         # Only the admission callback accesses this map, under the queue transaction.
         # Addresses never enter queue/spec documents; process restart forgets ownership.
         self._client_jobs: dict[str, str] = {}
@@ -322,6 +333,12 @@ class AdviceSubmitService:
                 raise
 
         def prepare() -> None:
+            # Only new work reaches this callback: late cache hits and open-job
+            # replays still answer after the deadline, without publishing a new spec.
+            if self._deadline_for is not None and datetime.fromisoformat(
+                at_utc
+            ) >= datetime.fromisoformat(self._deadline_for(context)):
+                raise DeadlinePassedError("This gameweek's deadline has passed.")
             if self._specs is not None:
                 # Before the job exists, never after: a worker may claim the instant the
                 # record lands, and a claimed job whose request cannot be read is a job

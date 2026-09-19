@@ -22,6 +22,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import median, pstdev
@@ -29,8 +30,10 @@ from statistics import median, pstdev
 import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
+    MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
     REPOSITORY_ROOT,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -45,7 +48,6 @@ from squadopt.experiments import (
 )
 from squadopt.experiments.config import PromotionPolicy
 from squadopt.experiments.statistics import season_aware_moving_block_interval
-from squadopt.optimization import OptimizationConfig
 from squadopt.planning import TransferPlanningConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -537,16 +539,24 @@ def main() -> int:
         starts = tuple(range(2, 39, stride))
     else:
         starts = tuple(int(value.strip()) for value in start_spec.split(","))
-    optimization_config = OptimizationConfig()
+    # The measurement limit by default, not only when the operator remembers to ask for one.
+    # A deterministic budget that has to be requested is a record that depends on whether it
+    # was (#590); the flags below still override it, and a wall-clock cap is raised well above
+    # the budget so the budget is what stops the solve.
+    optimization_config = measurement_optimization_config()
     if arguments.deterministic_time_limit is not None or arguments.wall_time_limit is not None:
+        deterministic = (
+            float(arguments.deterministic_time_limit)
+            if arguments.deterministic_time_limit is not None
+            else MEASUREMENT_DETERMINISTIC_TIME_LIMIT
+        )
         wall = arguments.wall_time_limit
         if wall is None:
-            # Raise the wall-clock cap well above the deterministic budget so the
-            # deterministic budget is the binding stopping rule.
-            wall = max(60.0, 6.0 * float(arguments.deterministic_time_limit or 10.0))
-        optimization_config = OptimizationConfig(
-            solver_time_limit_seconds=wall,
-            solver_deterministic_time_limit=arguments.deterministic_time_limit,
+            wall = max(60.0, 6.0 * deterministic)
+        optimization_config = replace(
+            optimization_config,
+            solver_time_limit_seconds=float(wall),
+            solver_deterministic_time_limit=deterministic,
         )
 
     window_records: list[dict[str, object]] = []

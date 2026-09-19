@@ -22,11 +22,11 @@ import tests.unit.test_live_transfers as world_module
 import tests.unit.test_source_fpl_live as payload_module
 import tests.unit.test_top100_weight as top100_tests
 from fastapi.testclient import TestClient
+from tests.fixtures.backend_app import app_for_capture
 
 import squadopt.application.top100_weight as switches_module_top100
 import squadopt.platform.advice_switches as switches_module
 import squadopt.platform.advice_worker as worker_module
-from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
@@ -475,7 +475,7 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     """POST, worker, GET — the actual request this backend exists to serve."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
     if chip is not None:
@@ -536,7 +536,7 @@ def test_recomputing_one_job_produces_the_same_bytes(running: dict[str, Any]) ->
     """
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     accepted = client.post(route, json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW})
     assert accepted.status_code == 202
@@ -561,7 +561,7 @@ def test_a_failing_computation_ends_the_job_without_leaking_the_inside(
     running: dict[str, Any],
 ) -> None:
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     accepted = client.post(route, json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW})
     job_id = accepted.json()["job_id"]
@@ -593,7 +593,7 @@ def test_the_loop_stops_when_asked_and_finishes_the_job_in_hand(
     """A container stop must cost nobody their solve, and must not need a second signal."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
@@ -651,7 +651,7 @@ def test_an_abandoned_job_is_walked_back_rather_than_lost(running: dict[str, Any
     """A worker that died mid-solve must not leave a member waiting forever."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
@@ -685,7 +685,7 @@ def test_a_rival_free_request_refuses_a_rival_without_changing_the_spec(
     """Reader and worker agree; an unsupported rival cannot create another job/spec."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
 
     plain = client.post(route, json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW})
@@ -795,7 +795,7 @@ def test_a_request_in_a_new_context_does_not_join_the_old_contexts_open_job(
     """
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
 
@@ -825,7 +825,7 @@ def test_the_claim_stays_alive_while_a_long_computation_runs(
     """
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
@@ -861,7 +861,7 @@ def test_an_idempotency_key_replayed_in_a_new_context_is_a_conflict(
     """
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
     header = {"Idempotency-Key": "client:advise:merge-review"}
@@ -938,7 +938,7 @@ def test_two_concurrent_contexts_get_two_job_ids_rather_than_a_collision(
                 rival_entry_id=None,
                 idempotency_key=None,
                 client_bucket="test",
-                at_utc=_now_stamp(),
+                at_utc=world_module.GW2_CAPTURED_AT,
             )
         except Exception as error:  # recorded, so the assertion names it
             outcomes[name] = error
@@ -970,7 +970,7 @@ def test_a_store_that_breaks_later_stops_the_worker_taking_new_work(
     """Healthy at startup is not healthy for ever, and the gate is asked every round."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
@@ -1053,7 +1053,7 @@ class _BusyThenFine:
 
 def test_a_busy_queue_lock_does_not_end_the_worker(running: dict[str, Any]) -> None:
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     assert client.post(route, json={"strategy": COMPUTED_MODE, "window": 1}).status_code == 202
     queue = _BusyThenFine(backend.queue)
@@ -1102,7 +1102,7 @@ def test_a_member_the_capture_does_not_hold_is_named_not_a_generic_failure(
     """The member directory lists the rival; the capture holds only the member's squad."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     compute = build_advice_compute(backend.contexts, backend.job_specs)
     for entry, body in (
         (RIVAL_ID, {"strategy": COMPUTED_MODE, "window": 1}),
@@ -1123,7 +1123,7 @@ def test_a_word_not_solved_for_one_member_is_named_not_a_generic_failure(
     """The menu says the word could not be applied; the job carries that, not a fault."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
 
     def not_solved(*_args: Any, **_kwargs: Any) -> dict[str, object]:
         raise ManagersWordNotSolved("The manager's word could not be applied to this plan.")
@@ -1174,7 +1174,7 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
     """The default path through ``advise_menu_entry`` moves no byte of what is served."""
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
     job_id = client.post(route, json=body).json()["job_id"]
@@ -1237,7 +1237,7 @@ def test_a_member_asks_for_a_top100_setting_and_gets_it(
     artifact_root = tmp_path / "artifacts"
     running = _deployment(tmp_path, monkeypatch, artifact_root=artifact_root)
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW, "top100_weight": 20}
     capabilities = f"/api/v1/leagues/{LEAGUE_ID}/capabilities"
@@ -1293,7 +1293,7 @@ def test_without_the_inputs_configured_a_setting_is_refused_by_name(
     running: dict[str, Any],
 ) -> None:
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     for body, code in (
         ({"top100_weight": 20}, "TOP100_INPUTS_UNAVAILABLE"),
@@ -1315,7 +1315,7 @@ def test_a_job_accepted_against_one_export_is_not_computed_from_another(
     artifact_root = tmp_path / "artifacts"
     running = _deployment(tmp_path, monkeypatch, artifact_root=artifact_root)
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW, "top100_weight": 20}
     _export_top100(running, artifact_root, monkeypatch)
@@ -1363,7 +1363,7 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     words = top100_tests._words(STARTING_ELEVEN[-1])
     monkeypatch.setattr(switches_module, "load_manager_words", lambda *_a, **_k: words)
 
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW, "managers_word": True}
     capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
@@ -1404,7 +1404,7 @@ def test_a_selection_the_planner_cannot_solve_is_named_and_its_diagnostic_is_not
     from squadopt.application.advice_menu import PLAN_NOT_FOUND_ERRORS
 
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     diagnostic = "deterministic time used was 12.0, relative gap was 0.31"
 
     def no_plan(*_args: Any, **_kwargs: Any) -> dict[str, object]:
@@ -1441,7 +1441,7 @@ def test_chip_entry_error_is_private_through_the_real_menu_branch(
 
     monkeypatch.setattr(menu, "advise_with_chip", fail)
     backend = running["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     response = client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
@@ -1469,7 +1469,7 @@ def test_accepted_chip_with_artifacts_does_not_prepare_a_projection(
 ) -> None:
     state = _deployment(tmp_path, monkeypatch, artifact_root=tmp_path / "artifacts")
     backend = state["backend"]
-    client = TestClient(app_for_backend(backend))
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
     response = client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": 1, "chip": "bboost"},
