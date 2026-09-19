@@ -75,6 +75,15 @@ from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLI
 #: ``v1`` was one record per season, gameweek and entry, addressed at ``entry-<id>/`` with
 #: no capture anywhere in it, so the two shapes cannot be read as one — see
 #: ``LEGACY_LAYOUT_NOTE`` for why no migration is written.
+#:
+#: A nullable field added to the document does not move this. The version separates shapes
+#: that cannot be read as one, which is what v1 and v2 are: a reader of v2 that meets a key
+#: it does not know ignores it, and a reader that wants a key an older document lacks gets
+#: ``None``, which the document means rather than a value it is missing. Moving the version
+#: for an additive field would make every older record unreadable to gain nothing, and this
+#: string is read nowhere outside this module, so the move would be inert as well. A field
+#: whose absence cannot be read as absent, or a changed meaning for an existing key, is what
+#: moves it.
 MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks

@@ -677,12 +677,6 @@
             "null"
           ]
         },
-        "wall_clock_stopped_the_search": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "source_snapshot_id": {
           "type": [
             "string",
@@ -829,6 +823,12 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "wall_clock_stopped_the_search": {
+          "type": [
+            "boolean",
+            "null"
           ]
         },
         "window": {
