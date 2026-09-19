@@ -5,6 +5,10 @@ Status: design fixed and measurement pre-registered on 2026-09-19, on the owner'
 No measurement under this protocol has been run. This document changes no plan, price or live
 control. Tracking issue: #659.
 
+Amended on 2026-09-19, before any run, after the owner's review of the design: a fifth arm
+without the reservation, and a weekly record of what each chip rule saw. Both are marked
+below. Nothing else changed, and no chain had been walked when this was written.
+
 ## What is asked, in one sentence
 
 For every chip a member still holds, say either "play it this gameweek" or "hold it, and this
@@ -103,11 +107,28 @@ half); `decaying` (the same constants, linear to zero at the end of each half, r
 lifted in the last gameweek of the half). One further arm as a floor: `planner` (every open
 chip offered every week with no holding value), which is "play it as soon as it helps".
 
+*Amendment.* A fifth arm, `threshold_only`: the decaying thresholds with no reservation at
+all. The reservation was measured with one bench boost for a whole season, where a double
+gameweek was certain to come. In a half that ends at gameweek 19 a double may never come, and
+then `decaying` holds the bench boost to the half's last gameweek and plays it there whatever
+it adds. `threshold_only` asks whether the reservation still pays under two sets.
+
 **Statistics.** Per arm: net season points, chips played and chips that expired unplayed, per
 season and pooled. The comparison that decides: `decaying - fixed`, paired by gameweek within
 season, with the 90 percent season-aware block bootstrap the chain records already use. Beside
 it, `fixed - off` and `decaying - off`, to say whether two sets are still worth about what one
 set was.
+
+*Amendment.* `decaying - threshold_only`, read the same way, decides whether the forecast keeps
+the reservation: it keeps it when the pooled difference is positive, and drops it otherwise,
+again without calling four seasons a proof. Every chain also records, for every gameweek, what
+its decision expected of its captain and of its bench (`captain_projected_points`,
+`bench_projected_points`), beside what they realized. That is what a triple captain and a
+bench boost would have been expected to add that week, at no extra solve. It is not read for
+any verdict here. It is the input of the next step: a threshold computed by backward induction
+over the remaining gameweeks of a half from the distribution of those weekly values by kind of
+gameweek (single, double, blank), in place of the linear decay. That step gets its own
+protocol before it is run.
 
 **Decision, fixed now.** The arm with the higher pooled net is the rule the forecast uses. Four
 seasons cannot separate arms that differ by a point a week, and the record will say so rather
@@ -140,6 +161,13 @@ line is a reading of the calendar and is labelled as one.
    existing chip policy switch, with the runner's two-window rule; tests on synthetic seasons.
    Touches `experiments/` and the runner only.
 3. The measurement, as its own pull request with its index row.
+   *Amendment.* When the rule names a gameweek inside a member's three- or five-week window,
+   the window plan may be solved with the chip **forced** in that gameweek
+   (`ChipAvailability.forced` exists). The window then prepares for a week already decided
+   by the weekly rule, which is what a window is good at; it never decides whether to spend
+   the chip, which is what it was measured to be bad at. The Top 100 export is not an input
+   anywhere in the forecast: it reports last gameweek's elevens, not this gameweek's chips.
+   It may serve later to score our timing against when those managers played theirs.
 4. `application/chip_forecast.py`: the pure function from a member's squad, the capture's
    projection, the calendar and the chips held to the forecast document, and its contract. No
    solve beyond the chip gains the product already computes. This is the first change that

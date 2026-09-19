@@ -9,6 +9,7 @@ from squadopt.data.sources.fpl_live import game_forecast
 from squadopt.evaluation.live_projection_audit import (
     TOP_PER_POSITION,
     LiveProjectionAuditError,
+    absent_forecast,
     audit_frame,
     paired_difference,
     pool,
@@ -88,6 +89,115 @@ def test_the_appearance_split_says_how_much_sat_on_players_who_did_not_appear() 
     buckets = split["by_minutes"]
     assert isinstance(buckets, dict)
     assert buckets["1_to_59"]["players"] == 1 and buckets["60_and_above"]["players"] == 2
+
+
+def test_the_absent_forecast_says_on_whom_the_points_sat() -> None:
+    players = pd.DataFrame(
+        {
+            "player_id": [1, 2, 3, 4, 5, 6],
+            "position": ["MID", "MID", "DEF", "DEF", "FWD", "GK"],
+            "price_tenths": [45, 60, 110, 50, 80, 40],
+        }
+    )
+    outcomes = pd.DataFrame(
+        {
+            "player_id": [1, 2, 3, 4, 5, 6],
+            "minutes": [90, 0, 0, 0, 0, 0],
+            "total_points": [2, 0, 0, 0, 0, 0],
+        }
+    )
+    frame = audit_frame(
+        players,
+        outcomes,
+        # Player 6 is absent from our projection: not a zero, and not counted.
+        expected_points={1: 3.0, 2: 4.0, 3: 2.0, 4: 0.5, 5: 3.0},
+        multipliers={2: 0.5, 5: 0.0},
+        game={2: 1.0, 6: 0.8},
+    )
+    decided = absent_forecast(frame, "ours_decided")
+    # 2.0 (named, halved), 2.0, 0.5, and the ruled-out forward at nothing.
+    assert decided["players"] == 4 and decided["forecast_points"] == pytest.approx(4.5)
+    rule = decided["by_our_availability_rule"]
+    assert isinstance(rule, dict)
+    assert rule["named"] == {
+        "players": 2,
+        "forecast_points": pytest.approx(2.0),
+        "share_of_absent_forecast": pytest.approx(2.0 / 4.5),
+    }
+    assert rule["not_named"]["forecast_points"] == pytest.approx(2.5)
+    sizes = decided["by_forecast_size"]
+    assert isinstance(sizes, dict)
+    assert [sizes[label]["players"] for label in sizes] == [2, 2, 0]
+    positions = decided["by_position"]
+    assert isinstance(positions, dict)
+    assert positions["DEF"]["forecast_points"] == pytest.approx(2.5)
+    assert positions["GK"]["players"] == 0
+    bands = decided["by_price_band"]
+    assert isinstance(bands, dict)
+    assert sum(block["players"] for block in bands.values()) == 4
+    largest = decided["largest"]
+    assert isinstance(largest, list)
+    assert [row["player_id"] for row in largest] == [2, 3, 4, 5]
+    assert largest[0]["named_by_our_availability_rule"] is True
+    assert largest[1]["named_by_our_availability_rule"] is False
+
+    # The game's forecast is read against the same flags. The goalkeeper our projection
+    # never scored is a player nobody named, not a player the rule named.
+    game = absent_forecast(frame, "game")
+    assert game["players"] == 2
+    game_rule = game["by_our_availability_rule"]
+    assert isinstance(game_rule, dict)
+    assert game_rule["named"]["forecast_points"] == pytest.approx(1.0)
+    assert game_rule["not_named"]["forecast_points"] == pytest.approx(0.8)
+
+    # The block agrees with the appearance split it decomposes.
+    summary = summarise_forecast(frame, "ours_decided")
+    split = summary["appearance_split"]
+    assert isinstance(split, dict)
+    assert split["forecast_points_on_players_who_did_not_appear"] == pytest.approx(4.5)
+    assert summary["absent_forecast"] == decided
+
+
+def test_the_error_is_read_by_how_much_the_player_had_been_playing() -> None:
+    frame = audit_frame(
+        _players(),
+        _outcomes(),
+        expected_points={1: 3.0, 2: 4.0, 3: 6.0, 4: 2.0},
+        multipliers={},
+        game=None,
+        # Player 4 is not named: no prior, which is not a prior of nothing.
+        prior_minutes_per_week={1: 90.0, 2: 0.0, 3: 60.0},
+    )
+    reading = summarise_forecast(frame, "ours_decided")["by_prior_minutes"]
+    assert isinstance(reading, dict) and reading["players"] == 3
+    buckets = reading["buckets"]
+    assert isinstance(buckets, dict)
+    assert buckets["none"]["players"] == 1 and buckets["none"]["appeared"] == 0
+    assert buckets["none"]["forecast_points"] == 4.0
+    assert buckets["under_30"]["players"] == 0 and buckets["30_to_60"]["players"] == 0
+    regulars = buckets["60_and_above"]
+    assert regulars["players"] == 2 and regulars["appeared"] == 2
+    assert regulars["forecast_points"] == 9.0 and regulars["realized_points"] == 11.0
+    assert regulars["bias"] == pytest.approx(1.0)
+
+    # With no prior handed over the reading is absent, and nothing else changes.
+    bare = audit_frame(_players(), _outcomes(), expected_points={1: 3.0}, multipliers={}, game=None)
+    assert summarise_forecast(bare, "ours_decided")["by_prior_minutes"] == {"players": 0}
+
+
+def test_nobody_absent_is_an_empty_reading_and_not_an_error() -> None:
+    frame = audit_frame(
+        _players().iloc[[0]],
+        _outcomes().iloc[[0]],
+        expected_points={1: 3.0},
+        multipliers={},
+        game=None,
+    )
+    reading = absent_forecast(frame, "ours_decided")
+    assert reading["players"] == 0 and reading["largest"] == []
+    rule = reading["by_our_availability_rule"]
+    assert isinstance(rule, dict)
+    assert rule["named"]["share_of_absent_forecast"] is None
 
 
 def test_the_paired_difference_is_negative_when_the_first_forecast_is_closer() -> None:
