@@ -103,12 +103,21 @@ def test_watch_resets_after_recovery_and_only_starts_missing_backend(tmp_path: P
 
 
 def test_watch_ignores_another_label_and_starts_only_its_connector(tmp_path: Path) -> None:
-    _run(tmp_path, health="$true", connector=PRESENT.replace("test-watch", "test-watch-other"))
+    output = _run(
+        tmp_path, health="$true", connector=PRESENT.replace("test-watch", "test-watch-other")
+    )
     actions = (tmp_path / "actions.txt").read_text(encoding="utf-16")
     assert actions.count("START") == 3
     assert all(f"tick={tick}" in actions for tick in (0, 3, 6))
     assert '--label test-watch run "test-tunnel"' in actions
     assert "-Workers" not in actions
+    assert output.count("started tunnel connector") == 3
+
+
+def test_every_backend_launch_is_logged(tmp_path: Path) -> None:
+    output = _run(tmp_path, health="$false", connector=PRESENT)
+    assert output.count("asked the launcher") == 3
+    assert (tmp_path / "actions.txt").read_text(encoding="utf-16").count("START") == 3
 
 
 def test_failed_process_probe_is_not_treated_as_missing(tmp_path: Path) -> None:
@@ -184,18 +193,34 @@ def test_live_recorded_workers_block_launch_without_repeated_logs(tmp_path: Path
     assert not list((tmp_path / "data/runtime/backend/logs").glob("launcher-*"))
 
 
-def test_existing_watcher_exits_without_probing_or_launching(tmp_path: Path) -> None:
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_existing_watcher_allows_only_dry_run_probes(tmp_path: Path, dry_run: bool) -> None:
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     (scripts / "run_backend_local.ps1").touch()
+    contender = tmp_path / "contender.ps1"
+    contender.write_text(
+        "function Invoke-WebRequest { return @{StatusCode=200} }\n"
+        f"function Get-CimInstance {{ {PRESENT} }}\n"
+        "function Start-Process { throw 'must not launch' }\n"
+        "function Start-Sleep { throw 'must not loop' }\n"
+        f"& {_quoted(SCRIPT)} -RepoRoot {_quoted(tmp_path)} -Port 18764 "
+        "-ConnectorLabel test-watch -TunnelName test-tunnel -Watch "
+        + ("-DryRun" if dry_run else ""),
+        encoding="ascii",
+    )
     command = (
         "$mutex = New-Object System.Threading.Mutex($true, "
-        '"Local\\SquadOpt-backend-18764-test-lock"); '
-        f"try {{ & powershell.exe -NoProfile -File {_quoted(SCRIPT)} "
-        f"-RepoRoot {_quoted(tmp_path)} -Port 18764 -ConnectorLabel test-lock -Watch -DryRun; "
+        '"Global\\SquadOpt-backend-18764-test-watch"); '
+        f"try {{ & powershell.exe -NoProfile -File {_quoted(contender)}; "
         "if ($LASTEXITCODE -ne 0) { throw 'second watcher failed' } } "
         "finally { $mutex.ReleaseMutex(); $mutex.Dispose() }"
     )
+    port = 20000 + zlib.crc32(str(tmp_path).encode()) % 20000
+    contender.write_text(
+        contender.read_text(encoding="ascii").replace("18764", str(port)), encoding="ascii"
+    )
+    command = command.replace("18764", str(port))
     result = subprocess.run(
         [str(POWERSHELL), "-NoProfile", "-Command", command],
         check=True,
@@ -203,8 +228,16 @@ def test_existing_watcher_exits_without_probing_or_launching(tmp_path: Path) -> 
         text=True,
         timeout=30,
     )
-    assert result.stdout.count("watcher already active") == 1
-    assert not (tmp_path / "data").exists()
+    if dry_run:
+        assert "backend healthy" in result.stdout and "tunnel connector healthy" in result.stdout
+        assert "watcher already active" not in result.stdout
+        assert not (tmp_path / "data").exists()
+    else:
+        assert result.stdout.count("watcher already active") == 1
+        assert "healthy" not in result.stdout
+        logs = list((tmp_path / "data/runtime/backend/logs").glob("startup-*.log"))
+        assert len(logs) == 1
+        assert "watcher already active" in logs[0].read_text(encoding="utf-8-sig")
 
 
 def test_registered_shortcut_runs_watch() -> None:

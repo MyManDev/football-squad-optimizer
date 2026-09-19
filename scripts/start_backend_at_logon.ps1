@@ -139,7 +139,7 @@ function Get-BackendBlocker {
                 return "backend unhealthy but recorded processes are alive; operator intervention needed"
             }
         }
-    } catch { return "backend process identity unknown; leaving processes alone" }
+    } catch { return "backend process identity unknown; leaving processes alone; operator intervention needed" }
     return $null
 }
 
@@ -159,8 +159,8 @@ function Start-MissingBackend {
             -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$launcher`"", "-Workers", $Workers, "-Port", $Port, "-RepoRoot", "`"$RepoRoot`"") `
             -RedirectStandardOutput (Join-Path $logRoot "launcher-$attempt.out.log") `
             -RedirectStandardError (Join-Path $logRoot "launcher-$attempt.err.log") | Out-Null
-        Write-Condition "backend" "asked the launcher to start the backend with $Workers workers on port $Port"
-    } catch { Write-Condition "backend" "backend launch failed: $_" }
+        Write-Line "asked the launcher to start the backend with $Workers workers on port $Port"
+    } catch { Write-Line "backend launch failed: $_" }
 }
 
 # The tunnel. Cloudflare accepts several connectors for one tunnel, so starting this one
@@ -182,8 +182,8 @@ function Start-MissingConnector {
             -ArgumentList @("tunnel", "--no-autoupdate", "--label", $ConnectorLabel, "run", "`"$TunnelName`"") `
             -RedirectStandardOutput (Join-Path $logRoot "cloudflared-$attempt.out.log") `
             -RedirectStandardError (Join-Path $logRoot "cloudflared-$attempt.err.log") | Out-Null
-        Write-Condition "connector" "started tunnel connector for $TunnelName with label $ConnectorLabel"
-    } catch { Write-Condition "connector" "tunnel launch failed: $_" }
+        Write-Line "started tunnel connector for $TunnelName with label $ConnectorLabel"
+    } catch { Write-Line "tunnel launch failed: $_" }
 }
 
 $backendFailures = 0
@@ -191,13 +191,21 @@ $connectorFailures = 0
 $threshold = 1
 $labelPattern = '(?:^|\s)--label(?:=|\s+)"?' + [regex]::Escape($ConnectorLabel) + '"?(?=\s|$)'
 $tunnelPattern = '(?:^|\s)run\s+"?' + [regex]::Escape($TunnelName) + '"?(?=\s|$)'
-$mutex = New-Object System.Threading.Mutex($false, "Local\SquadOpt-backend-$Port-$ConnectorLabel")
+$mutex = $null
 $ownsMutex = $false
 try {
-    try { $ownsMutex = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] {
-        $ownsMutex = $true
+    if (-not $DryRun) {
+        try {
+            $mutex = New-Object System.Threading.Mutex($false, "Global\SquadOpt-backend-$Port-$ConnectorLabel")
+            try { $ownsMutex = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] {
+                $ownsMutex = $true
+            }
+        } catch [System.UnauthorizedAccessException] { $ownsMutex = $false }
+        if (-not $ownsMutex) {
+            Write-Line "watcher already active for port $Port and label $ConnectorLabel"
+            exit 0
+        }
     }
-    if (-not $ownsMutex) { Write-Output "watcher already active for port $Port and label $ConnectorLabel"; exit 0 }
     do {
     try {
     $answers = $false
@@ -241,5 +249,5 @@ try {
     } while ($Watch -and -not $DryRun)
 } finally {
     if ($ownsMutex) { $mutex.ReleaseMutex() }
-    $mutex.Dispose()
+    if ($null -ne $mutex) { $mutex.Dispose() }
 }
