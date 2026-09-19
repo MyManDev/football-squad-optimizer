@@ -1,8 +1,16 @@
 # Live price honesty: protocol
 
-Status: pre-registered on 2026-09-19, before gameweek 5 of 2026-27 kicked off. No reading under
-this protocol has been taken. This document changes no plan, price, copy or live control, and
-it promotes nothing.
+Status: pre-registered on 2026-09-19, before any outcome of gameweek 5 of 2026-27 had been
+captured or read. No reading under this protocol has been taken. This document changes no
+plan, price, copy or live control, and it promotes nothing.
+
+Correction, 2026-09-19: the first version of this line said "before gameweek 5 kicked
+off". That was wrong. Gameweek 5's deadline was Friday 18 September 17:30Z and its first
+match kicked off at 19:00Z; this protocol was merged on Saturday 19 September at 01:32Z,
+with one of ten fixtures played and nine to come. What is true, and what matters for a
+protocol, is that nothing of gameweek 5 had been read or could have been: the newest capture
+on disk (`fpl-live-20260918T122516Z`) predates the deadline, so no gameweek 5 outcome existed
+in the repository's data when this was written.
 
 ## The claim being checked
 
