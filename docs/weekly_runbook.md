@@ -313,16 +313,26 @@ python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 6 --le
 ```
 
 Remove `--dry-run` only when operating the week. This records the complete published
-menu and opens `feature/gw06-decision-site-1`; it does not merge or deploy. A prior
+menu and opens `feature/gw06-decision-site-1`; it does not merge or publish to production.
+Once CI passes, the site pull request uploads one Pages preview, which counts toward
+the ten per UTC day. A prior
 preview without `--publish` cannot acquire it on resume: use a new run ID, with the
 explicit capture/evidence reuse options above if appropriate. An actual resume repeats
 the original options unchanged. A used suffix refuses before the expensive stages.
+Rebuilding the captures dated 12, 15, 17 or 18 September 2026, already recorded by
+older code, requires `python -m scripts.build_league_site` with `--no-advice-record`; the weekly runner
+has no skip-recording switch and otherwise refuses only at the end of the league stage.
 
-Check the candidate with `python -m scripts.check_league_tree <preview>/data`, then use
-the [release recipe](deployment_runbook.md#release-in-one-command):
-`scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <generated-after-ISO> <summary>`.
-Its real invocation performs the site release; `scripts/release/verify_live.py` checks
-the public result. The separate backend restart command and browser check follow the
+Check the candidate with `python -m scripts.check_league_tree <preview>/data`. The site
+pull request's CI also runs `shippedTree.test.ts` against the shipped tree; to run that
+check by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
+publication worktree's `web` directory. Then use the
+[release recipe](deployment_runbook.md#release-in-one-command) from Git Bash:
+`sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <generated-after-ISO> <summary>`.
+Its real invocation performs the site release and runs `verify_live.py`; the restart
+helper runs that verifier again before stopping anything. To run it again by hand,
+use `python scripts/release/verify_live.py <generated-after-ISO>`. The separate backend
+restart command and browser check follow the
 order in that runbook. These remain owner-operated actions, not part of this preview.
 
 After publication the backend selects the one agreed capture ID carried by all human
