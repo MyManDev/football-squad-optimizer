@@ -192,6 +192,25 @@ def test_missing_configuration_names_every_variable_at_once() -> None:
     assert "SQUADOPT_BACKEND_STORE_ROOT" not in message
 
 
+@pytest.mark.parametrize("value", [None, "2", "0", "-1", "bad"])
+def test_open_job_limit_environment_is_positive_and_defaults_to_four(
+    tmp_path: Path, value: str | None
+) -> None:
+    environment = {
+        f"SQUADOPT_BACKEND_{name}_ROOT": str(tmp_path / name.lower())
+        for name in ("STORE", "SITE_DATA", "SNAPSHOT", "HANDOFF")
+    }
+    if value is not None:
+        environment["SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT"] = value
+    if value in {"0", "-1", "bad"}:
+        with pytest.raises(BackendConfigError, match="MAX_OPEN_JOBS_PER_CLIENT"):
+            BackendConfig.from_environment(environment)
+    else:
+        assert BackendConfig.from_environment(environment).max_open_jobs_per_client == (
+            4 if value is None else 2
+        )
+
+
 def test_a_wildcard_origin_is_refused_by_configuration(tmp_path: Path) -> None:
     """ADR 0006: the allowlist is the Pages domains. A wildcard is not an allowlist."""
 

@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
-import { getProject, parseApiResponse } from "./cloudflare-deployment-budget.mjs";
+import { getProject, listDeployments, parseApiResponse } from "./cloudflare-deployment-budget.mjs";
 
 const delay = (milliseconds) =>
   new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
@@ -92,11 +92,11 @@ export function verifyCanonicalDeployment(project, deploymentId) {
   return canonical;
 }
 
-async function getDeployment({ accountId, project, deploymentId, apiToken }) {
+async function getDeployment({ accountId, project, deploymentId, apiToken, fetchImpl = fetch }) {
   const url = new URL(
     `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/pages/projects/${encodeURIComponent(project)}/deployments/${encodeURIComponent(deploymentId)}`,
   );
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     headers: { authorization: `Bearer ${apiToken}` },
     signal: AbortSignal.timeout(15_000),
   });
@@ -105,6 +105,51 @@ async function getDeployment({ accountId, project, deploymentId, apiToken }) {
     throw new Error("Cloudflare Pages API response does not contain a deployment");
   }
   return payload.result;
+}
+
+// Run inside the production concurrency group, immediately before upload. The
+// project identifies what is served; a newer tag may never have been deployed.
+export async function verifyProductionAdvance({ commitSha, releaseTag, compareCommits, ...api }) {
+  const project = await getProject(api);
+  if (project.canonical_deployment === null) {
+    const deployments = await listDeployments(api);
+    if (deployments.some((deployment) => deployment.environment !== "preview")) {
+      throw new Error(
+        "Production identity unreadable: deployments exist without a canonical commit",
+      );
+    }
+    return `First production deployment: ${releaseTag} (${commitSha})`;
+  }
+  const deploymentId = project.canonical_deployment?.id;
+  if (typeof deploymentId !== "string" || !/^[0-9a-f-]{36}$/i.test(deploymentId)) {
+    throw new Error("Production identity unreadable: no canonical deployment ID");
+  }
+  const deployment = await getDeployment({ ...api, deploymentId });
+  const metadata = deployment?.deployment_trigger?.metadata;
+  const liveSha = metadata?.commit_hash?.toLowerCase();
+  const liveTag =
+    (typeof metadata?.commit_message === "string"
+      ? metadata.commit_message.match(
+          /^release:(site-\d{4}-\d{2}-gw\d{2}-(?:decision|settled|fix\d+))$/,
+        )?.[1]
+      : null) ?? "live tag unreadable";
+  if (!/^[0-9a-f]{40}$/.test(liveSha ?? "")) {
+    throw new Error("Production identity unreadable: canonical commit is missing or invalid");
+  }
+  verifyDeploymentRecord({
+    deployment,
+    deploymentId,
+    project: api.project,
+    mode: "production",
+    branch: "main",
+    commitSha: liveSha,
+  });
+  const { data: comparison } = await compareCommits({ base: liveSha, head: commitSha });
+  const detail = `${releaseTag} (${commitSha}) is ${comparison.status} relative to live ${liveTag} (${liveSha})`;
+  if (!["ahead", "identical"].includes(comparison.status)) {
+    throw new Error(`Production refused: ${detail}`);
+  }
+  return `Production accepted: ${detail}`;
 }
 
 function safeMessage(error) {

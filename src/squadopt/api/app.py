@@ -42,6 +42,7 @@ from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     IdempotencyConflictError,
     MalformedIdempotencyKeyError,
+    OpenJobLimitedError,
     RateLimitedError,
 )
 from squadopt.platform.api_contract import (
@@ -320,6 +321,31 @@ def create_app(
         return _contract_error(
             429, "RATE_LIMITED", str(error), retry_after_seconds=error.retry_after_seconds
         )
+
+    @application.exception_handler(OpenJobLimitedError)
+    async def open_job_limited(_request: Request, _error: OpenJobLimitedError) -> JSONResponse:
+        if metrics is not None:
+            metrics.increment("advice_open_job_refused_total")
+        message = (
+            "This connection already has several computations open. "
+            "Wait for one to finish, then try again."
+        )
+        document = ApiErrorResponse(
+            ApiError(
+                code="OPEN_JOB_LIMITED",
+                message=message,
+                details={
+                    "public_reason": {
+                        "en": message,
+                        "tr": (
+                            "Bu bağlant\u0131da zaten birkaç hesaplama aç\u0131k. "
+                            "Birinin bitmesini bekleyip yeniden dene."
+                        ),
+                    }
+                },
+            )
+        ).to_dict()
+        return JSONResponse(status_code=429, content=document)
 
     @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
     def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
