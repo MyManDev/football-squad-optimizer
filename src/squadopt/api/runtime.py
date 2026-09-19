@@ -22,7 +22,11 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from squadopt.api.app import create_app
-from squadopt.platform.advice_observability import configure_advice_logging
+from squadopt.platform.advice_observability import (
+    API_COUNTER_FAMILIES,
+    AdviceMetrics,
+    configure_advice_logging,
+)
 from squadopt.platform.backend_runtime import AdviceBackend, backend_from_environment
 
 __all__ = ["app_for_backend", "build_app"]
@@ -56,4 +60,6 @@ def build_app() -> FastAPI:
     # for. uvicorn configures only its own loggers, so without this the advice events —
     # every accepted request, every rejection reason — go nowhere.
     configure_advice_logging()
-    return app_for_backend(backend_from_environment())
+    return app_for_backend(
+        backend_from_environment(metrics=AdviceMetrics(zero_counters=API_COUNTER_FAMILIES))
+    )

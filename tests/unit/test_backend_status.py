@@ -181,9 +181,9 @@ def test_non_positive_days_rejected() -> None:
 
 
 def test_job_gauges_and_initial_zero_counters_are_distinct_from_unexposed(tmp_path: Path) -> None:
-    from squadopt.platform.advice_observability import AdviceMetrics
+    from squadopt.platform.advice_observability import API_COUNTER_FAMILIES, AdviceMetrics
 
-    metrics = AdviceMetrics()
+    metrics = AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)
     body = metrics.render(
         queue_depth=2,
         jobs_by_status={

@@ -39,21 +39,21 @@ import sys
 import threading
 import time
 from bisect import bisect_left
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Final
 
 ADVICE_LOGGER_NAME: Final[str] = "advice"
 
-_COUNTER_FAMILIES: Final = frozenset(
-    {
-        "advice_cache_hits_total",
-        "advice_cache_misses_total",
-        "advice_jobs_submitted_total",
-        "advice_rejected_total",
-        "advice_jobs_total",
-        "advice_solver_status_total",
-        "advice_worker_queue_busy_total",
-    }
+API_COUNTER_FAMILIES: Final = (
+    "advice_cache_hits_total",
+    "advice_cache_misses_total",
+    "advice_jobs_submitted_total",
+    "advice_rejected_total",
+)
+WORKER_COUNTER_FAMILIES: Final = (
+    "advice_jobs_total",
+    "advice_solver_status_total",
+    "advice_worker_queue_busy_total",
 )
 
 _HISTOGRAM_BUCKETS: Final[tuple[float, ...]] = (
@@ -128,7 +128,8 @@ class _Histogram:
 class AdviceMetrics:
     """In-process counters and histograms, rendered as Prometheus text on demand."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, zero_counters: Iterable[str] = ()) -> None:
+        self._zero_counters = frozenset(zero_counters)
         self._counters: dict[tuple[str, tuple[tuple[str, str], ...]], int] = {}
         self._histograms: dict[str, _Histogram] = {}
         self._lock = threading.RLock()
@@ -177,6 +178,9 @@ class AdviceMetrics:
             lines.append("# TYPE advice_queue_depth gauge")
             lines.append(f"advice_queue_depth {queue_depth}")
         if jobs_by_status is not None:
+            lines.append(
+                "# HELP advice_jobs Jobs held in the store by status, not all-time totals."
+            )
             lines.append("# TYPE advice_jobs gauge")
             for status, count in sorted(jobs_by_status.items()):
                 lines.append(f'advice_jobs{{status="{status}"}} {count}')
@@ -185,7 +189,7 @@ class AdviceMetrics:
         # Before the first labelled observation, report a known zero without
         # inventing a reason/status. Once observed, only the actual label sets remain.
         present = {name for name, _ in counters}
-        for name in _COUNTER_FAMILIES - present:
+        for name in self._zero_counters - present:
             counters[(name, ())] = 0
         for (name, labels), count in sorted(counters.items()):
             rendered_labels = (

@@ -56,6 +56,7 @@ from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_k
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
 from squadopt.platform.advice_observability import (
+    WORKER_COUNTER_FAMILIES,
     AdviceLog,
     AdviceMetrics,
     configure_advice_logging,
@@ -486,7 +487,11 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
     if arguments.metrics_port is not None and not 0 <= arguments.metrics_port <= 65535:
         parser.error("--metrics-port must be between 0 and 65535.")
     configure_advice_logging()
-    running = backend if backend is not None else backend_from_environment()
+    running = (
+        backend
+        if backend is not None
+        else backend_from_environment(metrics=AdviceMetrics(zero_counters=WORKER_COUNTER_FAMILIES))
+    )
     probe = running.probe.result()
     if not probe.ok:
         # Loudly, and at once. A worker that cannot reach its store would otherwise spend
