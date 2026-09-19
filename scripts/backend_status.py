@@ -69,7 +69,7 @@ def _labelled(samples: list[Metric], name: str) -> str:
         for metric, labels, count in samples
         if metric == name and labels
     ]
-    return "; ".join(values) or UNAVAILABLE
+    return "; ".join(values) or _metric(samples, name)
 
 
 @dataclass
@@ -197,7 +197,7 @@ def status_report(
     lines.extend(
         [
             f"Queue depth (API): {_metric(samples, 'advice_queue_depth')}",
-            f"Jobs by status (API metric outcomes): {_labelled(samples, 'advice_jobs_total')}",
+            f"Jobs by status (API): {_labelled(samples, 'advice_jobs')}",
             f"Cache (API): hits={_metric(samples, 'advice_cache_hits_total')}; "
             f"misses={_metric(samples, 'advice_cache_misses_total')}",
             f"Request refusals (API): {_labelled(samples, 'advice_rejected_total')}",

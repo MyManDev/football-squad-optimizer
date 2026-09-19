@@ -604,9 +604,26 @@ def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(
     )
     assert response.status_code in {200, 202}, response.text
     assert backend.queue_depth() == 1
+    scrape = client.get("/metrics").text
+    assert 'advice_jobs{status="queued"} 1' in scrape
+    assert 'advice_jobs{status="completed"} 0' in scrape
+    assert "advice_queue_depth 1" in scrape
+    claimed = backend.queue.claim(at_utc=backend.queue.jobs()[0].created_at_utc)
+    assert claimed is not None
+    scrape = client.get("/metrics").text
+    assert 'advice_jobs{status="running"} 1' in scrape
+    assert 'advice_jobs{status="queued"} 0' in scrape
+    assert "advice_queue_depth 1" in scrape
+    backend.queue.complete(
+        claimed, cache=backend.cache, payload=b"{}", at_utc=claimed.updated_at_utc
+    )
+    scrape = client.get("/metrics").text
+    assert 'advice_jobs{status="completed"} 1' in scrape
+    assert 'advice_jobs{status="running"} 0' in scrape
+    assert "advice_queue_depth 0" in scrape
 
     job = backend.queue.jobs()[0]
-    assert job.status == "queued"
+    assert job.status == "completed"
     context = backend.contexts.current()
     assert context is not None
     # The job's address is the answer's address under *this* capture: the worker cannot

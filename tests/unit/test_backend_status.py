@@ -61,7 +61,7 @@ def test_canned_metrics_and_actual_log_shapes_are_reported_without_invented_valu
     assert "Queue depth (API): 2" in report
     assert "hits=7; misses=3" in report
     assert "reason=DataError: 1" in report
-    assert "Jobs by status (API metric outcomes): unavailable" in report
+    assert "Jobs by status (API): unavailable" in report
     assert "window 3, retained logs only): unavailable" in report
     assert "Completions without window (retained logs): 2" in report
     assert "n=2, median=6.000, slowest=10.000" in report
@@ -179,6 +179,31 @@ def test_non_positive_days_rejected() -> None:
     with pytest.raises(SystemExit) as error:
         status.main(["--days", "0"])
     assert error.value.code == 2
+
+
+def test_job_gauges_and_initial_zero_counters_are_distinct_from_unexposed(tmp_path: Path) -> None:
+    from squadopt.platform.advice_observability import API_COUNTER_FAMILIES, AdviceMetrics
+
+    metrics = AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)
+    body = metrics.render(
+        queue_depth=2,
+        jobs_by_status={
+            "queued": 1,
+            "running": 1,
+            "completed": 7,
+            "failed": 0,
+        },
+    )
+    _, report = status.status_report(
+        "http://127.0.0.1:18764",
+        "https://public.test",
+        tmp_path,
+        transport=lambda url: (200, body) if url.endswith("/metrics") else (503, "{}"),
+    )
+    assert "status=completed: 7" in report and "status=running: 1" in report
+    assert "hits=0; misses=0" in report
+    assert "Request refusals (API): 0" in report
+    assert status._labelled([], "advice_rejected_total") == status.UNAVAILABLE
 
 
 def test_window_summaries_use_exact_completed_samples_and_keep_legacy_counts(

@@ -657,6 +657,13 @@ class AdviceBackend:
 
         return sum(1 for job in self.queue.jobs() if not job.is_terminal)
 
+    def jobs_by_status(self) -> dict[str, int]:
+        """One current store read inside the owning API, never in the status script."""
+        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        for job in self.queue.jobs():
+            counts[job.status] += 1
+        return counts
+
     def readiness(self) -> tuple[bool, Mapping[str, bool]]:
         """Ready means this process can actually answer, checked rather than assumed."""
 
@@ -676,6 +683,7 @@ def build_backend(
     *,
     log: AdviceLog | None = None,
     probe: StoreProbeGate | None = None,
+    metrics: AdviceMetrics | None = None,
 ) -> AdviceBackend:
     """Open one store and wire every collaborator that reads or writes it.
 
@@ -685,7 +693,7 @@ def build_backend(
     """
 
     component_log = log if log is not None else AdviceLog("backend")
-    metrics = AdviceMetrics()
+    metrics = metrics if metrics is not None else AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
@@ -728,7 +736,9 @@ def build_backend(
     )
 
 
-def backend_from_environment(environ: Mapping[str, str] | None = None) -> AdviceBackend:
+def backend_from_environment(
+    environ: Mapping[str, str] | None = None, *, metrics: AdviceMetrics | None = None
+) -> AdviceBackend:
     """The deployment's backend, read from the server's own environment."""
 
-    return build_backend(BackendConfig.from_environment(environ))
+    return build_backend(BackendConfig.from_environment(environ), metrics=metrics)
