@@ -215,9 +215,32 @@ describe("production advance before upload", () => {
     );
     await expect(verifyProductionAdvance(args)).rejects.toThrow("deployments exist");
   });
+  it.each([undefined, "Dashboard rollback", 123])(
+    "compares the live commit when its tag label is unreadable: %j",
+    async (commit_message) => {
+      const deployment = {
+        ...live,
+        deployment_trigger: { metadata: { ...live.deployment_trigger.metadata, commit_message } },
+      };
+      const args = api({ canonical_deployment: { id: deploymentId } }, deployment);
+      await expect(verifyProductionAdvance(args)).resolves.toContain(
+        `live tag unreadable (${commitSha})`,
+      );
+      expect(args.compareCommits).toHaveBeenCalledExactlyOnceWith({
+        base: commitSha,
+        head: nextSha,
+      });
+    },
+  );
   it("refuses missing commit metadata", async () => {
+    const deployment = {
+      ...live,
+      deployment_trigger: {
+        metadata: { ...live.deployment_trigger.metadata, commit_hash: undefined },
+      },
+    };
     await expect(
-      verifyProductionAdvance(api({ canonical_deployment: { id: deploymentId } }, valid)),
-    ).rejects.toThrow("commit or release tag is missing");
+      verifyProductionAdvance(api({ canonical_deployment: { id: deploymentId } }, deployment)),
+    ).rejects.toThrow("canonical commit is missing or invalid");
   });
 });

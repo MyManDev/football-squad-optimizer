@@ -127,11 +127,14 @@ export async function verifyProductionAdvance({ commitSha, releaseTag, compareCo
   const deployment = await getDeployment({ ...api, deploymentId });
   const metadata = deployment?.deployment_trigger?.metadata;
   const liveSha = metadata?.commit_hash?.toLowerCase();
-  const liveTag = metadata?.commit_message?.match(
-    /^release:(site-\d{4}-\d{2}-gw\d{2}-(?:decision|settled|fix\d+))$/,
-  )?.[1];
-  if (!/^[0-9a-f]{40}$/.test(liveSha ?? "") || !liveTag) {
-    throw new Error("Production identity unreadable: canonical commit or release tag is missing");
+  const liveTag =
+    (typeof metadata?.commit_message === "string"
+      ? metadata.commit_message.match(
+          /^release:(site-\d{4}-\d{2}-gw\d{2}-(?:decision|settled|fix\d+))$/,
+        )?.[1]
+      : null) ?? "live tag unreadable";
+  if (!/^[0-9a-f]{40}$/.test(liveSha ?? "")) {
+    throw new Error("Production identity unreadable: canonical commit is missing or invalid");
   }
   verifyDeploymentRecord({
     deployment,
