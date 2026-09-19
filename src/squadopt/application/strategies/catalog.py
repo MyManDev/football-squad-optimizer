@@ -38,6 +38,7 @@ from types import MappingProxyType
 from typing import Final
 
 from squadopt.contracts import BayesianFactor, FactorKind
+from squadopt.contracts.honesty_stems import EN_STEMS, TR_STEMS
 from squadopt.planning.models import CHIP_NAMES
 
 
@@ -170,6 +171,7 @@ FORBIDDEN_FIELD_PATTERN: Final = re.compile(
     re.IGNORECASE,
 )
 
+
 #: The same rule applied to *text* rather than to field names, in both languages the
 #: site publishes. Its subject is the text **this repository generates**: strategy names,
 #: notes, badges, rule copy, every string in the published tree that a member did not
@@ -183,29 +185,31 @@ FORBIDDEN_FIELD_PATTERN: Final = re.compile(
 #: control characters, markup delimiters, length — because that is a safety question and
 #: not a question of wording.
 #:
-#: This is the web guard's ``AS_A_CHANCE`` set (``MemberDecisionControls.test.tsx``)
-#: with the repository's own ``P(`` and ``quantile`` beside it: one rule written twice.
-#:
-#: Some alternatives carry word boundaries — ``chances?``, ``likelihood``, ``odds``,
-#: ``\u015fans`` and ``y\u00fczde`` — while ``ihtimal`` and ``olas\u0131l`` stay stems.
-#: The boundaries were added while this pattern still read member-typed names, so that
-#: ``\u015eansl\u0131`` ("lucky"), the surname ``\u015eansal`` and ``Bu Y\u00fczden``
-#: ("for that reason") were not published as ``entry-<id>`` in place of the name a member
-#: chose. That reason is gone now that names are out of scope. The boundaries are left
-#: exactly as they are rather than re-tuned in the same change: widening them would move
-#: the guard on our own copy, and this change moves nothing there. Our own wording does
-#: not rely on them either way — the web tests hold it with an unbounded set.
-#:
-#: The dotless i and the soft g are escaped wherever they appear, here and in the pattern,
-#: because they are easy to misread as ``i`` and ``g``.
-#:
-#: The pattern is compiled from ``str``, so ``\b`` is the Unicode boundary and counts
-#: ``\u0131``, ``\u015f``, ``\u011f`` and ``\u00fc`` as word characters — measured,
-#: not assumed: under ``re.ASCII`` it would fall *inside* these words, and bare
-#: ``\u015fans`` would pass.
+#: Stems come from docs/contracts/honesty_words.json through a generated package
+#: constant. Word boundaries, causal "yüzden", and ownership are engine-side rules.
+def _text_stem(stem: str) -> str:
+    escaped = re.escape(stem)
+    if stem in {"tail", "kuyruk"}:
+        return rf"(?a:\b){escaped}(?a:\b)"
+    if stem == "P(":
+        return rf"(?a:\b){escaped}"
+    if stem == "yüzde":
+        return escaped + r"(?!n(?a:\b))"
+    return escaped
+
+
+# Python re requires fixed-width lookbehind. Exclude each of the 41 allowed distances
+# separately; together these mean the web's ownership wording within forty characters.
+# [\s\S] includes newlines on both engines. This changes only the percent alternative.
+_OWNERSHIP = ("owned", "ownership", "sahipli")
+_PERCENT_NOT_OWNERSHIP = (
+    "".join(rf"(?<!{word}[\s\S]{{{distance}}})" for word in _OWNERSHIP for distance in range(41))
+    + r"%(?![\s\S]{0,40}(?:"
+    + "|".join(_OWNERSHIP)
+    + "))"
+)
 FORBIDDEN_TEXT_PATTERN: Final = re.compile(
-    r"%|\bP\(|probabilit|quantile|\bchances?\b|\blikelihood\b|\bodds\b"
-    "|\\bihtimal|\\b\u015fans\\b|\\by\u00fczde\\b|olas\u0131l",
+    "|".join([_PERCENT_NOT_OWNERSHIP, *map(_text_stem, (*EN_STEMS, *TR_STEMS))]),
     re.IGNORECASE,
 )
 
