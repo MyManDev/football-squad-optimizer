@@ -1,11 +1,12 @@
 # Hosting the advice backend for nothing
 
-The advice backend is built and tested and runs nowhere
+The advice backend runs on the owner's Windows PC behind a Cloudflare Tunnel
 ([backend runbook](backend_runbook.md), [ADR 0006](architecture/decisions/0006-backend-hosting.md)).
 ADR 0006 chose Azure Container Apps with an Azure Files NFS share, and applying that creates
 paid resources. This document is the zero-cost route: what can carry the same two processes
 for no money, what each option costs in other ways, and the exact steps for the one that
-works tomorrow.
+is in use. The operating instructions below reflect the code as of 19 September 2026;
+this documentation update did not restart, deploy or measure the live service.
 
 It does not re-decide ADR 0006. Running the backend on the owner's PC keeps every rule that
 ADR set (one shared ReadWrite filesystem that every process mounts, only the api reachable,
@@ -29,7 +30,11 @@ nothing is built on it.
 | read access to captures, handoffs and the published tree | the backend answers from what ops publishes and never calls upstream |
 | inbound HTTPS on a hostname the site can call | the browser posts to it cross-origin |
 
-## Measured on the owner's PC, 2026-09-17
+## Historical timing record, 2026-09-17
+
+These are the [committed 17 September observations](https://github.com/MyManDev/football-squad-optimizer/blob/1550a54c/docs/backend_free_hosting.md#measured-on-the-owners-pc-2026-09-17),
+preserved with their original capture and load conditions. They predate worker warmup
+and chosen-chip compute. They are not a measurement of today's deployment.
 
 One api and **one** worker, started by `scripts/run_backend_local.ps1` from this branch's
 code, reading the main checkout's `data/snapshots`, `data/handoffs` and `web/public/data`
@@ -66,13 +71,24 @@ Other things the run showed:
   matched, the port had no listener and the pid file was gone.
 - Memory per process was not measured.
 
-What the numbers mean for tomorrow: a window-5 request holds a worker for about three and a
-half minutes, and the site gives up on a job after 300 s (`useAdviceJob.ts`, 150 polls at
-2 s). With one worker a second member who asks during that time waits behind it and can run
+In that run a window-5 request held a worker for about three and a
+half minutes. The site's wait budgets are 180 s, 360 s and 600 s for windows 1, 3 and 5
+(`useAdviceJob.ts`, `PATIENCE_MS`). It polls every 2 s for the first minute and every 5 s
+afterwards. With one worker a second member waits behind the first and can run
 out of patience before their job starts. Start several workers. Each busy worker is one
-core and the PC has 32 logical CPUs, so `-Workers 6` leaves the weekly run its 15.
+core; `-Workers 6` is the owner's current launch setting, not a capacity guarantee.
 
-## Tomorrow: the PC and a Cloudflare Tunnel
+The [warmup change](https://github.com/MyManDev/football-squad-optimizer/pull/627)
+verifies warm-before-claim ordering but reports no production latency measurement.
+The [browser acceptance record](https://github.com/MyManDev/football-squad-optimizer/pull/650)
+reports 49.42 s before and 47.45 s after for the complete local synthetic test call,
+including publication, build and startup. That is not a chip latency or a speedup claim.
+Chosen-chip production timings remain unmeasured. Updated window timings will be posted on
+[#632](https://github.com/MyManDev/football-squad-optimizer/issues/632);
+do not use an offline solver record as public endpoint latency or update the site's
+duration copy from it.
+
+## Operating the PC and Cloudflare Tunnel
 
 ### 1. Start the backend
 
@@ -91,6 +107,7 @@ and N `python -m squadopt.platform.advice_worker` processes from `.venv`, with:
 | `SQUADOPT_BACKEND_HANDOFF_ROOT` | `data\handoffs` |
 | `SQUADOPT_BACKEND_ALLOWED_ORIGINS` | `SITE_ORIGINS` from `platform/backend_runtime.py`; a test holds the two together |
 | `SQUADOPT_BACKEND_RATE_LIMIT`, `..._RATE_WINDOW_SECONDS` | 30 per 60 s, the code's defaults, settable with `-RateLimit` and `-RateWindowSeconds` |
+| `SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT` | 4 queued plus running jobs per client address per API process; set in the environment before starting |
 | `SQUADOPT_REPOSITORY_COMMIT` | `git rev-parse HEAD`, stamped once so the api and every worker file answers under one identity |
 | `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` | 1 |
 | `SQUADOPT_BACKEND_ARTIFACT_ROOT`, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE` | `<repo>/artifacts` and the committed example fixture; the inputs of the Top 100 setting and the manager's word (`-ArtifactRoot`, `-ClubNewsSource` override) |
@@ -113,11 +130,40 @@ Three things to know before relying on it:
   a job leaves it `running`. The next worker walks it back to `queued` once the claim is
   older than the 300 s lease and computes it again. Stop when `-Status` shows
   `advice_queue_depth 0`.
-- **The processes end at logoff, sleep or reboot** and nothing restarts them. A scheduled
-  task "at log on" that runs the script makes that automatic. The PC must not sleep while
-  members are expected; that is a Windows power setting for the owner to change.
-- **The answer's identity includes the commit.** After a `git pull` and a restart the cache
-  starts empty for the new commit. Old entries stay on disk and stay addressable.
+- **The shortcut watches after logon.** `scripts\start_backend_at_logon.ps1 -Watch`
+  checks loopback `/health` and the connector carrying its label every 60 seconds.
+  The first pass starts missing components immediately; subsequent passes require three
+  consecutive failures for that component before a start attempt.
+  A successful check resets its counter. One watcher per port and connector label holds
+  a machine-wide named mutex; another non-dry instance exits without starting anything.
+  A dry run takes no mutex, so it can report health while the watcher runs and cannot
+  prevent a real watcher from starting. The watcher avoids
+  launcher attempts while verified recorded processes are alive. An unhealthy backend needs the owner to
+  investigate; watch mode never kills or restarts it. A failed connector process listing
+  or an unavailable command line is unknown, so it does not trigger another connector.
+  Repeated conditions are logged only when they change; a log failure does not end the
+  watcher. Every launch attempt is logged. Actions go to the same backend
+  log directory. `-Register` puts one shortcut using `-Watch` in the owner's own
+  Startup folder, with no elevation, no service and no registry key, and `-Unregister`
+  removes it. The owner runs `-Register` from the main checkout; a shortcut into a removed
+  worktree cannot start the backend. `-DryRun` probes once and prints component status
+  and planned starts, without starting anything or writing logs. `-ConnectorLabel`
+  and `-Port` allow isolated checks. Running without `-Watch` retains one-time startup.
+  The shortcut does not make sleeping or logged-off Windows serve requests.
+  The PC must not sleep while members are expected; that is a Windows power setting
+  for the owner to change.
+- **The answer's identity includes the commit.** Publication and a backend code rollout
+  belong to the same release procedure. The launcher stamps `SQUADOPT_REPOSITORY_COMMIT`
+  once for the API and all workers; updating files under running processes does not update
+  that identity. Publish from the intended release, drain open jobs, then have the owner
+  run `powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop`,
+  then the start command from section 1 on that code revision. A release restart command
+  (#663) will replace this manual sequence when it lands. Verify `/ready` and the public health
+  endpoint before relying on compute. New requests address the new revision's cache;
+  old entries remain on disk. A capture-only update is detected without restarting, but
+  that does not make an old process a new-code deployment. See the
+  [publishing recipe](../scripts/release/ship.sh), which publishes the site and does not
+  restart the backend.
 
 Then prove it locally:
 
@@ -127,26 +173,38 @@ Then prove it locally:
 
 ### What `/ready` needs on this machine
 
-All three checks come from files, re-read on every request, so none of them needs a restart.
+Four checks distinguish an alive process from a backend able to serve the published week.
+The API and workers use the same capture-selection code. They prefer the capture named
+consistently by the published human entry documents when it has a readable matching
+handoff. That handoff can be the gameweek file or an unambiguous retained projection under
+`handoffs/by-capture/<capture>/`. If the published pair is unusable they fall back to the
+newest live capture and log the reason. See [capture selection](backend_runbook.md#configuration).
 
 | Check | Holds when | Code |
 | --- | --- | --- |
-| `capture_context` | the lexically newest `fpl-live-*` directory under `data\snapshots` has a `metadata.json`, **and** `data\handoffs\<season>-gw<NN>.json` exists for that capture's own season and gameweek, **and** that handoff's `source_snapshot_id` is that capture | `capture_context.py`, `load_capture_identity` |
+| `capture_context` | the selected published capture, or fallback newest live capture, has a valid identity and matching handoff | `backend_runtime.py`, `CaptureContextProvider.identity` |
 | `league_tree` | `web\public\data\league\members.json` is readable | `advice_read.py`, `FileLeagueDirectory.readable` |
 | `cache_store` | the store root exists and passes the probe | `store_probe.py` |
+| `league_tree_matches_capture` | the published tree's season and gameweek agree with the selected context | `advice_read.py`, `FileLeagueDirectory.matches` |
 
-Two consequences:
+`league_tree_matches_capture` compares season and gameweek, not capture IDs. Republishing
+the same gameweek from a newer capture can leave this check true.
 
-- Between the weekly run writing a new capture and writing its handoff, `capture_context` is
-  false and advice routes answer 503. Today that gap was about seven minutes (capture id
-  stamped 10:33Z, handoff written 10:40Z). The site treats a 5xx as "backend down" and
-  serves the published static answer, so members see the static site for those minutes.
-  A handoff built from an older capture of the same gameweek does not count: the capture
-  named inside it must be the newest one.
-- Nothing checks that `members.json` names the same season and gameweek as the capture.
-  `league_tree` only asks whether the file can be read. If the published tree is a week
-  behind the newest capture, the page shows one week and the button computes another.
-  Publish the week before relying on the button.
+A newer unpublished capture no longer displaces a usable published capture. Replacing the
+published tree is noticed on the next context resolution; an unreadable or inconsistent
+pair is logged and can make readiness fail. The capture-match check is a week comparison,
+not a published capture ID. The browser also checks capture identity before offering compute.
+
+Workers load the selected capture before their first claim and warm again when its full
+identity changes. `advice_worker_warmed` records capture and elapsed seconds;
+`advice_worker_warm_failed` reports a non-fatal failure. This moves projection preparation
+ahead of a member's first job, without sharing a solver cache or changing solver limits.
+
+Chosen chips use the same queued compute path. Capabilities confirm the member holds the
+chip before offering a supported one-week selection. Unknown history or an unavailable
+chip produces a named refusal; it does not silently produce a no-chip answer. The chip
+is part of request/cache identity. Opening or reloading the page first reads cached advice;
+only the explicit Compute action submits a new job.
 
 ### 2. The tunnel
 
@@ -267,7 +325,7 @@ Cloudflare answers 502 and the site serves the static tree.
   hammering, not a quota. That Block is the only action a Free rule may take was not
   confirmed on the page; it is the action to choose.
 - **The application's own limit is the one that protects the solver.** 30 POSTs per 60 s per
-  client address and per (capture, entry), applied before the cache read; at most one open
+  client address and per (capture, entry), applied after a cache miss; at most one open
   job per distinct request; a computed answer is served from the cache for ever after.
   Polls are not limited by the application, which is what the Cloudflare rule is for.
 - **What a Cloudflare block looks like to the site.** Cloudflare's 403 and 429 pages carry
@@ -314,23 +372,17 @@ repository **variable** so it can be changed or emptied without a commit:
 gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "https://squadopt-api.mymandev.com"
 ```
 
-The workflow change, applied on its own pull request because workflows are a
-release-critical path:
+The wiring is already present in `.github/workflows/ci.yml`:
 
-```diff
---- a/.github/workflows/ci.yml
-+++ b/.github/workflows/ci.yml
-@@ jobs: web: steps:
-       - name: Build
-+        env:
-+          # Unset or empty is the static site, byte for byte (ADR 0006). A repository
-+          # variable, not a secret: the value ships in the bundle.
-+          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
-         run: npm run build
+```yaml
+- name: Build
+  env:
+    VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
+  run: npm run build
 ```
 
 An unset variable expands to the empty string, and `createAdviceClient` treats empty as no
-backend, so the diff is inert until the variable exists.
+backend, so a build with no variable stays a static site.
 
 What follows from building it this way:
 
@@ -494,13 +546,15 @@ implementations drifting.
 
 ## Recommendation
 
-**Tomorrow: (a).** Start the backend with the script, run the local smoke, create the
-tunnel on `squadopt-api.mymandev.com`, run the smoke through it with `--origin`, add the
-two Cloudflare rules, set the repository variable, apply the three-line workflow diff, and
-release. Every step but the release can be undone by stopping a process, and with the PC
-off the site is what it is today.
+The `Backend uptime` workflow checks public `/health` every 15 minutes, with a 10-second timeout and one retry after 20 seconds. A failed check opens one `backend-down` issue; continuing failure is silent, and recovery comments on and closes that issue. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time and status, never a URL or response body. Scheduled Actions can be delayed and are not an exact uptime guarantee. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
 
-**Next: (b), behind the same tunnel hostname, after one measurement.** Oracle's A1 instance
+**Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
+coordinate publication with the backend code revision. The existing tunnel hostname is
+`squadopt-api.mymandev.com`; the build variable is already wired. With the PC off the
+published static plans remain available. This runbook does not authorize a live restart.
+
+**Conditional next route: (b), only after the owner confirms an Oracle account exists.**
+No migration work is authorized before that decision. Oracle's A1 instance
 is the only always-on free offer found that gives this backend what it needs without
 rewriting it: real cores, a real disk, long-running processes. Before it can carry members
 it needs, in this order: the aarch64 parity measurement ADR 0006 asks for (the same

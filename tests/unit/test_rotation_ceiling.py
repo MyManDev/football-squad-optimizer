@@ -436,3 +436,37 @@ def test_the_autosub_reading_charges_the_surrendered_recovery_back() -> None:
     assert "1.27 points per decision for the control" in reading
     assert "surrenders 0.76" in reading
     assert "ceiling near 1.72" in reading
+
+
+def test_a_measurement_binds_on_solver_work_and_not_on_the_clock() -> None:
+    from scripts._experiment_cli import (
+        MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
+        measurement_optimization_config,
+    )
+
+    from squadopt.optimization import OptimizationConfig
+
+    config = measurement_optimization_config()
+    assert config.solver_deterministic_time_limit == MEASUREMENT_DETERMINISTIC_TIME_LIMIT
+    # The wall clock is a cap far above the binding limit, never the limit itself, and the
+    # default config is the wall-clock one this helper exists to replace.
+    assert config.solver_time_limit_seconds >= 60 * MEASUREMENT_DETERMINISTIC_TIME_LIMIT
+    assert OptimizationConfig().solver_deterministic_time_limit is None
+
+
+def test_the_twin_says_what_the_record_rests_on_and_admits_when_it_cannot() -> None:
+    from scripts.measure_rotation_ceiling import _solver_reading
+
+    told = _solver_reading(
+        {
+            "solver": {
+                "binding_limit": "deterministic_time",
+                "solver_deterministic_time_limit": 5.0,
+                "solver_time_limit_seconds": 600.0,
+                "solver_status_counts": {"FEASIBLE": 57, "OPTIMAL": 237},
+            }
+        }
+    )
+    assert "57 FEASIBLE" in told and "237 OPTIMAL" in told and "deterministic_time" in told
+    # A record written before the block existed cannot say, and says that.
+    assert "predates the solver block" in _solver_reading({})

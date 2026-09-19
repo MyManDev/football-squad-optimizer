@@ -5,6 +5,7 @@ import { points, signedPoints, utcShort } from "../../../lib/format";
 import { CHIP_COPY, chipLimit, chipRescores } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { publishedPrice } from "../advice/publishedPrice";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
@@ -104,8 +105,10 @@ export function AdviceCard({
   members = [],
   squad,
   rivalSquad,
+  windowControl = null,
 }: {
   shown: ShownAdvice;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   members?: EntryView[];
   squad: LeagueViewEnvelope<EntrySquad>;
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
@@ -130,8 +133,6 @@ export function AdviceCard({
   // and a price below zero is a giveaway no constrained plan can hand out, so no
   // producer's number is rendered as one.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
-  const priceCeiling = view.expected_points_cost_ceiling;
-  const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
@@ -139,8 +140,14 @@ export function AdviceCard({
   // with the word on as well, the one number is the pair's.
   const top100Priced = view.top100 !== undefined;
   const strategyPriced = top100Priced && view.mode !== "saf-puan";
-  const showsPrice =
-    (view.mode !== "saf-puan" || wordPriced || top100Priced) && finiteNumber(price) && price >= 0;
+  const price = publishedPrice({
+    strategy: view.mode,
+    word: wordPriced,
+    top100: top100Priced,
+    unproven,
+    expected_points_cost: view.expected_points_cost,
+    expected_points_cost_ceiling: view.expected_points_cost_ceiling,
+  });
   const evidenceCopy = EVIDENCE_COPY[language];
   const top100Copy = TOP100_COPY[language];
   const alternative = view.alternative_plan;
@@ -199,7 +206,7 @@ export function AdviceCard({
               : copy.unprovenPlanGapUnknown}
         </p>
       ) : null}
-      {showsPrice && price != null ? (
+      {price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
             {strategyPriced
@@ -332,6 +339,7 @@ export function AdviceCard({
       <ChipChoiceSection view={view} />
       <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
+      <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
@@ -431,7 +439,12 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <div className={styles.windowScroll}>
+      <div
+        className={styles.windowScroll}
+        tabIndex={0}
+        role="region"
+        aria-label={`${copy.windowWeek}: ${weeks.map((week) => week.gameweek).join(", ")}`}
+      >
         <table className={styles.windowTable}>
           <thead>
             <tr>
@@ -767,5 +780,66 @@ function AdviceRow({
       </div>
       <p className={styles.muted}>{reason}</p>
     </article>
+  );
+}
+
+function WindowComparison({ view, control }: { view: EntryAdvice; control: EntryAdvice | null }) {
+  const { locale, language, messages } = useLanguage();
+  const copy = TOP100_COPY[language];
+  if (
+    !control ||
+    view.window <= 1 ||
+    (view.mode === "saf-puan" && !view.top100) ||
+    !view.source_snapshot_id ||
+    view.source_snapshot_id !== control.source_snapshot_id ||
+    view.entry_id !== control.entry_id ||
+    view.league_id !== control.league_id ||
+    view.window !== control.window ||
+    view.season !== control.season ||
+    view.gameweek !== control.gameweek ||
+    control.mode !== "saf-puan" ||
+    control.top100 !== undefined ||
+    control.evidence !== undefined ||
+    control.chip != null
+  )
+    return null;
+  const total = (plan: EntryAdvice): number | null => {
+    const weeks = plan.plan_weeks;
+    if (
+      !weeks ||
+      weeks.length !== plan.window ||
+      weeks.some(
+        (week, index) =>
+          week.gameweek !== plan.gameweek + index ||
+          !finiteNumber(week.expected_points) ||
+          !finiteNumber(week.transfer_hit_points),
+      )
+    )
+      return null;
+    const value = weeks.reduce(
+      (sum, week) => sum + week.expected_points - week.transfer_hit_points,
+      0,
+    );
+    return Number.isFinite(value) ? value : null;
+  };
+  const selected = total(view),
+    pure = total(control);
+  if (selected === null || pure === null) return null;
+  return (
+    <section aria-label={copy.windowComparisonTitle}>
+      <h3 className={styles.lineupTitle}>{copy.windowComparisonTitle}</h3>
+      <dl className={styles.armband}>
+        <div>
+          <dt>{copy.windowSelectedTotal}</dt>
+          <dd className="num">{points(selected, 1, locale)}</dd>
+        </div>
+        <div>
+          <dt>{copy.windowPureTotal}</dt>
+          <dd className="num">{points(pure, 1, locale)}</dd>
+        </div>
+      </dl>
+      <p className={styles.honesty}>{copy.windowComparisonBasis}</p>
+      <p className={styles.honesty}>{messages.leagueMembers.windowLimits}</p>
+    </section>
   );
 }

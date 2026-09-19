@@ -4,6 +4,11 @@ export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
   suggestionHistory: {
+    recordedPlans: "Recorded Plans and Settings",
+    recordedPlansNote:
+      "One-week plans. Window plans and other rivals are in the week's own record and are not listed here. This does not show what you chose, and these alternatives have not been scored against results here.",
+    unknownPlayer: "Player Not Recorded",
+    noRecordedMoves: "No Moves Listed",
     title: "Weekly Suggestion History",
     overview: "Overview",
     systemNet: "System Suggestion · Net",
@@ -967,6 +972,11 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    recordedPlans: "Kaydedilmiş Planlar ve Ayarlar",
+    recordedPlansNote:
+      "Bir haftalık planlar. Çok haftalık planlar ve diğer rakipler haftanın kendi kaydında bulunur, burada listelenmez. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
+    unknownPlayer: "Oyuncu Kaydedilmemiş",
+    noRecordedMoves: "Listelenen Hamle Yok",
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",
     systemNet: "Sistem Tavsiyesi · Net",
@@ -983,7 +993,7 @@ const tr: MessageSchema<typeof en> = {
     back: "Üyeye Dön",
     week: "Kayıtlı Hafta",
     gameweek: (week) => `Oyun Haftası ${week}`,
-    scope: "Lig 352490 · Deadline öncesinde kaydedilmiş son bir haftalık saf puan önerisi.",
+    scope: "Lig 352490 · Son tarihten önce kaydedilmiş son bir haftalık saf puan önerisi.",
     method:
       "Kayıtlı kadroyu kesinleşmiş oyuncu sonuçları, kaptan ve otomatik yedek kurallarıyla puanlıyoruz. Geçmiş önerileri yeniden hesaplatmıyoruz. Puan farkı bir karşılaştırmadır; öneriyi uyguladığınızı veya bu puanı kazanacağınızı kanıtlamaz.",
     empty: "Kayıt Yok",
@@ -992,7 +1002,7 @@ const tr: MessageSchema<typeof en> = {
     retry: "Yeniden Dene",
     unsettled: "Sonuç Kesinleşmedi",
     unavailable: "Karşılaştırma Yapılamıyor",
-    noEligible: "Deadline öncesinde kaydedilmiş öneri yok.",
+    noEligible: "Son tarihten önce kaydedilmiş öneri yok.",
     missingOutcomes: "Hafta kesinleşmiş ancak oyuncu sonuçlarının kaydı bulunmuyor.",
     invalid: "Kayıtlı veriler doğrulanmış bir karşılaştırma için yeterli değil.",
     pending: "Hafta tamamlanıp sonuçlar kontrol edilene kadar puanlar gösterilmez.",
@@ -1024,7 +1034,7 @@ const tr: MessageSchema<typeof en> = {
       "Beklenen ve gerçekleşen değerler oyuncunun çarpansız puanıdır. Uygulanan çarpan kaptan etiketinde gösterilir.",
     evidence: "Kayıt Ayrıntıları",
     published: "Kayıtlı Yayın",
-    deadline: "Deadline",
+    deadline: "Son Tarih",
     captured: "Öneri Verisinin Alındığı An",
     settledAt: "Sonuçların Alındığı An",
     outcomeAsOf: "Sonuç Verisinin Tarihi",

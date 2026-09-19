@@ -183,6 +183,8 @@ export interface ComputableAdvice {
   top100Weights: Top100Weight[];
   /** Whether it would apply the manager's word to this strategy and window. */
   word: boolean;
+  /** Held chips the service can compute for this strategy and window. */
+  chips: MemberChip[];
 }
 
 /** The URL parameter that switches the manager's word on: `llm=on`. */
@@ -331,7 +333,15 @@ export function resolvePublishedAdvice(
 }
 
 function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {
-  return { selection: false, strategies, windows: [], rivals: [], top100Weights: [0], word: false };
+  return {
+    selection: false,
+    strategies,
+    windows: [],
+    rivals: [],
+    top100Weights: [0],
+    word: false,
+    chips: [],
+  };
 }
 
 /**
@@ -340,7 +350,7 @@ function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {
  * The index still has to be readable: it is where the member's rivals, default rival and
  * declared failures come from. A combination the producer tried and declared impossible
  * stays impossible; asking the same solver again would only make the member wait for the
- * same answer. A chosen chip is not computed by the service yet, so it stays published-only.
+ * same answer. Held chips are offered only when the service confirms them for this member.
  */
 function withComputable(
   published: PublishedAdviceSelection,
@@ -398,7 +408,8 @@ function withComputable(
   const baseline = strategy === "saf-puan" && window === 1;
   const word = capabilities.managersWord && baseline && windowComputable;
   const settings: Top100Weight[] = windowComputable ? capabilities.top100Weights : [0];
-  const computable = { strategies, windows, rivals, top100Weights: settings, word };
+  const chips = baseline && windowComputable ? (capabilities.chipsByEntry?.[entryId] ?? []) : [];
+  const computable = { strategies, windows, rivals, top100Weights: settings, word, chips };
 
   // The switches as asked, wherever the published tree or the service can honour them.
   const wordOn =
@@ -413,11 +424,18 @@ function withComputable(
       ? asked
       : 0;
   const switched = wordOn || weight !== 0;
+  const askedChip = parseChip(searchParams).chip;
+  const chip = switched
+    ? null
+    : baseline && askedChip !== null && chips.includes(askedChip)
+      ? askedChip
+      : published.chip.chip;
   const request: AdviceRequest = {
     ...published.request,
     rivalEntryId,
     top100Weight: weight,
     managersWord: wordOn,
+    chip,
   };
   const declared = declaredFor(rivalEntryId, window);
   if (declared) {
@@ -430,7 +448,6 @@ function withComputable(
       computable: { ...computable, selection: false },
     };
   }
-  const chip = switched ? null : published.chip.chip;
   const sameAsPublished =
     published.status === "ready" &&
     (published.request.rivalEntryId ?? null) === rivalEntryId &&
@@ -439,7 +456,7 @@ function withComputable(
     published.chip.chip === chip;
   const canAsk =
     windowComputable &&
-    chip === null &&
+    (chip === null || chips.includes(chip)) &&
     (!capability.requiresRival || rivalEntryId !== null) &&
     (weight === 0 || settings.includes(weight)) &&
     (!wordOn || word);
@@ -460,7 +477,7 @@ function withComputable(
       weight,
       notOffered: weight === 0 && published.top100.notOffered,
     },
-    chip: { ...published.chip, chip },
+    chip: { ...published.chip, chip, notOffered: chip === null && published.chip.notOffered },
     computable: { ...computable, selection: canAsk },
   };
 }

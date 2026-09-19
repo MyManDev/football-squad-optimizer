@@ -14,10 +14,13 @@ from squadopt.data.errors import SnapshotIntegrityError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
 from squadopt.experiments.preseason_difficulty import (
+    PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION,
     TEAM_STRENGTH_FIELDS,
     build_preseason_record,
     compare_to_later,
     drift_to_dict,
+    later_difficulty,
+    record_from_dict,
     record_to_dict,
     record_to_markdown,
 )
@@ -218,3 +221,48 @@ def test_drift_serializes_to_json_native_values(tmp_path: Path) -> None:
     record = build_preseason_record(tmp_path, _store(tmp_path), season="2026-27")
     document = drift_to_dict(compare_to_later(record, record.difficulty))
     assert json.loads(json.dumps(document))["unchanged"] is True
+
+
+def test_a_stored_record_reads_back_and_compares_without_its_capture(tmp_path: Path) -> None:
+    """The evidence is the record. The capture it was made from may be gone, as 2026-27's is."""
+
+    root = tmp_path / "snapshots"
+    recorded = build_preseason_record(root, _store(root), season="2026-27")
+    stored = json.loads(json.dumps(record_to_dict(recorded)))
+    back = record_from_dict(stored)
+    assert record_to_dict(back) == record_to_dict(recorded)
+
+    # An in-season capture, with a fixture played: the record builder refuses it, as it must,
+    # and the later-reading path reads it, which is the whole point of a later reading.
+    later_root = tmp_path / "later"
+    later_id = _store(later_root, captured_at=AFTER, finished=True, difficulty=(2, 5))
+    with pytest.raises(ExperimentExecutionError):
+        build_preseason_record(later_root, later_id, season="2026-27")
+    drift = compare_to_later(back, later_difficulty(later_root, later_id, season="2026-27"))
+    assert (drift.compared_rows, drift.changed_rows, drift.missing_rows) == (4, 1, 0)
+
+
+def test_a_document_that_is_not_a_record_is_refused() -> None:
+    with pytest.raises(ExperimentExecutionError, match="is not"):
+        record_from_dict({"contract_version": "something_else"})
+    with pytest.raises(ExperimentExecutionError, match="difficulty table"):
+        record_from_dict(
+            {"contract_version": PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION, "difficulty": []}
+        )
+
+
+def test_the_markdown_lists_every_reading(tmp_path: Path) -> None:
+    root = tmp_path / "snapshots"
+    record = build_preseason_record(root, _store(root), season="2026-27")
+    readings = [
+        {
+            "snapshot_id": "fpl-live-later",
+            "captured_at_utc": AFTER,
+            "compared_rows": 4,
+            "missing_rows": 0,
+            "changed_rows": 0,
+        }
+    ]
+    text = record_to_markdown(record, None, readings)
+    assert "## Every reading so far" in text and "`fpl-live-later`" in text
+    assert "## Every reading so far" not in record_to_markdown(record)

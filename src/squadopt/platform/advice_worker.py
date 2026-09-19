@@ -46,6 +46,7 @@ from typing import Final
 from squadopt.application.advice_capabilities import menu_capabilities
 from squadopt.application.advice_menu import (
     PLAN_NOT_FOUND_ERRORS,
+    ChipUnavailable,
     ManagersWordNotSolved,
     MenuRequest,
     advise_menu_entry,
@@ -55,6 +56,7 @@ from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_k
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
 from squadopt.platform.advice_observability import (
+    WORKER_COUNTER_FAMILIES,
     AdviceLog,
     AdviceMetrics,
     configure_advice_logging,
@@ -66,6 +68,7 @@ from squadopt.platform.advice_queue import (
     run_advice_worker_once,
 )
 from squadopt.platform.advice_switches import (
+    CHIP_SWITCH,
     MANAGERS_WORD_SWITCH,
     TOP100_SWITCH,
     SwitchInputUnavailable,
@@ -109,7 +112,7 @@ def _stamp(moment: datetime) -> str:
 
 #: The switches this worker computes, and the code a job fails with when the capture has
 #: no input for one. A switch that needs no per-capture input is added to the first only.
-_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH})
+_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH})
 _SWITCH_REFUSAL_CODES: Final = {
     TOP100_SWITCH: "TOP100_INPUTS_UNAVAILABLE",
     MANAGERS_WORD_SWITCH: "MANAGERS_WORD_UNAVAILABLE",
@@ -127,6 +130,9 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
     weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
     word = MANAGERS_WORD_SWITCH in spec.switches
+    chip = spec.switch(CHIP_SWITCH).get("chip")
+    if CHIP_SWITCH in spec.switches and not isinstance(chip, str):
+        raise AdviceComputeRefused("REQUEST_UNREADABLE", "The chip choice is unreadable.")
     unknown = set(spec.switches) - _KNOWN_SWITCHES
     if unknown or (TOP100_SWITCH in spec.switches and weight < 1):
         raise AdviceComputeRefused(
@@ -134,7 +140,12 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
             "The recorded request names a switch this worker does not compute.",
         )
     try:
-        held = switch_identity(capture.switches, top100_weight=weight, managers_word=word)
+        held = switch_identity(
+            capture.switches,
+            top100_weight=weight,
+            managers_word=word,
+            chip=chip if isinstance(chip, str) else None,
+        )
     except SwitchInputUnavailable as error:
         raise AdviceComputeRefused(_SWITCH_REFUSAL_CODES[error.switch], str(error)) from error
     if held != {name: dict(value) for name, value in spec.switches.items()}:
@@ -153,6 +164,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
         rival_entry_id=spec.rival_entry_id,
         top100_weight=weight,
         managers_word=word,
+        chip=chip if isinstance(chip, str) else None,
     )
 
 
@@ -162,6 +174,7 @@ def build_advice_compute(
     *,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     cache: AdviceCacheRepository | None = None,
+    job_log_fields: dict[str, object] | None = None,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -204,6 +217,10 @@ def build_advice_compute(
         return payload if isinstance(payload, dict) else None
 
     def compute(job: AdviceJob) -> bytes:
+        # One worker computes one job at a time. Share only the validated spec's
+        # coordinates with the terminal logger; a later unreadable spec stays absent.
+        if job_log_fields is not None:
+            job_log_fields.clear()
         if job.attempt > max_attempts:
             raise AdviceComputeRefused(
                 "TOO_MANY_ATTEMPTS",
@@ -227,6 +244,8 @@ def build_advice_compute(
                 "No request is recorded at this job's address, so what to compute "
                 "cannot be known. Ask again to file a fresh one.",
             )
+        if job_log_fields is not None:
+            job_log_fields.update(window=spec.window, strategy=spec.strategy)
         capture = contexts.capture(spec.context)
         if capture is None:
             # The whole context, not just the capture: the key this answer will be filed
@@ -260,6 +279,8 @@ def build_advice_compute(
                 manager_words=capture.manager_words,
                 prerequisite=lambda address: cached_plain(spec, address),
             )
+        except ChipUnavailable as error:
+            raise AdviceComputeRefused(error.code, str(error)) from error
         except ManagersWordNotSolved as error:
             # One member's outcome, not a fault and not a missing input: the capture has
             # the club news, and this member's plan under the word and the setting could
@@ -308,9 +329,11 @@ def run_advice_worker(
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
     heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
     store_ready: Callable[[], bool] | None = None,
+    contexts: CaptureContextProvider | None = None,
     max_jobs: int | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
+    job_log_fields: dict[str, object] | None = None,
 ) -> int:
     """Claim and compute until told to stop; return how many jobs reached a terminal state.
 
@@ -328,6 +351,7 @@ def run_advice_worker(
     processed = 0
     recovered_at = 0.0
     waiting_on_store = False
+    warmed = None
     while not should_stop():
         if store_ready is not None and not store_ready():
             if not waiting_on_store and log is not None:
@@ -343,6 +367,30 @@ def run_advice_worker(
             if log is not None:
                 log.event("advice_worker_store_recovered")
         elapsed = time.monotonic()
+        if contexts is not None:
+            context = None
+            try:
+                context = contexts.current()
+                if context is not None and context != warmed:
+                    warmed = context
+                    started = time.monotonic()
+                    if contexts.capture(context) is None:
+                        raise ValueError("The capture changed while warming the worker.")
+                    if log is not None:
+                        log.event(
+                            "advice_worker_warmed",
+                            snapshot_id=context.capture_snapshot_id,
+                            seconds=round(time.monotonic() - started, 3),
+                        )
+                elif context is None:
+                    warmed = None
+            except Exception as error:
+                if log is not None:
+                    log.event(
+                        "advice_worker_warm_failed",
+                        reason=str(error),
+                        snapshot_id=None if context is None else context.capture_snapshot_id,
+                    )
         try:
             if elapsed - recovered_at >= recover_every_seconds:
                 recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
@@ -358,6 +406,7 @@ def run_advice_worker(
                 heartbeat_seconds=heartbeat_seconds,
                 metrics=metrics,
                 log=log,
+                job_log_fields=job_log_fields,
             )
         except QueueLockTimeout:
             # Contention on the queue's lock is a busy moment, not a reason to stop
@@ -447,7 +496,11 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
     if arguments.metrics_port is not None and not 0 <= arguments.metrics_port <= 65535:
         parser.error("--metrics-port must be between 0 and 65535.")
     configure_advice_logging()
-    running = backend if backend is not None else backend_from_environment()
+    running = (
+        backend
+        if backend is not None
+        else backend_from_environment(metrics=AdviceMetrics(zero_counters=WORKER_COUNTER_FAMILIES))
+    )
     probe = running.probe.result()
     if not probe.ok:
         # Loudly, and at once. A worker that cannot reach its store would otherwise spend
@@ -476,6 +529,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 )
             )
             running.log.event("advice_worker_metrics_started", port=server.server_port)
+        job_log_fields: dict[str, object] = {}
         processed = run_advice_worker(
             running.queue,
             running.cache,
@@ -484,14 +538,17 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 running.job_specs,
                 max_attempts=arguments.max_attempts,
                 cache=running.cache,
+                job_log_fields=job_log_fields,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.
             store_ready=running.probe.passed,
+            contexts=running.contexts,
             idle_seconds=arguments.idle_seconds,
             max_jobs=arguments.max_jobs,
             metrics=running.metrics,
             log=running.log,
+            job_log_fields=job_log_fields,
         )
     running.log.event("advice_worker_stopped", processed=processed)
     return 0

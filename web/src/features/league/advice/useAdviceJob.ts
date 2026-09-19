@@ -75,6 +75,8 @@ export interface AdviceJob {
   compute: (request: AdviceRequest) => void;
   /** Pick up a wait this tab began before a reload; false when there is none to pick up. */
   resume?: (request: AdviceRequest) => boolean;
+  /** Read once without starting a job; an absent, stale or unreadable answer stays silent. */
+  readCached?: (request: AdviceRequest) => void;
   reset: () => void;
 }
 
@@ -89,7 +91,8 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     left.gameweek === right.gameweek &&
     (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null) &&
     (left.top100Weight ?? 0) === (right.top100Weight ?? 0) &&
-    (left.managersWord ?? false) === (right.managersWord ?? false)
+    (left.managersWord ?? false) === (right.managersWord ?? false) &&
+    (left.chip ?? null) === (right.chip ?? null)
   );
 }
 
@@ -105,7 +108,11 @@ function failure(error: unknown): { reason: string | null; retryAfterSeconds: nu
   return { reason: null, retryAfterSeconds: null };
 }
 
-export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true): AdviceJob {
+export function useAdviceJob(
+  client: AdviceClient,
+  allowPublishedBaseline = true,
+  expectedSnapshotId?: string | null,
+): AdviceJob {
   const [state, setState] = useState<ComputePhase>({ phase: "idle" });
   const generation = useRef(0);
   const active = useRef<AbortController | null>(null);
@@ -120,8 +127,41 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
   const reset = useCallback(() => {
     generation.current += 1;
     active.current?.abort();
+    active.current = null;
     setState({ phase: "idle" });
   }, []);
+
+  const readCached = useCallback(
+    (request: AdviceRequest) => {
+      if (active.current) return;
+      const run = ++generation.current;
+      const controller = new AbortController();
+      active.current = controller;
+      void withRequestDeadline(
+        async (signal) => {
+          const read = await client.readAdvice(request, { signal, publishedFallback: false });
+          if (read.kind !== "advice" || signal.aborted || generation.current !== run) return;
+          checkedAdvice(read.envelope, request);
+          const snapshot = read.envelope.payload.source_snapshot_id;
+          if (snapshot != null && expectedSnapshotId != null && snapshot !== expectedSnapshotId)
+            return;
+          setState((prev) =>
+            prev.phase === "idle"
+              ? { phase: "done", request, envelope: read.envelope, source: read.source }
+              : prev,
+          );
+        },
+        { signal: controller.signal, timeoutMs: REQUEST_ALLOWANCE_MS },
+      )
+        .catch(() => {
+          // A cache miss or failed read leaves the ordinary Compute panel in place.
+        })
+        .finally(() => {
+          if (active.current === controller) active.current = null;
+        });
+    },
+    [client, expectedSnapshotId],
+  );
 
   const start = useCallback(
     (request: AdviceRequest, resumed: StoredAdviceJob | null) => {
@@ -130,6 +170,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
       const controller = new AbortController();
       active.current = controller;
       let taskSignal = controller.signal;
+      let readAfterMissingJob = false;
       const alive = () => generation.current === run && !taskSignal.aborted;
       const patience = PATIENCE_MS[request.window] ?? PATIENCE_MS[1];
       const fail = (error?: unknown, reason?: string) => {
@@ -195,6 +236,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
                     rivalEntryId: null,
                     top100Weight: undefined,
                     managersWord: undefined,
+                    chip: undefined,
                   },
                   options,
                 )
@@ -228,6 +270,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
                 // failure: the page is simply back where a fresh visit starts.
                 if (resumed && error instanceof AdviceApiError && error.status === 404) {
                   setState({ phase: "idle" });
+                  readAfterMissingJob = true;
                 } else {
                   fail(error);
                 }
@@ -283,9 +326,10 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
         })
         .finally(() => {
           if (active.current === controller) active.current = null;
+          if (readAfterMissingJob && generation.current === run) readCached(request);
         });
     },
-    [client, allowPublishedBaseline],
+    [client, allowPublishedBaseline, readCached],
   );
 
   const compute = useCallback((request: AdviceRequest) => start(request, null), [start]);
@@ -305,5 +349,5 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
     [start],
   );
 
-  return { state, compute, resume, reset };
+  return { state, compute, resume, readCached, reset };
 }

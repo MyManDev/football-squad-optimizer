@@ -448,12 +448,24 @@ def test_every_other_document_keeps_the_bytes_its_own_function_returns(
         )
 
 
-def test_a_chip_document_is_not_in_the_advice_record(world: dict[str, Any], tmp_path: Path) -> None:
+def test_published_chip_documents_are_in_the_advice_record(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
     _publish(world, tmp_path / "tree", advice_record_root=tmp_path / "record")
-    records = list((tmp_path / "record").rglob("*.json"))
+    records = list((tmp_path / "record").rglob("advice.json"))
     assert records
-    for record in records:
-        assert "chip-" not in record.read_text(encoding="utf-8")
+    recorded = {
+        item["published_path"]
+        for path in records
+        for item in json.loads(path.read_text(encoding="utf-8"))["advice"]
+        if "/chip-" in item["published_path"]
+    }
+    published = {
+        path.relative_to(tmp_path / "tree").as_posix()
+        for path in (tmp_path / "tree").rglob("chip-*.json")
+    }
+    assert published
+    assert recorded == published
 
 
 def test_a_chip_played_since_the_last_publish_takes_its_file_with_it(

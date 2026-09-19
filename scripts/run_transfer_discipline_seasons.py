@@ -29,13 +29,16 @@ import itertools
 import logging
 import sys
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
+    MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
     REPOSITORY_ROOT,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -58,7 +61,6 @@ from squadopt.experiments.season_chain_runs import (
     parse_holding_values,
     season_fixture_counts,
 )
-from squadopt.optimization import OptimizationConfig
 from squadopt.planning import TransferPlanningConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -392,14 +394,24 @@ def main() -> int:
         return 1
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     panel = build_panel(arguments.archive_root)
-    optimization_config = OptimizationConfig()
+    # The measurement limit by default, not only when the operator remembers to ask for one.
+    # A deterministic budget that has to be requested is a record that depends on whether it
+    # was (#590); the flags below still override it, and a wall-clock cap is raised well above
+    # the budget so the budget is what stops the solve.
+    optimization_config = measurement_optimization_config()
     if arguments.deterministic_time_limit is not None or arguments.wall_time_limit is not None:
+        deterministic = (
+            float(arguments.deterministic_time_limit)
+            if arguments.deterministic_time_limit is not None
+            else MEASUREMENT_DETERMINISTIC_TIME_LIMIT
+        )
         wall = arguments.wall_time_limit
         if wall is None:
-            wall = max(60.0, 6.0 * float(arguments.deterministic_time_limit or 10.0))
-        optimization_config = OptimizationConfig(
-            solver_time_limit_seconds=wall,
-            solver_deterministic_time_limit=arguments.deterministic_time_limit,
+            wall = max(60.0, 6.0 * deterministic)
+        optimization_config = replace(
+            optimization_config,
+            solver_time_limit_seconds=float(wall),
+            solver_deterministic_time_limit=deterministic,
         )
     records: list[dict[str, object]] = []
     try:

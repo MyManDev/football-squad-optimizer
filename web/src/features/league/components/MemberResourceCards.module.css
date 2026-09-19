@@ -3,6 +3,28 @@
   font-size: var(--step-2);
   font-variant-numeric: tabular-nums;
 }
+.details > summary {
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  font-weight: 600;
+}
+.details > summary > h2 {
+  display: inline;
+  font: inherit;
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .details > section > header > h2 {
+    display: none;
+  }
+}
+@media (min-width: 641px) {
+  .details > summary {
+    display: none;
+  }
+}
 .chips {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));

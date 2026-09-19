@@ -8,19 +8,19 @@
     },
     "3": {
       "cells": 5,
-      "mean_claimed": 0.8720000000000001,
+      "mean_claimed": 0.8719999999999999,
       "mean_shared_starters": 3.6,
       "realized_ahead_share": 0.0
     },
     "5": {
       "cells": 5,
-      "mean_claimed": 0.8939999999999999,
-      "mean_shared_starters": 3.6,
+      "mean_claimed": 0.8940000000000001,
+      "mean_shared_starters": 3.8,
       "realized_ahead_share": 0.0
     }
   },
   "contract_version": "windowed_rank_v1",
-  "created_utc": "2026-08-20T06:19:35+00:00",
+  "created_utc": "2026-09-19T01:34:41+00:00",
   "environment": {
     "logical_cpu_count": 32,
     "ortools": "9.15.6755",
@@ -34,6 +34,13 @@
     3,
     5
   ],
+  "loaded_seasons": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
   "locked_holdout_accessed": false,
   "measurement_only": true,
   "origins": [
@@ -46,11 +53,11 @@
   "projection_note": "Each window week repeats the origin's projection; the control produces one week and the calendar-aware GW2+ projection is the data side's deliverable.",
   "provenance": {
     "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
-    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
     "archive_repository": "vaastav/Fantasy-Premier-League",
     "experiment_contract_version": "screening_doe_v1",
     "feature_generation_contract_version": "form_window_v1",
-    "history_rows": 156075,
+    "history_rows": 126737,
     "history_seasons": [
       "2020-21",
       "2021-22",
@@ -59,13 +66,15 @@
       "2024-25",
       "2025-26"
     ],
-    "repository_commit": "a64b8e66501c24587cb0776ab294be52d59de757",
-    "working_tree_dirty": true
+    "repository_commit": "7a29bd579650bd6db6115f949a4319679a30fe7e",
+    "working_tree_dirty": false
   },
   "rival_edge_points_per_week": 7.19,
   "rows": [
     {
       "claimed_probability_ahead": 0.58,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 1,
       "origin": 8,
       "realized_ahead": true,
@@ -76,29 +85,35 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.63,
+      "claimed_probability_ahead": 0.62,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 3,
       "origin": 8,
       "realized_ahead": false,
       "realized_score": 108.0,
       "rival_realized_score": 129.0,
-      "scenario_mean_score": 262.87641246516705,
+      "scenario_mean_score": 263.0793731861623,
       "shared_starters": 5,
       "solver_status": "FEASIBLE"
     },
     {
       "claimed_probability_ahead": 0.56,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 5,
       "origin": 8,
       "realized_ahead": false,
       "realized_score": 176.0,
       "rival_realized_score": 246.0,
-      "scenario_mean_score": 439.42119053597133,
+      "scenario_mean_score": 439.91274241914437,
       "shared_starters": 5,
       "solver_status": "FEASIBLE"
     },
     {
       "claimed_probability_ahead": 0.82,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 1,
       "origin": 14,
       "realized_ahead": false,
@@ -109,29 +124,35 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.9,
+      "claimed_probability_ahead": 0.91,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 3,
       "origin": 14,
       "realized_ahead": false,
       "realized_score": 135.0,
       "rival_realized_score": 180.0,
-      "scenario_mean_score": 274.560434231124,
+      "scenario_mean_score": 274.27449640805787,
       "shared_starters": 3,
       "solver_status": "FEASIBLE"
     },
     {
       "claimed_probability_ahead": 0.98,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 5,
       "origin": 14,
       "realized_ahead": false,
       "realized_score": 260.0,
       "rival_realized_score": 289.0,
-      "scenario_mean_score": 461.65999122170143,
+      "scenario_mean_score": 461.94789220991987,
       "shared_starters": 3,
       "solver_status": "FEASIBLE"
     },
     {
       "claimed_probability_ahead": 0.81,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 1,
       "origin": 20,
       "realized_ahead": true,
@@ -142,29 +163,35 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.93,
+      "claimed_probability_ahead": 0.94,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 3,
       "origin": 20,
       "realized_ahead": false,
       "realized_score": 160.0,
       "rival_realized_score": 187.0,
-      "scenario_mean_score": 308.9059683662736,
+      "scenario_mean_score": 309.3882674235625,
       "shared_starters": 4,
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.98,
+      "claimed_probability_ahead": 0.99,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 5,
       "origin": 20,
       "realized_ahead": false,
-      "realized_score": 329.0,
+      "realized_score": 352.0,
       "rival_realized_score": 380.0,
-      "scenario_mean_score": 509.90668122018417,
-      "shared_starters": 4,
-      "solver_status": "FEASIBLE"
+      "scenario_mean_score": 507.36330066948284,
+      "shared_starters": 5,
+      "solver_status": "OPTIMAL"
     },
     {
       "claimed_probability_ahead": 0.81,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 1,
       "origin": 26,
       "realized_ahead": false,
@@ -175,29 +202,35 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.93,
+      "claimed_probability_ahead": 0.92,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 3,
       "origin": 26,
       "realized_ahead": false,
       "realized_score": 189.0,
       "rival_realized_score": 196.0,
-      "scenario_mean_score": 308.2435295945377,
+      "scenario_mean_score": 308.1502308666282,
       "shared_starters": 4,
       "solver_status": "FEASIBLE"
     },
     {
       "claimed_probability_ahead": 0.96,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 5,
       "origin": 26,
       "realized_ahead": false,
       "realized_score": 208.0,
       "rival_realized_score": 257.0,
-      "scenario_mean_score": 510.4250720682258,
+      "scenario_mean_score": 510.5786320134663,
       "shared_starters": 4,
       "solver_status": "FEASIBLE"
     },
     {
       "claimed_probability_ahead": 0.82,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 1,
       "origin": 32,
       "realized_ahead": true,
@@ -209,27 +242,35 @@
     },
     {
       "claimed_probability_ahead": 0.97,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 3,
       "origin": 32,
       "realized_ahead": false,
       "realized_score": 119.0,
       "rival_realized_score": 156.0,
-      "scenario_mean_score": 250.2694409717953,
+      "scenario_mean_score": 250.21930642336375,
       "shared_starters": 2,
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.99,
+      "claimed_probability_ahead": 0.98,
+      "deterministic_budget_source": "rank_default",
+      "deterministic_time_limit": 10.0,
       "horizon": 5,
       "origin": 32,
       "realized_ahead": false,
       "realized_score": 193.0,
       "rival_realized_score": 249.0,
-      "scenario_mean_score": 413.79827169412266,
+      "scenario_mean_score": 413.8713603981459,
       "shared_starters": 2,
       "solver_status": "FEASIBLE"
     }
   ],
   "scenario_count": 100,
-  "season": "2024-25"
+  "season": "2024-25",
+  "solver_statuses": {
+    "FEASIBLE": 14,
+    "OPTIMAL": 1
+  }
 }

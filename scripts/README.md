@@ -151,12 +151,16 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `_phase_e_live.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_shadow_live` | 2026-09-07 |
 | `_phase_e_shadow_live.py` | helper | imported by `run_phase_e_live_shadow` | 2026-09-07 |
 
-## Deprecated compatibility commands
+## Retired compatibility commands
 
-These commands still support older runbooks or argument conventions. Confirm their callers and retirement window before removal.
+The one-release compatibility window ended with 1.0.0. These shells have been removed;
+historical runbooks retain their original commands as records of those runs.
 
-| Script | Class | Record it writes, or what names it | Last commit |
-| --- | --- | --- | --- |
-| `capture_deadline_snapshot.py` | deprecated shell | replaced by `squadopt season tick`; still named by `docs/opening_week_runbook.md` | 2026-09-07 |
-| `run_gameweek_ops.py` | deprecated shell | replaced by `squadopt gameweek decide` / `settle`; `docs/architecture/platform_runtime.md` | 2026-08-20 |
-| `run_season_tick.py` | deprecated shell | replaced by `squadopt season tick`; `docs/architecture/platform_runtime.md` | 2026-08-20 |
+| Removed script | Current command |
+| --- | --- |
+| `capture_deadline_snapshot.py` | `squadopt season tick --dry-run` to inspect due actions, then `squadopt season tick` to execute them |
+| `run_gameweek_ops.py` | `squadopt gameweek decide` / `squadopt gameweek settle --gameweek N` |
+| `run_season_tick.py` | `squadopt season tick` |
+
+A season tick can capture, decide and settle; it is not a capture-only replacement.
+Dry-run records CLI bookkeeping but does not execute those due actions.

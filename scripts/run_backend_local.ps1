@@ -11,6 +11,7 @@ Cloudflare Tunnel (deploy/cloudflared/config.example.yml) is what makes it reach
 
   powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Workers 4
   powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Status
+  powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop -WhatIf
   powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop
 
 It refuses to start while a previous start is still alive, records every process it
@@ -69,11 +70,13 @@ param(
     [int]$WorkerMetricsBasePort = 0,
     [int]$StartTimeoutSeconds = 60,
     [switch]$Stop,
+    [switch]$WhatIf,
     [switch]$Status
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
+if ($WhatIf -and -not $Stop) { throw "-WhatIf is supported only with -Stop." }
 
 if (-not $RepoRoot) { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
@@ -111,14 +114,21 @@ function Get-RecordedProcess($entry) {
     return $live
 }
 
-function Get-Descendants([int]$parentId) {
+function Get-Descendants([int]$parentId, $snapshot) {
     # .venv\Scripts\python.exe is a launcher: the interpreter doing the work is its child.
+    # Windows retains orphan ParentProcessId values even after that pid is reused.
+    # Both creation dates come from one snapshot; never traverse an older orphan.
     $found = @()
-    $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$parentId")
+    $parent = $snapshot | Where-Object { $_.ProcessId -eq $parentId } | Select-Object -First 1
+    if ($null -eq $parent -or $null -eq $parent.CreationDate) { return $found }
+    $children = @($snapshot | Where-Object {
+        $_.ParentProcessId -eq $parentId -and $_.ProcessId -ne $parentId -and
+        $null -ne $_.CreationDate -and $_.CreationDate -ge $parent.CreationDate
+    })
     foreach ($child in $children) {
         if ($child.Name -eq "conhost.exe") { continue }
         $found += [int]$child.ProcessId
-        $found += @(Get-Descendants ([int]$child.ProcessId))
+        $found += @(Get-Descendants ([int]$child.ProcessId) $snapshot)
     }
     return $found
 }
@@ -142,6 +152,7 @@ function Stop-Recorded($state) {
     $ordered = @($state.processes | Where-Object { $_.role -eq "api" }) +
         @($state.processes | Where-Object { $_.role -ne "api" })
     $targets = @()
+    $snapshot = @(Get-CimInstance Win32_Process -ErrorAction Stop)
     foreach ($entry in $ordered) {
         $live = Get-RecordedProcess $entry
         if ($null -eq $live) {
@@ -151,8 +162,19 @@ function Stop-Recorded($state) {
         # Children are read while the parent is still alive and verified, so a child
         # pid cannot be somebody else's.
         $targets += [int]$entry.pid
-        $targets += @(Get-Descendants ([int]$entry.pid))
-        Write-Host ("{0} (pid {1}): stopping" -f $entry.role, $entry.pid)
+        $targets += @(Get-Descendants ([int]$entry.pid) $snapshot)
+        if (-not $WhatIf) { Write-Host ("{0} (pid {1}): stopping" -f $entry.role, $entry.pid) }
+    }
+    $targets = @($targets | Select-Object -Unique)
+    if ($WhatIf) {
+        foreach ($id in $targets) {
+            $row = $snapshot | Where-Object { $_.ProcessId -eq $id } | Select-Object -First 1
+            $command = "<process exited before listing>"
+            if ($null -ne $row) { $command = [string]$row.CommandLine }
+            Write-Host ("Would stop pid {0}: {1}" -f $id, $command)
+        }
+        Write-Host "WhatIf: no process stopped; pid file kept."
+        return $true
     }
     foreach ($id in $targets) {
         try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { }
