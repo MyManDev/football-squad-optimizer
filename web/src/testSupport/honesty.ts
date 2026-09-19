@@ -1,4 +1,4 @@
-import words from "../../../docs/contracts/honesty_words.json";
+import words from "../../../docs/contracts/honesty_words.json" with { type: "json" };
 
 // Only for product copy owned by the repository, never member-supplied names.
 //

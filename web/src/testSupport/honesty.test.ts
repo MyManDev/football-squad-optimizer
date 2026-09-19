@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import words from "../../../docs/contracts/honesty_words.json";
+import words from "../../../docs/contracts/honesty_words.json" with { type: "json" };
 import { AS_A_CHANCE } from "./honesty";
 
 describe("the shared product-copy honesty guard", () => {
