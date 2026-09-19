@@ -73,6 +73,25 @@ def _multipliers(bootstrap: bytes) -> dict[int, float]:
     return {int(p): float(v) for p, v in zip(ones["player_id"], scaled, strict=True)}
 
 
+def _prior_minutes_per_week(bootstrap: bytes) -> dict[int, float] | None:
+    """Season minutes the capture states for each player, over the gameweeks it had scored.
+
+    Blank and double gameweeks make this approximate for the clubs they touch; the
+    buckets it feeds are wide. With no gameweek scored there is no prior to state.
+    """
+
+    weeks = len(scored_gameweeks(bootstrap))
+    if weeks == 0:
+        return None
+    prior: dict[int, float] = {}
+    for element in json.loads(bootstrap)["elements"]:
+        code, minutes = element.get("code"), element.get("minutes")
+        # A missing figure is absent, never zero.
+        if isinstance(code, int) and isinstance(minutes, int) and not isinstance(minutes, bool):
+            prior[code] = minutes / weeks
+    return prior
+
+
 def _handoffs(handoff_root: Path, capture_id: str) -> list[InSeasonProjection]:
     directory = handoff_root / "by-capture" / capture_id
     if not directory.is_dir():
@@ -183,6 +202,7 @@ def measure(data_root: Path) -> dict[str, object]:
         players = player_snapshot(bootstrap)
         multipliers = _multipliers(bootstrap)
         forecast = game_forecast(bootstrap)
+        prior_minutes = _prior_minutes_per_week(bootstrap)
         decision = _ledger_decision(ledger_root, season, gameweek)
         held = _ledger_handoff_fingerprint(decision)
         readings: list[dict[str, object]] = []
@@ -193,6 +213,7 @@ def measure(data_root: Path) -> dict[str, object]:
                 expected_points=handoff.expected_points,
                 multipliers=multipliers,
                 game=forecast,
+                prior_minutes_per_week=prior_minutes,
             )
             in_ledger = held is not None and handoff.fingerprint == held
             if in_ledger or (gameweek not in primary_frames and handoff is handoffs[-1]):
@@ -267,6 +288,84 @@ _HEADER = (
 )
 
 
+_ABSENT_SPLITS = (
+    ("by_position", "position"),
+    ("by_price_band", "price band"),
+    ("by_forecast_size", "size of the forecast"),
+    ("by_our_availability_rule", "our availability rule"),
+)
+
+
+def _absent_cell(block: object) -> str:
+    if not isinstance(block, dict) or not block.get("players"):
+        return "none"
+    return f"{block['forecast_points']:.1f} ({block['players']})"
+
+
+def _absent_table(forecasts: Mapping[str, Mapping[str, object]]) -> list[str]:
+    """Forecast points on players who did not appear, by where they sat."""
+
+    blocks: dict[str, dict[str, object]] = {}
+    for name, summary in forecasts.items():
+        block = summary.get("absent_forecast")
+        if isinstance(block, dict):
+            blocks[name] = block
+    if not blocks:
+        return []
+    names = list(blocks)
+    lines = [
+        "",
+        "Forecast points on players who did not appear, as points (players):",
+        "",
+        "| split | bucket | " + " | ".join(names) + " |",
+        "| --- | --- | " + " | ".join("---:" for _ in names) + " |",
+        "| all | all | " + " | ".join(_absent_cell(blocks[name]) for name in names) + " |",
+    ]
+    for key, title in _ABSENT_SPLITS:
+        first = blocks[names[0]][key]
+        assert isinstance(first, dict)
+        for bucket in first:
+            cells = []
+            for name in names:
+                split = blocks[name][key]
+                assert isinstance(split, dict)
+                cells.append(_absent_cell(split.get(bucket)))
+            lines.append(f"| {title} | {bucket} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def _prior_table(forecasts: Mapping[str, Mapping[str, object]]) -> list[str]:
+    """Forecast against realized points by how much the player had been playing."""
+
+    blocks: dict[str, dict[str, object]] = {}
+    for name, summary in forecasts.items():
+        block = summary.get("by_prior_minutes")
+        if isinstance(block, dict) and isinstance(block.get("buckets"), dict):
+            blocks[name] = block["buckets"]
+    if not blocks:
+        return []
+    lines = [
+        "",
+        "By minutes a gameweek played this season before the deadline:",
+        "",
+        "| forecast | prior minutes | players | appeared | forecast points | "
+        "realized points | MAE | bias |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for name, buckets in blocks.items():
+        for label, block in buckets.items():
+            assert isinstance(block, dict)
+            if not block.get("players"):
+                continue
+            lines.append(
+                f"| {name} | {label} | {block['players']} | {block['appeared']} | "
+                f"{block['forecast_points']:.1f} | {block['realized_points']:.1f} | "
+                f"{_number(block.get('mean_absolute_error')).lstrip('+')} | "
+                f"{_number(block.get('bias'))} |"
+            )
+    return lines
+
+
 def _markdown(record: Mapping[str, object]) -> str:
     lines = [
         "# Live projection audit",
@@ -304,6 +403,8 @@ def _markdown(record: Mapping[str, object]) -> str:
             lines += ["", f"**{title}**" + (f" ({'; '.join(tags)})" if tags else ""), "", _HEADER]
             for name, summary in reading["forecasts"].items():
                 lines.append(_row(name, summary))
+            lines += _absent_table(reading["forecasts"])
+            lines += _prior_table(reading["forecasts"])
             paired = reading.get("ours_decided_minus_game")
             if isinstance(paired, dict) and paired.get("players"):
                 lines += [
@@ -341,6 +442,8 @@ def _markdown(record: Mapping[str, object]) -> str:
         lines += ["", _HEADER]
         for name, summary in pooled["forecasts"].items():
             lines.append(_row(name, summary))
+        lines += _absent_table(pooled["forecasts"])
+        lines += _prior_table(pooled["forecasts"])
     return "\n".join(lines) + "\n"
 
 
