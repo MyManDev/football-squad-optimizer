@@ -40,6 +40,25 @@ it.each<Language>(["tr", "en"])(
       expect(rows[index]).not.toHaveTextContent(language === "tr" ? "0,0" : "0.0");
   },
 );
+it.each<Language>(["tr", "en"])(
+  "uses the plain price sentence when the recorded ceiling equals the cost in %s",
+  async (language) => {
+    const value = history();
+    Object.assign(value.payload.weeks[0], {
+      recorded_plans: [
+        { ...planRows[1], expected_points_cost: 4, expected_points_cost_ceiling: 4 },
+      ],
+    });
+    show(value, language);
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    await userEvent.click(screen.getByText(MESSAGES[language].suggestionHistory.recordedPlans));
+    const price = language === "tr" ? "4,0" : "4.0";
+    expect(screen.getByText(TOP100_COPY[language].combinedCost(price))).toBeVisible();
+    expect(
+      screen.queryByText(TOP100_COPY[language].combinedCostAtMost(price)),
+    ).not.toBeInTheDocument();
+  },
+);
 it("does not display negative archived prices", async () => {
   const value = history();
   Object.assign(value.payload.weeks[0], {

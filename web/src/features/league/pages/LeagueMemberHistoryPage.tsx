@@ -396,7 +396,9 @@ function RecordedPlans({ week, members }: { week: WeekReview; members: EntryView
             word: plan.managers_word === true,
             top100: plan.top100_weight !== undefined,
           });
-          const capped = plan.expected_points_cost_ceiling !== undefined;
+          const capped =
+            plan.expected_points_cost_ceiling !== undefined &&
+            plan.expected_points_cost_ceiling !== plan.expected_points_cost;
           const top100Copy = TOP100_COPY[language];
           const evidenceCopy = EVIDENCE_COPY[language];
           const priceText =

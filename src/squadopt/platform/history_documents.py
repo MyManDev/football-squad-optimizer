@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from squadopt.application.advice_capabilities import TOP100_WEIGHTS
+from squadopt.application.mode_selection import MODE_SLUGS
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION, SUPPORTED_LEAGUE_ID
 from squadopt.live.rules import CHIP_NAMES
@@ -50,7 +51,7 @@ def history_schema() -> dict[str, Any]:
     }
     plan = {
         "published_path": {"type": "string", "pattern": "^advice/[1-9][0-9]*/"},
-        "strategy": {"enum": list(STRATEGY_CATALOG)},
+        "strategy": {"enum": [*STRATEGY_CATALOG, *MODE_SLUGS.values()]},
         "window": {"const": 1},
         "rival_entry_id": {"type": ["integer", "null"], "minimum": 1},
         "chip": chip,

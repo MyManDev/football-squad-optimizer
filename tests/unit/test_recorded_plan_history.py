@@ -169,3 +169,16 @@ def test_reproducible_history_schema_accepts_both_shapes_and_refuses_a_null_pric
     jsonschema.validate(legacy, schema)
     rows[0]["expected_points_cost"] = None
     assert list(jsonschema.Draft202012Validator(schema).iter_errors(legacy))
+
+
+@pytest.mark.parametrize("mode", ["garantici", "agresif", "asiri-agresif"])
+def test_history_schema_accepts_legacy_mode_rows_the_publisher_can_emit(mode: str) -> None:
+    history = json.loads(
+        (ROOT / "web/src/fixtures/weeklySuggestionHistory.json").read_text(encoding="utf-8")
+    )
+    row = json.loads((ROOT / "web/src/fixtures/recordedPlanRows.json").read_text(encoding="utf-8"))[
+        0
+    ]
+    row.update(strategy=mode, published_path=f"advice/101/{mode}/1.json")
+    history["payload"]["weeks"][0]["recorded_plans"] = [row]
+    jsonschema.validate(history, history_schema())

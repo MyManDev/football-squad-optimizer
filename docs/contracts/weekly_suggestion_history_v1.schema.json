@@ -288,7 +288,11 @@
                         "takvim-onceligi",
                         "cip-yerlesimi",
                         "transfer-disiplini",
-                        "fiyat-yakala"
+                        "fiyat-yakala",
+                        "saf-puan",
+                        "garantici",
+                        "agresif",
+                        "asiri-agresif"
                       ]
                     },
                     "top100_weight": {
