@@ -52,11 +52,14 @@ export function checkedAdvice(
   // manager's word carries its evidence and the plain one does not. A request that states
   // neither (every request of a static build) is held to nothing here, as before.
   const top100 = payload.top100;
+  const chosenChip = record(payload.chip_choice) ? payload.chip_choice.chip : null;
   if (
     (request.top100Weight !== undefined &&
       ((record(top100) ? top100.weight : 0) ?? 0) !== request.top100Weight) ||
     (request.managersWord !== undefined &&
-      (payload.evidence !== undefined) !== request.managersWord)
+      (payload.evidence !== undefined) !== request.managersWord) ||
+    (request.chip !== undefined &&
+      (chosenChip !== request.chip || (payload.chip ?? null) !== request.chip))
   ) {
     throw new AdviceContextError("Advice does not match the selected switches.");
   }

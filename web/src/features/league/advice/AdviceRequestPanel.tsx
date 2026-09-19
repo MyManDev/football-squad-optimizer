@@ -51,7 +51,7 @@ export function AdviceRequestPanel({
   computable?: boolean;
   /** With a ready service: whether the published tree already answers this selection. */
   published?: boolean;
-  /** A chosen chip is shown from the published tree only; the service computes none yet. */
+  /** A chip computation has no measured duration to display. */
   chipChosen?: boolean;
   /**
    * A service is configured and has not said yet what it computes. The static build's
@@ -78,7 +78,7 @@ export function AdviceRequestPanel({
           {service !== "ready"
             ? copy.computeUnsupportedSelection
             : chipChosen
-              ? computeCopy.chipNotComputed
+              ? computeCopy.chipUnavailable
               : computeCopy.notComputable}
         </p>
       ) : null}
@@ -87,7 +87,13 @@ export function AdviceRequestPanel({
       {service === "ready" && supported ? (
         <p role="note" className={styles.durationNote}>
           {published ? null : <>{computeCopy.notPrecomputed} </>}
-          {computeCopy.duration[request.window]} {computeCopy.durationNote}
+          {chipChosen ? (
+            computeCopy.chipDurationUnknown
+          ) : (
+            <>
+              {computeCopy.duration[request.window]} {computeCopy.durationNote}
+            </>
+          )}
         </p>
       ) : null}
       <div className={styles.controls}>

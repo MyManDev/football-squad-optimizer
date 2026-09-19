@@ -22,6 +22,7 @@ import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
 import type { AdviceStrategy, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { checkedCapabilities, type AdviceCapabilities } from "./adviceCapabilities";
 import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
+import type { MemberChip } from "./chipChoice";
 
 export interface AdviceRequest {
   leagueId: number;
@@ -36,6 +37,7 @@ export interface AdviceRequest {
    */
   top100Weight?: number;
   managersWord?: boolean;
+  chip?: MemberChip | null;
   /** Display context only; the server resolves its own immutable computation inputs. */
   season?: string;
   gameweek?: number;
@@ -90,7 +92,7 @@ export interface AdviceJobStatus {
 
 /** Whether a request asks for a Top 100 setting or the manager's word. */
 export function isSwitchedRequest(request: AdviceRequest): boolean {
-  return (request.top100Weight ?? 0) !== 0 || request.managersWord === true;
+  return (request.top100Weight ?? 0) !== 0 || request.managersWord === true || request.chip != null;
 }
 
 type AdviceLoader = (
@@ -225,11 +227,13 @@ export class HttpAdviceClient implements AdviceClient {
     // Only a switch that is on is named, so a plain request's address does not move.
     const weight = request.top100Weight ? `&top100_weight=${request.top100Weight}` : "";
     const word = request.managersWord === true ? "&managers_word=true" : "";
+    const chip = request.chip == null ? "" : `&chip=${encodeURIComponent(request.chip)}`;
     return (
       `${this.origin}/api/v1/leagues/${request.leagueId}/entries/${request.entryId}/advice` +
       `?strategy=${encodeURIComponent(request.strategy)}&window=${request.window}${rival}` +
       weight +
-      word
+      word +
+      chip
     );
   }
 
@@ -294,6 +298,7 @@ export class HttpAdviceClient implements AdviceClient {
           rival_entry_id: request.rivalEntryId ?? null,
           ...(request.top100Weight ? { top100_weight: request.top100Weight } : {}),
           ...(request.managersWord === true ? { managers_word: true } : {}),
+          ...(request.chip == null ? {} : { chip: request.chip }),
         }),
       });
       if (response.status === 202) {
