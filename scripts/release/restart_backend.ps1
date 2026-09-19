@@ -89,7 +89,8 @@ function Read-Readiness {
         return ($response.StatusCode -eq 200 -and $report.ready -eq $true -and
             $report.checks.league_tree_matches_capture -eq $true)
     } catch {
-        $failed = $_.Exception.Response
+        $failed = $null
+        if ($_.Exception.PSObject.Properties['Response']) { $failed = $_.Exception.Response }
         if ($null -ne $failed) {
             $script:backendUp = $true
             # Windows PowerShell may already have consumed the response stream.
@@ -160,7 +161,7 @@ Write-Output "Then require /ready and league_tree_matches_capture; compare launc
 if ($DryRun) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher -RepoRoot $RepoRoot -StoreRoot $StoreRoot -Stop -WhatIf
     if ($LASTEXITCODE -ne 0) { throw "Stop preview failed; backend left running." }
-    Write-Output "DryRun: no pull, stop, start or files changed."
+    Write-Output "DryRun: no pull, stop, start or working-tree/backend files changed."
     exit 0
 }
 
@@ -169,7 +170,9 @@ if ($LASTEXITCODE -ne 0) { throw "Fast-forward pull failed; backend left running
 Assert-Checkout
 $commit = Git-Read -arguments @('rev-parse', 'HEAD')
 # Pull may replace published data; check it again before stopping anything.
-if ((Published-Capture) -ne $publicCapture) { throw "Pulled capture differs from live publication; backend left running." }
+$pulledCapture = Published-Capture
+Write-Output "Public capture=$publicCapture pulled local capture=$pulledCapture"
+if ($pulledCapture -ne $publicCapture) { throw "Pulled capture differs from live publication; backend left running." }
 if ((Queue-Depth $port) -gt 0 -and -not $Force) { throw "New work arrived; backend left running." }
 $previousPath = $env:PYTHONPATH
 try {
@@ -178,9 +181,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Pulled code import failed; backend left running." }
 } finally { $env:PYTHONPATH = $previousPath }
 
+$stopFailed = $true
+$revisionMismatch = ""
 try {
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher -RepoRoot $RepoRoot -StoreRoot $StoreRoot -Stop
 if ($LASTEXITCODE -ne 0) { throw "Stop failed; not starting another backend." }
+$stopFailed = $false
 # Let the launcher independently resolve its code identity, ignoring a shell override.
 $previousCommit = $env:SQUADOPT_REPOSITORY_COMMIT
 try {
@@ -205,12 +211,20 @@ do {
 if (-not $ready) { throw "Backend did not become ready with a matching published week." }
 $started = Read-Json $registry
 Write-Output "Launcher-recorded commit=$($started.repository_commit) expected=$commit"
-if ($started.repository_commit -ne $commit) { throw "Launcher-recorded commit differs from pulled HEAD." }
+if ($started.repository_commit -ne $commit) {
+    $revisionMismatch = "recorded=$($started.repository_commit) expected=$commit"
+    throw "Launcher-recorded commit differs from pulled HEAD."
+}
 Write-Output "Backend ready on port $port with $workers workers; tunnel untouched."
 } catch {
     $failure = $_
     try { $null = Read-Readiness } catch { }
-    if ($backendUp) { Write-Output "BACKEND UP, NOT READY" } else { Write-Output "BACKEND DOWN" }
+    if ($backendUp -and $revisionMismatch) { Write-Output "BACKEND UP, WRONG REVISION: $revisionMismatch" }
+    elseif ($backendUp) { Write-Output "BACKEND UP, NOT READY" }
+    else { Write-Output "BACKEND DOWN" }
+    if ($stopFailed) {
+        Write-Output "Recovery stop: powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$launcher`" -RepoRoot `"$RepoRoot`" -StoreRoot `"$StoreRoot`" -Stop"
+    }
     Write-Output ('Recovery start (after inspecting any remaining processes): $env:SQUADOPT_REPOSITORY_COMMIT=$null; ' + $startLine)
     Write-Output "Logs: $logs"
     Write-Output "Last /ready body: $lastReadyBody"

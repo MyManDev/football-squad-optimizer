@@ -226,7 +226,9 @@ tree and backend files stay unchanged. Real execution fetches as well. The helpe
 the launcher's creation-time-checked process walk and `-Stop -WhatIf` support. A failed
 start or readiness check exits nonzero with a backend up/down state, the exact start
 command retaining the recorded port and worker count, the log directory and the last
-readiness body. Inspect those before another attempt: a timed-out launcher may still be
+readiness body. A failed stop prints the stop command before the start command; a
+ready backend on a different revision is reported as `BACKEND UP, WRONG REVISION`
+with both hashes. Inspect those before another attempt: a timed-out launcher may still be
 starting, and a failed stop may have left recorded processes alive. After a successful
 stop or failed-start cleanup the PID registry may be gone; use the printed start command
 instead of rerunning the restart helper, which cannot recover the old count without it.
