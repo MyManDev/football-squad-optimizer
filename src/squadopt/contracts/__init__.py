@@ -6,9 +6,19 @@ from squadopt.contracts.factors import (
     BayesianOptimizationError,
     FactorKind,
 )
-from squadopt.contracts.players import POSITIONS, REQUIRED_COLUMNS, Position, sort_players_by_id
+from squadopt.contracts.players import (
+    CANONICAL_COLUMNS,
+    OPTIONAL_COLUMNS,
+    POSITIONS,
+    REQUIRED_COLUMNS,
+    Position,
+    canonical_columns_present,
+    sort_players_by_id,
+)
 
 __all__ = [
+    "CANONICAL_COLUMNS",
+    "OPTIONAL_COLUMNS",
     "POSITIONS",
     "REQUIRED_COLUMNS",
     "BayesianFactor",
@@ -16,5 +26,6 @@ __all__ = [
     "BayesianOptimizationError",
     "FactorKind",
     "Position",
+    "canonical_columns_present",
     "sort_players_by_id",
 ]
