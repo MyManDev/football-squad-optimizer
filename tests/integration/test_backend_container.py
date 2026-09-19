@@ -73,6 +73,17 @@ API_COMMAND = [
 ]
 WORKER_COMMAND = ["python", "-m", "squadopt.platform.advice_worker"]
 
+FIXTURE_APP = "/mnt/squadopt-test/backend_app.py"
+FIXTURE_API_COMMAND = [
+    "python",
+    FIXTURE_APP,
+    worker_fixture.world_module.GW2_CAPTURED_AT,
+    "--host",
+    "0.0.0.0",
+    "--port",
+    "8000",
+]
+
 READY_DEADLINE = 60.0
 JOB_DEADLINE = 240.0
 STOP_GRACE = 120
@@ -217,6 +228,18 @@ def _origin(container: str) -> str:
     return f"http://127.0.0.1:{mapping.rsplit(':', 1)[-1]}"
 
 
+def _start_fixture_api(state: dict[str, Any]) -> str:
+    return _start(
+        state,
+        "api",
+        FIXTURE_API_COMMAND,
+        "--publish",
+        "127.0.0.1::8000",
+        "--volume",
+        f"{REPOSITORY / 'tests/fixtures/backend_app.py'}:{FIXTURE_APP}:ro",
+    )
+
+
 def _logs(state: dict[str, Any]) -> str:
     """Every container's own account of itself, both streams, for a failure message.
 
@@ -250,7 +273,9 @@ def _get(url: str, deadline: float, state: dict[str, Any], *, expect: int = 200)
     pytest.fail(f"{url} never answered {expect} within {deadline}s (last: {last})\n{_logs(state)}")
 
 
-def _post(origin: str, state: dict[str, Any]) -> tuple[int, Any]:
+def _post(
+    origin: str, state: dict[str, Any], *, expected_error: int | None = None
+) -> tuple[int, Any]:
     request = urllib.request.Request(
         f"{origin}/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         data=json.dumps({"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}).encode("utf-8"),
@@ -261,6 +286,8 @@ def _post(origin: str, state: dict[str, Any]) -> tuple[int, Any]:
         with urllib.request.urlopen(request, timeout=30) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
+        if error.code == expected_error:
+            return error.code, json.loads(error.read().decode("utf-8"))
         raise AssertionError(
             f"POST advice failed: HTTP {error.code} "
             f"{error.read().decode('utf-8', 'replace')[:300]}\n{_logs(state)}"
@@ -349,6 +376,15 @@ def test_a_worker_without_its_volume_refuses_to_start() -> None:
     assert "advice_worker_store_unavailable" in finished.stdout + finished.stderr
 
 
+def test_production_factory_refuses_a_closed_gameweek(deployment: dict[str, Any]) -> None:
+    api = _start(deployment, "api", API_COMMAND, "--publish", "127.0.0.1::8000")
+    origin = _origin(api)
+    _get(f"{origin}/ready", READY_DEADLINE, deployment)
+    status, refused = _post(origin, deployment, expected_error=422)
+    assert status == 422, (status, refused)
+    assert refused["error"]["code"] == "DEADLINE_PASSED"
+
+
 def test_two_containers_from_one_image_answer_through_the_shared_volume(
     deployment: dict[str, Any],
 ) -> None:
@@ -359,7 +395,7 @@ def test_two_containers_from_one_image_answer_through_the_shared_volume(
     negative control is needed to make that claim.
     """
 
-    api = _start(deployment, "api", API_COMMAND, "--publish", "127.0.0.1::8000")
+    api = _start_fixture_api(deployment)
     origin = _origin(api)
     worker = _start(deployment, "worker", WORKER_COMMAND)
 
@@ -419,7 +455,7 @@ def test_two_containers_from_one_image_answer_through_the_shared_volume(
     # Replace the api container against the same volume: the completed job and the cached
     # answer are on the store, not in the process that accepted them.
     _docker("rm", "--force", api, timeout=90.0)
-    replacement = _start(deployment, "api", API_COMMAND, "--publish", "127.0.0.1::8000")
+    replacement = _start_fixture_api(deployment)
     new_origin = _origin(replacement)
     _get(f"{new_origin}/ready", READY_DEADLINE, deployment)
     assert _get(f"{new_origin}/api/v1/advice-jobs/{job_id}", 30.0, deployment)["status"] == (
@@ -469,6 +505,30 @@ def test_compose_runs_the_documented_services_and_preserves_cache(
     config.write_text(
         "".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8"
     )
+    # Only the synthetic API clock differs from the checked-in deployment. The image,
+    # installed package, worker and all store mounts still come from that deployment.
+    fixture_override = tmp_path / "compose-fixture.json"
+    fixture_override.write_text(
+        json.dumps(
+            {
+                "services": {
+                    "api": {
+                        "command": FIXTURE_API_COMMAND,
+                        "volumes": [
+                            {
+                                "type": "bind",
+                                "source": (REPOSITORY / "tests/fixtures/backend_app.py").as_posix(),
+                                "target": FIXTURE_APP,
+                                "read_only": True,
+                                "bind": {"create_host_path": False},
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     command = (
         "compose",
         "--project-name",
@@ -477,6 +537,8 @@ def test_compose_runs_the_documented_services_and_preserves_cache(
         str(config),
         "--file",
         str(REPOSITORY / "deploy/compose.yaml"),
+        "--file",
+        str(fixture_override),
     )
     try:
         _docker(*command, "up", "--detach", "--wait", "--wait-timeout", "90")
