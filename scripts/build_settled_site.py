@@ -39,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"Scratch candidate: {result.out_dir}")
     print(f"Accepted outcome stamp: {result.generated_at_utc}")
+    season_count = sum(name.startswith(f"data/{args.season}/") for name in result.changed_files)
+    print(f"Changed file count: {len(result.changed_files)} ({season_count} season documents)")
     print("Changed files (post this list before a site PR):")
     for name in result.changed_files:
         print(name)

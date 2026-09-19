@@ -2,9 +2,11 @@
 
 import hashlib
 import json
+import stat
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock
 
@@ -116,6 +118,22 @@ def world(
             ).encode()
         advice_path = accepted / f"data/league/advice/{entry_id}/saf-puan/1.json"
         write(advice_path, {"payload": {"gameweek": 5, "entry_id": entry_id}})
+        # All advice envelope shapes in the published member menu must survive
+        # preflight and remain byte-identical, not just the plain plan.
+        for variant in (
+            "saf-puan/hoca-sozu.json",
+            "saf-puan/top100-10.json",
+            "saf-puan/top100-10-hoca-sozu.json",
+            "yakala/1/102.json",
+            "index.json",
+        ):
+            write(
+                advice_path.parents[1] / variant,
+                {
+                    "contract_version": "provisional_league_ui_v1",
+                    "payload": {"gameweek": 5, "entry_id": entry_id, "fixture_variant": variant},
+                },
+            )
         write(accepted / f"data/league/entries/{entry_id}.json", {"payload": {"gameweek": 5}})
         record_member_advice(
             tmp_path / "records",
@@ -245,6 +263,10 @@ def historical_scoreboard() -> dict[str, Any]:
                             ("elite_xi", 58.0),
                             ("ownership_template", 99.0),
                         )
+                    ]
+                    + [
+                        {"kind": kind, "net": 9999, "source_snapshot_id": "old-ordinary"}
+                        for kind in ("system", "league_mean", "game_mean")
                     ],
                 }
             ],
@@ -269,7 +291,17 @@ def test_historical_cells_keep_provenance_without_entering_new_week_or_totals(
     prior = old["payload"]["gameweeks"][0]
     assert four["top100"] == prior["top100"]
     for cell in prior["comparisons"]:
-        assert next(row for row in four["comparisons"] if row["kind"] == cell["kind"]) == cell
+        actual = next(row for row in four["comparisons"] if row["kind"] == cell["kind"])
+        if cell["kind"] in {"system", "league_mean", "game_mean"}:
+            reference_four = next(
+                row for row in reference["payload"]["gameweeks"] if row["gameweek"] == 4
+            )
+            assert actual == next(
+                row for row in reference_four["comparisons"] if row["kind"] == cell["kind"]
+            )
+            assert actual != cell
+        else:
+            assert actual == cell
     for key in ("cohort_snapshot_id", "cohort_picks_snapshot_id"):
         assert result[key] == old["payload"][key]
     assert result["source_snapshot_id"] == request.snapshot_id
@@ -408,24 +440,42 @@ def test_failure_after_generation_does_not_expose_half_candidate(
     with pytest.raises(DataError, match="broken score"):
         publication.publish_settled(request)
     assert not request.out_dir.exists() and inventory(request.accepted_dir) == before
+    assert not list(request.out_dir.parent.glob("settled-*"))
 
 
-@pytest.mark.parametrize("path", ["data/new-root.json", "data/league/entries/101.json"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "data/new-root.json",
+        "data/league/entries/101.json",
+        "data/league/advice/101/saf-puan/1.json",
+        f"data/{SEASON}/advice/retained.json",
+    ],
+)
+@pytest.mark.parametrize("delete", [False, True])
 def test_new_output_outside_boundary_refuses_and_names_it(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: str, delete: bool
 ) -> None:
     request = world(tmp_path)
+    # The season-prefix case also kills removal of the global advice denial:
+    # without it the broad season allowance would admit this mutation.
+    if not (request.accepted_dir / path).exists() and (delete or "advice" in Path(path).parts):
+        write(request.accepted_dir / path, {"payload": {"gameweek": 5}})
     original = publication._publish_scoreboard
 
     def unexpected(req: Any, capture: Any, candidate: Path, ids: Any) -> Any:
         result = original(req, capture, candidate, ids)
-        write(candidate / path, {"unexpected": True})
+        if delete:
+            (candidate / path).unlink()
+        else:
+            write(candidate / path, {"unexpected": True})
         return result
 
     monkeypatch.setattr(publication, "_publish_scoreboard", unexpected)
     with pytest.raises(DataError, match=path):
         publication.publish_settled(request)
     assert not request.out_dir.exists()
+    assert not list(request.out_dir.parent.glob("settled-*"))
 
 
 def test_existing_output_is_never_overwritten(
@@ -553,3 +603,81 @@ def test_cli_reports_the_actual_candidate_file_list(
     assert STAMP in output and "data/league/members.json" in output
     assert "data/league/series-horizon.json" in output
     assert "data/league/entries/101.json" not in output
+    changed = output.split("Changed files (post this list before a site PR):\n")[1].splitlines()
+    season_count = sum(name.startswith(f"data/{SEASON}/") for name in changed)
+    assert f"Changed file count: {len(changed)} ({season_count} season documents)" in output
+
+
+def test_missing_past_week_with_only_ordinary_cells_refuses(tmp_path: Path) -> None:
+    request = world(tmp_path)
+    old = historical_scoreboard()
+    old["payload"]["gameweeks"].append(
+        {"gameweek": 3, "comparisons": [{"kind": "system", "net": 45}], "top100": None}
+    )
+    write(request.accepted_dir / "data/league/scoreboard.json", old)
+    with pytest.raises(DataError, match="GW3 is absent from capture"):
+        publication.publish_settled(request)
+    assert not request.out_dir.exists()
+    assert not list(request.out_dir.parent.glob("settled-*"))
+
+
+def test_other_outcome_capture_in_history_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = world(tmp_path)
+    original = publication.review_member_weeks
+
+    def different_capture(**kwargs: Any) -> Any:
+        reviews = original(**kwargs)
+        reviews[101] = tuple(
+            replace(row, outcome_snapshot_id="another-capture") for row in reviews[101]
+        )
+        return reviews
+
+    monkeypatch.setattr(publication, "review_member_weeks", different_capture)
+    assert_early_refusal(request, monkeypatch, "101 history did not settle on the named capture")
+
+
+@pytest.mark.parametrize("link_kind", ["symlink", "windows-reparse"])
+def test_accepted_link_refuses_before_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, link_kind: str
+) -> None:
+    request = world(tmp_path)
+    target = request.accepted_dir / "data/index.json"
+    # Exercise both real metadata predicates without needing Windows symlink
+    # privilege or creating a junction the test runner then has to remove.
+    if link_kind == "symlink":
+        original_link = Path.is_symlink
+        monkeypatch.setattr(Path, "is_symlink", lambda p: p == target or original_link(p))
+    else:
+        original_stat = Path.lstat
+
+        def reparse(p: Path) -> Any:
+            result = original_stat(p)
+            return (
+                SimpleNamespace(
+                    st_mode=result.st_mode, st_file_attributes=stat.FILE_ATTRIBUTE_REPARSE_POINT
+                )
+                if p == target
+                else result
+            )
+
+        monkeypatch.setattr(Path, "lstat", reparse)
+    assert_early_refusal(request, monkeypatch, "contains a link: data")
+
+
+def test_accepted_tree_change_during_generation_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = world(tmp_path)
+    original = publication._publish_scoreboard
+
+    def changed_input(req: Any, capture: Any, candidate: Path, ids: Any) -> None:
+        original(req, capture, candidate, ids)
+        write(request.accepted_dir / "data/index.json", {"changed": "during generation"})
+
+    monkeypatch.setattr(publication, "_publish_scoreboard", changed_input)
+    with pytest.raises(DataError, match="accepted tree changed during generation"):
+        publication.publish_settled(request)
+    assert not request.out_dir.exists()
+    assert not list(request.out_dir.parent.glob("settled-*"))

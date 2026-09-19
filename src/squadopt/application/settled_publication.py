@@ -283,8 +283,8 @@ def _carry_scoreboard_evidence(
             if top100 is not None or any(cell.get("net") is not None for cell in cells.values()):
                 raise DataError(f"Cannot carry unapproved scoreboard evidence for GW{week}.")
             continue
-        if (cells or top100 is not None) and week not in current:
-            raise DataError(f"Cannot carry scoreboard evidence: GW{week} is absent from capture.")
+        if week not in current:
+            raise DataError(f"Cannot carry scoreboard history: GW{week} is absent from capture.")
         if top100 is not None:
             if top100.get("gameweek") != week or not previous.get("cohort_snapshot_id"):
                 raise DataError(f"Cannot carry Top-100 evidence with unclear GW{week} provenance.")
