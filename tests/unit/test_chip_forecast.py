@@ -20,7 +20,10 @@ from squadopt.application.chip_forecast import (
     CHIP_FORECAST_SCHEMA_PATH,
     HOLD_REASONS,
     LATER_WEEK_BASIS,
+    MEASURED_RESERVATION,
+    MEASURED_THRESHOLD_POLICY,
     PROTOCOL_HOLDING_VALUES,
+    THRESHOLD_DECAYING,
     THRESHOLD_POLICIES,
     VERDICTS,
     ChipForecastError,
@@ -137,6 +140,24 @@ def _field_names(value: object) -> Iterator[str]:
 
 
 # The threshold.
+
+
+def test_the_measured_rule_is_named_once_and_the_function_still_prefers_neither() -> None:
+    """What `chip_forecast_rule` chose, in one place, for the caller to pass."""
+
+    assert MEASURED_THRESHOLD_POLICY == THRESHOLD_DECAYING
+    assert MEASURED_RESERVATION is False
+    assert MEASURED_THRESHOLD_POLICY in THRESHOLD_POLICIES
+    # The function takes both as inputs and has no default of its own: a document says
+    # which rule made it, so a reader never has to know what the caller's default was.
+    with pytest.raises(TypeError):
+        ChipForecastInputs(  # type: ignore[call-arg]
+            decision_gameweek=5,
+            chips=(),
+            squad=(),
+            calendar=(),
+            holding_values={},
+        )
 
 
 def test_the_fixed_threshold_is_the_holding_value_to_the_end_of_the_window() -> None:

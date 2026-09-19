@@ -8,7 +8,10 @@ count of every club in every gameweek the forecast looks at.
 
 Two decisions are injected, because a pre-registered measurement makes them and this
 module may not: the threshold policy (``fixed`` or ``decaying``) and whether the
-reservation applies (``reserve``). Nothing here prefers one.
+reservation applies (``reserve``). Nothing here prefers one: what was measured is
+named in ``MEASURED_THRESHOLD_POLICY`` and ``MEASURED_RESERVATION`` for the caller to
+pass, so that a later change of rule is a change of one constant and not of this
+module's arithmetic.
 
 The rule, for a chip ``c`` held in a window from ``s`` to ``L`` and a decision gameweek
 ``t``:
@@ -67,6 +70,19 @@ CHIP_FORECAST_SCHEMA_PATH: Final = Path("docs") / "contracts" / "chip_forecast_v
 THRESHOLD_FIXED: Final = "fixed"
 THRESHOLD_DECAYING: Final = "decaying"
 THRESHOLD_POLICIES: Final = (THRESHOLD_FIXED, THRESHOLD_DECAYING)
+
+#: What `chip_forecast_rule` chose, so that one place says it and every caller reads it
+#: from here. The function itself prefers neither policy and takes both as inputs.
+#: `decaying - fixed` was -0.44 points a gameweek with an interval of [-1.35, +0.99]
+#: over four development seasons, so the two were not separated and the protocol's own
+#: rule kept the decaying threshold for the structural reason: it cannot let a chip
+#: expire, where the fixed threshold let ten of thirty-two windows expire unplayed.
+MEASURED_THRESHOLD_POLICY: Final = THRESHOLD_DECAYING
+#: The same record's amended comparison, `decaying - threshold_only`, was -0.15 points a
+#: gameweek, a negative pooled difference, and the amendment said the reservation is kept
+#: only on a positive one. So the forecast offers every chip in every gameweek of its
+#: window and lets the threshold do the holding.
+MEASURED_RESERVATION: Final = False
 
 VERDICT_PLAY_NOW: Final = "play_now"
 VERDICT_HOLD: Final = "hold"
