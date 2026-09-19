@@ -329,10 +329,10 @@ pull request's CI also runs `shippedTree.test.ts` against the shipped tree; to r
 check by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
 publication worktree's `web` directory. Then use the [release recipe](deployment_runbook.md#release-in-one-command)
 from Git Bash:
-`sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <generated-after-ISO> <summary>`.
+`sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <accepted-generated-at-ISO> <summary>`.
 Its real invocation performs the site release and runs `verify_live.py`; the restart
 helper runs that verifier again before stopping anything. To run it again by hand,
-use `python scripts/release/verify_live.py <generated-after-ISO>`. The separate backend
+use `python scripts/release/verify_live.py <accepted-generated-at-ISO>`. The separate backend
 restart command and browser check follow the order in that runbook. These remain
 owner-operated actions, not part of this preview.
 
