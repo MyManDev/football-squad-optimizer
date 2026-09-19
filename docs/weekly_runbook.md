@@ -112,7 +112,9 @@ names the files, the chips the member holds, and why any chip has none (`already
 there are none at all (`no_chip_left`, `chip_history_unknown`). Each document states what
 the chip week is expected to score above the member's own plan without it, this gameweek
 only, beside the sentence saying a later gameweek's value is not measured; it combines with
-neither the manager's word nor a Top 100 setting, and it is not in the advice record. A
+neither the manager's word nor a Top 100 setting. With `--record-advice` or `--publish`,
+the advice record includes every published choice, including chip and switch documents,
+with their selection settings and file digests. A
 Wildcard or Free Hit solve is a whole-squad problem: on the GW5 capture one took 25 to 42
 seconds with three members solved side by side on a machine already running a league
 build, so budget about a minute and a half per member. A chip file an earlier publish wrote
@@ -297,8 +299,39 @@ have scored as an FPL entry.
 A gameweek that has finished but has not been data-checked in the capture is marked
 provisional: bonus points land fixture by fixture, so its scores can still move.
 
-Windows beyond one week are not computed for members; the page shows them disabled and
-says why.
+The member page offers the one-, three- and five-week windows named by the published
+index or the on-demand capabilities. An unavailable selection has a reason; a window
+plan is not a fresh prediction for every later week.
+
+## From a recorded preview to a release
+
+Run these only inside the intended deadline window, after choosing the actual season,
+gameweek, run ID and an unused publication suffix. This example is a no-write preview:
+
+```sh
+python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 6 --league 352490 --workers 6 --run-id 2026-27-gw06-decision --rotation --projection component-only --record-advice --publish --publish-suffix 1 --dry-run
+```
+
+Remove `--dry-run` only when operating the week. This records the complete published
+menu and opens `feature/gw06-decision-site-1`; it does not merge or deploy. A prior
+preview without `--publish` cannot acquire it on resume: use a new run ID, with the
+explicit capture/evidence reuse options above if appropriate. An actual resume repeats
+the original options unchanged. A used suffix refuses before the expensive stages.
+
+Check the candidate with `python -m scripts.check_league_tree <preview>/data`, then use
+the [release recipe](deployment_runbook.md#release-in-one-command):
+`scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <generated-after-ISO> <summary>`.
+Its real invocation performs the site release; `scripts/release/verify_live.py` checks
+the public result. The separate backend restart command and browser check follow the
+order in that runbook. These remain owner-operated actions, not part of this preview.
+
+After publication the backend selects the one agreed capture ID carried by all human
+entry documents, not simply the newest capture on disk. The chosen capture still needs
+its matching handoff. Missing or unusable published capture metadata falls back to the
+newest live capture and logs why. A newly captured but unpublished week must not be
+mistaken for a backend release; see [backend hosting](backend_free_hosting.md).
+The readiness field `league_tree_matches_capture` checks season and gameweek only;
+the release restart command separately checks the public/local capture IDs.
 
 ## What stays a person's act
 
