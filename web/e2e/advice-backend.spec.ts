@@ -263,7 +263,10 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await expect
     .poll(async () => {
       try {
-        await page.request.get(`${context.apiOrigin}/ready`, { timeout: 1_000 });
+        await page.request.get(`${context.apiOrigin}/ready`, {
+          timeout: 1_000,
+          headers: { Connection: "close" },
+        });
         return false;
       } catch {
         return true;

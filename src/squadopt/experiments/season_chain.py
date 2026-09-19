@@ -32,7 +32,7 @@ runner that drives it refuses to.
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import takewhile
 from types import MappingProxyType
 from typing import Final
@@ -58,6 +58,7 @@ from squadopt.planning import (
     ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
+    PlanningWeekResult,
     TransferPlanningConfig,
     optimize_transfer_plan,
     sell_price_tenths,
@@ -66,6 +67,7 @@ from squadopt.planning import (
 
 SEASON_CHAIN_CONTRACT_VERSION: Final = "season_chain_v1"
 CHIP_POLICIES: Final = ("planner", "double_gameweeks_only", "hybrid")
+CHIP_THRESHOLDS: Final = ("fixed", "decaying")
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +94,27 @@ class ChipWindowRule:
         return self.start_gameweek <= gameweek <= self.stop_gameweek
 
 
+def _captain_projection(week: PlanningWeekResult) -> float | None:
+    value = week.captain.get("expected_points")
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
+
+
+def decayed_holding_value(constant: float, window: ChipWindowRule, gameweek: int) -> float:
+    """What waiting for a chip is worth in ``gameweek`` of its window, falling to zero.
+
+    Linear in the share of the window still ahead: the constant in the window's first
+    gameweek, zero in its last, and zero for a window of a single gameweek, because a
+    chip that cannot be played later is worth nothing held.
+    """
+
+    span = window.stop_gameweek - window.start_gameweek
+    if span <= 0 or not window.covers(gameweek):
+        return 0.0
+    return float(constant) * (window.stop_gameweek - gameweek) / span
+
+
 @dataclass(frozen=True, slots=True)
 class SeasonChainConfig:
     """Frozen controls for one season-long chain."""
@@ -114,8 +137,18 @@ class SeasonChainConfig:
     A finite horizon cannot see that the season continues past its end, so under
     ``planner`` a chip worth anything now is worth playing now; the reservation rule is
     the cheapest stand-in for the option value the horizon cannot price. Under both
-    reservation policies the free hit is offered only in structured gameweeks — one
-    where some team is blank or doubles — the weeks a temporary squad is for."""
+    reservation policies the free hit is offered only in structured gameweeks, those
+    where some team is blank or doubles: the weeks a temporary squad is for. Every chain
+    committed before 2026-09-19 saw only the doubles among them (see
+    ``_is_structured_gameweek``)."""
+    chip_threshold: str = "fixed"
+    """``fixed``: a chip's holding value is the transfer configuration's constant for as
+    long as its window is open, which is how every committed chain was run. ``decaying``:
+    the constant falls linearly from the window's first gameweek to zero at its last, and
+    in that last gameweek the reservation of ``chip_policy`` is lifted. A window that
+    closes takes its chip with it, so what waiting is worth has to reach zero when the
+    window does; a fixed value can hold a chip until it expires unplayed
+    (``docs/chip_forecast_prereg.md``)."""
     sell_on_fee_halved: bool = True
     """Sell a squad member at purchase price plus half of any rise, rounded down to a
     tenth (the game's rule); False sells at the market price, as the windowed
@@ -178,6 +211,10 @@ class SeasonChainConfig:
             )
         if self.chip_policy not in CHIP_POLICIES:
             raise ExperimentConfigurationError(f"chip_policy must be one of {CHIP_POLICIES!r}.")
+        if self.chip_threshold not in CHIP_THRESHOLDS:
+            raise ExperimentConfigurationError(
+                f"chip_threshold must be one of {CHIP_THRESHOLDS!r}."
+            )
         windows = tuple(self.chip_windows)
         if any(not isinstance(window, ChipWindowRule) for window in windows):
             raise ExperimentConfigurationError("chip_windows must hold ChipWindowRule entries.")
@@ -236,6 +273,14 @@ class SeasonChainWeek:
     chip_counterfactual_net_points: float | None = None
     """For a free-hit week: what the same decision without the chip would have realized
     net of hits, so the chip's gain is measured against it."""
+    captain_projected_points: float | None = None
+    """What the decision expected of its captain, once, before any doubling: what a
+    triple captain would have been expected to add this week. Beside the realized
+    figure it lets a later study see the week a chip rule saw, without another solve.
+    ``None`` when the plan's captain row carries no projection."""
+    bench_projected_points: float | None = None
+    """What the decision expected of its bench: what a bench boost would have been
+    expected to add this week."""
 
     def __post_init__(self) -> None:
         for name in ("realized_points", "transfer_hit_points", "projected_points"):
@@ -275,6 +320,8 @@ class SeasonChainWeek:
             "carried_unexplained_rows": self.carried_unexplained_rows,
             "squad_player_ids": [str(player) for player in self.squad_player_ids],
             "chip_counterfactual_net_points": self.chip_counterfactual_net_points,
+            "captain_projected_points": self.captain_projected_points,
+            "bench_projected_points": self.bench_projected_points,
         }
 
 
@@ -473,6 +520,13 @@ class SeasonChain(DecisionSeason):
                 "cheap_pool_per_position": settings.cheap_pool_per_position,
                 "sell_on_fee_halved": settings.sell_on_fee_halved,
                 "chip_policy": settings.chip_policy,
+                # Recorded only when chosen, so a chain run as every committed one was
+                # keeps the record it always wrote.
+                **(
+                    {"chip_threshold": settings.chip_threshold}
+                    if settings.chip_threshold != "fixed"
+                    else {}
+                ),
                 "chip_windows": [
                     {
                         "name": window.name,
@@ -592,15 +646,46 @@ class SeasonChain(DecisionSeason):
             if (window.name, index) in state.used_chips:
                 continue
             weeks = {gameweek for gameweek in horizon_gameweeks if window.covers(gameweek)}
+            # A reserved chip that is not played in its window's last gameweek is lost,
+            # so under the decaying threshold that gameweek is offered unreserved.
+            last_call = (
+                {window.stop_gameweek} & weeks
+                if self._settings.chip_threshold == "decaying"
+                else set()
+            )
             if window.name in reserved:
-                weeks = {gameweek for gameweek in weeks if self._is_double_gameweek(gameweek)}
+                weeks = {
+                    gameweek for gameweek in weeks if self._is_double_gameweek(gameweek)
+                } | last_call
             elif window.name == "freehit" and policy != "planner":
-                weeks = {gameweek for gameweek in weeks if self._is_structured_gameweek(gameweek)}
+                weeks = {
+                    gameweek for gameweek in weeks if self._is_structured_gameweek(gameweek)
+                } | last_call
             if weeks:
                 available.setdefault(window.name, set()).update(weeks)
         return ChipAvailability(
             available={name: frozenset(weeks) for name, weeks in available.items()}
         )
+
+    def _week_transfer_config(self, gameweek: int, state: _ChainState) -> TransferPlanningConfig:
+        """The transfer configuration of one decision, with this week's holding values.
+
+        Under ``fixed`` it is the frozen configuration itself, the same object every
+        committed chain passed. Under ``decaying`` each held chip's constant is scaled by
+        the share of its open window that is still ahead, so it is the constant in the
+        window's first gameweek and zero in its last.
+        """
+
+        frozen = self._settings.frozen_transfer_config
+        if self._settings.chip_threshold == "fixed" or not frozen.chip_holding_value_points:
+            return frozen
+        values: dict[str, float] = {}
+        for index, window in enumerate(self._settings.chip_windows):
+            if (window.name, index) in state.used_chips or not window.covers(gameweek):
+                continue
+            constant = float(frozen.chip_holding_value_points.get(window.name, 0.0))
+            values[window.name] = decayed_holding_value(constant, window, gameweek)
+        return replace(frozen, chip_holding_value_points=values)
 
     def _is_double_gameweek(self, gameweek: int) -> bool:
         """True when some team has more than one fixture in ``gameweek``."""
@@ -610,10 +695,21 @@ class SeasonChain(DecisionSeason):
         )
 
     def _is_structured_gameweek(self, gameweek: int) -> bool:
-        """True when some team doubles or some team is blank in ``gameweek``."""
+        """True when some team doubles or some team is blank in ``gameweek``.
+
+        A blank club is one with a zero count or with no row at all that week. The
+        archive's table is built by counting fixtures (``season_fixture_counts``), so
+        a club without a fixture has no row there and a zero never appears; reading
+        only zeros made every blank-only gameweek of a real season look ordinary.
+        """
 
         counts = [count for (week, _), count in self._fixture_counts.items() if week == gameweek]
-        return any(count >= 2 for count in counts) or any(count == 0 for count in counts)
+        clubs = {team for (_, team) in self._fixture_counts}
+        return (
+            any(count >= 2 for count in counts)
+            or any(count == 0 for count in counts)
+            or len(counts) < len(clubs)
+        )
 
     def _spend_chip(
         self, chip: str, gameweek: int, state: _ChainState
@@ -639,6 +735,7 @@ class SeasonChain(DecisionSeason):
         pool, carried_ids, blank, holes = self._week_pool(gameweek, state)
         horizon = self._planning_horizon(pool, horizon_gameweeks, state)
         chips = self._chip_availability(horizon_gameweeks, state)
+        transfer_config = self._week_transfer_config(gameweek, state)
         plan = optimize_transfer_plan(
             horizon,
             InitialSquadState(
@@ -647,7 +744,7 @@ class SeasonChain(DecisionSeason):
                 free_transfers=state.free_transfers,
             ),
             settings.frozen_optimization_config,
-            settings.frozen_transfer_config,
+            transfer_config,
             chips=chips,
         )
         if not plan.has_solution:
@@ -669,7 +766,7 @@ class SeasonChain(DecisionSeason):
                     free_transfers=state.free_transfers,
                 ),
                 settings.frozen_optimization_config,
-                settings.frozen_transfer_config,
+                transfer_config,
                 chips=None,
             )
             if without.has_solution:
@@ -742,5 +839,7 @@ class SeasonChain(DecisionSeason):
             carried_unexplained_rows=holes,
             squad_player_ids=new_squad,
             chip_counterfactual_net_points=counterfactual_net,
+            captain_projected_points=_captain_projection(week),
+            bench_projected_points=float(week.projected_bench_points),
         )
         return record, new_state
