@@ -131,7 +131,8 @@ def read_logs(directory: Path, *, days: int = 7) -> LogSummary:
                     if event == "advice_forwarded_trust" and record.get("component") == "api":
                         trust = record.get("trust_status")
                         source = record.get("trust_source")
-                        allowed = record.get("forwarded_allow_ips")
+                        allowlist_set = record.get("forwarded_allow_ips_set")
+                        allowlist_count = record.get("forwarded_allow_ips_count")
                         proxy_source = record.get("proxy_headers_source")
                         if (
                             trust in ("enabled", "disabled", "unverified")
@@ -142,8 +143,12 @@ def read_logs(directory: Path, *, days: int = 7) -> LogSummary:
                             )
                         ):
                             description = f"{trust}; source={json.dumps(source)}"
-                            if isinstance(allowed, str):
-                                description += f"; configured allowlist={json.dumps(allowed)}"
+                            if isinstance(allowlist_set, bool):
+                                description += (
+                                    f"; allowlist explicitly set={json.dumps(allowlist_set)}"
+                                )
+                            if type(allowlist_count) is int and allowlist_count >= 0:
+                                description += f"; allowlist entries={allowlist_count}"
                             if isinstance(proxy_source, str):
                                 description += f"; proxy-header source={json.dumps(proxy_source)}"
                             summary.forwarded_trust = (stamp, description)

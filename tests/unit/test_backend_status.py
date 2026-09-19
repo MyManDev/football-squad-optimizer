@@ -257,7 +257,9 @@ def test_latest_startup_trust_reports_only_declared_fields(tmp_path: Path) -> No
             "at_utc": "2026-09-19T01:00:00Z",
             "trust_status": "enabled",
             "trust_source": "uvicorn commandline",
-            "forwarded_allow_ips": "127.0.0.1",
+            "forwarded_allow_ips": "192.0.2.20",
+            "forwarded_allow_ips_set": True,
+            "forwarded_allow_ips_count": 1,
             "proxy_headers_source": "uvicorn commandline",
             "client_address": "198.51.100.9",
         },
@@ -286,6 +288,8 @@ def test_latest_startup_trust_reports_only_declared_fields(tmp_path: Path) -> No
     _, report = status.status_report(
         "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=lambda url: (200, "{}")
     )
-    assert 'configured allowlist="127.0.0.1"' in report
+    assert "allowlist explicitly set=true" in report
+    assert "allowlist entries=1" in report
+    assert "192.0.2.20" not in report
     assert 'source="uvicorn commandline"' in report
     assert "198.51.100.9" not in report

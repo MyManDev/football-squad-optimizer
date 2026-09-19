@@ -32,7 +32,8 @@ def test_unset_cli_reports_the_server_loopback_default(monkeypatch: pytest.Monke
     assert observe(monkeypatch) == {
         "trust_status": "enabled",
         "trust_source": "uvicorn default",
-        "forwarded_allow_ips": "127.0.0.1",
+        "forwarded_allow_ips_set": False,
+        "forwarded_allow_ips_count": 1,
         "proxy_headers": True,
         "proxy_headers_source": "uvicorn default",
     }
@@ -43,7 +44,8 @@ def test_cli_overrides_environment_and_names_both_sources(monkeypatch: pytest.Mo
     monkeypatch.setenv("UVICORN_FORWARDED_ALLOW_IPS", "192.0.2.2")
     monkeypatch.setenv("UVICORN_PROXY_HEADERS", "false")
     result = observe(monkeypatch, "--proxy-headers", "--forwarded-allow-ips=127.0.0.1")
-    assert result["forwarded_allow_ips"] == "127.0.0.1"
+    assert result["forwarded_allow_ips_set"] is True
+    assert result["forwarded_allow_ips_count"] == 1
     assert result["trust_status"] == "enabled"
     assert result["trust_source"] == "uvicorn commandline"
     assert result["proxy_headers_source"] == "uvicorn commandline"
@@ -59,9 +61,12 @@ def test_cli_overrides_environment_and_names_both_sources(monkeypatch: pytest.Mo
 def test_environment_allowlist_is_named(
     monkeypatch: pytest.MonkeyPatch, name: str, source: str
 ) -> None:
-    monkeypatch.setenv(name, "192.0.2.0/24")
+    monkeypatch.setenv(name, "192.0.2.0/24, , 198.51.100.1")
     result = observe(monkeypatch)
-    assert result["forwarded_allow_ips"] == "192.0.2.0/24"
+    assert result["forwarded_allow_ips_set"] is True
+    assert result["forwarded_allow_ips_count"] == 2
+    assert "192.0.2.0" not in json.dumps(result)
+    assert "198.51.100.1" not in json.dumps(result)
     assert result["trust_source"] == source
 
 
@@ -74,7 +79,10 @@ def test_disabled_headers_do_not_claim_trust(monkeypatch: pytest.MonkeyPatch) ->
 @pytest.mark.parametrize("allowed", ["", " , "])
 def test_empty_allowlist_trusts_no_peer(monkeypatch: pytest.MonkeyPatch, allowed: str) -> None:
     monkeypatch.setenv("FORWARDED_ALLOW_IPS", allowed)
-    assert observe(monkeypatch)["trust_status"] == "disabled"
+    result = observe(monkeypatch)
+    assert result["trust_status"] == "disabled"
+    assert result["forwarded_allow_ips_set"] is True
+    assert result["forwarded_allow_ips_count"] == 0
 
 
 @pytest.mark.parametrize("entry", ["uvicorn.exe", "/venv/lib/uvicorn/__main__.py"])
@@ -116,14 +124,17 @@ def test_factory_emits_one_structured_configuration_event(
     assert len(records) == 1
     assert records[0]["event"] == "advice_forwarded_trust"
     assert records[0]["component"] == "api"
-    assert records[0]["forwarded_allow_ips"] == "127.0.0.1"
+    assert records[0]["forwarded_allow_ips_set"] is True
+    assert records[0]["forwarded_allow_ips_count"] == 1
+    assert "127.0.0.1" not in caplog.text
     assert set(records[0]) == {
         "event",
         "component",
         "at_utc",
         "trust_status",
         "trust_source",
-        "forwarded_allow_ips",
+        "forwarded_allow_ips_set",
+        "forwarded_allow_ips_count",
         "proxy_headers",
         "proxy_headers_source",
     }

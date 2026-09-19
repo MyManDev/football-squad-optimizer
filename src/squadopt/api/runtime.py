@@ -73,7 +73,8 @@ def _forwarded_trust() -> dict[str, object]:
             if enabled and any(peer.strip() for peer in allowed.split(","))
             else "disabled",
             "trust_source": source,
-            "forwarded_allow_ips": allowed,
+            "forwarded_allow_ips_set": source != "uvicorn default",
+            "forwarded_allow_ips_count": sum(bool(peer.strip()) for peer in allowed.split(",")),
             "proxy_headers": enabled,
             "proxy_headers_source": f"uvicorn {proxy_source.name.lower()}"
             if proxy_source

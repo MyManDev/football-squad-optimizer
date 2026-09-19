@@ -360,9 +360,10 @@ league. These templates are not evidence that this boundary is ready for public 
 The PC launcher's explicit loopback trust flags are unchanged. Application code does
 not parse forwarded headers.
 
-The API writes one `advice_forwarded_trust` startup event with the declared allowlist,
-whether trust is enabled, and the configuration sources. Only configuration values are
-recorded, never observed visitor addresses. Uvicorn CLI flags take precedence over its
+The API writes one `advice_forwarded_trust` startup event with whether the allowlist was
+explicitly set, its nonempty entry count, whether trust is enabled, and the configuration
+sources. Neither allowlist values nor observed visitor addresses are recorded. An unset
+allowlist reports one entry from Uvicorn's default. Uvicorn CLI flags take precedence over its
 environment defaults. A programmatic launcher, or a Uvicorn env-file invocation whose
 earlier CLI environment cannot be reconstructed, is reported as unverified rather than
 guessed. `python -m scripts.backend_status` prints the latest such API startup alongside
