@@ -1,12 +1,21 @@
 #!/bin/sh
-# usage: ship.sh [--dry-run] <site PR> <tag> <release branch> <live generated-after ISO> <summary sentence>
+# usage: ship.sh [--dry-run] <site PR> <tag> <release branch> <live generated-after ISO> <summary sentence> [settled gameweek]
 # Wait for the site PR, cut the release as a real two-parent merge whose tree is develop's,
 # merge it, then deploy.sh (main CI, tag, dispatch, watch) and verify the live site.
 set -u
 DRY_RUN=0
 if [ "${1:-}" = "--dry-run" ]; then DRY_RUN=1; shift; fi
-[ "$#" -eq 5 ] || { echo 'usage: ship.sh [--dry-run] <site PR> <tag> <release branch> <live generated-after ISO> <summary>' >&2; exit 2; }
-SITE_PR="$1"; TAG="$2"; BR="$3"; LIVE_AFTER="$4"; SUMMARY="$5"
+case "$#" in 5|6) ;; *) echo 'usage: ship.sh [--dry-run] <site PR> <tag> <release branch> <live generated-after ISO> <summary> [settled gameweek]' >&2; exit 2;; esac
+SITE_PR="$1"; TAG="$2"; BR="$3"; LIVE_AFTER="$4"; SUMMARY="$5"; SETTLED="${6:-}"
+# A settled release states the gameweek it settles, so the verifier asserts it rather than
+# printing it. A decision release has no settled week and passes nothing.
+SETTLED_ARGS=""
+if [ -n "$SETTLED" ]; then
+  case "$SETTLED" in *[!0-9]*) echo "settled gameweek must be a number" >&2; exit 2;; esac
+  SETTLED_ARGS="--settled $SETTLED"
+elif [ "${TAG#*-settled}" != "$TAG" ]; then
+  echo "tag $TAG settles a gameweek; pass it as the sixth argument" >&2; exit 2
+fi
 REPO=$(git rev-parse --show-toplevel) || exit 1
 S=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
 WT="$REPO/.codex-tmp/worktrees/$(echo "$BR" | tr '/' '-')"
@@ -29,7 +38,7 @@ Fetch origin; require main to have two parents and develop's tree.
 Wait up to 40 minutes for successful main push CI at that exact SHA and one unexpired site artifact.
 Refuse an existing tag; create annotated $TAG on main and push it.
 Dispatch deploy-pages.yml from develop with release_tag=$TAG; watch its result.
-Run ten live smoke checks and content checks generated after $LIVE_AFTER; retry once.
+Run the live smoke checks and content checks generated after $LIVE_AFTER${SETTLED:+, settling gameweek $SETTLED}; retry once.
 EOF
   exit 0
 fi
@@ -89,6 +98,7 @@ log "release PR #$PR merged"
 sleep 20
 sh "$S/deploy.sh" "$TAG" || { log "deploy.sh stopped"; exit 1; }
 sleep 45
-"$PY" "$S/verify_live.py" "$LIVE_AFTER" || { sleep 60; "$PY" "$S/verify_live.py" "$LIVE_AFTER" || { log "live verification found failures"; exit 1; }; }
+# shellcheck disable=SC2086  # SETTLED_ARGS is one optional flag pair, deliberately split.
+"$PY" "$S/verify_live.py" "$LIVE_AFTER" $SETTLED_ARGS || { sleep 60; "$PY" "$S/verify_live.py" "$LIVE_AFTER" $SETTLED_ARGS || { log "live verification found failures"; exit 1; }; }
 log "LIVE"
 log "Next: cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts (read-only browser check after verify_live.py)"
