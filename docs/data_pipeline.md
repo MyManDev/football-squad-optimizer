@@ -493,10 +493,15 @@ The archive publishes a gameweek after it has been played, so it cannot answer w
 roster looked like before a deadline. A live season needs its own capture.
 
 ```bash
-python -m scripts.capture_deadline_snapshot --dry-run   # read and report, write nothing
-python -m scripts.capture_deadline_snapshot             # capture
-python -m scripts.capture_deadline_snapshot --list      # what is held locally
+squadopt season tick --dry-run   # inspect due actions
+squadopt season tick             # execute due actions
 ```
+
+The tick can capture, decide and settle according to the current season state; it is
+not a capture-only command. Dry-run does not execute those actions, but still records
+the CLI request, run manifest and registry bookkeeping. The snapshot API's
+`list_snapshot_ids` and `read_snapshot` provide local inventory and replay access;
+the retired capture shell's `--list` option has no tick equivalent.
 
 The source and the reasoning behind choosing it are in
 [live_data_source_options.md](live_data_source_options.md). Three properties of the
