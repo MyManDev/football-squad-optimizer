@@ -11,7 +11,6 @@ const PAGES = [
   { heading: "Önerilen Hamleler", path: "/moves" },
   { heading: "Rakip Analizi", path: "/rivals" },
   { heading: "Lig Analizi", path: "/league" },
-  { heading: "Analiz Merkezi", path: "/analysis" },
   { heading: "Yönetim", path: "/admin" },
 ] as const;
 
@@ -35,7 +34,7 @@ test("visitor navigation reaches league entry without browser errors", async ({ 
 });
 
 for (const language of ["tr", "en"] as const) {
-  test(`the unlisted ${language} admin page links to analysis without fetching system data`, async ({
+  test(`the unlisted ${language} admin page does not link to the archive or fetch system data`, async ({
     page,
   }) => {
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
@@ -56,13 +55,11 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.locator('a[href="/league"]')).toHaveCount(0);
     expect(systemDataRequests).toEqual([]);
 
-    await page
-      .getByRole("link", { name: language === "tr" ? "Ölçüm arşivi" : "Measurement archive" })
-      .click();
-    await expect(page).toHaveURL("/analysis");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      language === "tr" ? "Analiz Merkezi" : "Analysis Center",
-    );
+    // The measurement archive is not served from the member origin: its documents are the
+    // laboratory's record, in the laboratory's vocabulary, and they were reachable here.
+    await expect(
+      page.getByRole("link", { name: language === "tr" ? "Ölçüm arşivi" : "Measurement archive" }),
+    ).toHaveCount(0);
   });
 
   test(`a cold ${language} visitor finds the published member list without system-squad links`, async ({
