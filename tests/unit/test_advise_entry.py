@@ -1501,10 +1501,11 @@ def test_the_one_week_plan_says_whether_the_clock_stopped_its_search(
     `member_plan_determinism` measured five of fifteen members reading a different plan
     where the ceiling bound, with nothing in the published document to show it.
 
-    The work spent is deliberately not published beside this flag. It is a fact about a
-    solve rather than about a document: the batch renderer and a single request answer the
-    same question with different amounts of solver work, so publishing it would make two
-    correct paths disagree byte for byte on the same request.
+    The work spent is deliberately not published beside this flag, and the reason is
+    reproducibility rather than path. Two runs of the same publish disagree on it in the
+    last decimal digit, measured against the committed `member_plan_determinism` record,
+    and a capture's record must rebuild to the same bytes. What ended the search is a
+    category and does not wobble.
     """
 
     from squadopt.application.advice import build_advice_payload
@@ -1523,10 +1524,13 @@ def test_the_one_week_plan_says_whether_the_clock_stopped_its_search(
 def test_a_payload_that_solved_nothing_leaves_the_clock_flag_absent(
     world: dict[str, Any],
 ) -> None:
-    """Absent is not false. A caller bringing its own decision brings no diagnostics.
+    """Absent is not false, for a caller that does not state what stopped its search.
 
-    Publishing `false` here would say the wall clock did not stop a search this payload
-    never ran, which is a claim nobody measured.
+    This payload solves nothing: it is handed a decision and publishes it. Whether the
+    caller happens to hold diagnostics is the caller's business, and the ones that do now
+    pass them. What is pinned here is the default: a caller that says nothing produces a
+    document that says nothing, and `false` would be the claim that the wall clock did not
+    stop a search this payload never ran.
     """
 
     from squadopt.application.advice import build_advice_payload

@@ -89,7 +89,6 @@
       }
     ],
     "optimality_gap": 0.0,
-    "wall_clock_stopped_the_search": false,
     "overlap_applied": 10,
     "overlap_count": 10,
     "overlap_target": 5,
@@ -202,6 +201,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 1
   },
   "ortak-koru/1": {
@@ -294,7 +294,6 @@
       }
     ],
     "optimality_gap": 0.0,
-    "wall_clock_stopped_the_search": false,
     "overlap_applied": 9,
     "overlap_count": 10,
     "overlap_target": 9,
@@ -407,6 +406,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 1
   },
   "saf-puan/1": {
@@ -487,7 +487,6 @@
       }
     ],
     "optimality_gap": 0.0,
-    "wall_clock_stopped_the_search": false,
     "rival_label": null,
     "season": "2026-27",
     "solver_status": "OPTIMAL",
@@ -594,6 +593,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 1
   },
   "saf-puan/3": {
@@ -674,7 +674,6 @@
       }
     ],
     "optimality_gap": 0.0,
-    "wall_clock_stopped_the_search": false,
     "plan_weeks": [
       {
         "chip": null,
@@ -865,6 +864,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 3
   },
   "saf-puan/5": {
@@ -945,7 +945,6 @@
       }
     ],
     "optimality_gap": 0.0,
-    "wall_clock_stopped_the_search": false,
     "plan_weeks": [
       {
         "chip": null,
@@ -1188,6 +1187,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 5
   }
 }

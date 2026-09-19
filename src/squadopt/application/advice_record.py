@@ -415,9 +415,14 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         "optimality_gap": _number(payload, "optimality_gap"),
         # And whether the wall clock stopped it, so a settled record can tell a plan the
         # budget ended from one that was a property of the machine's load. The work spent
-        # is deliberately not here: two legitimate paths solving the same request spend
-        # different amounts of it, so it is a fact about a solve and not about a document.
         "wall_clock_stopped_the_search": _flag(payload, "wall_clock_stopped_the_search"),
+        # The work spent is deliberately not here, and the reason is reproducibility rather
+        # than path. Two runs of the same publish disagree on it in the last decimal digit:
+        # member 2199732 read 1.2949777377880984 and then ...82 on the same capture under the
+        # same budget, measured against the committed `member_plan_determinism` record. The
+        # record of a capture must be rebuildable to the same bytes, so a field that wobbles
+        # below the last digit anyone would read cannot be in it. What ends the search is a
+        # category and does not wobble.
         # Whether this document can be scored at all. A competitive mode's payload is
         # published without a lineup (the selector chose a transfer decision, not a week),
         # and the record says so rather than presenting an empty eleven as a decision.
