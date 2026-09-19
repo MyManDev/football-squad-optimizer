@@ -31,7 +31,32 @@ function missing(route: Route) {
   return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
 }
 
+/**
+ * A calendar in which the mocked league's gameweek is still open. The member page reads
+ * the published calendar to say when a deadline has passed and then stops offering
+ * Compute; a spec that mocks a league must not change its outcome with the wall clock,
+ * so the mocked week never closes. A spec about a closed week routes its own calendar
+ * after calling `installLeagueMocks`.
+ */
+export function openCalendar() {
+  const { season, gameweek } = mockLeagueMembersEnvelope.payload;
+  return {
+    contract_version: "fixtures_v1",
+    generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
+    source_kind: mockLeagueMembersEnvelope.source_kind,
+    payload: {
+      season,
+      source_snapshot_id: "fpl-live-mock",
+      captured_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
+      current_gameweek: gameweek,
+      unscheduled_count: 0,
+      gameweeks: [{ gameweek, deadline_utc: "2999-01-01T00:00:00Z", fixtures: [] }],
+    },
+  };
+}
+
 export async function installLeagueMocks(page: Page) {
+  await page.route("**/data/fixtures.json", (route) => fulfill(route, openCalendar()));
   await page.route("**/data/league/members.json", (route) =>
     fulfill(route, mockLeagueMembersEnvelope),
   );
