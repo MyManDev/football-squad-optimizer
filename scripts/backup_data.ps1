@@ -9,7 +9,8 @@ The destination must already exist outside this repository and every linked work
 param(
     [Parameter(Mandatory=$true)][string]$Destination,
     [switch]$DryRun,
-    [switch]$Verify
+    [switch]$Verify,
+    [string]$Manifest = ''
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
@@ -18,7 +19,8 @@ $source = Join-Path $repo 'data'
 $trees = @('snapshots', 'ledger', 'handoffs', 'advice_records', 'entries')
 
 function File-Hash([string]$path) {
-    $stream = [IO.File]::OpenRead($path)
+    $share = [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
+    $stream = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, $share)
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '') }
     finally { $sha.Dispose(); $stream.Dispose() }
@@ -28,7 +30,7 @@ function Assert-NoLinks([string]$path) {
         if (Test-Path -LiteralPath $path) {
             $item = Get-Item -LiteralPath $path -Force
             if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                throw 'Refusing a reparse point in a backup path.'
+                throw "Refusing reparse point: $path"
             }
         }
         $path = Split-Path -Parent $path
@@ -69,8 +71,21 @@ function Source-Files {
         }
     }
 }
+function Check-DestinationTree([string]$root) {
+    Assert-NoLinks $root
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) { return }
+    foreach ($item in Get-ChildItem -LiteralPath $root -Force) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "Refusing reparse point: $($item.FullName)"
+        }
+        if ($item.PSIsContainer) { Check-DestinationTree $item.FullName }
+    }
+}
 try {
     if ($DryRun -and $Verify) { throw 'Choose -DryRun or -Verify, not both.' }
+    if ($Manifest -and (-not $Verify -or $Manifest -notmatch '^manifest-[A-Za-z0-9_-]+\.json$')) {
+        throw '-Manifest requires -Verify and a manifest-*.json name inside the destination.'
+    }
     Assert-NoLinks ([IO.Path]::GetFullPath($Destination))
     if (-not (Test-Path -LiteralPath $Destination -PathType Container)) {
         throw 'Destination must be an existing directory.'
@@ -86,16 +101,22 @@ try {
             }
         }
     }
-    $files = @(Source-Files)
-    if ($Verify) {
-        $latest = Get-ChildItem -LiteralPath $destinationRoot -Filter 'manifest-*.json' -File |
-            Sort-Object Name -Descending | Select-Object -First 1
-        if (-not $latest) { throw 'No backup manifest found.' }
+    foreach ($tree in $trees) { Check-DestinationTree (Join-Path $destinationRoot $tree) }
+    $files = @(Source-Files | Sort-Object FullName)
+    $latest = Get-ChildItem -LiteralPath $destinationRoot -Filter 'manifest-*.json' -File |
+        Sort-Object Name -Descending | Select-Object -First 1
+    if ($Manifest) { $latest = Get-Item -LiteralPath (Join-Path $destinationRoot $Manifest) }
+    $previous = $null
+    if ($latest) {
         Assert-NoLinks $latest.FullName
-        $manifest = Get-Content -LiteralPath $latest.FullName -Raw | ConvertFrom-Json
+        $previous = Get-Content -LiteralPath $latest.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    if ($Verify) {
+        if (-not $latest) { throw 'No backup manifest found.' }
+        $manifestDocument = $previous
         $seen = @{}
         $differences = 0
-        foreach ($record in $manifest.files) {
+        foreach ($record in $manifestDocument.files) {
             $seen[$record.path] = $true
             $pair = @{
                 source = (Manifest-Path $source $record.path)
@@ -119,11 +140,22 @@ try {
             }
         }
         if ($differences) { throw "Verification found $differences differences." }
-        Write-Output "Verified $($manifest.files.Count) files against $($latest.Name)."
+        Write-Output "Verified $($manifestDocument.files.Count) files against $($latest.Name)."
         exit 0
+    }
+    if ($previous) {
+        $missing = @($previous.files | Where-Object {
+            -not (Test-Path -LiteralPath (Manifest-Path $source $_.path) -PathType Leaf)
+        })
+        if ($missing.Count) {
+            Write-Output "MISSING at source: $($missing.Count) files"
+            foreach ($record in $missing) { Write-Output $record.path }
+            throw 'Source loss detected; no backup files or manifest written.'
+        }
     }
     $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')
     $records = New-Object 'Collections.Generic.List[object]'
+    $newConflicts = New-Object 'Collections.Generic.List[string]'
     [long]$bytes = 0
     foreach ($file in $files) {
         $relative = $file.FullName.Substring($source.Length + 1).Replace('\', '/')
@@ -135,9 +167,18 @@ try {
                 throw "Destination is not a file: $relative"
             }
             if ((File-Hash $target) -ne $hash) {
-                $targetRelative = "$relative.conflict-$stamp"
+                $same = Get-ChildItem -LiteralPath (Split-Path -Parent $target) -File |
+                    Where-Object { $_.Name.StartsWith($file.Name + '.conflict-') } |
+                    Sort-Object Name | Where-Object { (File-Hash $_.FullName) -eq $hash } |
+                    Select-Object -First 1
+                if ($same) {
+                    $targetRelative = $same.FullName.Substring($destinationRoot.Length + 1).Replace('\', '/')
+                } else {
+                    $targetRelative = "$relative.conflict-$stamp"
+                    $newConflicts.Add($relative)
+                    Write-Output "CONFLICT $relative; preserving incoming content as $targetRelative"
+                }
                 $target = Manifest-Path $destinationRoot $targetRelative
-                Write-Output "CONFLICT $relative; preserving incoming content as $targetRelative"
             }
         }
         if (-not (Test-Path -LiteralPath $target)) {
@@ -155,16 +196,20 @@ try {
     }
     Write-Output "Copy total: $bytes bytes; examined $($files.Count) files."
     if (-not $DryRun) {
-        $manifest = @{created_at_utc=$stamp; files=@($records.ToArray())} | ConvertTo-Json -Depth 4
+        $manifestDocument = @{created_at_utc=$stamp; files=@($records.ToArray())} | ConvertTo-Json -Depth 4
         $path = Join-Path $destinationRoot "manifest-$stamp.json"
         $stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew)
         try {
             $writer = New-Object IO.StreamWriter($stream)
-            try { $writer.WriteLine($manifest) } finally { $writer.Dispose() }
+            try { $writer.WriteLine($manifestDocument) } finally { $writer.Dispose() }
         } finally { $stream.Dispose() }
         Write-Output "Wrote manifest-$stamp.json"
     }
+    if ($newConflicts.Count) {
+        Write-Output "New conflicts: $($newConflicts.Count); inspect the named files."
+        exit 1
+    }
 } catch {
-    Write-Error $_
+    Write-Output $_.Exception.Message
     exit 1
 }
