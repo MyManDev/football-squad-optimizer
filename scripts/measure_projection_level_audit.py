@@ -44,6 +44,7 @@ DEFAULT_MARKDOWN_OUTPUT = REPOSITORY_ROOT / "docs" / "projection_level_audit.md"
 #: the last decimal of a few cells; the record says whether it did.
 EVALUATED_TABLE_SHA256 = "b05f10c3fd3ab5058fe1ff720cc6ef0a4b1362a70a19dd979ad0eb0f47d12c01"
 EVALUATED_ROWS = 101_447
+EVALUATED_ROSTER_SHA256 = "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e"
 
 
 def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -81,14 +82,25 @@ def prior_minutes_per_week(panel: pd.DataFrame, keys: pd.DataFrame) -> pd.Series
 
 
 def level_table(rows: pd.DataFrame, roster: pd.DataFrame, panel: pd.DataFrame) -> pd.DataFrame:
-    """The handoff's rows in the audit's own columns, from the first gameweek it reads."""
+    """The handoff's rows in the audit's own columns, from the first gameweek it reads.
 
-    keyed = rows.merge(
+    The table's ``points_target`` is conditional: it is stated for the players who appeared
+    and absent for the rest, who scored nothing. The outcome is read as the component
+    evaluation reads it. A thin-history row carries no forecast in this table (the system
+    fell back to the direct control there), so it is left out and counted by the caller: a
+    forecast that is absent is not a forecast of nothing.
+    """
+
+    # The verified handoff may already carry the roster's position on its rows.
+    keyed = rows.drop(columns=["position"], errors="ignore").merge(
         roster.loc[:, [*HANDOFF_KEY, "position"]], on=list(HANDOFF_KEY), validate="one_to_one"
     )
     keyed = keyed.loc[
-        (keyed["fixture_count"] > 0) & (keyed["target_gameweek"] >= FIRST_TARGET_GAMEWEEK)
+        (keyed["fixture_count"] > 0)
+        & (keyed["target_gameweek"] >= FIRST_TARGET_GAMEWEEK)
+        & keyed["control_expected_points"].notna()
     ].reset_index(drop=True)
+    appeared = keyed["appearance_target"].astype(float) == 1.0
     return pd.DataFrame(
         {
             "season": keyed["season"].astype(str),
@@ -96,7 +108,7 @@ def level_table(rows: pd.DataFrame, roster: pd.DataFrame, panel: pd.DataFrame) -
             "player_id": keyed["player_id"].astype("int64"),
             "position": keyed["position"].astype(str),
             "forecast": keyed["control_expected_points"].astype(float),
-            "realized": keyed["points_target"].astype(float),
+            "realized": keyed["points_target"].astype(float).where(appeared, 0.0),
             "appearance_forecast": keyed["appearance_probability"].astype(float),
             # The outcome of a row with no component forecast is not read against one.
             "appeared": keyed["appearance_target"]
@@ -160,7 +172,9 @@ def _markdown(record: Mapping[str, Any]) -> str:
         )
         + f"), {pooled['rows']} rows read over {pooled['decisions']} decisions from target "
         f"gameweek {record['first_target_gameweek']}, blank rows left out "
-        f"({record['rows_left_out_blank']}). Bias is realized minus forecast, so a positive "
+        f"({record['rows_left_out_blank']}) and so are the thin-history rows the table holds "
+        f"no forecast for ({record['rows_left_out_without_a_forecast']}). Bias is realized "
+        "minus forecast, so a positive "
         "bias is a forecast that ran low. Intervals resample decisions.",
     ]
     lines += _rows("By minutes a gameweek played before the decision", pooled["by_prior_minutes"])
@@ -228,8 +242,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "table_rows": len(handoff.rows),
         "table_is_the_evaluated_table": handoff.table_sha256 == EVALUATED_TABLE_SHA256,
         "table_has_the_evaluated_row_count": len(handoff.rows) == EVALUATED_ROWS,
+        "roster_is_the_evaluated_roster": handoff.roster_sha256 == EVALUATED_ROSTER_SHA256,
         "first_target_gameweek": FIRST_TARGET_GAMEWEEK,
         "rows_left_out_blank": int((in_scope["fixture_count"] <= 0).sum()),
+        "rows_left_out_without_a_forecast": int(
+            ((in_scope["fixture_count"] > 0) & in_scope["control_expected_points"].isna()).sum()
+        ),
         "interval": {
             "level": INTERVAL_LEVEL,
             "unit": "decision",

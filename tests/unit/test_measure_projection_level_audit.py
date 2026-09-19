@@ -36,31 +36,45 @@ def test_the_prior_is_the_seasons_minutes_before_the_target_over_its_gameweeks()
     assert prior.iloc[2] == pytest.approx(45 / 4)
 
 
-def test_the_table_leaves_out_blank_rows_and_early_gameweeks_and_keeps_absent_absent() -> None:
-    def row(gameweek: int, player: int, fixtures: int, components: bool) -> dict[str, object]:
+def test_the_table_leaves_out_what_it_cannot_read_and_scores_the_absent_as_nothing() -> None:
+    def row(
+        gameweek: int,
+        player: int,
+        *,
+        fixtures: int = 1,
+        appeared: bool = True,
+        forecast: bool = True,
+    ) -> dict[str, object]:
         return {
             "season": "2021-22",
             "target_gameweek": gameweek,
             "fold_id": f"2021-22-gw{gameweek:02d}",
             "player_id": player,
             "fixture_count": fixtures,
-            "appearance_target": 1,
-            "points_target": 5,
-            "appearance_probability": 0.8 if components else np.nan,
-            "expected_points_if_appearance": 4.0 if components else np.nan,
-            "control_expected_points": 3.2,
+            "appearance_target": 1 if appeared else 0,
+            # Conditional: stated for those who appeared, absent for the rest.
+            "points_target": 5.0 if appeared else np.nan,
+            "appearance_probability": 0.8 if forecast else np.nan,
+            "expected_points_if_appearance": 4.0 if forecast else np.nan,
+            "control_expected_points": 3.2 if forecast else np.nan,
         }
 
     rows = pd.DataFrame(
-        [row(3, 1, 1, True), row(4, 1, 1, True), row(4, 2, 1, False), row(5, 1, 0, True)]
+        [
+            row(3, 1),  # before the first gameweek read
+            row(4, 1),
+            row(4, 2, appeared=False),
+            row(4, 3, forecast=False),  # thin history: no forecast in the table
+            row(5, 1, fixtures=0),  # blank
+        ]
     )
     roster = rows.loc[:, ["season", "target_gameweek", "fold_id", "player_id"]].assign(
         position="MID"
     )
     table = level_table(rows, roster, _panel())
-    assert list(table["fold_id"]) == ["2021-22-gw04", "2021-22-gw04"]
-    composed, direct = table.iloc[0], table.iloc[1]
-    assert composed["appeared"] == 1.0 and composed["conditional_forecast"] == 4.0
-    # A direct-control row has no component forecast, so its appearance is not read either.
-    assert np.isnan(direct["appeared"]) and np.isnan(direct["appearance_forecast"])
-    assert direct["forecast"] == 3.2 and direct["realized"] == 5.0
+    assert list(table["player_id"]) == [1, 2]
+    played, absent = table.iloc[0], table.iloc[1]
+    assert played["realized"] == 5.0 and played["appeared"] == 1.0
+    assert played["conditional_forecast"] == 4.0 and played["forecast"] == 3.2
+    # He did not appear, so he scored nothing: that is an outcome, not a missing one.
+    assert absent["realized"] == 0.0 and absent["appeared"] == 0.0
