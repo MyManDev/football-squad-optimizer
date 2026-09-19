@@ -12,6 +12,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Literal, TypeAlias
 
+from squadopt.contracts import CANONICAL_COLUMNS as PROJECTION_CANONICAL_COLUMNS
+from squadopt.contracts import OPTIONAL_COLUMNS as PROJECTION_OPTIONAL_COLUMNS
 from squadopt.contracts import POSITIONS, Position
 from squadopt.contracts import REQUIRED_COLUMNS as PROJECTION_REQUIRED_COLUMNS
 from squadopt.data.errors import InvalidValueError
@@ -40,6 +42,8 @@ __all__ = [
     "POSITION_ALIASES",
     "PRE_MATCH_COLUMNS",
     "PRICE_TENTHS_PER_UNIT",
+    "PROJECTION_CANONICAL_COLUMNS",
+    "PROJECTION_OPTIONAL_COLUMNS",
     "PROJECTION_REQUIRED_COLUMNS",
     "REQUIRED_COLUMNS",
     "ColumnKind",
