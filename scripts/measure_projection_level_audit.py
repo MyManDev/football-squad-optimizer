@@ -135,8 +135,9 @@ def _rows(title: str, blocks: Mapping[str, Any]) -> list[str]:
         "",
         f"**{title}**",
         "",
-        "| bucket | rows | forecast points | realized points | bias | 90% interval | "
-        "who plays: bias | interval | when they play: bias | interval |",
+        "| bucket | rows | forecast points | realized points | bias, points a row | "
+        "90% interval | who plays: bias, appearances a row | interval | "
+        "when they score: bias, points a row of those who appeared | interval |",
         "| --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: | --- |",
     ]
     for label, block in blocks.items():
@@ -176,7 +177,9 @@ def _markdown(record: Mapping[str, Any]) -> str:
         f"no forecast for ({record['rows_left_out_without_a_forecast']}). Bias is realized "
         "minus forecast, so a positive "
         "bias is a forecast that ran low. Intervals resample decisions. The two sources of a "
-        "level error do not add up to it and may not be added: the forecast is a product of "
+        "level error do not add up to it and may not be added, and they are not even in the "
+        "same unit: the level and the conditional side are points a row, the who-plays side is "
+        "appearances a row, the forecast is a product of "
         "them, the level is a difference of sums, and the second is read only over the rows "
         "that appeared.",
     ]
