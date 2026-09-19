@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $repo 'data'
 $trees = @('snapshots', 'ledger', 'handoffs', 'advice_records', 'entries')
+$skippedTransient = New-Object 'Collections.Generic.List[string]'
 
 function File-Hash([string]$path) {
     $share = [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
@@ -54,7 +55,7 @@ function Manifest-Path([string]$root, [string]$relative) {
 }
 function Is-Transient([string]$relative) {
     foreach ($name in $relative.Split('/')) {
-        if ($name.Contains('.staging-') -or $name -like '.*.lock') { return $true }
+        if ($name.StartsWith('.')) { return $true }
     }
     return $false
 }
@@ -72,7 +73,10 @@ function Source-Files {
                 if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
                     throw "Refusing a source reparse point: $($item.FullName)"
                 }
-                if (Is-Transient $item.Name) { continue }
+                if (Is-Transient $item.Name) {
+                    $skippedTransient.Add($item.FullName.Substring($source.Length + 1).Replace('\', '/'))
+                    continue
+                }
                 if ($item.PSIsContainer) { $pending.Push($item.FullName) }
                 else { $item }
             }
@@ -112,6 +116,11 @@ try {
     }
     foreach ($tree in $trees) { Check-DestinationTree (Join-Path $destinationRoot $tree) }
     $files = @(Source-Files | Sort-Object FullName)
+    Write-Output "Ignored dot-named source paths: $($skippedTransient.Count)"
+    foreach ($relative in ($skippedTransient | Sort-Object | Select-Object -First 20)) {
+        Write-Output "TRANSIENT $relative"
+    }
+    if ($skippedTransient.Count -gt 20) { Write-Output 'Showing the first 20 transient paths.' }
     $latest = Get-ChildItem -LiteralPath $destinationRoot -Filter 'manifest-*.json' -File |
         Sort-Object Name -Descending | Select-Object -First 1
     if ($Manifest) { $latest = Get-Item -LiteralPath (Join-Path $destinationRoot $Manifest) }
@@ -119,6 +128,10 @@ try {
     if ($latest) {
         Assert-NoLinks $latest.FullName
         $previous = Get-Content -LiteralPath $latest.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        $ignoredPrevious = @($previous.files | Where-Object { Is-Transient $_.path })
+        if ($ignoredPrevious.Count) {
+            Write-Output "Ignored transient entries in $($latest.Name): $($ignoredPrevious.Count)"
+        }
     }
     if ($Verify) {
         if (-not $latest) { throw 'No backup manifest found.' }
@@ -208,6 +221,7 @@ try {
     }
     Write-Output "Copy total: $bytes bytes; examined $($files.Count) files."
     if ($missing.Count -and -not $AcceptMissing) {
+        if ($DryRun) { throw 'Source loss detected; dry run wrote no files or manifest.' }
         throw 'Source loss detected; additive copies retained, no manifest written. Restore or acknowledge with -AcceptMissing.'
     }
     if ($missing.Count) { Write-Output "ACCEPTED missing at source: $($missing.Count) files; old backups retained." }

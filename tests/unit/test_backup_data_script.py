@@ -203,6 +203,11 @@ def test_loss_still_protects_new_files_until_explicit_acknowledgement(
         assert (destination / f"entries/day{day}.json").read_bytes() == new.read_bytes()
         assert list(destination.glob("manifest-*.json")) == [original_manifest]
         assert original_manifest.read_bytes() == original_bytes
+    dry_file = repo / "data/entries/dry.json"
+    dry_file.write_text("dry", encoding="ascii")
+    dry = _run(repo, destination, "-DryRun")
+    assert dry.returncode == 1 and "dry run wrote no files or manifest" in dry.stdout
+    assert not (destination / "entries/dry.json").exists()
     accepted = _run(repo, destination, "-AcceptMissing")
     assert accepted.returncode == 0 and "ACCEPTED missing at source: 1 files" in accepted.stdout
     assert (destination / "ledger/record.json").read_text() == "ledger"
@@ -244,12 +249,57 @@ def test_staging_and_lock_land_without_false_loss_even_with_old_manifest(
             )
         )
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    verified = _run(repo, destination, "-Verify")
+    assert verified.returncode == 0 and "Ignored transient entries" in verified.stdout
     staging.rename(season / "gw05")
     lock.unlink()
     result = _run(repo, destination)
     assert result.returncode == 0 and "MISSING" not in result.stdout, result.stdout
+    assert f"Ignored transient entries in {manifest_path.name}: 2" in result.stdout
     assert (destination / tree / "2026-27/gw05/manifest.json").read_text() == "landed record"
     assert _run(repo, destination, "-Verify").returncode == 0
+
+
+def test_dot_temporaries_are_reported_but_ordinary_names_are_backed_up(
+    backup: tuple[Path, Path],
+) -> None:
+    repo, destination = backup
+    tmp = repo / "data/ledger/2026-27/gw04/.outcome.json.tmp-55-abcd"
+    tmp.parent.mkdir(parents=True)
+    tmp.write_text("temporary outcome", encoding="ascii")
+    retained = repo / "data/handoffs/.retain-fixture"
+    retained.mkdir()
+    (retained / "record.json").write_text("temporary handoff", encoding="ascii")
+    stable_paths = ("snapshots/payloads/lock.json", "advice_records/staging/record.json")
+    for relative in stable_paths:
+        path = repo / "data" / relative
+        path.parent.mkdir(parents=True)
+        path.write_text("stable", encoding="ascii")
+    result = _run(repo, destination)
+    assert result.returncode == 0, result.stdout
+    assert "Ignored dot-named source paths: 2" in result.stdout
+    assert "TRANSIENT handoffs/.retain-fixture" in result.stdout
+    assert "TRANSIENT ledger/2026-27/gw04/.outcome.json.tmp-55-abcd" in result.stdout
+    manifest = json.loads(next(destination.glob("manifest-*.json")).read_text())
+    assert len(manifest["files"]) == 7
+    assert not any(part.startswith(".") for r in manifest["files"] for part in r["path"].split("/"))
+    for relative in stable_paths:
+        assert (destination / relative).read_text() == "stable"
+    tmp.unlink()
+    retained.rename(retained.with_name("retained"))
+    assert _run(repo, destination).returncode == 0
+    assert _run(repo, destination, "-Verify").returncode == 0
+
+
+def test_transient_output_is_bounded_and_dry_run_writes_nothing(backup: tuple[Path, Path]) -> None:
+    repo, destination = backup
+    for number in range(25):
+        (repo / f"data/handoffs/.handoff-{number:02}").mkdir()
+    result = _run(repo, destination, "-DryRun")
+    assert result.returncode == 0
+    assert "Ignored dot-named source paths: 25" in result.stdout
+    assert sum(line.startswith("TRANSIENT ") for line in result.stdout.splitlines()) == 20
+    assert list(destination.iterdir()) == []
 
 
 def test_missing_output_has_total_and_bounded_sample(backup: tuple[Path, Path]) -> None:
