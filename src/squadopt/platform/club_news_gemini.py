@@ -23,6 +23,7 @@ records the wrong one of them is worse than a week that records nothing.
 """
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Final, Protocol
 
@@ -52,12 +53,31 @@ DEFAULT_GEMINI_MODEL: Final = "gemini-2.5-flash"
 #: or a proxy's access line as part of the URL.
 KEY_HEADER: Final = "x-goog-api-key"
 
+#: What may travel in a header value: printable ASCII with no space and no control byte.
+#:
+#: This is checked rather than trusted because of where an unchecked key ends up. A key with
+#: an interior newline, which is what a two-line key file or a bad paste produces, reaches the
+#: HTTP layer and is rejected there by an exception **whose message quotes the whole header
+#: value**. That exception is not one of the types the acquisition command catches, so it
+#: escapes as a traceback and prints the key into the run log. Refusing here keeps the secret
+#: inside the process, and the refusal below never echoes what it refused.
+_HEADER_SAFE: Final = re.compile(r"[\x21-\x7e]+")
+
 _ENDPOINT: Final = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 #: Deterministic decoding. Two runs over one capture should ask the same question and, as far
 #: as the service allows, get the same answer; the claims are then replayable from the stored
 #: bytes rather than from a second call that may differ.
 _TEMPERATURE: Final = 0.0
+
+#: Thinking off, and stated rather than left to the server.
+#:
+#: Two reasons. The setting is part of what produced an answer, and a default that the vendor
+#: can change underneath us is a setting this repository did not choose; naming it means a
+#: week coded today and a week coded in March were asked the same way. And on these models
+#: thinking tokens count against ``maxOutputTokens``, so an unstated budget spends the ceiling
+#: that the claims need and turns a good answer into a truncation refusal.
+_THINKING_BUDGET: Final = 0
 
 #: Finish reasons that mean the model declined rather than answered. A declined request has no
 #: claims in it and must not be recorded as a week in which nobody was mentioned.
@@ -130,6 +150,43 @@ def gemini_schema(schema: Mapping[str, object]) -> dict[str, object]:
     return translated
 
 
+def _checked_key(api_key: str) -> str:
+    """The key, or a refusal that does not repeat it.
+
+    Only the ends are stripped, because an interior space is as unsendable as a leading one
+    and silently deleting it would change the secret rather than reject it. The refusal names
+    the likely cause and quotes nothing: a message that echoed the key to explain why it was
+    wrong would put it exactly where this check exists to keep it out of.
+    """
+
+    candidate = str(api_key).strip()
+    if not candidate:
+        return ""
+    if not _HEADER_SAFE.fullmatch(candidate):
+        raise ClubNewsGeminiError(
+            "The API key holds a character that cannot travel in an HTTP header: a space, a "
+            "line break or a byte outside printable ASCII. A key file with a trailing line "
+            "break that was read whole, or a paste that wrapped, is the usual cause. The key "
+            "is not quoted here on purpose."
+        )
+    return candidate
+
+
+def _transport_error_types() -> tuple[type[BaseException], ...]:
+    """The transport's own failures, looked up rather than imported at module load.
+
+    ``httpx2`` is an optional install, so this returns nothing when it is absent and the
+    ``except`` below simply catches nothing. A test that hands in its own transport can still
+    raise a real ``httpx2`` error and be caught, which is what makes that test worth having.
+    """
+
+    try:
+        import httpx2
+    except ImportError:
+        return ()
+    return (httpx2.HTTPError,)
+
+
 class GeminiClubNewsProvider:
     """Codes club documents by asking the Generative Language API.
 
@@ -157,20 +214,40 @@ class GeminiClubNewsProvider:
 
         self._model_identifier = model_identifier
         self._timeout = timeout
+        self._api_key = "" if api_key is None else _checked_key(api_key)
+        self._owns_transport = transport is None
         if transport is not None:
             self._transport: Transport = transport
-            self._api_key = ""
             return
-        if not (api_key or "").strip():
+        if not self._api_key:
             raise ClubNewsGeminiError(
                 "This provider needs an API key. It is read from the environment by "
                 "`club_news_provider` and never committed, so a checkout alone cannot code a "
                 "week's club news; the fixture provider is what runs without one."
             )
-        import httpx2
+        try:
+            import httpx2
+        except ImportError as error:
+            raise ClubNewsGeminiError(
+                "Coding club news with this provider needs httpx2, which is not a runtime "
+                "dependency of this project (install it with the 'llm' extra: pip install -c "
+                f"constraints.txt -e '.[llm]'): {error}"
+            ) from error
 
-        self._api_key = str(api_key)
         self._transport = httpx2.Client(timeout=timeout)
+
+    def close(self) -> None:
+        """Release the HTTP client this provider built, if it built one.
+
+        A supplied transport belongs to whoever supplied it and is left alone. A week's run
+        codes twenty clubs through one provider and then ends, so the pool would be collected
+        eventually; saying when is cheaper than relying on that, and a test that builds a real
+        client can leave nothing behind.
+        """
+
+        closer = getattr(self._transport, "close", None)
+        if self._owns_transport and callable(closer):
+            closer()
 
     def fetch(self, url: str) -> RawDocument:
         """Refuse: this provider codes documents, it does not go and get them."""
@@ -202,15 +279,44 @@ class GeminiClubNewsProvider:
                 "responseSchema": gemini_schema(response_schema()),
                 "maxOutputTokens": MAX_OUTPUT_TOKENS,
                 "temperature": _TEMPERATURE,
+                "thinkingConfig": {"thinkingBudget": _THINKING_BUDGET},
             },
         }
-        reply = self._transport.post(
-            _ENDPOINT.format(model=self._model_identifier),
-            headers={KEY_HEADER: self._api_key, "Content-Type": "application/json"},
-            json=body,
-            timeout=self._timeout,
-        )
+        try:
+            reply = self._transport.post(
+                _ENDPOINT.format(model=self._model_identifier),
+                headers={KEY_HEADER: self._api_key, "Content-Type": "application/json"},
+                json=body,
+                timeout=self._timeout,
+            )
+        except _transport_error_types() as error:
+            # The type only. A transport error's message can quote the request it failed on,
+            # headers included, and one club's timeout must not be the thing that writes the
+            # key into the run log. With no retry here the week loses this club and keeps the
+            # rest, which is the failure the per-club unit exists for.
+            raise ClubNewsGeminiError(
+                f"The request did not complete ({type(error).__name__})."
+            ) from None
         return _claim_response(reply, asked_for=self._model_identifier)
+
+
+def _why(reply: Reply) -> str:
+    """The service's own status and message, and nothing else from the body.
+
+    This API states a failure as ``{"error": {"status": ..., "message": ...}}``. Those two
+    fields are the service describing itself; the rest of a body can be a gateway echoing the
+    request that failed, headers included, so it is never quoted.
+    """
+
+    try:
+        document = reply.json()
+    except (ValueError, json.JSONDecodeError):
+        return ""
+    error = document.get("error") if isinstance(document, Mapping) else None
+    if not isinstance(error, Mapping):
+        return ""
+    stated = [str(error[key]) for key in ("status", "message") if isinstance(error.get(key), str)]
+    return f" ({'; '.join(stated)})" if stated else ""
 
 
 def _payload(reply: Reply) -> Mapping[str, Any]:
@@ -228,15 +334,16 @@ def _payload(reply: Reply) -> Mapping[str, Any]:
             "free tier's limit is a fact about the run and not a transient to paper over."
         )
     if status != 200:
-        raise ClubNewsGeminiError(
-            f"The service answered {status} rather than 200: {reply.text[:200]!r}."
-        )
+        raise ClubNewsGeminiError(f"The service answered {status} rather than 200{_why(reply)}.")
     try:
         document = reply.json()
-    except (ValueError, json.JSONDecodeError) as error:
+    except (ValueError, json.JSONDecodeError):
+        # The body is not quoted. A gateway can echo the request it rejected, headers and all,
+        # and a refusal that pasted the first bytes of that into a log would defeat the point
+        # of keeping the key out of the URL.
         raise ClubNewsGeminiError(
-            f"The response body is not JSON ({error}); the first bytes were {reply.text[:120]!r}."
-        ) from error
+            "The response body is not JSON, so it carries no candidate to read."
+        ) from None
     if not isinstance(document, Mapping):
         raise ClubNewsGeminiError(
             f"The response body is {type(document).__name__} rather than an object, so it "
@@ -290,7 +397,13 @@ def _claim_response(reply: Reply, *, asked_for: str) -> ClaimResponse:
     parts = content.get("parts") if isinstance(content, Mapping) else None
     text = ""
     if isinstance(parts, Sequence) and not isinstance(parts, str):
-        text = "".join(str(part.get("text", "")) for part in parts if isinstance(part, Mapping))
+        # A thinking part is the model working, not the model answering, and folding it into
+        # the claims would feed the parser prose it never agreed to read.
+        text = "".join(
+            str(part.get("text", ""))
+            for part in parts
+            if isinstance(part, Mapping) and part.get("thought") is not True
+        )
     if not text.strip():
         raise ClubNewsGeminiError(
             f"The response carries no text (finish reason {finish!r}). A week in which the "

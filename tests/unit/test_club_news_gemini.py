@@ -12,11 +12,14 @@ from typing import Any
 
 import pytest
 
+from squadopt.data.claim_identity import UnresolvedClaim, resolve_claim_player
 from squadopt.data.sources.club_news import ClubNewsError, RawDocument, RosterPlayer
 from squadopt.data.sources.club_news_coding import (
     CODING_MODEL_IDENTIFIER,
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     SYSTEM_PROMPT,
     coding_prompt_sha256,
+    locate_claim_response,
     response_schema,
 )
 from squadopt.platform.club_news_gemini import (
@@ -41,6 +44,10 @@ ANSWER = json.dumps(
         "claims": [],
     }
 )
+#: A key no service would issue, so that every assertion about where it does not appear is
+#: an assertion about a value that is actually there to leak.
+SENTINEL_KEY = "sentinel-key-0123456789"
+
 ROSTER = (RosterPlayer(player_id=1, web_name="Saka", team_name="Arsenal"),)
 DOCUMENTS = (
     RawDocument(
@@ -96,8 +103,10 @@ def _answered(text: str = ANSWER, *, model: str = "gemini-2.5-flash-002") -> _Re
 
 
 def _provider(reply: _Reply) -> tuple[GeminiClubNewsProvider, _Transport]:
+    """A provider holding a real key and a transport that never leaves the process."""
+
     transport = _Transport(reply)
-    return GeminiClubNewsProvider(transport=transport), transport
+    return GeminiClubNewsProvider(api_key=SENTINEL_KEY, transport=transport), transport
 
 
 # --- what a good answer looks like ------------------------------------------
@@ -128,35 +137,58 @@ def test_the_request_carries_the_frozen_prompt_the_schema_and_the_key_in_a_heade
     provider.code(DOCUMENTS, ROSTER)
 
     assert DEFAULT_GEMINI_MODEL in transport.url
-    assert transport.headers[KEY_HEADER] == ""
-    # The key never travels in the URL, where a proxy or a server log would keep it.
-    assert "key=" not in transport.url
+    assert transport.headers[KEY_HEADER] == SENTINEL_KEY
+    # The key travels in the header and nowhere else: not in the URL, where a proxy or a
+    # server log would keep it, and not in the body.
+    assert SENTINEL_KEY not in transport.url
+    assert SENTINEL_KEY not in json.dumps(transport.body)
     assert transport.body["systemInstruction"] == {"parts": [{"text": SYSTEM_PROMPT}]}
     generation = transport.body["generationConfig"]
     assert isinstance(generation, dict)
     assert generation["responseMimeType"] == "application/json"
     assert generation["temperature"] == 0.0
     assert generation["responseSchema"] == gemini_schema(response_schema())
+    # Stated rather than left to the server, and off: on these models a thinking budget is
+    # spent out of the same ceiling the claims need.
+    assert generation["thinkingConfig"] == {"thinkingBudget": 0}
 
 
-def test_a_player_the_roster_does_not_hold_is_passed_through_rather_than_judged() -> None:
-    """Resolving a name is ``data/claim_identity``'s job and it does not raise.
+def test_a_player_the_roster_does_not_hold_reaches_the_resolver_and_is_unresolved() -> None:
+    """The adapter passes it through; ``claim_identity`` is what decides, and it does not raise.
 
-    A claim naming somebody who is not in the game is one of that module's three unresolved
-    reasons: the caller drops the claim and counts it. If this adapter refused the response,
-    one unplaceable name would cost the club's whole read.
+    Run the returned bytes through the real chain rather than asserting they came back
+    unchanged, which was the earlier version of this test and tested nothing the first case
+    did not. A claim naming somebody who is not in the game resolves to ``no_match``, one of
+    the three unresolved reasons, and the caller drops that claim and counts it. If the
+    adapter refused instead, one unplaceable name would cost the club's whole read.
     """
 
     said = json.dumps(
         {
-            "contract_version": "rotation_claim_coding_v1",
+            "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
             "documents": [],
-            "claims": [{"player_web_name": "Nobody", "club": "Arsenal"}],
+            "claims": [
+                {
+                    "player_name": "Nobody At All",
+                    "team_name": "Arsenal",
+                    "disposition": "stated_expected_absent",
+                    "speaker": "the manager",
+                    "source_url": DOCUMENTS[0].final_url,
+                    "quote": "Saka trained fully.",
+                    "paraphrase": "He is out.",
+                }
+            ],
         }
     )
     provider, _ = _provider(_answered(said))
 
-    assert provider.code(DOCUMENTS, ROSTER).text == said
+    response = provider.code(DOCUMENTS, ROSTER)
+    located = locate_claim_response(response, DOCUMENTS)
+    claim = json.loads(located.text)["claims"][0]
+
+    assert resolve_claim_player(claim["player_name"], claim["team_name"], ROSTER) == (
+        UnresolvedClaim(reason="no_match")
+    )
 
 
 # --- the four ways an answer is not one -------------------------------------
@@ -266,8 +298,11 @@ def test_the_free_provider_is_selected_by_environment_variable_alone() -> None:
     assert GEMINI_PROVIDER in registered_providers()
 
     provider, config = build_coding_provider(
-        {PROVIDER_ENVIRONMENT_VARIABLE: GEMINI_PROVIDER, KEY_ENVIRONMENT_VARIABLE: "not-a-key"}
+        {PROVIDER_ENVIRONMENT_VARIABLE: GEMINI_PROVIDER, KEY_ENVIRONMENT_VARIABLE: SENTINEL_KEY}
     )
+    # A real client was built here, so this test closes it rather than leaving a socket pool
+    # to a garbage collector that runs whenever it likes.
+    provider.close()
 
     assert isinstance(provider, GeminiClubNewsProvider)
     assert config.provider == GEMINI_PROVIDER
@@ -286,3 +321,134 @@ def test_a_week_coded_here_stays_distinguishable_from_one_coded_by_the_other_mod
 def test_a_provider_built_without_a_key_refuses_before_any_call() -> None:
     with pytest.raises(ClubNewsError, match="needs an API key"):
         GeminiClubNewsProvider(api_key="   ")
+
+
+# --- the key, which is the thing that must not travel -----------------------
+
+
+def test_a_key_that_cannot_travel_in_a_header_is_refused_without_being_quoted() -> None:
+    """A two-line key file is the usual cause, and the refusal must not repeat the secret.
+
+    Left unchecked, a key with an interior line break reaches the HTTP layer and is rejected
+    there by an exception whose message quotes the whole header value. That exception is not
+    one of the types `club_news_acquire` catches, so it escapes as a traceback and prints the
+    key into the run log.
+    """
+
+    leaky = f"{SENTINEL_KEY}\nX-Injected: yes"
+
+    with pytest.raises(ClubNewsGeminiError) as refusal:
+        GeminiClubNewsProvider(api_key=leaky)
+
+    assert "cannot travel in an HTTP header" in str(refusal.value)
+    assert SENTINEL_KEY not in str(refusal.value)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        _Reply(429, {"error": {"status": "RESOURCE_EXHAUSTED", "message": "quota"}}),
+        _Reply(403, {"error": {"status": "PERMISSION_DENIED", "message": "bad key"}}),
+        _Reply(200, "<html>gateway</html>", text="<html>gateway</html>"),
+        _Reply(200, {"promptFeedback": {"blockReason": "SAFETY"}}),
+        _Reply(200, {"candidates": []}),
+        _Reply(
+            200,
+            {
+                "candidates": [{"content": {"parts": []}, "finishReason": "STOP"}],
+                "modelVersion": "gemini-2.5-flash-002",
+            },
+        ),
+    ],
+)
+def test_no_refusal_message_carries_the_key(reply: _Reply) -> None:
+    """Every way this can fail, checked against the one string that must never be in it."""
+
+    provider, _ = _provider(reply)
+
+    with pytest.raises(ClubNewsError) as refusal:
+        provider.code(DOCUMENTS, ROSTER)
+
+    assert SENTINEL_KEY not in str(refusal.value)
+
+
+def test_a_failure_the_service_described_is_quoted_by_its_own_fields_only() -> None:
+    """Its status and message; never the body, which a gateway can fill with our request."""
+
+    provider, _ = _provider(
+        _Reply(
+            403,
+            {
+                "error": {"status": "PERMISSION_DENIED", "message": "API key not valid"},
+                # What a gateway can put beside it, and what must not be quoted back.
+                "requestEcho": {"headers": {KEY_HEADER: SENTINEL_KEY}},
+            },
+        )
+    )
+
+    with pytest.raises(ClubNewsGeminiError) as refusal:
+        provider.code(DOCUMENTS, ROSTER)
+
+    assert "PERMISSION_DENIED" in str(refusal.value)
+    assert "API key not valid" in str(refusal.value)
+    assert "requestEcho" not in str(refusal.value)
+    assert SENTINEL_KEY not in str(refusal.value)
+
+
+def test_a_transport_failure_is_named_by_type_and_costs_one_club() -> None:
+    """A timeout used to escape as itself, and its message can quote the request's headers.
+
+    ``code_week_by_club`` catches ``ClubNewsError`` only, so an uncaught transport error was
+    a traceback and no capture at all: one reset on club seven of twenty lost the week.
+    """
+
+    import httpx2
+
+    class _Broken:
+        def post(self, url: str, **_: object) -> _Reply:
+            raise httpx2.ConnectTimeout(f"connecting to {url} with {SENTINEL_KEY}")
+
+    provider = GeminiClubNewsProvider(api_key=SENTINEL_KEY, transport=_Broken())
+
+    with pytest.raises(ClubNewsGeminiError) as refusal:
+        provider.code(DOCUMENTS, ROSTER)
+
+    assert "ConnectTimeout" in str(refusal.value)
+    assert SENTINEL_KEY not in str(refusal.value)
+
+
+def test_a_thinking_part_is_not_part_of_the_answer() -> None:
+    """The model working is not the model answering, and the parser reads only the answer."""
+
+    reply = _Reply(
+        200,
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"text": "let me consider the squad", "thought": True},
+                            {"text": ANSWER},
+                        ]
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "modelVersion": "gemini-2.5-flash-002",
+        },
+    )
+    provider, _ = _provider(reply)
+
+    assert provider.code(DOCUMENTS, ROSTER).text == ANSWER
+
+
+def test_the_configuration_does_not_print_the_key() -> None:
+    """A dataclass prints itself into any log line or traceback that touches it."""
+
+    built, config = build_coding_provider(
+        {PROVIDER_ENVIRONMENT_VARIABLE: GEMINI_PROVIDER, KEY_ENVIRONMENT_VARIABLE: SENTINEL_KEY}
+    )
+    built.close()
+
+    assert SENTINEL_KEY not in repr(config)
+    assert config.api_key == SENTINEL_KEY

@@ -35,7 +35,7 @@ apart; a convenience default here would undo it in one line.
 
 import os
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 from squadopt.data.sources.club_news import (
@@ -51,9 +51,14 @@ from squadopt.data.sources.club_news_coding import (
     coding_prompt_sha256,
 )
 
-# The names, not the adapter: registration needs them when this module is imported, while
-# the class itself is imported only when its provider is selected, as the first one is.
-from squadopt.platform.club_news_gemini import DEFAULT_GEMINI_MODEL, GEMINI_PROVIDER
+# Eager, and the laziness that matters is kept where it belongs. Registration needs the name
+# when this module is imported, so deferring the class while importing its constants would
+# defer nothing; the adapter's own heavy import, the HTTP client, stays behind a function call.
+from squadopt.platform.club_news_gemini import (
+    DEFAULT_GEMINI_MODEL,
+    GEMINI_PROVIDER,
+    GeminiClubNewsProvider,
+)
 
 #: Which adapter codes the week. No vendor name, by contract.
 PROVIDER_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_PROVIDER"
@@ -74,7 +79,7 @@ DEFAULT_PROVIDER: Final = "anthropic"
 #: constant: a second adapter adds a row here and changes nothing else.
 VENDOR_KEY_VARIABLES: Final[Mapping[str, str]] = {
     "anthropic": "ANTHROPIC_API_KEY",
-    "gemini": "GEMINI_API_KEY",
+    GEMINI_PROVIDER: "GEMINI_API_KEY",
 }
 
 
@@ -93,7 +98,10 @@ class CodingProviderConfig:
 
     provider: str
     model_identifier: str
-    api_key: str
+    #: Out of the repr, because a dataclass prints itself into any log line, traceback or
+    #: debugger frame that touches it, and the one field here that must never appear in
+    #: one is this.
+    api_key: str = field(repr=False)
 
 
 #: Name -> a factory taking the resolved configuration. A second provider is one entry here
@@ -275,9 +283,7 @@ def _anthropic(config: CodingProviderConfig) -> ClubNewsProvider:
 
 
 def _gemini(config: CodingProviderConfig) -> ClubNewsProvider:
-    """Build the free-tier adapter, importing it only when it is selected."""
-
-    from squadopt.platform.club_news_gemini import GeminiClubNewsProvider
+    """Build the free-tier adapter. Its HTTP client is built here and not before."""
 
     return GeminiClubNewsProvider(api_key=config.api_key, model_identifier=config.model_identifier)
 
