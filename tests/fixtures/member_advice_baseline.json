@@ -1,0 +1,1188 @@
+{
+  "fark-yarat/1": {
+    "alternative_plan": {
+      "expected_points_cost": 19.97,
+      "expected_points_cost_ceiling": 19.97,
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 20.0
+    },
+    "bench": [
+      {
+        "expected_points": 1.0,
+        "name": "Player 1001",
+        "player_id": 1001,
+        "position": "GK",
+        "short_name": "1001",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.05,
+        "name": "Player 1006",
+        "player_id": 1006,
+        "position": "DEF",
+        "short_name": "1006",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.03,
+        "name": "Player 1004",
+        "player_id": 1004,
+        "position": "DEF",
+        "short_name": "1004",
+        "team": "Club 1"
+      }
+    ],
+    "captain": {
+      "expected_points": 1.23,
+      "name": "Player 1024",
+      "player_id": 1024,
+      "position": "FWD",
+      "short_name": "1024",
+      "team": "Club 5"
+    },
+    "captain_agreement": false,
+    "chip": null,
+    "control_optimality_gap": 0.0,
+    "control_solver_status": "OPTIMAL",
+    "data_quality": "partial",
+    "entry_id": 101,
+    "expected_gain_vs_hold": 0.040000000000000924,
+    "expected_gap_vs_rival": 0.5600000000000005,
+    "expected_own_points": 13.790000000000001,
+    "expected_points_cost": 0.0,
+    "expected_points_cost_ceiling": 0.0,
+    "gameweek": 2,
+    "league_id": 352490,
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "mode": "fark-yarat",
+    "moves": [
+      {
+        "expected_points_delta": 0.040000000000000924,
+        "move_id": "gw02-1",
+        "player_in": {
+          "name": "Player 1018",
+          "player_id": 1018,
+          "position": "MID",
+          "short_name": "1018",
+          "team": "Club 1"
+        },
+        "player_out": {
+          "name": "Player 1012",
+          "player_id": 1012,
+          "position": "MID",
+          "short_name": "1012",
+          "team": "Club 1"
+        },
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "optimality_gap": 0.0,
+    "overlap_applied": 10,
+    "overlap_count": 10,
+    "overlap_target": 5,
+    "plan_kind": "within_free_transfers",
+    "rival_entry_id": 202,
+    "rival_label": "entry-202",
+    "season": "2026-27",
+    "solver_status": "OPTIMAL",
+    "squad_basis": "captured",
+    "starting_xi": [
+      {
+        "expected_points": 1.01,
+        "name": "Player 1002",
+        "player_id": 1002,
+        "position": "GK",
+        "short_name": "1002",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.1,
+        "name": "Player 1011",
+        "player_id": 1011,
+        "position": "DEF",
+        "short_name": "1011",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.08,
+        "name": "Player 1009",
+        "player_id": 1009,
+        "position": "DEF",
+        "short_name": "1009",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.06,
+        "name": "Player 1007",
+        "player_id": 1007,
+        "position": "DEF",
+        "short_name": "1007",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.18,
+        "name": "Player 1019",
+        "player_id": 1019,
+        "position": "MID",
+        "short_name": "1019",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.17,
+        "name": "Player 1018",
+        "player_id": 1018,
+        "position": "MID",
+        "short_name": "1018",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.16,
+        "name": "Player 1017",
+        "player_id": 1017,
+        "position": "MID",
+        "short_name": "1017",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.1400000000000001,
+        "name": "Player 1015",
+        "player_id": 1015,
+        "position": "MID",
+        "short_name": "1015",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.23,
+        "name": "Player 1024",
+        "player_id": 1024,
+        "position": "FWD",
+        "short_name": "1024",
+        "team": "Club 5"
+      },
+      {
+        "expected_points": 1.22,
+        "name": "Player 1023",
+        "player_id": 1023,
+        "position": "FWD",
+        "short_name": "1023",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.21,
+        "name": "Player 1022",
+        "player_id": 1022,
+        "position": "FWD",
+        "short_name": "1022",
+        "team": "Club 3"
+      }
+    ],
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
+    "transfer_cap": 1,
+    "transfer_hit_points": 0.0,
+    "vice_captain": {
+      "expected_points": 1.22,
+      "name": "Player 1023",
+      "player_id": 1023,
+      "position": "FWD",
+      "short_name": "1023",
+      "team": "Club 4"
+    },
+    "window": 1
+  },
+  "ortak-koru/1": {
+    "alternative_plan": {
+      "expected_points_cost": 0.0,
+      "expected_points_cost_ceiling": 0.0,
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 0.0
+    },
+    "bench": [
+      {
+        "expected_points": 1.0,
+        "name": "Player 1001",
+        "player_id": 1001,
+        "position": "GK",
+        "short_name": "1001",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.05,
+        "name": "Player 1006",
+        "player_id": 1006,
+        "position": "DEF",
+        "short_name": "1006",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.03,
+        "name": "Player 1004",
+        "player_id": 1004,
+        "position": "DEF",
+        "short_name": "1004",
+        "team": "Club 1"
+      }
+    ],
+    "captain": {
+      "expected_points": 1.23,
+      "name": "Player 1024",
+      "player_id": 1024,
+      "position": "FWD",
+      "short_name": "1024",
+      "team": "Club 5"
+    },
+    "captain_agreement": false,
+    "chip": null,
+    "control_optimality_gap": 0.0,
+    "control_solver_status": "OPTIMAL",
+    "data_quality": "partial",
+    "entry_id": 101,
+    "expected_gain_vs_hold": 0.040000000000000924,
+    "expected_gap_vs_rival": 0.5600000000000005,
+    "expected_own_points": 13.790000000000001,
+    "expected_points_cost": 0.0,
+    "expected_points_cost_ceiling": 0.0,
+    "gameweek": 2,
+    "league_id": 352490,
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "mode": "ortak-koru",
+    "moves": [
+      {
+        "expected_points_delta": 0.040000000000000924,
+        "move_id": "gw02-1",
+        "player_in": {
+          "name": "Player 1018",
+          "player_id": 1018,
+          "position": "MID",
+          "short_name": "1018",
+          "team": "Club 1"
+        },
+        "player_out": {
+          "name": "Player 1012",
+          "player_id": 1012,
+          "position": "MID",
+          "short_name": "1012",
+          "team": "Club 1"
+        },
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "optimality_gap": 0.0,
+    "overlap_applied": 9,
+    "overlap_count": 10,
+    "overlap_target": 9,
+    "plan_kind": "within_free_transfers",
+    "rival_entry_id": 202,
+    "rival_label": "entry-202",
+    "season": "2026-27",
+    "solver_status": "OPTIMAL",
+    "squad_basis": "captured",
+    "starting_xi": [
+      {
+        "expected_points": 1.01,
+        "name": "Player 1002",
+        "player_id": 1002,
+        "position": "GK",
+        "short_name": "1002",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.1,
+        "name": "Player 1011",
+        "player_id": 1011,
+        "position": "DEF",
+        "short_name": "1011",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.08,
+        "name": "Player 1009",
+        "player_id": 1009,
+        "position": "DEF",
+        "short_name": "1009",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.06,
+        "name": "Player 1007",
+        "player_id": 1007,
+        "position": "DEF",
+        "short_name": "1007",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.18,
+        "name": "Player 1019",
+        "player_id": 1019,
+        "position": "MID",
+        "short_name": "1019",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.17,
+        "name": "Player 1018",
+        "player_id": 1018,
+        "position": "MID",
+        "short_name": "1018",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.16,
+        "name": "Player 1017",
+        "player_id": 1017,
+        "position": "MID",
+        "short_name": "1017",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.1400000000000001,
+        "name": "Player 1015",
+        "player_id": 1015,
+        "position": "MID",
+        "short_name": "1015",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.23,
+        "name": "Player 1024",
+        "player_id": 1024,
+        "position": "FWD",
+        "short_name": "1024",
+        "team": "Club 5"
+      },
+      {
+        "expected_points": 1.22,
+        "name": "Player 1023",
+        "player_id": 1023,
+        "position": "FWD",
+        "short_name": "1023",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.21,
+        "name": "Player 1022",
+        "player_id": 1022,
+        "position": "FWD",
+        "short_name": "1022",
+        "team": "Club 3"
+      }
+    ],
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
+    "transfer_cap": 1,
+    "transfer_hit_points": 0.0,
+    "vice_captain": {
+      "expected_points": 1.22,
+      "name": "Player 1023",
+      "player_id": 1023,
+      "position": "FWD",
+      "short_name": "1023",
+      "team": "Club 4"
+    },
+    "window": 1
+  },
+  "saf-puan/1": {
+    "bench": [
+      {
+        "expected_points": 1.0,
+        "name": "Player 1001",
+        "player_id": 1001,
+        "position": "GK",
+        "short_name": "1001",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.05,
+        "name": "Player 1006",
+        "player_id": 1006,
+        "position": "DEF",
+        "short_name": "1006",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.03,
+        "name": "Player 1004",
+        "player_id": 1004,
+        "position": "DEF",
+        "short_name": "1004",
+        "team": "Club 1"
+      }
+    ],
+    "captain": {
+      "expected_points": 1.23,
+      "name": "Player 1024",
+      "player_id": 1024,
+      "position": "FWD",
+      "short_name": "1024",
+      "team": "Club 5"
+    },
+    "chip": null,
+    "data_quality": "partial",
+    "entry_id": 101,
+    "expected_gain_vs_hold": 0.040000000000000924,
+    "expected_own_points": 13.790000000000001,
+    "expected_points_cost": 0.0,
+    "gameweek": 2,
+    "league_id": 352490,
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "mode": "saf-puan",
+    "moves": [
+      {
+        "expected_points_delta": 0.040000000000000924,
+        "move_id": "gw02-1",
+        "player_in": {
+          "name": "Player 1018",
+          "player_id": 1018,
+          "position": "MID",
+          "short_name": "1018",
+          "team": "Club 1"
+        },
+        "player_out": {
+          "name": "Player 1012",
+          "player_id": 1012,
+          "position": "MID",
+          "short_name": "1012",
+          "team": "Club 1"
+        },
+        "reason_code": "points_gain"
+      }
+    ],
+    "optimality_gap": 0.0,
+    "rival_label": null,
+    "season": "2026-27",
+    "solver_status": "OPTIMAL",
+    "squad_basis": "captured",
+    "starting_xi": [
+      {
+        "expected_points": 1.01,
+        "name": "Player 1002",
+        "player_id": 1002,
+        "position": "GK",
+        "short_name": "1002",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.1,
+        "name": "Player 1011",
+        "player_id": 1011,
+        "position": "DEF",
+        "short_name": "1011",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.08,
+        "name": "Player 1009",
+        "player_id": 1009,
+        "position": "DEF",
+        "short_name": "1009",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.06,
+        "name": "Player 1007",
+        "player_id": 1007,
+        "position": "DEF",
+        "short_name": "1007",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.18,
+        "name": "Player 1019",
+        "player_id": 1019,
+        "position": "MID",
+        "short_name": "1019",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.17,
+        "name": "Player 1018",
+        "player_id": 1018,
+        "position": "MID",
+        "short_name": "1018",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.16,
+        "name": "Player 1017",
+        "player_id": 1017,
+        "position": "MID",
+        "short_name": "1017",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.1400000000000001,
+        "name": "Player 1015",
+        "player_id": 1015,
+        "position": "MID",
+        "short_name": "1015",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.23,
+        "name": "Player 1024",
+        "player_id": 1024,
+        "position": "FWD",
+        "short_name": "1024",
+        "team": "Club 5"
+      },
+      {
+        "expected_points": 1.22,
+        "name": "Player 1023",
+        "player_id": 1023,
+        "position": "FWD",
+        "short_name": "1023",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.21,
+        "name": "Player 1022",
+        "player_id": 1022,
+        "position": "FWD",
+        "short_name": "1022",
+        "team": "Club 3"
+      }
+    ],
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
+    "transfer_hit_points": 0.0,
+    "vice_captain": {
+      "expected_points": 1.22,
+      "name": "Player 1023",
+      "player_id": 1023,
+      "position": "FWD",
+      "short_name": "1023",
+      "team": "Club 4"
+    },
+    "window": 1
+  },
+  "saf-puan/3": {
+    "bench": [
+      {
+        "expected_points": 1.0,
+        "name": "Player 1001",
+        "player_id": 1001,
+        "position": "GK",
+        "short_name": "1001",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.05,
+        "name": "Player 1006",
+        "player_id": 1006,
+        "position": "DEF",
+        "short_name": "1006",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.03,
+        "name": "Player 1004",
+        "player_id": 1004,
+        "position": "DEF",
+        "short_name": "1004",
+        "team": "Club 1"
+      }
+    ],
+    "captain": {
+      "expected_points": 1.23,
+      "name": "Player 1024",
+      "player_id": 1024,
+      "position": "FWD",
+      "short_name": "1024",
+      "team": "Club 5"
+    },
+    "chip": null,
+    "data_quality": "partial",
+    "entry_id": 101,
+    "expected_gain_vs_hold": 0.040000000000000924,
+    "expected_own_points": 13.790000000000001,
+    "expected_points_cost": 0.0,
+    "gameweek": 2,
+    "league_id": 352490,
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "mode": "saf-puan",
+    "moves": [
+      {
+        "expected_points_delta": 0.040000000000000924,
+        "move_id": "gw02-1",
+        "player_in": {
+          "name": "Player 1018",
+          "player_id": 1018,
+          "position": "MID",
+          "short_name": "1018",
+          "team": "Club 1"
+        },
+        "player_out": {
+          "name": "Player 1012",
+          "player_id": 1012,
+          "position": "MID",
+          "short_name": "1012",
+          "team": "Club 1"
+        },
+        "reason_code": "window_value"
+      }
+    ],
+    "optimality_gap": 0.0,
+    "plan_weeks": [
+      {
+        "chip": null,
+        "expected_points": 13.790000000000001,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 2,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1018",
+            "player_id": 1018,
+            "position": "MID",
+            "short_name": "1018",
+            "team": "Club 1"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1012",
+            "player_id": 1012,
+            "position": "MID",
+            "short_name": "1012",
+            "team": "Club 1"
+          }
+        ]
+      },
+      {
+        "chip": null,
+        "expected_points": 13.820000000000002,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 3,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1010",
+            "player_id": 1010,
+            "position": "DEF",
+            "short_name": "1010",
+            "team": "Club 1"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1004",
+            "player_id": 1004,
+            "position": "DEF",
+            "short_name": "1004",
+            "team": "Club 1"
+          }
+        ]
+      },
+      {
+        "chip": null,
+        "expected_points": 13.83,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 4,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1016",
+            "player_id": 1016,
+            "position": "MID",
+            "short_name": "1016",
+            "team": "Club 5"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1014",
+            "player_id": 1014,
+            "position": "MID",
+            "short_name": "1014",
+            "team": "Club 3"
+          }
+        ]
+      }
+    ],
+    "rival_label": null,
+    "season": "2026-27",
+    "solver_status": "OPTIMAL",
+    "squad_basis": "captured",
+    "starting_xi": [
+      {
+        "expected_points": 1.01,
+        "name": "Player 1002",
+        "player_id": 1002,
+        "position": "GK",
+        "short_name": "1002",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.1,
+        "name": "Player 1011",
+        "player_id": 1011,
+        "position": "DEF",
+        "short_name": "1011",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.08,
+        "name": "Player 1009",
+        "player_id": 1009,
+        "position": "DEF",
+        "short_name": "1009",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.06,
+        "name": "Player 1007",
+        "player_id": 1007,
+        "position": "DEF",
+        "short_name": "1007",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.18,
+        "name": "Player 1019",
+        "player_id": 1019,
+        "position": "MID",
+        "short_name": "1019",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.17,
+        "name": "Player 1018",
+        "player_id": 1018,
+        "position": "MID",
+        "short_name": "1018",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.16,
+        "name": "Player 1017",
+        "player_id": 1017,
+        "position": "MID",
+        "short_name": "1017",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.1400000000000001,
+        "name": "Player 1015",
+        "player_id": 1015,
+        "position": "MID",
+        "short_name": "1015",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.23,
+        "name": "Player 1024",
+        "player_id": 1024,
+        "position": "FWD",
+        "short_name": "1024",
+        "team": "Club 5"
+      },
+      {
+        "expected_points": 1.22,
+        "name": "Player 1023",
+        "player_id": 1023,
+        "position": "FWD",
+        "short_name": "1023",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.21,
+        "name": "Player 1022",
+        "player_id": 1022,
+        "position": "FWD",
+        "short_name": "1022",
+        "team": "Club 3"
+      }
+    ],
+    "stated_limits": [
+      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
+      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
+      "Prices are held at the captured values; no price change is modelled.",
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
+    "transfer_hit_points": 0.0,
+    "vice_captain": {
+      "expected_points": 1.22,
+      "name": "Player 1023",
+      "player_id": 1023,
+      "position": "FWD",
+      "short_name": "1023",
+      "team": "Club 4"
+    },
+    "window": 3
+  },
+  "saf-puan/5": {
+    "bench": [
+      {
+        "expected_points": 1.0,
+        "name": "Player 1001",
+        "player_id": 1001,
+        "position": "GK",
+        "short_name": "1001",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.13,
+        "name": "Player 1014",
+        "player_id": 1014,
+        "position": "MID",
+        "short_name": "1014",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.05,
+        "name": "Player 1006",
+        "player_id": 1006,
+        "position": "DEF",
+        "short_name": "1006",
+        "team": "Club 3"
+      },
+      {
+        "expected_points": 1.03,
+        "name": "Player 1004",
+        "player_id": 1004,
+        "position": "DEF",
+        "short_name": "1004",
+        "team": "Club 1"
+      }
+    ],
+    "captain": {
+      "expected_points": 1.23,
+      "name": "Player 1024",
+      "player_id": 1024,
+      "position": "FWD",
+      "short_name": "1024",
+      "team": "Club 5"
+    },
+    "chip": null,
+    "data_quality": "partial",
+    "entry_id": 101,
+    "expected_gain_vs_hold": 0.040000000000000924,
+    "expected_own_points": 13.790000000000001,
+    "expected_points_cost": 0.0,
+    "gameweek": 2,
+    "league_id": 352490,
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "mode": "saf-puan",
+    "moves": [
+      {
+        "expected_points_delta": 0.040000000000000924,
+        "move_id": "gw02-1",
+        "player_in": {
+          "name": "Player 1018",
+          "player_id": 1018,
+          "position": "MID",
+          "short_name": "1018",
+          "team": "Club 1"
+        },
+        "player_out": {
+          "name": "Player 1012",
+          "player_id": 1012,
+          "position": "MID",
+          "short_name": "1012",
+          "team": "Club 1"
+        },
+        "reason_code": "window_value"
+      }
+    ],
+    "optimality_gap": 0.0,
+    "plan_weeks": [
+      {
+        "chip": null,
+        "expected_points": 13.790000000000001,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 2,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1018",
+            "player_id": 1018,
+            "position": "MID",
+            "short_name": "1018",
+            "team": "Club 1"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1012",
+            "player_id": 1012,
+            "position": "MID",
+            "short_name": "1012",
+            "team": "Club 1"
+          }
+        ]
+      },
+      {
+        "chip": null,
+        "expected_points": 13.820000000000002,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 3,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1010",
+            "player_id": 1010,
+            "position": "DEF",
+            "short_name": "1010",
+            "team": "Club 1"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1004",
+            "player_id": 1004,
+            "position": "DEF",
+            "short_name": "1004",
+            "team": "Club 1"
+          }
+        ]
+      },
+      {
+        "chip": null,
+        "expected_points": 13.83,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 4,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1016",
+            "player_id": 1016,
+            "position": "MID",
+            "short_name": "1016",
+            "team": "Club 5"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1014",
+            "player_id": 1014,
+            "position": "MID",
+            "short_name": "1014",
+            "team": "Club 3"
+          }
+        ]
+      },
+      {
+        "chip": null,
+        "expected_points": 13.840000000000002,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 5,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1003",
+            "player_id": 1003,
+            "position": "GK",
+            "short_name": "1003",
+            "team": "Club 3"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1001",
+            "player_id": 1001,
+            "position": "GK",
+            "short_name": "1001",
+            "team": "Club 1"
+          }
+        ]
+      },
+      {
+        "chip": null,
+        "expected_points": 13.840000000000002,
+        "free_transfers_after": 1,
+        "free_transfers_before": 1,
+        "gameweek": 6,
+        "transfer_hit_points": 0.0,
+        "transfers_in": [
+          {
+            "name": "Player 1008",
+            "player_id": 1008,
+            "position": "DEF",
+            "short_name": "1008",
+            "team": "Club 5"
+          }
+        ],
+        "transfers_out": [
+          {
+            "name": "Player 1006",
+            "player_id": 1006,
+            "position": "DEF",
+            "short_name": "1006",
+            "team": "Club 3"
+          }
+        ]
+      }
+    ],
+    "rival_label": null,
+    "season": "2026-27",
+    "solver_status": "OPTIMAL",
+    "squad_basis": "captured",
+    "starting_xi": [
+      {
+        "expected_points": 1.01,
+        "name": "Player 1002",
+        "player_id": 1002,
+        "position": "GK",
+        "short_name": "1002",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.1,
+        "name": "Player 1011",
+        "player_id": 1011,
+        "position": "DEF",
+        "short_name": "1011",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.08,
+        "name": "Player 1009",
+        "player_id": 1009,
+        "position": "DEF",
+        "short_name": "1009",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.06,
+        "name": "Player 1007",
+        "player_id": 1007,
+        "position": "DEF",
+        "short_name": "1007",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.18,
+        "name": "Player 1019",
+        "player_id": 1019,
+        "position": "MID",
+        "short_name": "1019",
+        "team": "Club 2"
+      },
+      {
+        "expected_points": 1.17,
+        "name": "Player 1018",
+        "player_id": 1018,
+        "position": "MID",
+        "short_name": "1018",
+        "team": "Club 1"
+      },
+      {
+        "expected_points": 1.16,
+        "name": "Player 1017",
+        "player_id": 1017,
+        "position": "MID",
+        "short_name": "1017",
+        "team": "Club 6"
+      },
+      {
+        "expected_points": 1.1400000000000001,
+        "name": "Player 1015",
+        "player_id": 1015,
+        "position": "MID",
+        "short_name": "1015",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.23,
+        "name": "Player 1024",
+        "player_id": 1024,
+        "position": "FWD",
+        "short_name": "1024",
+        "team": "Club 5"
+      },
+      {
+        "expected_points": 1.22,
+        "name": "Player 1023",
+        "player_id": 1023,
+        "position": "FWD",
+        "short_name": "1023",
+        "team": "Club 4"
+      },
+      {
+        "expected_points": 1.21,
+        "name": "Player 1022",
+        "player_id": 1022,
+        "position": "FWD",
+        "short_name": "1022",
+        "team": "Club 3"
+      }
+    ],
+    "stated_limits": [
+      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
+      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
+      "Prices are held at the captured values; no price change is modelled.",
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
+    "transfer_hit_points": 0.0,
+    "vice_captain": {
+      "expected_points": 1.22,
+      "name": "Player 1023",
+      "player_id": 1023,
+      "position": "FWD",
+      "short_name": "1023",
+      "team": "Club 4"
+    },
+    "window": 5
+  }
+}

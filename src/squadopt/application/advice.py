@@ -112,6 +112,13 @@ _BENCH_WEIGHT: float = OptimizationConfig().bench_weight
 #: on work this machine has been seen to do, and still ends a run that is twelve times
 #: slower than any measured one.
 WINDOW_WALL_CEILING_SECONDS = 1800.0
+#: CP-SAT's linearization level for a member window, and for nothing else. At the
+#: solver's default every published three- and five-week plan of the GW5 capture was
+#: an incumbent with sixteen to fifty-nine points between it and its bound; at 2, under
+#: the same deterministic budget, fifteen of fifteen three-week plans and twelve of
+#: fifteen five-week plans are proved. The one-week plan, the system's own horizon path
+#: and every measurement runner do not pass it and solve as they always did.
+WINDOW_LINEARIZATION_LEVEL = 2
 
 #: Builds the projection horizon for the requested consecutive gameweeks from the one
 #: capture the advice is answered from. Bound by the caller (``member_horizon_builder``)
@@ -817,6 +824,7 @@ def solve_window_plan(
             solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
         ),
         first_week_overlap=first_week_overlap,
+        linearization_level=WINDOW_LINEARIZATION_LEVEL,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError(

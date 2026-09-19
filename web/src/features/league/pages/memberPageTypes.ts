@@ -42,5 +42,11 @@ export interface LeagueMemberViewProps {
   computeService?: ComputeService;
   /** A service is configured and has not answered yet; never true on a static build. */
   computePending?: boolean;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
+  /**
+   * The advised gameweek's deadline once it has passed, from the published fixture
+   * calendar; null while it is open or the calendar does not say.
+   */
+  deadlinePassed?: string | null;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
 }

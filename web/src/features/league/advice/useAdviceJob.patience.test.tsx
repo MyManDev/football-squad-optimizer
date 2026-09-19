@@ -249,9 +249,12 @@ describe("a reload", () => {
 
     rememberJob(REQUEST, { jobId: "advice-gone", startedAt: Date.now() });
     client.job = new AdviceApiError(404, "NOT_FOUND");
+    const read = vi.spyOn(client, "readAdvice").mockResolvedValue({ kind: "not-computed" });
     await click("resume");
     await act(async () => vi.advanceTimersByTimeAsync(2100));
     expect(phase()).toBe("idle"); // a fresh visit, not this visit's failure
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(client.keys).toEqual([]);
     expect(recallJob(REQUEST)).toBeNull();
   });
 

@@ -1,0 +1,330 @@
+{
+  "artifact_type": "rank_tail_selector_inertness",
+  "by_gameweek": [
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 130.7,
+      "behind_pairs": 0,
+      "gameweek": 1,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 129.0,
+      "behind_pairs": 0,
+      "gameweek": 2,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 127.2,
+      "behind_pairs": 0,
+      "gameweek": 3,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 125.4,
+      "behind_pairs": 0,
+      "gameweek": 4,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 123.6,
+      "behind_pairs": 0,
+      "gameweek": 5,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 121.8,
+      "behind_pairs": 0,
+      "gameweek": 6,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 119.9,
+      "behind_pairs": 0,
+      "gameweek": 7,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 118.0,
+      "behind_pairs": 0,
+      "gameweek": 8,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 116.1,
+      "behind_pairs": 0,
+      "gameweek": 9,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 114.2,
+      "behind_pairs": 0,
+      "gameweek": 10,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 112.2,
+      "behind_pairs": 0,
+      "gameweek": 11,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 110.2,
+      "behind_pairs": 0,
+      "gameweek": 12,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 108.1,
+      "behind_pairs": 0,
+      "gameweek": 13,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 106.0,
+      "behind_pairs": 0,
+      "gameweek": 14,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 103.9,
+      "behind_pairs": 0,
+      "gameweek": 15,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 101.7,
+      "behind_pairs": 0,
+      "gameweek": 16,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 99.4,
+      "behind_pairs": 0,
+      "gameweek": 17,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 97.2,
+      "behind_pairs": 0,
+      "gameweek": 18,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 94.8,
+      "behind_pairs": 0,
+      "gameweek": 19,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 92.4,
+      "behind_pairs": 0,
+      "gameweek": 20,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 89.9,
+      "behind_pairs": 0,
+      "gameweek": 21,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 87.4,
+      "behind_pairs": 0,
+      "gameweek": 22,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 84.8,
+      "behind_pairs": 0,
+      "gameweek": 23,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 82.1,
+      "behind_pairs": 0,
+      "gameweek": 24,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 79.3,
+      "behind_pairs": 0,
+      "gameweek": 25,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 76.4,
+      "behind_pairs": 0,
+      "gameweek": 26,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 73.4,
+      "behind_pairs": 0,
+      "gameweek": 27,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 70.3,
+      "behind_pairs": 0,
+      "gameweek": 28,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 0,
+      "band_edge_points": 67.0,
+      "behind_pairs": 0,
+      "gameweek": 29,
+      "level_pairs": 210,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 1,
+      "band_edge_points": 63.6,
+      "behind_pairs": 1,
+      "gameweek": 30,
+      "level_pairs": 208,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 2,
+      "band_edge_points": 60.0,
+      "behind_pairs": 2,
+      "gameweek": 31,
+      "level_pairs": 206,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 4,
+      "band_edge_points": 56.1,
+      "behind_pairs": 4,
+      "gameweek": 32,
+      "level_pairs": 202,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 8,
+      "band_edge_points": 51.9,
+      "behind_pairs": 8,
+      "gameweek": 33,
+      "level_pairs": 194,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 12,
+      "band_edge_points": 47.4,
+      "behind_pairs": 12,
+      "gameweek": 34,
+      "level_pairs": 186,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 16,
+      "band_edge_points": 42.4,
+      "behind_pairs": 16,
+      "gameweek": 35,
+      "level_pairs": 178,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 24,
+      "band_edge_points": 36.7,
+      "behind_pairs": 24,
+      "gameweek": 36,
+      "level_pairs": 162,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 32,
+      "band_edge_points": 30.0,
+      "behind_pairs": 32,
+      "gameweek": 37,
+      "level_pairs": 146,
+      "ordered_pairs": 210
+    },
+    {
+      "ahead_pairs": 45,
+      "band_edge_points": 21.2,
+      "behind_pairs": 45,
+      "gameweek": 38,
+      "level_pairs": 120,
+      "ordered_pairs": 210
+    }
+  ],
+  "contract_version": "rank_tail_selector_inertness_v1",
+  "criterion_contract_version": "rank_tail_mean_selector_v1",
+  "criterion_cost": {
+    "median_seconds": 0.06005229999573203,
+    "minimum_seconds": 0.059198399998422246
+  },
+  "criterion_cost_shape": {
+    "candidates": 16,
+    "repeats": 7,
+    "rivals": 14,
+    "scenarios": 1000
+  },
+  "first_gameweek_with_a_pair_outside_the_band": 30,
+  "gate_evidence": false,
+  "is_the_preregistered_measurement": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "members": 15,
+  "ordered_pairs": 210,
+  "strategy_rule_id": "gap_and_weeks_strategy_rule_v1",
+  "widest_gap_points": 66
+}

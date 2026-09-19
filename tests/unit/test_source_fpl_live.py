@@ -33,6 +33,7 @@ from squadopt.data.sources.fpl_live import (
     entry_transfer_history,
     fixture_snapshot,
     fpl_entry_picks,
+    fpl_league_name,
     fpl_league_standings,
     fpl_league_standings_page,
     fpl_live_event_points,
@@ -1036,6 +1037,17 @@ def test_a_numbered_standings_page_rejects_the_wrong_page_or_repeated_order() ->
 def test_a_registry_that_lists_an_entry_twice_is_rejected() -> None:
     with pytest.raises(InvalidValueError, match="distinct"):
         entry_endpoint_paths([11, 22, 11], gameweek=1)
+
+
+def test_the_league_is_called_what_its_standings_call_it() -> None:
+    assert fpl_league_name(_standings_payload(), league_id=352490) == "The Mini League"
+    for league in ({"id": 352490}, {"id": 352490, "name": "   "}, {"id": 352490, "name": 7}):
+        payload = json.dumps({"league": league, "standings": {"results": []}}).encode("utf-8")
+        # No name stated is no name; the reader does not invent one.
+        assert fpl_league_name(payload, league_id=352490) is None
+    assert fpl_league_name(json.dumps({"standings": {}}).encode("utf-8"), league_id=352490) is None
+    with pytest.raises(DataSourceError, match="declares league 352490, not 314"):
+        fpl_league_name(_standings_payload(), league_id=314)
 
 
 def test_the_league_page_yields_its_members_in_rank_order() -> None:

@@ -14,6 +14,7 @@ has moved since — which is the measurement the record exists for.
 """
 
 import argparse
+import json
 import logging
 import sys
 from datetime import UTC, datetime
@@ -29,6 +30,8 @@ from squadopt.experiments.preseason_difficulty import (
     build_preseason_record,
     compare_to_later,
     drift_to_dict,
+    later_difficulty,
+    record_from_dict,
     record_to_dict,
     record_to_markdown,
 )
@@ -65,6 +68,34 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _stored_record(path: Path) -> dict[str, object] | None:
+    if not Path(path).is_file():
+        return None
+    document = json.loads(Path(path).read_text(encoding="utf-8"))
+    return document if isinstance(document, dict) else None
+
+
+def _readings(document: dict[str, object] | None) -> list[dict[str, object]]:
+    """Every drift reading the stored record already holds, the single older one included."""
+
+    if document is None:
+        return []
+    held = document.get("readings")
+    if isinstance(held, list):
+        return [dict(row) for row in held if isinstance(row, dict)]
+    drift = document.get("drift")
+    compared = document.get("compared_against")
+    if isinstance(drift, dict) and isinstance(compared, str):
+        # Written before readings were kept as a list. The capture's instant was not stored,
+        # and its identifier carries it.
+        stamp = compared.split("-")[2]
+        instant = (
+            f"{stamp[0:4]}-{stamp[4:6]}-{stamp[6:8]}T{stamp[9:11]}:{stamp[11:13]}:{stamp[13:15]}Z"
+        )
+        return [{"snapshot_id": compared, "captured_at_utc": instant, **drift}]
+    return []
+
+
 def main() -> int:
     arguments = _parse_arguments()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -90,14 +121,30 @@ def main() -> int:
                 print(f"No {FPL_LIVE_SOURCE} captures stored under {root}.")
                 return 1
             snapshot_id = stored[0]
-        LOGGER.info("Recording %s for %s", snapshot_id, arguments.season)
-        record = build_preseason_record(root, snapshot_id, season=str(arguments.season))
+        stored_document = _stored_record(arguments.json_output)
+        if arguments.compare and stored_document is not None:
+            # The record is the evidence; the capture it was made from may be gone (the
+            # 2026-27 one was lost on 2026-09-10). A comparison reads the record.
+            record = record_from_dict(stored_document)
+            LOGGER.info("Reading the committed record of %s", record.snapshot_id)
+        else:
+            LOGGER.info("Recording %s for %s", snapshot_id, arguments.season)
+            record = build_preseason_record(root, snapshot_id, season=str(arguments.season))
         drift = None
+        readings = _readings(stored_document)
         if arguments.compare:
-            later = build_preseason_record(
-                root, str(arguments.compare), season=str(arguments.season)
+            compared = str(arguments.compare)
+            later = later_difficulty(root, compared, season=str(arguments.season))
+            drift = compare_to_later(record, later)
+            readings = [row for row in readings if row["snapshot_id"] != compared]
+            readings.append(
+                {
+                    "snapshot_id": compared,
+                    "captured_at_utc": str(later["captured_at_utc"].iloc[0]),
+                    **drift_to_dict(drift),
+                }
             )
-            drift = compare_to_later(record, later.difficulty)
+            readings.sort(key=lambda row: str(row["captured_at_utc"]))
             LOGGER.info(
                 "Compared against %s: %d of %d fixture sides changed",
                 arguments.compare,
@@ -112,10 +159,11 @@ def main() -> int:
         **record_to_dict(record),
         "compared_against": str(arguments.compare) if arguments.compare else None,
         "drift": drift_to_dict(drift) if drift is not None else None,
+        "readings": readings,
         "measurement_only": True,
         "locked_holdout_accessed": False,
     }
-    markdown = record_to_markdown(record, drift)
+    markdown = record_to_markdown(record, drift, readings)
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, markdown)
     print(markdown)

@@ -57,9 +57,7 @@ SQUADOPT_BACKEND_STORE_ROOT=/mnt/squadopt-store/store
 # connected" from this tree and never from an upstream call.
 SQUADOPT_BACKEND_SITE_DATA_ROOT=/mnt/squadopt-inputs/site/data
 
-# Captures, and the projection handoffs that go with them. The most recent capture that has a
-# handoff is the context; publishing a new pair moves the backend to the new week with no
-# redeploy.
+# Captures and their projection handoffs, selected as described below.
 SQUADOPT_BACKEND_SNAPSHOT_ROOT=/mnt/squadopt-inputs/snapshots
 SQUADOPT_BACKEND_HANDOFF_ROOT=/mnt/squadopt-inputs/handoffs
 
@@ -77,6 +75,7 @@ SQUADOPT_REPOSITORY_COMMIT=<40 hex>
 SQUADOPT_BACKEND_SEASON=              # otherwise inferred from the capture
 SQUADOPT_BACKEND_RATE_LIMIT=30        # per window, per client address and per (capture, entry)
 SQUADOPT_BACKEND_RATE_WINDOW_SECONDS=60
+SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT=4  # queued + running, per address per API process
 
 # Optional, and together they switch the member menu's two switches on. Unset, the backend
 # answers plain requests exactly as before and refuses a switch by name.
@@ -97,6 +96,15 @@ switch, because the Top 100 gate needs the projected table. An export or rotatio
 lands later is picked up by both without a restart. The Top 100 menu needs a handoff built
 without the uplift (`--projection component-only`), as the weekly runbook says; otherwise the
 gate refuses every export and the setting stays off.
+
+The backend follows the capture named consistently by the published human entry documents
+under `league/entries/`, when that capture and its matching handoff are readable. It uses the
+gameweek handoff if it names that capture, otherwise the unambiguous retained projection under
+`handoffs/by-capture/<capture>/`. Without that published pair it follows the newest live capture
+as before. The files are checked again on each request, so replacing the published tree moves
+both processes to its capture without a restart. The four readiness checks remain;
+`league_tree_matches_capture` now checks the published capture's week while that capture
+is usable, or the newest capture's season and gameweek when the backend falls back.
 
 The ops process does not move. Captures, decisions, settles and site builds stay on the machine
 that owns the ledger; the backend **reads** what ops publishes and never writes it.

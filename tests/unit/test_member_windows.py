@@ -153,6 +153,33 @@ def _walk(node: object, path: str, offenders: list[str]) -> None:
         offenders.append(f"{path} (text: {node[:60]!r})")
 
 
+def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str, Any]) -> None:
+    """Pin the current product outputs; the exact list ordering is pinned, not its meaning.
+
+    The deliberate regeneration command is in tests/fixtures/member_advice_baseline.md.
+    """
+    picks = window_world["provider"].picks(ENTRY, SEASON, 1)
+    window_world["provider"]._picks[202] = dataclasses.replace(picks, entry_id=202)
+    reference = json.loads(
+        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text(
+            encoding="utf-8"
+        ),
+        # Runtime float summation can differ in the last binary digits (observed
+        # below 2e-15 on Python 3.11). Keep every key, identity and list ordering exact.
+        parse_float=lambda value: pytest.approx(float(value), rel=0, abs=1e-12),
+    )
+    for key, expected in reference.items():
+        strategy, window = key.split("/")
+        payload = _advise(
+            window_world,
+            strategy=strategy,
+            window=int(window),
+            rival_entry_id=None if strategy == "saf-puan" else 202,
+        )
+        payload.pop("source_snapshot_id", None)
+        assert payload == expected, key
+
+
 @pytest.mark.parametrize("window", [3, 5])
 def test_a_window_publishes_the_first_week_and_the_whole_plan(
     window_world: dict[str, Any], window: int
