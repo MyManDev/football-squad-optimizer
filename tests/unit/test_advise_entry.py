@@ -1488,3 +1488,61 @@ def test_a_binding_word_is_priced_against_the_control_under_one_policy(
     ceiling = float(str(payload["expected_points_cost_ceiling"]))
     assert cost >= 0.0 and ceiling >= cost
     assert payload["control_solver_status"] == control.plan.solver_status.name
+
+
+def test_the_one_week_plan_says_whether_the_clock_stopped_its_search(
+    world: dict[str, Any],
+) -> None:
+    """`solver_status` says whether a proof finished; it does not say what stopped it.
+
+    The two are different facts. A search its deterministic budget ended is reproducible:
+    the same capture under the same budget returns the same plan. A search the wall clock
+    ended is a property of what else the machine was doing that minute, and
+    `member_plan_determinism` measured five of fifteen members reading a different plan
+    where the ceiling bound, with nothing in the published document to show it.
+
+    The work spent is deliberately not published beside this flag. It is a fact about a
+    solve rather than about a document: the batch renderer and a single request answer the
+    same question with different amounts of solver work, so publishing it would make two
+    correct paths disagree byte for byte on the same request.
+    """
+
+    from squadopt.application.advice import build_advice_payload
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+
+    payload = build_advice_payload(picks, inputs, projection, rules, league_id=352490)
+
+    assert payload["wall_clock_stopped_the_search"] is False
+    assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    assert "deterministic_time_used" not in payload
+    assert not any("probab" in key or key.startswith("p_") for key in payload)
+
+
+def test_a_payload_that_solved_nothing_leaves_the_clock_flag_absent(
+    world: dict[str, Any],
+) -> None:
+    """Absent is not false. A caller bringing its own decision brings no diagnostics.
+
+    Publishing `false` here would say the wall clock did not stop a search this payload
+    never ran, which is a claim nobody measured.
+    """
+
+    from squadopt.application.advice import build_advice_payload
+    from squadopt.application.entries import held_squad_from_picks
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    _plan, decision, _config = advice_service.plan_transfers(inputs, projection, held, rules)
+
+    payload = build_advice_payload(
+        picks, inputs, projection, rules, league_id=352490, mode="garantici", decision=decision
+    )
+
+    assert payload["wall_clock_stopped_the_search"] is None

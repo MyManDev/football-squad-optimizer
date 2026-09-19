@@ -316,6 +316,18 @@ def _number(payload: Mapping[str, object], key: str) -> float | None:
     return None if value is None else float(str(value))
 
 
+def _flag(payload: Mapping[str, object], key: str) -> bool | None:
+    """A published boolean, or ``None`` where the document does not carry one.
+
+    A missing field is not ``False``. A document published before its producer
+    carried this says nothing about which budget stopped its search, and a record
+    that read it as ``False`` would say the clock did not, which nobody measured.
+    """
+
+    value = payload.get(key)
+    return value if isinstance(value, bool) else None
+
+
 def _text(values: Mapping[str, object], key: str) -> str | None:
     value = values.get(key)
     return None if value is None else str(value)
@@ -401,6 +413,11 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         # with the measured bound gap beside it.
         "solver_status": _text(payload, "solver_status"),
         "optimality_gap": _number(payload, "optimality_gap"),
+        # And whether the wall clock stopped it, so a settled record can tell a plan the
+        # budget ended from one that was a property of the machine's load. The work spent
+        # is deliberately not here: two legitimate paths solving the same request spend
+        # different amounts of it, so it is a fact about a solve and not about a document.
+        "wall_clock_stopped_the_search": _flag(payload, "wall_clock_stopped_the_search"),
         # Whether this document can be scored at all. A competitive mode's payload is
         # published without a lineup (the selector chose a transfer decision, not a week),
         # and the record says so rather than presenting an empty eleven as a decision.

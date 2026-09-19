@@ -77,6 +77,10 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "difference_makers",
         "solver_status",
         "optimality_gap",
+        # What stopped the search, which the status alone does not say: whether the
+        # wall-clock safety cap ended it before its deterministic budget did. Not a
+        # probability, a share or a spread, and not a measure of anything.
+        "wall_clock_stopped_the_search",
         "captain",
         "vice_captain",
         "starting_xi",
@@ -393,6 +397,10 @@ _BASELINE_PUBLISHES: Final = frozenset(
         "stated_limits",
         "solver_status",
         "optimality_gap",
+        # What stopped the search, which the status alone does not say: whether the
+        # wall-clock safety cap ended it before its deterministic budget did. Not a
+        # probability, a share or a spread, and not a measure of anything.
+        "wall_clock_stopped_the_search",
         "captain",
         "vice_captain",
         "starting_xi",

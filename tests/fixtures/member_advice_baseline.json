@@ -89,6 +89,7 @@
       }
     ],
     "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
     "overlap_applied": 10,
     "overlap_count": 10,
     "overlap_target": 5,
@@ -293,6 +294,7 @@
       }
     ],
     "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
     "overlap_applied": 9,
     "overlap_count": 10,
     "overlap_target": 9,
@@ -485,6 +487,7 @@
       }
     ],
     "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
     "rival_label": null,
     "season": "2026-27",
     "solver_status": "OPTIMAL",
@@ -671,6 +674,7 @@
       }
     ],
     "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
     "plan_weeks": [
       {
         "chip": null,
@@ -941,6 +945,7 @@
       }
     ],
     "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
     "plan_weeks": [
       {
         "chip": null,
