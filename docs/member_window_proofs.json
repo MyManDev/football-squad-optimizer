@@ -1,0 +1,2389 @@
+{
+  "contract_version": "member_window_proofs_v1",
+  "deterministic_units_per_week": 20.0,
+  "gameweek": 5,
+  "members": 15,
+  "rows": [
+    {
+      "absolute_gap": 17.491000000000014,
+      "arm": "solver_default",
+      "best_bound": 190.222,
+      "deterministic_time_used": 60.00132883621609,
+      "entry_id": 313686,
+      "plan_value": 172.731,
+      "primary_deterministic_time": 60.00132883621609,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            444102
+          ]
+        ],
+        [
+          7,
+          [
+            177815
+          ]
+        ]
+      ],
+      "wall_seconds": 54.8161681000056,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 173.988,
+      "deterministic_time_used": 38.04153795911243,
+      "entry_id": 313686,
+      "plan_value": 173.988,
+      "primary_deterministic_time": 14.754978490246106,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            503139
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ]
+      ],
+      "wall_seconds": 28.197088800006895,
+      "window": 3
+    },
+    {
+      "absolute_gap": 16.61700000000002,
+      "arm": "solver_default",
+      "best_bound": 191.704,
+      "deterministic_time_used": 60.002098318094326,
+      "entry_id": 2199732,
+      "plan_value": 175.087,
+      "primary_deterministic_time": 60.002098318094326,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            503139
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 46.049202800000785,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 175.104,
+      "deterministic_time_used": 25.30775173675665,
+      "entry_id": 2199732,
+      "plan_value": 175.104,
+      "primary_deterministic_time": 12.829735167620008,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            503139
+          ]
+        ]
+      ],
+      "wall_seconds": 23.334686400005012,
+      "window": 3
+    },
+    {
+      "absolute_gap": 18.823999999999984,
+      "arm": "solver_default",
+      "best_bound": 190.761,
+      "deterministic_time_used": 60.00048539415244,
+      "entry_id": 2281624,
+      "plan_value": 171.937,
+      "primary_deterministic_time": 60.00048539415244,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            209036
+          ]
+        ]
+      ],
+      "wall_seconds": 61.56838909999351,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 172.476,
+      "deterministic_time_used": 31.373962282819626,
+      "entry_id": 2281624,
+      "plan_value": 172.476,
+      "primary_deterministic_time": 14.71377597874443,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 27.76429089999874,
+      "window": 3
+    },
+    {
+      "absolute_gap": 29.935000000000002,
+      "arm": "solver_default",
+      "best_bound": 174.369,
+      "deterministic_time_used": 60.03877800615295,
+      "entry_id": 3832237,
+      "plan_value": 144.434,
+      "primary_deterministic_time": 60.03877800615295,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            17761
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            223340
+          ]
+        ]
+      ],
+      "wall_seconds": 53.91023850000056,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 145.398,
+      "deterministic_time_used": 45.66556659898056,
+      "entry_id": 3832237,
+      "plan_value": 145.398,
+      "primary_deterministic_time": 14.774758737969261,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 44.06167719999212,
+      "window": 3
+    },
+    {
+      "absolute_gap": 21.47200000000001,
+      "arm": "solver_default",
+      "best_bound": 190.547,
+      "deterministic_time_used": 60.0009919315568,
+      "entry_id": 4287206,
+      "plan_value": 169.075,
+      "primary_deterministic_time": 60.0009919315568,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            222531
+          ]
+        ],
+        [
+          7,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 69.59193400001095,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 169.448,
+      "deterministic_time_used": 28.291180453164298,
+      "entry_id": 4287206,
+      "plan_value": 169.448,
+      "primary_deterministic_time": 12.73490231028221,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            222531
+          ]
+        ]
+      ],
+      "wall_seconds": 30.57750230000238,
+      "window": 3
+    },
+    {
+      "absolute_gap": 24.513000000000005,
+      "arm": "solver_default",
+      "best_bound": 191.651,
+      "deterministic_time_used": 60.000829379623525,
+      "entry_id": 5081114,
+      "plan_value": 167.138,
+      "primary_deterministic_time": 60.000829379623525,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            60307
+          ]
+        ],
+        [
+          7,
+          [
+            465730
+          ]
+        ]
+      ],
+      "wall_seconds": 59.66030899999896,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 167.708,
+      "deterministic_time_used": 17.71841338801474,
+      "entry_id": 5081114,
+      "plan_value": 167.708,
+      "primary_deterministic_time": 7.658495377468229,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            465730
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 24.43637569999555,
+      "window": 3
+    },
+    {
+      "absolute_gap": 21.555000000000007,
+      "arm": "solver_default",
+      "best_bound": 189.466,
+      "deterministic_time_used": 60.216567462610975,
+      "entry_id": 5349883,
+      "plan_value": 167.911,
+      "primary_deterministic_time": 60.216567462610975,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            503139
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ]
+      ],
+      "wall_seconds": 67.67566929999157,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 168.157,
+      "deterministic_time_used": 26.73568508313261,
+      "entry_id": 5349883,
+      "plan_value": 168.157,
+      "primary_deterministic_time": 13.710497968542882,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ]
+      ],
+      "wall_seconds": 31.242938199997297,
+      "window": 3
+    },
+    {
+      "absolute_gap": 26.893,
+      "arm": "solver_default",
+      "best_bound": 187.525,
+      "deterministic_time_used": 60.000646149983865,
+      "entry_id": 5662073,
+      "plan_value": 160.632,
+      "primary_deterministic_time": 60.000646149983865,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ]
+      ],
+      "wall_seconds": 51.15135400000145,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 161.271,
+      "deterministic_time_used": 60.008890629818545,
+      "entry_id": 5662073,
+      "plan_value": 161.271,
+      "primary_deterministic_time": 44.846757631068165,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            222531
+          ]
+        ]
+      ],
+      "wall_seconds": 51.70111199999519,
+      "window": 3
+    },
+    {
+      "absolute_gap": 23.47999999999999,
+      "arm": "solver_default",
+      "best_bound": 193.244,
+      "deterministic_time_used": 60.002029880656295,
+      "entry_id": 6654210,
+      "plan_value": 169.764,
+      "primary_deterministic_time": 60.002029880656295,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            647850
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 63.3765041000006,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 171.207,
+      "deterministic_time_used": 21.6546270190614,
+      "entry_id": 6654210,
+      "plan_value": 171.207,
+      "primary_deterministic_time": 7.932774030594784,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 24.100563100000727,
+      "window": 3
+    },
+    {
+      "absolute_gap": 29.619,
+      "arm": "solver_default",
+      "best_bound": 186.559,
+      "deterministic_time_used": 60.00095069466599,
+      "entry_id": 6879786,
+      "plan_value": 156.94,
+      "primary_deterministic_time": 60.00095069466599,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            141746
+          ]
+        ],
+        [
+          6,
+          [
+            513418
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 54.71717180000269,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 156.997,
+      "deterministic_time_used": 49.70271948121407,
+      "entry_id": 6879786,
+      "plan_value": 156.997,
+      "primary_deterministic_time": 8.034447896969718,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            223094
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 44.521071099996334,
+      "window": 3
+    },
+    {
+      "absolute_gap": 21.028999999999996,
+      "arm": "solver_default",
+      "best_bound": 191.88,
+      "deterministic_time_used": 60.00432109024241,
+      "entry_id": 6880255,
+      "plan_value": 170.851,
+      "primary_deterministic_time": 60.00432109024241,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 69.322576999999,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 170.851,
+      "deterministic_time_used": 56.80694914804049,
+      "entry_id": 6880255,
+      "plan_value": 170.851,
+      "primary_deterministic_time": 7.48054075977732,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 45.55252250000194,
+      "window": 3
+    },
+    {
+      "absolute_gap": 19.368000000000023,
+      "arm": "solver_default",
+      "best_bound": 188.497,
+      "deterministic_time_used": 60.00002919597749,
+      "entry_id": 7018833,
+      "plan_value": 169.129,
+      "primary_deterministic_time": 60.00002919597749,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            222531
+          ]
+        ],
+        [
+          7,
+          [
+            177815
+          ]
+        ]
+      ],
+      "wall_seconds": 58.42770690000907,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 169.636,
+      "deterministic_time_used": 26.478427090333504,
+      "entry_id": 7018833,
+      "plan_value": 169.636,
+      "primary_deterministic_time": 15.855180860049675,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            222531
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 27.377416000002995,
+      "window": 3
+    },
+    {
+      "absolute_gap": 18.859999999999985,
+      "arm": "solver_default",
+      "best_bound": 195.004,
+      "deterministic_time_used": 60.00125503892782,
+      "entry_id": 7252721,
+      "plan_value": 176.144,
+      "primary_deterministic_time": 60.00125503892782,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            219168
+          ]
+        ],
+        [
+          6,
+          [
+            17761
+          ]
+        ],
+        [
+          7,
+          [
+            244850
+          ]
+        ]
+      ],
+      "wall_seconds": 52.89652660000138,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 176.171,
+      "deterministic_time_used": 36.675817849922744,
+      "entry_id": 7252721,
+      "plan_value": 176.171,
+      "primary_deterministic_time": 20.857714669638852,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            17761
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            244850
+          ]
+        ]
+      ],
+      "wall_seconds": 34.795965999990585,
+      "window": 3
+    },
+    {
+      "absolute_gap": 19.87899999999999,
+      "arm": "solver_default",
+      "best_bound": 188.03,
+      "deterministic_time_used": 60.000942926779786,
+      "entry_id": 8548384,
+      "plan_value": 168.151,
+      "primary_deterministic_time": 60.000942926779786,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            177815
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 65.08817979999003,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 168.445,
+      "deterministic_time_used": 31.529121515395257,
+      "entry_id": 8548384,
+      "plan_value": 168.445,
+      "primary_deterministic_time": 11.193530013182457,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            17761
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 29.42512539999734,
+      "window": 3
+    },
+    {
+      "absolute_gap": 23.171999999999997,
+      "arm": "solver_default",
+      "best_bound": 191.914,
+      "deterministic_time_used": 60.010203569807345,
+      "entry_id": 8883467,
+      "plan_value": 168.742,
+      "primary_deterministic_time": 60.010203569807345,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ]
+      ],
+      "wall_seconds": 62.64294299999892,
+      "window": 3
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 168.796,
+      "deterministic_time_used": 44.72328485372955,
+      "entry_id": 8883467,
+      "plan_value": 168.796,
+      "primary_deterministic_time": 9.160499269270309,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            60307
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ]
+      ],
+      "wall_seconds": 31.833377799994196,
+      "window": 3
+    },
+    {
+      "absolute_gap": 33.846000000000004,
+      "arm": "solver_default",
+      "best_bound": 320.771,
+      "deterministic_time_used": 100.00139073097431,
+      "entry_id": 313686,
+      "plan_value": 286.925,
+      "primary_deterministic_time": 100.00139073097431,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            463034
+          ]
+        ],
+        [
+          7,
+          [
+            204936
+          ]
+        ],
+        [
+          8,
+          [
+            226182
+          ]
+        ],
+        [
+          9,
+          [
+            222531
+          ]
+        ]
+      ],
+      "wall_seconds": 97.94504580000648,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 293.275,
+      "deterministic_time_used": 76.7859837976236,
+      "entry_id": 313686,
+      "plan_value": 293.275,
+      "primary_deterministic_time": 29.30093913843081,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            177815
+          ]
+        ],
+        [
+          7,
+          [
+            222531
+          ]
+        ],
+        [
+          8,
+          [
+            226182
+          ]
+        ],
+        [
+          9,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 73.01969830000598,
+      "window": 5
+    },
+    {
+      "absolute_gap": 30.178999999999974,
+      "arm": "solver_default",
+      "best_bound": 321.871,
+      "deterministic_time_used": 100.00264047746437,
+      "entry_id": 2199732,
+      "plan_value": 291.692,
+      "primary_deterministic_time": 100.00264047746437,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            97846
+          ]
+        ],
+        [
+          8,
+          [
+            219847
+          ]
+        ],
+        [
+          9,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 103.10439639999822,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 295.054,
+      "deterministic_time_used": 100.00097459011566,
+      "entry_id": 2199732,
+      "plan_value": 295.054,
+      "primary_deterministic_time": 88.86624084143186,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            661313
+          ]
+        ],
+        [
+          7,
+          [
+            141746
+          ]
+        ],
+        [
+          8,
+          [
+            222531
+          ]
+        ],
+        [
+          9,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 115.92052459999104,
+      "window": 5
+    },
+    {
+      "absolute_gap": 32.37099999999998,
+      "arm": "solver_default",
+      "best_bound": 321.339,
+      "deterministic_time_used": 100.0020592833705,
+      "entry_id": 2281624,
+      "plan_value": 288.968,
+      "primary_deterministic_time": 100.0020592833705,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            17761
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ],
+        [
+          8,
+          [
+            513418
+          ]
+        ],
+        [
+          9,
+          [
+            522047
+          ]
+        ]
+      ],
+      "wall_seconds": 111.03746089999913,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 291.052,
+      "deterministic_time_used": 100.00243325594803,
+      "entry_id": 2281624,
+      "plan_value": 291.052,
+      "primary_deterministic_time": 52.75699836604161,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ],
+        [
+          8,
+          [
+            226182
+          ]
+        ],
+        [
+          9,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 105.28249529999448,
+      "window": 5
+    },
+    {
+      "absolute_gap": 58.899,
+      "arm": "solver_default",
+      "best_bound": 305.312,
+      "deterministic_time_used": 100.0010609039422,
+      "entry_id": 3832237,
+      "plan_value": 246.413,
+      "primary_deterministic_time": 100.0010609039422,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ],
+        [
+          8,
+          [
+            465730
+          ]
+        ],
+        [
+          9,
+          [
+            222531
+          ]
+        ]
+      ],
+      "wall_seconds": 83.08293749998847,
+      "window": 5
+    },
+    {
+      "absolute_gap": 10.37100000000001,
+      "arm": "window_level",
+      "best_bound": 257.454,
+      "deterministic_time_used": 100.00446101579502,
+      "entry_id": 3832237,
+      "plan_value": 247.083,
+      "primary_deterministic_time": 100.00446101579502,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            469142
+          ]
+        ],
+        [
+          8,
+          [
+            477424
+          ]
+        ],
+        [
+          9,
+          [
+            60307
+          ]
+        ]
+      ],
+      "wall_seconds": 71.8039865000028,
+      "window": 5
+    },
+    {
+      "absolute_gap": 37.07400000000001,
+      "arm": "solver_default",
+      "best_bound": 321.482,
+      "deterministic_time_used": 100.00192821986555,
+      "entry_id": 4287206,
+      "plan_value": 284.408,
+      "primary_deterministic_time": 100.00192821986555,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ],
+        [
+          8,
+          [
+            17761
+          ]
+        ],
+        [
+          9,
+          [
+            219847
+          ]
+        ]
+      ],
+      "wall_seconds": 103.33746329999121,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 286.303,
+      "deterministic_time_used": 100.02872570400635,
+      "entry_id": 4287206,
+      "plan_value": 286.303,
+      "primary_deterministic_time": 25.273362534475176,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            222531
+          ]
+        ],
+        [
+          8,
+          [
+            60307
+          ]
+        ],
+        [
+          9,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 104.10009799999534,
+      "window": 5
+    },
+    {
+      "absolute_gap": 43.331999999999994,
+      "arm": "solver_default",
+      "best_bound": 321.794,
+      "deterministic_time_used": 100.00223233758553,
+      "entry_id": 5081114,
+      "plan_value": 278.462,
+      "primary_deterministic_time": 100.00223233758553,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            216646
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ],
+        [
+          8,
+          [
+            220627
+          ]
+        ],
+        [
+          9,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 127.71939969999949,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 284.905,
+      "deterministic_time_used": 100.00681694267027,
+      "entry_id": 5081114,
+      "plan_value": 284.905,
+      "primary_deterministic_time": 76.31614951367092,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            465730
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ],
+        [
+          8,
+          [
+            610799
+          ]
+        ],
+        [
+          9,
+          [
+            108416
+          ]
+        ]
+      ],
+      "wall_seconds": 96.60273280000547,
+      "window": 5
+    },
+    {
+      "absolute_gap": 37.62700000000001,
+      "arm": "solver_default",
+      "best_bound": 318.956,
+      "deterministic_time_used": 100.00119406812559,
+      "entry_id": 5349883,
+      "plan_value": 281.329,
+      "primary_deterministic_time": 100.00119406812559,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            60307
+          ]
+        ],
+        [
+          7,
+          [
+            485055
+          ]
+        ],
+        [
+          8,
+          [
+            465730
+          ]
+        ],
+        [
+          9,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 167.48926200000278,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 283.627,
+      "deterministic_time_used": 100.00166948044405,
+      "entry_id": 5349883,
+      "plan_value": 283.627,
+      "primary_deterministic_time": 59.30154538996855,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ],
+        [
+          8,
+          [
+            222531
+          ]
+        ],
+        [
+          9,
+          [
+            219847
+          ]
+        ]
+      ],
+      "wall_seconds": 122.89714279999316,
+      "window": 5
+    },
+    {
+      "absolute_gap": 47.61500000000001,
+      "arm": "solver_default",
+      "best_bound": 317.678,
+      "deterministic_time_used": 100.00185339336558,
+      "entry_id": 5662073,
+      "plan_value": 270.063,
+      "primary_deterministic_time": 100.00185339336558,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            226182
+          ]
+        ],
+        [
+          6,
+          [
+            477424
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ],
+        [
+          8,
+          [
+            222531
+          ]
+        ],
+        [
+          9,
+          [
+            502500
+          ]
+        ]
+      ],
+      "wall_seconds": 86.11957939999411,
+      "window": 5
+    },
+    {
+      "absolute_gap": 7.532000000000039,
+      "arm": "window_level",
+      "best_bound": 280.319,
+      "deterministic_time_used": 100.00206175471828,
+      "entry_id": 5662073,
+      "plan_value": 272.787,
+      "primary_deterministic_time": 100.00206175471828,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            223094
+          ]
+        ],
+        [
+          7,
+          [
+            17761
+          ]
+        ],
+        [
+          8,
+          [
+            513418
+          ]
+        ],
+        [
+          9,
+          [
+            477424
+          ]
+        ]
+      ],
+      "wall_seconds": 73.31223100000352,
+      "window": 5
+    },
+    {
+      "absolute_gap": 41.382000000000005,
+      "arm": "solver_default",
+      "best_bound": 323.351,
+      "deterministic_time_used": 100.00068169266797,
+      "entry_id": 6654210,
+      "plan_value": 281.969,
+      "primary_deterministic_time": 100.00068169266797,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            177815
+          ]
+        ],
+        [
+          6,
+          [
+            647850
+          ]
+        ],
+        [
+          7,
+          [
+            522047
+          ]
+        ],
+        [
+          8,
+          [
+            222531
+          ]
+        ],
+        [
+          9,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 86.14407870000286,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 288.905,
+      "deterministic_time_used": 100.00174469676992,
+      "entry_id": 6654210,
+      "plan_value": 288.905,
+      "primary_deterministic_time": 74.68693025665506,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            477424
+          ]
+        ],
+        [
+          8,
+          [
+            503139
+          ]
+        ],
+        [
+          9,
+          [
+            465730
+          ]
+        ]
+      ],
+      "wall_seconds": 109.02104580000741,
+      "window": 5
+    },
+    {
+      "absolute_gap": 50.911,
+      "arm": "solver_default",
+      "best_bound": 316.651,
+      "deterministic_time_used": 100.00472753862135,
+      "entry_id": 6879786,
+      "plan_value": 265.74,
+      "primary_deterministic_time": 100.00472753862135,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            141746
+          ]
+        ],
+        [
+          6,
+          [
+            513418
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ],
+        [
+          8,
+          [
+            17761
+          ]
+        ],
+        [
+          9,
+          [
+            60307
+          ]
+        ]
+      ],
+      "wall_seconds": 104.25995439999679,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 271.739,
+      "deterministic_time_used": 86.85405690633087,
+      "entry_id": 6879786,
+      "plan_value": 271.739,
+      "primary_deterministic_time": 39.144162252783055,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            223094
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ],
+        [
+          8,
+          [
+            17761
+          ]
+        ],
+        [
+          9,
+          [
+            503139
+          ]
+        ]
+      ],
+      "wall_seconds": 86.47099570000137,
+      "window": 5
+    },
+    {
+      "absolute_gap": 38.678,
+      "arm": "solver_default",
+      "best_bound": 322.688,
+      "deterministic_time_used": 100.00305027899604,
+      "entry_id": 6880255,
+      "plan_value": 284.01,
+      "primary_deterministic_time": 100.00305027899604,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            177815
+          ]
+        ],
+        [
+          6,
+          [
+            60307
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ],
+        [
+          8,
+          [
+            477424
+          ]
+        ],
+        [
+          9,
+          [
+            108416
+          ]
+        ]
+      ],
+      "wall_seconds": 87.23029849999875,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 288.735,
+      "deterministic_time_used": 88.8034197588548,
+      "entry_id": 6880255,
+      "plan_value": 288.735,
+      "primary_deterministic_time": 44.55621022028856,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ],
+        [
+          8,
+          [
+            503139
+          ]
+        ],
+        [
+          9,
+          [
+            177815
+          ]
+        ]
+      ],
+      "wall_seconds": 90.58125249999284,
+      "window": 5
+    },
+    {
+      "absolute_gap": 35.68300000000005,
+      "arm": "solver_default",
+      "best_bound": 318.571,
+      "deterministic_time_used": 100.00220992353705,
+      "entry_id": 7018833,
+      "plan_value": 282.888,
+      "primary_deterministic_time": 100.00220992353705,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            17761
+          ]
+        ],
+        [
+          6,
+          [
+            232351
+          ]
+        ],
+        [
+          7,
+          [
+            60307
+          ]
+        ],
+        [
+          8,
+          [
+            219168
+          ]
+        ],
+        [
+          9,
+          [
+            513418
+          ]
+        ]
+      ],
+      "wall_seconds": 90.07050700001128,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 285.323,
+      "deterministic_time_used": 100.00571692997396,
+      "entry_id": 7018833,
+      "plan_value": 285.323,
+      "primary_deterministic_time": 25.554391152492272,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            222531
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ],
+        [
+          8,
+          [
+            219168
+          ]
+        ],
+        [
+          9,
+          [
+            522047
+          ]
+        ]
+      ],
+      "wall_seconds": 83.92134970000188,
+      "window": 5
+    },
+    {
+      "absolute_gap": 29.156999999999982,
+      "arm": "solver_default",
+      "best_bound": 325.233,
+      "deterministic_time_used": 100.00243734013749,
+      "entry_id": 7252721,
+      "plan_value": 296.076,
+      "primary_deterministic_time": 100.00243734013749,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            219168
+          ]
+        ],
+        [
+          6,
+          [
+            17761
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ],
+        [
+          8,
+          [
+            223340
+          ]
+        ],
+        [
+          9,
+          [
+            244851
+          ]
+        ]
+      ],
+      "wall_seconds": 79.61807910000789,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.6289999999999623,
+      "arm": "window_level",
+      "best_bound": 297.354,
+      "deterministic_time_used": 100.00699728393691,
+      "entry_id": 7252721,
+      "plan_value": 296.725,
+      "primary_deterministic_time": 100.00699728393691,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            17761
+          ]
+        ],
+        [
+          6,
+          [
+            219168
+          ]
+        ],
+        [
+          7,
+          [
+            513418
+          ]
+        ],
+        [
+          8,
+          [
+            223340
+          ]
+        ],
+        [
+          9,
+          [
+            97846
+          ]
+        ]
+      ],
+      "wall_seconds": 84.57606079999823,
+      "window": 5
+    },
+    {
+      "absolute_gap": 36.999000000000024,
+      "arm": "solver_default",
+      "best_bound": 317.574,
+      "deterministic_time_used": 100.00257546983438,
+      "entry_id": 8548384,
+      "plan_value": 280.575,
+      "primary_deterministic_time": 100.00257546983438,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            647850
+          ]
+        ],
+        [
+          7,
+          [
+            155465
+          ]
+        ],
+        [
+          8,
+          [
+            204580
+          ]
+        ],
+        [
+          9,
+          [
+            17761
+          ]
+        ]
+      ],
+      "wall_seconds": 74.05258489999687,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 284.659,
+      "deterministic_time_used": 56.67436174234368,
+      "entry_id": 8548384,
+      "plan_value": 284.659,
+      "primary_deterministic_time": 24.62883013639244,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            60307
+          ]
+        ],
+        [
+          6,
+          [
+            226182
+          ]
+        ],
+        [
+          7,
+          [
+            219168
+          ]
+        ],
+        [
+          8,
+          [
+            17761
+          ]
+        ],
+        [
+          9,
+          [
+            177815
+          ]
+        ]
+      ],
+      "wall_seconds": 56.25492740000482,
+      "window": 5
+    },
+    {
+      "absolute_gap": 39.95700000000005,
+      "arm": "solver_default",
+      "best_bound": 323.261,
+      "deterministic_time_used": 100.01091991731323,
+      "entry_id": 8883467,
+      "plan_value": 283.304,
+      "primary_deterministic_time": 100.01091991731323,
+      "solver_status": "FEASIBLE",
+      "tiebreak_completed": false,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            60307
+          ]
+        ],
+        [
+          7,
+          [
+            177815
+          ]
+        ],
+        [
+          8,
+          [
+            477424
+          ]
+        ],
+        [
+          9,
+          [
+            522047
+          ]
+        ]
+      ],
+      "wall_seconds": 87.37088139999832,
+      "window": 5
+    },
+    {
+      "absolute_gap": 0.0,
+      "arm": "window_level",
+      "best_bound": 285.866,
+      "deterministic_time_used": 82.54740590402226,
+      "entry_id": 8883467,
+      "plan_value": 285.866,
+      "primary_deterministic_time": 51.467080737907175,
+      "solver_status": "OPTIMAL",
+      "tiebreak_completed": true,
+      "transfers": [
+        [
+          5,
+          [
+            513418
+          ]
+        ],
+        [
+          6,
+          [
+            60307
+          ]
+        ],
+        [
+          7,
+          [
+            226182
+          ]
+        ],
+        [
+          8,
+          [
+            503139
+          ]
+        ],
+        [
+          9,
+          [
+            219847
+          ]
+        ]
+      ],
+      "wall_seconds": 79.89730670000426,
+      "window": 5
+    }
+  ],
+  "season": "2026-27",
+  "snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+  "summary": {
+    "3": {
+      "solver_default": {
+        "largest_open_gap": 29.935000000000002,
+        "mean_deterministic_time": 60.01876385836321,
+        "mean_plan_value": 167.2444,
+        "proved": 0,
+        "solves": 15,
+        "total_wall_seconds": 890.8948740000051
+      },
+      "window_level": {
+        "largest_open_gap": null,
+        "mean_deterministic_time": 36.04759567263309,
+        "mean_plan_value": 167.7102,
+        "proved": 15,
+        "solves": 15,
+        "total_wall_seconds": 498.9217133999773
+      }
+    },
+    "5": {
+      "solver_default": {
+        "largest_open_gap": 58.899,
+        "mean_deterministic_time": 100.00273077172008,
+        "mean_plan_value": 280.1881333333333,
+        "proved": 0,
+        "solves": 15,
+        "total_wall_seconds": 1488.5819289999927
+      },
+      "window_level": {
+        "largest_open_gap": 10.37100000000001,
+        "mean_deterministic_time": 92.78178865090358,
+        "mean_plan_value": 283.73586666666665,
+        "proved": 12,
+        "solves": 15,
+        "total_wall_seconds": 1353.6618479000026
+      }
+    }
+  },
+  "window_level": 2
+}

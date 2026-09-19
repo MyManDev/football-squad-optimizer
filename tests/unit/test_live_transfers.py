@@ -18,7 +18,6 @@ from typing import Any
 
 import pandas as pd
 import pytest
-import scripts.run_gameweek_ops as ops
 
 import squadopt.application.commands as command_services
 import squadopt.live.transfers as live_transfers
@@ -44,6 +43,8 @@ from squadopt.live.transfers import (
     _transfer_config,
 )
 from squadopt.planning import TransferPlanningConfig
+from squadopt.platform.cli import CliServices
+from squadopt.platform.cli import main as cli_main
 from squadopt.prediction.component_dataset import (
     FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
@@ -210,7 +211,6 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             FIXTURES_PAYLOAD: b"[]",
         },
     )
-    monkeypatch.setattr(ops, "build_panel", lambda root: _panel())
     # No allowlist monkeypatch: the world's handoff uses the really pinned version, so
     # these tests prove the promotion end to end.
     return {
@@ -225,18 +225,33 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 
 def _run(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -> int:
+    arguments = list(extra)
+    phase_index = arguments.index("--phase")
+    phase = arguments.pop(phase_index + 1)
+    arguments.pop(phase_index)
+    root = world["snapshot_root"].parent
     argv = [
-        "run_gameweek_ops",
+        "gameweek",
+        phase,
+        "--workspace-root",
+        str(root),
+        "--archive-root",
+        str(root / "archive"),
+        "--runtime-root",
+        str(root / "runtime"),
+        "--log-root",
+        str(root / "logs"),
+        "--summary-root",
+        str(root / "docs"),
         "--snapshot-root",
         str(world["snapshot_root"]),
         "--ledger-root",
         str(world["ledger_root"]),
         "--summary-output",
         str(world["summary"]),
-        *extra,
+        *arguments,
     ]
-    monkeypatch.setattr("sys.argv", argv)
-    return ops.main()
+    return cli_main(argv, services=CliServices(panel_builder=lambda root: _panel()))
 
 
 def _decide_gw1(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]) -> dict[str, Any]:

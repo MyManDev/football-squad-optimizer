@@ -9,9 +9,10 @@ not closed when it was taken, and recommends for that. **Replay** names a captur
 gameweek and rebuilds exactly what that capture supported — which works because the capture
 is immutable and checksummed, and because every other input is pinned.
 
-Capture separately, close to the deadline:
+Inspect due capture, decision and settlement actions close to the deadline, then execute:
 
-    python -m scripts.capture_deadline_snapshot
+    squadopt season tick --dry-run
+    squadopt season tick
 
 Prices move daily and availability hourly near a deadline, so a recommendation is only as
 current as the capture it came from. The report prints the capture's timestamp for exactly
@@ -86,8 +87,8 @@ def resolve_snapshot_id(requested: str | None) -> str:
     live = list_snapshot_ids(SNAPSHOT_ROOT, source=FPL_LIVE_SOURCE)
     if not live:
         raise DataError(
-            f"No {FPL_LIVE_SOURCE} snapshots under {SNAPSHOT_ROOT}. Capture one first with "
-            "'python -m scripts.capture_deadline_snapshot'."
+            f"No {FPL_LIVE_SOURCE} snapshots under {SNAPSHOT_ROOT}. Inspect due actions with "
+            "'squadopt season tick --dry-run', then execute them with 'squadopt season tick'."
         )
     return live[-1]
 

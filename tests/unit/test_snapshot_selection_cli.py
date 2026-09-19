@@ -91,8 +91,10 @@ def test_a_root_of_cohort_captures_alone_is_no_capture_to_recommend_from(
     _cohort(tmp_path)
     monkeypatch.setattr(recommend_cli, "SNAPSHOT_ROOT", tmp_path)
 
-    with pytest.raises(DataError, match="No fpl-live snapshots"):
+    with pytest.raises(DataError, match="No fpl-live snapshots") as error:
         recommend_cli.resolve_snapshot_id(None)
+    assert "squadopt season tick --dry-run" in str(error.value)
+    assert "'squadopt season tick'" in str(error.value)
 
 
 # --- scripts.build_projection_horizon -----------------------------------------------

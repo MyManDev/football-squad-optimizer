@@ -31,13 +31,19 @@ from __future__ import annotations
 
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Final, Protocol
 
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
-from squadopt.platform.advice_read import AdviceBackendNotReadyError, AdviceReadStore
+from squadopt.platform.advice_read import (
+    AdviceBackendNotReadyError,
+    AdviceReadStore,
+    AdviceRequestContext,
+)
 from squadopt.platform.api_contract import (
     ApiCommandRequest,
     BackendApiContractError,
@@ -62,6 +68,14 @@ class RateLimitedError(ValueError):
     def __init__(self, message: str, *, retry_after_seconds: int = 60) -> None:
         super().__init__(message)
         self.retry_after_seconds = max(1, int(retry_after_seconds))
+
+
+class OpenJobLimitedError(ValueError):
+    """This address already owns the allowed queued and running work."""
+
+
+class DeadlinePassedError(ValueError):
+    """The resolved capture's gameweek no longer accepts new work."""
 
 
 class MalformedIdempotencyKeyError(ValueError):
@@ -117,7 +131,7 @@ class SubmitOutcome:
 
 
 class AdviceSubmitService:
-    """Turn a validated request into a cache hit or exactly one open job."""
+    """Turn a request into a cache hit or job, with ownership capped per API process."""
 
     def __init__(
         self,
@@ -127,12 +141,21 @@ class AdviceSubmitService:
         rate_limiter: RateLimiter | None = None,
         specs: AdviceJobSpecStore | None = None,
         store_ready: Callable[[], bool] | None = None,
+        max_open_jobs_per_client: int = 4,
+        deadline_for: Callable[[AdviceRequestContext], str] | None = None,
     ) -> None:
+        if max_open_jobs_per_client < 1:
+            raise ValueError("max_open_jobs_per_client must be at least 1.")
         self._reader = reader
         self._queue = queue
         self._limiter = rate_limiter
         self._specs = specs
         self._store_ready = store_ready
+        self._max_open_jobs_per_client = max_open_jobs_per_client
+        self._deadline_for = deadline_for
+        # Only the admission callback accesses this map, under the queue transaction.
+        # Addresses never enter queue/spec documents; process restart forgets ownership.
+        self._client_jobs: dict[str, str] = {}
 
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
@@ -287,31 +310,63 @@ class AdviceSubmitService:
             updated_at_utc=at_utc,
             idempotency_key=command.idempotency_key,
         )
-        if self._specs is not None:
-            # Before the job exists, never after: a worker may claim the instant the
-            # record lands, and a claimed job whose request cannot be read is a job
-            # nobody can answer. The rival is normalized exactly as the cache key
-            # normalizes it, so requests that share an address share a meaning.
-            self._specs.put(
-                cache_key,
-                AdviceJobSpec(
-                    league_id=int(league_id),
-                    entry_id=int(entry_id),
-                    strategy=strategy,
-                    window=int(window),
-                    context=context,
-                    rival_entry_id=(
-                        rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+
+        @contextmanager
+        def admit() -> Iterator[None]:
+            self._client_jobs = {
+                identifier: owner
+                for identifier, owner in self._client_jobs.items()
+                if (owned := self._queue.load(identifier)) is not None and not owned.is_terminal
+            }
+            if (
+                sum(owner == client_bucket for owner in self._client_jobs.values())
+                >= self._max_open_jobs_per_client
+            ):
+                raise OpenJobLimitedError(
+                    "This connection already has the allowed open computations."
+                )
+            self._client_jobs[record.job_id] = client_bucket
+            try:
+                yield
+            except BaseException:
+                self._client_jobs.pop(record.job_id, None)
+                raise
+
+        def prepare() -> None:
+            # Only new work reaches this callback: late cache hits and open-job
+            # replays still answer after the deadline, without publishing a new spec.
+            if self._deadline_for is not None and datetime.fromisoformat(
+                at_utc
+            ) >= datetime.fromisoformat(self._deadline_for(context)):
+                raise DeadlinePassedError("This gameweek's deadline has passed.")
+            if self._specs is not None:
+                # Before the job exists, never after: a worker may claim the instant the
+                # record lands, and a claimed job whose request cannot be read is a job
+                # nobody can answer. The rival is normalized exactly as the cache key
+                # normalizes it, so requests that share an address share a meaning.
+                self._specs.put(
+                    cache_key,
+                    AdviceJobSpec(
+                        league_id=int(league_id),
+                        entry_id=int(entry_id),
+                        strategy=strategy,
+                        window=int(window),
+                        context=context,
+                        rival_entry_id=(
+                            rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+                        ),
+                        # Exactly what entered the key: the switch values and the identity
+                        # of the inputs they were accepted against.
+                        switches=resolved.switches,
                     ),
-                    # Exactly what entered the key: the switch values and the identity
-                    # of the inputs they were accepted against.
-                    switches=resolved.switches,
-                ),
-            )
+                )
+
         # Completion publishes cache bytes and removes the open reservation under the
         # same lock as this final cache check and enqueue decision. An earlier miss must
         # not create a second job after another worker has already answered it.
-        winner = self._queue.submit_unless_cached(record, read_cached=self._reader.cached)
+        winner = self._queue.submit_unless_cached(
+            record, read_cached=self._reader.cached, admit=admit, prepare=prepare
+        )
         if isinstance(winner, bytes):
             return SubmitOutcome(kind="hit", payload=winner)
         return SubmitOutcome(kind="job", job=winner)
