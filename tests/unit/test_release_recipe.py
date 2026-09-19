@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -68,7 +69,7 @@ def test_ship_dry_run_only_reads_repository_location(tmp_path: Path, tag: str) -
             "two parents",
             "unexpired site artifact",
             "deploy-pages.yml",
-            "ten live",
+            "live smoke checks",
             "60 minutes",
             "45 minutes",
             "40 minutes",
@@ -203,6 +204,66 @@ esac
         assert "body unreadable" in result.stdout or "body scan FAILED" in result.stdout
 
 
+def test_a_settled_tag_refuses_to_ship_without_the_gameweek_it_settles() -> None:
+    """The verifier can only assert a week the operator names, so the tag demands it.
+
+    Run from the repository, because a dry run reads its own location; it prints and exits
+    before touching anything, which the stubbed test above is what proves.
+    """
+
+    if not Path(SHELL).is_file():
+        pytest.skip("A POSIX shell is required")
+    common = [
+        SHELL,
+        str(ROOT / "scripts/release/ship.sh"),
+        "--dry-run",
+        "618",
+        "site-2026-27-gw05-settled",
+        "release/gw05-settled",
+        "2026-09-18T17:00:00Z",
+        "Publish the accepted tree.",
+    ]
+    without = subprocess.run(common, cwd=ROOT, capture_output=True, text=True, timeout=15)
+    assert without.returncode == 2
+    assert "pass it as the sixth argument" in without.stderr
+
+    with_week = subprocess.run([*common, "5"], cwd=ROOT, capture_output=True, text=True, timeout=15)
+    assert with_week.returncode == 0, with_week.stderr
+    assert "settling gameweek 5" in with_week.stdout
+
+    not_a_number = subprocess.run(
+        [*common, "five"], cwd=ROOT, capture_output=True, text=True, timeout=15
+    )
+    assert not_a_number.returncode == 2
+    assert "must be a number" in not_a_number.stderr
+
+
+def _live(settled: int, scored: int | None, next_gameweek: int) -> object:
+    """A live site that has settled ``settled`` and says so in all three documents."""
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        if path == verify_live.ABSENT:
+            return 404, b""
+        if path in verify_live.ROUTES:
+            return 200, b'<div id="root"></div>'
+        if path == "/data/league/scoreboard.json":
+            weeks = [
+                {"gameweek": week, "finished": True, "data_checked": True}
+                for week in range(1, settled + 1)
+            ]
+            return 200, json.dumps({"payload": {"gameweeks": weeks}}).encode()
+        if path == "/data/2026-27/status.json":
+            return 200, json.dumps({"payload": {"next_gameweek": next_gameweek}}).encode()
+        return 200, json.dumps(
+            {
+                "generated_at_utc": "2026-09-18T18:00:00Z",
+                "payload": {"scored_gameweek": scored, "members": []},
+            }
+        ).encode()
+
+    return fetch
+
+
 @pytest.mark.parametrize("absent_status", [404, 200])
 def test_live_checks_retain_the_absent_document_rule(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], absent_status: int
@@ -217,6 +278,57 @@ def test_live_checks_retain_the_absent_document_rule(
     monkeypatch.setattr(verify_live, "fetch", fetch)
     assert verify_live.main("2026-09-18T17:00:00Z") == (0 if absent_status == 404 else 1)
     output = capsys.readouterr().out
-    assert output.count(" html ") == 7
-    assert output.count(" json ") == 2
+    assert output.count(" html ") == len(verify_live.ROUTES)
+    assert output.count(" json ") == len(verify_live.DOCUMENTS)
     assert "must be 404" in output
+
+
+def test_the_verifier_checks_the_same_routes_the_deployment_smoke_does() -> None:
+    """The two lists drifted once: `/fixtures` was added to one and not the other."""
+
+    source = (ROOT / "web/scripts/smoke-deployment.mjs").read_text(encoding="utf-8")
+    block = source.split("export const SMOKE_CHECKS = [", 1)[1].split("\n];", 1)[0]
+    paths = re.findall(r'path:\s*"([^"]+)"', block)
+    kinds = re.findall(r'kind:\s*"([^"]+)"', block)
+    assert len(paths) == len(kinds), block
+    named = dict(zip(paths, kinds, strict=True))
+    assert [path for path, kind in named.items() if kind == "html"] == verify_live.ROUTES
+    assert [path for path, kind in named.items() if kind == "json"] == verify_live.DOCUMENTS
+    assert [path for path, kind in named.items() if kind == "absent"] == [verify_live.ABSENT]
+
+
+def test_a_week_that_did_not_settle_fails_instead_of_being_printed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Without --settled the verifier printed the settled weeks and returned ALL GOOD."""
+
+    monkeypatch.setattr(verify_live, "fetch", _live(settled=4, scored=4, next_gameweek=5))
+    assert verify_live.main("2026-09-18T17:00:00Z") == 0
+    assert verify_live.main("2026-09-18T17:00:00Z", 4) == 0
+    # One exit code, three named failures: the count is in the output, not the return.
+    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    output = capsys.readouterr().out
+    assert "BAD scoreboard settles gameweek 5" in output
+    assert "BAD members.json scored_gameweek is 5" in output
+    assert "BAD status moved past gameweek 5" in output
+
+
+def test_each_of_the_three_settled_claims_fails_on_its_own(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(verify_live, "fetch", _live(settled=5, scored=4, next_gameweek=6))
+    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    monkeypatch.setattr(verify_live, "fetch", _live(settled=5, scored=5, next_gameweek=5))
+    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    monkeypatch.setattr(verify_live, "fetch", _live(settled=4, scored=5, next_gameweek=6))
+    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    capsys.readouterr()
+
+
+def test_the_generated_after_argument_has_no_default_any_more() -> None:
+    """A stale default made the only freshness check vacuous when the argument was forgotten."""
+
+    with pytest.raises(SystemExit):
+        verify_live._arguments([])
+    assert verify_live._arguments(["2026-09-18T17:00:00Z"]).settled is None
+    assert verify_live._arguments(["2026-09-18T17:00:00Z", "--settled", "5"]).settled == 5

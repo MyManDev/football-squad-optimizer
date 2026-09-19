@@ -10,6 +10,9 @@ Windows PowerShell 5.1, ASCII only. The launcher must include Stop -WhatIf suppo
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$LiveGeneratedAfter,
+    # The gameweek this release settles, asserted by the verifier rather than printed. Omit it
+    # for a decision release, which settles nothing.
+    [int]$SettledGameweek,
     [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
     [string]$StoreRoot = "",
     [string]$SiteDataRoot = "",
@@ -130,8 +133,12 @@ Write-Output "Current launcher-recorded commit=$($state.repository_commit)"
 if ($depth -gt 0 -and -not $Force) { throw "Jobs are queued or running; drain them or explicitly use -Force." }
 
 $verifier = Join-Path $RepoRoot 'scripts\release\verify_live.py'
-Write-Output "Verify public release: $Python $verifier $LiveGeneratedAfter"
-& $Python $verifier $LiveGeneratedAfter
+$verifierArgs = @($verifier, $LiveGeneratedAfter)
+if ($PSBoundParameters.ContainsKey('SettledGameweek')) {
+    $verifierArgs += @('--settled', "$SettledGameweek")
+}
+Write-Output "Verify public release: $Python $($verifierArgs -join ' ')"
+& $Python @verifierArgs
 if ($LASTEXITCODE -ne 0) { throw "Public release verification failed; backend left running." }
 $publicCapture = Published-Capture -Public
 try { $localCapture = Published-Capture } catch { $localCapture = "unavailable: $_" }

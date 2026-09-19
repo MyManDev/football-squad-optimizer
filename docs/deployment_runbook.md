@@ -195,8 +195,8 @@ unexpired site artifact, creates the annotated tag, dispatches the trusted workf
 and checks the live site. Existing remote tags refuse. Choose a fresh release
 branch: the recipe removes an existing local worktree and branch with that name.
 
-`deploy.sh <tag>` is the second stage. `verify_live.py <generated-after-ISO>`
-retains the ten smoke checks and content checks. `queue2.sh <PR>...` is the separate
+`deploy.sh <tag>` is the second stage. `verify_live.py <generated-after-ISO> [--settled <gameweek>]`
+retains the eleven smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
 path. These are operator commands, not scheduled jobs; inspect their output and stop
@@ -257,7 +257,7 @@ The complete operator order is: accept the recorded weekly tree, release the sit
 drain the backend queue, preview then run the restart command above from clean
 `develop`, and run the [manual browser check](#post-deployment-smoke). Both `ship.sh`
 and the restart helper run `verify_live.py`; to run it again by hand, use
-`python scripts/release/verify_live.py <generated-after-ISO>`. A zero queue depth
+`python scripts/release/verify_live.py <generated-after-ISO> --settled <gameweek>`. A zero queue depth
 permits a restart; `-Force` is an explicit operator exception, not the normal command.
 `/ready` alone does not prove capture-ID or code-commit equality: its published-tree
 check is season/gameweek. `ship.sh` publishes the site only and does not restart the
