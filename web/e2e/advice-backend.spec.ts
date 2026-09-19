@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cp, readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -246,10 +246,12 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   }
   if (process.platform === "win32") {
     const pids = windowsApiPids(context.apiPid, context.fixturePid, Number(origin.port));
-    execFileSync("taskkill", [...pids.flatMap((pid) => ["/PID", String(pid)]), "/F"], {
+    const stopped = spawnSync("taskkill", [...pids.flatMap((pid) => ["/PID", String(pid)]), "/F"], {
       windowsHide: true,
       timeout: 10_000,
     });
+    if (stopped.error) throw stopped.error;
+    // A child can exit with its launcher before taskkill reaches it. Check /ready below.
   } else {
     const parent = execFileSync("ps", ["-o", "ppid=", "-p", String(context.apiPid)], {
       encoding: "utf8",

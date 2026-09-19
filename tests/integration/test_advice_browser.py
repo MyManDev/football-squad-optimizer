@@ -12,6 +12,8 @@ import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 from urllib.error import URLError
 from urllib.request import urlopen
 from uuid import uuid4
@@ -108,21 +110,23 @@ def _process(
                 # Playwright starts preview/Chromium children; a timeout must close
                 # this test's entire process tree, not just its parent Node process.
                 if os.name == "nt":
-                    subprocess.run(
-                        [
-                            "taskkill",
-                            *[
-                                arg
-                                for pid in _windows_process_ids(process.pid)
-                                for arg in ("/PID", str(pid))
+                    try:
+                        pids = _windows_process_ids(process.pid)
+                    except (OSError, subprocess.SubprocessError, ValueError, StopIteration):
+                        # The held handle still identifies our root if listing fails.
+                        process.kill()
+                    else:
+                        subprocess.run(
+                            [
+                                "taskkill",
+                                *[arg for pid in pids for arg in ("/PID", str(pid))],
+                                "/F",
                             ],
-                            "/F",
-                        ],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        timeout=10,
-                        check=False,
-                    )
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=10,
+                            check=False,
+                        )
                 else:
                     # Playwright handles SIGINT by tearing down its detached preview
                     # server; uvicorn and the worker also handle this shutdown signal.
@@ -135,6 +139,35 @@ def _process(
                     else:
                         os.killpg(process.pid, signal.SIGKILL)
                     process.wait(timeout=5)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        subprocess.TimeoutExpired("powershell.exe", 10),
+        json.JSONDecodeError("invalid listing", "", 0),
+        StopIteration(),
+    ],
+    ids=["listing-timeout", "invalid-json", "root-exited"],
+)
+def test_windows_cleanup_uses_held_handle_without_hiding_test_failure(
+    tmp_path, monkeypatch, failure
+):
+    process = Mock(pid=10)
+    process.poll.return_value = None
+    monkeypatch.setattr(subprocess, "Popen", Mock(return_value=process))
+    tree_kill = Mock()
+    monkeypatch.setattr(subprocess, "run", tree_kill)
+    monkeypatch.setattr(sys.modules[__name__], "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(sys.modules[__name__], "_windows_process_ids", Mock(side_effect=failure))
+    with (
+        pytest.raises(RuntimeError, match="original browser failure"),
+        _process(["unused"], {}, tmp_path / "process.log"),
+    ):
+        raise RuntimeError("original browser failure")
+    process.kill.assert_called_once_with()
+    process.wait.assert_called_once_with(timeout=5)
+    tree_kill.assert_not_called()
 
 
 def _top100_export(capture, bootstrap: bytes, directory: Path) -> None:
