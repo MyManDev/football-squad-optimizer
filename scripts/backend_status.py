@@ -83,6 +83,8 @@ class LogSummary:
     last: str = ""
     capture: tuple[str, str] | None = None
     completed_seconds: list[float] = field(default_factory=list)
+    window_seconds: dict[int, list[float]] = field(default_factory=dict)
+    completions_without_window: int = 0
     refusals: Counter[str] = field(default_factory=Counter)
 
 
@@ -140,6 +142,11 @@ def read_logs(directory: Path, *, days: int = 7) -> LogSummary:
                         and seconds >= 0
                     ):
                         summary.completed_seconds.append(float(seconds))
+                        window = record.get("window")
+                        if type(window) is int and window in (1, 3, 5):
+                            summary.window_seconds.setdefault(window, []).append(float(seconds))
+                        else:
+                            summary.completions_without_window += 1
                     code = record.get("code")
                     if event == "advice_job_refused" and isinstance(code, str):
                         summary.refusals[code] += 1
@@ -207,9 +214,15 @@ def status_report(
         + (f"{logs.capture[1]} at {logs.capture[0]}" if logs.capture else UNAVAILABLE)
     )
     lines.append("Published capture ID: " + UNAVAILABLE)
-    lines.append(
-        "Solve median/slowest by window: " + UNAVAILABLE + " (no window in completion logs)"
-    )
+    for window in (1, 3, 5):
+        values = logs.window_seconds.get(window, [])
+        summary = (
+            f"n={len(values)}, median={statistics.median(values):.3f}, slowest={max(values):.3f}"
+            if values
+            else "unavailable: no completion samples"
+        )
+        lines.append(f"Completed job wall seconds (window {window}, retained logs only): {summary}")
+    lines.append(f"Completions without window (retained logs): {logs.completions_without_window}")
     if logs.completed_seconds:
         values = logs.completed_seconds
         lines.append(
