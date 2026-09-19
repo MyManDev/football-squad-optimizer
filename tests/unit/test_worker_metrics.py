@@ -21,7 +21,8 @@ def test_metrics_listener_is_independent_and_releases_its_socket() -> None:
             text = response.read().decode()
         assert 'advice_jobs_total{outcome="completed"} 1' in text
         assert "advice_solve_seconds_count 1" in text
-        assert "advice_cache_hits_total" not in text
+        assert "advice_cache_hits_total 0\n" in text
+        assert "advice_cache_hits_total 1\n" in api.render()
         with urlopen(f"{address}/health", timeout=2) as response:
             assert response.status == 200
         with pytest.raises(HTTPError) as error:
