@@ -91,3 +91,4 @@ sh "$S/deploy.sh" "$TAG" || { log "deploy.sh stopped"; exit 1; }
 sleep 45
 "$PY" "$S/verify_live.py" "$LIVE_AFTER" || { sleep 60; "$PY" "$S/verify_live.py" "$LIVE_AFTER" || { log "live verification found failures"; exit 1; }; }
 log "LIVE"
+log "Next: cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts (read-only browser check after verify_live.py)"
