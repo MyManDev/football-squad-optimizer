@@ -98,6 +98,7 @@ from squadopt.application.top100_weight import (
     Top100Counts,
     top100_file,
 )
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION as LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data.errors import DataError
 from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
@@ -109,8 +110,6 @@ from squadopt.live.transfers import plan_transfer_menu
 from squadopt.planning import TransferPlanResult
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
-
-LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
 
 
 def computable_rival_strategies() -> tuple[str, ...]:

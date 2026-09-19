@@ -75,6 +75,7 @@ SQUADOPT_REPOSITORY_COMMIT=<40 hex>
 SQUADOPT_BACKEND_SEASON=              # otherwise inferred from the capture
 SQUADOPT_BACKEND_RATE_LIMIT=30        # per window, per client address and per (capture, entry)
 SQUADOPT_BACKEND_RATE_WINDOW_SECONDS=60
+SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT=4  # queued + running, per address per API process
 
 # Optional, and together they switch the member menu's two switches on. Unset, the backend
 # answers plain requests exactly as before and refuses a switch by name.
