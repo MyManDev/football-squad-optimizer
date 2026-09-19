@@ -68,7 +68,7 @@ it.each([
         return envelope;
       });
     const query = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    const { unmount } = render(
+    const { unmount, container } = render(
       <QueryClientProvider client={query}>
         <LanguageProvider initialLanguage="en">
           <MemoryRouter
@@ -105,6 +105,18 @@ it.each([
       screen.queryByRole("region", { name: TOP100_COPY.en.windowComparisonTitle });
     if (published && valid && !malformed) await waitFor(() => expect(comparison()).toBeVisible());
     else expect(comparison()).toBeNull();
+    if (malformed) {
+      const controlCall = load.mock.calls.findIndex(
+        ([, mode, window]) => mode === "saf-puan" && window === 3,
+      );
+      expect(controlCall).toBeGreaterThanOrEqual(0);
+      await act(async () => {
+        await load.mock.results[controlCall]!.value;
+      });
+      await waitFor(() => expect(query.isFetching()).toBe(0));
+      expect(comparison()).toBeNull();
+      expect(container.querySelector('[aria-labelledby="entry-advice-title"]')).toBeVisible();
+    }
     unmount();
     query.clear();
   },
