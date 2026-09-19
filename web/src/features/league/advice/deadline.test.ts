@@ -48,7 +48,7 @@ describe("the deadline of the advised gameweek", () => {
         copy.deadlinePassedCompute,
       ]) {
         expect(sentence).not.toMatch(AS_A_CHANCE);
-        expect(sentence).not.toContain("—");
+        expect(sentence).not.toContain(String.fromCharCode(0x2014));
       }
       expect(copy.deadlinePassedBody(5, "WHEN")).toContain("WHEN");
       expect(copy.deadlinePassedBody(5, "WHEN")).toContain("5");
