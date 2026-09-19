@@ -10,7 +10,10 @@ fixtures: each season is walked as a lookahead-1 chain four times,
 * ``fixed``: the hybrid reservation with the recorded holding values, constant to the end
   of each half, which is how the committed chains held chips under one set;
 * ``decaying``: the same, with each holding value falling linearly to zero at the end of
-  its half and the reservation lifted in a half's last gameweek.
+  its half and the reservation lifted in a half's last gameweek;
+* ``threshold_only``: the decaying holding values with no reservation at all, which asks
+  whether saving the bench boost for a double still pays when a double may never come
+  before the half ends.
 
 The record keeps each chain, the chips played and the chips that expired unplayed, and the
 paired comparisons the protocol names. Nights only; it refuses to overwrite its record.
@@ -55,8 +58,15 @@ HALF_SPLIT = 19
 #: The constants of the committed chain records (``run_season_chain_seasons.py``).
 HOLDING_VALUES = {"bboost": 20.0, "3xc": 18.0, "wildcard": 12.0, "freehit": 15.0}
 HIT_COST = 4.0
-ARMS = ("off", "planner", "fixed", "decaying")
-COMPARISONS = (("decaying", "fixed"), ("fixed", "off"), ("decaying", "off"), ("planner", "off"))
+ARMS = ("off", "planner", "fixed", "decaying", "threshold_only")
+COMPARISONS = (
+    ("decaying", "fixed"),
+    ("decaying", "threshold_only"),
+    ("fixed", "off"),
+    ("decaying", "off"),
+    ("threshold_only", "off"),
+    ("planner", "off"),
+)
 
 
 def two_set_windows() -> tuple[ChipWindowRule, ...]:
@@ -162,13 +172,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         counts = season_fixture_counts(arguments.archive_root, season)
         cap = MAX_FREE_TRANSFERS.get(season, 5)
         for arm in arms:
-            held = arm in {"fixed", "decaying"}
+            held = arm in {"fixed", "decaying", "threshold_only"}
             config = SeasonChainConfig(
                 season=season,
                 lookahead=1,
                 chip_windows=() if arm == "off" else windows,
-                chip_policy="hybrid" if held else "planner",
-                chip_threshold="decaying" if arm == "decaying" else "fixed",
+                chip_policy="hybrid" if arm in {"fixed", "decaying"} else "planner",
+                chip_threshold="fixed" if arm in {"off", "planner", "fixed"} else "decaying",
                 optimization_config=optimization,
                 transfer_config=TransferPlanningConfig(
                     max_free_transfers=cap,

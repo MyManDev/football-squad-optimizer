@@ -194,6 +194,20 @@ def test_the_hybrid_policy_reserves_only_the_bench_boost() -> None:
     assert result.diagnostics["chip_policy"] == "hybrid"
 
 
+def test_a_week_records_what_its_captain_and_bench_were_expected_to_score(
+    myopic: SeasonChainResult,
+) -> None:
+    """What a triple captain or a bench boost would have been expected to add, per week."""
+
+    for week in myopic.weeks:
+        record = week.as_record()
+        assert record["captain_projected_points"] is not None
+        assert float(record["captain_projected_points"]) > 0.0
+        assert float(record["bench_projected_points"]) >= 0.0
+        # The captain is one of the eleven, so the eleven's projection covers it twice.
+        assert float(record["captain_projected_points"]) * 2 <= float(record["projected_points"])
+
+
 def test_a_holding_value_decays_to_zero_at_the_end_of_its_window() -> None:
     window = ChipWindowRule("bboost", 2, 8)
     assert decayed_holding_value(12.0, window, 2) == pytest.approx(12.0)

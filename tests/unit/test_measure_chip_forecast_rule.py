@@ -50,5 +50,6 @@ def test_a_window_that_closed_with_its_chip_unplayed_is_counted_once() -> None:
 
 def test_the_holdout_is_never_loaded_and_the_arms_are_the_protocols() -> None:
     assert LOCKED_HOLDOUT_SEASON not in HISTORY_SEASONS
-    assert ARMS == ("off", "planner", "fixed", "decaying")
+    assert ARMS == ("off", "planner", "fixed", "decaying", "threshold_only")
+    assert ("decaying", "threshold_only") in COMPARISONS
     assert COMPARISONS[0] == ("decaying", "fixed")

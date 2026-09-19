@@ -58,6 +58,7 @@ from squadopt.planning import (
     ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
+    PlanningWeekResult,
     TransferPlanningConfig,
     optimize_transfer_plan,
     sell_price_tenths,
@@ -91,6 +92,13 @@ class ChipWindowRule:
 
     def covers(self, gameweek: int) -> bool:
         return self.start_gameweek <= gameweek <= self.stop_gameweek
+
+
+def _captain_projection(week: PlanningWeekResult) -> float | None:
+    value = week.captain.get("expected_points")
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
 
 
 def decayed_holding_value(constant: float, window: ChipWindowRule, gameweek: int) -> float:
@@ -263,6 +271,14 @@ class SeasonChainWeek:
     chip_counterfactual_net_points: float | None = None
     """For a free-hit week: what the same decision without the chip would have realized
     net of hits, so the chip's gain is measured against it."""
+    captain_projected_points: float | None = None
+    """What the decision expected of its captain, once, before any doubling: what a
+    triple captain would have been expected to add this week. Beside the realized
+    figure it lets a later study see the week a chip rule saw, without another solve.
+    ``None`` when the plan's captain row carries no projection."""
+    bench_projected_points: float | None = None
+    """What the decision expected of its bench: what a bench boost would have been
+    expected to add this week."""
 
     def __post_init__(self) -> None:
         for name in ("realized_points", "transfer_hit_points", "projected_points"):
@@ -302,6 +318,8 @@ class SeasonChainWeek:
             "carried_unexplained_rows": self.carried_unexplained_rows,
             "squad_player_ids": [str(player) for player in self.squad_player_ids],
             "chip_counterfactual_net_points": self.chip_counterfactual_net_points,
+            "captain_projected_points": self.captain_projected_points,
+            "bench_projected_points": self.bench_projected_points,
         }
 
 
@@ -808,5 +826,7 @@ class SeasonChain(DecisionSeason):
             carried_unexplained_rows=holes,
             squad_player_ids=new_squad,
             chip_counterfactual_net_points=counterfactual_net,
+            captain_projected_points=_captain_projection(week),
+            bench_projected_points=float(week.projected_bench_points),
         )
         return record, new_state
