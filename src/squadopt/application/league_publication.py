@@ -36,6 +36,7 @@ from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     EntryGameweekPoints,
     fpl_entry_history_points,
+    fpl_league_name,
     fpl_league_standings,
     scored_gameweeks,
 )
@@ -90,6 +91,8 @@ class PreparedLeaguePublication:
     standings: Mapping[int, MemberStanding]
     scored_gameweek: int | None
     scored_members: int
+    #: The league's own name from the capture's standings; ``None`` when it states none.
+    league_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,6 +182,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
     standings_name = f"league-{request.league_id}-standings.json"
     payloads = getattr(snapshot, "payloads", {})
     standings: dict[int, MemberStanding] = {}
+    league_name: str | None = None
     registered = [int(entry.entry_id) for entry in registry.entries]
     scored = last_scored_gameweek(
         payloads["bootstrap-static.json"], before=int(inputs.deadline.gameweek)
@@ -186,6 +190,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
     scores = member_points(payloads, registered, gameweek=scored) if scored is not None else {}
     if standings_name in payloads:
         rows = fpl_league_standings(payloads[standings_name], league_id=request.league_id)
+        league_name = fpl_league_name(payloads[standings_name], league_id=request.league_id)
         standings = {
             row.entry_id: MemberStanding(
                 entry_id=row.entry_id,
@@ -212,6 +217,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
         standings=standings,
         scored_gameweek=scored,
         scored_members=len(scores),
+        league_name=league_name,
     )
 
 
@@ -317,7 +323,9 @@ def publish_prepared_league(
         projection,
         read_season_rules(snapshot, season=season),
         league_id=request.league_id,
-        league_name=f"League {request.league_id}",
+        # The members know their league by its name. The number stands in only when the
+        # capture states no name.
+        league_name=prepared.league_name or f"League {request.league_id}",
         out_dir=out_dir,
         standings=prepared.standings,
         scored_gameweek=prepared.scored_gameweek,
