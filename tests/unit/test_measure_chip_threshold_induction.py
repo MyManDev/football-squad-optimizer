@@ -1,7 +1,12 @@
 """The induction runner's replay, and the windows it covers."""
 
 import pytest
-from scripts.measure_chip_threshold_induction import COMPARISONS, covered_windows, replay
+from scripts.measure_chip_threshold_induction import (
+    COMPARISONS,
+    covered_windows,
+    replay,
+    unpriced_gameweeks,
+)
 
 from squadopt.experiments.chip_threshold import WindowThresholds
 from squadopt.experiments.season_chain import ChipWindowRule
@@ -95,3 +100,25 @@ def test_only_the_chips_with_a_weekly_value_on_record_are_covered() -> None:
 def test_a_gameweek_outside_the_window_has_no_threshold() -> None:
     with pytest.raises(Exception, match="not a classified gameweek"):
         _thresholds().threshold_at(8)
+
+
+def test_a_gameweek_the_table_does_not_price_is_counted_and_not_left_silent() -> None:
+    """A window gameweek with no threshold falls back to the decay; the record says how many."""
+
+    assert unpriced_gameweeks(_thresholds()) == []
+    thin = WindowThresholds(
+        chip="3xc",
+        start_gameweek=4,
+        stop_gameweek=7,
+        # The season's classification did not know gameweeks 5 and 6.
+        gameweeks=(4, 7),
+        thresholds=(9.0, 0.0),
+        pooled_fallback_kinds=(),
+        sample_seasons=("2022-23",),
+        sample_sizes=(("single", 10),),
+    )
+    assert unpriced_gameweeks(thin) == [5, 6]
+    # The schedule the chain is handed prices exactly the gameweeks the table holds.
+    schedule = thin.as_schedule()
+    assert schedule.value_at(4) == 9.0
+    assert schedule.value_at(5) is None and schedule.value_at(6) is None

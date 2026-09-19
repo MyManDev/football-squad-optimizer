@@ -157,6 +157,25 @@ def _covers(thresholds: WindowThresholds, gameweek: int) -> bool:
     return thresholds.start_gameweek <= gameweek <= thresholds.stop_gameweek
 
 
+def unpriced_gameweeks(thresholds: WindowThresholds) -> list[int]:
+    """The window's gameweeks the threshold table does not price.
+
+    A window covers a range; the table holds a threshold only for the gameweeks the season's
+    classification knows. A gameweek it does not know has no threshold, so the schedule does
+    not price it and the chain falls back to the linear decay there, quietly. The archive
+    classifies every gameweek of every development season, so this is expected to be empty;
+    it is counted and recorded rather than trusted, because a silent fallback is exactly the
+    thing a record should not leave to a reader to work out.
+    """
+
+    priced = set(thresholds.gameweeks)
+    return [
+        gameweek
+        for gameweek in range(thresholds.start_gameweek, thresholds.stop_gameweek + 1)
+        if gameweek not in priced
+    ]
+
+
 def _decay_line(chip: str, thresholds: WindowThresholds) -> dict[str, float]:
     window = ChipWindowRule(chip, thresholds.start_gameweek, thresholds.stop_gameweek)
     constant = float(HOLDING_VALUES.get(chip, 0.0))
@@ -208,11 +227,18 @@ def _stage_one(arguments: argparse.Namespace) -> dict[str, Any]:
         },
         "thresholds": {
             season: [
-                {**item.as_record(), "linear_decay": _decay_line(item.chip, item)}
+                {
+                    **item.as_record(),
+                    "linear_decay": _decay_line(item.chip, item),
+                    "unpriced_gameweeks": unpriced_gameweeks(item),
+                }
                 for item in by_season[season]
             ]
             for season in seasons
         },
+        "unpriced_gameweeks_total": sum(
+            len(unpriced_gameweeks(item)) for season in seasons for item in by_season[season]
+        ),
         "replay": replays,
         "replay_agrees_everywhere": all(item["same_gameweek"] for item in replays),
         "stage_two_runs": not all(item["same_gameweek"] for item in replays),
@@ -365,6 +391,14 @@ def _markdown(record: Mapping[str, Any]) -> str:
         ),
         "",
         "## The thresholds",
+        "",
+        (
+            "Every gameweek of every covered window is priced by the table."
+            if record["unpriced_gameweeks_total"] == 0
+            else f"**{record['unpriced_gameweeks_total']} gameweeks of the covered windows are "
+            "not priced by the table** and fall back to the linear decay; they are named per "
+            "window in the JSON."
+        ),
     ]
     lines += _threshold_table(record)
     stage_two = record.get("stage_two")
