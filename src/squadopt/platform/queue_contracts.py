@@ -1,6 +1,7 @@
 """Adapter-neutral advice queue operations and attempt ownership errors."""
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import Final, Protocol
 
 from squadopt.platform._queue_lock import QueueLockTimeout as QueueLockTimeout
@@ -32,7 +33,7 @@ class JobQueue(Protocol):
         job: AdviceJob,
         *,
         read_cached: Callable[[str], bytes | None],
-        admit: Callable[[frozenset[str]], None] | None = None,
+        admit: Callable[[], AbstractContextManager[None]] | None = None,
         prepare: Callable[[], None] | None = None,
     ) -> AdviceJob | bytes: ...
 

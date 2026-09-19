@@ -31,7 +31,8 @@ from __future__ import annotations
 
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Final, Protocol
 
@@ -121,7 +122,7 @@ class SubmitOutcome:
 
 
 class AdviceSubmitService:
-    """Turn a validated request into a cache hit or exactly one open job."""
+    """Turn a request into a cache hit or job, with ownership capped per API process."""
 
     def __init__(
         self,
@@ -299,11 +300,12 @@ class AdviceSubmitService:
             idempotency_key=command.idempotency_key,
         )
 
-        def admit(open_job_ids: frozenset[str]) -> None:
+        @contextmanager
+        def admit() -> Iterator[None]:
             self._client_jobs = {
                 identifier: owner
                 for identifier, owner in self._client_jobs.items()
-                if identifier in open_job_ids
+                if (owned := self._queue.load(identifier)) is not None and not owned.is_terminal
             }
             if (
                 sum(owner == client_bucket for owner in self._client_jobs.values())
@@ -313,6 +315,11 @@ class AdviceSubmitService:
                     "This connection already has the allowed open computations."
                 )
             self._client_jobs[record.job_id] = client_bucket
+            try:
+                yield
+            except BaseException:
+                self._client_jobs.pop(record.job_id, None)
+                raise
 
         def prepare() -> None:
             if self._specs is not None:

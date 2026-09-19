@@ -87,6 +87,7 @@ def _world(
     *,
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
+    submit_services: list[AdviceSubmitService] | None = None,
     **app_kwargs: object,
 ):
     _publish_members(tmp_path / "site")
@@ -99,6 +100,8 @@ def _world(
         {"saf-puan": False, "fark-yarat": True},
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
+    if submit_services is not None:
+        submit_services.append(submit)
     application = create_app(
         data_root=tmp_path / "site",
         advice_store=reader,
@@ -281,20 +284,56 @@ def test_a_new_api_process_does_not_recover_client_addresses_from_disk(tmp_path:
     assert len(queue.jobs()) == 2
 
 
-def test_a_failed_spec_write_leaves_no_job_or_occupied_slot(
+def test_two_api_processes_have_independent_caps_over_one_store(tmp_path: Path) -> None:
+    first, _cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    second, _cache, _queue = _world(tmp_path, max_open_jobs_per_client=1)
+    assert first.post(ADVICE_URL, json=BODY).status_code == 202
+    assert second.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    for client in (first, second):
+        assert client.post(ADVICE_URL, json={**BODY, "window": 5}).status_code == 429
+    assert len(queue.jobs()) == 2
+
+
+def test_admission_does_not_add_another_full_history_scan(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    specs = FileAdviceJobSpecStore(tmp_path / "specs")
-    client, _cache, queue = _world(tmp_path, specs=specs, max_open_jobs_per_client=1)
-    original = specs.put
+    client, _cache, queue = _world(tmp_path)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    original = queue.jobs
+    calls = 0
 
-    def fail(_key, _spec):
+    def history():
+        nonlocal calls
+        calls += 1
+        assert calls == 1  # Only the existing idempotency/attempt history lookup.
+        return original()
+
+    monkeypatch.setattr(queue, "jobs", history)
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    assert calls == 1
+
+
+@pytest.mark.parametrize("failure", ["spec", "queue"])
+def test_failed_preparation_or_publication_leaves_no_job_or_occupied_slot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    specs = FileAdviceJobSpecStore(tmp_path / "specs")
+    services: list[AdviceSubmitService] = []
+    client, _cache, queue = _world(
+        tmp_path, specs=specs, max_open_jobs_per_client=1, submit_services=services
+    )
+
+    def fail(*_args):
         raise OSError("fixture write failure")
 
-    monkeypatch.setattr(specs, "put", fail)
-    assert client.post(ADVICE_URL, json=BODY).status_code == 500
+    with monkeypatch.context() as patch:
+        if failure == "spec":
+            patch.setattr(specs, "put", fail)
+        else:
+            patch.setattr(queue, "submit_unique", fail)
+        assert client.post(ADVICE_URL, json=BODY).status_code == 500
+    assert services[0]._client_jobs == {}  # Free now, before another admission prunes.
     assert queue.jobs() == ()
-    monkeypatch.setattr(specs, "put", original)
     assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
 
 

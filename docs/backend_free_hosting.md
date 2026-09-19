@@ -107,6 +107,7 @@ and N `python -m squadopt.platform.advice_worker` processes from `.venv`, with:
 | `SQUADOPT_BACKEND_HANDOFF_ROOT` | `data\handoffs` |
 | `SQUADOPT_BACKEND_ALLOWED_ORIGINS` | `SITE_ORIGINS` from `platform/backend_runtime.py`; a test holds the two together |
 | `SQUADOPT_BACKEND_RATE_LIMIT`, `..._RATE_WINDOW_SECONDS` | 30 per 60 s, the code's defaults, settable with `-RateLimit` and `-RateWindowSeconds` |
+| `SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT` | 4 queued plus running jobs per client address per API process; set in the environment before starting |
 | `SQUADOPT_REPOSITORY_COMMIT` | `git rev-parse HEAD`, stamped once so the api and every worker file answers under one identity |
 | `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` | 1 |
 | `SQUADOPT_BACKEND_ARTIFACT_ROOT`, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE` | `<repo>/artifacts` and the committed example fixture; the inputs of the Top 100 setting and the manager's word (`-ArtifactRoot`, `-ClubNewsSource` override) |

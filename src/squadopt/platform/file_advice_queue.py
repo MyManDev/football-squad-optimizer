@@ -176,7 +176,7 @@ class FileJobQueue:
         job: AdviceJob,
         *,
         read_cached: Callable[[str], bytes | None],
-        admit: Callable[[frozenset[str]], None] | None = None,
+        admit: Callable[[], contextlib.AbstractContextManager[None]] | None = None,
         prepare: Callable[[], None] | None = None,
     ) -> AdviceJob | bytes:
         """Recheck the validated cache and reserve work atomically with completion.
@@ -185,9 +185,10 @@ class FileJobQueue:
         cleanup. The read callback only reads and validates immutable answer bytes;
         computation stays outside this short metadata transaction.
 
-        For genuinely new work, ``admit`` makes a memory-only decision from open job
-        IDs, then ``prepare`` writes its request spec before any worker can claim it.
-        Neither callback receives a client identity from this adapter.
+        For genuinely new work, ``admit`` checks the caller's owned job IDs and holds
+        a memory-only reservation through preparation and publication, removing it
+        if either fails. ``prepare`` writes the spec before a worker can claim it.
+        Both run under this transaction; this adapter receives no client identity.
         """
 
         if job.status != "queued":
@@ -200,11 +201,10 @@ class FileJobQueue:
                 existing = self._index_job(self._open_index(job.cache_key), repair=True)
                 if existing is not None and not existing.is_terminal:
                     return existing
-                if admit is not None:
-                    admit(frozenset(one.job_id for one in self.jobs() if not one.is_terminal))
+            with admit() if admit is not None else contextlib.nullcontext():
                 if prepare is not None:
                     prepare()
-            winner, _created = self.submit_unique(job)
+                winner, _created = self.submit_unique(job)
             return winner
 
     def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]:

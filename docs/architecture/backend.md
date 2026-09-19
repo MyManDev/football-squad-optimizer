@@ -403,12 +403,17 @@ The advice routes add their own codes:
 `Retry-After` is listed in `Access-Control-Expose-Headers` for the allowed origins, so a
 page on another origin can read how long a 429 or a 503 asked it to wait.
 
-`SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT` defaults to four queued plus running jobs.
+`SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT` defaults to four queued plus running jobs
+per client address **per API process**. The current deployment uses one API process;
+the six compute workers never admit jobs, and `containerapp.yaml` pins one replica.
+Multiple API processes each have their own cap: two processes can admit eight jobs
+from one address at the default setting, even with a shared store.
 Ownership lives only in this API process's memory and is forgotten on restart; no
-client address is written to a job, spec, log or metric. Completed and missing jobs
-release their slots at the next admission. Cache hits, idempotency replays and dedup
+client address is written to a job, spec, log or metric. Completed, failed and missing
+owned jobs release their slots at the next admission, reading only owned job IDs.
+Failed preparation or publication removes the reservation immediately. Cache hits, idempotency replays and dedup
 do not consume slots or meet this cap. The existing request-rate limiter still charges
-cache misses before deduplication. A household sharing one address, or a member quickly
+cache misses before deduplication or a cap refusal. A household sharing one address, or a member quickly
 changing selections, can meet the cap; server-side cancellation is not provided.
 `advice_open_job_refused_total` starts at zero in the API role and counts these refusals.
 
