@@ -174,6 +174,7 @@ def build_advice_compute(
     *,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     cache: AdviceCacheRepository | None = None,
+    job_log_fields: dict[str, object] | None = None,
 ) -> Callable[[AdviceJob], bytes]:
     """Return the callback that turns one claimed job into the bytes it will be served as.
 
@@ -216,6 +217,10 @@ def build_advice_compute(
         return payload if isinstance(payload, dict) else None
 
     def compute(job: AdviceJob) -> bytes:
+        # One worker computes one job at a time. Share only the validated spec's
+        # coordinates with the terminal logger; a later unreadable spec stays absent.
+        if job_log_fields is not None:
+            job_log_fields.clear()
         if job.attempt > max_attempts:
             raise AdviceComputeRefused(
                 "TOO_MANY_ATTEMPTS",
@@ -239,6 +244,8 @@ def build_advice_compute(
                 "No request is recorded at this job's address, so what to compute "
                 "cannot be known. Ask again to file a fresh one.",
             )
+        if job_log_fields is not None:
+            job_log_fields.update(window=spec.window, strategy=spec.strategy)
         capture = contexts.capture(spec.context)
         if capture is None:
             # The whole context, not just the capture: the key this answer will be filed
@@ -326,6 +333,7 @@ def run_advice_worker(
     max_jobs: int | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
+    job_log_fields: dict[str, object] | None = None,
 ) -> int:
     """Claim and compute until told to stop; return how many jobs reached a terminal state.
 
@@ -398,6 +406,7 @@ def run_advice_worker(
                 heartbeat_seconds=heartbeat_seconds,
                 metrics=metrics,
                 log=log,
+                job_log_fields=job_log_fields,
             )
         except QueueLockTimeout:
             # Contention on the queue's lock is a busy moment, not a reason to stop
@@ -520,6 +529,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 )
             )
             running.log.event("advice_worker_metrics_started", port=server.server_port)
+        job_log_fields: dict[str, object] = {}
         processed = run_advice_worker(
             running.queue,
             running.cache,
@@ -528,6 +538,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
                 running.job_specs,
                 max_attempts=arguments.max_attempts,
                 cache=running.cache,
+                job_log_fields=job_log_fields,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.
@@ -537,6 +548,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
             max_jobs=arguments.max_jobs,
             metrics=running.metrics,
             log=running.log,
+            job_log_fields=job_log_fields,
         )
     running.log.event("advice_worker_stopped", processed=processed)
     return 0
