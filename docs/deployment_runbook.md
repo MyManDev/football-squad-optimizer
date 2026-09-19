@@ -243,27 +243,14 @@ be restarted by hand with those same options; the registry does not record them.
 The first production use is the owner's operation, not part of development verification.
 
 The complete operator order is: accept the recorded weekly tree, release the site,
-pass `verify_live.py`, drain the backend queue, preview then run
-`scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO>` from clean
-`develop`, and check the live member journey. The restart preserves the recorded port
-and worker count; `-DryRun` fetches the remote-tracking ref and previews the stop,
-without pulling, changing working-tree/backend files or changing any process. The
-public human-entry capture IDs must agree with fetched `origin/develop`, then with
-the pulled tree before stop; pre-pull local metadata is informational. A zero queue depth
+drain the backend queue, preview then run the restart command above from clean
+`develop`, and run the [manual browser check](#post-deployment-smoke). Both `ship.sh`
+and the restart helper run `verify_live.py`; to run it again by hand, use
+`python scripts/release/verify_live.py <generated-after-ISO>`. A zero queue depth
 permits a restart; `-Force` is an explicit operator exception, not the normal command.
-The launcher-recorded commit must equal the pulled revision. `/ready` alone does not
-prove capture-ID or code-commit equality: its published-tree check is season/gameweek.
-`ship.sh` publishes the site only and does not restart the backend or tunnel.
-
-The manual browser command is run from `web` with `LIVE_BASE_URL` set to the canonical
-site: `npx playwright test --config playwright.live.config.ts`. It checks desktop and
-phone journeys without submitting a job. `LIVE_SMOKE_COMPUTE=1` adds a browser GET to
-the public backend and reports either a capture-matching cached answer or exactly
-`404/NOT_COMPUTED`; neither path submits work. Any other backend error fails, including
-a CORS refusal. It is separate from the offline CI browser suite. A reported 404 for
-the optional `/data/league/series-horizon.json` means the settled history cannot yet
-support that document; other own-origin network failures remain failures apart from
-the validated `NOT_COMPUTED` response.
+`/ready` alone does not prove capture-ID or code-commit equality: its published-tree
+check is season/gameweek. `ship.sh` publishes the site only and does not restart the
+backend or tunnel.
 
 ## Daily circuit breaker
 
