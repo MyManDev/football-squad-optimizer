@@ -187,6 +187,84 @@ def test_source_loss_does_not_replace_last_good_manifest(backup: tuple[Path, Pat
     assert _run(repo, destination, "-Verify").returncode == 0
 
 
+def test_loss_still_protects_new_files_until_explicit_acknowledgement(
+    backup: tuple[Path, Path],
+) -> None:
+    repo, destination = backup
+    assert _run(repo, destination).returncode == 0
+    original_manifest = next(destination.glob("manifest-*.json"))
+    original_bytes = original_manifest.read_bytes()
+    (repo / "data/ledger/record.json").unlink()
+    for day in (1, 2):
+        new = repo / f"data/entries/day{day}.json"
+        new.write_text(f"day {day}", encoding="ascii")
+        result = _run(repo, destination)
+        assert result.returncode == 1 and "MISSING at source: 1 files" in result.stdout
+        assert (destination / f"entries/day{day}.json").read_bytes() == new.read_bytes()
+        assert list(destination.glob("manifest-*.json")) == [original_manifest]
+        assert original_manifest.read_bytes() == original_bytes
+    accepted = _run(repo, destination, "-AcceptMissing")
+    assert accepted.returncode == 0 and "ACCEPTED missing at source: 1 files" in accepted.stdout
+    assert (destination / "ledger/record.json").read_text() == "ledger"
+    assert original_manifest.read_bytes() == original_bytes
+    assert len(list(destination.glob("manifest-*.json"))) == 2
+    assert _run(repo, destination, "-Verify").returncode == 0
+    assert _run(repo, destination).returncode == 0
+    assert _run(repo, destination, "-AcceptMissing", "-Verify").returncode == 1
+    assert _run(repo, destination, "-AcceptMissing", "-DryRun").returncode == 1
+
+
+@pytest.mark.parametrize("tree", ["ledger", "advice_records"])
+def test_staging_and_lock_land_without_false_loss_even_with_old_manifest(
+    backup: tuple[Path, Path], tree: str
+) -> None:
+    repo, destination = backup
+    season = repo / "data" / tree / "2026-27"
+    staging = season / ".gw05.staging-123-abcd"
+    staging.mkdir(parents=True)
+    record = staging / "manifest.json"
+    record.write_text("landed record", encoding="ascii")
+    lock = season / ".gw05.lock"
+    lock.write_text("123", encoding="ascii")
+    assert _run(repo, destination).returncode == 0
+    manifest_path = next(destination.glob("manifest-*.json"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    assert len(manifest["files"]) == 5
+    assert not (destination / tree / "2026-27").exists()
+    # A pre-fix manifest may already contain these transient records.
+    for path in (record, lock):
+        relative = path.relative_to(repo / "data").as_posix()
+        content = path.read_bytes()
+        manifest["files"].append(
+            dict(
+                path=relative,
+                destination_path=relative,
+                size=len(content),
+                sha256=hashlib.sha256(content).hexdigest(),
+            )
+        )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    staging.rename(season / "gw05")
+    lock.unlink()
+    result = _run(repo, destination)
+    assert result.returncode == 0 and "MISSING" not in result.stdout, result.stdout
+    assert (destination / tree / "2026-27/gw05/manifest.json").read_text() == "landed record"
+    assert _run(repo, destination, "-Verify").returncode == 0
+
+
+def test_missing_output_has_total_and_bounded_sample(backup: tuple[Path, Path]) -> None:
+    repo, destination = backup
+    added = [repo / f"data/entries/sample-{number:02}.json" for number in range(25)]
+    for path in added:
+        path.write_text("entry", encoding="ascii")
+    assert _run(repo, destination).returncode == 0
+    for path in added:
+        path.unlink()
+    result = _run(repo, destination)
+    assert result.returncode == 1 and "MISSING at source: 25 files" in result.stdout
+    assert sum(line.startswith("entries/sample-") for line in result.stdout.splitlines()) == 20
+
+
 def test_verify_selected_manifest_and_reject_escape(backup: tuple[Path, Path]) -> None:
     repo, destination = backup
     assert _run(repo, destination).returncode == 0
@@ -199,6 +277,10 @@ def test_verify_selected_manifest_and_reject_escape(backup: tuple[Path, Path]) -
     assert _run(repo, destination, "-Verify", "-Manifest", old.name).returncode == 0
     assert _run(repo, destination, "-Verify", "-Manifest", "../" + old.name).returncode == 1
     assert _run(repo, destination, "-Manifest", old.name).returncode == 1
+    assert _run(repo, destination).returncode == 1
+    assert _run(repo, destination, "-AcceptMissing").returncode == 0
+    assert (destination / "entries/added.json").read_text() == "new"
+    assert old.is_file()
 
 
 def test_utf8_filename_survives_manifest_verification(backup: tuple[Path, Path]) -> None:
@@ -221,6 +303,7 @@ def test_tree_junction_is_refused_before_any_copy(backup: tuple[Path, Path], sid
     subprocess.run([str(POWERSHELL), "-NoProfile", "-Command", command], check=True)
     result = _run(repo, destination)
     assert result.returncode == 1 and "reparse point" in result.stdout
+    assert str(link) in result.stdout
     assert not list(destination.glob("manifest-*.json"))
     assert not (destination / "advice_records").exists()
     assert not (destination / "snapshots/record.json").exists()

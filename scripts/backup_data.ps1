@@ -10,7 +10,8 @@ param(
     [Parameter(Mandatory=$true)][string]$Destination,
     [switch]$DryRun,
     [switch]$Verify,
-    [string]$Manifest = ''
+    [string]$Manifest = '',
+    [switch]$AcceptMissing
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
@@ -51,6 +52,12 @@ function Manifest-Path([string]$root, [string]$relative) {
     Assert-NoLinks $path
     return $path
 }
+function Is-Transient([string]$relative) {
+    foreach ($name in $relative.Split('/')) {
+        if ($name.Contains('.staging-') -or $name -like '.*.lock') { return $true }
+    }
+    return $false
+}
 function Source-Files {
     foreach ($tree in $trees) {
         $root = Join-Path $source $tree
@@ -63,8 +70,9 @@ function Source-Files {
         while ($pending.Count) {
             foreach ($item in Get-ChildItem -LiteralPath $pending.Pop() -Force) {
                 if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                    throw "Refusing a source reparse point in $tree."
+                    throw "Refusing a source reparse point: $($item.FullName)"
                 }
+                if (Is-Transient $item.Name) { continue }
                 if ($item.PSIsContainer) { $pending.Push($item.FullName) }
                 else { $item }
             }
@@ -83,6 +91,7 @@ function Check-DestinationTree([string]$root) {
 }
 try {
     if ($DryRun -and $Verify) { throw 'Choose -DryRun or -Verify, not both.' }
+    if ($AcceptMissing -and ($DryRun -or $Verify)) { throw '-AcceptMissing requires a copy run.' }
     if ($Manifest -and (-not $Verify -or $Manifest -notmatch '^manifest-[A-Za-z0-9_-]+\.json$')) {
         throw '-Manifest requires -Verify and a manifest-*.json name inside the destination.'
     }
@@ -117,6 +126,7 @@ try {
         $seen = @{}
         $differences = 0
         foreach ($record in $manifestDocument.files) {
+            if (Is-Transient $record.path) { continue }
             $seen[$record.path] = $true
             $pair = @{
                 source = (Manifest-Path $source $record.path)
@@ -140,17 +150,19 @@ try {
             }
         }
         if ($differences) { throw "Verification found $differences differences." }
-        Write-Output "Verified $($manifestDocument.files.Count) files against $($latest.Name)."
+        Write-Output "Verified $($seen.Count) files against $($latest.Name)."
         exit 0
     }
+    $missing = @()
     if ($previous) {
         $missing = @($previous.files | Where-Object {
-            -not (Test-Path -LiteralPath (Manifest-Path $source $_.path) -PathType Leaf)
+            -not (Is-Transient $_.path) -and
+                -not (Test-Path -LiteralPath (Manifest-Path $source $_.path) -PathType Leaf)
         })
         if ($missing.Count) {
             Write-Output "MISSING at source: $($missing.Count) files"
-            foreach ($record in $missing) { Write-Output $record.path }
-            throw 'Source loss detected; no backup files or manifest written.'
+            foreach ($record in ($missing | Select-Object -First 20)) { Write-Output $record.path }
+            if ($missing.Count -gt 20) { Write-Output 'Showing the first 20 missing paths.' }
         }
     }
     $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')
@@ -195,6 +207,10 @@ try {
         $records.Add(@{path=$relative; destination_path=$targetRelative; size=$file.Length; sha256=$hash})
     }
     Write-Output "Copy total: $bytes bytes; examined $($files.Count) files."
+    if ($missing.Count -and -not $AcceptMissing) {
+        throw 'Source loss detected; additive copies retained, no manifest written. Restore or acknowledge with -AcceptMissing.'
+    }
+    if ($missing.Count) { Write-Output "ACCEPTED missing at source: $($missing.Count) files; old backups retained." }
     if (-not $DryRun) {
         $manifestDocument = @{created_at_utc=$stamp; files=@($records.ToArray())} | ConvertTo-Json -Depth 4
         $path = Join-Path $destinationRoot "manifest-$stamp.json"
