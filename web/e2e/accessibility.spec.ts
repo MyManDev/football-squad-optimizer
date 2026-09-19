@@ -13,7 +13,6 @@ const ROUTES = [
   "/league/members",
   "/league/members/35249001?mode=saf-puan&window=3",
   "/league/members/squadopt",
-  "/analysis",
   "/admin",
   "/status",
 ] as const;

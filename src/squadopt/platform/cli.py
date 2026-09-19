@@ -36,6 +36,7 @@ from squadopt.application import (
     verify_decision,
 )
 from squadopt.application.commands import PanelBuilder
+from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import (
     METADATA_FILENAME,
@@ -54,12 +55,12 @@ from squadopt.live import (
     REPORT_CONTRACT_VERSION,
     SEASON_LEDGER_CONTRACT_VERSION,
 )
-from squadopt.live.runlog import LOG_ROOT_NAME, RunLog, configure_run_logging
 from squadopt.live.tick import TickAction, TickConfig, TickPlan
 from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
 from squadopt.platform.artifacts import FileArtifactRegistry, artifact_checksum
 from squadopt.platform.context import RunContext
 from squadopt.platform.fpl_capture import capture as capture_snapshot
+from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.runtime import (
     RuntimeArtifact,
     RuntimeInputArtifact,

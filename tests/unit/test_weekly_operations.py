@@ -12,7 +12,7 @@ from tests.unit.test_publication_services import publication_world
 
 from squadopt.application.build import _recent_events
 from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_artifact
-from squadopt.live.runlog import LOG_ROOT_NAME
+from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.platform import weekly_operations as weekly
 from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths, inspect_run
 
