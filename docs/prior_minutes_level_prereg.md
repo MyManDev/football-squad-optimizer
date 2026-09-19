@@ -32,6 +32,17 @@ unseen, the conditional points model for the regulars). A recalibration of the a
 forecast by its own value, which stage one's text allowed, is not opened: the level by the size of
 the forecast is flat, so there is nothing for it to fix.
 
+## What a neighbouring record says this can be worth
+
+`rotation_oracle_ceiling` measured a perfect signal for one kind of absence (a regular rested),
+used as an exclusion before the solve, at +1.1088 points a decision over the same 147 folds,
+interval [+0.1905, +1.7891], with nothing changed in 92 of 147 decisions. That is a perfect flag
+on the group the solver buys from. This candidate is not a flag and knows nothing about a single
+week: it moves the level of whole groups, most of all a group the solver rarely buys (players the
+season has not seen). So the honest expectation, written before the run, is a decision effect
+well under that ceiling and quite possibly indistinguishable from zero; `level_only` is the
+likeliest verdict, and that is why it is a named verdict and not a consolation invented later.
+
 ## The candidate, `prior_minutes_level_v1`
 
 For a decision `t` and a bucket `b` of the table above:
