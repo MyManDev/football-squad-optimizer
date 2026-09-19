@@ -4,7 +4,7 @@
     python -m scripts.build_site --schema-only
 
 Thin shell over ``squadopt.application.build_site``: it reads the captures and the
-ledger, makes the same tick plan ``run_season_tick --dry-run`` would make (so the status
+ledger, makes the same tick plan ``squadopt season tick --dry-run`` would make (so the status
 page says what the scheduler would do), and writes ``<out>/data/**``. It records nothing
 and never plans a real action.
 """
