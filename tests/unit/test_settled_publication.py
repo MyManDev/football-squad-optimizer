@@ -603,6 +603,12 @@ def test_cli_reports_the_actual_candidate_file_list(
     assert STAMP in output and "data/league/members.json" in output
     assert "data/league/series-horizon.json" in output
     assert "data/league/entries/101.json" not in output
+    assert f'python -m scripts.check_league_tree "{request.out_dir / "data"}"' in output
+    assert "report its result in #632" in output
+    assert (
+        "Frozen season-schema and root-index consistency still need separate verification."
+        in output
+    )
     changed = output.split("Changed files (post this list before a site PR):\n")[1].splitlines()
     season_count = sum(name.startswith(f"data/{SEASON}/") for name in changed)
     assert f"Changed file count: {len(changed)} ({season_count} season documents)" in output

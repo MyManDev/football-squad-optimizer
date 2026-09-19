@@ -41,6 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Accepted outcome stamp: {result.generated_at_utc}")
     season_count = sum(name.startswith(f"data/{args.season}/") for name in result.changed_files)
     print(f"Changed file count: {len(result.changed_files)} ({season_count} season documents)")
+    print("Before a site PR, run the candidate check and report its result in #632:")
+    print(f'python -m scripts.check_league_tree "{result.out_dir / "data"}"')
+    print("Frozen season-schema and root-index consistency still need separate verification.")
     print("Changed files (post this list before a site PR):")
     for name in result.changed_files:
         print(name)
