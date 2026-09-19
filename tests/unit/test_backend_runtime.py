@@ -31,16 +31,52 @@ from squadopt.platform.backend_runtime import (
     BackendConfig,
     BackendConfigError,
     CaptureContextProvider,
+    StoreProbeGate,
     build_backend,
     computable_strategies,
     configuration_fingerprint,
 )
+from squadopt.platform.store_probe import StoreProbeResult
 
 SEASON = world_module.SEASON
 BOOTSTRAP_PAYLOAD = world_module.BOOTSTRAP_PAYLOAD
 FIXTURES_PAYLOAD = world_module.FIXTURES_PAYLOAD
 LEAGUE_ID = 352490
 ENTRY_ID = 101
+
+
+def test_probe_logs_first_pass_recovery_and_every_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    healthy = StoreProbeResult(True, {"write": True}, {})
+    failed = StoreProbeResult(False, {"write": False}, {"write": "unavailable"})
+    probe = Mock(side_effect=[healthy, healthy, failed, failed, healthy, healthy])
+    monkeypatch.setattr(backend_runtime, "probe_store", probe)
+    now = [0.0]
+    gate = StoreProbeGate(
+        tmp_path, clock=lambda: now[0], recheck_seconds=30.0, log=AdviceLog("backend")
+    )
+    caplog.set_level("INFO", logger="advice.backend")
+    for stamp, expected in [
+        (0, True),
+        (5, True),
+        (31, True),
+        (62, False),
+        (62, False),
+        (62, True),
+        (93, True),
+    ]:
+        now[0] = float(stamp)
+        assert gate.result().ok is expected
+    assert probe.call_count == 6  # A held pass skips the probe; a failure never does.
+    records = [json.loads(record.message) for record in caplog.records]
+    assert [record["event"] for record in records] == [
+        "advice_store_probe_passed",
+        "advice_store_probe_failed",
+        "advice_store_probe_failed",
+        "advice_store_probe_passed",
+    ]
+    assert all(record["failed"] == "write" for record in records[1:3])
 
 
 def _capture(snapshot_root: Path) -> str:
