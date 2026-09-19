@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
+import words from "../../../docs/contracts/honesty_words.json";
 import { AS_A_CHANCE } from "./honesty";
 
 describe("the shared product-copy honesty guard", () => {
+  it.each(Object.values(words.stems).flat())("rejects the committed stem %s", (stem) => {
+    expect(stem).toMatch(AS_A_CHANCE);
+  });
+
+  it.each(Object.values(words.allowed).flat())("accepts the committed sentence %s", (copy) => {
+    expect(copy).not.toMatch(AS_A_CHANCE);
+  });
+
+  it.each(["owned", "ownership", "sahipli"])("bounds the %s exception", (ownership) => {
+    for (const distance of [0, 40, 41]) {
+      const padding = "\n".repeat(distance);
+      for (const copy of [`${ownership}${padding}%`, `%${padding}${ownership}`]) {
+        expect(AS_A_CHANCE.test(copy)).toBe(distance > 40);
+      }
+    }
+    expect(`12% ${ownership}, lower tail`).toMatch(AS_A_CHANCE);
+  });
+
   it.each([
     "chance",
     "likelihood",

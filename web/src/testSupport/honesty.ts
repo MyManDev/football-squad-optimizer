@@ -1,3 +1,5 @@
+import words from "../../../docs/contracts/honesty_words.json";
+
 // Only for product copy owned by the repository, never member-supplied names.
 //
 // The standing rule: no member-facing page or payload, in either language, publishes a
@@ -19,25 +21,15 @@
 const OWNERSHIP = "owned|ownership|sahipli";
 const PERCENT_NOT_OWNERSHIP = `(?<!(?:${OWNERSHIP})[\\s\\S]{0,40})%(?![\\s\\S]{0,40}(?:${OWNERSHIP}))`;
 
+function textStem(stem: string): string {
+  const escaped = stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (stem === "tail" || stem === "kuyruk") return `\\b${escaped}\\b`;
+  if (stem === "P(") return `\\b${escaped}`;
+  if (stem === "yüzde") return `${escaped}(?!n\\b)`;
+  return escaped;
+}
+
 export const AS_A_CHANCE = new RegExp(
-  [
-    PERCENT_NOT_OWNERSHIP,
-    "probabilit",
-    "olasıl",
-    "\\bP\\(",
-    "chance",
-    "likelihood",
-    "odds",
-    "quantile",
-    "spread",
-    "percentage",
-    "\\btail\\b",
-    "ihtimal",
-    "şans",
-    "yüzde(?!n\\b)",
-    "kantil",
-    "yayılım",
-    "\\bkuyruk\\b",
-  ].join("|"),
+  [PERCENT_NOT_OWNERSHIP, ...Object.values(words.stems).flat().map(textStem)].join("|"),
   "i",
 );
