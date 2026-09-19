@@ -61,7 +61,11 @@ const CAPABILITIES = {
 
 describe("the request on the wire", () => {
   it("sends a plain request exactly as before, switches stated off or not at all", async () => {
-    for (const request of [PLAIN, { ...PLAIN, top100Weight: 0, managersWord: false }]) {
+    for (const request of [
+      PLAIN,
+      { ...PLAIN, chip: null },
+      { ...PLAIN, top100Weight: 0, managersWord: false },
+    ]) {
       const { calls, client } = recorder(() =>
         jsonResponse(202, { job_id: "j", status: "queued" }),
       );

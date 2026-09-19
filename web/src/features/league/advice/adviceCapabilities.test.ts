@@ -36,6 +36,25 @@ const DOCUMENT = {
 };
 
 describe("league capabilities", () => {
+  it("distinguishes held chips, no chips and unknown member history", () => {
+    const held = { "101": ["wildcard", "3xc"], "202": [] };
+    const result = checkedCapabilities({ ...DOCUMENT, chips: { held_by_entry: held } }, 352490);
+    expect(result.chipsByEntry).toEqual(held);
+    expect(result.chipsByEntry?.["303"]).toBeUndefined();
+    expect(checkedCapabilities(DOCUMENT, 352490).chipsByEntry).toBeUndefined();
+  });
+
+  it.each([
+    null,
+    {},
+    { held_by_entry: { "0": [] } },
+    { held_by_entry: { "101": ["unknown"] } },
+    { held_by_entry: { "101": ["wildcard", "wildcard"] } },
+  ])("refuses malformed chips %j", (chips) => {
+    expect(() => checkedCapabilities({ ...DOCUMENT, chips }, 352490)).toThrow(
+      AdviceCapabilitiesError,
+    );
+  });
   it("reads every field the committed contract requires, under the contract's name", () => {
     expect(schema.properties.contract_version?.const).toBe(DOCUMENT.contract_version);
     expect(Object.keys(DOCUMENT).sort()).toEqual([...schema.required].sort());

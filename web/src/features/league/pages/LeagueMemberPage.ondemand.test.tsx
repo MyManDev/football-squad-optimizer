@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   mockEntryAdviceEnvelope,
+  mockEntryAdviceChipEnvelope,
   mockEntryAdviceIndex,
   mockEntryAdviceTop100Envelope,
   mockEntrySquadEnvelopes,
@@ -341,6 +342,25 @@ describe("a selection nobody published, with the service answering", () => {
 });
 
 describe("a published selection, with the service answering", () => {
+  it("computes an unpublished chip and shows its result without claiming a measured duration", async () => {
+    const client = new RecordingClient(() => ({
+      kind: "advice",
+      source: "api-cache",
+      envelope: mockEntryAdviceChipEnvelope(ENTRY, "bboost"),
+    }));
+    const { container } = renderView("chip=bboost", client, {
+      capabilities: { ...CAPABILITIES, chipsByEntry: { [ENTRY]: ["bboost"] } },
+    });
+    expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
+    expect(container).toHaveTextContent(computeCopy.chipDurationUnknown);
+    expect(container).not.toHaveTextContent(computeCopy.duration[1]);
+    await pressCompute();
+    expect(client.requests[0]).toMatchObject({ chip: "bboost" });
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: PLAN_SHOWN })).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("chip-choice")).toHaveTextContent(copy.chipNames.bboost);
+  });
   it("is shown at once with no request, and Hesapla can still recompute it", async () => {
     const client = new RecordingClient(() => ({ kind: "unavailable" }));
     const read = vi.spyOn(client, "readAdvice");
@@ -376,7 +396,7 @@ describe("a published selection, with the service answering", () => {
       },
     );
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
-    expect(container).toHaveTextContent(computeCopy.chipNotComputed);
+    expect(container).toHaveTextContent(computeCopy.chipUnavailable);
   });
 });
 
