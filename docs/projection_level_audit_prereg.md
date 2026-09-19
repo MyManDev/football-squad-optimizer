@@ -38,6 +38,18 @@ level for regulars, for the rotation, or by the size of the forecast. No entry o
 conditionally; the squad-level selection-optimism shift (`scenario_calibration_audit`) is a
 different quantity, measured on selected squads and not on the player population.
 
+Two records sit next to the "who plays" half of this question and neither answers it.
+`rotation_oracle_ceiling` measured what a perfect signal for one kind of absence (a regular
+rested) is worth as an exclusion before the solve: +1.1088 points per decision over the same
+147 folds, interval [+0.1905, +1.7891], nothing changed in 92 of 147 decisions and 2021-22 the
+other way. That is a ceiling on a flag, measured on squads; it does not say whether the
+appearance forecast is level for regulars, and it bounds what a stage two "who plays"
+candidate could be worth on that group, which its protocol will have to say.
+`participation_calibration` read a start probability given appearance (bias +0.0049 pooled,
+goalkeepers -0.0943) and left `p_appearance` deliberately unread, pointing at
+`phase_c_component_evaluation` for it; the bins above are that record's, read for level here
+for the first time.
+
 ## The table
 
 The exporter (`scripts/export_component_oof.py`, v1 scope, default seasons) regenerates the table
