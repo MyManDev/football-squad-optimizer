@@ -137,8 +137,10 @@ class SeasonChainConfig:
     A finite horizon cannot see that the season continues past its end, so under
     ``planner`` a chip worth anything now is worth playing now; the reservation rule is
     the cheapest stand-in for the option value the horizon cannot price. Under both
-    reservation policies the free hit is offered only in structured gameweeks — one
-    where some team is blank or doubles — the weeks a temporary squad is for."""
+    reservation policies the free hit is offered only in structured gameweeks, those
+    where some team is blank or doubles: the weeks a temporary squad is for. Every chain
+    committed before 2026-09-19 saw only the doubles among them (see
+    ``_is_structured_gameweek``)."""
     chip_threshold: str = "fixed"
     """``fixed``: a chip's holding value is the transfer configuration's constant for as
     long as its window is open, which is how every committed chain was run. ``decaying``:
@@ -693,10 +695,21 @@ class SeasonChain(DecisionSeason):
         )
 
     def _is_structured_gameweek(self, gameweek: int) -> bool:
-        """True when some team doubles or some team is blank in ``gameweek``."""
+        """True when some team doubles or some team is blank in ``gameweek``.
+
+        A blank club is one with a zero count or with no row at all that week. The
+        archive's table is built by counting fixtures (``season_fixture_counts``), so
+        a club without a fixture has no row there and a zero never appears; reading
+        only zeros made every blank-only gameweek of a real season look ordinary.
+        """
 
         counts = [count for (week, _), count in self._fixture_counts.items() if week == gameweek]
-        return any(count >= 2 for count in counts) or any(count == 0 for count in counts)
+        clubs = {team for (_, team) in self._fixture_counts}
+        return (
+            any(count >= 2 for count in counts)
+            or any(count == 0 for count in counts)
+            or len(counts) < len(clubs)
+        )
 
     def _spend_chip(
         self, chip: str, gameweek: int, state: _ChainState

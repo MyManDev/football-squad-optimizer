@@ -349,6 +349,12 @@ Register-ScheduledTask -TaskName 'SquadOptDataBackup' -Action (New-ScheduledTask
 
 ## Rollback
 
+The production workflow refuses a tag whose commit is behind or unrelated to the live
+commit. Roll back through Cloudflare's dashboard, or publish a new `fixN` tag on a commit
+ahead of live. After a dashboard rollback, the project serves that older deployment and
+the next workflow release is compared with its commit. This rollback procedure has never
+been exercised.
+
 In Cloudflare, open **Workers & Pages → project → Deployments** and select the previous
 known-good production deployment by its site tag and commit SHA. Roll it back, run the full
 smoke gate (`npm run smoke:deployment -- https://squadopt.mymandev.com`), and record that tag
