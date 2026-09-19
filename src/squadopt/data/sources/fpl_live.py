@@ -1590,6 +1590,29 @@ def fpl_league_standings_page(
     )
 
 
+def fpl_league_name(standings: bytes, *, league_id: int) -> str | None:
+    """The league's own name as its standings payload states it, or ``None``.
+
+    A payload that declares another league is refused, as the member reader refuses it.
+    A payload that states no name, or a blank one, has no name: the caller says so in
+    its own words rather than this reader inventing one.
+    """
+
+    identifier = _positive(league_id, "league id")
+    league = _document(standings, "League standings").get("league")
+    if not isinstance(league, dict):
+        return None
+    declared = league.get("id")
+    if isinstance(declared, int) and not isinstance(declared, bool) and declared != identifier:
+        raise DataSourceError(
+            f"League standings payload declares league {declared}, not {identifier}."
+        )
+    name = league.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return name.strip()
+
+
 def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueStanding, ...]:
     """Return a classic league's members, in the order the page ranks them.
 
