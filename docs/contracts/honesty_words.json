@@ -1,0 +1,31 @@
+{
+  "stems": {
+    "en": [
+      "probabilit",
+      "P(",
+      "chance",
+      "likelihood",
+      "odds",
+      "quantile",
+      "spread",
+      "percentage",
+      "tail"
+    ],
+    "tr": ["olasıl", "ihtimal", "şans", "yüzde", "kantil", "yayılım", "kuyruk"]
+  },
+  "allowed": {
+    "en": [
+      "cost 1.8 points",
+      "Record Details",
+      "starters owned by 12% or less",
+      "the starting eleven averages 34% ownership"
+    ],
+    "tr": [
+      "Kaptan açığı",
+      "Kuyrukta",
+      "Bu yüzden yapılacak transfer yoktur.",
+      "%12 veya daha az sahiplikli ilk 11 oyuncuları",
+      "ilk on birin ortalama sahipliği %34"
+    ]
+  }
+}

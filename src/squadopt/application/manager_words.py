@@ -60,6 +60,7 @@ QUOTE_WITHHELD_PATTERN: Final = re.compile(
     "|".join(
         (
             FORBIDDEN_TEXT_PATTERN.pattern,
+            r"%",  # Quotes never receive the product-copy ownership exception.
             r"per\s?cent",
             r"percentage",
             r"probabilit",

@@ -228,6 +228,7 @@ def optimize_rank_probability_squad(
     config: RankObjectiveConfig | None = None,
     *,
     reference_expected_points: float | None = None,
+    linearization_level: int | None = None,
 ) -> RankOptimizationResult:
     """Choose the squad that is ahead of ``rival`` in the most scenarios.
 
@@ -235,6 +236,14 @@ def optimize_rank_probability_squad(
     (normally the risk-neutral one); with ``config.expected_points_budget`` it bounds
     how much expected score the goal may cost. Without either, expected score is only
     the secondary tie-break.
+
+    ``linearization_level`` is CP-SAT's own parameter, left at the solver's default
+    when ``None`` so every existing caller solves exactly as before. The same lever at
+    2 took the member windows from none proved to fifteen of fifteen inside the same
+    deterministic budget (``docs/member_window_proofs.md``); whether it does anything
+    for this objective, whose phase one is a count of scenarios the solver is meant to
+    be able to bound, is a different question and is measured rather than assumed. It
+    changes how hard the solver works on the bound, never what the model says.
     """
 
     if not isinstance(scenarios, ScenarioSet):
@@ -358,6 +367,8 @@ def optimize_rank_probability_squad(
     # Phase 1: the ahead count alone (small integers; a bound the solver can prove).
     model.maximize(ahead_total)
     solver = cp_model.CpSolver()
+    if linearization_level is not None:
+        solver.parameters.linearization_level = linearization_level
     configure_solver(
         solver,
         optimization_config,
@@ -419,6 +430,11 @@ def optimize_rank_probability_squad(
     primary_value = int(solver.value(ahead_total))
     best_bound = float(solver.best_objective_bound)
     diagnostics["best_objective_bound"] = best_bound
+    # What the first phase actually held when it stopped, as distinct from the count the
+    # squad finally chosen is ahead in: the later phases may replace the squad entirely, so
+    # a record that reports only the final count cannot show that the objective phase
+    # proved nothing.
+    diagnostics["primary_phase_ahead_count"] = primary_value
     diagnostics["absolute_optimality_gap"] = (
         0.0 if status is SolverStatus.OPTIMAL else max(0.0, best_bound - primary_value)
     )
@@ -448,6 +464,8 @@ def optimize_rank_probability_squad(
                 model.add_hint(variable, int(solver.value(variable)))
         secondary_share = _SECONDARY_PHASE_SHARE / (1.0 - _PRIMARY_PHASE_SHARE)
         secondary_solver = cp_model.CpSolver()
+        if linearization_level is not None:
+            secondary_solver.parameters.linearization_level = linearization_level
         configure_solver(
             secondary_solver,
             optimization_config,
@@ -491,6 +509,8 @@ def optimize_rank_probability_squad(
             secondary_value,
         )
         tiebreak_solver = cp_model.CpSolver()
+        if linearization_level is not None:
+            tiebreak_solver.parameters.linearization_level = linearization_level
         configure_solver(
             tiebreak_solver, optimization_config, remaining_time, remaining_deterministic
         )
