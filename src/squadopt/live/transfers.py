@@ -778,6 +778,7 @@ def plan_transfer_horizon(
     first_week_overlap: FirstWeekOverlap | None = None,
     first_week_transfer_cap: int | None = None,
     first_week_exclusion: FirstWeekExclusion | None = None,
+    linearization_level: int | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -903,6 +904,7 @@ def plan_transfer_horizon(
         first_week_overlap=first_week_overlap,
         first_week_transfer_cap=first_week_transfer_cap,
         first_week_exclusion=first_week_exclusion,
+        linearization_level=linearization_level,
     )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
