@@ -14,6 +14,11 @@ member reads: the bench order, the captain among ties, and which of two equal-va
 published. Whether that happens at the ceilings this repository actually runs is a question, not
 a prediction.
 
+Those three line numbers are the code as it stood at `7f5131c9`, the commit this record was
+measured against. #723 removes the wall remainder from that phase, so after it lands the
+citations above describe a defect this repository no longer has, and the lines they name are
+unrelated code. Read them as history, not as a map.
+
 The arms are wall ceilings and nothing else. The deterministic budget is pinned at
 `PLAN_DETERMINISTIC_TIME_LIMIT`, the value production runs at, and passed explicitly: left as
 `None` the planner would raise every ceiling below 300 to 300 itself (`:1029-1032`), and the

@@ -56,6 +56,10 @@ from squadopt.planning.models import (
     TransferPlanResult,
 )
 
+# The wall ceiling bounds each phase rather than being divided between them, so a solve
+# that reached it in both phases would stop at twice this value. That is the shape
+# `optimization/optimizer.py` has had since #192.
+#
 # A wall-clock budget only decides anything when it is what stops the search -- and then
 # the answer is a function of the CPU share the process happened to receive. Fifteen
 # members solved back to back inherit exactly that: which of them proves its plan optimal
@@ -1130,15 +1134,22 @@ def optimize_transfer_plan(
     # whatever wall time the primary left over, which made the phase that settles bench order,
     # the captain among equals and the choice between two equal-value fifteens a function of
     # the CPU share the process received: exactly the dependence the deterministic budget was
-    # introduced to remove from the primary (#247, #275). `member_plan_determinism` measured
-    # it on the gameweek 5 capture: where the ceiling bound, five of fifteen members read a
-    # different published plan and one was handed a different captain, and nothing in the
-    # published document said the clock was the cause.
+    # introduced to remove from the primary (#247, #275).
+    #
+    # `optimization/optimizer.py` settled this the same way for the one-week path in #192,
+    # where the tie-break's wall limit is floored at the caller's own budget rather than the
+    # leftover. This file was the one that still divided the ceiling between its phases.
+    #
+    # What this does NOT claim: `member_plan_determinism` cut this phase with the clock 24
+    # times on the gameweek 5 capture and the published plan did not move once. The five of
+    # fifteen members who read a different plan there had their primary search cut, which is
+    # a different phase and is not addressed here. This makes a property guaranteed that was
+    # measured to hold anyway.
     #
     # The ceiling keeps the job its comment gives it, a stop so that a pathological run still
-    # ends, but it now bounds each phase instead of being divided between them. The price is
-    # that a pathological solve can take up to twice the ceiling rather than once; the budget
-    # that decides the answer is deterministic in both phases, which is the point.
+    # ends, but it now bounds each phase instead of being divided between them, so the stop
+    # is at twice its value. That is the bound `optimization/optimizer.py` has accepted since
+    # #192; the budget that decides the answer is deterministic in both phases.
     if primary_status is SolverStatus.OPTIMAL and deterministic_budget_available:
         diagnostics["tiebreak_attempted"] = True
         # Hint the tie-break with the primary's solution: a known-feasible,
