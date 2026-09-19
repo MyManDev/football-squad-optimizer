@@ -104,8 +104,10 @@ export function AdviceCard({
   members = [],
   squad,
   rivalSquad,
+  windowControl = null,
 }: {
   shown: ShownAdvice;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   members?: EntryView[];
   squad: LeagueViewEnvelope<EntrySquad>;
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
@@ -332,6 +334,7 @@ export function AdviceCard({
       <ChipChoiceSection view={view} />
       <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
+      <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
@@ -772,5 +775,66 @@ function AdviceRow({
       </div>
       <p className={styles.muted}>{reason}</p>
     </article>
+  );
+}
+
+function WindowComparison({ view, control }: { view: EntryAdvice; control: EntryAdvice | null }) {
+  const { locale, language, messages } = useLanguage();
+  const copy = TOP100_COPY[language];
+  if (
+    !control ||
+    view.window <= 1 ||
+    (view.mode === "saf-puan" && !view.top100) ||
+    !view.source_snapshot_id ||
+    view.source_snapshot_id !== control.source_snapshot_id ||
+    view.entry_id !== control.entry_id ||
+    view.league_id !== control.league_id ||
+    view.window !== control.window ||
+    view.season !== control.season ||
+    view.gameweek !== control.gameweek ||
+    control.mode !== "saf-puan" ||
+    control.top100 !== undefined ||
+    control.evidence !== undefined ||
+    control.chip != null
+  )
+    return null;
+  const total = (plan: EntryAdvice): number | null => {
+    const weeks = plan.plan_weeks;
+    if (
+      !weeks ||
+      weeks.length !== plan.window ||
+      weeks.some(
+        (week, index) =>
+          week.gameweek !== plan.gameweek + index ||
+          !finiteNumber(week.expected_points) ||
+          !finiteNumber(week.transfer_hit_points),
+      )
+    )
+      return null;
+    const value = weeks.reduce(
+      (sum, week) => sum + week.expected_points - week.transfer_hit_points,
+      0,
+    );
+    return Number.isFinite(value) ? value : null;
+  };
+  const selected = total(view),
+    pure = total(control);
+  if (selected === null || pure === null) return null;
+  return (
+    <section aria-label={copy.windowComparisonTitle}>
+      <h3 className={styles.lineupTitle}>{copy.windowComparisonTitle}</h3>
+      <dl className={styles.armband}>
+        <div>
+          <dt>{copy.windowSelectedTotal}</dt>
+          <dd className="num">{points(selected, 1, locale)}</dd>
+        </div>
+        <div>
+          <dt>{copy.windowPureTotal}</dt>
+          <dd className="num">{points(pure, 1, locale)}</dd>
+        </div>
+      </dl>
+      <p className={styles.honesty}>{copy.windowComparisonBasis}</p>
+      <p className={styles.honesty}>{messages.leagueMembers.windowLimits}</p>
+    </section>
   );
 }
