@@ -445,6 +445,90 @@ def test_wall_clock_limits_do_not_choose_the_plan(
         )
 
 
+def test_the_tiebreak_is_budgeted_on_solver_work_not_on_what_the_clock_left(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both phases are handed the ceiling; neither is handed the remainder of it.
+
+    The primary already stops on deterministic work. The tie-break used to receive
+    ``deadline - perf_counter()``, so the phase that settles bench order, the captain among
+    equals and the choice between two equal-value fifteens was a function of the CPU share
+    the process happened to receive: the same dependence the deterministic budget was
+    introduced to remove from the primary (#247). ``member_plan_determinism`` measured what
+    it costs where the ceiling binds: five of fifteen members read a different published plan
+    and one was handed a different captain.
+
+    ``test_wall_clock_limits_do_not_choose_the_plan`` above cannot see this. It brings no
+    deterministic budget, so the planner raises both of its arms to ``PLAN_WALL_CEILING_SECONDS``
+    and the two runs agree on the wall figure that reaches the solver. A caller that brings its
+    own budget keeps its own ceiling, and that is the caller whose tie-break was cut short.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = replace(
+        small_config,
+        solver_time_limit_seconds=45.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    walls: list[float] = []
+    original = planning_optimizer.configure_solver
+
+    def record(
+        solver: cp_model.CpSolver,
+        configuration: OptimizationConfig,
+        time_limit_seconds: float,
+        deterministic_time_limit: float | None = None,
+    ) -> None:
+        walls.append(float(time_limit_seconds))
+        original(solver, configuration, time_limit_seconds, deterministic_time_limit)
+
+    monkeypatch.setattr(planning_optimizer, "configure_solver", record)
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+
+    assert result.diagnostics["tiebreak_attempted"] is True
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    # Two phases, two configured solvers, and the same ceiling for each. A tie-break that got
+    # less than the primary would be reading the clock.
+    assert walls == [45.0, 45.0]
+
+
+def test_two_wall_ceilings_agree_when_the_caller_names_its_own_solver_work(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The property the test above protects, stated as a caller would see it."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    tight = replace(
+        small_config, solver_time_limit_seconds=1.0, solver_deterministic_time_limit=2.0
+    )
+    loose = replace(
+        small_config, solver_time_limit_seconds=600.0, solver_deterministic_time_limit=2.0
+    )
+
+    first = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, tight)
+    second = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, loose)
+
+    assert [week.selected_squad["player_id"].tolist() for week in first.weeks] == [
+        week.selected_squad["player_id"].tolist() for week in second.weeks
+    ]
+    assert [week.starting_xi["player_id"].tolist() for week in first.weeks] == [
+        week.starting_xi["player_id"].tolist() for week in second.weeks
+    ]
+    assert [week.captain["player_id"] for week in first.weeks] == [
+        week.captain["player_id"] for week in second.weeks
+    ]
+    assert first.solver_status is second.solver_status
+    assert (
+        first.diagnostics["deterministic_time_used"]
+        == second.diagnostics["deterministic_time_used"]
+    )
+    assert first.diagnostics["tiebreak_completed"] == second.diagnostics["tiebreak_completed"]
+
+
 def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,

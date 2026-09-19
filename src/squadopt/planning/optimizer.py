@@ -35,7 +35,6 @@ from squadopt.optimization.decisions import (
 from squadopt.optimization.optimizer import (
     CP_SAT_SAFE_INTEGER_MAX,
     MIN_TIEBREAK_DETERMINISTIC_TIME,
-    MIN_TIEBREAK_TIME_SECONDS,
     _deterministic_time_used,
     _map_solver_status,
     _raw_status_name,
@@ -1025,7 +1024,6 @@ def optimize_transfer_plan(
         deterministic_limit = PLAN_DETERMINISTIC_TIME_LIMIT
         wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
         deterministic_budget_source = "planner_default"
-    deadline = started_at + wall_limit
     primary_solver = cp_model.CpSolver()
     configure_solver(
         primary_solver,
@@ -1120,7 +1118,6 @@ def optimize_transfer_plan(
         relative_gap = absolute_gap / max(1.0, abs(model_objective))
 
     result_solver = primary_solver
-    remaining_time = deadline - perf_counter()
     remaining_deterministic_time = _remaining_deterministic_time(
         deterministic_limit,
         primary_deterministic_time,
@@ -1129,11 +1126,20 @@ def optimize_transfer_plan(
         remaining_deterministic_time is None
         or remaining_deterministic_time > MIN_TIEBREAK_DETERMINISTIC_TIME
     )
-    if (
-        primary_status is SolverStatus.OPTIMAL
-        and remaining_time > MIN_TIEBREAK_TIME_SECONDS
-        and deterministic_budget_available
-    ):
+    # The tie-break is gated and budgeted on deterministic work alone. It used to be handed
+    # whatever wall time the primary left over, which made the phase that settles bench order,
+    # the captain among equals and the choice between two equal-value fifteens a function of
+    # the CPU share the process received: exactly the dependence the deterministic budget was
+    # introduced to remove from the primary (#247, #275). `member_plan_determinism` measured
+    # it on the gameweek 5 capture: where the ceiling bound, five of fifteen members read a
+    # different published plan and one was handed a different captain, and nothing in the
+    # published document said the clock was the cause.
+    #
+    # The ceiling keeps the job its comment gives it, a stop so that a pathological run still
+    # ends, but it now bounds each phase instead of being divided between them. The price is
+    # that a pathological solve can take up to twice the ceiling rather than once; the budget
+    # that decides the answer is deterministic in both phases, which is the point.
+    if primary_status is SolverStatus.OPTIMAL and deterministic_budget_available:
         diagnostics["tiebreak_attempted"] = True
         # Hint the tie-break with the primary's solution: a known-feasible,
         # objective-optimal start turns most tie-break solves into a fast proof
@@ -1151,7 +1157,7 @@ def optimize_transfer_plan(
         configure_solver(
             tiebreak_solver,
             optimization_config,
-            remaining_time,
+            wall_limit,
             remaining_deterministic_time,
         )
         if linearization_level is not None:
