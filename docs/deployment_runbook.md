@@ -339,6 +339,14 @@ Use a new, empty `site-<run-id>` directory so retained bytes cannot mix with ano
 confirm the GitHub deployment queue is empty and Cloudflare remains below the hard daily cap.
 Run the smoke command immediately against the production alias printed by Wrangler.
 
+## Back up irreplaceable data
+
+From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries. Choose a second drive or synced folder outside every repository worktree; all five source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify`; do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. Scheduling is the owner's action; after replacing both path placeholders, this PowerShell line registers a daily Windows Task Scheduler action (it does not run the backup now):
+
+```powershell
+Register-ScheduledTask -TaskName 'SquadOptDataBackup' -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File "<repo>\scripts\backup_data.ps1" -Destination "<backup>"') -Trigger (New-ScheduledTaskTrigger -Daily -At '03:00')
+```
+
 ## Rollback
 
 In Cloudflare, open **Workers & Pages → project → Deployments** and select the previous
