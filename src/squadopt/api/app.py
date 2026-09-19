@@ -140,6 +140,7 @@ def create_app(
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     queue_depth: Callable[[], int] | None = None,
+    jobs_by_status: Callable[[], Mapping[str, int]] | None = None,
     readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
 ) -> FastAPI:
@@ -464,9 +465,14 @@ def create_app(
     def metrics_endpoint() -> Response:
         if metrics is None:
             return _contract_error(404, "NOT_FOUND", "Metrics are not enabled here.")
-        depth = queue_depth() if queue_depth is not None else None
+        statuses = jobs_by_status() if jobs_by_status is not None else None
+        depth: int | None
+        if statuses is not None:
+            depth = statuses.get("queued", 0) + statuses.get("running", 0)
+        else:
+            depth = queue_depth() if queue_depth is not None else None
         return Response(
-            content=metrics.render(queue_depth=depth),
+            content=metrics.render(queue_depth=depth, jobs_by_status=statuses),
             media_type="text/plain; version=0.0.4",
         )
 

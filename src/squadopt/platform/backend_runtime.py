@@ -657,6 +657,13 @@ class AdviceBackend:
 
         return sum(1 for job in self.queue.jobs() if not job.is_terminal)
 
+    def jobs_by_status(self) -> dict[str, int]:
+        """One current store read inside the owning API, never in the status script."""
+        counts = dict.fromkeys(("queued", "running", "completed", "failed"), 0)
+        for job in self.queue.jobs():
+            counts[job.status] += 1
+        return counts
+
     def readiness(self) -> tuple[bool, Mapping[str, bool]]:
         """Ready means this process can actually answer, checked rather than assumed."""
 

@@ -44,6 +44,18 @@ from typing import Final
 
 ADVICE_LOGGER_NAME: Final[str] = "advice"
 
+_COUNTER_FAMILIES: Final = frozenset(
+    {
+        "advice_cache_hits_total",
+        "advice_cache_misses_total",
+        "advice_jobs_submitted_total",
+        "advice_rejected_total",
+        "advice_jobs_total",
+        "advice_solver_status_total",
+        "advice_worker_queue_busy_total",
+    }
+)
+
 _HISTOGRAM_BUCKETS: Final[tuple[float, ...]] = (
     0.1,
     0.5,
@@ -148,11 +160,15 @@ class AdviceMetrics:
     def solve_seconds(self, seconds: float) -> None:
         self.observe("advice_solve_seconds", seconds)
 
-    def render(self, *, queue_depth: int | None = None) -> str:
+    def render(
+        self, *, queue_depth: int | None = None, jobs_by_status: Mapping[str, int] | None = None
+    ) -> str:
         with self._lock:
-            return self._render(queue_depth=queue_depth)
+            return self._render(queue_depth=queue_depth, jobs_by_status=jobs_by_status)
 
-    def _render(self, *, queue_depth: int | None = None) -> str:
+    def _render(
+        self, *, queue_depth: int | None = None, jobs_by_status: Mapping[str, int] | None = None
+    ) -> str:
         """The scrape body. Queue depth is read at scrape time by the caller that has
         the queue, because a gauge that counts events drifts from the store."""
 
@@ -160,8 +176,18 @@ class AdviceMetrics:
         if queue_depth is not None:
             lines.append("# TYPE advice_queue_depth gauge")
             lines.append(f"advice_queue_depth {queue_depth}")
+        if jobs_by_status is not None:
+            lines.append("# TYPE advice_jobs gauge")
+            for status, count in sorted(jobs_by_status.items()):
+                lines.append(f'advice_jobs{{status="{status}"}} {count}')
         seen_families: set[str] = set()
-        for (name, labels), count in sorted(self._counters.items()):
+        counters = dict(self._counters)
+        # Before the first labelled observation, report a known zero without
+        # inventing a reason/status. Once observed, only the actual label sets remain.
+        present = {name for name, _ in counters}
+        for name in _COUNTER_FAMILIES - present:
+            counters[(name, ())] = 0
+        for (name, labels), count in sorted(counters.items()):
             rendered_labels = (
                 "{" + ",".join(f'{key}="{value}"' for key, value in labels) + "}" if labels else ""
             )

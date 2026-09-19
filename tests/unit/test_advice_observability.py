@@ -112,6 +112,21 @@ def test_the_worker_reports_solve_seconds_and_outcomes(tmp_path: Path) -> None:
     assert 'advice_solve_seconds_bucket{le="+Inf"} 1' in body
 
 
+def test_unincremented_counters_are_zero_without_invented_label_values() -> None:
+    metrics = AdviceMetrics()
+    body = metrics.render()
+    assert "advice_cache_hits_total 0\n" in body
+    assert "advice_rejected_total 0\n" in body
+    assert "advice_jobs_total 0\n" in body
+    assert "advice_jobs{" not in body  # no queue reader was supplied
+    metrics.rejected("UnknownEntryError")
+    metrics.rejected("UnknownEntryError")
+    body = metrics.render()
+    assert 'advice_rejected_total{reason="UnknownEntryError"} 2' in body
+    assert "advice_rejected_total 0\n" not in body
+    assert body.count("# TYPE advice_rejected_total counter") == 1
+
+
 def test_readiness_is_separate_from_liveness(tmp_path: Path) -> None:
     """A full disk must not look healthy: /health stays up, /ready says no."""
 

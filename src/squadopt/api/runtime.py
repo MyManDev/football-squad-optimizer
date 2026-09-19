@@ -42,6 +42,7 @@ def app_for_backend(backend: AdviceBackend) -> FastAPI:
         allowed_origins=backend.config.allowed_origins,
         metrics=backend.metrics,
         queue_depth=backend.queue_depth,
+        jobs_by_status=backend.jobs_by_status,
         readiness=backend.readiness,
     )
 
