@@ -34,10 +34,10 @@ from squadopt.application.views import (
     positions_in_order,
     short_name,
 )
+from squadopt.contracts.run_logs import component_log_directory
 from squadopt.live.ledger import LedgerEntry, decision_mode, load_ledger
 from squadopt.live.report import Recommendation
 from squadopt.live.risk import LiveRiskDiagnostics
-from squadopt.live.runlog import component_log_directory
 from squadopt.live.tick import LedgerState, TickPlan
 
 _PROJECTIONS_FILE = "projections.csv"

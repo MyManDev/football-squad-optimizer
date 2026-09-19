@@ -5,7 +5,7 @@ Three layers, each answering one operator question.
 **Structured log** — what happened, per request and per job, as JSON lines carrying
 the fields the plan names: request and job identity, the cache key, the request
 coordinates, the phase, the solver's account, and how long things took. The shape
-extends ``live/runlog.py``'s pattern (one JSON object per line, stable field names)
+extends ``platform/runlog.py``'s pattern (one JSON object per line, stable field names)
 rather than inventing a second logging idiom; it lives here because the api may not
 import ``live``.
 

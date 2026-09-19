@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 
 from squadopt.data.errors import DataSourceError
-from squadopt.live.runlog import configure_run_logging
 from squadopt.platform.cli import CliServices, main
 from squadopt.platform.fpl_capture import fetch
+from squadopt.platform.runlog import configure_run_logging
 
 COMMIT = "a" * 40
 NOW = datetime(2026, 8, 21, 15, 30, tzinfo=UTC)
