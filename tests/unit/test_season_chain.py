@@ -21,8 +21,9 @@ from squadopt.experiments import (
     SeasonChainResult,
 )
 from squadopt.experiments.multi_gw_rehearsal import WeekRealization
+from squadopt.experiments.season_chain import decayed_holding_value
 from squadopt.optimization import optimize_squad
-from squadopt.planning import InitialSquadState, sell_price_tenths
+from squadopt.planning import InitialSquadState, TransferPlanningConfig, sell_price_tenths
 
 POOL = {"candidate_pool_per_position": 10, "cheap_pool_per_position": 2}
 ALL_CHIPS = (
@@ -193,11 +194,83 @@ def test_the_hybrid_policy_reserves_only_the_bench_boost() -> None:
     assert result.diagnostics["chip_policy"] == "hybrid"
 
 
+def test_a_week_records_what_its_captain_and_bench_were_expected_to_score(
+    myopic: SeasonChainResult,
+) -> None:
+    """What a triple captain or a bench boost would have been expected to add, per week."""
+
+    for week in myopic.weeks:
+        record = week.as_record()
+        assert record["captain_projected_points"] is not None
+        assert float(record["captain_projected_points"]) > 0.0
+        assert float(record["bench_projected_points"]) >= 0.0
+        # The captain is one of the eleven, so the eleven's projection covers it twice.
+        assert float(record["captain_projected_points"]) * 2 <= float(record["projected_points"])
+
+
+def test_a_holding_value_decays_to_zero_at_the_end_of_its_window() -> None:
+    window = ChipWindowRule("bboost", 2, 8)
+    assert decayed_holding_value(12.0, window, 2) == pytest.approx(12.0)
+    assert decayed_holding_value(12.0, window, 5) == pytest.approx(6.0)
+    assert decayed_holding_value(12.0, window, 8) == 0.0
+    # Outside its window, or in a window of one gameweek, waiting is worth nothing.
+    assert decayed_holding_value(12.0, window, 9) == 0.0
+    assert decayed_holding_value(12.0, ChipWindowRule("bboost", 4, 4), 4) == 0.0
+
+
+def _boost_weeks(result: SeasonChainResult) -> list[int]:
+    return [week.gameweek for week in result.weeks if week.chip == "bboost"]
+
+
+def test_a_fixed_threshold_lets_a_chip_expire_and_a_decaying_one_plays_it() -> None:
+    """The window opens after the season's only double, so the reservation never fires."""
+
+    late_boost = (ChipWindowRule("bboost", 5, 8),)
+    dear = TransferPlanningConfig(chip_holding_value_points={"bboost": 500.0})
+    common = {"chip_windows": late_boost, "chip_policy": "hybrid", "transfer_config": dear}
+
+    fixed = _run(**common)
+    assert _boost_weeks(fixed) == []
+    assert "chip_threshold" not in fixed.diagnostics
+
+    decaying = _run(**common, chip_threshold="decaying")
+    # Reserved for a double that never comes, it is played when the window closes.
+    assert _boost_weeks(decaying) == [8]
+    assert decaying.diagnostics["chip_threshold"] == "decaying"
+
+
+def test_the_default_threshold_is_the_chain_as_it_always_ran() -> None:
+    config = {"lookahead": 2, "chip_windows": ALL_CHIPS, "chip_policy": "hybrid"}
+    default, named = _run(**config), _run(**config, chip_threshold="fixed")
+    assert [week.as_record() for week in default.weeks] == [
+        week.as_record() for week in named.weeks
+    ]
+    with pytest.raises(ExperimentConfigurationError, match="chip_threshold"):
+        SeasonChainConfig(season=SEASON, chip_threshold="sometimes")
+
+
 def test_unknown_chips_and_inverted_windows_are_refused() -> None:
     with pytest.raises(ExperimentConfigurationError, match="Unknown chip"):
         ChipWindowRule("assistant_manager", 1, 38)
     with pytest.raises(ExperimentConfigurationError, match="may not end before"):
         ChipWindowRule("bboost", 5, 4)
+
+
+def test_a_blank_club_without_a_row_still_makes_the_gameweek_structured() -> None:
+    """The archive's fixture table counts fixtures, so a blank club has no row and no
+    zero. Gameweek 6 blanks team 6 that way and nobody doubles: the free hit must be
+    on offer there under a reservation policy, as it is in the double of gameweek 4."""
+
+    counts = _fixture_counts()
+    counts = counts.loc[~((counts["gameweek"] == 6) & (counts["team_id"] == 6))]
+    assert not ((counts["gameweek"] == 6) & (counts["fixture_count"] != 1)).any()
+    chain = SeasonChain(
+        make_canonical_gameweeks(),
+        counts.reset_index(drop=True),
+        SeasonChainConfig(season=SEASON, **POOL),  # type: ignore[arg-type]
+    )
+    structured = [week for week in range(2, 9) if chain._is_structured_gameweek(week)]
+    assert structured == [4, 6]
 
 
 def test_a_free_hit_reverts_the_held_squad_and_reports_its_gain() -> None:

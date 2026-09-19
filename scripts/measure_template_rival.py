@@ -23,6 +23,7 @@ from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -31,7 +32,7 @@ from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments.control_residuals import build_control_residual_table
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
-from squadopt.optimization import OptimizationConfig, optimize_squad
+from squadopt.optimization import optimize_squad
 from squadopt.scenarios.rivals import (
     TEMPLATE_RIVAL_CONTRACT_VERSION,
     template_rival_from_ownership,
@@ -77,7 +78,8 @@ def main() -> int:
     ownership = ownership.loc[:, ["season", "gameweek", "player_id", "selected"]]
     prices = panel.loc[panel["season"] == season, ["gameweek", "player_id", "price_tenths", "name"]]
 
-    optimization = OptimizationConfig()
+    # Named rather than inherited (#590, #621).
+    optimization = measurement_optimization_config()
     rows: list[dict[str, object]] = []
     skipped: list[str] = []
     for fold_id, block in folds.groupby("fold_id", sort=True):
