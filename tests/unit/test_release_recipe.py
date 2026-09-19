@@ -238,7 +238,12 @@ def test_a_settled_tag_refuses_to_ship_without_the_gameweek_it_settles() -> None
     assert "must be a number" in not_a_number.stderr
 
 
-def _live(settled: int, scored: int | None, next_gameweek: int) -> object:
+def _live(
+    settled: int,
+    scored: int | None,
+    next_gameweek: int,
+    generated: str = "2026-09-18T18:00:00Z",
+) -> object:
     """A live site that has settled ``settled`` and says so in all three documents."""
 
     def fetch(path: str) -> tuple[int, bytes]:
@@ -256,7 +261,7 @@ def _live(settled: int, scored: int | None, next_gameweek: int) -> object:
             return 200, json.dumps({"payload": {"next_gameweek": next_gameweek}}).encode()
         return 200, json.dumps(
             {
-                "generated_at_utc": "2026-09-18T18:00:00Z",
+                "generated_at_utc": generated,
                 "payload": {"scored_gameweek": scored, "members": []},
             }
         ).encode()
@@ -276,7 +281,7 @@ def test_live_checks_retain_the_absent_document_rule(
         return 200, json.dumps({"generated_at_utc": "2026-09-18T18:00:00Z", "payload": {}}).encode()
 
     monkeypatch.setattr(verify_live, "fetch", fetch)
-    assert verify_live.main("2026-09-18T17:00:00Z") == (0 if absent_status == 404 else 1)
+    assert verify_live.main("2026-09-18T18:00:00Z") == (0 if absent_status == 404 else 1)
     output = capsys.readouterr().out
     assert output.count(" html ") == len(verify_live.ROUTES)
     assert output.count(" json ") == len(verify_live.DOCUMENTS)
@@ -303,10 +308,10 @@ def test_a_week_that_did_not_settle_fails_instead_of_being_printed(
     """Without --settled the verifier printed the settled weeks and returned ALL GOOD."""
 
     monkeypatch.setattr(verify_live, "fetch", _live(settled=4, scored=4, next_gameweek=5))
-    assert verify_live.main("2026-09-18T17:00:00Z") == 0
-    assert verify_live.main("2026-09-18T17:00:00Z", 4) == 0
+    assert verify_live.main("2026-09-18T18:00:00Z") == 0
+    assert verify_live.main("2026-09-18T18:00:00Z", 4) == 0
     # One exit code, three named failures: the count is in the output, not the return.
-    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    assert verify_live.main("2026-09-18T18:00:00Z", 5) == 1
     output = capsys.readouterr().out
     assert "BAD scoreboard settles gameweek 5" in output
     assert "BAD members.json scored_gameweek is 5" in output
@@ -317,18 +322,45 @@ def test_each_of_the_three_settled_claims_fails_on_its_own(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(verify_live, "fetch", _live(settled=5, scored=4, next_gameweek=6))
-    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    assert verify_live.main("2026-09-18T18:00:00Z", 5) == 1
     monkeypatch.setattr(verify_live, "fetch", _live(settled=5, scored=5, next_gameweek=5))
-    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    assert verify_live.main("2026-09-18T18:00:00Z", 5) == 1
     monkeypatch.setattr(verify_live, "fetch", _live(settled=4, scored=5, next_gameweek=6))
-    assert verify_live.main("2026-09-18T17:00:00Z", 5) == 1
+    assert verify_live.main("2026-09-18T18:00:00Z", 5) == 1
     capsys.readouterr()
 
 
-def test_the_generated_after_argument_has_no_default_any_more() -> None:
-    """A stale default made the only freshness check vacuous when the argument was forgotten."""
+@pytest.mark.parametrize(
+    ("served", "accepted", "expected"),
+    [
+        pytest.param("2026-09-22T12:00:00Z", "2026-09-22T12:00:00Z", 0, id="same-tag-redispatch"),
+        pytest.param("2026-09-18T12:26:35Z", "2026-09-22T12:00:00Z", 1, id="dashboard-rollback"),
+        pytest.param("2026-09-22T13:00:00Z", "2026-09-22T13:00:00Z", 0, id="fix-own-candidate"),
+        pytest.param("2026-09-22T13:00:00Z", "2026-09-22T12:00:00Z", 1, id="unaccepted-newer-tree"),
+    ],
+)
+def test_live_stamp_must_match_the_accepted_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    served: str,
+    accepted: str,
+    expected: int,
+) -> None:
+    # Entirely synthetic HTTP responses: no real tag, release or live-site request.
+    monkeypatch.setattr(verify_live, "fetch", _live(5, 5, 6, generated=served))
+    assert verify_live.main(accepted, 5) == expected
+    output = capsys.readouterr().out
+    assert f"generated_at_utc {served}  (must equal accepted {accepted})" in output
+    assert ("ALL GOOD" in output) == (expected == 0)
+
+
+def test_the_accepted_stamp_argument_is_required() -> None:
+    """The operator must name the accepted publication even when re-dispatching its tag."""
 
     with pytest.raises(SystemExit):
         verify_live._arguments([])
+    assert verify_live._arguments(["2026-09-18T17:00:00Z"]).accepted_generated_at == (
+        "2026-09-18T17:00:00Z"
+    )
     assert verify_live._arguments(["2026-09-18T17:00:00Z"]).settled is None
     assert verify_live._arguments(["2026-09-18T17:00:00Z", "--settled", "5"]).settled == 5
