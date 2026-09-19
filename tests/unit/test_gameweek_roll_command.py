@@ -14,8 +14,8 @@ from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import load_entry, read_season_rules
-from squadopt.live.runlog import configure_run_logging
 from squadopt.platform.cli import EXIT_KNOWN_FAILURE, EXIT_OK, CliServices, main
+from squadopt.platform.runlog import configure_run_logging
 
 COMMIT = "a" * 40
 NOW = datetime(2026, 9, 16, 12, 0, tzinfo=UTC)
