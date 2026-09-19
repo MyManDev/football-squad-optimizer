@@ -43,6 +43,23 @@ MINUTES_BUCKETS: Final[tuple[tuple[str, int, int], ...]] = (
     ("1_to_59", 1, 59),
     ("60_and_above", 60, 10_000),
 )
+#: How large the forecast was for a player who then did not appear: squad filler, a
+#: rotation option, or somebody the forecast expected to start.
+FORECAST_SIZES: Final[tuple[tuple[str, float, float], ...]] = (
+    ("under_1.0", 0.0, 1.0),
+    ("1.0_to_2.5", 1.0, 2.5),
+    ("2.5_and_above", 2.5, float("inf")),
+)
+#: Minutes a gameweek the player had played this season before the deadline. Sixty is the
+#: game's own line for a full appearance; none is a player the season has not yet seen.
+PRIOR_MINUTES_BUCKETS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("none", 0.0, 0.0),
+    ("under_30", 0.0, 30.0),
+    ("30_to_60", 30.0, 60.0),
+    ("60_and_above", 60.0, float("inf")),
+)
+#: How many of the largest absent forecasts a reading lists by player.
+LARGEST_ABSENT: Final = 10
 FORECASTS: Final[tuple[str, ...]] = ("ours_decided", "ours_unconditional", "game")
 POSITIONS: Final[tuple[str, ...]] = ("GK", "DEF", "MID", "FWD")
 
@@ -55,6 +72,7 @@ FRAME_COLUMNS: Final[tuple[str, ...]] = (
     "game",
     "realized_points",
     "minutes",
+    "prior_minutes_per_week",
 )
 
 
@@ -70,6 +88,7 @@ def audit_frame(
     multipliers: Mapping[int, float] | None,
     decided: Mapping[int, float] | None = None,
     game: Mapping[int, float] | None,
+    prior_minutes_per_week: Mapping[int, float] | None = None,
 ) -> pd.DataFrame:
     """Pair one gameweek's forecasts with its outcome, one row per player of the capture.
 
@@ -81,6 +100,9 @@ def audit_frame(
 
     ``decided`` overrides the product of ``expected_points`` and ``multipliers`` for the one
     case where only the decided numbers survive (gameweek 1, whose capture was lost).
+    ``prior_minutes_per_week`` is what the same capture said each player had played so
+    far this season, a gameweek; a player it does not name has no prior, which is not
+    a prior of nothing.
     """
 
     for name, frame, columns in (
@@ -110,6 +132,11 @@ def audit_frame(
     else:
         frame["ours_decided"] = float("nan")
     frame["game"] = ids.map(dict(game)) if game is not None else float("nan")
+    frame["prior_minutes_per_week"] = (
+        ids.map(dict(prior_minutes_per_week))
+        if prior_minutes_per_week is not None
+        else float("nan")
+    )
     ordered = frame.loc[:, list(FRAME_COLUMNS)].sort_values("player_id").reset_index(drop=True)
     return ordered.astype({"realized_points": "float64", "minutes": "int64"})
 
@@ -190,6 +217,105 @@ def _appearance_split(frame: pd.DataFrame, forecast: str) -> dict[str, object]:
     }
 
 
+def _by_prior_minutes(frame: pd.DataFrame, forecast: str) -> dict[str, object]:
+    """The error by how much the player had been playing before the deadline.
+
+    It asks where a forecast's level is off: on the players the season has not yet
+    seen, on the rotation, or on the regulars. Totals sit beside the means because the
+    buckets are of very different sizes and a small mean over many players is a large
+    number of points.
+    """
+
+    rows = frame.loc[frame[forecast].notna() & frame["prior_minutes_per_week"].notna()]
+    if rows.empty:
+        return {"players": 0}
+    buckets: dict[str, object] = {}
+    prior = rows["prior_minutes_per_week"]
+    for label, low, high in PRIOR_MINUTES_BUCKETS:
+        held = rows.loc[
+            (prior == 0) if high == 0 else (prior > 0) & (prior >= low) & (prior < high)
+        ]
+        buckets[label] = {
+            **_error_block(held, forecast),
+            "forecast_points": float(held[forecast].sum()),
+            "realized_points": float(held["realized_points"].sum()),
+            "appeared": int((held["minutes"] > 0).sum()),
+        }
+    return {"players": len(rows), "buckets": buckets}
+
+
+def _mass(rows: pd.DataFrame, forecast: str, total: float) -> dict[str, object]:
+    points = float(rows[forecast].sum())
+    return {
+        "players": len(rows),
+        "forecast_points": points,
+        "share_of_absent_forecast": points / total if total > 0 else None,
+    }
+
+
+def absent_forecast(frame: pd.DataFrame, forecast: str) -> dict[str, object]:
+    """Where the forecast points of players who did not appear were sitting.
+
+    The appearance split says how much of a forecast sat on players who did not appear.
+    This says on whom: by position, by price band, by how large the forecast was, and
+    by whether our own availability rule had named the player before the deadline
+    (``ours_decided`` below ``ours_unconditional``). The last split separates two
+    different faults. Points on players the rule named are "the rule discounts too
+    little"; points on players nobody named are "the projection expected somebody to
+    play who was never going to", which no availability flag can repair. It is asked
+    of every forecast with the same naming, so the game's own forecast is read against
+    our rule's flags and the two are comparable.
+    """
+
+    rows = frame.loc[frame[forecast].notna() & (frame["minutes"] == 0)]
+    total = float(rows[forecast].sum())
+    banded = rows.assign(price_band=rows["price_tenths"].map(_band))
+    # Absent on either side is not a flag: a player the rule never scored was not named.
+    named = rows["ours_decided"] < rows["ours_unconditional"] - 1e-9
+    largest = rows.sort_values([forecast, "player_id"], ascending=[False, True]).head(
+        LARGEST_ABSENT
+    )
+    return {
+        "players": len(rows),
+        "forecast_points": total,
+        "by_position": {
+            position: _mass(rows.loc[rows["position"] == position], forecast, total)
+            for position in POSITIONS
+        },
+        "by_price_band": {
+            label: _mass(banded.loc[banded["price_band"] == label], forecast, total)
+            for label, _, _ in PRICE_BANDS
+        },
+        "by_forecast_size": {
+            label: _mass(
+                rows.loc[(rows[forecast] >= low) & (rows[forecast] < high)], forecast, total
+            )
+            for label, low, high in FORECAST_SIZES
+        },
+        "by_our_availability_rule": {
+            "named": _mass(rows.loc[named], forecast, total),
+            "not_named": _mass(rows.loc[~named], forecast, total),
+        },
+        "largest": [
+            {
+                "player_id": int(player_id),
+                "position": str(position),
+                "price_tenths": int(price_tenths),
+                "forecast_points": float(points),
+                "named_by_our_availability_rule": bool(flag),
+            }
+            for player_id, position, price_tenths, points, flag in zip(
+                largest["player_id"],
+                largest["position"],
+                largest["price_tenths"],
+                largest[forecast],
+                named.loc[largest.index],
+                strict=True,
+            )
+        ],
+    }
+
+
 def summarise_forecast(frame: pd.DataFrame, forecast: str) -> dict[str, object]:
     """Everything the protocol reads about one forecast in one gameweek."""
 
@@ -213,6 +339,8 @@ def summarise_forecast(frame: pd.DataFrame, forecast: str) -> dict[str, object]:
             for label, _, _ in PRICE_BANDS
         },
         "appearance_split": _appearance_split(banded, forecast),
+        "absent_forecast": absent_forecast(banded, forecast),
+        "by_prior_minutes": _by_prior_minutes(banded, forecast),
     }
 
 
