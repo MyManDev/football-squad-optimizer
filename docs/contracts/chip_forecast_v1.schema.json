@@ -1,0 +1,410 @@
+{
+  "$id": "https://squadopt.dev/contracts/chip_forecast_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "chips": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "play_now"
+                  ]
+                }
+              },
+              "required": [
+                "verdict"
+              ]
+            },
+            "then": {
+              "properties": {
+                "gain_this_week": {
+                  "type": "number"
+                },
+                "points_at_gameweek": {
+                  "type": "null"
+                },
+                "reservation_allows_this_week": {
+                  "const": true
+                },
+                "threshold_this_week": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "unknown_this_week"
+                  ]
+                }
+              },
+              "required": [
+                "verdict"
+              ]
+            },
+            "then": {
+              "properties": {
+                "gain_this_week": {
+                  "type": "null"
+                },
+                "reservation_allows_this_week": {
+                  "const": true
+                },
+                "threshold_this_week": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "else": {
+              "properties": {
+                "hold_reason": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "hold"
+                  ]
+                }
+              },
+              "required": [
+                "verdict"
+              ]
+            },
+            "then": {
+              "properties": {
+                "hold_reason": {
+                  "enum": [
+                    "gain_not_above_threshold",
+                    "reserved_for_structured_gameweek"
+                  ]
+                },
+                "reservation_allows_this_week": {
+                  "type": "boolean"
+                },
+                "threshold_this_week": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "window_not_open",
+                    "expired_window"
+                  ]
+                }
+              },
+              "required": [
+                "verdict"
+              ]
+            },
+            "then": {
+              "properties": {
+                "gain_this_week": {
+                  "type": "null"
+                },
+                "reservation_allows_this_week": {
+                  "type": "null"
+                },
+                "threshold_this_week": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "expired_window"
+                  ]
+                }
+              },
+              "required": [
+                "verdict"
+              ]
+            },
+            "then": {
+              "properties": {
+                "points_at_gameweek": {
+                  "type": "null"
+                },
+                "structured_gameweeks": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "enum": [
+                    "wildcard",
+                    "freehit"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ]
+            },
+            "then": {
+              "properties": {
+                "points_at_gameweek": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "enum": [
+                    "wildcard",
+                    "3xc",
+                    "bboost"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ]
+            },
+            "then": {
+              "properties": {
+                "structured_gameweeks": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "gain_this_week": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "hold_reason": {
+            "enum": [
+              null,
+              "gain_not_above_threshold",
+              "reserved_for_structured_gameweek"
+            ]
+          },
+          "holding_value": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "name": {
+            "enum": [
+              "wildcard",
+              "freehit",
+              "bboost",
+              "3xc"
+            ]
+          },
+          "points_at_gameweek": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "estimated_gain": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "gameweek": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "player_ids": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "threshold": {
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "gameweek",
+                  "estimated_gain",
+                  "threshold",
+                  "player_ids"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservation_allows_this_week": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "structured_gameweeks": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "clubs_blank": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "clubs_doubling": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "gameweek": {
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "gameweek",
+                    "clubs_doubling",
+                    "clubs_blank"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "threshold_this_week": {
+            "minimum": 0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "verdict": {
+            "enum": [
+              "play_now",
+              "hold",
+              "unknown_this_week",
+              "window_not_open",
+              "expired_window"
+            ]
+          },
+          "window": {
+            "additionalProperties": false,
+            "properties": {
+              "first_gameweek": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "last_gameweek": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "first_gameweek",
+              "last_gameweek"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "window",
+          "holding_value",
+          "verdict",
+          "hold_reason",
+          "gain_this_week",
+          "threshold_this_week",
+          "reservation_allows_this_week",
+          "points_at_gameweek",
+          "structured_gameweeks"
+        ],
+        "type": "object"
+      },
+      "maxItems": 4,
+      "type": "array"
+    },
+    "contract_version": {
+      "const": "chip_forecast_v1",
+      "type": "string"
+    },
+    "decision_gameweek": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "later_week_basis": {
+      "const": "this_week_projection_scaled_by_relative_fixture_count_v1",
+      "type": "string"
+    },
+    "limits": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "players_without_fixture_this_week": {
+      "items": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "reserve": {
+      "type": "boolean"
+    },
+    "threshold_policy": {
+      "enum": [
+        "fixed",
+        "decaying"
+      ]
+    }
+  },
+  "required": [
+    "contract_version",
+    "decision_gameweek",
+    "threshold_policy",
+    "reserve",
+    "later_week_basis",
+    "players_without_fixture_this_week",
+    "chips",
+    "limits"
+  ],
+  "title": "SquadOpt chip forecast",
+  "type": "object"
+}
