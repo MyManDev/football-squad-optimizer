@@ -172,13 +172,23 @@ class FileJobQueue:
             index.unlink(missing_ok=True)
 
     def submit_unless_cached(
-        self, job: AdviceJob, *, read_cached: Callable[[str], bytes | None]
+        self,
+        job: AdviceJob,
+        *,
+        read_cached: Callable[[str], bytes | None],
+        admit: Callable[[], contextlib.AbstractContextManager[None]] | None = None,
+        prepare: Callable[[], None] | None = None,
     ) -> AdviceJob | bytes:
         """Recheck the validated cache and reserve work atomically with completion.
 
         A POST's earlier miss can outlive a worker's cache publication and open-index
         cleanup. The read callback only reads and validates immutable answer bytes;
         computation stays outside this short metadata transaction.
+
+        For genuinely new work, ``admit`` checks the caller's owned job IDs and holds
+        a memory-only reservation through preparation and publication, removing it
+        if either fails. ``prepare`` writes the spec before a worker can claim it.
+        Both run under this transaction; this adapter receives no client identity.
         """
 
         if job.status != "queued":
@@ -187,7 +197,14 @@ class FileJobQueue:
             cached = read_cached(job.cache_key)
             if cached is not None:
                 return cached
-            winner, _created = self.submit_unique(job)
+            if admit is not None or prepare is not None:
+                existing = self._index_job(self._open_index(job.cache_key), repair=True)
+                if existing is not None and not existing.is_terminal:
+                    return existing
+            with admit() if admit is not None else contextlib.nullcontext():
+                if prepare is not None:
+                    prepare()
+                winner, _created = self.submit_unique(job)
             return winner
 
     def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]:

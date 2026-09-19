@@ -1,0 +1,2437 @@
+{
+  "contract_version": "projection_level_audit_v1",
+  "descriptive_only": true,
+  "first_target_gameweek": 4,
+  "generated_at_utc": "2026-09-19T13:05:01+00:00",
+  "interval": {
+    "level": 0.9,
+    "resamples": 2000,
+    "seed": 0,
+    "unit": "decision"
+  },
+  "locked_holdout_accessed": false,
+  "manifest_sha256": "f2bf78473673f3422dfc879e1d4cb5e6eb2b44435f0d32f442c30b64fee3ea20",
+  "model_version": "phase_c_control_components_v1",
+  "operational_control_changed": false,
+  "prereg": "docs/projection_level_audit_prereg.md",
+  "producer_repository_commit": "aab12b3f6e0558d8721da885cf9293a21cfbd99a",
+  "reading": {
+    "by_season": {
+      "2021-22": {
+        "all": {
+          "bias": -0.027571006290553503,
+          "bias_interval": [
+            -0.0537418830340003,
+            4.917720732290567e-05
+          ],
+          "decisions": 35,
+          "forecast_points": 29454.275117448,
+          "mean_absolute_error": 1.25791467735732,
+          "realized_points": 28865.0,
+          "rows": 21373,
+          "what_they_score_when_they_play": {
+            "bias": -0.0004984357502798219,
+            "bias_interval": [
+              -0.05344287005035944,
+              0.054883520438474546
+            ],
+            "mean_forecast": 3.231414039063466,
+            "mean_realized": 3.2309156033131856,
+            "rows": 8934
+          },
+          "who_plays": {
+            "appearances": 8934.0,
+            "bias": -0.009846151357553923,
+            "bias_interval": [
+              -0.012753292168554475,
+              -0.006829153639088641
+            ],
+            "forecast_appearances": 9144.441792965,
+            "rows": 21373
+          }
+        },
+        "by_forecast_size": {
+          "1.0_to_2.5": {
+            "bias": 0.127606929265286,
+            "bias_interval": [
+              0.04595411641291405,
+              0.2140519127947384
+            ],
+            "decisions": 35,
+            "forecast_points": 7282.4262949,
+            "mean_absolute_error": 1.7588533415197238,
+            "realized_points": 7800.0,
+            "rows": 4056,
+            "what_they_score_when_they_play": {
+              "bias": 0.08735974935991377,
+              "bias_interval": [
+                -0.03064191279072077,
+                0.2012364062867483
+              ],
+              "mean_forecast": 2.714364388571121,
+              "mean_realized": 2.8017241379310347,
+              "rows": 2784
+            },
+            "who_plays": {
+              "appearances": 2784.0,
+              "bias": 0.01921801684418146,
+              "bias_interval": [
+                0.007385501436670387,
+                0.030650826250187013
+              ],
+              "forecast_appearances": 2706.05172368,
+              "rows": 4056
+            }
+          },
+          "2.5_to_4.0": {
+            "bias": -0.13884870020246734,
+            "bias_interval": [
+              -0.2175468521118606,
+              -0.06339224622981911
+            ],
+            "decisions": 35,
+            "forecast_points": 12668.000526636999,
+            "mean_absolute_error": 2.4186666987235124,
+            "realized_points": 12094.0,
+            "rows": 4134,
+            "what_they_score_when_they_play": {
+              "bias": -0.08895017677619843,
+              "bias_interval": [
+                -0.18637367185940737,
+                0.008699223451693616
+              ],
+              "mean_forecast": 3.459630221369286,
+              "mean_realized": 3.370680044593088,
+              "rows": 3588
+            },
+            "who_plays": {
+              "appearances": 3588.0,
+              "bias": -0.01820957674842767,
+              "bias_interval": [
+                -0.02898138568666138,
+                -0.008509558182511598
+              ],
+              "forecast_appearances": 3663.278390278,
+              "rows": 4134
+            }
+          },
+          "4.0_and_above": {
+            "bias": -0.09995559431961472,
+            "bias_interval": [
+              -0.4201583381232782,
+              0.17132735019870748
+            ],
+            "decisions": 35,
+            "forecast_points": 5751.149288713,
+            "mean_absolute_error": 3.5600678628222417,
+            "realized_points": 5637.0,
+            "rows": 1142,
+            "what_they_score_when_they_play": {
+              "bias": 0.07124302845974781,
+              "bias_interval": [
+                -0.21666097567638293,
+                0.3079292308112105
+              ],
+              "mean_forecast": 5.396264246031038,
+              "mean_realized": 5.467507274490786,
+              "rows": 1031
+            },
+            "who_plays": {
+              "appearances": 1031.0,
+              "bias": -0.033129814630472855,
+              "bias_interval": [
+                -0.05490450702696511,
+                -0.01436225595715086
+              ],
+              "forecast_appearances": 1068.834248308,
+              "rows": 1142
+            }
+          },
+          "under_1.0": {
+            "bias": -0.034772776945270326,
+            "bias_interval": [
+              -0.059026288727586494,
+              -0.008971559765211534
+            ],
+            "decisions": 35,
+            "forecast_points": 3752.699007198,
+            "mean_absolute_error": 0.47231422756315916,
+            "realized_points": 3334.0,
+            "rows": 12041,
+            "what_they_score_when_they_play": {
+              "bias": -0.0012807937818419444,
+              "bias_interval": [
+                -0.11657601257889698,
+                0.11220126590550382
+              ],
+              "mean_forecast": 2.178942452828217,
+              "mean_realized": 2.177661659046375,
+              "rows": 1531
+            },
+            "who_plays": {
+              "appearances": 1531.0,
+              "bias": -0.014556717108130555,
+              "bias_interval": [
+                -0.021105915090662165,
+                -0.007524123304264233
+              ],
+              "forecast_appearances": 1706.277430699,
+              "rows": 12041
+            }
+          }
+        },
+        "by_prior_minutes": {
+          "30_to_60": {
+            "bias": 0.00971981618711586,
+            "bias_interval": [
+              -0.06240652848478969,
+              0.08237652728339015
+            ],
+            "decisions": 35,
+            "forecast_points": 9090.30084749,
+            "mean_absolute_error": 1.8824488678916458,
+            "realized_points": 9133.0,
+            "rows": 4393,
+            "what_they_score_when_they_play": {
+              "bias": -0.0396330635530356,
+              "bias_interval": [
+                -0.1472688848691665,
+                0.0634607196246033
+              ],
+              "mean_forecast": 3.22630438246441,
+              "mean_realized": 3.1866713189113747,
+              "rows": 2866
+            },
+            "who_plays": {
+              "appearances": 2866.0,
+              "bias": 0.023108495366036878,
+              "bias_interval": [
+                0.012430077834910873,
+                0.03362161670759272
+              ],
+              "forecast_appearances": 2764.484379857,
+              "rows": 4393
+            }
+          },
+          "60_and_above": {
+            "bias": 0.06505119227580827,
+            "bias_interval": [
+              -0.028674881056627643,
+              0.15883173311851925
+            ],
+            "decisions": 35,
+            "forecast_points": 13607.245402643,
+            "mean_absolute_error": 2.419301469470903,
+            "realized_points": 13899.0,
+            "rows": 4485,
+            "what_they_score_when_they_play": {
+              "bias": 0.08671746777178203,
+              "bias_interval": [
+                -0.00880004989945523,
+                0.18306389404484485
+              ],
+              "mean_forecast": 3.571876899166886,
+              "mean_realized": 3.6585943669386682,
+              "rows": 3799
+            },
+            "who_plays": {
+              "appearances": 3799.0,
+              "bias": 0.0013739115547380166,
+              "bias_interval": [
+                -0.010650021895131229,
+                0.012764698149514106
+              ],
+              "forecast_appearances": 3792.838006677,
+              "rows": 4485
+            }
+          },
+          "none": {
+            "bias": -0.18203653703185327,
+            "bias_interval": [
+              -0.20671093913953154,
+              -0.1570081341151607
+            ],
+            "decisions": 35,
+            "forecast_points": 1400.53911419,
+            "mean_absolute_error": 0.25807253070045044,
+            "realized_points": 269.0,
+            "rows": 6216,
+            "what_they_score_when_they_play": {
+              "bias": -0.3448080912402598,
+              "bias_interval": [
+                -0.8412727638249021,
+                0.06994864710386145
+              ],
+              "mean_forecast": 2.0915613379935065,
+              "mean_realized": 1.7467532467532467,
+              "rows": 154
+            },
+            "who_plays": {
+              "appearances": 154.0,
+              "bias": -0.07640112663175676,
+              "bias_interval": [
+                -0.08108879901251463,
+                -0.07141163404723834
+              ],
+              "forecast_appearances": 628.909403143,
+              "rows": 6216
+            }
+          },
+          "under_30": {
+            "bias": 0.03309607371794872,
+            "bias_interval": [
+              -0.015567262927132097,
+              0.0885843962323671
+            ],
+            "decisions": 35,
+            "forecast_points": 5356.189753125001,
+            "mean_absolute_error": 0.9812178023728301,
+            "realized_points": 5564.0,
+            "rows": 6279,
+            "what_they_score_when_they_play": {
+              "bias": -0.07905620750070924,
+              "bias_interval": [
+                -0.1958651279070385,
+                0.045963186561028414
+              ],
+              "mean_forecast": 2.709789068020804,
+              "mean_realized": 2.6307328605200944,
+              "rows": 2115
+            },
+            "who_plays": {
+              "appearances": 2115.0,
+              "bias": 0.024970536186016884,
+              "bias_interval": [
+                0.01269292162557255,
+                0.038274925932615576
+              ],
+              "forecast_appearances": 1958.210003288,
+              "rows": 6279
+            }
+          }
+        },
+        "decisions": 35,
+        "rows": 21373,
+        "rows_without_a_prior": 0,
+        "top_per_position": {
+          "DEF": {
+            "bias": -0.032332649551428574,
+            "bias_interval": [
+              -0.226321253842,
+              0.15501849088510708
+            ],
+            "decisions": 35,
+            "forecast_points": 4675.265709372,
+            "mean_absolute_error": 2.90655677543,
+            "realized_points": 4630.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.08907195615811254,
+              "bias_interval": [
+                -0.11924485694917537,
+                0.295845800974709
+              ],
+              "mean_forecast": 3.7437095007955294,
+              "mean_realized": 3.8327814569536423,
+              "rows": 1208
+            },
+            "who_plays": {
+              "appearances": 1208.0,
+              "bias": -0.03115952847857143,
+              "bias_interval": [
+                -0.04691900121260714,
+                -0.0164999754165
+              ],
+              "forecast_appearances": 1251.62333987,
+              "rows": 1400
+            }
+          },
+          "FWD": {
+            "bias": -0.3170756123170909,
+            "bias_interval": [
+              -0.4368386425499213,
+              -0.19693262590509517
+            ],
+            "decisions": 35,
+            "forecast_points": 4003.9789669360002,
+            "mean_absolute_error": 2.334675061239273,
+            "realized_points": 3568.0,
+            "rows": 1375,
+            "what_they_score_when_they_play": {
+              "bias": -0.3251771772217936,
+              "bias_interval": [
+                -0.4713905892580641,
+                -0.1659987269122411
+              ],
+              "mean_forecast": 3.765871487732883,
+              "mean_realized": 3.44069431051109,
+              "rows": 1037
+            },
+            "who_plays": {
+              "appearances": 1037.0,
+              "bias": -0.012232840376,
+              "bias_interval": [
+                -0.03050150342520924,
+                0.0056418871295250885
+              ],
+              "forecast_appearances": 1053.8201555169999,
+              "rows": 1375
+            }
+          },
+          "GK": {
+            "bias": 0.1700013355450613,
+            "bias_interval": [
+              0.07242223632489123,
+              0.2677767017378824
+            ],
+            "decisions": 35,
+            "forecast_points": 2245.2081475990003,
+            "mean_absolute_error": 1.3461911177974046,
+            "realized_points": 2481.0,
+            "rows": 1387,
+            "what_they_score_when_they_play": {
+              "bias": 0.4761292524976229,
+              "bias_interval": [
+                0.27611357321505103,
+                0.6822000734417748
+              ],
+              "mean_forecast": 3.4557249471854203,
+              "mean_realized": 3.931854199683043,
+              "rows": 631
+            },
+            "who_plays": {
+              "appearances": 631.0,
+              "bias": -0.024073339599134817,
+              "bias_interval": [
+                -0.029349825713636694,
+                -0.01935467720020021
+              ],
+              "forecast_appearances": 664.3897220240001,
+              "rows": 1387
+            }
+          },
+          "MID": {
+            "bias": -0.10941986421571433,
+            "bias_interval": [
+              -0.2962082861717143,
+              0.08285256974489282
+            ],
+            "decisions": 35,
+            "forecast_points": 5522.1878099020005,
+            "mean_absolute_error": 2.7973920591157144,
+            "realized_points": 5369.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.044688322718927725,
+              "bias_interval": [
+                -0.12915645795656885,
+                0.2291889727729926
+              ],
+              "mean_forecast": 4.3168063970211215,
+              "mean_realized": 4.361494719740048,
+              "rows": 1231
+            },
+            "who_plays": {
+              "appearances": 1231.0,
+              "bias": -0.034243795214285715,
+              "bias_interval": [
+                -0.053784205348785724,
+                -0.01582388070603571
+              ],
+              "forecast_appearances": 1278.9413132999998,
+              "rows": 1400
+            }
+          },
+          "all": {
+            "bias": -0.0716721743633585,
+            "bias_interval": [
+              -0.1437485819180507,
+              -0.0006506599862047391
+            ],
+            "decisions": 35,
+            "forecast_points": 16446.640633809002,
+            "mean_absolute_error": 2.3485928906783533,
+            "realized_points": 16048.0,
+            "rows": 5562,
+            "what_they_score_when_they_play": {
+              "bias": 0.030640144595325068,
+              "bias_interval": [
+                -0.0656342768733795,
+                0.127685430105113
+              ],
+              "mean_forecast": 3.8768348980148524,
+              "mean_realized": 3.907475042610178,
+              "rows": 4107
+            },
+            "who_plays": {
+              "appearances": 4107.0,
+              "bias": -0.02548984730510608,
+              "bias_interval": [
+                -0.034490238839793734,
+                -0.017508899038480605
+              ],
+              "forecast_appearances": 4248.774530711,
+              "rows": 5562
+            }
+          }
+        }
+      },
+      "2022-23": {
+        "all": {
+          "bias": 0.006305521141324651,
+          "bias_interval": [
+            -0.014810214629709583,
+            0.026630627107078628
+          ],
+          "decisions": 34,
+          "forecast_points": 29024.815375721002,
+          "mean_absolute_error": 1.1112186606873835,
+          "realized_points": 29170.0,
+          "rows": 23025,
+          "what_they_score_when_they_play": {
+            "bias": -0.0303303492273648,
+            "bias_interval": [
+              -0.06825876868847995,
+              0.0049818806194981136
+            ],
+            "mean_forecast": 2.9845535617045775,
+            "mean_realized": 2.954223212477213,
+            "rows": 9874
+          },
+          "who_plays": {
+            "appearances": 9874.0,
+            "bias": 0.00608519728907709,
+            "bias_interval": [
+              0.0023098845815305,
+              0.010018244992595737
+            ],
+            "forecast_appearances": 9733.888332419001,
+            "rows": 23025
+          }
+        },
+        "by_forecast_size": {
+          "1.0_to_2.5": {
+            "bias": 0.060732602166077,
+            "bias_interval": [
+              -0.006740070375211445,
+              0.1239991138314132
+            ],
+            "decisions": 34,
+            "forecast_points": 8779.179846592,
+            "mean_absolute_error": 1.678428140457024,
+            "realized_points": 9071.0,
+            "rows": 4805,
+            "what_they_score_when_they_play": {
+              "bias": 0.008451349970441979,
+              "bias_interval": [
+                -0.07285199507500839,
+                0.08582269659239443
+              ],
+              "mean_forecast": 2.497349755001934,
+              "mean_realized": 2.5058011049723756,
+              "rows": 3620
+            },
+            "who_plays": {
+              "appearances": 3620.0,
+              "bias": 0.01883265401269511,
+              "bias_interval": [
+                0.007033941227395172,
+                0.030273604298152595
+              ],
+              "forecast_appearances": 3529.509097469,
+              "rows": 4805
+            }
+          },
+          "2.5_to_4.0": {
+            "bias": -0.021084297019736832,
+            "bias_interval": [
+              -0.12665157590580428,
+              0.0797149705333551
+            ],
+            "decisions": 34,
+            "forecast_points": 12439.529954969,
+            "mean_absolute_error": 2.3188917896376706,
+            "realized_points": 12353.0,
+            "rows": 4104,
+            "what_they_score_when_they_play": {
+              "bias": -0.05543826793470047,
+              "bias_interval": [
+                -0.15557332208741412,
+                0.04270315418100518
+              ],
+              "mean_forecast": 3.3886816570334592,
+              "mean_realized": 3.333243389098759,
+              "rows": 3706
+            },
+            "who_plays": {
+              "appearances": 3706.0,
+              "bias": 0.009333834073099415,
+              "bias_interval": [
+                -0.0015683145791338556,
+                0.019978925785056337
+              ],
+              "forecast_appearances": 3667.693944964,
+              "rows": 4104
+            }
+          },
+          "4.0_and_above": {
+            "bias": 0.12673906186942321,
+            "bias_interval": [
+              -0.17804344944683242,
+              0.39778010466606484
+            ],
+            "decisions": 34,
+            "forecast_points": 4572.526802142,
+            "mean_absolute_error": 3.4108124808618068,
+            "realized_points": 4689.0,
+            "rows": 919,
+            "what_they_score_when_they_play": {
+              "bias": 0.14055848996774192,
+              "bias_interval": [
+                -0.16672884108681324,
+                0.39977555975389206
+              ],
+              "mean_forecast": 5.261515242751153,
+              "mean_realized": 5.402073732718894,
+              "rows": 868
+            },
+            "who_plays": {
+              "appearances": 868.0,
+              "bias": -0.0006834848313384114,
+              "bias_interval": [
+                -0.015554952578927571,
+                0.012697017319983598
+              ],
+              "forecast_appearances": 868.6281225600001,
+              "rows": 919
+            }
+          },
+          "under_1.0": {
+            "bias": -0.01338022065757369,
+            "bias_interval": [
+              -0.029877412888304537,
+              0.003204270755185438
+            ],
+            "decisions": 34,
+            "forecast_points": 3233.5787720179997,
+            "mean_absolute_error": 0.36900006613972874,
+            "realized_points": 3057.0,
+            "rows": 13197,
+            "what_they_score_when_they_play": {
+              "bias": -0.14680137112500002,
+              "bias_interval": [
+                -0.23866274084396483,
+                -0.055427528301975615
+              ],
+              "mean_forecast": 1.9664442282678574,
+              "mean_realized": 1.8196428571428571,
+              "rows": 1680
+            },
+            "who_plays": {
+              "appearances": 1680.0,
+              "bias": 0.0009049657175115562,
+              "bias_interval": [
+                -0.0039692641324438034,
+                0.006190674077225337
+              ],
+              "forecast_appearances": 1668.057167426,
+              "rows": 13197
+            }
+          }
+        },
+        "by_prior_minutes": {
+          "30_to_60": {
+            "bias": 0.04315057835921588,
+            "bias_interval": [
+              -0.01425422801756735,
+              0.09737659427559646
+            ],
+            "decisions": 34,
+            "forecast_points": 7404.504528205,
+            "mean_absolute_error": 1.7112961152594195,
+            "realized_points": 7574.0,
+            "rows": 3928,
+            "what_they_score_when_they_play": {
+              "bias": -0.061427436221932114,
+              "bias_interval": [
+                -0.13294466219527018,
+                0.006272999947821232
+              ],
+              "mean_forecast": 2.8864927103733686,
+              "mean_realized": 2.825065274151436,
+              "rows": 2681
+            },
+            "who_plays": {
+              "appearances": 2681.0,
+              "bias": 0.04351887940733197,
+              "bias_interval": [
+                0.03341228816728634,
+                0.05406433088860818
+              ],
+              "forecast_appearances": 2510.057841688,
+              "rows": 3928
+            }
+          },
+          "60_and_above": {
+            "bias": 0.1432791841709504,
+            "bias_interval": [
+              0.05888609601956154,
+              0.22389502546767806
+            ],
+            "decisions": 34,
+            "forecast_points": 14648.881774646,
+            "mean_absolute_error": 2.2624256327001397,
+            "realized_points": 15368.0,
+            "rows": 5019,
+            "what_they_score_when_they_play": {
+              "bias": 0.0972145721794931,
+              "bias_interval": [
+                0.00855737240243088,
+                0.1841908308394923
+              ],
+              "mean_forecast": 3.443799252705299,
+              "mean_realized": 3.5410138248847924,
+              "rows": 4340
+            },
+            "who_plays": {
+              "appearances": 4340.0,
+              "bias": 0.020475878159992026,
+              "bias_interval": [
+                0.010604021902160424,
+                0.02958248776573465
+              ],
+              "forecast_appearances": 4237.231567515,
+              "rows": 5019
+            }
+          },
+          "none": {
+            "bias": -0.11591746446491102,
+            "bias_interval": [
+              -0.13163906446079437,
+              -0.10126271757030761
+            ],
+            "decisions": 34,
+            "forecast_points": 1067.320187866,
+            "mean_absolute_error": 0.18246670461893238,
+            "realized_points": 253.0,
+            "rows": 7025,
+            "what_they_score_when_they_play": {
+              "bias": -0.19796669178082196,
+              "bias_interval": [
+                -0.479261609036292,
+                0.13128972561629837
+              ],
+              "mean_forecast": 1.9308434041095892,
+              "mean_realized": 1.7328767123287672,
+              "rows": 146
+            },
+            "who_plays": {
+              "appearances": 146.0,
+              "bias": -0.05775842775402135,
+              "bias_interval": [
+                -0.06326977553222811,
+                -0.051506365277725785
+              ],
+              "forecast_appearances": 551.752954972,
+              "rows": 7025
+            }
+          },
+          "under_30": {
+            "bias": 0.010051200197929955,
+            "bias_interval": [
+              -0.0270775243404643,
+              0.046560887795227164
+            ],
+            "decisions": 34,
+            "forecast_points": 5904.108885004,
+            "mean_absolute_error": 0.8828719227446477,
+            "realized_points": 5975.0,
+            "rows": 7053,
+            "what_they_score_when_they_play": {
+              "bias": -0.1949771030731437,
+              "bias_interval": [
+                -0.27939294051657404,
+                -0.11688967788200355
+              ],
+              "mean_forecast": 2.4022175906978203,
+              "mean_realized": 2.2072404876246767,
+              "rows": 2707
+            },
+            "who_plays": {
+              "appearances": 2707.0,
+              "bias": 0.03858698876449738,
+              "bias_interval": [
+                0.030630834922130562,
+                0.04717531500073987
+              ],
+              "forecast_appearances": 2434.845968244,
+              "rows": 7053
+            }
+          }
+        },
+        "decisions": 34,
+        "rows": 23025,
+        "rows_without_a_prior": 0,
+        "top_per_position": {
+          "DEF": {
+            "bias": -0.11377357684632355,
+            "bias_interval": [
+              -0.329211654851875,
+              0.10632869507852939
+            ],
+            "decisions": 34,
+            "forecast_points": 4258.732064510999,
+            "mean_absolute_error": 2.6511937137992647,
+            "realized_points": 4104.0,
+            "rows": 1360,
+            "what_they_score_when_they_play": {
+              "bias": -0.1235743392581967,
+              "bias_interval": [
+                -0.3559413184365925,
+                0.10716748927756808
+              ],
+              "mean_forecast": 3.4875087654877044,
+              "mean_realized": 3.363934426229508,
+              "rows": 1220
+            },
+            "who_plays": {
+              "appearances": 1220.0,
+              "bias": -0.0022705389345588256,
+              "bias_interval": [
+                -0.01835251715305147,
+                0.013491624321066173
+              ],
+              "forecast_appearances": 1223.087932951,
+              "rows": 1360
+            }
+          },
+          "FWD": {
+            "bias": -0.12664653962132352,
+            "bias_interval": [
+              -0.2683247022487132,
+              0.020194963710404423
+            ],
+            "decisions": 34,
+            "forecast_points": 3866.239293885,
+            "mean_absolute_error": 2.296325322690441,
+            "realized_points": 3694.0,
+            "rows": 1360,
+            "what_they_score_when_they_play": {
+              "bias": -0.13454226718623852,
+              "bias_interval": [
+                -0.32256718064905887,
+                0.05971737557539438
+              ],
+              "mean_forecast": 3.5235330928743123,
+              "mean_realized": 3.388990825688073,
+              "rows": 1090
+            },
+            "who_plays": {
+              "appearances": 1090.0,
+              "bias": 0.0002456368102941188,
+              "bias_interval": [
+                -0.016678266519852943,
+                0.017361447184926472
+              ],
+              "forecast_appearances": 1089.6659339379999,
+              "rows": 1360
+            }
+          },
+          "GK": {
+            "bias": 0.3005991703139706,
+            "bias_interval": [
+              0.18665923523158084,
+              0.42047769717062505
+            ],
+            "decisions": 34,
+            "forecast_points": 2105.1851283729998,
+            "mean_absolute_error": 1.3576732485683825,
+            "realized_points": 2514.0,
+            "rows": 1360,
+            "what_they_score_when_they_play": {
+              "bias": 0.6203077636200001,
+              "bias_interval": [
+                0.40074645212435495,
+                0.8507189013364548
+              ],
+              "mean_forecast": 3.247384544072308,
+              "mean_realized": 3.8676923076923075,
+              "rows": 650
+            },
+            "who_plays": {
+              "appearances": 650.0,
+              "bias": -0.006307032453676473,
+              "bias_interval": [
+                -0.013272116108713235,
+                0.0008421225637132317
+              ],
+              "forecast_appearances": 658.5775641370001,
+              "rows": 1360
+            }
+          },
+          "MID": {
+            "bias": 0.06935606993602941,
+            "bias_interval": [
+              -0.06402077008213236,
+              0.20360448077636026
+            ],
+            "decisions": 34,
+            "forecast_points": 5362.675744886999,
+            "mean_absolute_error": 2.6975797486963238,
+            "realized_points": 5457.0,
+            "rows": 1360,
+            "what_they_score_when_they_play": {
+              "bias": 0.02573930916248037,
+              "bias_interval": [
+                -0.12012637060633458,
+                0.17462920638737173
+              ],
+              "mean_forecast": 4.257620188482731,
+              "mean_realized": 4.283359497645212,
+              "rows": 1274
+            },
+            "who_plays": {
+              "appearances": 1274.0,
+              "bias": 0.013798133772058824,
+              "bias_interval": [
+                0.004168769049742646,
+                0.023328088684448526
+              ],
+              "forecast_appearances": 1255.2345380699999,
+              "rows": 1360
+            }
+          },
+          "all": {
+            "bias": 0.032383780945588234,
+            "bias_interval": [
+              -0.05038018683868566,
+              0.11228391407612134
+            ],
+            "decisions": 34,
+            "forecast_points": 15592.832231656,
+            "mean_absolute_error": 2.2506930084386028,
+            "realized_points": 15769.0,
+            "rows": 5440,
+            "what_they_score_when_they_play": {
+              "bias": 0.03273031674492205,
+              "bias_interval": [
+                -0.06922210461648567,
+                0.1346927738925502
+              ],
+              "mean_forecast": 3.6916437975677847,
+              "mean_realized": 3.7243741143127065,
+              "rows": 4234
+            },
+            "who_plays": {
+              "appearances": 4234.0,
+              "bias": 0.0013665497985294098,
+              "bias_interval": [
+                -0.007546161077141543,
+                0.010187045096902573
+              ],
+              "forecast_appearances": 4226.565969096,
+              "rows": 5440
+            }
+          }
+        }
+      },
+      "2023-24": {
+        "all": {
+          "bias": 0.020184537908991884,
+          "bias_interval": [
+            0.0053175399785540525,
+            0.035512398566484915
+          ],
+          "decisions": 35,
+          "forecast_points": 28353.606862711,
+          "mean_absolute_error": 0.9930416078274114,
+          "realized_points": 28891.0,
+          "rows": 26624,
+          "what_they_score_when_they_play": {
+            "bias": 0.04137217098929588,
+            "bias_interval": [
+              0.0031401052777743836,
+              0.08303857718937965
+            ],
+            "mean_forecast": 2.795807442091329,
+            "mean_realized": 2.8371796130806244,
+            "rows": 10183
+          },
+          "who_plays": {
+            "appearances": 10183.0,
+            "bias": 0.0007808421950120197,
+            "bias_interval": [
+              -0.0011011835925432965,
+              0.0027571052286435695
+            ],
+            "forecast_appearances": 10162.210857400001,
+            "rows": 26624
+          }
+        },
+        "by_forecast_size": {
+          "1.0_to_2.5": {
+            "bias": -0.03720844542723356,
+            "bias_interval": [
+              -0.08738774671849989,
+              0.01579823327145565
+            ],
+            "decisions": 35,
+            "forecast_points": 9727.655890136,
+            "mean_absolute_error": 1.6610398268226259,
+            "realized_points": 9529.0,
+            "rows": 5339,
+            "what_they_score_when_they_play": {
+              "bias": -0.07924968634526473,
+              "bias_interval": [
+                -0.14217113495795697,
+                -0.012770535054445776
+              ],
+              "mean_forecast": 2.4478800616870493,
+              "mean_realized": 2.3686303753417848,
+              "rows": 4023
+            },
+            "who_plays": {
+              "appearances": 4023.0,
+              "bias": 0.00586963504139352,
+              "bias_interval": [
+                -0.0040424176511059794,
+                0.015405651347800342
+              ],
+              "forecast_appearances": 3991.662018514,
+              "rows": 5339
+            }
+          },
+          "2.5_to_4.0": {
+            "bias": 0.10128474866802135,
+            "bias_interval": [
+              0.027402353504389347,
+              0.17136810406994218
+            ],
+            "decisions": 35,
+            "forecast_points": 11762.241944494,
+            "mean_absolute_error": 2.3801946734665984,
+            "realized_points": 12161.0,
+            "rows": 3937,
+            "what_they_score_when_they_play": {
+              "bias": 0.09115833880547793,
+              "bias_interval": [
+                0.014493527555479028,
+                0.16888162611361326
+              ],
+              "mean_forecast": 3.307667821060369,
+              "mean_realized": 3.398826159865847,
+              "rows": 3578
+            },
+            "who_plays": {
+              "appearances": 3578.0,
+              "bias": 0.0072824323157226305,
+              "bias_interval": [
+                -0.0005461624834203318,
+                0.01569735778619186
+              ],
+              "forecast_appearances": 3549.329063973,
+              "rows": 3937
+            }
+          },
+          "4.0_and_above": {
+            "bias": 0.4687663612674771,
+            "bias_interval": [
+              0.11157094037832765,
+              0.7909642327428055
+            ],
+            "decisions": 35,
+            "forecast_points": 3218.551734286,
+            "mean_absolute_error": 3.7167319444437683,
+            "realized_points": 3527.0,
+            "rows": 658,
+            "what_they_score_when_they_play": {
+              "bias": 0.6049814171552288,
+              "bias_interval": [
+                0.24405232329996668,
+                0.934931085196057
+              ],
+              "mean_forecast": 5.1580904782696075,
+              "mean_realized": 5.7630718954248366,
+              "rows": 612
+            },
+            "who_plays": {
+              "appearances": 612.0,
+              "bias": -0.015560769389057752,
+              "bias_interval": [
+                -0.03195967697507152,
+                -0.0018487198350210644
+              ],
+              "forecast_appearances": 622.238986258,
+              "rows": 658
+            }
+          },
+          "under_1.0": {
+            "bias": 0.0017281429721390028,
+            "bias_interval": [
+              -0.012818345151770334,
+              0.016592379435760928
+            ],
+            "decisions": 35,
+            "forecast_points": 3645.1572937950004,
+            "mean_absolute_error": 0.344758063661414,
+            "realized_points": 3674.0,
+            "rows": 16690,
+            "what_they_score_when_they_play": {
+              "bias": 0.022183320713705573,
+              "bias_interval": [
+                -0.06382653138239262,
+                0.11230947471493498
+              ],
+              "mean_forecast": 1.8427912985756345,
+              "mean_realized": 1.8649746192893402,
+              "rows": 1970
+            },
+            "who_plays": {
+              "appearances": 1970.0,
+              "bias": -0.001736416336429,
+              "bias_interval": [
+                -0.0060691918114645265,
+                0.002722599704200877
+              ],
+              "forecast_appearances": 1998.980788655,
+              "rows": 16690
+            }
+          }
+        },
+        "by_prior_minutes": {
+          "30_to_60": {
+            "bias": 0.13224731020982905,
+            "bias_interval": [
+              0.06938634307966028,
+              0.19099754090756524
+            ],
+            "decisions": 35,
+            "forecast_points": 8128.082588218,
+            "mean_absolute_error": 1.639024708403846,
+            "realized_points": 8747.0,
+            "rows": 4680,
+            "what_they_score_when_they_play": {
+              "bias": 0.08116210096245954,
+              "bias_interval": [
+                -0.0030803473530643713,
+                0.15879656155938063
+              ],
+              "mean_forecast": 2.74958223560712,
+              "mean_realized": 2.8307443365695795,
+              "rows": 3090
+            },
+            "who_plays": {
+              "appearances": 3090.0,
+              "bias": 0.03874637440192307,
+              "bias_interval": [
+                0.030819680034417492,
+                0.04625647496469228
+              ],
+              "forecast_appearances": 2908.666967799,
+              "rows": 4680
+            }
+          },
+          "60_and_above": {
+            "bias": 0.12166467711086114,
+            "bias_interval": [
+              0.041602458680148856,
+              0.20368150682381855
+            ],
+            "decisions": 35,
+            "forecast_points": 13462.181393605,
+            "mean_absolute_error": 2.2720205364109223,
+            "realized_points": 14057.0,
+            "rows": 4889,
+            "what_they_score_when_they_play": {
+              "bias": 0.09726311539832135,
+              "bias_interval": [
+                0.014965826427644113,
+                0.1812148851647039
+              ],
+              "mean_forecast": 3.2737200980309353,
+              "mean_realized": 3.3709832134292568,
+              "rows": 4170
+            },
+            "who_plays": {
+              "appearances": 4170.0,
+              "bias": 0.017268564983227656,
+              "bias_interval": [
+                0.008466827285048112,
+                0.026391181292447156
+              ],
+              "forecast_appearances": 4085.573985797,
+              "rows": 4889
+            }
+          },
+          "none": {
+            "bias": -0.10767892282603736,
+            "bias_interval": [
+              -0.11842824540431521,
+              -0.09621630956675087
+            ],
+            "decisions": 35,
+            "forecast_points": 1325.024816043,
+            "mean_absolute_error": 0.16285305415114107,
+            "realized_points": 287.0,
+            "rows": 9640,
+            "what_they_score_when_they_play": {
+              "bias": -0.15460145873255818,
+              "bias_interval": [
+                -0.4313780706122738,
+                0.15505361924462976
+              ],
+              "mean_forecast": 1.8232061098953487,
+              "mean_realized": 1.6686046511627908,
+              "rows": 172
+            },
+            "who_plays": {
+              "appearances": 172.0,
+              "bias": -0.056802621450311196,
+              "bias_interval": [
+                -0.060745682356448526,
+                -0.052659102202196245
+              ],
+              "forecast_appearances": 719.5772707809999,
+              "rows": 9640
+            }
+          },
+          "under_30": {
+            "bias": 0.04877706475455159,
+            "bias_interval": [
+              0.014116985111282848,
+              0.08710671167434729
+            ],
+            "decisions": 35,
+            "forecast_points": 5438.318064845,
+            "mean_absolute_error": 0.8213475774695886,
+            "realized_points": 5800.0,
+            "rows": 7415,
+            "what_they_score_when_they_play": {
+              "bias": -0.07578837335478006,
+              "bias_interval": [
+                -0.15720046733365559,
+                0.005626278692785061
+              ],
+              "mean_forecast": 2.184112619083606,
+              "mean_realized": 2.108324245728826,
+              "rows": 2751
+            },
+            "who_plays": {
+              "appearances": 2751.0,
+              "bias": 0.04081016412366824,
+              "bias_interval": [
+                0.03228256362379233,
+                0.05027964150733593
+              ],
+              "forecast_appearances": 2448.392633023,
+              "rows": 7415
+            }
+          }
+        },
+        "decisions": 35,
+        "rows": 26624,
+        "rows_without_a_prior": 0,
+        "top_per_position": {
+          "DEF": {
+            "bias": -0.07274175695928571,
+            "bias_interval": [
+              -0.21594143734042856,
+              0.06832499096646427
+            ],
+            "decisions": 35,
+            "forecast_points": 4099.8384597429995,
+            "mean_absolute_error": 2.6243675945421425,
+            "realized_points": 3998.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": -0.07138083793779905,
+              "bias_interval": [
+                -0.2282167270044954,
+                0.08389254906099512
+              ],
+              "mean_forecast": 3.2595786050829347,
+              "mean_realized": 3.1881977671451356,
+              "rows": 1254
+            },
+            "who_plays": {
+              "appearances": 1254.0,
+              "bias": -0.0015013057807142837,
+              "bias_interval": [
+                -0.01573503101282143,
+                0.01163977008246428
+              ],
+              "forecast_appearances": 1256.101828093,
+              "rows": 1400
+            }
+          },
+          "FWD": {
+            "bias": 0.19103286800499997,
+            "bias_interval": [
+              0.05971845918167855,
+              0.3265239646649286
+            ],
+            "decisions": 35,
+            "forecast_points": 3541.553984793,
+            "mean_absolute_error": 2.1829120121578574,
+            "realized_points": 3809.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.28681833868629253,
+              "bias_interval": [
+                0.120616474369656,
+                0.4553119288851782
+              ],
+              "mean_forecast": 3.217321495720331,
+              "mean_realized": 3.5041398344066237,
+              "rows": 1087
+            },
+            "who_plays": {
+              "appearances": 1087.0,
+              "bias": 0.000305476911428573,
+              "bias_interval": [
+                -0.01278101086407143,
+                0.013303349014321428
+              ],
+              "forecast_appearances": 1086.572332324,
+              "rows": 1400
+            }
+          },
+          "GK": {
+            "bias": 0.1619564158807143,
+            "bias_interval": [
+              0.08460429420603573,
+              0.23836770165878568
+            ],
+            "decisions": 35,
+            "forecast_points": 1995.2610177669999,
+            "mean_absolute_error": 1.229317736365,
+            "realized_points": 2222.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.3221158372474074,
+              "bias_interval": [
+                0.15834081410254625,
+                0.4786426085600566
+              ],
+              "mean_forecast": 2.969736014604444,
+              "mean_realized": 3.291851851851852,
+              "rows": 675
+            },
+            "who_plays": {
+              "appearances": 675.0,
+              "bias": -0.0011240939985714287,
+              "bias_interval": [
+                -0.0075426330984642844,
+                0.00491652307967857
+              ],
+              "forecast_appearances": 676.5737315980001,
+              "rows": 1400
+            }
+          },
+          "MID": {
+            "bias": 0.3674287984992858,
+            "bias_interval": [
+              0.1950419785979286,
+              0.5413328637789642
+            ],
+            "decisions": 35,
+            "forecast_points": 5198.599682101,
+            "mean_absolute_error": 2.8496543700807146,
+            "realized_points": 5713.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.38926456333256354,
+              "bias_interval": [
+                0.20305295646506305,
+                0.5690539495906737
+              ],
+              "mean_forecast": 4.008733897021555,
+              "mean_realized": 4.397998460354119,
+              "rows": 1299
+            },
+            "who_plays": {
+              "appearances": 1299.0,
+              "bias": 0.005399932160000002,
+              "bias_interval": [
+                -0.0076142865645,
+                0.018184913891642854
+              ],
+              "forecast_appearances": 1291.440094976,
+              "rows": 1400
+            }
+          },
+          "all": {
+            "bias": 0.16191908135642855,
+            "bias_interval": [
+              0.10098773031858926,
+              0.22212121164125892
+            ],
+            "decisions": 35,
+            "forecast_points": 14835.253144404,
+            "mean_absolute_error": 2.2215629282864287,
+            "realized_points": 15742.0,
+            "rows": 5600,
+            "what_they_score_when_they_play": {
+              "bias": 0.21908292498006954,
+              "bias_interval": [
+                0.14111950312811136,
+                0.297409980827135
+              ],
+              "mean_forecast": 3.429121014765006,
+              "mean_realized": 3.648203939745075,
+              "rows": 4315
+            },
+            "who_plays": {
+              "appearances": 4315.0,
+              "bias": 0.0007700023230357148,
+              "bias_interval": [
+                -0.005374139225589286,
+                0.0068378411740178556
+              ],
+              "forecast_appearances": 4310.687986991,
+              "rows": 5600
+            }
+          }
+        }
+      },
+      "2024-25": {
+        "all": {
+          "bias": 0.014604436948738553,
+          "bias_interval": [
+            0.00031936795465087894,
+            0.029805600896952576
+          ],
+          "decisions": 35,
+          "forecast_points": 28475.466355472,
+          "mean_absolute_error": 1.0232915257820183,
+          "realized_points": 28839.0,
+          "rows": 24892,
+          "what_they_score_when_they_play": {
+            "bias": -0.012566188230901294,
+            "bias_interval": [
+              -0.04610485061698185,
+              0.02301178392781868
+            ],
+            "mean_forecast": 2.7630669035384834,
+            "mean_realized": 2.7505007153075822,
+            "rows": 10485
+          },
+          "who_plays": {
+            "appearances": 10485.0,
+            "bias": 0.007271015229832877,
+            "bias_interval": [
+              0.005324587779217662,
+              0.009388074132545794
+            ],
+            "forecast_appearances": 10304.009888899,
+            "rows": 24892
+          }
+        },
+        "by_forecast_size": {
+          "1.0_to_2.5": {
+            "bias": 0.021934753793225122,
+            "bias_interval": [
+              -0.02037790036311046,
+              0.06484982471291216
+            ],
+            "decisions": 35,
+            "forecast_points": 10369.6738155,
+            "mean_absolute_error": 1.63287336408398,
+            "realized_points": 10494.0,
+            "rows": 5668,
+            "what_they_score_when_they_play": {
+              "bias": -0.013378219018438433,
+              "bias_interval": [
+                -0.07191982084641782,
+                0.046798447826003446
+              ],
+              "mean_forecast": 2.4021785832342366,
+              "mean_realized": 2.3888003642157978,
+              "rows": 4393
+            },
+            "who_plays": {
+              "appearances": 4393.0,
+              "bias": 0.009117499180310514,
+              "bias_interval": [
+                0.001414075426113212,
+                0.016654595993472375
+              ],
+              "forecast_appearances": 4341.322014646,
+              "rows": 5668
+            }
+          },
+          "2.5_to_4.0": {
+            "bias": 0.020598172795138012,
+            "bias_interval": [
+              -0.048596555152707846,
+              0.09013112302950728
+            ],
+            "decisions": 35,
+            "forecast_points": 11819.657815632,
+            "mean_absolute_error": 2.3124810016738415,
+            "realized_points": 11901.0,
+            "rows": 3949,
+            "what_they_score_when_they_play": {
+              "bias": -0.0031522730083056597,
+              "bias_interval": [
+                -0.07567597038926921,
+                0.06662278071583909
+              ],
+              "mean_forecast": 3.2980027713471753,
+              "mean_realized": 3.2948504983388704,
+              "rows": 3612
+            },
+            "who_plays": {
+              "appearances": 3612.0,
+              "bias": 0.007882057828310966,
+              "bias_interval": [
+                9.052694005219518e-05,
+                0.01599656406495267
+              ],
+              "forecast_appearances": 3580.8737536360004,
+              "rows": 3949
+            }
+          },
+          "4.0_and_above": {
+            "bias": 0.17423132714951767,
+            "bias_interval": [
+              -0.15669412743375125,
+              0.4797467907674474
+            ],
+            "decisions": 35,
+            "forecast_points": 3134.628114513,
+            "mean_absolute_error": 3.6461389449115758,
+            "realized_points": 3243.0,
+            "rows": 622,
+            "what_they_score_when_they_play": {
+              "bias": 0.28207974850342465,
+              "bias_interval": [
+                -0.039598332605604664,
+                0.5769678353901129
+              ],
+              "mean_forecast": 5.271002443277397,
+              "mean_realized": 5.553082191780822,
+              "rows": 584
+            },
+            "who_plays": {
+              "appearances": 584.0,
+              "bias": -0.015131553771704179,
+              "bias_interval": [
+                -0.029158548331331528,
+                -0.0019132857357366836
+              ],
+              "forecast_appearances": 593.411826446,
+              "rows": 622
+            }
+          },
+          "under_1.0": {
+            "bias": 0.0033776967292022115,
+            "bias_interval": [
+              -0.007920316233980644,
+              0.014441897290899557
+            ],
+            "decisions": 35,
+            "forecast_points": 3151.506609827,
+            "mean_absolute_error": 0.32872179982208416,
+            "realized_points": 3201.0,
+            "rows": 14653,
+            "what_they_score_when_they_play": {
+              "bias": -0.11937475235917723,
+              "bias_interval": [
+                -0.18438449852364036,
+                -0.05875863699211831
+              ],
+              "mean_forecast": 1.8076658915996835,
+              "mean_realized": 1.6882911392405062,
+              "rows": 1896
+            },
+            "who_plays": {
+              "appearances": 1896.0,
+              "bias": 0.007343049602743466,
+              "bias_interval": [
+                0.002433602056421346,
+                0.01256405901706552
+              ],
+              "forecast_appearances": 1788.402294171,
+              "rows": 14653
+            }
+          }
+        },
+        "by_prior_minutes": {
+          "30_to_60": {
+            "bias": 0.05504088843966904,
+            "bias_interval": [
+              -0.0015739703655352,
+              0.10987301924410922
+            ],
+            "decisions": 35,
+            "forecast_points": 7597.517094399,
+            "mean_absolute_error": 1.5405706450569983,
+            "realized_points": 7837.0,
+            "rows": 4351,
+            "what_they_score_when_they_play": {
+              "bias": -0.05615972588597944,
+              "bias_interval": [
+                -0.12263675121225812,
+                0.0124216723746464
+              ],
+              "mean_forecast": 2.6537732492535633,
+              "mean_realized": 2.597613523367584,
+              "rows": 3017
+            },
+            "who_plays": {
+              "appearances": 3017.0,
+              "bias": 0.046343673698460125,
+              "bias_interval": [
+                0.03699448795572705,
+                0.055542106767875715
+              ],
+              "forecast_appearances": 2815.358675738,
+              "rows": 4351
+            }
+          },
+          "60_and_above": {
+            "bias": 0.15569702590779597,
+            "bias_interval": [
+              0.09533411803016341,
+              0.21710410276592543
+            ],
+            "decisions": 35,
+            "forecast_points": 14481.153950409,
+            "mean_absolute_error": 2.2655696209641962,
+            "realized_points": 15290.0,
+            "rows": 5195,
+            "what_they_score_when_they_play": {
+              "bias": 0.12915162653269577,
+              "bias_interval": [
+                0.06462450937903813,
+                0.19500581017787452
+              ],
+              "mean_forecast": 3.2716490852110764,
+              "mean_realized": 3.400800711743772,
+              "rows": 4496
+            },
+            "who_plays": {
+              "appearances": 4496.0,
+              "bias": 0.018155545264677574,
+              "bias_interval": [
+                0.010694713059132978,
+                0.02565209747240632
+              ],
+              "forecast_appearances": 4401.68194235,
+              "rows": 5195
+            }
+          },
+          "none": {
+            "bias": -0.09364853914901002,
+            "bias_interval": [
+              -0.10233542927583128,
+              -0.08350405672515905
+            ],
+            "decisions": 35,
+            "forecast_points": 942.3983375009999,
+            "mean_absolute_error": 0.1439069939214451,
+            "realized_points": 214.0,
+            "rows": 7778,
+            "what_they_score_when_they_play": {
+              "bias": -0.3805602628385093,
+              "bias_interval": [
+                -0.5378522344390623,
+                -0.23979751359349735
+              ],
+              "mean_forecast": 1.7097528094223602,
+              "mean_realized": 1.329192546583851,
+              "rows": 161
+            },
+            "who_plays": {
+              "appearances": 161.0,
+              "bias": -0.05077339240395989,
+              "bias_interval": [
+                -0.05571189193291457,
+                -0.04510196921055882
+              ],
+              "forecast_appearances": 555.9154461180001,
+              "rows": 7778
+            }
+          },
+          "under_30": {
+            "bias": 0.005761499317785414,
+            "bias_interval": [
+              -0.03127020367633669,
+              0.043268203910031965
+            ],
+            "decisions": 35,
+            "forecast_points": 5454.3969731629995,
+            "mean_absolute_error": 0.7769301008843816,
+            "realized_points": 5498.0,
+            "rows": 7568,
+            "what_they_score_when_they_play": {
+              "bias": -0.17136894385521165,
+              "bias_interval": [
+                -0.2511703299202415,
+                -0.09534507167162899
+              ],
+              "mean_forecast": 2.1272565283447173,
+              "mean_realized": 1.9558875844895056,
+              "rows": 2811
+            },
+            "who_plays": {
+              "appearances": 2811.0,
+              "bias": 0.03699077369278541,
+              "bias_interval": [
+                0.02844453924195682,
+                0.046581252811588744
+              ],
+              "forecast_appearances": 2531.053824693,
+              "rows": 7568
+            }
+          }
+        },
+        "decisions": 35,
+        "rows": 24892,
+        "rows_without_a_prior": 0,
+        "top_per_position": {
+          "DEF": {
+            "bias": 0.008329846460714283,
+            "bias_interval": [
+              -0.14538845639992856,
+              0.17190773822092859
+            ],
+            "decisions": 35,
+            "forecast_points": 4078.3382149550002,
+            "mean_absolute_error": 2.504501578487857,
+            "realized_points": 4090.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": -0.025541980797971913,
+              "bias_interval": [
+                -0.18815099090251922,
+                0.14434931290979916
+              ],
+              "mean_forecast": 3.2158695939024966,
+              "mean_realized": 3.1903276131045244,
+              "rows": 1282
+            },
+            "who_plays": {
+              "appearances": 1282.0,
+              "bias": 0.00881943609,
+              "bias_interval": [
+                -0.0034494043286071438,
+                0.020488361727035713
+              ],
+              "forecast_appearances": 1269.652789474,
+              "rows": 1400
+            }
+          },
+          "FWD": {
+            "bias": 0.11233052071,
+            "bias_interval": [
+              -0.0035741198994642936,
+              0.23212498398599998
+            ],
+            "decisions": 35,
+            "forecast_points": 3495.737271006,
+            "mean_absolute_error": 2.1852426226614283,
+            "realized_points": 3653.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.09410496644301466,
+              "bias_interval": [
+                -0.045795256652589655,
+                0.22971173195156255
+              ],
+              "mean_forecast": 3.263431798262868,
+              "mean_realized": 3.3575367647058822,
+              "rows": 1088
+            },
+            "who_plays": {
+              "appearances": 1088.0,
+              "bias": 0.027381399592857143,
+              "bias_interval": [
+                0.007074115494964287,
+                0.04632733603389285
+              ],
+              "forecast_appearances": 1049.66604057,
+              "rows": 1400
+            }
+          },
+          "GK": {
+            "bias": 0.24400761644642857,
+            "bias_interval": [
+              0.15407609876514283,
+              0.3327565811047499
+            ],
+            "decisions": 35,
+            "forecast_points": 1968.389336975,
+            "mean_absolute_error": 1.276192522942143,
+            "realized_points": 2310.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.47450342777272725,
+              "bias_interval": [
+                0.29633279118198225,
+                0.6543771369602412
+              ],
+              "mean_forecast": 2.9125933464208207,
+              "mean_realized": 3.3870967741935485,
+              "rows": 682
+            },
+            "who_plays": {
+              "appearances": 682.0,
+              "bias": 0.001828958994999997,
+              "bias_interval": [
+                -0.0028660857336785723,
+                0.006031935114392856
+              ],
+              "forecast_appearances": 679.4394574070001,
+              "rows": 1400
+            }
+          },
+          "MID": {
+            "bias": 0.03864792452785713,
+            "bias_interval": [
+              -0.11225975799175,
+              0.1865744193500714
+            ],
+            "decisions": 35,
+            "forecast_points": 5241.8929056609995,
+            "mean_absolute_error": 2.6637635090364284,
+            "realized_points": 5296.0,
+            "rows": 1400,
+            "what_they_score_when_they_play": {
+              "bias": 0.027857828062883457,
+              "bias_interval": [
+                -0.12656626070320628,
+                0.17553895282259
+              ],
+              "mean_forecast": 4.03349186518865,
+              "mean_realized": 4.061349693251533,
+              "rows": 1304
+            },
+            "who_plays": {
+              "appearances": 1304.0,
+              "bias": 0.004889886473571432,
+              "bias_interval": [
+                -0.0057346767020000034,
+                0.015376358139892857
+              ],
+              "forecast_appearances": 1297.154158937,
+              "rows": 1400
+            }
+          },
+          "all": {
+            "bias": 0.10082897703625,
+            "bias_interval": [
+              0.044504347472848226,
+              0.16009610683316072
+            ],
+            "decisions": 35,
+            "forecast_points": 14784.357728596999,
+            "mean_absolute_error": 2.1574250582819645,
+            "realized_points": 15349.0,
+            "rows": 5600,
+            "what_they_score_when_they_play": {
+              "bias": 0.09861784427043158,
+              "bias_interval": [
+                0.03311578589508217,
+                0.17125959012197142
+              ],
+              "mean_forecast": 3.425027702102387,
+              "mean_realized": 3.523645546372819,
+              "rows": 4356
+            },
+            "who_plays": {
+              "appearances": 4356.0,
+              "bias": 0.010729920287857141,
+              "bias_interval": [
+                0.004670410456794644,
+                0.01660649125017857
+              ],
+              "forecast_appearances": 4295.912446388,
+              "rows": 5600
+            }
+          }
+        }
+      }
+    },
+    "pooled": {
+      "all": {
+        "bias": 0.004762978174698168,
+        "bias_interval": [
+          -0.004815472413936009,
+          0.0148524560568641
+        ],
+        "decisions": 139,
+        "forecast_points": 115308.16371135201,
+        "mean_absolute_error": 1.0882846350694164,
+        "realized_points": 115765.0,
+        "rows": 95914,
+        "what_they_score_when_they_play": {
+          "bias": -0.00036474211371466197,
+          "bias_interval": [
+            -0.02068016795534578,
+            0.021216873860108447
+          ],
+          "mean_forecast": 2.932906033024648,
+          "mean_realized": 2.932541290910933,
+          "rows": 39476
+        },
+        "who_plays": {
+          "appearances": 39476.0,
+          "bias": 0.0013704894834643533,
+          "bias_interval": [
+            -0.00028182867035149943,
+            0.003033507262945887
+          ],
+          "forecast_appearances": 39344.55087168299,
+          "rows": 95914
+        }
+      },
+      "by_forecast_size": {
+        "1.0_to_2.5": {
+          "bias": 0.036997390420374476,
+          "bias_interval": [
+            0.005362201293078604,
+            0.06809694119958051
+          ],
+          "decisions": 139,
+          "forecast_points": 36158.935847128,
+          "mean_absolute_error": 1.6771780869304411,
+          "realized_points": 36894.0,
+          "rows": 19868,
+          "what_they_score_when_they_play": {
+            "bias": -0.007003277679082324,
+            "bias_interval": [
+              -0.04635123441014463,
+              0.032735587424713296
+            ],
+            "mean_forecast": 2.4964769618896088,
+            "mean_realized": 2.4894736842105263,
+            "rows": 14820
+          },
+          "who_plays": {
+            "appearances": 14820.0,
+            "bias": 0.012656288790567747,
+            "bias_interval": [
+              0.007617959754173233,
+              0.01747508462238672
+            ],
+            "forecast_appearances": 14568.544854309,
+            "rows": 19868
+          }
+        },
+        "2.5_to_4.0": {
+          "bias": -0.011190166319275614,
+          "bias_interval": [
+            -0.051799080339466966,
+            0.028916040570904383
+          ],
+          "decisions": 139,
+          "forecast_points": 48689.430241732,
+          "mean_absolute_error": 2.357871120208633,
+          "realized_points": 48509.0,
+          "rows": 16124,
+          "what_they_score_when_they_play": {
+            "bias": -0.014486946223349895,
+            "bias_interval": [
+              -0.05894950183394308,
+              0.029953688964562457
+            ],
+            "mean_forecast": 3.3636308291286245,
+            "mean_realized": 3.349143882905275,
+            "rows": 14484
+          },
+          "who_plays": {
+            "appearances": 14484.0,
+            "bias": 0.001415582184879681,
+            "bias_interval": [
+              -0.0034693590526002427,
+              0.006367295296080747
+            ],
+            "forecast_appearances": 14461.175152851,
+            "rows": 16124
+          }
+        },
+        "4.0_and_above": {
+          "bias": 0.12545467235737803,
+          "bias_interval": [
+            -0.03215185635052838,
+            0.2739486466962292
+          ],
+          "decisions": 139,
+          "forecast_points": 16676.855939654,
+          "mean_absolute_error": 3.5658911141676146,
+          "realized_points": 17096.0,
+          "rows": 3341,
+          "what_they_score_when_they_play": {
+            "bias": 0.23600631084297252,
+            "bias_interval": [
+              0.08624218173024507,
+              0.3808532019702503
+            ],
+            "mean_forecast": 5.28774166977092,
+            "mean_realized": 5.523747980613893,
+            "rows": 3095
+          },
+          "who_plays": {
+            "appearances": 3095.0,
+            "bias": -0.017393948988925472,
+            "bias_interval": [
+              -0.026285537909847282,
+              -0.009159685868249725
+            ],
+            "forecast_appearances": 3153.113183572,
+            "rows": 3341
+          }
+        },
+        "under_1.0": {
+          "bias": -0.009136312239762467,
+          "bias_interval": [
+            -0.0176259791965701,
+            -0.0006870962198973037
+          ],
+          "decisions": 139,
+          "forecast_points": 13782.941682838,
+          "mean_absolute_error": 0.37340453689818137,
+          "realized_points": 13266.0,
+          "rows": 56581,
+          "what_they_score_when_they_play": {
+            "bias": -0.060932681565211255,
+            "bias_interval": [
+              -0.10633502068554487,
+              -0.016893351909740745
+            ],
+            "mean_forecast": 1.9354557845749614,
+            "mean_realized": 1.87452310300975,
+            "rows": 7077
+          },
+          "who_plays": {
+            "appearances": 7077.0,
+            "bias": -0.0014972814363655646,
+            "bias_interval": [
+              -0.0043990839774834655,
+              0.0014076683630420213
+            ],
+            "forecast_appearances": 7161.717680951,
+            "rows": 56581
+          }
+        }
+      },
+      "by_prior_minutes": {
+        "30_to_60": {
+          "bias": 0.06169864809174734,
+          "bias_interval": [
+            0.0317806821858125,
+            0.09399057848672109
+          ],
+          "decisions": 139,
+          "forecast_points": 32220.405058312,
+          "mean_absolute_error": 1.6923252379760259,
+          "realized_points": 33291.0,
+          "rows": 17352,
+          "what_they_score_when_they_play": {
+            "bias": -0.016897058321434694,
+            "bias_interval": [
+              -0.05795597529990533,
+              0.02492266165137815
+            ],
+            "mean_forecast": 2.873512812568903,
+            "mean_realized": 2.8566157542474686,
+            "rows": 11654
+          },
+          "who_plays": {
+            "appearances": 11654.0,
+            "bias": 0.03777271409163209,
+            "bias_interval": [
+              0.033053665847807695,
+              0.042507205662657435
+            ],
+            "forecast_appearances": 10998.567865082001,
+            "rows": 17352
+          }
+        },
+        "60_and_above": {
+          "bias": 0.12326615676419236,
+          "bias_interval": [
+            0.0842605894892366,
+            0.16258965800055541
+          ],
+          "decisions": 139,
+          "forecast_points": 56199.462521303,
+          "mean_absolute_error": 2.3015736126465693,
+          "realized_points": 58614.0,
+          "rows": 19588,
+          "what_they_score_when_they_play": {
+            "bias": 0.10339802483939303,
+            "bias_interval": [
+              0.06195233390862515,
+              0.14519381455994704
+            ],
+            "mean_forecast": 3.384492483937757,
+            "mean_realized": 3.4878905087771495,
+            "rows": 16805
+          },
+          "who_plays": {
+            "appearances": 16805.0,
+            "bias": 0.014686261877731265,
+            "bias_interval": [
+              0.009937730136514769,
+              0.019362228808241268
+            ],
+            "forecast_appearances": 16517.325502339,
+            "rows": 19588
+          }
+        },
+        "none": {
+          "bias": -0.12108295950944258,
+          "bias_interval": [
+            -0.13001923720984424,
+            -0.1128967955035979
+          ],
+          "decisions": 139,
+          "forecast_points": 4735.2824556,
+          "mean_absolute_error": 0.1818460971173228,
+          "realized_points": 1023.0,
+          "rows": 30659,
+          "what_they_score_when_they_play": {
+            "bias": -0.2683495043759873,
+            "bias_interval": [
+              -0.42154942990992694,
+              -0.11608879017050888
+            ],
+            "mean_forecast": 1.8844632484518167,
+            "mean_realized": 1.6161137440758293,
+            "rows": 633
+          },
+          "who_plays": {
+            "appearances": 633.0,
+            "bias": -0.05946557536168825,
+            "bias_interval": [
+              -0.062287751962752894,
+              -0.05666571259715504
+            ],
+            "forecast_appearances": 2456.1550750139995,
+            "rows": 30659
+          }
+        },
+        "under_30": {
+          "bias": 0.02415632434621226,
+          "bias_interval": [
+            0.004145554687430702,
+            0.044638250305986116
+          ],
+          "decisions": 139,
+          "forecast_points": 22153.013676137,
+          "mean_absolute_error": 0.8602529239854141,
+          "realized_points": 22837.0,
+          "rows": 28315,
+          "what_they_score_when_they_play": {
+            "bias": -0.13339934641361711,
+            "bias_interval": [
+              -0.1803215369145967,
+              -0.0887096469957173
+            ],
+            "mean_forecast": 2.3326481907895804,
+            "mean_realized": 2.1992488443759632,
+            "rows": 10384
+          },
+          "who_plays": {
+            "appearances": 10384.0,
+            "bias": 0.03572302916305845,
+            "bias_interval": [
+              0.030942489135068474,
+              0.04071128049674969
+            ],
+            "forecast_appearances": 9372.502429248,
+            "rows": 28315
+          }
+        }
+      },
+      "decisions": 139,
+      "rows": 95914,
+      "rows_without_a_prior": 0,
+      "top_per_position": {
+        "DEF": {
+          "bias": -0.052189649025359705,
+          "bias_interval": [
+            -0.14086424384449642,
+            0.035958035657562955
+          ],
+          "decisions": 139,
+          "forecast_points": 17112.174448580998,
+          "mean_absolute_error": 2.671802118455216,
+          "realized_points": 16822.0,
+          "rows": 5560,
+          "what_they_score_when_they_play": {
+            "bias": -0.03332356184790493,
+            "bias_interval": [
+              -0.12889172077977423,
+              0.06186737765187207
+            ],
+            "mean_forecast": 3.4221229172064866,
+            "mean_realized": 3.388799355358582,
+            "rows": 4964
+          },
+          "who_plays": {
+            "appearances": 4964.0,
+            "bias": -0.00655861337913669,
+            "bias_interval": [
+              -0.013828783416834535,
+              0.0006679327400359726
+            ],
+            "forecast_appearances": 5000.465890388,
+            "rows": 5560
+          }
+        },
+        "FWD": {
+          "bias": -0.033154384213188795,
+          "bias_interval": [
+            -0.10189430942348747,
+            0.03646570024566542
+          ],
+          "decisions": 139,
+          "forecast_points": 14907.50951662,
+          "mean_absolute_error": 2.2490690400740743,
+          "realized_points": 14724.0,
+          "rows": 5535,
+          "what_they_score_when_they_play": {
+            "bias": -0.016202246947931192,
+            "bias_interval": [
+              -0.09807690390889727,
+              0.0689182139172654
+            ],
+            "mean_forecast": 3.438796389207345,
+            "mean_realized": 3.422594142259414,
+            "rows": 4302
+          },
+          "who_plays": {
+            "appearances": 4302.0,
+            "bias": 0.004024487380487804,
+            "bias_interval": [
+              -0.0052486423960935915,
+              0.012579023919757987
+            ],
+            "forecast_appearances": 4279.7244623490005,
+            "rows": 5535
+          }
+        },
+        "GK": {
+          "bias": 0.21866889657220118,
+          "bias_interval": [
+            0.17019683016953407,
+            0.26557645984252404
+          ],
+          "decisions": 139,
+          "forecast_points": 8314.043630713999,
+          "mean_absolute_error": 1.301841907601947,
+          "realized_points": 9527.0,
+          "rows": 5547,
+          "what_they_score_when_they_play": {
+            "bias": 0.47182605479984846,
+            "bias_interval": [
+              0.37576342450019024,
+              0.5705489249773956
+            ],
+            "mean_forecast": 3.139622011917362,
+            "mean_realized": 3.61144806671721,
+            "rows": 2638
+          },
+          "who_plays": {
+            "appearances": 2638.0,
+            "bias": -0.007387862838651523,
+            "bias_interval": [
+              -0.01064024188369999,
+              -0.004221161520337871
+            ],
+            "forecast_appearances": 2678.980475166,
+            "rows": 5547
+          }
+        },
+        "MID": {
+          "bias": 0.09166256428938849,
+          "bias_interval": [
+            0.008981701761375895,
+            0.17859226329290465
+          ],
+          "decisions": 139,
+          "forecast_points": 21325.356142550998,
+          "mean_absolute_error": 2.752489635207374,
+          "realized_points": 21835.0,
+          "rows": 5560,
+          "what_they_score_when_they_play": {
+            "bias": 0.12329375111648394,
+            "bias_interval": [
+              0.04066594895654103,
+              0.21104839566564612
+            ],
+            "mean_forecast": 4.151373437607087,
+            "mean_realized": 4.274667188723571,
+            "rows": 5108
+          },
+          "who_plays": {
+            "appearances": 5108.0,
+            "bias": -0.0026564937559352512,
+            "bias_interval": [
+              -0.010194840060980216,
+              0.00453219768856115
+            ],
+            "forecast_appearances": 5122.770105283,
+            "rows": 5560
+          }
+        },
+        "all": {
+          "bias": 0.05625242147257004,
+          "bias_interval": [
+            0.019170453509133434,
+            0.09167585755401977
+          ],
+          "decisions": 139,
+          "forecast_points": 61659.083738466,
+          "mean_absolute_error": 2.2443462908135303,
+          "realized_points": 62908.0,
+          "rows": 22202,
+          "what_they_score_when_they_play": {
+            "bias": 0.09636382470503174,
+            "bias_interval": [
+              0.050567217458350765,
+              0.1403414141393603
+            ],
+            "mean_forecast": 3.6014965091769335,
+            "mean_realized": 3.6978603338819656,
+            "rows": 17012
+          },
+          "who_plays": {
+            "appearances": 17012.0,
+            "bias": -0.0031502086832717767,
+            "bias_interval": [
+              -0.007346833857975467,
+              0.0009308731563135348
+            ],
+            "forecast_appearances": 17081.940933186,
+            "rows": 22202
+          }
+        }
+      }
+    }
+  },
+  "roster_is_the_evaluated_roster": true,
+  "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+  "rows_left_out_blank": 0,
+  "rows_left_out_without_a_forecast": 662,
+  "seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "stage_two_rule": [
+    {
+      "bucket": "none",
+      "opens_a_candidate": true,
+      "pooled_bias": -0.12108295950944258,
+      "pooled_interval": [
+        -0.13001923720984424,
+        -0.1128967955035979
+      ],
+      "pooled_interval_excludes_zero": true,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 4,
+      "split": "by_prior_minutes"
+    },
+    {
+      "bucket": "under_30",
+      "opens_a_candidate": true,
+      "pooled_bias": 0.02415632434621226,
+      "pooled_interval": [
+        0.004145554687430702,
+        0.044638250305986116
+      ],
+      "pooled_interval_excludes_zero": true,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 4,
+      "split": "by_prior_minutes"
+    },
+    {
+      "bucket": "30_to_60",
+      "opens_a_candidate": true,
+      "pooled_bias": 0.06169864809174734,
+      "pooled_interval": [
+        0.0317806821858125,
+        0.09399057848672109
+      ],
+      "pooled_interval_excludes_zero": true,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 4,
+      "split": "by_prior_minutes"
+    },
+    {
+      "bucket": "60_and_above",
+      "opens_a_candidate": true,
+      "pooled_bias": 0.12326615676419236,
+      "pooled_interval": [
+        0.0842605894892366,
+        0.16258965800055541
+      ],
+      "pooled_interval_excludes_zero": true,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 4,
+      "split": "by_prior_minutes"
+    },
+    {
+      "bucket": "under_1.0",
+      "opens_a_candidate": false,
+      "pooled_bias": -0.009136312239762467,
+      "pooled_interval": [
+        -0.0176259791965701,
+        -0.0006870962198973037
+      ],
+      "pooled_interval_excludes_zero": true,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 2,
+      "split": "by_forecast_size"
+    },
+    {
+      "bucket": "1.0_to_2.5",
+      "opens_a_candidate": true,
+      "pooled_bias": 0.036997390420374476,
+      "pooled_interval": [
+        0.005362201293078604,
+        0.06809694119958051
+      ],
+      "pooled_interval_excludes_zero": true,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 3,
+      "split": "by_forecast_size"
+    },
+    {
+      "bucket": "2.5_to_4.0",
+      "opens_a_candidate": false,
+      "pooled_bias": -0.011190166319275614,
+      "pooled_interval": [
+        -0.051799080339466966,
+        0.028916040570904383
+      ],
+      "pooled_interval_excludes_zero": false,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 2,
+      "split": "by_forecast_size"
+    },
+    {
+      "bucket": "4.0_and_above",
+      "opens_a_candidate": false,
+      "pooled_bias": 0.12545467235737803,
+      "pooled_interval": [
+        -0.03215185635052838,
+        0.2739486466962292
+      ],
+      "pooled_interval_excludes_zero": false,
+      "seasons_read": 4,
+      "seasons_with_the_pooled_sign": 3,
+      "split": "by_forecast_size"
+    }
+  ],
+  "table_has_the_evaluated_row_count": true,
+  "table_is_the_evaluated_table": false,
+  "table_rows": 101447,
+  "table_sha256": "167f3e6aeda0ab109140db3ffee60b6d196e07ab5ae4f8459921db66840af45d"
+}
