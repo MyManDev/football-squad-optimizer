@@ -104,6 +104,47 @@
           {
             "if": {
               "properties": {
+                "hold_reason": {
+                  "const": "gain_not_above_threshold"
+                }
+              },
+              "required": [
+                "hold_reason"
+              ]
+            },
+            "then": {
+              "properties": {
+                "gain_this_week": {
+                  "type": "number"
+                },
+                "reservation_allows_this_week": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "hold_reason": {
+                  "const": "reserved_for_structured_gameweek"
+                }
+              },
+              "required": [
+                "hold_reason"
+              ]
+            },
+            "then": {
+              "properties": {
+                "reservation_allows_this_week": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
                 "verdict": {
                   "enum": [
                     "window_not_open",
@@ -148,6 +189,27 @@
                   "type": "null"
                 },
                 "structured_gameweeks": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "verdict": {
+                  "enum": [
+                    "window_not_open"
+                  ]
+                }
+              },
+              "required": [
+                "verdict"
+              ]
+            },
+            "then": {
+              "properties": {
+                "points_at_gameweek": {
                   "type": "null"
                 }
               }
@@ -276,6 +338,22 @@
               {
                 "items": {
                   "additionalProperties": false,
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "clubs_doubling": {
+                          "minimum": 1
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "clubs_blank": {
+                          "minimum": 1
+                        }
+                      }
+                    }
+                  ],
                   "properties": {
                     "clubs_blank": {
                       "minimum": 0,
@@ -354,7 +432,8 @@
         "type": "object"
       },
       "maxItems": 4,
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "contract_version": {
       "const": "chip_forecast_v1",

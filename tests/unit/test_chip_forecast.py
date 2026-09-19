@@ -490,6 +490,79 @@ def test_a_chip_whose_window_has_not_opened_states_no_gain_and_no_threshold() ->
     _validate(document)
 
 
+def test_a_bench_boost_whose_window_has_not_opened_names_no_later_gameweek() -> None:
+    """The weakest number the module could produce, and it does not produce it.
+
+    A second-half chip asked in gameweek 5 would otherwise be answered with this gameweek's
+    projection carried fifteen weeks on fixture counts alone, for a chip nobody can play now.
+    """
+
+    document = chip_forecast(
+        _inputs(
+            [HeldChip("bboost", 20, 38, None)],
+            gameweek=5,
+            last=38,
+            # A double gameweek inside the window, which is what would have been named.
+            counts={20: {5: 2}},
+        )
+    )
+    chip = _only(document)
+
+    assert chip["verdict"] == "window_not_open"
+    assert chip["points_at_gameweek"] is None
+    assert chip["gain_this_week"] is None and chip["threshold_this_week"] is None
+    _validate(document)
+
+    # And the same chip inside its window does name one, so the test is not passing on a
+    # calendar that offered nothing.
+    inside = _forecast(
+        [HeldChip("bboost", 20, 38, None)], gameweek=19, last=38, counts={20: {5: 2}}
+    )
+    assert inside["verdict"] == "window_not_open"
+    later = _forecast(
+        [HeldChip("bboost", 20, 38, 1.0)], gameweek=20, last=38, counts={20: {5: 1}, 21: {5: 2}}
+    )
+    assert later["points_at_gameweek"] is not None
+
+
+def test_the_schema_refuses_the_documents_the_module_never_writes() -> None:
+    """Four shapes that validated before: the contract is what a publisher writes against."""
+
+    document = chip_forecast(_inputs([HeldChip("bboost", 2, 19, 1.0)], counts={10: {5: 2}}))
+    _validate(document)
+    chip = _only(document)
+    assert chip["verdict"] == "hold" and chip["hold_reason"] == "gain_not_above_threshold"
+
+    def refused(**changes: Any) -> None:
+        forged = json.loads(json.dumps(document))
+        forged["chips"][0].update(changes)
+        with pytest.raises(jsonschema.ValidationError):
+            _validate(forged)
+
+    # "The gain did not exceed the threshold", stating no gain.
+    refused(gain_this_week=None)
+    # The same hold, claiming the reservation refused it.
+    refused(reservation_allows_this_week=False)
+    # A chip held by the reservation that the reservation allowed.
+    refused(hold_reason="reserved_for_structured_gameweek", reservation_allows_this_week=True)
+
+    # A structured gameweek that is not structured by anything.
+    free_hit = chip_forecast(_inputs([HeldChip("freehit", 2, 19, None)], counts={12: {5: 2}}))
+    _validate(free_hit)
+    forged = json.loads(json.dumps(free_hit))
+    forged["chips"][0]["structured_gameweeks"] = [
+        {"gameweek": 12, "clubs_doubling": 0, "clubs_blank": 0}
+    ]
+    with pytest.raises(jsonschema.ValidationError):
+        _validate(forged)
+
+    # The same chip listed twice.
+    twice = json.loads(json.dumps(document))
+    twice["chips"] = [twice["chips"][0], json.loads(json.dumps(twice["chips"][0]))]
+    with pytest.raises(jsonschema.ValidationError):
+        _validate(twice)
+
+
 def test_a_gain_stated_outside_the_window_is_refused() -> None:
     with pytest.raises(ChipForecastError, match="outside its window"):
         _inputs([HeldChip("wildcard", 2, 19, 4.0)], gameweek=1)

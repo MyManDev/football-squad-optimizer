@@ -544,6 +544,11 @@ def _chip_forecast(chip: HeldChip, inputs: ChipForecastInputs) -> dict[str, obje
         ]
     if now < chip.first_gameweek:
         entry["verdict"] = VERDICT_WINDOW_NOT_OPEN
+        # A window that has not opened states no gain, no threshold and no later gameweek. The
+        # gameweek it would name is the weakest number here: this gameweek's projection carried
+        # to the window's own first weeks by fixture counts alone, for a chip nobody can play
+        # this week. The structured gameweeks stay: those are the calendar, not a projection.
+        entry["points_at_gameweek"] = None
         return entry
     threshold = holding_threshold(
         inputs.threshold, holding, chip.first_gameweek, chip.last_gameweek, now
@@ -597,7 +602,11 @@ def chip_forecast_schema() -> dict[str, Any]:
     The conditions at the end are the rule's honesty written as a contract: a verdict of
     play now needs a stated gain and names no later gameweek, unknown this gameweek
     means the gain is ``null`` and never a number, and a window that is not open states
-    neither a gain nor a threshold.
+    neither a gain, nor a threshold, nor a later gameweek. Two holds carry their own
+    condition: a chip held because its gain did not exceed the threshold has to state that
+    gain and to have been allowed this week, and a chip held by the reservation has to be
+    one the reservation refused. Neither is expressible as a type, and both were documents
+    the schema admitted while the module never wrote them.
     """
 
     gameweek = {"type": "integer", "minimum": 1}
@@ -623,6 +632,12 @@ def chip_forecast_schema() -> dict[str, Any]:
         },
         "required": ["gameweek", "clubs_doubling", "clubs_blank"],
         "additionalProperties": False,
+        # Listed because some club doubles or some club is blank. Neither, and the week is not
+        # structured and had no business being named.
+        "anyOf": [
+            {"properties": {"clubs_doubling": {"minimum": 1}}},
+            {"properties": {"clubs_blank": {"minimum": 1}}},
+        ],
     }
 
     def verdict_is(*verdicts: str) -> dict[str, Any]:
@@ -695,6 +710,27 @@ def chip_forecast_schema() -> dict[str, Any]:
                 "else": {"properties": {"hold_reason": null}},
             },
             {
+                # "The gain did not exceed the threshold" has to state the gain it means.
+                "if": {
+                    "properties": {"hold_reason": {"const": HOLD_BELOW_THRESHOLD}},
+                    "required": ["hold_reason"],
+                },
+                "then": {
+                    "properties": {
+                        "gain_this_week": {"type": "number"},
+                        "reservation_allows_this_week": {"const": True},
+                    }
+                },
+            },
+            {
+                # And its mirror: a chip held by the reservation is one the reservation refused.
+                "if": {
+                    "properties": {"hold_reason": {"const": HOLD_RESERVED}},
+                    "required": ["hold_reason"],
+                },
+                "then": {"properties": {"reservation_allows_this_week": {"const": False}}},
+            },
+            {
                 "if": verdict_is(VERDICT_WINDOW_NOT_OPEN, VERDICT_EXPIRED_WINDOW),
                 "then": {
                     "properties": {
@@ -707,6 +743,10 @@ def chip_forecast_schema() -> dict[str, Any]:
             {
                 "if": verdict_is(VERDICT_EXPIRED_WINDOW),
                 "then": {"properties": {"points_at_gameweek": null, "structured_gameweeks": null}},
+            },
+            {
+                "if": verdict_is(VERDICT_WINDOW_NOT_OPEN),
+                "then": {"properties": {"points_at_gameweek": null}},
             },
             {
                 "if": {
@@ -736,7 +776,12 @@ def chip_forecast_schema() -> dict[str, Any]:
             "reserve": {"type": "boolean"},
             "later_week_basis": {"type": "string", "const": LATER_WEEK_BASIS},
             "players_without_fixture_this_week": player_ids,
-            "chips": {"type": "array", "items": chip, "maxItems": len(CHIP_NAMES)},
+            "chips": {
+                "type": "array",
+                "items": chip,
+                "maxItems": len(CHIP_NAMES),
+                "uniqueItems": True,
+            },
             "limits": {
                 "type": "array",
                 "items": {"type": "string", "minLength": 1},
