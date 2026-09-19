@@ -40,9 +40,6 @@ const LeagueMemberHistoryPage = lazy(() =>
     default: m.LeagueMemberHistoryPage,
   })),
 );
-const AnalysisPage = lazy(() =>
-  import("../features/analysis/pages/AnalysisPage").then((m) => ({ default: m.AnalysisPage })),
-);
 const AdminPage = lazy(() =>
   import("../features/admin/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
@@ -109,8 +106,6 @@ function LocalizedApp({ basename }: { basename: string }) {
               <Route path="/fixtures" element={<FixturesPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/admin" element={<AdminPage />} />
-              <Route path="/analysis" element={<AnalysisPage />} />
-              <Route path="/analysis/:slug" element={<AnalysisPage />} />
               <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />
             </Routes>
           </Suspense>

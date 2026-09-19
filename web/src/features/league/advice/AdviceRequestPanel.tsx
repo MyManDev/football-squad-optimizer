@@ -42,6 +42,7 @@ export function AdviceRequestPanel({
   published = true,
   chipChosen = false,
   pending = false,
+  deadlinePassed = false,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
@@ -58,6 +59,11 @@ export function AdviceRequestPanel({
    * sentence about what Compute supports would be wrong a moment later, so it waits.
    */
   pending?: boolean;
+  /**
+   * The gameweek's deadline has passed. A plan for a closed week cannot be applied, so
+   * nothing is asked of the service and the panel says why; the page explains above it.
+   */
+  deadlinePassed?: boolean;
 }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -66,14 +72,16 @@ export function AdviceRequestPanel({
   const { state, compute } = job;
   const isSelf = viewer !== null && viewer.entryId === request.entryId;
   const supported =
-    service === "ready"
+    !deadlinePassed &&
+    (service === "ready"
       ? computable
-      : service !== "other-capture" && selectionAvailable && canComputeAdvice(request);
+      : service !== "other-capture" && selectionAvailable && canComputeAdvice(request));
 
   return (
     <Card tone="muted" title={copy.computeTitle}>
       <p className={styles.hint}>{isSelf ? copy.computeBodySelf : copy.computeBodyOther}</p>
-      {!supported && !pending && service !== "other-capture" ? (
+      {deadlinePassed ? <p role="note">{computeCopy.deadlinePassedCompute}</p> : null}
+      {!deadlinePassed && !supported && !pending && service !== "other-capture" ? (
         <p role="note">
           {service !== "ready"
             ? copy.computeUnsupportedSelection
@@ -82,8 +90,12 @@ export function AdviceRequestPanel({
               : computeCopy.notComputable}
         </p>
       ) : null}
-      {service === "unreachable" ? <p role="note">{computeCopy.serviceUnreachable}</p> : null}
-      {service === "other-capture" ? <p role="note">{computeCopy.otherCapture}</p> : null}
+      {!deadlinePassed && service === "unreachable" ? (
+        <p role="note">{computeCopy.serviceUnreachable}</p>
+      ) : null}
+      {!deadlinePassed && service === "other-capture" ? (
+        <p role="note">{computeCopy.otherCapture}</p>
+      ) : null}
       {service === "ready" && supported ? (
         <p role="note">
           {published ? null : <>{computeCopy.notPrecomputed} </>}
