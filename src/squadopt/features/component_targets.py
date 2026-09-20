@@ -14,12 +14,12 @@ else -- not ``minutes >= 60``, not lineup membership, not points -- and
 and a population is a pre-registration act, not something a builder may do on its own.
 
 The population is two seasons, and it is narrower than the set of seasons whose files carry
-the column. Those are different claims: ``data/sources/vaastav.py`` says which seasons the
-archive carries ``starts`` for *completely*, while :data:`START_TARGET_SUPPORTED_SEASONS`
-says which of them this contract may label. 2025-26 is carried and not labelled, because it
-is the locked holdout. A row outside the declared population gets ``pd.NA`` even when its
-season's column is right there -- missing, not zero, because what is absent is the
-declaration and not the data.
+the column. Those are different claims: ``src/squadopt/data/sources/vaastav.py`` says which
+seasons the archive carries ``starts`` for *completely*, while
+:data:`START_TARGET_SUPPORTED_SEASONS` says which of them this contract may label. 2025-26 is
+carried and not labelled, because it is the locked holdout. A row outside the declared
+population gets ``pd.NA`` even when its season's column is right there -- missing, not zero,
+because what is absent is the declaration and not the data.
 
 **Conditional minutes** and **conditional points** are the realized values on rows where
 the player appeared, and missing everywhere else. Missing, not zero: a player who did not
