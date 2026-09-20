@@ -245,6 +245,39 @@ def _stage_one(arguments: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def deciding_comparison(document: Mapping[str, Any]) -> str:
+    """Which comparison the protocol says decides, read from the forecast record.
+
+    ``docs/chip_threshold_induction_prereg.md`` makes this conditional rather than fixed:
+    ``induction - decaying`` decides, "if the pending chip forecast measurement drops the
+    reservation, the forecast's rule is ``threshold_only``, and then
+    ``induction - threshold_only`` is the comparison that decides".
+
+    Whether the reservation dropped is not a judgement either. ``chip_forecast_prereg.md``'s
+    amendment fixes it: ``decaying - threshold_only`` "decides whether the forecast keeps the
+    reservation: it keeps it when the pooled difference is positive, and drops it otherwise".
+    So this reads that comparison out of the committed record and applies the rule.
+
+    It is a predicate rather than a constant on purpose. The name was hard-coded here as
+    ``induction_minus_decaying``, which is the branch the conditional does **not** take on the
+    committed record, and a constant cannot notice that. Deriving it also means the choice
+    cannot be revisited once stage 2's own numbers are visible, which is the failure a
+    pre-registration exists to prevent.
+    """
+
+    for comparison in document["comparisons"]:
+        if str(comparison["variant"]) == "decaying" and str(comparison["baseline"]) == (
+            "threshold_only"
+        ):
+            difference = float(comparison["mean_weekly_advantage_points"])
+            kept = difference > 0.0
+            return "induction_minus_decaying" if kept else "induction_minus_threshold_only"
+    raise SystemExit(
+        "The chip forecast record carries no `decaying - threshold_only` comparison, so which "
+        "arm the forecast's rule is cannot be read and the deciding comparison cannot be named."
+    )
+
+
 def _stage_two(arguments: argparse.Namespace, stage_one: Mapping[str, Any]) -> dict[str, Any]:
     document = json.loads(arguments.chip_forecast_record.read_text(encoding="utf-8"))
     seasons = list(stage_one["seasons"])
@@ -336,7 +369,15 @@ def _stage_two(arguments: argparse.Namespace, stage_one: Mapping[str, Any]) -> d
         },
         "chains": chains,
         "comparisons": comparisons,
-        "deciding_comparison": "induction_minus_decaying",
+        "deciding_comparison": deciding_comparison(document),
+        "deciding_comparison_source": (
+            "Read from the forecast record rather than fixed here: "
+            "`chip_forecast_prereg.md`'s amendment keeps the reservation when "
+            "`decaying - threshold_only` is positive and drops it otherwise, and "
+            "`chip_threshold_induction_prereg.md` says the dropped case makes "
+            "`induction - threshold_only` the comparison that decides. Both are reported "
+            "either way, as that protocol requires."
+        ),
     }
 
 
