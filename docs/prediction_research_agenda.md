@@ -95,7 +95,7 @@ Not scheduled. Ordered by what each one needs from the ones before it.
 
 **Time-of-knowledge as a first-class property.** Today the guarantee is a `shift(1)` inside one
 primitive (`features/rolling.py:101`) plus a per-column timing classification in
-`data/schema.py` (`PRE_MATCH_COLUMNS`, `OUTCOME_COLUMNS`, `AMBIGUOUS_TIMING_COLUMNS`), and it is
+`src/squadopt/data/schema.py` (`PRE_MATCH_COLUMNS`, `OUTCOME_COLUMNS`, `AMBIGUOUS_TIMING_COLUMNS`), and it is
 enforced by mutation tests rather than by types. That is stronger than most projects manage and
 it is still a convention. The live path already has the real concept — a capture instant
 compared against a published deadline — and the archive cannot prove the same thing. Making the

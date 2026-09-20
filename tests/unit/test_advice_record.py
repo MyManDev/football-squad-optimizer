@@ -1078,3 +1078,23 @@ def test_a_record_that_could_not_land_still_leaves_every_other_member_recorded(
     recorded = load_member_advice_record(records, SEASON, 2, 202, world["gw2_id"])
     assert recorded["entry_id"] == 202
     assert list(entry_directory(records, SEASON, 2, 101).iterdir()) == []
+
+
+def test_the_record_keeps_an_absent_budget_flag_absent_rather_than_false() -> None:
+    """A document published before the producer carried these says nothing about them.
+
+    Reading a missing field as `False` would turn silence into the claim that the wall clock
+    did not stop the search, which is exactly the absent-is-not-zero rule in its boolean form.
+    A non-boolean is also absent: a string "true" is a document this reader does not
+    understand, not a fact it may assert.
+    """
+
+    from squadopt.application.advice_record import _flag
+
+    key = "wall_clock_stopped_the_search"
+    assert _flag({}, key) is None
+    assert _flag({key: None}, key) is None
+    assert _flag({key: "true"}, key) is None
+    assert _flag({key: 1}, key) is None
+    assert _flag({key: False}, key) is False
+    assert _flag({key: True}, key) is True

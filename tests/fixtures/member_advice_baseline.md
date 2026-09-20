@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory() as temporary:
                           rival_entry_id=None if strategy == 'saf-puan' else 202)
         payload.pop('source_snapshot_id', None)
         result[key] = payload
-    path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + chr(10),
+    path.write_text(json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + chr(10),
                     encoding='utf-8', newline=chr(10))
 '@ | python -
 ```

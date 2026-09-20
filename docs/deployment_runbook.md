@@ -132,6 +132,17 @@ There are two normal publications per gameweek from GW2 onward:
 2. **Settled:** after outcomes are settled, regenerate the public data and season summary,
    merge to `main`, tag it `...-settled`, dispatch, and require green smoke.
 
+For the GW5 scratch candidate produced by `python -m scripts.build_settled_site`, run
+`python -m scripts.check_league_tree <candidate>/data` and report its result, the complete
+changed-file list and the independent scoreboard cells before/after in #632 before a site-data
+PR. This checker does not replace verification of rebuilt season documents against the frozen
+schemas or of the frozen root index against the candidate's file list. The producer preserves
+accepted member advice bytes and never re-solves them. If an accepted advice document was
+re-rendered after its immutable record was written, even to add a reporting field, its hash
+can differ and publication refuses with "Recorded comparison does not match accepted advice".
+That refusal is the evidence guard working, not a silent overwrite or a producer defect.
+Stop and reconcile which accepted bytes and records belong together; do not bypass the guard.
+
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
 run sheet publishes the decision view after the deadline. The pre-deadline order above becomes
@@ -186,7 +197,13 @@ sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
 ```
 
 Replace the example's site PR, unused tag, release branch, content timestamp and
-summary with the accepted publication. The dry run prints every step and performs
+summary with the accepted publication. Read the exact `generated_at_utc` from
+`web/public/data/league/members.json` in that accepted candidate tree. Verification
+requires equality: the same tag can be re-dispatched, an older rollback refuses,
+and a fix release requires its own accepted stamp. A matching stamp identifies
+the publication claimed by that document; it is not a whole-tree byte comparison.
+A settled release also requires its gameweek as the sixth argument (for GW5, append `5`).
+The dry run prints every step and performs
 no network requests or writes. Remove `--dry-run` only when operating the release.
 The script waits for the site PR to merge, creates a two-parent release whose tree
 equals develop, waits for the release PR to be clean and merges it with a merge
@@ -233,7 +250,7 @@ whatever happens after it, so a run that uploads and then fails its smoke check 
 one. Previews spend from the same day and stop at eight; on a busy day the previews can be gone
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
-`deploy.sh <tag>` is the second stage. `verify_live.py <generated-after-ISO> [--settled <gameweek>]`
+`deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
 retains the eleven smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
@@ -255,17 +272,17 @@ against a backend that is not running it stops on a raw exception and prints non
 recovery guidance. It can only replace a running backend, never start one. If it is down,
 pull develop by hand and start the backend with `run_backend_local.ps1` instead, then carry
 on. The processes belong to the logon session and nothing restarts them, so a logoff or a
-reboot between the publish and this step leaves nothing to restart. Replace `<same-ISO>` with the generated-after timestamp
+reboot between the publish and this step leaves nothing to restart. Replace `<same-ISO>` with the accepted candidate timestamp
 used for `ship.sh`. First preview the restart:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO> -DryRun
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO> -DryRun
 ```
 
 Only for the intended restart, run the same command without `-DryRun`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -LiveGeneratedAfter <same-ISO>
+powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO>
 ```
 
 The script verifies the public site, requires the public capture to match the fetched
@@ -302,7 +319,7 @@ The complete operator order is: accept the recorded weekly tree, release the sit
 drain the backend queue, preview then run the restart command above from clean
 `develop`, and run the [manual browser check](#post-deployment-smoke). Both `ship.sh`
 and the restart helper run `verify_live.py`; to run it again by hand, use
-`python scripts/release/verify_live.py <generated-after-ISO> --settled <gameweek>`. A zero queue depth
+`python scripts/release/verify_live.py <accepted-generated-at-ISO> --settled <gameweek>`. A zero queue depth
 permits a restart; `-Force` is an explicit operator exception, not the normal command.
 `/ready` alone does not prove capture-ID or code-commit equality: its published-tree
 check is season/gameweek. `ship.sh` publishes the site only and does not restart the
@@ -330,22 +347,22 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
+The trusted smoke test makes **eleven** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
-Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
-`/league`, `/league/members/0`, `/analysis`, `/status`. The nested member path is there
+Eight are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
+`/league`, `/league/members/0`, `/analysis`, `/status`, `/fixtures`. The nested member path is there
 deliberately, because a path-scoped not-found rule would break a nested client-side route first
 and nothing else on the list would notice.
 
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and `/data/league/members.json`.
 
-**The tenth is the opposite check, and reading it as a 200 inverts it.**
+**The eleventh is the opposite check, and reading it as a 200 inverts it.**
 `/data/league/entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is seven 200s, two JSON 200s, and one 404.
+rather than the application shell. A green smoke is eight route 200s, two JSON 200s, and one 404.
 
 Transient edge and propagation failures are retried for roughly one minute.
 

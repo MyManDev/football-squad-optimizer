@@ -47,7 +47,7 @@ def fetch(path: str) -> tuple[int, bytes]:
         return error.code, b""
 
 
-def main(expected_generated_after: str, settled_gameweek: int | None = None) -> int:
+def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int:
     failures = 0
 
     print(f"== {len(ROUTES) + len(DOCUMENTS) + 1} smoke checks ==")
@@ -76,11 +76,11 @@ def main(expected_generated_after: str, settled_gameweek: int | None = None) -> 
     members = json.loads(body)
     generated = members.get("generated_at_utc", "")
     payload = members.get("payload", {})
-    fresh = generated > expected_generated_after
-    failures += not fresh
+    matches = generated == accepted_generated_at
+    failures += not matches
     print(
-        f"  {'ok ' if fresh else 'BAD'} generated_at_utc {generated}"
-        f"  (must be after {expected_generated_after})"
+        f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}"
+        f"  (must equal accepted {accepted_generated_at})"
     )
     print(
         f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
@@ -129,11 +129,11 @@ def main(expected_generated_after: str, settled_gameweek: int | None = None) -> 
 def _arguments(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "generated_after",
+        "accepted_generated_at",
         help=(
-            "the live publication must be stamped strictly after this UTC time. Read it from the "
-            "tree being published, not from the clock: it is what build_league_site stamped, hours "
-            "before the deploy. A value below what the site serves already makes this vacuous."
+            "the live publication's generated_at_utc must equal this accepted candidate stamp. "
+            "Read the exact value from web/public/data/league/members.json in the accepted "
+            "publication tree, not from the clock or the previous live site."
         ),
     )
     parser.add_argument(
@@ -147,4 +147,4 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
 
 if __name__ == "__main__":
     parsed = _arguments(sys.argv[1:])
-    sys.exit(main(parsed.generated_after, parsed.settled))
+    sys.exit(main(parsed.accepted_generated_at, parsed.settled))

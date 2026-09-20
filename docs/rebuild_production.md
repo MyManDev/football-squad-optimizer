@@ -173,11 +173,12 @@ replacement-PC startup and logon persistence are **never exercised**.
 
 ## 6. Prove what the member can read
 
-Use a UTC time strictly before the accepted publication's `generated_at_utc`, not the verifier's historical
-default and not the recovery time (restoring a PC does not republish the site):
+Use the exact `generated_at_utc` from `web/public/data/league/members.json` in the accepted
+publication tree. The verifier requires equality, including for a same-tag re-dispatch.
+Do not use the recovery time (restoring a PC does not republish the site):
 
 ```powershell
-.venv\Scripts\python.exe scripts/release/verify_live.py <accepted-generated-after-UTC>
+.venv\Scripts\python.exe scripts/release/verify_live.py <accepted-generated-at-UTC>
 Push-Location web
 $env:LIVE_BASE_URL = 'https://squadopt.mymandev.com'
 $env:LIVE_SMOKE_COMPUTE = '1'

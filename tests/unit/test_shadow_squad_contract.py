@@ -108,6 +108,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "captain_agreement",
         "difference_makers",
         "solver_status",
+        "wall_clock_stopped_the_search",
         "optimality_gap",
         "captain",
         "vice_captain",

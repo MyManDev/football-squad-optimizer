@@ -84,7 +84,8 @@ choice.
 **Status: resolved, and the two sources answer differently.** The inspection has now
 happened on both paths, and the outcome is not one classification but two.
 
-*The live path is verified pre-deadline.* `scripts/capture_deadline_snapshot.py` records
+*The live path is verified pre-deadline.* The capture, taken by `squadopt season tick`
+since the legacy shell was retired in #702, records
 `status` and `chance_of_playing_this_round` together with an explicit `captured_at_utc`
 that `normalize_utc_timestamp` refuses unless it is timezone-aware UTC, and the capture is
 immutable and checksummed. Capture-before-deadline is provable rather than assumed, which

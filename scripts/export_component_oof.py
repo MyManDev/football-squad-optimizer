@@ -150,8 +150,9 @@ ROSTER_CONTRACT_VERSION = "phase_c_decision_roster_v1"
 # one table two contracts.
 #
 # Ownership is deliberately absent. `selected_by_percent` is the only candidate the panel
-# carries and `data/schema.py` classifies it in `AMBIGUOUS_TIMING_COLUMNS`: its snapshot
-# timing cannot be proven from the schema, so it fails the "only if timing is verified"
+# carries, and `src/squadopt/data/schema.py` classifies it in `AMBIGUOUS_TIMING_COLUMNS`:
+# its snapshot timing cannot be proven from the schema, so it fails the "only if timing is
+# verified"
 # condition rather than passing it quietly.
 ROSTER_COLUMNS = (
     "contract_version",
