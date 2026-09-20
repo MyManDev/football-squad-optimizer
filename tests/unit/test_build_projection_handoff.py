@@ -23,6 +23,7 @@ from scripts import build_projection_handoff as command
 from tests.unit.test_live_transfers import EVENTS, SHAPE, TEAMS
 
 from squadopt.application import projection_handoff as producer
+from squadopt.contracts import OPTIONAL_COLUMNS
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
@@ -45,6 +46,7 @@ from squadopt.prediction.in_season import (
     IN_SEASON_FEATURE_CONTRACT_VERSION,
     IN_SEASON_MODEL_VERSION,
 )
+from squadopt.scenarios.components import COMPONENT_INPUT_COLUMNS
 
 SEASON = "2026-27"
 HISTORY_SEASON = "2025-26"
@@ -783,11 +785,78 @@ def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
     assert diagnostics["route:component_model"] == 1
     assert diagnostics["route:direct_control"] == 1
     assert diagnostics["component_history_incomplete_players"] == 1
+    # The chance the player appears is estimated for the component-model row and missing for
+    # the direct-control one, which is the whole point of carrying it: the consumer can tell
+    # "the model says a third" from "nobody modelled this player".
+    assert by_player.loc[1001, "appearance_probability"] == pytest.approx(2.0 / 3.0, abs=0.05)
+    assert pd.isna(by_player.loc[1002, "appearance_probability"])
+    # One column, not two. The sampler's frame carries the producer's own copy under this
+    # name, and a merge that let both through would rename them ``_x`` and ``_y``.
+    assert list(table.columns).count("appearance_probability") == 1
     if include_components:
         assert by_player.loc[1001, "raw_expected_points_if_appearance"] == pytest.approx(
             conditional_points
         )
         assert pd.isna(by_player.loc[1002, "raw_expected_points_if_appearance"])
         assert diagnostics["component_training_data_fingerprint"]
+        # ``_phase_e_live`` joins the decision pool for ``team_id`` and ``position`` and then
+        # narrows to these; every other name it needs has to come from here under one spelling.
+        assert {
+            name for name in COMPONENT_INPUT_COLUMNS if name not in {"team_id", "position"}
+        } <= set(table.columns)
     else:
-        assert list(table.columns) == ["player_id", "expected_points"]
+        assert list(table.columns) == ["player_id", "expected_points", "appearance_probability"]
+
+
+# --- which optional columns a week's components actually estimated -----------------------
+
+
+def _components(**columns: object) -> pd.DataFrame:
+    """A composed component table narrowed to the fields the carry rule reads."""
+
+    frame = pd.DataFrame({"player_id": [1, 2, 3], "fixture_count": [1, 1, 1]})
+    for name, values in columns.items():
+        frame[name] = values
+    return frame
+
+
+def test_an_estimated_optional_column_is_carried() -> None:
+    frame = _components(appearance_probability=[0.9, None, 0.4])
+
+    assert producer._carried(frame) == ["appearance_probability"]
+
+
+def test_a_column_no_row_filled_is_not_carried() -> None:
+    """An all-absent column is the promise of a number, and the consumer falls back anyway."""
+
+    frame = _components(appearance_probability=[None, None, None])
+
+    assert producer._carried(frame) == []
+
+
+def test_a_column_the_components_do_not_declare_is_not_invented() -> None:
+    assert producer._carried(_components()) == []
+
+
+def test_the_zeros_a_blank_gameweek_writes_do_not_make_a_column_estimated() -> None:
+    """``_compose`` zeroes every number of a no-fixture row, including one nobody estimates.
+
+    Counting those would make the carried set depend on whether some club is idle this week,
+    and would hand the consumer a column whose only filled rows say "will not start" about
+    players who are not playing. It is why ``start_probability`` stays out while the component
+    contract keeps declaring it.
+    """
+
+    frame = _components(start_probability=[0.0, None, None])
+    frame["fixture_count"] = [0, 1, 1]
+
+    assert producer._carried(frame) == []
+    assert producer._carried(frame.assign(fixture_count=[1, 1, 1])) == ["start_probability"]
+
+
+def test_the_carried_order_is_the_contract_order_not_the_frame_order() -> None:
+    """Two frames carrying the same columns have to narrow to the same shape."""
+
+    frame = _components(start_probability=[0.5, 0.5, 0.5], appearance_probability=[0.9, 0.9, 0.9])
+
+    assert producer._carried(frame) == list(OPTIONAL_COLUMNS)
