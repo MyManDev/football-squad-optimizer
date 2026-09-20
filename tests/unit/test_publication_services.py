@@ -3,7 +3,7 @@
 import json
 from collections.abc import Mapping
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -29,7 +29,9 @@ from squadopt.platform.publication_workers import league_mapper
 NOW = datetime(2026, 8, 27, 10, tzinfo=UTC)
 
 
-def publication_world(tmp_path: Path) -> LeaguePublicationRequest:
+def publication_world(
+    tmp_path: Path, *, complete_chip_calendar: bool = False
+) -> LeaguePublicationRequest:
     """A capture, archive and handoff generated entirely from synthetic fixture builders."""
 
     snapshot_root = tmp_path / "snapshots"
@@ -40,6 +42,35 @@ def publication_world(tmp_path: Path) -> LeaguePublicationRequest:
     # The worker fixture does not need it; no score has been confirmed in this fixture.
     for event in bootstrap["events"]:
         event["data_checked"] = False
+    if complete_chip_calendar:
+        # Exercise the real capture-to-panel club join, not a projection-derived map.
+        # These are synthetic fixtures covering the captured first-half chip windows.
+        last = max(chip["stop_event"] for chip in bootstrap["chips"] if chip["start_event"] <= 2)
+        deadline = datetime.fromisoformat(bootstrap["events"][-1]["deadline_time"])
+        for week in range(4, last + 1):
+            bootstrap["events"].append(
+                {
+                    "id": week,
+                    "deadline_time": (deadline + timedelta(weeks=week - 3)).isoformat(),
+                    "finished": False,
+                    "data_checked": False,
+                }
+            )
+        clubs = [team["id"] for team in bootstrap["teams"]]
+        payloads["fixtures.json"] = json.dumps(
+            [
+                {
+                    "id": week * 100 + pair,
+                    "event": week,
+                    "team_h": clubs[pair],
+                    "team_a": clubs[pair + 1],
+                    "finished": False,
+                    "kickoff_time": None,
+                }
+                for week in range(2, last + 1)
+                for pair in range(0, len(clubs), 2)
+            ]
+        ).encode("utf-8")
     payloads["bootstrap-static.json"] = json.dumps(bootstrap).encode("utf-8")
     snapshot_id = write_snapshot(
         snapshot_root,
@@ -181,7 +212,7 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
         return record_member_advice(root, record)
 
     monkeypatch.setattr(league_views, "record_member_advice", record_with_forecast)
-    request = publication_world(tmp_path)
+    request = publication_world(tmp_path, complete_chip_calendar=True)
     first = publish_league(request)
     assert first.report.rendered_count == 1
     assert first.gameweek == 2 and first.snapshot_id == request.snapshot_id
@@ -200,7 +231,10 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert first.report.files == second.report.files
     for output in (request.out_dir, parallel.out_dir):
         index = output / "data/league/advice" / str(member_fixture.ENTRY_ID) / "index.json"
-        assert "chip_forecast" in json.loads(index.read_text(encoding="utf-8"))["payload"]
+        forecast = json.loads(index.read_text(encoding="utf-8"))["payload"]["chip_forecast"]
+        assert forecast["status"] == "available", forecast
+        assert forecast["source_snapshot_id"] == request.snapshot_id
+        assert forecast["forecast"]["chips"]
     for name in first.report.files:
         assert (request.out_dir / "data/league" / name).read_bytes() == (
             parallel.out_dir / "data/league" / name
