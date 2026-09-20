@@ -195,6 +195,35 @@ describe("with the service answering", () => {
 });
 
 describe("with a service that cannot help right now", () => {
+  it.each(["tr", "en"] as const)("distinguishes all three publication states in %s", (language) => {
+    const copy = COMPUTE_COPY[language];
+    for (const published of [true, false, undefined]) {
+      const { container } = renderPanel({ service: "unreachable", published }, language);
+      const expected =
+        published === true
+          ? copy.serviceUnreachablePublished
+          : published === false
+            ? copy.serviceUnreachableAbsent
+            : copy.serviceUnreachable;
+      expect(container).toHaveTextContent(expected);
+      for (const other of [
+        copy.serviceUnreachablePublished,
+        copy.serviceUnreachableAbsent,
+        copy.serviceUnreachable,
+      ]) {
+        if (other !== expected) expect(container).not.toHaveTextContent(other);
+      }
+      cleanup();
+    }
+  });
+
+  it("keeps an unconfirmed publication unknown while preserving the ready-service duration", () => {
+    const { container } = renderPanel({ service: "ready", computable: true });
+    expect(container).not.toHaveTextContent(tr.notPrecomputed);
+    expect(container).toHaveTextContent(tr.duration[3]);
+    expect(container).toHaveTextContent(tr.durationNote);
+  });
+
   it("leaves a short notice and the static rule when it is down", () => {
     const { container, button } = renderPanel({
       service: "unreachable",
@@ -219,6 +248,25 @@ describe("with a service that cannot help right now", () => {
 });
 
 describe("a gameweek whose deadline has passed", () => {
+  it.each(["tr", "en"] as const)(
+    "describes retained plans as readable after failure in %s",
+    (language) => {
+      for (const phase of ["failed", "unavailable"] as const) {
+        const { container, button } = renderPanel(
+          {
+            deadlinePassed: true,
+            state: { phase, request: REQUEST, reason: "SERVICE_UNREACHABLE" },
+          },
+          language,
+        );
+        expect(button).toBeDisabled();
+        expect(container).toHaveTextContent(language === "tr" ? "okunabilir" : "available to read");
+        expect(container).not.toHaveTextContent(/geçerli|still stands/);
+        cleanup();
+      }
+    },
+  );
+
   it("asks nothing of a ready service and says why, in both languages", () => {
     for (const language of ["tr", "en"] as const) {
       const { button, compute } = renderPanel(

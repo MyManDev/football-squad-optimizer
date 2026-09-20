@@ -242,6 +242,7 @@ export function AdviceCard({
             : copy.controlGapUnknown}
         </p>
       ) : null}
+      {unproven ? <p className={styles.honesty}>{copy.unprovenPlanNextStep}</p> : null}
       {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
         <p className={styles.muted}>
           {copy.overlapLine(view.overlap_count)} ·{" "}
