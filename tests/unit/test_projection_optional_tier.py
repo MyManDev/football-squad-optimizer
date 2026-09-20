@@ -68,7 +68,7 @@ def _snapshot(table: pd.DataFrame) -> PredictionSnapshot:
 def test_the_two_tiers_do_not_overlap_and_canonical_is_their_concatenation() -> None:
     assert not set(REQUIRED_COLUMNS) & set(OPTIONAL_COLUMNS)
     assert (*REQUIRED_COLUMNS, *OPTIONAL_COLUMNS) == CANONICAL_COLUMNS
-    assert "start_probability" in OPTIONAL_COLUMNS
+    assert set(OPTIONAL_COLUMNS) == {"appearance_probability", "start_probability"}
 
 
 def test_a_frame_without_an_optional_column_narrows_exactly_as_before() -> None:
@@ -83,7 +83,41 @@ def test_an_optional_column_is_carried_and_an_unknown_one_is_not() -> None:
     assert canonical_columns_present(frame) == [*REQUIRED_COLUMNS, "start_probability"]
 
 
+def test_the_appearance_chance_is_in_the_tier_and_narrows_in_contract_order() -> None:
+    """The column the bench rule needs (#531), and the one a producer fills today.
+
+    Order is the contract's rather than the frame's, so a producer that happens to build its
+    columns the other way round still narrows to the same shape.
+    """
+
+    frame = _table(start_probability=[0.5] * 3, appearance_probability=[0.9, 0.4, 0.7])
+
+    assert canonical_columns_present(frame) == [*REQUIRED_COLUMNS, *OPTIONAL_COLUMNS]
+
+
 # --- the boundary the column has to cross -----------------------------------
+
+
+def test_a_supplied_appearance_probability_survives_the_projection_boundary() -> None:
+    """The boundary #621's task 4.1 is about: the producer fills it and the solve sees it."""
+
+    snapshot = _snapshot(_table(appearance_probability=[0.95, 0.40, 0.72]))
+
+    assert list(snapshot.table.columns) == [*REQUIRED_COLUMNS, "appearance_probability"]
+    assert snapshot.table["appearance_probability"].tolist() == [0.95, 0.40, 0.72]
+
+
+def test_an_appearance_chance_nobody_estimated_stays_absent() -> None:
+    """Absent is not zero, and here the difference is a bench order.
+
+    Ordering the bench by ``expected_points / appearance_probability`` reads a zero as a
+    division by zero rather than as "nobody modelled this player", so the absence has to
+    arrive as an absence.
+    """
+
+    snapshot = _snapshot(_table(appearance_probability=[0.95, None, 0.72]))
+
+    assert snapshot.table["appearance_probability"].isna().tolist() == [False, True, False]
 
 
 def test_a_supplied_start_probability_survives_the_projection_boundary() -> None:

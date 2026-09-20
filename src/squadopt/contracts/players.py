@@ -33,15 +33,26 @@ REQUIRED_COLUMNS: tuple[str, ...] = (
 #: (``docs/participation_model_prereg.md``) -- the composition, not the conditional ``q`` the
 #: model fits. The name is the one the component prediction contract already uses
 #: (``prediction/components.py``), where the column exists and is deliberately left absent:
-#: ``start_component_status`` returns ``"unavailable"`` and every component row sets it to
-#: ``None``. One quantity keeps one name across the boundary it crosses, so the day that
-#: column carries a number it does not have to be renamed to reach the solve.
+#: ``start_component_status`` returns ``"unavailable"`` and no component row estimates it. One
+#: quantity keeps one name across the boundary it crosses, so the day that column carries a
+#: number it does not have to be renamed to reach the solve.
 #:
-#: Nothing produces it into a live projection today. ``application/projection_handoff`` narrows
-#: the component snapshot to ``player_id`` and ``expected_points`` before it becomes a
-#: projection, which is the producer-side half and is left alone here: widening it while every
-#: value is ``None`` would add an all-absent column to every live run for no consumer.
-OPTIONAL_COLUMNS: tuple[str, ...] = ("start_probability",)
+#: Nothing produces ``start_probability`` into a live projection today, so it is named here
+#: and carried by nobody. The only non-absent values it takes are the zeros a blank gameweek
+#: writes into every number of its row, which say that a player who is not playing will not
+#: start rather than anything a model estimated; ``projection_handoff._carried`` is where that
+#: distinction is drawn.
+#:
+#: ``appearance_probability`` is the chance the player appears at all, substitute included, and
+#: it is the one the bench rule actually needs (#531). The exchange argument is short enough to
+#: keep here: the game walks the bench and skips a player who did not appear, so a bench player
+#: who is absent costs nothing and the first slot should hold whoever is worth most **if** they
+#: appear. Between two players the difference between the two orders is ``p1 * p2 * (c1 - c2)``,
+#: whose sign is the sign of ``c1 - c2``, so the order is by points given an appearance,
+#: ``expected_points / appearance_probability``. Dividing by ``start_probability`` instead would
+#: send a likely cameo to the top, which is the opposite of the intent. The component prediction
+#: contract already carries both names, and this one already carries numbers.
+OPTIONAL_COLUMNS: tuple[str, ...] = ("appearance_probability", "start_probability")
 
 #: Every recognised projection column, required first then optional. The shape ``data/schema``
 #: has carried one layer down since it was written, now that the projection needs it too.
