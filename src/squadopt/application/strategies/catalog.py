@@ -77,6 +77,10 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "difference_makers",
         "solver_status",
         "optimality_gap",
+        # What stopped the search, which the status alone does not say: whether the
+        # wall-clock safety cap ended it before its deterministic budget did. Not a
+        # probability, a share or a spread, and not a measure of anything.
+        "wall_clock_stopped_the_search",
         "captain",
         "vice_captain",
         "starting_xi",
@@ -117,6 +121,9 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # expected-points totals for one gameweek; what the chip would be worth in a
         # later one is not measured, and the document says so beside it.
         "chip_choice",
+        # Capture-bound fixture scaling of existing expected gains and declared rule
+        # thresholds, with refusal/provenance labels; no probability or calibrated spread.
+        "chip_forecast",
     }
 )
 
@@ -393,6 +400,10 @@ _BASELINE_PUBLISHES: Final = frozenset(
         "stated_limits",
         "solver_status",
         "optimality_gap",
+        # What stopped the search, which the status alone does not say: whether the
+        # wall-clock safety cap ended it before its deterministic budget did. Not a
+        # probability, a share or a spread, and not a measure of anything.
+        "wall_clock_stopped_the_search",
         "captain",
         "vice_captain",
         "starting_xi",

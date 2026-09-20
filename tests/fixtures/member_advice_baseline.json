@@ -201,6 +201,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 1
   },
   "ortak-koru/1": {
@@ -405,6 +406,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 1
   },
   "saf-puan/1": {
@@ -591,6 +593,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 1
   },
   "saf-puan/3": {
@@ -861,6 +864,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 3
   },
   "saf-puan/5": {
@@ -1183,6 +1187,7 @@
       "short_name": "1023",
       "team": "Club 4"
     },
+    "wall_clock_stopped_the_search": false,
     "window": 5
   }
 }

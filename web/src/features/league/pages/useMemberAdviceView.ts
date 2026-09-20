@@ -177,6 +177,8 @@ export function useMemberAdviceView(
     job: panelJob,
     request,
     shown,
+    computedForecast:
+      computed?.source === "api-cache" ? computed.envelope.payload.chip_forecast : undefined,
     rejectedContext,
     rejectedUnreadable,
   };

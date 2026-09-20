@@ -35,7 +35,7 @@ apart; a convenience default here would undo it in one line.
 
 import os
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 from squadopt.data.sources.club_news import (
@@ -51,6 +51,15 @@ from squadopt.data.sources.club_news_coding import (
     coding_prompt_sha256,
 )
 
+# Eager, and the laziness that matters is kept where it belongs. Registration needs the name
+# when this module is imported, so deferring the class while importing its constants would
+# defer nothing; the adapter's own heavy import, the HTTP client, stays behind a function call.
+from squadopt.platform.club_news_gemini import (
+    DEFAULT_GEMINI_MODEL,
+    GEMINI_PROVIDER,
+    GeminiClubNewsProvider,
+)
+
 #: Which adapter codes the week. No vendor name, by contract.
 PROVIDER_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_PROVIDER"
 
@@ -60,13 +69,18 @@ MODEL_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_MODEL"
 #: The key, read from the environment and never committed.
 KEY_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_API_KEY"
 
-#: The provider selected when nothing says otherwise: the one adapter that exists.
+#: The provider selected when nothing says otherwise: the adapter the coding contract was
+#: written against. A second adapter does not change it, because the model a run asks is
+#: recorded forever and an unconfigured run should keep asking the one the contract names.
 DEFAULT_PROVIDER: Final = "anthropic"
 
 #: Each adapter's own historical key variable, read only when the generic one is unset. This
 #: is a compatibility path and not the contract, which is why it is a lookup rather than a
 #: constant: a second adapter adds a row here and changes nothing else.
-VENDOR_KEY_VARIABLES: Final[Mapping[str, str]] = {"anthropic": "ANTHROPIC_API_KEY"}
+VENDOR_KEY_VARIABLES: Final[Mapping[str, str]] = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    GEMINI_PROVIDER: "GEMINI_API_KEY",
+}
 
 
 class ClubNewsProviderError(ClubNewsError):
@@ -84,7 +98,10 @@ class CodingProviderConfig:
 
     provider: str
     model_identifier: str
-    api_key: str
+    #: Out of the repr, because a dataclass prints itself into any log line, traceback or
+    #: debugger frame that touches it, and the one field here that must never appear in
+    #: one is this.
+    api_key: str = field(repr=False)
 
 
 #: Name -> a factory taking the resolved configuration. A second provider is one entry here
@@ -162,14 +179,18 @@ def resolve_provider_config(
 def _default_model(provider: str) -> str:
     """The model an adapter asks when the environment does not say.
 
-    Only the vendor the coding contract was written against has one: its identifier is part of
-    the frozen prompt's fingerprint, so defaulting to it keeps an unconfigured run producing
-    exactly the digest the contract describes. Any other provider must be told, because there
-    is no model this repository has declared for it.
+    Two providers declare one. The contract's own vendor defaults to the identifier that is
+    part of the frozen prompt's fingerprint, so an unconfigured run keeps producing exactly the
+    digest the contract describes. The free adapter declares the model its free tier serves,
+    which is what lets an operator select it with one variable instead of two. Any other
+    provider must be told, because there is no model this repository has declared for it, and a
+    guessed identifier would be recorded as though it had been chosen.
     """
 
     if provider == DEFAULT_PROVIDER:
         return CODING_MODEL_IDENTIFIER
+    if provider == GEMINI_PROVIDER:
+        return DEFAULT_GEMINI_MODEL
     raise ClubNewsProviderError(
         f"{MODEL_ENVIRONMENT_VARIABLE} is unset and provider {provider!r} declares no default "
         "model. Name the model: which one answered is recorded forever, so it is not a thing "
@@ -261,7 +282,14 @@ def _anthropic(config: CodingProviderConfig) -> ClubNewsProvider:
     )
 
 
+def _gemini(config: CodingProviderConfig) -> ClubNewsProvider:
+    """Build the free-tier adapter. Its HTTP client is built here and not before."""
+
+    return GeminiClubNewsProvider(api_key=config.api_key, model_identifier=config.model_identifier)
+
+
 register_provider(DEFAULT_PROVIDER, _anthropic)
+register_provider(GEMINI_PROVIDER, _gemini)
 
 
 __all__ = [

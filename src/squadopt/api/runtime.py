@@ -46,6 +46,9 @@ def _forwarded_trust() -> dict[str, object]:
     A programmatic server can override its environment. Its settings are unknown to an
     app factory, so do not report the environment as the effective configuration there.
     """
+    for name in ("FORWARDED_ALLOW_IPS", "UVICORN_FORWARDED_ALLOW_IPS"):
+        if "*" in {peer.strip() for peer in os.environ.get(name, "").split(",")}:
+            raise ValueError(f"{name} must name trusted proxy peers; wildcard trust is refused")
     unknown: dict[str, object] = {"trust_status": "unverified", "trust_source": "unknown launcher"}
     executable = Path(sys.argv[0])
     if not (
@@ -56,12 +59,16 @@ def _forwarded_trust() -> dict[str, object]:
     # Use Uvicorn's own option parser so CLI flags and UVICORN_* precedence match it.
     # Parsing a context does not invoke the command or start a server.
     with uvicorn_cli.make_context("uvicorn", sys.argv[1:]) as context:
+        allowed = context.params["forwarded_allow_ips"]
+        if allowed is not None and "*" in {peer.strip() for peer in allowed.split(",")}:
+            raise ValueError(
+                "--forwarded-allow-ips must name trusted proxy peers; wildcard trust is refused"
+            )
         if context.params["env_file"] is not None:
             # An env file may have changed the environment since CLI parsing. Without
             # that earlier environment we cannot reconstruct its effective options.
             return unknown
         enabled = context.params["proxy_headers"]
-        allowed = context.params["forwarded_allow_ips"]
         allow_source = context.get_parameter_source("forwarded_allow_ips")
         source = f"uvicorn {allow_source.name.lower()}" if allow_source else "unknown"
         if allowed is None:

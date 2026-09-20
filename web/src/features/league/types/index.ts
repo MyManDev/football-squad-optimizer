@@ -322,6 +322,8 @@ export type IndexChips =
 
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
+  /** Optional evidence is validated separately; a bad forecast must not remove the plan. */
+  chip_forecast?: unknown;
   league_id: number;
   season: string;
   gameweek: number;
@@ -394,6 +396,7 @@ export interface AdvicePlanWeek {
 }
 
 export interface EntryAdvice {
+  chip_forecast?: unknown;
   league_id: number;
   season: string;
   gameweek: number;
@@ -441,6 +444,13 @@ export interface EntryAdvice {
   solver_status?: string | null;
   /** The measured bound gap beside a FEASIBLE plan; 0 under proof. */
   optimality_gap?: number | null;
+  /**
+   * True when the wall-clock safety cap stopped the search before its deterministic
+   * budget, which makes the plan a property of what else the machine was doing rather
+   * than of the problem. Absent, meaning not false, on documents published before the
+   * producer carried it.
+   */
+  wall_clock_stopped_the_search?: boolean | null;
   /** Rival strategies: the rival the plan was priced against and the set arithmetic. */
   rival_entry_id?: number;
   overlap_count?: number;

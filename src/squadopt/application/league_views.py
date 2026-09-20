@@ -75,6 +75,11 @@ from squadopt.application.advice_variants import (
     advise_window_with_top100,
     band_level_with_one_transfer,
 )
+from squadopt.application.chip_forecast_publication import (
+    ForecastSource,
+    member_chip_forecast,
+    published_chip_gains,
+)
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
@@ -107,6 +112,7 @@ from squadopt.live import (
     SeasonRules,
 )
 from squadopt.live.transfers import plan_transfer_menu
+from squadopt.optimization import wall_clock_stopped_the_search
 from squadopt.planning import TransferPlanResult
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
@@ -220,6 +226,7 @@ class MemberRender:
     chip_payloads: tuple[tuple[str, dict[str, object]], ...] = ()
     chip_unavailable: tuple[tuple[str, str, str], ...] = ()
     chip_notes: tuple[str, ...] = ()
+    chip_forecast: dict[str, Any] | None = None
 
 
 def render_member(
@@ -232,6 +239,7 @@ def render_member(
     horizon_builder: HorizonBuilder | None = None,
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
+    chip_forecast_source: ForecastSource | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
     every saf-puan window and Top 100 weight the task names.
@@ -470,6 +478,19 @@ def render_member(
         chip_payloads=tuple(chip_payloads),
         chip_unavailable=tuple(chip_unavailable),
         chip_notes=tuple(chip_notes),
+        chip_forecast=(
+            member_chip_forecast(
+                league_id=task.league_id,
+                picks=picks,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                source=chip_forecast_source,
+                gains=published_chip_gains(chip_payloads),
+            )
+            if chip_forecast_source is not None
+            else None
+        ),
     )
 
 
@@ -1183,6 +1204,7 @@ def build_league_views(
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
     top100_unavailable_reason: str | None = None,
+    chip_forecast_source: ForecastSource | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -1400,6 +1422,7 @@ def build_league_views(
                 horizon_builder=horizon_builder,
                 manager_words=manager_words,
                 top100_counts=top100_counts,
+                chip_forecast_source=chip_forecast_source,
             ),
             tasks,
         )
@@ -1422,6 +1445,7 @@ def build_league_views(
     # digest it was solved under, and every advice document with the bytes that landed.
     # Records are written from this after the whole tree is on disk.
     publications: list[tuple[EntryPicks, str, list[PublishedAdvice], dict[str, object]]] = []
+    published_indexes: dict[int, tuple[str, bytes]] = {}
     #: Members with no advice this week, whose index names why.
     refused: set[int] = set()
 
@@ -1731,7 +1755,7 @@ def build_league_views(
         suggested = _suggested_strategy(
             task, placings=placings, gameweek=gameweek, scored_gameweek=scored_gameweek
         )
-        if rival_menu or task.windows:
+        if rival_menu or task.windows or render.chip_forecast is not None:
             unavailable: list[dict[str, object]] = [
                 {
                     "strategy": strategy,
@@ -1762,8 +1786,9 @@ def build_league_views(
                 for strategy, window, rival_id, weight, reason in render.variant_unavailable
                 if weight == 0
             )
-            _write(
-                f"advice/{entry_id}/index.json",
+            index_path = f"advice/{entry_id}/index.json"
+            index_raw = _write(
+                index_path,
                 {
                     "league_id": int(league_id),
                     "season": season,
@@ -1773,6 +1798,11 @@ def build_league_views(
                     "evidence": evidence_index,
                     "top100": top100_index,
                     "chips": chips_index,
+                    **(
+                        {"chip_forecast": render.chip_forecast}
+                        if render.chip_forecast is not None
+                        else {}
+                    ),
                     # Per strategy, the windows whose file exists: saf-puan's solved
                     # windows, every rival strategy at one week.
                     "windows": {
@@ -1797,6 +1827,8 @@ def build_league_views(
                     "unavailable": unavailable,
                 },
             )
+            if render.chip_forecast is not None:
+                published_indexes[entry_id] = (index_path, index_raw)
 
         mode_note = ""
         rival = (
@@ -1836,6 +1868,10 @@ def build_league_views(
                         expected_points_cost=item.expected_points_cost,
                         rival_label=item.rival_label,
                         solver_status=chosen_plan.solver_status.name,
+                        # The same solve the status and the gap below come from.
+                        clock_stopped_the_search=wall_clock_stopped_the_search(
+                            chosen_plan.solver_status, chosen_plan.diagnostics
+                        ),
                         optimality_gap=(float(str(chosen_gap)) if chosen_gap is not None else None),
                     )
                     mode_relative = f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json"
@@ -2008,6 +2044,7 @@ def build_league_views(
                 told=told,
                 transfer_config_fingerprint=fingerprint or None,
                 commit=commit,
+                published_index=published_indexes.get(picks.entry_id),
             )
             try:
                 record_member_advice(Path(advice_record_root), record)

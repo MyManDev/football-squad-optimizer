@@ -562,6 +562,7 @@ def build_advice_payload(
     rival_label: str | None = None,
     solver_status: str | None = None,
     optimality_gap: float | None = None,
+    clock_stopped_the_search: bool | None = None,
     week: PlanningWeekResult | None = None,
     control: MemberControl | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
@@ -608,6 +609,9 @@ def build_advice_payload(
         solver_status = plan.solver_status.name
         raw_gap = plan.diagnostics.get("absolute_optimality_gap")
         optimality_gap = float(str(raw_gap)) if raw_gap is not None else None
+        clock_stopped_the_search = wall_clock_stopped_the_search(
+            plan.solver_status, plan.diagnostics
+        )
         week = plan.weeks[0]
     else:
         transfers = decision
@@ -674,6 +678,14 @@ def build_advice_payload(
         # plan with the measured bound gap beside it. Absent proof is stated, not hidden.
         "solver_status": solver_status,
         "optimality_gap": optimality_gap,
+        # Which budget stopped the search, which the status alone does not say, and the
+        # two are different facts. Deterministic work is machine independent: the same
+        # capture under the same budget spends it again and returns the same plan. A
+        # search the wall clock stopped is instead a property of what else the machine
+        # was doing that minute, and `member_plan_determinism` measured five of fifteen
+        # members reading a different plan where the ceiling bound. `null` on documents
+        # published before the producer carried these, which is absent and not false.
+        "wall_clock_stopped_the_search": clock_stopped_the_search,
         # The rest of the decision: who wears the armband, who stands in for him, the
         # eleven in pitch order, the bench in the order the game's autosubs walk it,
         # and the chip — all in expected points, none of it a probability.
@@ -901,6 +913,13 @@ def window_payload(
         # the plan it found with the measured bound gap beside it.
         "solver_status": plan.solver_status.name,
         "optimality_gap": float(str(raw_gap)) if raw_gap is not None else None,
+        # Which budget stopped the search. This path already refuses a plan the clock cut
+        # short, so the flag published here is always false; it is published anyway, because
+        # a reader comparing a window card with a one-week card should not have to know
+        # which of them carries the guard to know what the absence of the field means.
+        "wall_clock_stopped_the_search": wall_clock_stopped_the_search(
+            plan.solver_status, plan.diagnostics
+        ),
         **lineup_fields(first),
         # One row per gameweek. ``expected_points`` is the planner's projected score
         # for that week's eleven with the captain's multiplier, before hits.
@@ -1267,6 +1286,12 @@ def advise_with_managers_word(
         expected_points_cost=cost,
         solver_status=plan.solver_status.name,
         optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
+        # Which budget stopped this solve. A gap may be unpublishable because it is on
+        # another scale; the work spent and what ended the search are on no scale and are
+        # published whatever the gap does.
+        clock_stopped_the_search=wall_clock_stopped_the_search(
+            plan.solver_status, plan.diagnostics
+        ),
         week=plan.weeks[0],
         exclusion=exclusion,
         move_reason=move_reason,
@@ -1494,6 +1519,12 @@ def advise_with_top100(
             # The planner's gap is on the weighted scale; no base-model bound exists for
             # it, so none is published and the page says the proof did not finish.
             optimality_gap=None,
+            # Which budget stopped this solve. A gap may be unpublishable because it is on
+            # another scale; the work spent and what ended the search are on no scale and are
+            # published whatever the gap does.
+            clock_stopped_the_search=wall_clock_stopped_the_search(
+                plan.solver_status, plan.diagnostics
+            ),
             week=rebased_week(week, points),
             exclusion=exclusion,
             move_reason=move_reason,
@@ -1821,6 +1852,12 @@ def _advise_against_rival(
         solver_status=plan.solver_status.name,
         # A gap measured on other points may not be printed beside base-model numbers.
         optimality_gap=(float(str(raw_gap)) if raw_gap is not None and base is None else None),
+        # Which budget stopped this solve. A gap may be unpublishable because it is on
+        # another scale; the work spent and what ended the search are on no scale and are
+        # published whatever the gap does.
+        clock_stopped_the_search=wall_clock_stopped_the_search(
+            plan.solver_status, plan.diagnostics
+        ),
         week=plan.weeks[0] if base is None else rebased_week(plan.weeks[0], base),
         choice_points=None if choice is None else base_points(choice),
     )

@@ -329,10 +329,10 @@ pull request's CI also runs `shippedTree.test.ts` against the shipped tree; to r
 check by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
 publication worktree's `web` directory. Then use the [release recipe](deployment_runbook.md#release-in-one-command)
 from Git Bash:
-`sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <generated-after-ISO> <summary>`.
+`sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <accepted-generated-at-ISO> <summary>`.
 Its real invocation performs the site release and runs `verify_live.py`; the restart
 helper runs that verifier again before stopping anything. To run it again by hand,
-use `python scripts/release/verify_live.py <generated-after-ISO>`. The separate backend
+use `python scripts/release/verify_live.py <accepted-generated-at-ISO>`. The separate backend
 restart command and browser check follow the order in that runbook. These remain
 owner-operated actions, not part of this preview.
 
@@ -351,3 +351,14 @@ The outward half of publishing — merging the PR, releasing develop to main, th
 Settling our squad (`squadopt gameweek settle`) and the replayed catch-up decisions above
 are separate commands run by a person; the weekly command decides only when `--decide`
 asks it to, and never settles.
+
+**Do not re-publish a capture whose advice has already been accepted.** The advice record is
+immutable within one capture and the settled publisher checks each accepted document's hash
+against it, so a second publication of the same capture refuses as soon as the producer emits
+a different byte, which it will whenever the payload has gained a field since the record was
+written. That refusal is the guard working and the answer is to stop, not to force it: the
+accepted documents are the ones members read before the deadline and the record is what proves
+it. Restarting the backend does not re-publish anything (`scripts/release/restart_backend.ps1`
+verifies the published site, fast-forwards the checkout and restarts the launcher), so the
+standing rule to restart only with a publish means restart *after* an accepted publication,
+not invoke the publisher as part of restarting.

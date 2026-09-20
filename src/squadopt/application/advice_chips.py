@@ -342,6 +342,12 @@ def advise_with_chip(
         decision=decision,
         solver_status=plan.solver_status.name,
         optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
+        # This path refuses a clock-stopped plan above, so the flag is always false here.
+        # It is published anyway: a reader comparing two cards should not have to know
+        # which of them carries the guard to know what an absent field means.
+        clock_stopped_the_search=wall_clock_stopped_the_search(
+            plan.solver_status, plan.diagnostics
+        ),
         week=week,
     )
     # The lineup total is published as the chip week scores, and it must be both what the

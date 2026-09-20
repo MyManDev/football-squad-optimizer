@@ -35,6 +35,7 @@ from squadopt.application.capture_entries import (
 from squadopt.application.capture_entries import (
     capture_element_codes as capture_element_codes,
 )
+from squadopt.application.chip_forecast_publication import ForecastSource, forecast_source
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
 from squadopt.data.errors import DataError
@@ -104,6 +105,7 @@ class AdviceCaptureContext:
     provider: CapturePicksProvider
     horizon_builder: HorizonBuilder
     switches: AdviceSwitchInputs = field(default_factory=AdviceSwitchInputs)
+    chip_forecast_source: ForecastSource | None = None
 
     @property
     def top100_counts(self) -> Top100Counts | None:
@@ -236,6 +238,7 @@ def load_capture_context(identity: CaptureIdentity) -> AdviceCaptureContext:
         projection=projection,
         rules=rules,
         provider=CapturePicksProvider(identity.snapshot, inputs.snapshot_id),
+        chip_forecast_source=forecast_source(identity.snapshot),
         # The same capture and handoff, as the multi-week windows read them; built once
         # per window for the life of this context and shared by every request.
         horizon_builder=member_horizon_builder(

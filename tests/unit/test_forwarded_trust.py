@@ -85,6 +85,48 @@ def test_empty_allowlist_trusts_no_peer(monkeypatch: pytest.MonkeyPatch, allowed
     assert result["forwarded_allow_ips_count"] == 0
 
 
+@pytest.mark.parametrize("name", ["FORWARDED_ALLOW_IPS", "UVICORN_FORWARDED_ALLOW_IPS"])
+@pytest.mark.parametrize("allowed", ["*", "192.0.2.1, *, 198.51.100.1"])
+@pytest.mark.parametrize("launcher", ["uvicorn", "custom_server.py"])
+def test_factory_refuses_wildcard_environment_before_constructing_backend(
+    monkeypatch: pytest.MonkeyPatch, name: str, allowed: str, launcher: str
+) -> None:
+    monkeypatch.setenv(name, allowed)
+    monkeypatch.setattr(
+        runtime.sys, "argv", [launcher, "squadopt.api.runtime:build_app", "--factory"]
+    )
+    monkeypatch.setattr(runtime, "configure_advice_logging", lambda: None)
+    monkeypatch.setattr(
+        runtime,
+        "backend_from_environment",
+        lambda **kwargs: pytest.fail("backend must not be constructed"),
+    )
+    with pytest.raises(ValueError, match="wildcard trust is refused") as error:
+        runtime.build_app()
+    assert "192.0.2.1" not in str(error.value)
+    assert "198.51.100.1" not in str(error.value)
+
+
+@pytest.mark.parametrize("flags", [[], ["--no-proxy-headers"], ["--env-file", "unused.env"]])
+def test_cli_wildcard_is_refused_even_when_effective_trust_is_unverified_or_disabled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, flags: list[str]
+) -> None:
+    if "--env-file" in flags:
+        env_file = tmp_path / "server.env"
+        env_file.write_text("", encoding="utf-8")
+        flags = ["--env-file", str(env_file)]
+    with pytest.raises(ValueError, match="wildcard trust is refused"):
+        observe(monkeypatch, "--forwarded-allow-ips", "192.0.2.1, *", *flags)
+
+
+def test_narrow_cli_override_does_not_hide_a_forbidden_environment_setting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "*")
+    with pytest.raises(ValueError, match="wildcard trust is refused"):
+        observe(monkeypatch, "--forwarded-allow-ips", "127.0.0.1")
+
+
 @pytest.mark.parametrize("entry", ["uvicorn.exe", "/venv/lib/uvicorn/__main__.py"])
 def test_supported_cli_launch_shapes(monkeypatch: pytest.MonkeyPatch, entry: str) -> None:
     monkeypatch.setattr(runtime.sys, "argv", [entry, "squadopt.api.runtime:build_app", "--factory"])

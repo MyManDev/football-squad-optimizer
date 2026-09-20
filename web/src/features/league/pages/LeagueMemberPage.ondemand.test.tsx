@@ -436,7 +436,9 @@ describe("a bundle built with an origin whose service is down", () => {
     });
     stubStaticTree();
     const { container } = open();
-    expect(await screen.findByText(computeCopy.serviceUnreachable)).toBeInTheDocument();
+    expect(await screen.findByText(computeCopy.serviceUnreachablePublished)).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachable);
+    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableAbsent);
     const service = "https://squadopt-api.example";
     expect(calls.filter((url) => url.startsWith(service))).toEqual([
       `${service}/api/v1/leagues/${INDEX.league_id}/capabilities`,
@@ -470,6 +472,8 @@ describe("a bundle built with an origin whose service is down", () => {
       "/data/fixtures.json",
     ]);
     expect(container).not.toHaveTextContent(computeCopy.serviceUnreachable);
+    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachablePublished);
+    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableAbsent);
   });
 
   it("offers the unpublished selection once the service answers", async () => {

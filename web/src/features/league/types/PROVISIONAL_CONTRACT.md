@@ -66,5 +66,33 @@ contract. They do not redefine the data-zone dataclass.
 - The explicit application invariant that every entry is evaluated independently and that the
   virtual SquadOpt team is absent from another member's objective.
 
+### Optional member chip forecast
+
+The member index and a newly computed chip advice response may carry `chip_forecast`.
+Its envelope binds season, league, entry, decision gameweek, source capture, held fifteen
+and present bench to `chip_forecast_v1`. The producer passes only gains already computed
+on that path. A new single-chip response never borrows the other published gains.
+The page renders published and newly computed readings separately; no automatic chip
+selection or additional calculation is triggered by the card.
+
+`status=unavailable` carries a translated refusal code, null forecast,
+`calendar_has_structure=null` and `calendar_range=null`. An available reading carries a
+boolean structure observation and the inclusive first/last later gameweek examined.
+The complete club roster supplies explicit zero counts for clubs omitted from a week's
+match list. Unscheduled fixtures refuse the reading. When no later held window remains,
+the available reading has false plus a null range and the card explicitly says the range
+is empty; it makes no claim about an ordinary future calendar. A false nonempty reading
+and a refused reading have different sentences in both languages. Cup rescheduling is
+stated on all branches. The pure forecast schema and arithmetic are unchanged.
+
+An old publication with no optional field remains readable. The field is treated as
+unknown until `readChipForecast` checks its shape, unique chip names, verdict/gain and
+window consistency, player references, held chips and identity against the displayed
+squad. Rejection affects only this optional card; it never removes an otherwise valid
+plan. The immutable member record keeps the exact published forecast fragment and its
+digest, plus index path and digest. Replay compares the fragment and path exactly;
+only the index digest that includes the publication clock is blanked for comparison.
+The first stored bytes are never rewritten and missing/present blocks conflict.
+
 Until those decisions land, production loaders fail closed when league JSON is absent; example
 fixtures live under `web/src/fixtures` and are excluded from production builds.

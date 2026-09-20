@@ -13,6 +13,7 @@ import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { Pitch } from "../../squad/components/Pitch";
 import { MemberResourceCards } from "../components/MemberResourceCards";
+import { ChipForecastCard } from "../components/ChipForecastCard";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { isMemberStrategy } from "../types";
 import { AdviceCard, MissingAdviceCard } from "./MemberAdviceCard";
@@ -82,6 +83,7 @@ function LeagueMemberContent({
     job,
     request,
     shown,
+    computedForecast,
     rejectedContext,
     rejectedUnreadable,
   } = useMemberAdviceView(
@@ -249,6 +251,11 @@ function LeagueMemberContent({
             </p>
           </Card>
         ) : null}
+        <ChipForecastCard
+          published={indexReadable ? index?.chip_forecast : undefined}
+          computed={computedForecast}
+          squad={view}
+        />
         <TemplatePicker
           canApply={(params) => {
             const offered = resolve(params);
@@ -284,7 +291,19 @@ function LeagueMemberContent({
             }
             computable={computeAvailable}
             pending={computePending}
-            published={selection.status === "ready"}
+            published={
+              adviceLoading || !indexReadable
+                ? undefined
+                : selection.status === "not-listed" || selection.status === "declared-unavailable"
+                  ? false
+                  : selectionAvailable &&
+                      advice &&
+                      !adviceIssue &&
+                      !rejectedContext &&
+                      !rejectedUnreadable
+                    ? true
+                    : undefined
+            }
             chipChosen={selection.chip.chip !== null}
             deadlinePassed={deadlinePassed !== null}
           />

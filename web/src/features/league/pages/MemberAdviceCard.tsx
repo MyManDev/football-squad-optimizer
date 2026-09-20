@@ -133,6 +133,9 @@ export function AdviceCard({
   // and a price below zero is a giveaway no constrained plan can hand out, so no
   // producer's number is rendered as one.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
+  const explainedUnproven =
+    view.solver_status === "FEASIBLE" ||
+    (view.control_solver_status === "FEASIBLE" && !view.chip_choice);
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
@@ -242,6 +245,7 @@ export function AdviceCard({
             : copy.controlGapUnknown}
         </p>
       ) : null}
+      {explainedUnproven ? <p className={styles.honesty}>{copy.unprovenPlanNextStep}</p> : null}
       {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
         <p className={styles.muted}>
           {copy.overlapLine(view.overlap_count)} ·{" "}
