@@ -93,6 +93,17 @@ expected points = appearance_probability
   here**: the handoff records that the raw probability breaks at the top of its range, promising
   better than an even chance on 40 judged fixtures where the clean sheet happened a third of the
   time (0.534 against 0.325). An uncalibrated by-product may not price a defender.
+- **The constants that recalibration and its rating need are inherited, not chosen here.** The
+  calibration runs under the constants `CsRemeasureConfig` declares in
+  `src/squadopt/experiments/team_rating_cs.py`, unchanged and not overridden: its season span,
+  its evaluated seasons, its first evaluated gameweek and both search grids. The record names
+  the value it read for each, from that config, so this document fixes where they come from and
+  the record fixes what they were. No value is copied into this document, because a number
+  transcribed into prose is a number that can be transcribed wrongly.
+  **Two different gameweek bounds are in play and they are not the same axis**:
+  `first_evaluated_gameweek` bounds which gameweeks of the **earlier** seasons the calibration
+  trains on, while target gameweek 4 below bounds which rows are **judged**. They hold different
+  values and neither is a correction of the other.
 - **`bonus(position)`** is the per-position mean realized bonus **over appeared rows**, fitted on
   the same walk-forward split. Not over clean-sheet matches: a mean taken on clean sheets and
   then added to every row would over-price every defender, in the same direction the level audit
@@ -175,12 +186,21 @@ front of it.
   `read_phase_c_component_handoff` joins `roster[["season", "target_gameweek", "fold_id",
   "player_id", "position"]]` onto the table before returning. Naming the table alone would send a
   runner looking for the column that defines this population in the file that does not have it.
-- **`team_id` is in the roster and is not joined onto the rows.** The clean-sheet term needs the
-  row's club to find its fixture, and that reader carries `position` across and nothing else, so
-  the runner joins `team_id` itself, from the roster, on the same four-column key.
-- **Realized `bonus` is in neither file.** It is the archive's own `bonus` column in
-  `merged_gw.csv`, read over the training seasons only, which is where `bonus(position)` is
-  fitted. The out-of-fold table carries `points_target` and no decomposition of it.
+- **`team_id` is in the roster, is not joined onto the rows, and is a club name.** The
+  clean-sheet term needs the row's club to find its fixture, and that reader carries `position`
+  across and nothing else, so the runner joins `team_id` itself, from the roster, on the same
+  four-column key. That is not the end of it: the roster spells a club as a **name**
+  ("Liverpool"), while the rating and the fixture table speak persistent codes, so the runner
+  bridges the one to the other through the archive's own team file, the way
+  `player_fixture_rows` in `src/squadopt/experiments/team_rating.py` does with
+  `load_team_codes`. A join that stopped at the roster column would match nothing.
+- **Realized `bonus` is in neither file, and the loader a runner would reach for does not have
+  it either.** It is the archive's own `bonus` column in `merged_gw.csv`, read over the training
+  seasons only, which is where `bonus(position)` is fitted. The out-of-fold table carries
+  `points_target` and no decomposition of it, and the canonical panel does not carry `bonus` at
+  all: the vaastav adapter's `COLUMN_MAP` does not declare it and `SEASON_OPTIONAL_COLUMNS`
+  declares only `starts`, so `build_panel` returns a frame without it. The runner reads the
+  archive file for that one column.
 - **A training row** is an appeared goalkeeper or defender player-gameweek of a strictly earlier
   season, read from the **archive panel** and not from this table. That distinction is not
   cosmetic: the table begins at 2021-22, and 2022-23's training seasons are 2020-21 and 2021-22,
