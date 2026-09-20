@@ -48,7 +48,7 @@ from squadopt.evaluation import (
     prepare_phase_c_component_folds,
     read_phase_c_component_handoff,
 )
-from squadopt.evaluation.component_handoff import LOCKED_HOLDOUT_SEASON
+from squadopt.evaluation.component_handoff import HANDOFF_KEY, LOCKED_HOLDOUT_SEASON
 from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.experiments.positional_defence import (
     DEFENCE_POSITIONS,
@@ -185,19 +185,32 @@ def clean_sheet_table(archive_root: Path) -> tuple[pd.DataFrame, dict[str, Any]]
 
 
 def priced_rows(
-    handoff_rows: pd.DataFrame, archive_root: Path
+    handoff_rows: pd.DataFrame, roster: pd.DataFrame, archive_root: Path
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """The protocol's population with the candidate priced on it, and what that took."""
+    """The protocol's population with the candidate priced on it, and what that took.
+
+    Two joins stand between a row and its clean-sheet probability, and the protocol names
+    both. ``read_phase_c_component_handoff`` carries ``position`` across from the roster and
+    nothing else, so ``team_id`` is fetched here on the same four-column key; and the roster
+    spells a club as a **name** while the rating speaks persistent codes, so the name is then
+    bridged through the archive's own team file. A join that stopped at either step would
+    match nothing, silently.
+    """
 
     rows, counts = eligible_rows(handoff_rows)
-    roster_clubs = club_codes(archive_root, JUDGED_SEASONS)
     rows = rows.merge(
-        roster_clubs,
-        left_on=["season", "team_id"],
-        right_on=["season", "team_id"],
+        roster.loc[:, [*HANDOFF_KEY, "team_id"]],
+        on=list(HANDOFF_KEY),
         how="left",
-        validate="many_to_one",
+        validate="one_to_one",
     )
+    if bool(rows["team_id"].isna().any()):
+        raise SystemExit("A judged row has no club in the decision roster.")
+    roster_clubs = club_codes(archive_root, JUDGED_SEASONS)
+    rows = rows.merge(roster_clubs, on=["season", "team_id"], how="left", validate="many_to_one")
+    if bool(rows["club"].isna().any()):
+        unresolved = sorted(set(rows.loc[rows["club"].isna(), "team_id"].astype(str)))
+        raise SystemExit(f"These club names do not resolve to a persistent code: {unresolved!r}")
     sheets, chosen = clean_sheet_table(archive_root)
     rows = rows.merge(
         sheets,
@@ -517,7 +530,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     started = datetime.now(UTC)
-    rows, detail = priced_rows(handoff.rows, arguments.archive_root)
+    rows, detail = priced_rows(handoff.rows, handoff.roster, arguments.archive_root)
     if detail["seasons_refused_for_thin_training"]:
         print(
             "Judged seasons with fewer than "

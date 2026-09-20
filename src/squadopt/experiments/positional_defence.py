@@ -64,11 +64,25 @@ ORDERING_TOLERANCE: Final = 0.010
 #:
 #: The protocol's words are that the ordering "must not fall below the shipped composition's
 #: by more than 0.010", so a shortfall of exactly the tolerance passes. The shortfall is a
-#: difference of two correlations and carries floating error of order 1e-16, which is enough
-#: to turn an exact boundary into a failure: ``0.50 - 0.010`` against ``0.50`` computes to
-#: ``0.010000000000000009``. This guard makes the boundary determinate. It is not a widening
-#: of the gate and may not be used as one -- 1e-12 is not a measurable quantity in a rank
-#: correlation, and no candidate can be rescued by it.
+#: difference of two correlations and carries floating error of order 1e-16, and the point is
+#: not that an unguarded comparison is stricter -- it is that it is **inconsistent**. Every
+#: one of these is a true shortfall of exactly 0.010::
+#:
+#:     0.500 against 0.490 -> 0.010000000000000009  fails
+#:     0.563 against 0.553 -> 0.009999999999999898  passes
+#:
+#: So without the guard, whether a candidate on the boundary passes depends on where its two
+#: correlations happen to sit on the number line, which is not a reading of the protocol at
+#: all. The guard implements the sentence. It is not a widening and may not be used as one:
+#: 1e-12 is a ten-billionth of the tolerance, which is itself about one standard error of a
+#: rank correlation on this population, so nothing can be rescued that is not exactly on the
+#: line. It was fixed before the run and before any result was visible.
+#:
+#: ``opening_two_part`` carries the same constant and does not have this problem, because its
+#: runner passes the pooled shortfall in as a value and the comparison meets an exact float.
+#: Here the shortfall is computed from two correlations, so the boundary is reachable in a way
+#: it was not there. **Same constant, different exposure**, which is worth saying because the
+#: next protocol to carry 0.010 across will inherit the number and not the exposure.
 ORDERING_REPRESENTATION_GUARD: Final = 1e-12
 
 #: A judged season with fewer appeared goalkeeper and defender training rows is not judged.
