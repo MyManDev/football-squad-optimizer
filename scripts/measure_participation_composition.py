@@ -478,7 +478,10 @@ def markdown(record: Mapping[str, Any]) -> str:
         " appearances. Both populations are reported together because the majority never"
         " appears and an all-rows number is mostly a reading of those rows. A realized value"
         " is `points_target` on an appearance and zero elsewhere; error is forecast minus"
-        " realized, so a positive number is over-forecasting.",
+        " realized, so a positive number is over-forecasting."
+        f" Of those rows, {points['rows_without_a_fitted_forecast']} carry no fitted forecast"
+        " in any arm, which is the whole of the difference between this count and the"
+        f" {points['rows_where_q_is_present']} the arms actually differ on below.",
         "",
         *_points_table(points),
         "",
@@ -538,11 +541,19 @@ def markdown(record: Mapping[str, Any]) -> str:
         "The interval is a moving-block bootstrap over the weeks of one season. It describes"
         " how much these 37 weeks move; it cannot describe how much the next season would.",
         "",
+        "**No loss is claimed for `composed`.** Its interval covers zero, so these 37 weeks"
+        " cannot separate its difference from nothing. What they do establish is that it"
+        " changed most of the squads while changing the error in the fourth decimal, and a"
+        " change that buys nothing on the error and is not a rounding difference on the squads"
+        " is refusable on those grounds without a loss. `state_split`'s interval excludes zero"
+        " and its loss reads as one.",
+        "",
         "**A candidate can be indistinguishable on the error and substantially different in"
-        " what it does.** That is a point about measurement design rather than about this"
-        " candidate, and it is the reason both halves are read here: an accuracy reading alone"
-        " would have seen the two all-rows figures above, called them a tie and filed it, while"
-        " the arm it was calling a tie moves most of the squads.",
+        " what it does**, and this record is not a caution about that happening to somebody"
+        " else. It happened here, to the arm that looked best: `state_split` has the best"
+        " appeared-row mean absolute error of the three and the worst decisions, and it is the"
+        " only arm whose interval excludes zero. An accuracy reading alone would have ranked"
+        " it first.",
         "",
         "## What would make this a gate, and when",
         "",
@@ -681,7 +692,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     record["decisions"] = decision_block(results, order)
     record["solver"] = solver_record(*results.values())
     record["elapsed_seconds"] = (datetime.now(UTC) - started).total_seconds()
-    record.update(artifact_metadata(panel_rows=len(panel), history_seasons=list(seasons)))
+    # Two loads, named separately and in a fixed order. `history_seasons` used to be built
+    # from a set of the handoff's own seasons, which named four where five were loaded and
+    # came out in whatever order the set iterated.
+    record["seasons_loaded"] = {
+        "modelling_frame": [TRAINING_SEASON, JUDGED_SEASON],
+        "decision_panel": list(DECISION_HISTORY_SEASONS),
+        "handoff_table": sorted(seasons),
+    }
+    record.update(
+        artifact_metadata(panel_rows=len(panel), history_seasons=list(DECISION_HISTORY_SEASONS))
+    )
 
     provenance = record.get("provenance")
     if isinstance(provenance, dict) and provenance.get("working_tree_dirty"):
