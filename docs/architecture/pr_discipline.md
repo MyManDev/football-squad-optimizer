@@ -139,7 +139,7 @@ Zones are in [ownership](ownership.md). In practice:
 
 - Stay in your zone. A change that needs someone else's zone is a conversation first, not a
   larger PR.
-- Shared boundaries — `contracts/`, `data/schema.py`, `optimization/config.py`, `backtest/` —
+- Shared boundaries — `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` —
   need one approving review from each of the other two roles.
 - If two people must work in the same area at once, split by file, not by function, and say so
   before starting.
