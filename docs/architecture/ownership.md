@@ -22,7 +22,7 @@ without saying what they are accountable for producing.
 | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
 | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`; `live/`'s measurement and decision logic; core CI, dependency enforcement, and the current `application/` pilot |
 | **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`) since the handover below, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
-| **shared, all three** | (none) | `contracts/`, `data/schema.py`, `optimization/config.py`, `backtest/` |
+| **shared, all three** | (none) | `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` |
 
 The middle column is the useful half when a piece of work does not obviously belong to a
 directory. "Does the residual export cross machines byte for byte?" is a data-side question
@@ -75,7 +75,7 @@ there is the most expensive kind:
 - **`contracts/`** — every package will import it by construction. It is also the natural
   dumping ground for anything awkward to place, so the friction is the safeguard. See
   [dependency rules](dependency_rules.md) for what is allowed in.
-- **`data/schema.py`** — the canonical column vocabulary, 17 column tuples, imported by 27
+- **`src/squadopt/data/schema.py`** — the canonical column vocabulary, 17 column tuples, imported by 27
   modules in `src/`.
 - **`optimization/config.py`** — where `Position` and `POSITIONS` live until `contracts`
   exists.
@@ -167,7 +167,7 @@ So the day a probabilistic hand-off is proposed, it touches `REQUIRED_COLUMNS`
 anyway. That conversation is the right moment to decide where `uncertainty/` belongs, because
 by then it will be a decision about live code rather than about a roadmap.
 
-## `data/identity.py`, classified
+## `src/squadopt/data/identity.py`, classified
 
 This page asked the data side whether the module is a public utility, a contract, or dead, on
 the premise that nothing inside `src/squadopt` imports it. That premise no longer holds, and
@@ -203,5 +203,5 @@ a deliberate decision rather than a quiet edit.
 
 Last reviewed against `99a3387a` (develop, 2026-09-12): the zone table, the backend handover
 rows and the `contracts/` entry were re-checked against `.github/CODEOWNERS` and the tree.
-The `data/identity.py` section rests on the system map's measurement at `95a6f7e`; the
+The `src/squadopt/data/identity.py` section rests on the system map's measurement at `95a6f7e`; the
 remaining prose was not re-measured, and saying so is cheaper than implying it was.

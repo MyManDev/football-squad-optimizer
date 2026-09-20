@@ -146,6 +146,7 @@ export function isAdvicePayload(value: unknown): boolean {
       overlap_applied: finite,
       captain_agreement: oneOf(true, false),
       solver_status: nullable(text),
+      wall_clock_stopped_the_search: nullable(oneOf(true, false)),
       control_solver_status: nullable(text),
       optimality_gap: nullable(finite),
       control_optimality_gap: nullable(finite),

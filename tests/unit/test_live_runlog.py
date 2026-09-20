@@ -9,14 +9,13 @@ from scripts.build_site import DEFAULT_LOG_ROOT as build_site_log_root
 from scripts.build_site import REPOSITORY_ROOT as build_site_root
 
 from squadopt.application.build import _recent_events
-from squadopt.live.runlog import (
-    LOG_ROOT_NAME,
+from squadopt.contracts.run_logs import LOG_ROOT_NAME, component_log_directory
+from squadopt.platform.cli import build_parser as cli_parser
+from squadopt.platform.runlog import (
     JsonLineFormatter,
-    component_log_directory,
     configure_run_logging,
     new_run_id,
 )
-from squadopt.platform.cli import build_parser as cli_parser
 from squadopt.platform.weekly_operations import WeeklyPaths
 
 
@@ -117,6 +116,7 @@ def test_every_holder_of_a_log_root_agrees_on_the_same_unqualified_root(tmp_path
     arguments = cli_parser().parse_args(
         ["season", "tick", "--workspace-root", str(tmp_path), "--dry-run"]
     )
+    assert Path("data/logs") == LOG_ROOT_NAME
     assert Path(arguments.log_root) == LOG_ROOT_NAME
     assert WeeklyPaths.under(tmp_path).log_root == tmp_path / LOG_ROOT_NAME
     assert build_site_log_root == build_site_root / LOG_ROOT_NAME

@@ -825,6 +825,12 @@
             }
           ]
         },
+        "wall_clock_stopped_the_search": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "window": {
           "enum": [
             1,
