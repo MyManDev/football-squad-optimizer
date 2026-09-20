@@ -64,10 +64,11 @@ _NAME_SEPARATORS: Final = ".-' \u2019\t\n"
 #: Letters that carry no combining mark for decomposition to drop, folded to what
 #: English-language football coverage writes -- which is the vocabulary this join actually
 #: meets, on a club's own page and in the platform's payload. A closed table, following the
-#: same shape as ``data/schema.py``'s position aliases: nine entries, each restatable, and
-#: nothing outside it is touched. This is not transliteration and is not a substitute for
-#: it; a Norwegian spelling of ``\u00f8`` as ``oe`` is a different convention and would be a
-#: different table, which is why an unlisted letter refuses instead of being guessed at.
+#: same shape as ``src/squadopt/data/schema.py``'s position aliases: nine entries, each
+#: restatable, and nothing outside it is touched. This is not transliteration and is not a
+#: substitute for it; a Norwegian spelling of ``\u00f8`` as ``oe`` is a different convention
+#: and would be a different table, which is why an unlisted letter refuses instead of being
+#: guessed at.
 _UNDECOMPOSED_LETTERS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "\u00d8": "O",
