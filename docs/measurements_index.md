@@ -94,6 +94,7 @@ recorded; re-running one is a new measurement, not a regeneration.
 
 | Artifact | Finding | PR |
 | --- | --- | --- |
+| `appearance_recalibration` (+`appearance_recalibration_prereg`; one frozen candidate) | **Fails the unchanged prediction gate.** Prior-only isotonic appearance calibration improves same-row Brier **0.107341 to 0.104783**, full-roster MAE **1.088578 to 1.064867**, and nonplayer forecast mass **0.214525 to 0.202519**, but the pooled within-position rank gain misses 0.01. Across all **147** paired development decisions the realized candidate-minus-base mean is **+0.346939**, 90% season-aware block interval **[-0.626531, 1.313605]**; two seasons lose, so the decision gate also fails. All pairs complete without clock stops; 210 OPTIMAL and 84 FEASIBLE solves at deterministic budget 5.0. One run, no retuning or repeat; historical 2021-25 scoring only, no locked 2025-26 access, no operational promotion or live DEFCON claim | #749 |
 | `control_uncertainty_calibration` | Player-adaptive holds 0.90 coverage at ~11.5% narrower intervals; fully development-internal | #62 |
 | `control_residual_export` (record) | Control-regime `oos_residual_export_v1`: exactly 147 folds / 101,447 rows; preflight-clean | #59 |
 | `candidate_residual_export` (record) | Calendar-aware `learned-rate-v2` half of the pair; control regenerated at the same commit and byte-identical across three commits | #80 |
