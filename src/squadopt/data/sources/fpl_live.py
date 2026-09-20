@@ -550,6 +550,24 @@ def _fixture_status(record: Mapping[str, object], label: str) -> str:
     return "provisional" if _boolean(record, "provisional_start_time", label) else "scheduled"
 
 
+def unscheduled_fixture_count(fixtures: bytes) -> int:
+    """How many fixtures the capture holds with no gameweek.
+
+    :func:`fixture_snapshot` excludes these, which is right: a club whose match was
+    postponed genuinely has no fixture that gameweek, and inventing a row for one that
+    has no date would put a match in a week nobody has scheduled it in. But the
+    exclusion is silent, and what it hides is not nothing. Each of these fixtures will
+    be given a gameweek, and that gameweek can be one a caller is already planning
+    over, so a count of zero and a count of three are different statements about how
+    settled a calendar is.
+
+    Counted here rather than at the caller so it is counted the same way the exclusion
+    is decided: one field, ``event``, in one place.
+    """
+
+    return sum(1 for record in _array_records(fixtures, "Fixture") if record.get("event") is None)
+
+
 def fixture_snapshot(
     fixtures: bytes,
     bootstrap: bytes,
