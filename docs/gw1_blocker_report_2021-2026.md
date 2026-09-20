@@ -123,7 +123,8 @@ Per season, before every GW1 deadline, retained permanently:
 - the fixture list as published at capture time, so a later reschedule cannot rewrite the
   calendar the decision actually faced.
 
-Produced by `scripts/capture_deadline_snapshot.py`; retained under `data/snapshots/`
+Produced by the deadline capture, then a standalone shell and now `squadopt season tick`
+after #702 retired it; retained under `data/snapshots/`
 (git-ignored, checksummed, immutable). This is already the pipeline in use — the blocker
 is historical, and the forward path is already closed.
 
