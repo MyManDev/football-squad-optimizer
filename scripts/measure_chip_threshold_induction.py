@@ -84,6 +84,14 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--block-length", type=int, default=4)
     parser.add_argument("--json-output", type=Path, default=DEFAULT_JSON_OUTPUT)
     parser.add_argument("--markdown-output", type=Path, default=DEFAULT_MARKDOWN_OUTPUT)
+    parser.add_argument(
+        "--render-only",
+        action="store_true",
+        help=(
+            "rewrite the markdown from the committed record and measure nothing. The record is "
+            "read, never written, so this cannot re-read a gate"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -245,6 +253,39 @@ def _stage_one(arguments: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def deciding_comparison(document: Mapping[str, Any]) -> str:
+    """Which comparison the protocol says decides, read from the forecast record.
+
+    ``docs/chip_threshold_induction_prereg.md`` makes this conditional rather than fixed:
+    ``induction - decaying`` decides, "if the pending chip forecast measurement drops the
+    reservation, the forecast's rule is ``threshold_only``, and then
+    ``induction - threshold_only`` is the comparison that decides".
+
+    Whether the reservation dropped is not a judgement either. ``chip_forecast_prereg.md``'s
+    amendment fixes it: ``decaying - threshold_only`` "decides whether the forecast keeps the
+    reservation: it keeps it when the pooled difference is positive, and drops it otherwise".
+    So this reads that comparison out of the committed record and applies the rule.
+
+    It is a predicate rather than a constant on purpose. The name was hard-coded here as
+    ``induction_minus_decaying``, which is the branch the conditional does **not** take on the
+    committed record, and a constant cannot notice that. Deriving it also means the choice
+    cannot be revisited once stage 2's own numbers are visible, which is the failure a
+    pre-registration exists to prevent.
+    """
+
+    for comparison in document["comparisons"]:
+        if str(comparison["variant"]) == "decaying" and str(comparison["baseline"]) == (
+            "threshold_only"
+        ):
+            difference = float(comparison["mean_weekly_advantage_points"])
+            kept = difference > 0.0
+            return "induction_minus_decaying" if kept else "induction_minus_threshold_only"
+    raise SystemExit(
+        "The chip forecast record carries no `decaying - threshold_only` comparison, so which "
+        "arm the forecast's rule is cannot be read and the deciding comparison cannot be named."
+    )
+
+
 def _stage_two(arguments: argparse.Namespace, stage_one: Mapping[str, Any]) -> dict[str, Any]:
     document = json.loads(arguments.chip_forecast_record.read_text(encoding="utf-8"))
     seasons = list(stage_one["seasons"])
@@ -336,7 +377,15 @@ def _stage_two(arguments: argparse.Namespace, stage_one: Mapping[str, Any]) -> d
         },
         "chains": chains,
         "comparisons": comparisons,
-        "deciding_comparison": "induction_minus_decaying",
+        "deciding_comparison": deciding_comparison(document),
+        "deciding_comparison_source": (
+            "Read from the forecast record rather than fixed here: "
+            "`chip_forecast_prereg.md`'s amendment keeps the reservation when "
+            "`decaying - threshold_only` is positive and drops it otherwise, and "
+            "`chip_threshold_induction_prereg.md` says the dropped case makes "
+            "`induction - threshold_only` the comparison that decides. Both are reported "
+            "either way, as that protocol requires."
+        ),
     }
 
 
@@ -349,7 +398,15 @@ def _threshold_table(record: Mapping[str, Any]) -> list[str]:
     for season, items in record["thresholds"].items():
         for item in items:
             decay = item["linear_decay"]
-            for gameweek, value in item["thresholds"].items():
+            # Sorted numerically here rather than trusted from the mapping. The thresholds are
+            # keyed by gameweek and `write_json` writes with `sort_keys=True`, so a record read
+            # back from disk offers them as text: 1, 10, 11 ... 19, 2, 3. Stage 1 rendered from
+            # the in-memory mapping and looked right; stage 2 re-renders from the file and did
+            # not. The table's whole point is a threshold falling across a window, so the order
+            # is part of its meaning and the renderer imposes it instead of inheriting it.
+            for gameweek, value in sorted(
+                item["thresholds"].items(), key=lambda pair: int(pair[0])
+            ):
                 lines.append(
                     f"| {season} | `{item['chip']}` | "
                     f"{item['start_gameweek']}-{item['stop_gameweek']} | {gameweek} | "
@@ -416,7 +473,15 @@ def _markdown(record: Mapping[str, Any]) -> str:
             "| --- | --- | ---: | --- | --- |",
         ]
         for chain in stage_two["chains"]:
-            played = ", ".join(f"GW{week} {name}" for week, name in chain["chips_played"].items())
+            # Numerically, for the reason the threshold table is: this mapping is keyed by
+            # gameweek and comes back from JSON sorted as text, so a season's chips read
+            # GW13, GW2, GW20, GW3 and the order a reader takes for chronology is not one.
+            played = ", ".join(
+                f"GW{week} {name}"
+                for week, name in sorted(
+                    chain["chips_played"].items(), key=lambda pair: int(pair[0])
+                )
+            )
             lines.append(
                 f"| {chain['season']} | `{chain['variant']}` | {chain['net_points']:.0f} | "
                 f"{played or 'none'} | {', '.join(chain['expired_chips']) or 'none'} |"
@@ -435,7 +500,58 @@ def _markdown(record: Mapping[str, Any]) -> str:
                 f"{comparison['mean_weekly_advantage_points']:+.2f} | {shown} | "
                 f"{comparison['positive_season_share']:.2f} |"
             )
+        lines += ["", *_stage_two_verdict(stage_two)]
     return "\n".join(lines) + "\n"
+
+
+def _stage_two_verdict(stage_two: Mapping[str, Any]) -> list[str]:
+    """What the deciding comparison's interval licenses, computed rather than written.
+
+    The record used to end at the comparison table, so its verdict lived only in the index row
+    and the pull request. A later reader finds the artifact, and the figure nearest the top of
+    that table is a positive mean whose interval contains zero and whose sign three of the four
+    seasons disagree with. Both sentences below are derived from the record so that neither the
+    verdict nor the one-season caveat can drift from the numbers above them.
+    """
+
+    name = str(stage_two["deciding_comparison"])
+    baseline = name.removeprefix("induction_minus_")
+    (deciding,) = [
+        comparison
+        for comparison in stage_two["comparisons"]
+        if str(comparison["baseline"]) == baseline
+    ]
+    interval = deciding["weekly_advantage_block_bootstrap_interval"]
+    separated = interval is not None and float(interval[0]) > 0.0
+    seasons = deciding["season_net_advantage_points"]
+    behind = sorted(season for season, value in seasons.items() if float(value) < 0.0)
+    lines = [
+        f"**Deciding comparison: `induction` minus `{baseline}`.** It is not fixed in this "
+        "runner: the forecast keeps its reservation only when `decaying - threshold_only` is "
+        "positive, the committed forecast record says otherwise, and this protocol makes the "
+        "dropped case decide on `threshold_only`.",
+        "",
+    ]
+    if separated:
+        lines.append(
+            "Its interval lies entirely above zero, which is the one condition under which the "
+            "protocol replaces the linear decay."
+        )
+    else:
+        lines.append(
+            "**Verdict: `not separated`.** Its interval does not lie entirely above zero, so by "
+            "the rule fixed before this ran the linear decay stays the forecast's threshold and "
+            "nothing is promoted."
+        )
+    if behind:
+        lines += [
+            "",
+            f"**The mean is not what the seasons did.** `induction` is behind in "
+            f"{len(behind)} of {len(seasons)} seasons ({', '.join(behind)}), so a positive "
+            "pooled figure here is carried by the rest. Read the per-season column before "
+            "quoting the mean.",
+        ]
+    return lines
 
 
 def _number(value: object) -> str:
@@ -448,6 +564,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not arguments.chip_forecast_record.is_file():
         print(f"{arguments.chip_forecast_record} does not exist; run the chip forecast first.")
         return 1
+    if arguments.render_only:
+        # The record is the measurement; the markdown is a view of it. Re-rendering reads the
+        # JSON and never writes it, so a verdict cannot be re-read and no number can move.
+        if not arguments.json_output.is_file():
+            print(f"{arguments.json_output} does not exist; there is nothing to render.")
+            return 1
+        record = json.loads(arguments.json_output.read_text(encoding="utf-8"))
+        write_text(arguments.markdown_output, _markdown(record))
+        print(f"Rendered {arguments.markdown_output} from {arguments.json_output}.")
+        return 0
     if arguments.stage == 1:
         if arguments.json_output.exists():
             print(f"{arguments.json_output} exists; retire it in its own commit before re-running.")

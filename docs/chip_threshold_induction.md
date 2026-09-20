@@ -335,3 +335,36 @@ The replay differs somewhere, so stage 2 runs.
 | 2024-25 | `3xc` | 20-38 | 36 | 11.39 | 2.00 | none |
 | 2024-25 | `3xc` | 20-38 | 37 | 10.64 | 1.00 | none |
 | 2024-25 | `3xc` | 20-38 | 38 | 0.00 | 0.00 | none |
+
+## Stage 2: the chains
+
+| Season | Arm | Net | Chips played | Expired unplayed |
+| --- | --- | ---: | --- | --- |
+| 2021-22 | `off` | 1994 | none | none |
+| 2021-22 | `decaying` | 2051 | GW2 3xc, GW5 wildcard, GW13 freehit, GW19 bboost, GW20 wildcard, GW22 freehit, GW26 bboost, GW27 3xc | none |
+| 2021-22 | `threshold_only` | 2056 | GW2 bboost, GW5 wildcard, GW8 freehit, GW9 3xc, GW20 wildcard, GW22 freehit, GW23 bboost, GW26 3xc | none |
+| 2022-23 | `off` | 2013 | none | none |
+| 2022-23 | `decaying` | 2139 | GW3 wildcard, GW8 freehit, GW9 3xc, GW19 bboost, GW20 wildcard, GW22 3xc, GW23 bboost, GW25 freehit | none |
+| 2022-23 | `threshold_only` | 2139 | GW2 bboost, GW3 wildcard, GW8 freehit, GW9 3xc, GW20 wildcard, GW22 3xc, GW23 bboost, GW25 freehit | none |
+| 2023-24 | `off` | 1724 | none | none |
+| 2023-24 | `decaying` | 1804 | GW7 wildcard, GW10 3xc, GW17 freehit, GW19 bboost, GW23 wildcard, GW25 freehit, GW27 3xc, GW28 bboost | none |
+| 2023-24 | `threshold_only` | 1837 | GW2 bboost, GW7 wildcard, GW9 freehit, GW10 3xc, GW20 wildcard, GW25 freehit, GW27 3xc, GW28 bboost | none |
+| 2024-25 | `off` | 1919 | none | none |
+| 2024-25 | `decaying` | 2037 | GW7 wildcard, GW10 3xc, GW15 freehit, GW19 bboost, GW24 bboost, GW25 3xc, GW26 wildcard, GW29 freehit | none |
+| 2024-25 | `threshold_only` | 2021 | GW2 bboost, GW7 wildcard, GW10 3xc, GW11 freehit, GW24 wildcard, GW25 3xc, GW27 bboost, GW28 freehit | none |
+| 2021-22 | `induction` | 2045 | GW2 bboost, GW3 3xc, GW5 wildcard, GW13 freehit, GW20 wildcard, GW22 freehit, GW36 3xc, GW37 bboost | none |
+| 2022-23 | `induction` | 2106 | GW2 bboost, GW3 wildcard, GW8 freehit, GW19 3xc, GW20 wildcard, GW25 freehit, GW29 3xc, GW34 bboost | none |
+| 2023-24 | `induction` | 1904 | GW2 bboost, GW7 wildcard, GW17 freehit, GW19 3xc, GW23 wildcard, GW25 freehit, GW35 3xc, GW37 bboost | none |
+| 2024-25 | `induction` | 2019 | GW2 bboost, GW7 wildcard, GW15 freehit, GW16 3xc, GW24 wildcard, GW25 3xc, GW29 freehit, GW38 bboost | none |
+
+| Comparison | Mean per season | Mean per gameweek | 90% interval | Seasons ahead |
+| --- | ---: | ---: | --- | ---: |
+| `induction` minus `decaying` | +10.8 | +0.29 | [-1.09, +0.88] | 0.25 |
+| `induction` minus `threshold_only` | +5.2 | +0.14 | [-1.29, +1.25] | 0.25 |
+| `induction` minus `off` | +106.0 | +2.88 | [+1.29, +4.01] | 1.00 |
+
+**Deciding comparison: `induction` minus `threshold_only`.** It is not fixed in this runner: the forecast keeps its reservation only when `decaying - threshold_only` is positive, the committed forecast record says otherwise, and this protocol makes the dropped case decide on `threshold_only`.
+
+**Verdict: `not separated`.** Its interval does not lie entirely above zero, so by the rule fixed before this ran the linear decay stays the forecast's threshold and nothing is promoted.
+
+**The mean is not what the seasons did.** `induction` is behind in 3 of 4 seasons (2021-22, 2022-23, 2024-25), so a positive pooled figure here is carried by the rest. Read the per-season column before quoting the mean.
