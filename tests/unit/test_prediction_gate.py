@@ -28,6 +28,18 @@ def test_rank_gain_can_pass_with_a_small_error_increase():
     assert read_gate().verdict == "passes"
 
 
+def test_exact_inclusive_rank_boundary_is_not_lost_to_binary_roundoff():
+    ranks = {(s, p): (0.1, 0.11) for s in (*SEASONS, "pooled") for p in POSITIONS}
+    assert read_gate(ranks=ranks).ranking == "passes"
+    below = {(s, p): (0.1, 0.10999999) for s in (*SEASONS, "pooled") for p in POSITIONS}
+    assert read_gate(ranks=below).ranking == "fails"
+
+
+def test_roundoff_allowance_never_turns_zero_error_or_zero_interval_into_a_pass():
+    assert read_gate(errors={"pooled": (0.0, 1e-13)}).error == "fails"
+    assert read_gate(decision_interval=(0.0, 1.0)).decision == "fails"
+
+
 @pytest.mark.parametrize(
     "change,clause",
     [

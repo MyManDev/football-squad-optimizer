@@ -42,6 +42,11 @@ changes that fingerprint; it cannot rescue a measured candidate under the same d
 
 ## Existing records, without a rerun
 
+Inclusive nonzero thresholds tolerate absolute arithmetic roundoff of `1e-12`, with no
+relative tolerance. Zero-control MAE and the strictly positive interval endpoint retain
+their exact zero boundaries. Thus a nominal rank gain from 0.10 to 0.11 is not rejected
+because subtraction yields 0.009999999999999995; a materially smaller gain still fails.
+
 Only the committed summaries/aggregate JSON fields were read. No OOF table, raw season,
 fold outcome or solver was opened for this comparison. The third record's ranking population
 is appeared GK/DEF rows; its result illustrates that population, not an unmeasured full-roster

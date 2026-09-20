@@ -107,6 +107,11 @@ or threshold is tried after the verdict. A failed/insufficient scientific verdic
 completes M6 when honestly recorded. An execution refusal must instead identify what could
 not be measured; it is not a scientific candidate failure or a passing run.
 
+Inclusive nonzero numeric comparisons allow only absolute floating-point roundoff of
+`1e-12` (relative tolerance zero). Zero-control MAE has no positive error allowance, and
+the interval's strictly positive lower endpoint receives no tolerance. This comparison
+rule is fixed before the run along with the thresholds; it is not a practical-effect margin.
+
 Write `docs/appearance_recalibration.json`, its Markdown twin and a measurements-index row.
 Record declaration digest/commit, policy digest, runner clean commit, source digests, solver
 configuration, software versions, counts and verdict. No private host/user/path or credential

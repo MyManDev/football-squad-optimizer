@@ -76,6 +76,13 @@ def _finite(value: float) -> bool:
     return not isinstance(value, bool) and math.isfinite(value)
 
 
+def _at_least(value: float, floor: float) -> bool:
+    """Inclusive thresholds tolerate only absolute arithmetic roundoff, not effect size."""
+    return value >= floor or (
+        value != 0 and floor != 0 and math.isclose(value, floor, rel_tol=0, abs_tol=1e-12)
+    )
+
+
 DEFAULT_PREDICTION_GATE = PredictionGatePolicy()
 
 
@@ -131,18 +138,18 @@ def evaluate_prediction_gate(
 
     enough_seasons = len(seasons) >= policy.minimum_seasons
     rank_checks = [
-        candidate - control >= -policy.maximum_cell_rank_loss
+        _at_least(candidate - control, -policy.maximum_cell_rank_loss)
         for control, candidate in ranks.values()
     ]
     if all(("pooled", position) in ranks for position in positions):
         mean_gain = sum(ranks["pooled", p][1] - ranks["pooled", p][0] for p in positions) / len(
             positions
         )
-        rank_checks.append(mean_gain >= policy.minimum_rank_gain)
+        rank_checks.append(_at_least(mean_gain, policy.minimum_rank_gain))
     ranking = _state(rank_checks, enough_seasons and set(ranks) == expected_ranks)
     error = _state(
         [
-            candidate <= control * (1 + policy.maximum_relative_mae_increase)
+            _at_least(control * (1 + policy.maximum_relative_mae_increase), candidate)
             for control, candidate in errors.values()
         ],
         enough_seasons and set(errors) == expected_errors,
@@ -151,7 +158,7 @@ def evaluate_prediction_gate(
         sum(value < 0 for value in decision_by_season.values()) <= policy.maximum_losing_seasons
     ]
     if decision_mean is not None:
-        decision_checks.append(decision_mean >= policy.minimum_decision_gain)
+        decision_checks.append(_at_least(decision_mean, policy.minimum_decision_gain))
     if decision_interval is not None:
         decision_checks.append(decision_interval[0] > 0)
     decision = _state(
