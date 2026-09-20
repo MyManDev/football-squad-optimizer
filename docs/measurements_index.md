@@ -1,5 +1,18 @@
 # Measurements Index
 
+## Scoring-regime limit on historical prediction evidence
+
+The 2021–25 prediction-development records below use historical points **without DEFCON**.
+Live 2026–27 total points include defensive contributions that the component model does not
+explicitly model. Their ranking, error and paired-decision verdicts retain their original
+meaning on the recorded population; none is proof of performance under live DEFCON scoring.
+The canonical schema lacks DEFCON training labels, and raw 2025–26 availability does not
+authorize accessing that locked holdout for this v1 research path. No DEFCON model, label
+backfill or live promotion follows from these records. The
+[research agenda](prediction_research_agenda.md#applicability-boundary-historical-points-and-live-defcon-scoring)
+states the research boundary; separately authorized holdout/v2 records remain separately
+identified below rather than being silently pooled with v1 evidence.
+
 One line per committed real-data measurement artifact: what it is, what it found, and
 where it came from. Every artifact here is measurement-only in the sense that matters —
 **nothing in this index promoted a model or changed the operational control** — but one row

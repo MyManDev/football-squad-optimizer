@@ -1,5 +1,24 @@
 # Prediction Research Agenda
 
+## Applicability boundary: historical points and live DEFCON scoring
+
+The 2021–25 development measurements use the historical scoring regime without DEFCON.
+Live 2026–27 `total_points` already includes defensive-contribution points, but the current
+canonical training schema has no DEFCON label and the component model does not model that
+contribution explicitly. Historical ranking, error, calibration and squad-decision verdicts
+therefore apply to their recorded scoring regime; they do not establish the same performance
+under live scoring. A historical improvement must not be described as proof of live improvement.
+
+**Do not fit or backfill a DEFCON component here.** The available raw DEFCON season is
+2025–26, the locked holdout for this v1 research path; its presence is not permission to read
+it, derive labels, or reinterpret it as additional development data. A DEFCON study requires
+an explicit new data/target/scoring declaration and owner authorization. Existing separately
+authorized v2 studies do not grant that permission to this programme's v1 candidates.
+
+This limitation narrows the applicability of existing verdicts without changing their
+historical measurements, original gates or operational model. See the
+[measurements index](measurements_index.md) and [review scope](prediction_e2e_review_scope.md).
+
 Owner: data / data mining. The question this side owns:
 
 > How do we produce the best available, leakage-safe, calibrated future information for the
