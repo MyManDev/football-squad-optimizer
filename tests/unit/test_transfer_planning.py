@@ -445,6 +445,99 @@ def test_wall_clock_limits_do_not_choose_the_plan(
         )
 
 
+def test_the_tiebreak_is_budgeted_on_solver_work_not_on_what_the_clock_left(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both phases are handed the ceiling; neither is handed the remainder of it.
+
+    The primary already stops on deterministic work. The tie-break used to receive
+    ``deadline - perf_counter()``, so the phase that settles bench order, the captain among
+    equals and the choice between two equal-value fifteens was a function of the CPU share
+    the process happened to receive: the same dependence the deterministic budget was
+    introduced to remove from the primary (#247), and the one ``optimization/optimizer.py``
+    removed from its own tie-break in #192 by flooring that phase's wall limit at the caller's
+    budget instead of its leftover.
+
+    ``member_plan_determinism`` cut this phase with the clock 24 times and the published plan
+    did not move once, so this pins a property that was measured to hold rather than repairing
+    an observed defect.
+
+    ``test_wall_clock_limits_do_not_choose_the_plan`` above cannot see this. It brings no
+    deterministic budget, so the planner raises both of its arms to ``PLAN_WALL_CEILING_SECONDS``
+    and the two runs agree on the wall figure that reaches the solver. A caller that brings its
+    own budget keeps its own ceiling, and that is the caller whose tie-break was cut short.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = replace(
+        small_config,
+        solver_time_limit_seconds=45.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    walls: list[float] = []
+    original = planning_optimizer.configure_solver
+
+    def record(
+        solver: cp_model.CpSolver,
+        configuration: OptimizationConfig,
+        time_limit_seconds: float,
+        deterministic_time_limit: float | None = None,
+    ) -> None:
+        walls.append(float(time_limit_seconds))
+        original(solver, configuration, time_limit_seconds, deterministic_time_limit)
+
+    monkeypatch.setattr(planning_optimizer, "configure_solver", record)
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+
+    assert result.diagnostics["tiebreak_attempted"] is True
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    # Two phases, two configured solvers, and the same ceiling for each. A tie-break that got
+    # less than the primary would be reading the clock.
+    assert walls == [45.0, 45.0]
+
+
+def test_an_expired_clock_does_not_stop_the_tiebreak_from_being_attempted(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gate half of the change, which the budget test above cannot reach.
+
+    A test that only checks the budget handed to the tie-break also passes for an
+    implementation that still *gates* on the clock, because this fixture proves in
+    milliseconds and a clock gate never binds on it. So move the clock instead of the
+    problem: the counter jumps far past any deadline the old code would have computed, while
+    the primary still proves optimal.
+
+    Under the old gate ``remaining_time`` would be hugely negative and the phase skipped. The
+    tie-break is now gated on remaining deterministic work, which the jump does not touch, so
+    it is still attempted.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = replace(
+        small_config,
+        solver_time_limit_seconds=45.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    calls = {"n": 0}
+
+    def jumped_clock() -> float:
+        calls["n"] += 1
+        # The first reading is the start; every later one is long past any deadline.
+        return 0.0 if calls["n"] == 1 else 1_000_000.0
+
+    monkeypatch.setattr(planning_optimizer, "perf_counter", jumped_clock)
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.diagnostics["tiebreak_attempted"] is True
+
+
 def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,

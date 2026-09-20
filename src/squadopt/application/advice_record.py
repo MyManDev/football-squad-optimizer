@@ -75,6 +75,15 @@ from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLI
 #: ``v1`` was one record per season, gameweek and entry, addressed at ``entry-<id>/`` with
 #: no capture anywhere in it, so the two shapes cannot be read as one — see
 #: ``LEGACY_LAYOUT_NOTE`` for why no migration is written.
+#:
+#: A nullable field added to the document does not move this. The version separates shapes
+#: that cannot be read as one, which is what v1 and v2 are: a reader of v2 that meets a key
+#: it does not know ignores it, and a reader that wants a key an older document lacks gets
+#: ``None``, which the document means rather than a value it is missing. Moving the version
+#: for an additive field would make every older record unreadable to gain nothing, and this
+#: string is read nowhere outside this module, so the move would be inert as well. A field
+#: whose absence cannot be read as absent, or a changed meaning for an existing key, is what
+#: moves it.
 MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks
@@ -316,6 +325,18 @@ def _number(payload: Mapping[str, object], key: str) -> float | None:
     return None if value is None else float(str(value))
 
 
+def _flag(payload: Mapping[str, object], key: str) -> bool | None:
+    """A published boolean, or ``None`` where the document does not carry one.
+
+    A missing field is not ``False``. A document published before its producer
+    carried this says nothing about which budget stopped its search, and a record
+    that read it as ``False`` would say the clock did not, which nobody measured.
+    """
+
+    value = payload.get(key)
+    return value if isinstance(value, bool) else None
+
+
 def _text(values: Mapping[str, object], key: str) -> str | None:
     value = values.get(key)
     return None if value is None else str(value)
@@ -401,6 +422,16 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         # with the measured bound gap beside it.
         "solver_status": _text(payload, "solver_status"),
         "optimality_gap": _number(payload, "optimality_gap"),
+        # And whether the wall clock stopped it, so a settled record can tell a plan the
+        # budget ended from one that was a property of the machine's load. The work spent
+        "wall_clock_stopped_the_search": _flag(payload, "wall_clock_stopped_the_search"),
+        # The work spent is deliberately not here, and the reason is reproducibility rather
+        # than path. Two runs of the same publish disagree on it in the last decimal digit:
+        # member 2199732 read 1.2949777377880984 and then ...82 on the same capture under the
+        # same budget, measured against the committed `member_plan_determinism` record. The
+        # record of a capture must be rebuildable to the same bytes, so a field that wobbles
+        # below the last digit anyone would read cannot be in it. What ends the search is a
+        # category and does not wobble.
         # Whether this document can be scored at all. A competitive mode's payload is
         # published without a lineup (the selector chose a transfer decision, not a week),
         # and the record says so rather than presenting an empty eleven as a decision.

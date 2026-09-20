@@ -107,6 +107,7 @@ from squadopt.live import (
     SeasonRules,
 )
 from squadopt.live.transfers import plan_transfer_menu
+from squadopt.optimization import wall_clock_stopped_the_search
 from squadopt.planning import TransferPlanResult
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
@@ -1836,6 +1837,10 @@ def build_league_views(
                         expected_points_cost=item.expected_points_cost,
                         rival_label=item.rival_label,
                         solver_status=chosen_plan.solver_status.name,
+                        # The same solve the status and the gap below come from.
+                        clock_stopped_the_search=wall_clock_stopped_the_search(
+                            chosen_plan.solver_status, chosen_plan.diagnostics
+                        ),
                         optimality_gap=(float(str(chosen_gap)) if chosen_gap is not None else None),
                     )
                     mode_relative = f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json"
