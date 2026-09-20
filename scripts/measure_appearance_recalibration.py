@@ -386,7 +386,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def markdown(record: dict[str, Any]) -> str:
     paired = record["decisions"]
     probability = record["probabilities"]["pooled"]
-    return (
+    introduction = (
         "# Appearance recalibration\n\n"
         f"Verdict **{record['verdict']}** under `{CONTRACT_VERSION}`. "
         f"Ranking: {record['gate']['ranking']}; error: {record['gate']['error']}; "
@@ -397,12 +397,55 @@ def markdown(record: dict[str, Any]) -> str:
         f"Paired decisions: {paired['paired_decisions']}; mean candidate minus base "
         f"{paired['mean_difference']}; 90% interval {paired['interval']}; "
         f"complete for gate: {paired['complete_for_gate']}.\n\n"
-        "The JSON twin retains all seasonal/positional readings, reliability bins, "
+        "The [JSON twin](appearance_recalibration.json) retains seasonal/positional readings, "
+        "reliability bins, "
         "training counts, solver statuses and input/declaration identities. "
         "See [the frozen declaration](appearance_recalibration_prereg.md).\n\n"
         "Historical 2021-25 scoring has no DEFCON. This does not establish live DEFCON "
         "performance or top-100 ability and does not promote an operational model.\n"
     )
+
+    def number(value: object) -> str:
+        return f"{value:.6f}" if isinstance(value, int | float) else "unavailable"
+
+    lines = [
+        introduction,
+        "## Same-row probability and full-roster point readings",
+        "",
+        "All pairs below are base / candidate. Brier uses eligible component rows; "
+        "MAE and nonplayer forecast mass use the full roster, including fallbacks and blanks.",
+        "",
+        "| Season | Brier | Point MAE | Nonplayer forecast mass |",
+        "| --- | --- | --- | --- |",
+    ]
+    for season in (*DECISION_SEASONS, "pooled"):
+        probability = record["probabilities"][season]
+        arms = record["row_readings"][season]["arms"]
+        brier = " / ".join(number(probability[a]["brier"]) for a in ("base", "candidate"))
+        mae = " / ".join(number(arms[a]["mae"]) for a in ("base", "candidate"))
+        mass = " / ".join(number(arms[a]["nonplayer_forecast_mass"]) for a in ("base", "candidate"))
+        lines.append(f"| {season} | {brier} | {mae} | {mass} |")
+    lines += [
+        "",
+        "## Pooled within-position ranking",
+        "",
+        "| Position | Rows | Base Spearman | Candidate Spearman |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for position, block in record["row_readings"]["pooled"]["within_position_rank"].items():
+        left, right = block["pair"]
+        lines.append(f"| {position} | {block['rows']} | {number(left)} | {number(right)} |")
+    lines += [
+        "",
+        "## Paired decisions by season",
+        "",
+        "Descriptive means below are not binding when the complete-pair/clock-stop check fails.",
+        "",
+        "| Season | Candidate minus base |",
+        "| --- | ---: |",
+    ]
+    lines += [f"| {season} | {number(value)} |" for season, value in paired["by_season"].items()]
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":
