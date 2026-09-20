@@ -98,6 +98,7 @@ def advice_read_schema() -> dict[str, Any]:
             "rival_label": {"type": ["string", "null"]},
             "rival_entry_id": {"type": "integer", "minimum": 1},
             "solver_status": {"type": ["string", "null"]},
+            "wall_clock_stopped_the_search": {"type": ["boolean", "null"]},
             "control_solver_status": {"type": ["string", "null"]},
             "optimality_gap": nullable_number,
             "control_optimality_gap": nullable_number,
