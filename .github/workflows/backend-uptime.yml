@@ -114,8 +114,8 @@ jobs:
               const labels = own.labels.map((item) => typeof item === "string" ? item : item.name);
               if (own.number !== created.number || own.pull_request || own.state !== "open"
                   || !labels.includes(label) || labels.includes("backend-down")
-                  || !own.title.startsWith("[EXERCISE]")
-                  || own.body?.split("\n")[0] !== `${marker} at ${at}.`) {
+                  || own.title !== `[EXERCISE] Backend alarm permission, run ${context.runId}`
+                  || own.body?.split(/\r?\n/)[0] !== `${marker} at ${at}.`) {
                 throw new Error("Refusing to close an issue not owned by this exercise.");
               }
               await github.rest.issues.createComment({

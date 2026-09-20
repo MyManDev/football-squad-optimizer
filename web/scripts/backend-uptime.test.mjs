@@ -155,12 +155,29 @@ describe("backend alarm issue exercise", () => {
     expect(result.logs).toContain("Exercise issue closed: https://example.test/issues/99");
   });
 
+  it("accepts GitHub CRLF body storage without weakening exercise ownership", async () => {
+    const result = await run({
+      tamper: (issue) => ({ ...issue, body: issue.body.replace(/\r?\n/g, "\r\n") }),
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.failures).toEqual([]);
+    expect(result.fetches).toBe(0);
+    expect(result.issues.get(99).state).toBe("closed");
+    expect(result.issues.get(42).state).toBe("open");
+    expect(result.calls.some(([kind]) => kind === "list")).toBe(false);
+    expect(result.logs).toContain("Exercise issue closed: https://example.test/issues/99");
+  });
+
   it.each([
     ["different number", (issue) => ({ ...issue, number: 42 })],
     ["production label", (issue) => ({ ...issue, labels: ["backend-down"] })],
     ["both labels", (issue) => ({ ...issue, labels: ["backend-down", "backend-uptime-exercise"] })],
     ["different run", (issue) => ({ ...issue, body: "EXERCISE run 456" })],
     ["unmarked title", (issue) => ({ ...issue, title: "Real alarm" })],
+    [
+      "different run title",
+      (issue) => ({ ...issue, title: "[EXERCISE] Backend alarm permission, run 456" }),
+    ],
     ["pull request", (issue) => ({ ...issue, pull_request: {} })],
   ])("refuses to close a retrieved issue with %s", async (_name, tamper) => {
     const result = await run({ tamper });
