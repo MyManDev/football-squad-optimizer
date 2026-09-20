@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
+import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { MESSAGES } from "../src/i18n/messages";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
@@ -276,11 +277,9 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await page.goto(`/league/members/${context.entryId}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
-  await expect(
-    page.getByText(
-      "Hesaplama servisine şu an ulaşılamıyor. Yayınlanmış planlar her zamanki gibi aşağıda.",
-    ),
-  ).toBeVisible();
+  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachablePublished)).toBeVisible();
+  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachable)).toHaveCount(0);
+  await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachableAbsent)).toHaveCount(0);
   await expect(advice).toBeVisible();
   await expect(advice).toContainText(baseline.payload.captain.name);
   await expect(page.getByText("Hesap sonucu", { exact: true })).toHaveCount(0);

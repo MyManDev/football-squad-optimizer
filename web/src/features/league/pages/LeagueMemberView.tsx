@@ -291,7 +291,19 @@ function LeagueMemberContent({
             }
             computable={computeAvailable}
             pending={computePending}
-            published={selection.status === "ready"}
+            published={
+              adviceLoading || !indexReadable
+                ? undefined
+                : selection.status === "not-listed" || selection.status === "declared-unavailable"
+                  ? false
+                  : selectionAvailable &&
+                      advice &&
+                      !adviceIssue &&
+                      !rejectedContext &&
+                      !rejectedUnreadable
+                    ? true
+                    : undefined
+            }
             chipChosen={selection.chip.chip !== null}
             deadlinePassed={deadlinePassed !== null}
           />
