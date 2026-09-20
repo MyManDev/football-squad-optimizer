@@ -348,6 +348,11 @@ def _arm_summary(result: Any) -> dict[str, Any]:
     return {
         "scored_decisions": len(values),
         "mean_realized_points": sum(values) / len(values) if values else None,
+        # The count as well as the share. A decision mean over unproved solves is a different
+        # object from one over proofs, and a reader who cannot tell which cannot tell whether
+        # a re-run would move it. The share alone makes that arithmetic rather than reading.
+        "solved_decisions": len(solved),
+        "proved_decisions": proven,
         "proven_share": proven / len(solved) if solved else 0.0,
     }
 
@@ -499,9 +504,16 @@ def markdown(record: Mapping[str, Any]) -> str:
     ]
     for name in ARM_NAMES:
         summary = decisions["arms"][name]
+        proved = summary.get("proved_decisions")
+        solved = summary.get("solved_decisions")
+        share = (
+            f"{summary['proven_share']:.2f}"
+            if proved is None or solved is None
+            else f"{proved} of {solved}"
+        )
         lines.append(
             f"| `{name}` | {summary['scored_decisions']} | "
-            f"{float(summary['mean_realized_points']):.3f} | {summary['proven_share']:.2f} |"
+            f"{float(summary['mean_realized_points']):.3f} | {share} |"
         )
     lines += [
         "",

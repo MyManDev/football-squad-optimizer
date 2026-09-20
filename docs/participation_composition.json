@@ -1,0 +1,362 @@
+{
+  "contract_version": "participation_composition_v1",
+  "created_utc": "2026-09-20T00:44:19+00:00",
+  "decisions": {
+    "arms": {
+      "composed": {
+        "mean_realized_points": 63.891891891891895,
+        "proven_share": 0.4864864864864865,
+        "scored_decisions": 37
+      },
+      "state_split": {
+        "mean_realized_points": 61.86486486486486,
+        "proven_share": 0.10810810810810811,
+        "scored_decisions": 37
+      },
+      "uncomposed": {
+        "mean_realized_points": 65.29729729729729,
+        "proven_share": 0.5135135135135135,
+        "scored_decisions": 37
+      }
+    },
+    "paired_against_uncomposed": {
+      "composed": {
+        "decisions_with_a_different_squad": 26,
+        "interval": [
+          -3.5689189189189197,
+          0.1635135135135123
+        ],
+        "interval_block_length": 4,
+        "interval_covers_one_season": true,
+        "interval_level": 0.9,
+        "interval_resamples": 2000,
+        "losses": 14,
+        "mean_difference": -1.4054054054054055,
+        "paired_decisions": 37,
+        "ties": 14,
+        "wins": 9
+      },
+      "state_split": {
+        "decisions_with_a_different_squad": 36,
+        "interval": [
+          -6.648648648648648,
+          -1.5391891891891905
+        ],
+        "interval_block_length": 4,
+        "interval_covers_one_season": true,
+        "interval_level": 0.9,
+        "interval_resamples": 2000,
+        "losses": 17,
+        "mean_difference": -3.4324324324324325,
+        "paired_decisions": 37,
+        "ties": 6,
+        "wins": 14
+      }
+    }
+  },
+  "declared_start_seasons": [
+    "2023-24",
+    "2024-25"
+  ],
+  "descriptive_only": true,
+  "elapsed_seconds": 987.288646,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "fits": {
+    "component_appearance_rows": 27877,
+    "component_conditional_rows": 10746,
+    "component_model_version": "phase_c_control_components_v1",
+    "feature_columns": [
+      "minutes_last_3",
+      "minutes_last_5",
+      "points_last_3",
+      "points_last_5",
+      "appearance_rate_last_3",
+      "appearance_rate_last_5",
+      "price_tenths",
+      "fixture_count",
+      "home_fixture_count"
+    ],
+    "modelling_frame_rows": 55661,
+    "points_pooled_rows": 10746,
+    "points_started_rows": 7930,
+    "points_substitute_rows": 2816,
+    "start_feature_columns": [
+      "minutes_last_3",
+      "minutes_last_5",
+      "points_last_3",
+      "points_last_5",
+      "appearance_rate_last_3",
+      "appearance_rate_last_5",
+      "price_tenths",
+      "fixture_count",
+      "home_fixture_count",
+      "team_points_last_5"
+    ],
+    "start_model_version": "participation_conditional_start_v1",
+    "start_training_rows": 10746,
+    "training_start_rate": 0.7379490042806626
+  },
+  "follow_up": "The second judged season is the **live 2026-27 season**, not the locked 2025-26 holdout, which stays locked: nothing here loads it, lists it or hashes it, and reading it early would spend the one season that could confirm this one. After gameweek 9 the live record can offer the weeks it has settled by then, and the same three arms are read on them. The label there is **not** the archive's `starts`. `docs/rotation_evidence_prereg.md` declares the prospective source as a settled capture's `stats.starts > 0` and admits a gameweek only once its `rotation_evidence_v1` artifact and its settled outcome are both on disk. That dependency is the plan's first step rather than an assumption behind it: no such artifact exists under `data/` today, checked by listing rather than taken on trust, so the follow-up begins by establishing whether the weeks it needs carry one, and reports that it does not rather than quietly reading a shorter population. Only with a second judged season in hand is it worth asking whether a gate is worth writing, and that gate would be pre-registered before the run and never after it.",
+  "gate": null,
+  "generated_at_utc": "2026-09-20T00:27:52+00:00",
+  "judged_season": "2024-25",
+  "locked_holdout_accessed": false,
+  "machine": "Another session's parallel `pytest -n 2` run was on this machine while these solves ran, and a third session holds the live backend. Both solver limits are deterministic, so no number in this record moves under that load; `elapsed_seconds` does, and is not a quiet-machine timing.",
+  "manifest_sha256": "1a06b69abb3d7fe98afde6983885a9a7723463d351a2432dc9e0a11082f5eba8",
+  "operational_control_changed": false,
+  "points": {
+    "appeared_rows": 11124,
+    "arms": {
+      "composed": {
+        "appeared_rows": {
+          "mean_absolute_error": 1.9069798992604947,
+          "mean_error": -0.4876548312028929,
+          "mean_forecast": 2.2555140749202924,
+          "mean_realized": 2.743168906123185,
+          "rows": 11089
+        },
+        "by_position": {
+          "DEF": {
+            "mean_absolute_error": 1.027473635064008,
+            "mean_error": -0.009909944028086037,
+            "mean_forecast": 1.0129315360998263,
+            "mean_realized": 1.0228414801279122,
+            "rows": 8756
+          },
+          "FWD": {
+            "mean_absolute_error": 1.228275840730572,
+            "mean_error": 0.056429928344465446,
+            "mean_forecast": 1.4237064212681796,
+            "mean_realized": 1.3672764929237142,
+            "rows": 2897
+          },
+          "GK": {
+            "mean_absolute_error": 0.7312076169441619,
+            "mean_error": -0.11281725894279687,
+            "mean_forecast": 0.7837219031701357,
+            "mean_realized": 0.8965391621129326,
+            "rows": 2745
+          },
+          "MID": {
+            "mean_absolute_error": 1.0538925151553737,
+            "mean_error": 0.052010601967516785,
+            "mean_forecast": 1.3335135413898564,
+            "mean_realized": 1.2815029394223396,
+            "rows": 11737
+          }
+        },
+        "by_state": {
+          "absent": {
+            "mean_absolute_error": 0.38449259040327277,
+            "mean_error": 0.38449259040327277,
+            "mean_forecast": 0.38449259040327277,
+            "mean_realized": 0.0,
+            "rows": 15046
+          },
+          "start": {
+            "mean_absolute_error": 2.194313686216082,
+            "mean_error": -0.7231601120532091,
+            "mean_forecast": 2.5677082631645067,
+            "mean_realized": 3.2908683752177157,
+            "rows": 8038
+          },
+          "substitute": {
+            "mean_absolute_error": 1.1499858056685541,
+            "mean_error": 0.13279467632737324,
+            "mean_forecast": 1.433024109300169,
+            "mean_realized": 1.3002294329727957,
+            "rows": 3051
+          }
+        },
+        "whole_population": {
+          "mean_absolute_error": 1.0304792660458109,
+          "mean_error": 0.014443125769992812,
+          "mean_forecast": 1.1783612432369912,
+          "mean_realized": 1.1639181174669984,
+          "rows": 26135
+        }
+      },
+      "state_split": {
+        "appeared_rows": {
+          "mean_absolute_error": 1.8757203732214756,
+          "mean_error": -0.5899620327845685,
+          "mean_forecast": 2.1532068733386165,
+          "mean_realized": 2.743168906123185,
+          "rows": 11089
+        },
+        "by_position": {
+          "DEF": {
+            "mean_absolute_error": 1.0251982928179422,
+            "mean_error": -0.05545347768651349,
+            "mean_forecast": 0.9673880024413988,
+            "mean_realized": 1.0228414801279122,
+            "rows": 8756
+          },
+          "FWD": {
+            "mean_absolute_error": 1.2874958444905629,
+            "mean_error": 0.0890152737826925,
+            "mean_forecast": 1.4562917667064068,
+            "mean_realized": 1.3672764929237142,
+            "rows": 2897
+          },
+          "GK": {
+            "mean_absolute_error": 0.7361470481748874,
+            "mean_error": -0.18140217069344805,
+            "mean_forecast": 0.7151369914194846,
+            "mean_realized": 0.8965391621129326,
+            "rows": 2745
+          },
+          "MID": {
+            "mean_absolute_error": 1.0818730451766263,
+            "mean_error": 0.06891449712092834,
+            "mean_forecast": 1.350417436543268,
+            "mean_realized": 1.2815029394223396,
+            "rows": 11737
+          }
+        },
+        "by_state": {
+          "absent": {
+            "mean_absolute_error": 0.44033737027969216,
+            "mean_error": 0.44033737027969216,
+            "mean_forecast": 0.44033737027969216,
+            "mean_realized": 0.0,
+            "rows": 15046
+          },
+          "start": {
+            "mean_absolute_error": 2.1197001201550383,
+            "mean_error": -0.9385460963258808,
+            "mean_forecast": 2.352322278891835,
+            "mean_realized": 3.2908683752177157,
+            "rows": 8038
+          },
+          "substitute": {
+            "mean_absolute_error": 1.2329444945417054,
+            "mean_error": 0.32839873507681105,
+            "mean_forecast": 1.6286281680496069,
+            "mean_realized": 1.3002294329727957,
+            "rows": 3051
+          }
+        },
+        "whole_population": {
+          "mean_absolute_error": 1.04936595721757,
+          "mean_error": 0.0031845070472611148,
+          "mean_forecast": 1.1671026245142593,
+          "mean_realized": 1.1639181174669984,
+          "rows": 26135
+        }
+      },
+      "uncomposed": {
+        "appeared_rows": {
+          "mean_absolute_error": 1.9096475491677887,
+          "mean_error": -0.4926266676711308,
+          "mean_forecast": 2.2505422384520544,
+          "mean_realized": 2.743168906123185,
+          "rows": 11089
+        },
+        "by_position": {
+          "DEF": {
+            "mean_absolute_error": 1.024110741164362,
+            "mean_error": -0.014828855864055149,
+            "mean_forecast": 1.0080126242638572,
+            "mean_realized": 1.0228414801279122,
+            "rows": 8756
+          },
+          "FWD": {
+            "mean_absolute_error": 1.2378238318345778,
+            "mean_error": 0.06067580308446508,
+            "mean_forecast": 1.4279522960081792,
+            "mean_realized": 1.3672764929237142,
+            "rows": 2897
+          },
+          "GK": {
+            "mean_absolute_error": 0.7300640960091022,
+            "mean_error": -0.1044079829749245,
+            "mean_forecast": 0.7921311791380082,
+            "mean_realized": 0.8965391621129326,
+            "rows": 2745
+          },
+          "MID": {
+            "mean_absolute_error": 1.05391813278707,
+            "mean_error": 0.0450538588801324,
+            "mean_forecast": 1.326556798302472,
+            "mean_realized": 1.2815029394223396,
+            "rows": 11737
+          }
+        },
+        "by_state": {
+          "absent": {
+            "mean_absolute_error": 0.3822192400508536,
+            "mean_error": 0.3822192400508536,
+            "mean_forecast": 0.3822192400508536,
+            "mean_realized": 0.0,
+            "rows": 15046
+          },
+          "start": {
+            "mean_absolute_error": 2.196034620802895,
+            "mean_error": -0.7344091617426961,
+            "mean_forecast": 2.5564592134750197,
+            "mean_realized": 3.2908683752177157,
+            "rows": 8038
+          },
+          "substitute": {
+            "mean_absolute_error": 1.1551476206843447,
+            "mean_error": 0.14436044715916813,
+            "mean_forecast": 1.444589880131964,
+            "mean_realized": 1.3002294329727957,
+            "rows": 3051
+          }
+        },
+        "whole_population": {
+          "mean_absolute_error": 1.0303023668845133,
+          "mean_error": 0.011024816070402694,
+          "mean_forecast": 1.174942933537401,
+          "mean_realized": 1.1639181174669984,
+          "rows": 26135
+        }
+      }
+    },
+    "judged_rows": 26303,
+    "rows_where_composed_differs_from_uncomposed": 26135,
+    "rows_where_q_is_present": 26135,
+    "rows_with_a_start_label": 26303,
+    "rows_without_a_fitted_forecast": 168
+  },
+  "producer_repository_commit": "a43c0ec558f43750cf9311eabd14c216c27a3014",
+  "promotion_decision": "none",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2023-24",
+      "2022-23",
+      "2024-25",
+      "2021-22"
+    ],
+    "repository_commit": "7f30cb66a3a607870ba409dadd76209d7c5c412c",
+    "working_tree_dirty": false
+  },
+  "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+  "solver": {
+    "binding_limit": "deterministic_time",
+    "solver_deterministic_time_limit": 5.0,
+    "solver_status_counts": {
+      "FEASIBLE": 70,
+      "OPTIMAL": 41
+    },
+    "solver_time_limit_seconds": 600.0
+  },
+  "table_sha256": "b05f10c3fd3ab5058fe1ff720cc6ef0a4b1362a70a19dd979ad0eb0f47d12c01",
+  "training_season": "2023-24",
+  "why_one_judged_season": "`START_TARGET_SUPPORTED_SEASONS` declares the archive's `starts` label over 2023-24 and 2024-25 and no other season. 2022-23 carries the column and not its values, summing to zero over GW1-GW15 beside normal minutes, and `src/squadopt/data/cleaning.py` refuses a partly populated canonical column (\"complete, so supply the values or drop the column\"), so the season goes whole. 2025-26 carries the column and is the locked holdout. Two declared seasons, one spent on the fit, leaves one judged season. A threshold written over one season is a threshold one season of noise can clear, so this record states none and asks to be read as a description."
+}
