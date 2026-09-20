@@ -302,7 +302,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         candidate = prepare_phase_c_component_folds(changed, base)
         row_readings, ranks, errors = full_roster_readings(base, candidate)
-        probability_readings = {}
+        probability_readings: dict[str, Any] = {}
         for season in (*DECISION_SEASONS, "pooled"):
             mask = transformed.eligible & (
                 True if season == "pooled" else handoff.rows.season.eq(season)
@@ -312,6 +312,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "base": reliability(handoff.rows.loc[mask, "appearance_probability"], target),
                 "candidate": reliability(transformed.probabilities.loc[mask], target),
             }
+            before = probability_readings[season]["base"]["brier"]
+            after = probability_readings[season]["candidate"]["brier"]
+            probability_readings[season]["candidate_minus_base_brier"] = (
+                float(after) - float(before) if after is not None and before is not None else None
+            )
         config = EvaluationConfig(
             optimization_config=measurement_optimization_config(),
             scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2,
