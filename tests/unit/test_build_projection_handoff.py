@@ -860,3 +860,35 @@ def test_the_carried_order_is_the_contract_order_not_the_frame_order() -> None:
     frame = _components(start_probability=[0.5, 0.5, 0.5], appearance_probability=[0.9, 0.9, 0.9])
 
     assert producer._carried(frame) == list(OPTIONAL_COLUMNS)
+
+
+# --- which chances the producer states --------------------------------------
+
+
+def test_the_producer_states_a_chance_only_for_the_players_it_modelled() -> None:
+    """A player the column leaves missing is left out, not entered at zero.
+
+    Zero is the claim that the player will certainly not appear. The direct-control
+    route leaves its component inputs absent by contract, so what it means there is that
+    nobody modelled the player, and a consumer dividing by the number would bench
+    everyone that route touched.
+    """
+
+    frame = pd.DataFrame(
+        {
+            "player_id": [1, 2, 3],
+            "expected_points": [4.0, 3.0, 2.0],
+            "appearance_probability": [0.9, None, 0.4],
+        }
+    )
+
+    assert producer._appearance(frame) == {1: 0.9, 3: 0.4}
+
+
+def test_a_projection_without_the_column_states_nothing_rather_than_nothing_at_all() -> None:
+    """``None`` against ``{}``: the legacy blend does not decompose its points, and a
+    mapping of nobody would claim it had tried and found nobody."""
+
+    frame = pd.DataFrame({"player_id": [1, 2], "expected_points": [4.0, 3.0]})
+
+    assert producer._appearance(frame) is None

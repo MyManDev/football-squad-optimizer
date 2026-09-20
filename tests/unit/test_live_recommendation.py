@@ -34,6 +34,7 @@ from squadopt.live import (
     read_inputs,
     render,
 )
+from squadopt.live.recommendation import InSeasonProjection
 from squadopt.live.report import (
     LIVE_DETERMINISTIC_UNITS,
     LIVE_WALL_CEILING_SECONDS,
@@ -905,3 +906,67 @@ def test_build_recommendation_passes_the_calendar_and_rivals_to_the_risk_layer(
     assert risk.status is LiveRiskStatus.AVAILABLE
     assert risk.diagnostics["double_gameweek_scale"] == 1.45
     assert not any("calendar-blind" in limit for limit in risk.diagnostics["stated_limits"])
+
+
+# --- the appearance chance reaching the decision pool -----------------------
+
+
+def _in_season(chances: dict[int, float] | None, snapshot_id: str) -> Any:
+    """A handoff covering the whole captured roster, with the chances the caller states."""
+
+    codes = [int(record["code"]) for record in _elements()]
+    return InSeasonProjection(
+        season=SEASON,
+        gameweek=2,
+        source_snapshot_id=snapshot_id,
+        model_name=CONTROL_MODEL_NAME,
+        model_version="synthetic-in-season-v0",
+        feature_contract_version="synthetic-in-season-features-v0",
+        expected_points=dict.fromkeys(codes, 4.0),
+        appearance_probability=chances,
+    )
+
+
+def test_a_stated_appearance_chance_reaches_the_decision_pool(tmp_path: Path) -> None:
+    """Where the bench rule of #531 will read it, one step short of reading it."""
+
+    inputs = read_inputs(_capture(tmp_path), season=SEASON, gameweek=2)
+    handoff = _in_season({1001: 0.92, 1004: 0.35}, inputs.snapshot_id)
+
+    table = project(inputs, in_season=handoff).table.set_index("player_id")
+
+    assert table.loc[1001, "appearance_probability"] == pytest.approx(0.92)
+    assert table.loc[1004, "appearance_probability"] == pytest.approx(0.35)
+    # Covered by the handoff's points and not by its chances: nobody modelled this one.
+    assert pd.isna(table.loc[1012, "appearance_probability"])
+
+
+def test_a_handoff_that_states_no_chance_leaves_the_pool_as_it_is(tmp_path: Path) -> None:
+    inputs = read_inputs(_capture(tmp_path), season=SEASON, gameweek=2)
+
+    table = project(inputs, in_season=_in_season(None, inputs.snapshot_id)).table
+
+    assert "appearance_probability" not in table.columns
+
+
+def test_availability_news_moves_the_chance_in_the_pool_too(tmp_path: Path) -> None:
+    """End to end, the property the bench rule rests on.
+
+    The producer's chance is news from before the deadline; the capture's status is news
+    from the club. Both are statements about appearing, so the pool carries their
+    product, and the quotient with the points stays the conditional mean.
+    """
+
+    elements = _elements()
+    elements[3]["status"] = "d"
+    elements[3]["chance_of_playing_next_round"] = 50
+    inputs = read_inputs(
+        _capture(tmp_path / "b", _bootstrap(elements=elements)), season=SEASON, gameweek=2
+    )
+    handoff = _in_season({1004: 0.8}, inputs.snapshot_id)
+
+    row = project(inputs, in_season=handoff).table.set_index("player_id").loc[1004]
+
+    assert row["appearance_probability"] == pytest.approx(0.4)
+    assert row["expected_points"] == pytest.approx(2.0)
+    assert row["expected_points"] / row["appearance_probability"] == pytest.approx(5.0)
