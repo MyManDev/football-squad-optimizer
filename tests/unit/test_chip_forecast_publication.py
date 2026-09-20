@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 import tests.unit.test_live_transfers as world_module
-from tests.unit.test_advice_chips import _every_chip_open
+from tests.unit.test_advice_chips import ENVELOPE, _every_chip_open
 from tests.unit.test_league_views import _legal_squad, _member_picks, _Provider, _world_context
 
 from squadopt.application import advice_menu
@@ -29,6 +29,7 @@ from squadopt.application.fixtures_view import (
     FixtureView,
 )
 from squadopt.application.league_views import build_league_views
+from squadopt.application.strategies import PUBLISHABLE_FIELDS
 
 world = world_module._world
 
@@ -182,6 +183,8 @@ def test_on_demand_computes_only_requested_chip_and_keeps_plan_on_refusal(
         **args,
     )
     assert calls == ["bboost"]
+    # Check the menu's final output, after it grafts on the optional forecast.
+    assert set(result) - ENVELOPE <= PUBLISHABLE_FIELDS
     rows = {row["name"]: row for row in result["chip_forecast"]["forecast"]["chips"]}
     assert rows["bboost"]["gain_this_week"] == 3.25
     assert rows["3xc"]["gain_this_week"] is None
@@ -196,6 +199,7 @@ def test_on_demand_computes_only_requested_chip_and_keeps_plan_on_refusal(
     assert calls == ["bboost", "bboost"]
     assert refused["moves"] == [] and refused["chip_choice"] == result["chip_choice"]
     assert refused["chip_forecast"]["reason"] == "fixtures_unscheduled"
+    assert set(refused) - ENVELOPE <= PUBLISHABLE_FIELDS
 
 
 def test_published_index_and_immutable_record_keep_the_same_forecast(

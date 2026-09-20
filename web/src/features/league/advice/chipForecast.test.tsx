@@ -205,7 +205,7 @@ it("names the examined window even without a Free Hit row", () => {
     </LanguageProvider>,
   );
   expect(view.container.textContent).toContain(
-    `${CHIP_FORECAST_COPY.en.calendarFalse}: ${squad.gameweek + 1}–19`,
+    `${CHIP_FORECAST_COPY.en.calendarFalse}: ${squad.gameweek + 1} to 19`,
   );
   view.rerender(
     <LanguageProvider initialLanguage="en">
