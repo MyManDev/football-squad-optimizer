@@ -715,6 +715,24 @@ def fit_clean_sheet_calibration(
     logistic would measure the fitting, not the rating, so the rating is given the same
     one-parameter-per-slope treatment on the same kind of data — walked forward over the
     seasons before the judged one, never the judged one itself.
+
+    **What this narrows and does not close.** ``docs/opponent_rating_handoff.md`` required a
+    recalibration because the **raw** probability broke at the top: over the 40 judged
+    fixtures where it promised better than an even chance, the clean sheet happened a third of
+    the time, 0.534 predicted against 0.325 realized. ``docs/positional_defence.json`` later
+    read the **recalibrated** probability this function produces, over the highest decile of
+    31,737 goalkeeper and defender rows in three judged seasons, and found 0.4623 predicted
+    against 0.3763 realized on 3,173 rows.
+
+    Those two readings are **not** a before and after of one quantity. Different object, raw
+    against recalibrated, and different population, the fixtures that crossed one threshold
+    against the top tenth of a row set. An arrow drawn between them would be read as a delta
+    and would not be one. What the pair does establish is a direction that holds on both
+    populations, each valid on its own: after this recalibration the top of the range **still**
+    predicts above what it realizes, and that word is what the sentence above licenses.
+
+    So a caller pricing something on the strength of a high probability here is being paid
+    more than the outcome, and how much is measured rather than assumed.
     """
 
     promoted = promoted_clubs(matches)
@@ -755,6 +773,19 @@ def _calibrated_clean_sheet(coefficients: tuple[float, float], probability: floa
     intercept, slope = coefficients
     value = intercept + slope * float(_logit(probability))
     return float(1.0 / (1.0 + math.exp(-max(min(value, 30.0), -30.0))))
+
+
+def calibrated_clean_sheet(coefficients: tuple[float, float], probability: float) -> float:
+    """Apply :func:`fit_clean_sheet_calibration`'s coefficients to one raw probability.
+
+    A public name for what this module already does internally, so a study that needs a
+    recalibrated clean-sheet probability reaches the same arithmetic instead of writing the
+    logistic out again. The handoff records why it must not use the raw one: it promises
+    better than an even chance on 40 judged fixtures where the clean sheet happened a third
+    of the time, and an uncalibrated by-product may not price a defender.
+    """
+
+    return _calibrated_clean_sheet(coefficients, probability)
 
 
 def _published_clean_sheet(
@@ -1257,6 +1288,7 @@ __all__ = [
     "TeamRating",
     "TeamRatingStudy",
     "TeamRatingStudyConfig",
+    "calibrated_clean_sheet",
     "fit_clean_sheet_calibration",
     "fit_dixon_coles",
     "load_match_results",

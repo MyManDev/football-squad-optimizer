@@ -49,7 +49,7 @@ codebase three people change several times a day, and it would make the measurem
 The boundaries we need are internal; buying them with distribution is overpaying.
 
 **Write the rules down and rely on review.** Cheapest, and it is what happens today. It
-produced the reverse dependency in `data/schema.py` even though that module's own docstring
+produced the reverse dependency in `src/squadopt/data/schema.py` even though that module's own docstring
 says the vocabulary belongs somewhere neutral. Writing a rule nobody checks is how the
 `data_followups.md` proposal for a contracts module has sat unimplemented. If the rule matters,
 it fails the build.
