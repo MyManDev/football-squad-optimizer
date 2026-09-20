@@ -99,8 +99,9 @@ RECORD_FILE: Final = "advice.json"
 #: How many differing fields a refusal names before it stops listing them.
 _DIFFERENCE_LIMIT: Final = 12
 #: What may be a capture's path segment. A snapshot identifier is
-#: ``{source}-{stamp}-{digest}`` (``data/snapshots.py``) and so is already safe, but this is
-#: the segment of a path that is written to, so it is checked rather than trusted: no
+#: ``{source}-{stamp}-{digest}`` (``src/squadopt/data/snapshots.py``) and so is already
+#: safe, but this is the segment of a path that is written to, so it is checked rather
+#: than trusted: no
 #: separator, no ``.``/``..``, and a length bound because the whole record path has to stay
 #: inside Windows' limit with a staging sibling's name on top of it.
 _CAPTURE_SEGMENT: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}")
