@@ -436,6 +436,35 @@ def _state_table(block: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def _claim(name: str, paired: Mapping[str, Any]) -> str:
+    """The sentence an arm's own interval licenses, derived rather than written.
+
+    A record's prose is where an overstated result hides, because a sentence is not audited
+    the way a number is, and a negative is audited least of all: it reads as modesty. So the
+    claim is computed from the interval the run produced. An author cannot write "costs
+    decisions" over an interval that covers zero, because the author does not write it.
+    """
+
+    interval = paired.get("interval")
+    decisions = paired.get("paired_decisions")
+    mean = paired.get("mean_difference")
+    if interval is None or mean is None:
+        return f"`{name}` has no interval, so nothing about its difference is claimed."
+    lower, upper = float(interval[0]), float(interval[1])
+    difference = f"{float(mean):+.3f} a decision"
+    if lower <= 0.0 <= upper:
+        return (
+            f"**No loss or gain is claimed for `{name}`.** Its difference is {difference} and"
+            f" its interval covers zero, so these {decisions} decisions cannot separate it"
+            " from nothing."
+        )
+    direction = "loss" if upper < 0.0 else "gain"
+    return (
+        f"`{name}`'s interval excludes zero, so its {direction} of {difference} reads as one"
+        f" at this level, over {decisions} decisions of a single season."
+    )
+
+
 def markdown(record: Mapping[str, Any]) -> str:
     points = record["points"]
     decisions = record.get("decisions")
@@ -541,12 +570,17 @@ def markdown(record: Mapping[str, Any]) -> str:
         "The interval is a moving-block bootstrap over the weeks of one season. It describes"
         " how much these 37 weeks move; it cannot describe how much the next season would.",
         "",
-        "**No loss is claimed for `composed`.** Its interval covers zero, so these 37 weeks"
-        " cannot separate its difference from nothing. What they do establish is that it"
-        " changed most of the squads while changing the error in the fourth decimal, and a"
-        " change that buys nothing on the error and is not a rounding difference on the squads"
-        " is refusable on those grounds without a loss. `state_split`'s interval excludes zero"
-        " and its loss reads as one.",
+        *[
+            _claim(name, decisions["paired_against_uncomposed"][name])
+            for name in ARM_NAMES
+            if name != "uncomposed"
+        ],
+        "",
+        "What the weeks do establish about `composed` is that it changed most of the squads"
+        " while changing the error in the fourth decimal. A change that buys nothing on the"
+        " error and is not a rounding difference on the squads is refusable on those grounds"
+        " without a loss, and claiming one it cannot support would only give the first reader"
+        " who checks the interval a reason to discount the rest.",
         "",
         "**A candidate can be indistinguishable on the error and substantially different in"
         " what it does**, and this record is not a caution about that happening to somebody"
