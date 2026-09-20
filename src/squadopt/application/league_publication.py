@@ -12,6 +12,7 @@ from pathlib import Path
 from squadopt.application.advice import member_horizon_builder
 from squadopt.application.advice_record import record_directory
 from squadopt.application.capture_entries import CapturePicksProvider
+from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.entries import EntryRegistration, EntryRegistry
 from squadopt.application.league_views import (
     LeagueViewsReport,
@@ -343,6 +344,7 @@ def publish_prepared_league(
         manager_words=manager_words,
         top100_counts=top100_counts,
         top100_unavailable_reason=top100_reason,
+        chip_forecast_source=forecast_source(snapshot),
     )
     outputs = [out_dir / name for name in report.files]
     history_root = request.history_record_root or request.record_root

@@ -48,6 +48,7 @@ services:
       <<: *environment
       # UNVERIFIED ingress peer: supply only the verified proxy peer/network allowlist.
       # Unset stays unset (Uvicorn defaults to loopback); never substitute a guessed peer.
+      # API startup refuses any wildcard entry in this allowlist.
       FORWARDED_ALLOW_IPS:
     cpus: 0.5
     mem_limit: 1g

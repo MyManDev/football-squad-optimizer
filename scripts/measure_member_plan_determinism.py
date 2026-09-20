@@ -53,7 +53,12 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from scripts._experiment_cli import REPOSITORY_ROOT, write_json, write_text
+from scripts._experiment_cli import (
+    REPOSITORY_ROOT,
+    repository_provenance,
+    write_json,
+    write_text,
+)
 
 from squadopt.application.entries import held_squad_from_picks
 from squadopt.application.lineup_publication import lineup_fields
@@ -111,10 +116,15 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         type=Path,
-        required=True,
-        help="The runtime data directory holding snapshots/ and handoffs/.",
+        help=(
+            "The runtime data directory holding snapshots/ and handoffs/. Required unless "
+            "--rewrite-markdown, which opens no capture."
+        ),
     )
-    parser.add_argument("--snapshot-id", required=True)
+    parser.add_argument(
+        "--snapshot-id",
+        help="The capture to solve against. Required unless --rewrite-markdown.",
+    )
     parser.add_argument(
         "--entries",
         default="all",
@@ -144,7 +154,24 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
             "must not cost another run of the grid."
         ),
     )
-    return parser.parse_args(argv)
+    arguments = parser.parse_args(argv)
+    # Asked for here rather than by ``required=True`` so that a re-render does not demand a
+    # capture it never opens. A flag that asks for a data root suggests it might read one,
+    # and this one returns before the capture is touched: what a command asks for is read as
+    # a claim about what it does, so asking for an unread capture says a re-render might
+    # re-measure. It cannot.
+    if not arguments.rewrite_markdown:
+        missing = [
+            name
+            for name, value in (
+                ("--data-root", arguments.data_root),
+                ("--snapshot-id", arguments.snapshot_id),
+            )
+            if value is None
+        ]
+        if missing:
+            parser.error("the following arguments are required: " + ", ".join(missing))
+    return arguments
 
 
 def _published_answer(week: Any) -> dict[str, Any]:
@@ -232,6 +259,45 @@ def _differences(cells: list[dict[str, Any]], arms: list[str]) -> dict[str, Any]
             "answer_moved": any(key.startswith("answer") for key in moved),
         }
     return per_member
+
+
+def _document(
+    *,
+    created_utc: str,
+    snapshot_id: str,
+    season: str,
+    gameweek: int,
+    entries: list[int],
+    arms: list[str],
+    per_arm: dict[str, Any],
+    cells: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """The record, assembled where a test can reach it.
+
+    Separated from ``main`` so that what the record carries can be asserted without a
+    capture and a solver. The first version of this runner built the dictionary inline and
+    shipped without naming the commit that produced it, which no test could have caught
+    because no test could construct the document.
+    """
+
+    return {
+        "contract_version": CONTRACT_VERSION,
+        "measurement_only": True,
+        "created_utc": created_utc,
+        "provenance": repository_provenance(),
+        "snapshot_id": snapshot_id,
+        "season": season,
+        "gameweek": gameweek,
+        "member_count": len(entries),
+        "entries": entries,
+        "arms": {arm: ARMS[arm] for arm in arms},
+        "deterministic_time_limit": PLAN_DETERMINISTIC_TIME_LIMIT,
+        "arm_echo_keys": sorted(ARM_ECHO_KEYS),
+        "machine_noise_keys": sorted(MACHINE_NOISE_KEYS),
+        "per_arm": per_arm,
+        "per_member": _differences(cells, arms),
+        "cells": cells,
+    }
 
 
 def _tiebreak_section(record: dict[str, Any], arm_order: list[str]) -> list[str]:
@@ -507,23 +573,16 @@ def main(argv: list[str] | None = None) -> int:
         for arm in arms
     }
 
-    document: dict[str, Any] = {
-        "contract_version": CONTRACT_VERSION,
-        "measurement_only": True,
-        "created_utc": created_utc,
-        "snapshot_id": arguments.snapshot_id,
-        "season": season,
-        "gameweek": gameweek,
-        "member_count": len(entries),
-        "entries": entries,
-        "arms": {arm: ARMS[arm] for arm in arms},
-        "deterministic_time_limit": PLAN_DETERMINISTIC_TIME_LIMIT,
-        "arm_echo_keys": sorted(ARM_ECHO_KEYS),
-        "machine_noise_keys": sorted(MACHINE_NOISE_KEYS),
-        "per_arm": per_arm,
-        "per_member": _differences(cells, arms),
-        "cells": cells,
-    }
+    document = _document(
+        created_utc=created_utc,
+        snapshot_id=arguments.snapshot_id,
+        season=season,
+        gameweek=gameweek,
+        entries=entries,
+        arms=arms,
+        per_arm=per_arm,
+        cells=cells,
+    )
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, _markdown(document))
     print(_markdown(document))

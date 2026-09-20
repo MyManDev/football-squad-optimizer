@@ -322,6 +322,8 @@ export type IndexChips =
 
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
+  /** Optional evidence is validated separately; a bad forecast must not remove the plan. */
+  chip_forecast?: unknown;
   league_id: number;
   season: string;
   gameweek: number;
@@ -394,6 +396,7 @@ export interface AdvicePlanWeek {
 }
 
 export interface EntryAdvice {
+  chip_forecast?: unknown;
   league_id: number;
   season: string;
   gameweek: number;
