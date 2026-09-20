@@ -715,6 +715,24 @@ def fit_clean_sheet_calibration(
     logistic would measure the fitting, not the rating, so the rating is given the same
     one-parameter-per-slope treatment on the same kind of data — walked forward over the
     seasons before the judged one, never the judged one itself.
+
+    **What this narrows and does not close.** ``docs/opponent_rating_handoff.md`` required a
+    recalibration because the **raw** probability broke at the top: over the 40 judged
+    fixtures where it promised better than an even chance, the clean sheet happened a third of
+    the time, 0.534 predicted against 0.325 realized. ``docs/positional_defence.json`` later
+    read the **recalibrated** probability this function produces, over the highest decile of
+    31,737 goalkeeper and defender rows in three judged seasons, and found 0.4623 predicted
+    against 0.3763 realized on 3,173 rows.
+
+    Those two readings are **not** a before and after of one quantity. Different object, raw
+    against recalibrated, and different population, the fixtures that crossed one threshold
+    against the top tenth of a row set. An arrow drawn between them would be read as a delta
+    and would not be one. What the pair does establish is a direction that holds on both
+    populations, each valid on its own: after this recalibration the top of the range **still**
+    predicts above what it realizes, and that word is what the sentence above licenses.
+
+    So a caller pricing something on the strength of a high probability here is being paid
+    more than the outcome, and how much is measured rather than assumed.
     """
 
     promoted = promoted_clubs(matches)
