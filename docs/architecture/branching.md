@@ -197,6 +197,23 @@ the PR number appended by the squash merge — the convention the history alread
 written down. Check it against the log (`git log --oneline`) rather than against a commit count
 recorded here.
 
+## A branch that carries a measurement record is merged, never rebased
+
+A record writes `provenance.repository_commit` at the moment it runs. Rebasing the branch
+afterwards rewrites that commit, so the SHA the artifact names becomes reachable only from the
+reflog and a cloner cannot resolve it at all. The repair is a regeneration, and for a
+pre-registered measurement a regeneration is forbidden, because the gate is read once and
+re-running after seeing a verdict is the thing that discipline exists to prevent. So a rebase on
+such a branch produces a provenance line that is permanently unverifiable with no legitimate
+repair.
+
+Bring the trunk in with `git merge origin/develop`, or let `gh pr update-branch` do it, which
+merges rather than rebases. This is not a style preference: on these branches the two operations
+differ in whether the artifact keeps its meaning.
+
+The same reasoning applies to anything else that names a commit from inside the tree it is
+committed to.
+
 ## Tag namespaces
 
 Four namespaces, each answering a different question. They were not designed together — the
