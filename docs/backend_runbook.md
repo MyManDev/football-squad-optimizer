@@ -348,7 +348,11 @@ leave `FORWARDED_ALLOW_IPS` unset: **neither platform's actual ingress peer has 
 verified**. Before public use, identify the proxy peer or network the API actually sees,
 set only that verified allowlist (in the Compose environment file, or the Azure API
 container's environment), and ensure direct callers cannot bypass the trusted ingress.
-Do not use wildcard trust. A host port bound to loopback does not prove that the peer
+Wildcard trust is refused at API startup, including a `*` entry in a comma-separated
+allowlist. This applies to `FORWARDED_ALLOW_IPS`, `UVICORN_FORWARDED_ALLOW_IPS` and the
+Uvicorn CLI option, even when proxy headers are disabled or a narrower CLI value would
+override an environment value. Remove the wildcard instead of overriding it. A host
+port bound to loopback does not prove that the peer
 inside a container is loopback. Azure's ingress boundary remains explicitly unverified
 until a real deployment confirms it.
 
