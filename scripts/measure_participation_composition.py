@@ -530,6 +530,10 @@ def markdown(record: Mapping[str, Any]) -> str:
         "",
         record["follow_up"],
         "",
+        "## What else was running",
+        "",
+        record["machine"],
+        "",
     ]
     return "\n".join(lines) + "\n"
 
@@ -567,22 +571,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         "why_one_judged_season": (
             "`START_TARGET_SUPPORTED_SEASONS` declares the archive's `starts` label over"
             " 2023-24 and 2024-25 and no other season. 2022-23 carries the column and not its"
-            " values, summing to zero over GW1-GW15 beside normal minutes, and `data/cleaning.py`"
-            " refuses a partly populated canonical column, so the season goes whole. 2025-26"
+            " values, summing to zero over GW1-GW15 beside normal minutes, and"
+            " `src/squadopt/data/cleaning.py` refuses a partly populated canonical column"
+            ' ("complete, so supply the values or drop the column"), so the season goes'
+            " whole. 2025-26"
             " carries the column and is the locked holdout. Two declared seasons, one spent on"
             " the fit, leaves one judged season. A threshold written over one season is a"
             " threshold one season of noise can clear, so this record states none and asks to"
             " be read as a description."
         ),
         "follow_up": (
-            "The live 2025-26 season is the second judged season this reading needs, and it"
-            " arrives on its own schedule rather than by decision. After gameweek 9 the settled"
-            " live record carries enough weeks to read the same three arms on data no part of"
-            " this fit has seen, at which point the question becomes whether a gate is worth"
-            " writing, and the gate would be pre-registered before that run rather than after"
-            " it. Until then the locked holdout stays locked: nothing here loads it, lists it"
-            " or hashes it, and reading it early would spend the only season that could confirm"
-            " this one."
+            "The second judged season is the **live 2026-27 season**, not the locked 2025-26"
+            " holdout, which stays locked: nothing here loads it, lists it or hashes it, and"
+            " reading it early would spend the one season that could confirm this one. After"
+            " gameweek 9 the live record can offer the weeks it has settled by then, and the"
+            " same three arms are read on them."
+            " The label there is **not** the archive's `starts`."
+            " `docs/rotation_evidence_prereg.md` declares the prospective source as a settled"
+            " capture's `stats.starts > 0` and admits a gameweek only once its"
+            " `rotation_evidence_v1` artifact and its settled outcome are both on disk. That"
+            " dependency is the plan's first step rather than an assumption behind it: no such"
+            " artifact exists under `data/` today, checked by listing rather than taken on"
+            " trust, so the follow-up begins by establishing whether the weeks it needs carry"
+            " one, and reports that it does not rather than quietly reading a shorter"
+            " population. Only with a second judged season in hand is it worth asking whether a"
+            " gate is worth writing, and that gate would be pre-registered before the run and"
+            " never after it."
+        ),
+        "machine": (
+            "Another session's parallel `pytest -n 2` run was on this machine while these"
+            " solves ran, and a third session holds the live backend. Both solver limits are"
+            " deterministic, so no number in this record moves under that load; `elapsed_seconds`"
+            " does, and is not a quiet-machine timing."
         ),
         "table_sha256": handoff.table_sha256,
         "roster_sha256": handoff.roster_sha256,
