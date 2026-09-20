@@ -13,10 +13,12 @@ import {
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { points } from "../../../lib/format";
+import { COMPUTE_COPY } from "../advice/computeCopy";
 import * as data from "../data";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberPage, LeagueMemberView } from "./LeagueMemberPage";
 import { LeagueMembersPage, LeagueMembersView } from "./LeagueMembersPage";
+import type { LeagueMemberViewProps } from "./memberPageTypes";
 
 const ENTRY = 35249001;
 const clients: QueryClient[] = [];
@@ -82,6 +84,93 @@ function showAdvice(
 
 describe.each(["tr", "en"] as const)("honest publication states in %s", (language) => {
   const copy = MESSAGES[language].leagueMembers;
+
+  it.each([
+    "published",
+    "not-listed",
+    "declared-unavailable",
+    "index-missing",
+    "index-error",
+    "invalid-index",
+    "loading",
+    "published-missing",
+    "unavailable",
+    "rejected-context",
+    "rejected-unreadable",
+    "different-selection",
+  ] as const)("keeps the unreachable-service notice honest for %s", (kind) => {
+    const props: LeagueMemberViewProps = {
+      squad: mockEntrySquadEnvelopes[ENTRY]!,
+      advice: structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)),
+      index: structuredClone(mockEntryAdviceIndex(ENTRY).payload),
+      members: mockLeagueMembersEnvelope.payload.members,
+      computeService: "unreachable",
+    };
+    if (kind === "index-missing") {
+      props.index = null;
+      props.adviceIssue = kind;
+    }
+    if (kind === "index-error") props.adviceIssue = kind;
+    if (kind === "invalid-index") props.index!.gameweek += 1;
+    if (kind === "not-listed") props.index!.windows = { "saf-puan": [1] };
+    if (kind === "loading") props.adviceLoading = true;
+    if (kind === "published-missing" || kind === "unavailable") {
+      props.advice = null;
+      props.adviceIssue = kind;
+    }
+    if (kind === "rejected-context") props.advice!.payload.source_snapshot_id = "different-capture";
+    if (kind === "rejected-unreadable")
+      props.advice!.payload.moves = null as unknown as EntryAdvice["moves"];
+    if (kind === "declared-unavailable")
+      props.index!.unavailable.push({
+        strategy: "saf-puan",
+        window: 1,
+        rival_entry_id: null,
+        reason: "not-computed",
+      });
+    const query =
+      kind === "not-listed"
+        ? "mode=saf-puan&window=3"
+        : kind === "different-selection"
+          ? "mode=saf-puan&window=3"
+          : "mode=saf-puan&window=1";
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
+          <LeagueMemberView {...props} />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const computeCopy = COMPUTE_COPY[language];
+    const expected =
+      kind === "published"
+        ? computeCopy.serviceUnreachablePublished
+        : kind === "not-listed" || kind === "declared-unavailable"
+          ? computeCopy.serviceUnreachableAbsent
+          : computeCopy.serviceUnreachable;
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    for (const other of [
+      computeCopy.serviceUnreachablePublished,
+      computeCopy.serviceUnreachableAbsent,
+      computeCopy.serviceUnreachable,
+    ]) {
+      if (other !== expected) expect(screen.queryByText(other)).not.toBeInTheDocument();
+    }
+  });
+
+  it.each(["plan", "control", "both", "neither"] as const)(
+    "shows one next step when %s proof is unfinished",
+    (kind) => {
+      const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
+      advice.payload.solver_status = kind === "plan" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
+      advice.payload.control_solver_status =
+        kind === "control" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
+      showAdvice(language, advice);
+      expect(screen.queryAllByText(copy.unprovenPlanNextStep)).toHaveLength(
+        kind === "neither" ? 0 : 1,
+      );
+    },
+  );
 
   it.each(["missing", "unreadable"] as const)("distinguishes a %s member list", async (kind) => {
     vi.mocked(data.loadLeagueMembers).mockRejectedValue(

@@ -39,7 +39,7 @@ export function AdviceRequestPanel({
   selectionAvailable = true,
   service = "static",
   computable = false,
-  published = true,
+  published,
   chipChosen = false,
   pending = false,
   deadlinePassed = false,
@@ -50,7 +50,7 @@ export function AdviceRequestPanel({
   service?: ComputeService;
   /** With a ready service: whether it can answer this exact selection now. */
   computable?: boolean;
-  /** With a ready service: whether the published tree already answers this selection. */
+  /** Whether a readable published plan answers this selection; undefined is unconfirmed. */
   published?: boolean;
   /** A chip computation has no measured duration to display. */
   chipChosen?: boolean;
@@ -91,14 +91,20 @@ export function AdviceRequestPanel({
         </p>
       ) : null}
       {!deadlinePassed && service === "unreachable" ? (
-        <p role="note">{computeCopy.serviceUnreachable}</p>
+        <p role="note">
+          {published === true
+            ? computeCopy.serviceUnreachablePublished
+            : published === false
+              ? computeCopy.serviceUnreachableAbsent
+              : computeCopy.serviceUnreachable}
+        </p>
       ) : null}
       {!deadlinePassed && service === "other-capture" ? (
         <p role="note">{computeCopy.otherCapture}</p>
       ) : null}
       {service === "ready" && supported ? (
         <p role="note" className={styles.durationNote}>
-          {published ? null : <>{computeCopy.notPrecomputed} </>}
+          {published === false ? <>{computeCopy.notPrecomputed} </> : null}
           {chipChosen ? (
             computeCopy.chipDurationUnknown
           ) : (

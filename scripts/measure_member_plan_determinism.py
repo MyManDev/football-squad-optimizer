@@ -116,10 +116,15 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         type=Path,
-        required=True,
-        help="The runtime data directory holding snapshots/ and handoffs/.",
+        help=(
+            "The runtime data directory holding snapshots/ and handoffs/. Required unless "
+            "--rewrite-markdown, which opens no capture."
+        ),
     )
-    parser.add_argument("--snapshot-id", required=True)
+    parser.add_argument(
+        "--snapshot-id",
+        help="The capture to solve against. Required unless --rewrite-markdown.",
+    )
     parser.add_argument(
         "--entries",
         default="all",
@@ -149,7 +154,24 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
             "must not cost another run of the grid."
         ),
     )
-    return parser.parse_args(argv)
+    arguments = parser.parse_args(argv)
+    # Asked for here rather than by ``required=True`` so that a re-render does not demand a
+    # capture it never opens. A flag that asks for a data root suggests it might read one,
+    # and this one returns before the capture is touched: what a command asks for is read as
+    # a claim about what it does, so asking for an unread capture says a re-render might
+    # re-measure. It cannot.
+    if not arguments.rewrite_markdown:
+        missing = [
+            name
+            for name, value in (
+                ("--data-root", arguments.data_root),
+                ("--snapshot-id", arguments.snapshot_id),
+            )
+            if value is None
+        ]
+        if missing:
+            parser.error("the following arguments are required: " + ", ".join(missing))
+    return arguments
 
 
 def _published_answer(week: Any) -> dict[str, Any]:
