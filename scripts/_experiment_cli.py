@@ -58,6 +58,23 @@ def _git_revision() -> tuple[str, bool]:
     return revision, dirty
 
 
+def repository_provenance() -> dict[str, object]:
+    """Which code produced a record, for a runner that reads no archive.
+
+    ``artifact_metadata`` stamps this beside the dataset and feature provenance a panel
+    measurement needs. A runner that measures the live planner reads no archive, so an
+    archive commit and a manifest digest would name a dataset the run never opened, and a
+    record naming inputs it did not read is worse than one naming fewer. It still has to say
+    which code ran, and that is what this is, so the narrow case has somewhere to call.
+
+    ``working_tree_dirty`` travels with the commit rather than being inferred from it,
+    because a SHA recorded from a modified checkout describes none of the bytes that ran.
+    """
+
+    revision, dirty = _git_revision()
+    return {"repository_commit": revision, "working_tree_dirty": dirty}
+
+
 def artifact_metadata(
     *,
     panel_rows: int,
@@ -70,12 +87,10 @@ def artifact_metadata(
     that load the full supported range may omit it and keep the historical default.
     """
 
-    revision, dirty = _git_revision()
     return {
         "created_utc": created_utc or datetime.now(UTC).isoformat(timespec="seconds"),
         "provenance": {
-            "repository_commit": revision,
-            "working_tree_dirty": dirty,
+            **repository_provenance(),
             "archive_repository": ARCHIVE_REPOSITORY,
             "archive_commit": ARCHIVE_COMMIT,
             "archive_manifest_sha256": _sha256(MANIFEST_PATH),
