@@ -52,6 +52,7 @@ from squadopt.evaluation.component_handoff import HANDOFF_KEY, LOCKED_HOLDOUT_SE
 from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.experiments.positional_defence import (
     DEFENCE_POSITIONS,
+    FIRST_TARGET_GAMEWEEK,
     JUDGED_SEASONS,
     MINIMUM_TRAINING_ROWS,
     POSITIONAL_DEFENCE_CONTRACT_VERSION,
@@ -181,7 +182,15 @@ def clean_sheet_table(archive_root: Path) -> tuple[pd.DataFrame, dict[str, Any]]
                             "clean_sheet_happened": 1.0 if conceded == 0 else 0.0,
                         }
                     )
-    return pd.DataFrame(rows), chosen_by_season
+    table = pd.DataFrame(rows)
+    # A club with two fixtures in one gameweek produces two clean-sheet probabilities, and the
+    # candidate prices one match, so it gets none rather than one of the two or their average.
+    # Those rows are already outside the population by the protocol's double-gameweek rule;
+    # collapsing here keeps the join honest instead of letting it pick a row.
+    sizes = table.groupby(["season", "gameweek", "club"], sort=False)["club"].transform("size")
+    unique = table.loc[sizes == 1].reset_index(drop=True)
+    doubled = table.loc[sizes > 1, ["season", "gameweek", "club"]].drop_duplicates().shape[0]
+    return unique, {"by_season": chosen_by_season, "club_gameweeks_with_two_fixtures": doubled}
 
 
 def priced_rows(
@@ -278,7 +287,8 @@ def priced_rows(
             "calibration_first_gameweek": RATING.first_evaluated_gameweek,
             "half_life_grid": list(RATING.half_life_grid),
             "ridge_grid": list(RATING.ridge_grid),
-            "selected_by_season": chosen,
+            "selected_by_season": chosen["by_season"],
+            "club_gameweeks_with_two_fixtures": chosen["club_gameweeks_with_two_fixtures"],
         },
         "bonus_by_position": {season: dict(values) for season, values in bonus.items()},
         "training_rows_by_season": training_rows,
@@ -530,6 +540,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     started = datetime.now(UTC)
+    # The structural checks come before the rating pass on purpose. Fitting the walk-forward
+    # rating is the expensive half of this run, and a fold set that does not line up is a
+    # five-second answer that used to arrive after it.
+    panel: pd.DataFrame | None = None
+    controls: tuple[Any, ...] = ()
+    order: list[str] = []
+    if not arguments.readings_only:
+        panel = build_panel(arguments.archive_root, seasons=DECISION_HISTORY_SEASONS)
+        ridge = build_walk_forward_folds(
+            panel,
+            seasons=DECISION_SEASONS,
+            projection_builder=make_ridge_projection_builder(cross_season=CrossSeasonConfig()),
+        )
+        gameweeks = (
+            handoff.rows.loc[:, ["fold_id", "target_gameweek"]]
+            .astype({"fold_id": str, "target_gameweek": "int64"})
+            .drop_duplicates()
+        )
+        order = [
+            str(fold)
+            for fold, gameweek in gameweeks.itertuples(index=False, name=None)
+            if str(fold)[:7] in set(JUDGED_SEASONS) and gameweek >= FIRST_TARGET_GAMEWEEK
+        ]
+        controls = tuple(fold for fold in ridge if fold.fold_id in set(order))
+        if [fold.fold_id for fold in controls] != order:
+            print("The ridge folds do not cover the judged decisions in the same order.")
+            return 1
+        print(f"{len(order)} judged decisions line up with their control folds.")
+
     rows, detail = priced_rows(handoff.rows, handoff.roster, arguments.archive_root)
     if detail["seasons_refused_for_thin_training"]:
         print(
@@ -568,26 +607,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(_markdown(record))
         return 0
 
-    panel = build_panel(arguments.archive_root, seasons=DECISION_HISTORY_SEASONS)
-    ridge = build_walk_forward_folds(
-        panel,
-        seasons=DECISION_SEASONS,
-        projection_builder=make_ridge_projection_builder(cross_season=CrossSeasonConfig()),
-    )
-    order = [
-        fold
-        for fold in handoff.rows["fold_id"].astype(str).drop_duplicates().tolist()
-        if str(fold)[:7] in set(JUDGED_SEASONS)
-        and int(
-            handoff.rows.loc[handoff.rows["fold_id"].astype(str) == fold, "target_gameweek"].iloc[0]
-        )
-        >= 4
-    ]
-    controls = tuple(fold for fold in ridge if fold.fold_id in set(order))
-    if [fold.fold_id for fold in controls] != order:
-        print("The ridge folds do not cover the judged decisions in the same order.")
-        return 1
-
+    assert panel is not None
     judged_rows = handoff.rows.loc[handoff.rows["fold_id"].astype(str).isin(order)]
     judged = replace(
         handoff,
