@@ -43,6 +43,11 @@ from squadopt.application.advice_variants import (
     advise_rival_with_top100,
     advise_window_with_top100,
 )
+from squadopt.application.chip_forecast_publication import (
+    ForecastSource,
+    member_chip_forecast,
+    published_chip_gains,
+)
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
@@ -185,6 +190,7 @@ def advise_menu_entry(
     top100_counts: Top100Counts | None = None,
     manager_words: ManagerWords | None = None,
     prerequisite: PrerequisiteLookup | None = None,
+    chip_forecast_source: ForecastSource | None = None,
 ) -> dict[str, object]:
     """Compute one document of the member menu from the member's own picks.
 
@@ -226,7 +232,7 @@ def advise_menu_entry(
         if held_chips is None or request.chip not in held_chips:
             raise ChipUnavailable("CHIP_HISTORY_UNKNOWN" if held_chips is None else "CHIP_NOT_HELD")
         try:
-            return advise_with_chip(
+            payload = advise_with_chip(
                 plain,
                 chip=request.chip,
                 provider=provider,
@@ -234,6 +240,18 @@ def advise_menu_entry(
                 projection=projection,
                 rules=rules,
             ).payload
+            if chip_forecast_source is not None:
+                picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
+                payload["chip_forecast"] = member_chip_forecast(
+                    league_id=request.league_id,
+                    picks=picks,
+                    inputs=inputs,
+                    projection=projection,
+                    rules=rules,
+                    source=chip_forecast_source,
+                    gains=published_chip_gains(((request.chip, payload),)),
+                )
+            return payload
         except EntryError as error:
             raise TransferPlanningError(str(error)) from error
 

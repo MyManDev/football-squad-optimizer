@@ -474,6 +474,28 @@ def _players_block(
     return players, unresolved
 
 
+def _published_forecast(index: tuple[str, bytes]) -> dict[str, object]:
+    """Keep the exact forecast fragment emitted by the member index writer."""
+    path, raw = index
+    try:
+        document = json.loads(raw)["payload"]["chip_forecast"]
+        # The index writer uses indent=2; this field is inside its payload. Keep
+        # its actual indentation too, then prove these exact bytes are present.
+        fragment = json.dumps(document, indent=2).replace("\n", "\n    ").encode("utf-8")
+        if raw.count(fragment) != 1:
+            raise ValueError("The exact forecast fragment is not unique in its index.")
+    except (KeyError, TypeError, ValueError) as error:
+        raise AdviceRecordError(
+            "The published index does not carry an exact chip forecast."
+        ) from error
+    return {
+        "document_json": fragment.decode("utf-8"),
+        "document_sha256": _sha256(fragment),
+        "published_index_path": path,
+        "published_index_sha256": _sha256(raw),
+    }
+
+
 def build_member_advice_record(
     picks: EntryPicks,
     projection: Projection,
@@ -486,6 +508,7 @@ def build_member_advice_record(
     told: Mapping[str, object] | None = None,
     transfer_config_fingerprint: str | None = None,
     commit: str | None = None,
+    published_index: tuple[str, bytes] | None = None,
 ) -> dict[str, object]:
     """Assemble one member's record for one gameweek from what was just published.
 
@@ -599,6 +622,7 @@ def build_member_advice_record(
         # them. Listing the ids keeps the gap visible instead of silently shortening a map.
         "unresolved_player_ids": unresolved,
         "advice": documents,
+        **({"chip_forecast": _published_forecast(published_index)} if published_index else {}),
     }
 
 
@@ -667,13 +691,15 @@ _REPLAYED: Final = "<moved by the publication clock>"
 def _without_publication_clock(record: Mapping[str, object]) -> dict[str, object]:
     """The record with the fields a re-publish moves for no reason blanked out.
 
-    Two of them, and only two. ``generated_at_utc`` is the clock the published envelopes
+    ``generated_at_utc`` is the clock the published envelopes
     carry, and every ``published_sha256`` is a digest of bytes that carry it, so all of
     them move when one capture is published again and not a word of the advice changes.
+    The optional forecast's index digest also includes that same publication clock.
+    Its exact document bytes, document digest and path are still compared.
 
     Every other field is left alone and compared — ``advice_sha256`` above all, the digest
     of the payload alone, which is precisely the field that says whether what the member
-    was told changed. Blanking two named fields rather than comparing a list of allowed
+    was told changed. Blanking named clock fields rather than comparing a list of allowed
     ones means a field added to the record later is compared by default: a new way for two
     builds to disagree is refused until someone decides otherwise, not forgiven by silence.
     """
@@ -684,6 +710,11 @@ def _without_publication_clock(record: Mapping[str, object]) -> dict[str, object
     advice = stripped.get("advice")
     if isinstance(advice, list):
         stripped["advice"] = [_document_without_publication_clock(item) for item in advice]
+    forecast = stripped.get("chip_forecast")
+    if isinstance(forecast, Mapping) and "published_index_sha256" in forecast:
+        # Blanked because the index it digests carries the publication clock,
+        # not because index digests are unimportant. The stored bytes never change.
+        stripped["chip_forecast"] = {**forecast, "published_index_sha256": _REPLAYED}
     return stripped
 
 

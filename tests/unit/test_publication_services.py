@@ -1,6 +1,7 @@
 """Installed publication services use named captures and preserve the public contracts."""
 
 import json
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,7 +13,7 @@ import tests.unit.test_advice_worker as member_fixture
 import tests.unit.test_backend_runtime as handoff_fixture
 import tests.unit.test_source_vaastav as archive_fixture
 
-from squadopt.application import capture_entries, league_publication, scoreboard
+from squadopt.application import capture_entries, league_publication, league_views, scoreboard
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     prepare_league_publication,
@@ -172,6 +173,14 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    record_member_advice = league_views.record_member_advice
+
+    def record_with_forecast(root: Path, record: Mapping[str, object]) -> Path:
+        # Name a missing field before the immutable-record guard refuses a replay.
+        assert "chip_forecast" in record, "Serial and pool publications must record chip_forecast"
+        return record_member_advice(root, record)
+
+    monkeypatch.setattr(league_views, "record_member_advice", record_with_forecast)
     request = publication_world(tmp_path)
     first = publish_league(request)
     assert first.report.rendered_count == 1
@@ -189,6 +198,9 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     with league_mapper(parallel, workers=2) as mapper:
         second = publish_league(parallel, mapper=mapper)
     assert first.report.files == second.report.files
+    for output in (request.out_dir, parallel.out_dir):
+        index = output / "data/league/advice" / str(member_fixture.ENTRY_ID) / "index.json"
+        assert "chip_forecast" in json.loads(index.read_text(encoding="utf-8"))["payload"]
     for name in first.report.files:
         assert (request.out_dir / "data/league" / name).read_bytes() == (
             parallel.out_dir / "data/league" / name

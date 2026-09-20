@@ -132,6 +132,17 @@ There are two normal publications per gameweek from GW2 onward:
 2. **Settled:** after outcomes are settled, regenerate the public data and season summary,
    merge to `main`, tag it `...-settled`, dispatch, and require green smoke.
 
+For the GW5 scratch candidate produced by `python -m scripts.build_settled_site`, run
+`python -m scripts.check_league_tree <candidate>/data` and report its result, the complete
+changed-file list and the independent scoreboard cells before/after in #632 before a site-data
+PR. This checker does not replace verification of rebuilt season documents against the frozen
+schemas or of the frozen root index against the candidate's file list. The producer preserves
+accepted member advice bytes and never re-solves them. If an accepted advice document was
+re-rendered after its immutable record was written, even to add a reporting field, its hash
+can differ and publication refuses with "Recorded comparison does not match accepted advice".
+That refusal is the evidence guard working, not a silent overwrite or a producer defect.
+Stop and reconcile which accepted bytes and records belong together; do not bypass the guard.
+
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
 run sheet publishes the decision view after the deadline. The pre-deadline order above becomes
