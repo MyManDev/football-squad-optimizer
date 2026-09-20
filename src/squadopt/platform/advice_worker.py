@@ -277,6 +277,7 @@ def build_advice_compute(
                 horizon_builder=capture.horizon_builder,
                 top100_counts=capture.top100_counts,
                 manager_words=capture.manager_words,
+                chip_forecast_source=capture.chip_forecast_source,
                 prerequisite=lambda address: cached_plain(spec, address),
             )
         except ChipUnavailable as error:

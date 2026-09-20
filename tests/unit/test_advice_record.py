@@ -909,6 +909,52 @@ def _rival_lands_first(monkeypatch: pytest.MonkeyPatch, winner: Path) -> list[fl
     return pauses
 
 
+def test_forecast_keeps_exact_published_fragment_and_index_digest() -> None:
+    forecast = {"status": "available", "forecast": {"chips": [{"name": "3xc", "gain": 4}]}}
+    raw = json.dumps(
+        {"generated_at_utc": "now", "payload": {"chip_forecast": forecast}}, indent=2
+    ).encode()
+    block = advice_records._published_forecast(("advice/101/index.json", raw))
+    kept = str(block["document_json"]).encode()
+    assert kept in raw and json.loads(kept) == forecast
+    assert block["document_sha256"] == hashlib.sha256(kept).hexdigest()
+    assert block["published_index_sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+def test_forecast_clock_replay_never_rewrites_original_bytes(tmp_path: Path) -> None:
+    record = _bare_record()
+    record["chip_forecast"] = {
+        "document_json": '{"gain": 4}',
+        "document_sha256": "forecast-digest",
+        "published_index_path": "advice/101/index.json",
+        "published_index_sha256": "first",
+    }
+    directory = record_member_advice(tmp_path, record)
+    before = (directory / RECORD_FILE).read_bytes()
+    incoming = copy.deepcopy(record)
+    incoming["chip_forecast"]["published_index_sha256"] = "later-clock"
+    assert record_member_advice(tmp_path, incoming) == directory
+    assert (directory / RECORD_FILE).read_bytes() == before
+    for key, value in [
+        ("document_json", '{"gain": 5}'),
+        ("document_sha256", "changed"),
+        ("published_index_path", "advice/102/index.json"),
+    ]:
+        changed = copy.deepcopy(incoming)
+        changed["chip_forecast"][key] = value
+        with pytest.raises(AdviceRecordConflictError, match=key):
+            record_member_advice(tmp_path, changed)
+    missing = copy.deepcopy(record)
+    del missing["chip_forecast"]
+    with pytest.raises(AdviceRecordConflictError, match="chip_forecast"):
+        record_member_advice(tmp_path, missing)
+    old_root = tmp_path / "old"
+    record_member_advice(old_root, missing)
+    with pytest.raises(AdviceRecordConflictError, match="chip_forecast"):
+        record_member_advice(old_root, record)
+    assert (directory / RECORD_FILE).read_bytes() == before
+
+
 def test_a_landing_rename_refused_for_a_moment_does_not_destroy_the_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

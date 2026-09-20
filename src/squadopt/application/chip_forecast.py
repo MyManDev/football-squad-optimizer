@@ -133,8 +133,10 @@ LIMIT_PRESENT_SQUAD: Final = (
     "every later gameweek; transfers, injuries and rotation before then are not seen."
 )
 LIMIT_RULE_SOURCE: Final = (
-    "The rule's worth was measured on the system's own squad over past seasons with one "
-    "set of chips; this season has two, and no gain is claimed for the member."
+    "The rule was measured on the system's own squad with this season's two chip "
+    "windows laid over the development seasons. Those seasons' managers played with "
+    "one set, so ownership and prices reflect one-set behaviour; the emulation changed "
+    "our rule, not the world around it. No gain is claimed for the member."
 )
 LIMIT_RECOMPUTED: Final = (
     "A named gameweek is a reading of the calendar under the rule as it stands at this "
