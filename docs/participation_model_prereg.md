@@ -63,7 +63,7 @@ Zero starts beside nineteen thousand minutes is an absent column, not a season i
 nobody started.
 
 The whole season goes, not only its first third, and the reason is the canonical contract
-rather than convenience. `data/cleaning.py` refuses a missing value in a canonical column —
+rather than convenience. `src/squadopt/data/cleaning.py` refuses a missing value in a canonical column —
 *"canonical data must be complete, so supply the values or drop the column"* — so there is no
 way to carry `starts` for part of a season: it is either complete for that season or absent
 from it. Keeping the zeros would put a false value in canonical data, which is the worse of

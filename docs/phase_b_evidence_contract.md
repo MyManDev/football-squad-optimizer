@@ -56,7 +56,7 @@ structural — each cohort is a prefix of one ordering — rather than three sep
 lists that a test has to hope agree. A test asserts it anyway, because a refactor could take
 the prefixes from different orderings and nothing else would notice.
 
-`data/cohorts.py` deliberately does not import `squadopt.evaluation`. Duplicating a freeze
+`src/squadopt/data/cohorts.py` deliberately does not import `squadopt.evaluation`. Duplicating a freeze
 rule across two layers is how two answers to one question appear.
 
 **Ordering comes from `rank_sort`, not `rank`.** The platform's tie handling lives in
