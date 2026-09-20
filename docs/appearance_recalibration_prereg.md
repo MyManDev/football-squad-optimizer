@@ -83,7 +83,8 @@ arm. Blank rows retain zero. Do not calibrate start probability, conditional poi
   only the convenient pairs. Report wins/ties/losses and changed squads descriptively.
 
 The paired difference interval is the existing season-aware moving-block bootstrap,
-**90%**, **2,000 resamples**, **block length 4**, **seed 0**, sampling decisions within
+**90%**, **2,000 resamples**, **block length 4**, **base seed 0**, with the existing helper adding the first eight SHA-256 hex digits of
+`appearance_recalibration_v1` as an integer to that base seed, sampling decisions within
 each season and aggregating their paired differences. Use the same draws for the two arms,
 not independent arm confidence intervals. Report per-season paired means too.
 
