@@ -538,6 +538,12 @@ def markdown(record: Mapping[str, Any]) -> str:
         "The interval is a moving-block bootstrap over the weeks of one season. It describes"
         " how much these 37 weeks move; it cannot describe how much the next season would.",
         "",
+        "**A candidate can be indistinguishable on the error and substantially different in"
+        " what it does.** That is a point about measurement design rather than about this"
+        " candidate, and it is the reason both halves are read here: an accuracy reading alone"
+        " would have seen the two all-rows figures above, called them a tie and filed it, while"
+        " the arm it was calling a tie moves most of the squads.",
+        "",
         "## What would make this a gate, and when",
         "",
         record["follow_up"],
