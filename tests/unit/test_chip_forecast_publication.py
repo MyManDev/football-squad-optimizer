@@ -138,6 +138,29 @@ def test_calendar_structure_does_not_depend_on_a_held_free_hit(world: dict[str, 
     assert completed.fixture_count_by_club[weeks[1].fixtures[0].home.team_id] == 0
 
 
+def test_an_extra_match_accumulates_a_double_and_marks_calendar_structure(
+    world: dict[str, Any],
+) -> None:
+    args = _member(world)
+    source = args["source"]
+    assert source.calendar is not None
+    weeks = source.calendar.gameweeks
+    match = weeks[1].fixtures[0]
+    extra = replace(match, fixture_id=999, home=match.away, away=match.home)
+    doubled = replace(weeks[1], fixtures=(*weeks[1].fixtures, extra))
+    args["source"] = replace(
+        source, calendar=replace(source.calendar, gameweeks=(weeks[0], doubled, *weeks[2:]))
+    )
+    counts = calendar_counts(args["source"], first=3, last=3)[0]
+    assert counts.fixture_count_by_club[match.home.team_id] == 2
+    assert counts.fixture_count_by_club[match.away.team_id] == 2
+    assert counts.clubs_doubling == 2
+    assert counts.clubs_blank == 0
+    result = member_chip_forecast(**args, gains={})
+    assert result["status"] == "available"
+    assert result["calendar_has_structure"] is True
+
+
 def test_no_held_window_has_an_explicit_empty_examined_range(world: dict[str, Any]) -> None:
     args = _member(world)
     args["picks"] = replace(
