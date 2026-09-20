@@ -71,7 +71,10 @@ expected points = appearance_probability
   column in all three judged seasons and carries none in either training season (checked in
   `data/raw/vaastav-fpl/data/<season>/gws/merged_gw.csv`), and for 2022-23 the column is present
   but unpopulated for gameweeks 1 to 15, summing to zero beside about 19,700 minutes a gameweek,
-  which is why `data/sources/vaastav.py` omits that season whole rather than a third of it. So
+  which is why `src/squadopt/data/sources/vaastav.py` omits that season whole rather than a third
+  of it. The path matters: `data/sources/` also exists at the repository root, holding a README
+  and two manifests, so a shorter citation resolves to a real directory that is not the adapter
+  and a reader who checks it concludes they mistyped. So
   the first judged season has no fitted label and neither training season has one at all. Over goalkeeper rows the
   choice moves the appearance term between 1.0 and 2.0 points, which is larger than the bias the
   study is about, so it may not be left to the runner.
@@ -115,10 +118,11 @@ population, and the live season is the only place it can be asked.
 - Seasons judged: **2022-23, 2023-24, 2024-25**, fitted walk-forward on strictly earlier seasons.
 - Target gameweeks 4 and later, so at least three gameweeks stand behind any season-to-date term.
 - **Fitted on strictly earlier seasons**, which for 2022-23 means 2020-21 and 2021-22, for
-  2023-24 adds 2022-23, and for 2024-25 adds 2023-24. A judged season whose training rows number
-  fewer than **200 appeared goalkeeper and defender rows** is not judged, and the record says so
-  rather than quietly shortening the population; the number is fixed here and, on the counts
-  above, is not expected to bind.
+  2023-24 adds 2022-23, and for 2024-25 adds 2023-24. Those rows come from the archive panel, not
+  from the out-of-fold table, which begins at 2021-22 and therefore does not hold 2020-21 at all.
+  A judged season whose training rows number fewer than **200 appeared goalkeeper and defender
+  rows**, counted that way, is not judged, and the record says so rather than quietly shortening
+  the population; the number is fixed here and, on the counts above, is not expected to bind.
 - The locked **2025-26 holdout is not read**, and the record carries that as a computed flag.
 
 ## The gate, fixed
@@ -150,9 +154,10 @@ front of it.
   is the convention `src/squadopt/evaluation/component_metrics.py` uses. This matters more than
   it looks: `points_target` is **NaN on every non-appeared row** by contract, and I checked it on
   the table rather than trusting the contract, finding it null on all 20,965 non-appeared
-  goalkeeper and defender rows in scope. A runner that read `points_target` on the all-rows floor
-  would drop two thirds of the rows and the floor would silently become a second appeared-rows
-  clause, which is the one thing it exists not to be.
+  goalkeeper and defender rows before the drops. The 20,012 the floor actually reads are a subset
+  of those, so they are null too; that is inherited from the check and not a second one. A runner
+  that read `points_target` on the floor would drop two thirds of the rows and the floor would
+  silently become a second appeared-rows clause, which is the one thing it exists not to be.
 - **The comparator** is `control_expected_points`, the shipped composition as that table records
   it, and not a recomputation of it.
 - **Rows whose composition route is `direct_control`** are dropped, and the record states how
@@ -163,25 +168,52 @@ front of it.
   scope, and the sibling audit drops them the same way and says so.
 - **A row whose gameweek gives its club more than one fixture** (`fixture_count > 1`) is dropped
   and counted. The structure prices one match, and pricing a double gameweek as a single one
-  would understate it for reasons that have nothing to do with the candidate.
+  would understate it for reasons that have nothing to do with the candidate. There are **1,289**
+  of them, overlapping the `direct_control` rows on ten.
+- **`position` is not in this table.** It has 24 columns and that is not one of them. It lives in
+  the companion roster file, and it reaches the rows because
+  `read_phase_c_component_handoff` joins `roster[["season", "target_gameweek", "fold_id",
+  "player_id", "position"]]` onto the table before returning. Naming the table alone would send a
+  runner looking for the column that defines this population in the file that does not have it.
+- **`team_id` is in the roster and is not joined onto the rows.** The clean-sheet term needs the
+  row's club to find its fixture, and that reader carries `position` across and nothing else, so
+  the runner joins `team_id` itself, from the roster, on the same four-column key.
+- **Realized `bonus` is in neither file.** It is the archive's own `bonus` column in
+  `merged_gw.csv`, read over the training seasons only, which is where `bonus(position)` is
+  fitted. The out-of-fold table carries `points_target` and no decomposition of it.
+- **A training row** is an appeared goalkeeper or defender player-gameweek of a strictly earlier
+  season, read from the **archive panel** and not from this table. That distinction is not
+  cosmetic: the table begins at 2021-22, and 2022-23's training seasons are 2020-21 and 2021-22,
+  so one of them is not in the table at all. The two fitted terms, the clean-sheet recalibration
+  and `bonus(position)`, read the archive, and the 200-row minimum below counts archive rows.
 
 ### The population, in numbers I measured rather than assumed
 
-Counted on the regenerated table: the three judged seasons hold **110** decisions, **104** of
-them from target gameweek 4, carrying **33,235** goalkeeper and defender rows of which **12,270**
-appeared. An earlier draft of this document said 147 folds, which is the four-season
-all-gameweek set and not this population.
+Counted on the regenerated table: the three judged seasons hold **110** decisions, of which
+**104** are from target gameweek 4 or later, and those 104 decisions carry **33,235** goalkeeper
+and defender rows, **12,270** of them appearances. An earlier draft of this document said 147
+folds, which is the four-season all-gameweek set and not this population.
 
-**1. Accuracy, with a floor on the whole population.** Mean absolute error against the shipped
-composition:
+**Those three counts are taken before the two drop rules**, and the drops are large enough that
+saying so changes what the clauses below mean. Removing the **219** `direct_control` rows and the
+**1,289** double-gameweek rows, which overlap on **ten**, leaves **31,737** rows, **11,725** of
+them appearances and **20,012** not. So the binding clause is read over 11,725 rows rather than
+12,270, and the floor over 31,737 rather than 33,235.
+
+**1. Accuracy, with a floor over every row surviving the drops.** Mean absolute error against the
+shipped composition:
 
 - **Binding, on appeared rows:** pooled improvement with the 90 per cent interval's lower bound
   above zero, and an improvement in **every** judged season.
-- **Floor, over all goalkeeper and defender rows in scope:** the pooled mean absolute error
-  must **not be worse** than the shipped composition's. Not an improvement, a floor, and an
-  exact tie passes: the clause is that the candidate may not be worse, so equality is not a
-  failure. The floor reads the outcome through the convention named above, so the non-appeared
-  rows are in it at zero rather than dropped as nulls.
+- **Floor, over all goalkeeper and defender rows surviving both drop rules:** the pooled mean
+  absolute error must **not be worse** than the shipped composition's. Not an improvement, a
+  floor, and an exact tie passes: the clause is that the candidate may not be worse, so equality
+  is not a failure. The floor reads the outcome through the convention named above, so the
+  non-appeared rows are in it at zero rather than dropped as nulls.
+- **The floor is not over the whole population and is not called that.** Two drop rules narrow it
+  first, and its own earlier heading said otherwise. A clause whose name claims more reach than
+  it has is the failure this document closes one layer up, wearing different clothes, so the
+  name is corrected here rather than explained in the record afterwards.
 
 **Pooled** means over all the judged seasons' rows together for an error, and the mean of the
 judged seasons' own correlations for a rank, because a correlation pooled across seasons would
@@ -198,10 +230,12 @@ not fall below the shipped composition's by more than **0.010** in any judged se
 The tolerance is the one `opening_two_part_prereg` fixed and is carried unchanged so the two are
 comparable; it is not re-derived here and it will not be moved.
 
-**3. Decision.** The **104** decisions named above and the harness
-`prepare_phase_c_component_folds` uses, with the goalkeeper and defender rows' expected points
-replaced by the candidate's and every other row left exactly as the table has it, scored against
-the unmodified table with the official autosub and vice-captain policy. Mean realized difference
+**3. Decision.** The **104** decisions named above, scored through
+`evaluate_phase_c_component_decisions` in `src/squadopt/evaluation/component_decisions.py`, which
+builds the folds with `prepare_phase_c_component_folds` and is itself the entry point that
+applies the scoring policy. The goalkeeper and defender rows' expected points are replaced by the
+candidate's, every other row is left exactly as the table has it, and both arms are scored
+against the unmodified table with the official autosub and vice-captain policy. Mean realized difference
 **at least zero** with **at most one** of the **three** judged seasons losing, paired by
 decision, with a 90 per cent
 season-aware moving block interval (2,000 resamples, seed 0, block length 4) reported beside it.
@@ -211,16 +245,21 @@ status, because a proof and an incumbent are different evidence.
 ### Why there is a floor, and what it costs
 
 Restricting the binding clauses to appeared rows closes the failure `opening_two_part` walked
-into and opens its inverse: the product prices **every** goalkeeper and defender row, not only
-the ones that appeared, so a candidate that is better on the appeared rows and worse over the
-whole population would pass a clause that only looks at the former. "Reported beside it" is not
-a defence, because nothing can be added once this document merges.
+into and opens its inverse: the product prices **every** goalkeeper and defender row it can
+price, not only the ones that appeared, so a candidate that is better on the appeared rows and
+worse across the rest would pass a clause that only looks at the former. "Reported beside it" is
+not a defence, because nothing can be added once this document merges.
 
 The floor is the answer, and it is deliberately weaker than the binding clause. Requiring an
-improvement over all rows would re-admit the thing being avoided, since those rows are mostly
+improvement over the 31,737 rows would re-admit the thing being avoided, since they are mostly
 players who did not appear and predicting near zero for them is what a candidate can win on
 without helping a decision. Requiring only that it is **not worse** says the candidate may not
-pay for its gains with the rest of the population.
+pay for its gains with the rest of the rows it prices.
+
+What the floor therefore does **not** cover is named rather than left implied: the 219
+`direct_control` rows, where neither arm is defined, and the 1,289 double-gameweek rows, which
+this candidate does not price. Both are dropped before either clause reads anything, and both
+counts go in the record.
 
 ## Reported, not gated
 
