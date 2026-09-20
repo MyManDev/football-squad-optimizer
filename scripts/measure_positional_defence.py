@@ -204,6 +204,15 @@ def priced_rows(
     spells a club as a **name** while the rating speaks persistent codes, so the name is then
     bridged through the archive's own team file. A join that stopped at either step would
     match nothing, silently.
+
+    **A join has two failure modes and only one of them looks like failure.** The refusals
+    above catch a join that matches nothing, which is the failure everyone guards against
+    because it produces an obviously empty result. This run was stopped instead by a join
+    that matched too **much**: a club with two fixtures in a gameweek offered two clean-sheet
+    probabilities, and over-matching produces a plausible result, a silent average or a row
+    count that is quietly wrong. Nothing written here caught that. ``validate=`` on the merge
+    did, because pandas was asked to be strict, and every merge in this module passes it for
+    that reason.
     """
 
     rows, counts = eligible_rows(handoff_rows)
