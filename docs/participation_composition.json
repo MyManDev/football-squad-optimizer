@@ -1,22 +1,28 @@
 {
   "contract_version": "participation_composition_v1",
-  "created_utc": "2026-09-20T00:44:19+00:00",
+  "created_utc": "2026-09-20T01:38:41+00:00",
   "decisions": {
     "arms": {
       "composed": {
         "mean_realized_points": 63.891891891891895,
+        "proved_decisions": 18,
         "proven_share": 0.4864864864864865,
-        "scored_decisions": 37
+        "scored_decisions": 37,
+        "solved_decisions": 37
       },
       "state_split": {
         "mean_realized_points": 61.86486486486486,
+        "proved_decisions": 4,
         "proven_share": 0.10810810810810811,
-        "scored_decisions": 37
+        "scored_decisions": 37,
+        "solved_decisions": 37
       },
       "uncomposed": {
         "mean_realized_points": 65.29729729729729,
+        "proved_decisions": 19,
         "proven_share": 0.5135135135135135,
-        "scored_decisions": 37
+        "scored_decisions": 37,
+        "solved_decisions": 37
       }
     },
     "paired_against_uncomposed": {
@@ -59,7 +65,7 @@
     "2024-25"
   ],
   "descriptive_only": true,
-  "elapsed_seconds": 987.288646,
+  "elapsed_seconds": 1010.710295,
   "environment": {
     "logical_cpu_count": 32,
     "ortools": "9.15.6755",
@@ -105,7 +111,7 @@
   },
   "follow_up": "The second judged season is the **live 2026-27 season**, not the locked 2025-26 holdout, which stays locked: nothing here loads it, lists it or hashes it, and reading it early would spend the one season that could confirm this one. After gameweek 9 the live record can offer the weeks it has settled by then, and the same three arms are read on them. The label there is **not** the archive's `starts`. `docs/rotation_evidence_prereg.md` declares the prospective source as a settled capture's `stats.starts > 0` and admits a gameweek only once its `rotation_evidence_v1` artifact and its settled outcome are both on disk. That dependency is the plan's first step rather than an assumption behind it: no such artifact exists under `data/` today, checked by listing rather than taken on trust, so the follow-up begins by establishing whether the weeks it needs carry one, and reports that it does not rather than quietly reading a shorter population. Only with a second judged season in hand is it worth asking whether a gate is worth writing, and that gate would be pre-registered before the run and never after it.",
   "gate": null,
-  "generated_at_utc": "2026-09-20T00:27:52+00:00",
+  "generated_at_utc": "2026-09-20T01:21:50+00:00",
   "judged_season": "2024-25",
   "locked_holdout_accessed": false,
   "machine": "Another session's parallel `pytest -n 2` run was on this machine while these solves ran, and a third session holds the live backend. Both solver limits are deterministic, so no number in this record moves under that load; `elapsed_seconds` does, and is not a quiet-machine timing.",
@@ -338,15 +344,35 @@
     "feature_generation_contract_version": "form_window_v1",
     "history_rows": 126737,
     "history_seasons": [
-      "2023-24",
+      "2020-21",
+      "2021-22",
       "2022-23",
-      "2024-25",
-      "2021-22"
+      "2023-24",
+      "2024-25"
     ],
-    "repository_commit": "7f30cb66a3a607870ba409dadd76209d7c5c412c",
+    "repository_commit": "c20932002aedf93ec28be56cce4278d6252e095f",
     "working_tree_dirty": false
   },
   "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+  "seasons_loaded": {
+    "decision_panel": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "handoff_table": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "modelling_frame": [
+      "2023-24",
+      "2024-25"
+    ]
+  },
   "solver": {
     "binding_limit": "deterministic_time",
     "solver_deterministic_time_limit": 5.0,

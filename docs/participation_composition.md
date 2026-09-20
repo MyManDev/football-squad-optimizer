@@ -20,7 +20,7 @@ composed    = p_appearance * (q * E[points | start] + (1 - q) * E[points | subst
 
 ## Points error
 
-26303 rows of the judged season, 11124 of them appearances. Both populations are reported together because the majority never appears and an all-rows number is mostly a reading of those rows. A realized value is `points_target` on an appearance and zero elsewhere; error is forecast minus realized, so a positive number is over-forecasting.
+26303 rows of the judged season, 11124 of them appearances. Both populations are reported together because the majority never appears and an all-rows number is mostly a reading of those rows. A realized value is `points_target` on an appearance and zero elsewhere; error is forecast minus realized, so a positive number is over-forecasting. Of those rows, 168 carry no fitted forecast in any arm, which is the whole of the difference between this count and the 26135 the arms actually differ on below.
 
 | arm | all rows: mean error | all rows: MAE | appeared rows: mean error | appeared rows: MAE |
 | --- | ---: | ---: | ---: | ---: |
@@ -42,9 +42,9 @@ By realized state, mean error:
 
 | arm | decisions | mean realized points | proved optimal |
 | --- | ---: | ---: | ---: |
-| `uncomposed` | 37 | 65.297 | 0.51 |
-| `state_split` | 37 | 61.865 | 0.11 |
-| `composed` | 37 | 63.892 | 0.49 |
+| `uncomposed` | 37 | 65.297 | 19 of 37 |
+| `state_split` | 37 | 61.865 | 4 of 37 |
+| `composed` | 37 | 63.892 | 18 of 37 |
 
 Paired against `uncomposed`, decision by decision:
 
@@ -54,6 +54,13 @@ Paired against `uncomposed`, decision by decision:
 | `composed` | 37 | -1.405 | [-3.569, +0.164] | 9/14/14 | 26 |
 
 The interval is a moving-block bootstrap over the weeks of one season. It describes how much these 37 weeks move; it cannot describe how much the next season would.
+
+`state_split`'s interval excludes zero, so its loss of -3.432 a decision reads as one at this level, over 37 decisions of a single season.
+**No loss or gain is claimed for `composed`.** Its difference is -1.405 a decision and its interval covers zero, so these 37 decisions cannot separate it from nothing.
+
+What the weeks do establish about `composed` is that it changed most of the squads while changing the error in the fourth decimal. A change that buys nothing on the error and is not a rounding difference on the squads is refusable on those grounds without a loss, and claiming one it cannot support would only give the first reader who checks the interval a reason to discount the rest.
+
+**A candidate can be indistinguishable on the error and substantially different in what it does**, and this record is not a caution about that happening to somebody else. It happened here, to the arm that looked best: `state_split` has the best appeared-row mean absolute error of the three and the worst decisions, and it is the only arm whose interval excludes zero. An accuracy reading alone would have ranked it first.
 
 ## What would make this a gate, and when
 
