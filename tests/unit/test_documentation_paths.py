@@ -18,6 +18,25 @@ both are legitimate shorthand. Requiring it only of citations whose first segmen
 top level directory leaves 43 failures; requiring it only of those that also name a Python
 module leaves the handful this file pins, every one of them the ambiguity above. Runtime
 JSON under `data/` is legitimately absent from the tree and is not checked.
+
+One allowance is structural rather than listed. A pre-registration names the runner that will
+write its record, and pre-registration means the protocol is committed before the measurement
+is run, so that runner routinely does not exist yet: nine citations across five protocols are
+of this shape, and today exactly one of them resolves nowhere, because its record is still in
+review. Requiring it to resolve would order the merges of a protocol and the record fulfilling
+it, which is backwards.
+
+The allowance covers a runner that resolves today as well as one that does not, and that is
+deliberate rather than an oversight in the ordering of the clauses. **A protocol is frozen when
+it merges.** It names what the runner was called at pre-registration, and if the runner is later
+renamed the protocol is still an accurate record of what was registered; making this check drag
+protocols after a rename would have it demand edits to pre-registered documents, which is the
+one thing a pre-registration exists to prevent. Records, plans and notes are not frozen and are
+checked in full.
+
+The allowance is confined to the two directories a runner lives in. A protocol citing
+`data/snapshots.py` is the ambiguity above, nothing about being a protocol makes it less wrong,
+and a protocol's author has less to check a path against than anyone, not more.
 """
 
 from __future__ import annotations
@@ -48,6 +67,22 @@ PROPOSED: dict[str, str] = {
 }
 
 
+#: Where a measurement runner lives. Only a citation under one of these can be the forward
+#: reference a pre-registration is entitled to make.
+RUNNER_ROOTS = ("scripts/", "src/squadopt/experiments/")
+
+
+def _is_a_runner_a_protocol_has_not_had_written_yet(document: Path, raw: str) -> bool:
+    """A pre-registration may name the runner that will produce its record.
+
+    The protocol is committed before the run by design, so the runner arrives later, in the
+    pull request that carries the record. Every other citation in the same document is held to
+    the same standard as any other document's.
+    """
+
+    return document.name.endswith("_prereg.md") and raw.startswith(RUNNER_ROOTS)
+
+
 def _cited_paths() -> list[tuple[Path, int, str]]:
     found: list[tuple[Path, int, str]] = []
     for document in sorted(DOCS.rglob("*.md")):
@@ -71,7 +106,9 @@ def test_every_rooted_python_path_cited_in_docs_is_a_file_that_exists() -> None:
     missing = [
         f"{document.relative_to(REPOSITORY_ROOT)}:{number} cites {raw}"
         for document, number, raw in cited
-        if raw not in PROPOSED and not (REPOSITORY_ROOT / raw).exists()
+        if raw not in PROPOSED
+        and not _is_a_runner_a_protocol_has_not_had_written_yet(document, raw)
+        and not (REPOSITORY_ROOT / raw).exists()
     ]
     assert not missing, "\n".join(
         [
@@ -92,4 +129,29 @@ def test_a_proposed_path_is_listed_only_while_it_does_not_exist() -> None:
     created = [raw for raw in PROPOSED if (REPOSITORY_ROOT / raw).exists()]
     assert not created, (
         "these are listed as proposed and now exist; delete their entries: " + ", ".join(created)
+    )
+
+
+def test_the_protocol_allowance_covers_a_runner_and_nothing_else() -> None:
+    """The allowance is the reason it was written, not the document it was written for.
+
+    Widening it to any unresolved path in a protocol would excuse the citation this file
+    exists to catch, in the documents most exposed to it: a protocol is written before the
+    code, so its author has nothing to check a path against.
+    """
+
+    protocol = DOCS / "positional_defence_prereg.md"
+    record = DOCS / "positional_defence.md"
+
+    assert _is_a_runner_a_protocol_has_not_had_written_yet(
+        protocol, "scripts/measure_positional_defence.py"
+    )
+    assert _is_a_runner_a_protocol_has_not_had_written_yet(
+        protocol, "src/squadopt/experiments/positional_defence.py"
+    )
+    # The ambiguity this file exists to catch, inside a protocol.
+    assert not _is_a_runner_a_protocol_has_not_had_written_yet(protocol, "data/snapshots.py")
+    # A protocol is written before its runner. A record is written by one that ran.
+    assert not _is_a_runner_a_protocol_has_not_had_written_yet(
+        record, "scripts/measure_positional_defence.py"
     )
