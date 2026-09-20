@@ -757,6 +757,19 @@ def _calibrated_clean_sheet(coefficients: tuple[float, float], probability: floa
     return float(1.0 / (1.0 + math.exp(-max(min(value, 30.0), -30.0))))
 
 
+def calibrated_clean_sheet(coefficients: tuple[float, float], probability: float) -> float:
+    """Apply :func:`fit_clean_sheet_calibration`'s coefficients to one raw probability.
+
+    A public name for what this module already does internally, so a study that needs a
+    recalibrated clean-sheet probability reaches the same arithmetic instead of writing the
+    logistic out again. The handoff records why it must not use the raw one: it promises
+    better than an even chance on 40 judged fixtures where the clean sheet happened a third
+    of the time, and an uncalibrated by-product may not price a defender.
+    """
+
+    return _calibrated_clean_sheet(coefficients, probability)
+
+
 def _published_clean_sheet(
     coefficients: tuple[float, float, float], difficulty: float, *, is_home: bool
 ) -> float:
@@ -1257,6 +1270,7 @@ __all__ = [
     "TeamRating",
     "TeamRatingStudy",
     "TeamRatingStudyConfig",
+    "calibrated_clean_sheet",
     "fit_clean_sheet_calibration",
     "fit_dixon_coles",
     "load_match_results",
