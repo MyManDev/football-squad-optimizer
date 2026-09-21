@@ -31,6 +31,8 @@ from scripts._experiment_cli import (
     REPOSITORY_ROOT,
     _sha256,
     artifact_metadata,
+    measurement_optimization_config,
+    solver_record,
 )
 
 from squadopt.backtest import (
@@ -134,6 +136,9 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         projection_builder=make_ridge_projection_builder(cross_season=CrossSeasonConfig()),
     )
     config = EvaluationConfig(
+        # Both arms solve under the measurement budget rather than the dataclass default,
+        # so which arm wins cannot depend on how busy the machine was (#590).
+        optimization_config=measurement_optimization_config(),
         scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2,
         run_metadata={"study": REPORT_VERSION},
     )
@@ -153,6 +158,9 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         },
         "player_metrics": phase_c_component_evaluation_to_dict(player_metrics),
         "decision_comparison": phase_c_decision_comparison_to_dict(decisions),
+        # One block, because one configuration ran: the control and the component base are
+        # two arms of the same comparison and share `config`, so their statuses pool.
+        "solver": solver_record(decisions.control, decisions.component_base),
         "panel_rows": len(panel),
     }
 
