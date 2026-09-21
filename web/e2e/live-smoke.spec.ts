@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Response } from "@playwright/test";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
 import { points } from "../src/lib/format";
@@ -17,7 +17,8 @@ test("published league and member journey works without submitting a solve", asy
   const errors: string[] = [];
   const consoleErrors: { text: string; url: string }[] = [];
   const absentDocuments = new Set<string>();
-  let cacheMissUrl: string | undefined;
+  const cacheMissUrls = new Set<string>();
+  const adviceMisses: Response[] = [];
   const failures: string[] = [];
   const writes: string[] = [];
   let capabilitiesUrl: string | undefined;
@@ -30,6 +31,12 @@ test("published league and member journey works without submitting a solve", asy
     if (new URL(request.url()).origin === origin) failures.push(request.url());
   });
   page.on("response", (response) => {
+    if (
+      response.status() === 404 &&
+      response.request().method() === "GET" &&
+      /^\/api\/v1\/leagues\/\d+\/entries\/\d+\/advice$/.test(new URL(response.url()).pathname)
+    )
+      adviceMisses.push(response);
     if (
       response.status() === 200 &&
       /^\/api\/v1\/leagues\/\d+\/capabilities$/.test(new URL(response.url()).pathname)
@@ -154,8 +161,8 @@ test("published league and member journey works without submitting a solve", asy
     }, cacheRead.toString());
     if (cached.status === 404) {
       expect(cached.body.error?.code).toBe("NOT_COMPUTED");
-      cacheMissUrl = cacheRead.toString();
-      console.log(`backend reachable, selection not computed: ${cacheMissUrl}`);
+      cacheMissUrls.add(cacheRead.toString());
+      console.log(`backend reachable, selection not computed: ${cacheRead}`);
     } else {
       expect(cached.status).toBe(200);
       const answer = cached.body as LeagueViewEnvelope<EntryAdvice>;
@@ -186,15 +193,30 @@ test("published league and member journey works without submitting a solve", asy
     ).toBeVisible();
   }
   expect(writes, "no mutating API request is allowed").toEqual([]);
+  // The model comparison also performs a cache-only GET. Admit only this member's
+  // exact baseline settings and a typed NOT_COMPUTED response from the discovered API.
+  for (const response of adviceMisses) {
+    expect(capabilitiesUrl, "cache reads must use the discovered backend").toBeTruthy();
+    const url = new URL(response.url());
+    expect(url.origin).toBe(new URL(capabilitiesUrl!).origin);
+    expect(url.pathname).toBe(
+      `/api/v1/leagues/${members.payload.league_id}/entries/${entryId}/advice`,
+    );
+    expect(url.searchParams.get("strategy")).toBe("saf-puan");
+    expect(url.searchParams.get("window")).toBe("1");
+    expect([null, "current", "football"]).toContain(url.searchParams.get("model"));
+    expect((await response.json()).error?.code).toBe("NOT_COMPUTED");
+    cacheMissUrls.add(response.url());
+  }
   expect(
-    failures.filter((failure) => failure !== `404 ${cacheMissUrl}`),
+    failures.filter((failure) => ![...cacheMissUrls].some((url) => failure === `404 ${url}`)),
     "the site's own requests must succeed apart from a validated cache miss",
   ).toEqual([]);
   expect(
     consoleErrors.filter(
       ({ text, url }) =>
         !(
-          (absentDocuments.has(url) || url === cacheMissUrl) &&
+          (absentDocuments.has(url) || cacheMissUrls.has(url)) &&
           /Failed to load resource:.*404/.test(text)
         ),
     ),

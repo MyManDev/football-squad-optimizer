@@ -351,7 +351,13 @@ export function MemberDecisionControls({
             ))}
           </div>
           <p className={styles.note}>
-            {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
+            {selection.request.model === "football"
+              ? language === "tr"
+                ? "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır; boş haftalar sıfır, çift maçlı haftalar maçların toplamıdır. Gelecekteki uygunluk ve fiyatlar kayıt anındaki haliyle sabit tutulur; planlayıcının transfer sınırları geçerlidir."
+                : "Each week's forecast uses that week's fixtures: blanks are zero and double gameweeks sum both matches. Future availability and prices stay at their captured values; the planner's transfer limits still apply."
+              : windows.length > 1
+                ? copy.windowLimits
+                : copy.windowNotComputed}
           </p>
         </fieldset>
 
