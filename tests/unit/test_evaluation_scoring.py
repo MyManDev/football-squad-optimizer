@@ -7,14 +7,17 @@ from fractions import Fraction
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from tests.fixtures.synthetic_players import make_baseline_players
 
 from squadopt import (
     EvaluationValidationError,
     FrozenSquadDecision,
+    OptimizationConfig,
     OptimizationResult,
     ScoringPolicy,
     SolverStatus,
     complete_optimization_decision,
+    optimize_squad,
     score_frozen_squad_decision,
     score_realized_squad_points,
 )
@@ -327,7 +330,7 @@ def test_optimizer_completion_uses_projection_order_and_stable_vice(
     completed = complete_optimization_decision(baseline_result)
     squad = baseline_result.selected_squad.set_index("player_id")
 
-    assert completed.completion_policy == "optimizer_projection_order_v1"
+    assert completed.completion_policy == "optimizer_projection_order_v2"
     assert squad.at[completed.bench[0], "position"] == "GK"
     outfield = list(completed.bench[1:])
     assert outfield == sorted(
@@ -335,6 +338,83 @@ def test_optimizer_completion_uses_projection_order_and_stable_vice(
         key=lambda player_id: (-float(squad.at[player_id, "expected_points"]), player_id),
     )
     assert completed.vice_captain_id != completed.captain_id
+
+
+def test_the_completion_reads_the_appearance_chance_and_leaves_the_vice_alone(
+    baseline_players: pd.DataFrame,
+) -> None:
+    """The consumer half of #621 task 4.3, and the one thing it must not touch.
+
+    The vice-captain is chosen among starters by expected points, unchanged by design:
+    a captain who does not play hands the armband over, so what matters there is the
+    total and not the total given an appearance.
+    """
+
+    players = baseline_players.assign(
+        appearance_probability=[
+            0.2 + 0.8 * index / (len(baseline_players) - 1)
+            for index in range(len(baseline_players))
+        ]
+    )
+    result = optimize_squad(players, OptimizationConfig())
+    squad = result.selected_squad.set_index("player_id")
+
+    completed = complete_optimization_decision(result)
+    outfield = list(completed.bench[1:])
+    conditional = [
+        float(squad.at[player, "expected_points"])
+        / float(squad.at[player, "appearance_probability"])
+        for player in outfield
+    ]
+
+    assert conditional == sorted(conditional, reverse=True)
+    starters = squad.loc[list(result.starting_xi["player_id"])]
+    best_other = starters.drop(index=completed.captain_id)["expected_points"].astype(float).idxmax()
+    assert completed.vice_captain_id == best_other
+
+
+def test_the_solve_and_its_completion_agree_on_one_bench(
+    baseline_players: pd.DataFrame,
+) -> None:
+    """The anti-drift pin, and the reason the rule lives in one function.
+
+    ``complete_optimization_decision`` re-orders the bench the solve already ordered, so
+    what this asserts is that the rule is a fixed point across the two. That is exactly
+    what agreement means here, and it fails in both ways that matter: if one site is later
+    given a different rule the second sort moves the first one's answer, and if the two
+    sites disagree only in arithmetic the move shows on a near tie. The ratios here are
+    deliberately close enough for the second case, because ``Decimal(str(f))`` preserves
+    the order of floats but ``Decimal`` and ``float64`` division need not agree in the
+    last place.
+    """
+
+    players = baseline_players.assign(
+        appearance_probability=[0.30 + 0.001 * index for index in range(len(baseline_players))]
+    )
+    result = optimize_squad(players, OptimizationConfig())
+
+    completed = complete_optimization_decision(result)
+
+    assert tuple(result.bench["player_id"].tolist()) == tuple(completed.bench)
+
+
+def test_a_bench_point_that_is_not_a_finite_number_is_refused() -> None:
+    """The guard that stayed behind when the sort moved out.
+
+    ``order_outfield_bench`` treats an unusable number as a reason to fall back, which is
+    right for an ordering. A frozen decision is a record, and a record whose points cannot
+    be read is not one to complete quietly.
+    """
+
+    result = optimize_squad(make_baseline_players(), OptimizationConfig())
+    bench = result.bench.copy(deep=True)
+    outfield = bench.loc[bench["position"] != "GK"]
+    # Infinity rather than NaN: a missing value is refused one check earlier, and the
+    # check under test is the one that reads a present number and finds it unusable.
+    bench.loc[outfield.index[0], "expected_points"] = float("inf")
+
+    with pytest.raises(EvaluationValidationError, match="must be finite numbers"):
+        complete_optimization_decision(replace(result, bench=bench))
 
 
 def test_public_v2_policy_completes_and_scores_an_optimizer_result(

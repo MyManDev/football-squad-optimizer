@@ -15,11 +15,17 @@ deadline starts from is read out of the opening entry's own record.
 New decisions also freeze ``vice_captain_player_id``, ``ordered_bench_player_ids``
 and ``completion_policy``. These are additive fields within ``season_ledger_v1``:
 existing fields keep their meanings, including the original ``bench_player_ids`` order.
-``optimizer_projection_order_v1`` uses decision-time expected points (descending,
-player ID to break ties), places the bench goalkeeper first, and chooses the best
-non-captain starter as vice. It reads no realized outcome. Older records without these
-fields remain valid and are never backfilled on read: absence means the completion
-was not recorded, not that the original bench order was the declared substitution order.
+Both completion policies place the bench goalkeeper first, choose the best non-captain
+starter as vice, and read no realized outcome. They differ in one thing:
+``optimizer_projection_order_v1`` orders the outfield bench by decision-time expected
+points alone, and ``optimizer_projection_order_v2`` orders it by expected points given
+that the player appears, falling back to v1's rule where the projection states no
+appearance chance. **The policy is carried, never checked against a list.** A token this
+module does not recognise is written and read back unchanged, because the field records
+which rule completed a decision and a ledger that refused an unknown one would turn every
+later rule into a migration. Older records without these fields remain valid and are never
+backfilled on read: absence means the completion was not recorded, not that the original
+bench order was the declared substitution order.
 Named-eleven outcome scoring is unchanged; recording completion does not apply autosubs.
 
 An outcome states the ``scoring_basis`` that produced its numbers, because the rule is
