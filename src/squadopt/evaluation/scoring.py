@@ -222,6 +222,17 @@ def _validate_realized_outcomes(realized_points: pd.DataFrame) -> pd.DataFrame:
         )
     joined = validated_points.merge(minutes, on="player_id", how="left", validate="one_to_one")
     joined["minutes"] = joined["minutes"].astype(int)
+    if "card_participation" in realized_points:
+        cards = realized_points["card_participation"]
+        if cards.isna().any() or any(type(value) is not bool for value in cards.tolist()):
+            raise EvaluationValidationError("card_participation must contain non-missing booleans.")
+        joined = joined.merge(
+            realized_points[["player_id", "card_participation"]],
+            on="player_id",
+            validate="one_to_one",
+        )
+    else:
+        joined["card_participation"] = False
     return joined
 
 
@@ -315,6 +326,10 @@ def score_frozen_squad_decision(
         )
     }
     minutes = dict(outcomes[["player_id", "minutes"]].itertuples(index=False, name=None))
+    # Cards constitute participation for autosubs even without pitch minutes.
+    # Captain fallback still uses actual minutes; never fabricate an appearance.
+    cards = dict(outcomes[["player_id", "card_participation"]].itertuples(index=False, name=None))
+    participated = {player: minutes[player] > 0 or cards[player] for player in minutes}
     squad_ids = squad["player_id"].tolist()
     missing = [
         player_id for player_id in squad_ids if player_id not in points or player_id not in minutes
@@ -337,7 +352,7 @@ def score_frozen_squad_decision(
     bench_goalkeeper = next(
         player_id for player_id in decision.bench if position_by_id[player_id] == "GK"
     )
-    if minutes[starting_goalkeeper] == 0 and minutes[bench_goalkeeper] > 0:
+    if not participated[starting_goalkeeper] and participated[bench_goalkeeper]:
         slot = final_slots.index(starting_goalkeeper)
         final_slots[slot] = bench_goalkeeper
         autosubs.append((starting_goalkeeper, bench_goalkeeper))
@@ -348,10 +363,10 @@ def score_frozen_squad_decision(
     missing_outfield = [
         player_id
         for player_id in decision.starting_xi
-        if position_by_id[player_id] != "GK" and minutes[player_id] == 0
+        if position_by_id[player_id] != "GK" and not participated[player_id]
     ]
     for substitute in decision.bench:
-        if position_by_id[substitute] == "GK" or minutes[substitute] == 0:
+        if position_by_id[substitute] == "GK" or not participated[substitute]:
             continue
         for outgoing in tuple(missing_outfield):
             candidate_counts = nominal_counts.copy()
@@ -366,7 +381,7 @@ def score_frozen_squad_decision(
             autosubs.append((outgoing, substitute))
             break
 
-    final_xi = tuple(player_id for player_id in final_slots if minutes[player_id] > 0)
+    final_xi = tuple(player_id for player_id in final_slots if participated[player_id])
     base_score = sum((points[player_id] for player_id in final_xi), start=Decimal(0))
     bonus_player: object | None = None
     bonus = Decimal(0)

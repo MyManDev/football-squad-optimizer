@@ -415,11 +415,18 @@ def _optimize_squad_with_objective_points(
     objective_contract: str,
     required_player_ids: tuple[int, ...] = (),
     excluded_decisions: Sequence[OptimizationResult] = (),
+    linearization_level: int | None = None,
 ) -> OptimizationResult:
     """Solve the shared squad model with a validated private objective override."""
 
     if not isinstance(config, OptimizationConfig):
         raise InvalidConfigurationError("config must be an OptimizationConfig instance.")
+    if linearization_level is not None and (
+        isinstance(linearization_level, bool)
+        or not isinstance(linearization_level, int)
+        or linearization_level not in (0, 1, 2)
+    ):
+        raise InvalidConfigurationError("linearization_level must be None, 0, 1 or 2.")
     if not isinstance(objective_contract, str) or not objective_contract.strip():
         raise InvalidConfigurationError("objective_contract must be a non-empty string.")
     if not isinstance(required_player_ids, tuple) or any(
@@ -455,6 +462,8 @@ def _optimize_squad_with_objective_points(
         config.solver_time_limit_seconds,
         config.solver_deterministic_time_limit,
     )
+    if linearization_level is not None:
+        primary_solver.parameters.linearization_level = linearization_level
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
     elapsed_after_primary = perf_counter() - started_at
@@ -490,6 +499,8 @@ def _optimize_squad_with_objective_points(
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if linearization_level is not None:
+        base_diagnostics["linearization_level"] = linearization_level
 
     if primary_status in {SolverStatus.INFEASIBLE, SolverStatus.UNKNOWN}:
         return _empty_result(ordered_players, primary_status, base_diagnostics)
@@ -549,6 +560,8 @@ def _optimize_squad_with_objective_points(
             remaining_time,
             remaining_deterministic_time,
         )
+        if linearization_level is not None:
+            tiebreak_solver.parameters.linearization_level = linearization_level
         raw_tiebreak_status = _solve(artifacts.model, tiebreak_solver)
         tiebreak_status = _map_solver_status(raw_tiebreak_status)
         tiebreak_deterministic_time = _deterministic_time_used(
@@ -639,6 +652,7 @@ def optimize_squad(
     *,
     required_player_ids: tuple[int, ...] = (),
     excluded_decisions: Sequence[OptimizationResult] = (),
+    linearization_level: int | None = None,
 ) -> OptimizationResult:
     """Select a squad, starting XI, bench, and captain for one gameweek.
 
@@ -652,6 +666,10 @@ def optimize_squad(
     decision after a known optimum is asked for. Only that exact decision is cut, so
     the answer is the best remaining decision under the unchanged objective and
     tie-break. Both empty (the default) is the historical model, bit for bit.
+
+    ``linearization_level`` optionally selects CP-SAT's LP relaxation setting for
+    both primary and tie-break solves. None preserves the backend default. This
+    changes search, not constraints, point coefficients or the tie-break objective.
     """
 
     return _optimize_squad_with_objective_points(
@@ -661,4 +679,5 @@ def optimize_squad(
         objective_contract="expected_points_v1",
         required_player_ids=required_player_ids,
         excluded_decisions=excluded_decisions,
+        linearization_level=linearization_level,
     )
