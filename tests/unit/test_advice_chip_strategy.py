@@ -84,10 +84,11 @@ def test_joint_advice_scores_chips_in_raw_points(world, window, chip, weight):
 
         picks = w["provider"].picks(ENTRY, SEASON, 1)
         collaborators = _collaborators(w)
-        base = collaborators["horizon_builder"](tuple(range(1, window + 1)))
+        start = payload["gameweek"]
+        base = collaborators["horizon_builder"](tuple(range(start, start + window)))
         weighted = weighted_horizon(base, w["counts"].counts, weight)
-        raw = base.table.loc[base.table.gameweek.eq(1)].set_index("player_id")
-        utility = weighted.table.loc[weighted.table.gameweek.eq(1)].set_index("player_id")
+        raw = base.table.loc[base.table.gameweek.eq(start)].set_index("player_id")
+        utility = weighted.table.loc[weighted.table.gameweek.eq(start)].set_index("player_id")
         hold = best_eleven_basis(
             (
                 (

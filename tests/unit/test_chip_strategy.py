@@ -148,6 +148,37 @@ def test_reference_has_fixed_budget_and_unproved_reference_is_refused(
             OPTIMAL_INITIAL,
             replace(small_config, solver_deterministic_time_limit=20),
             TransferPlanningConfig(),
-            ChipAvailability(),
+            ChipAvailability(available={"3xc": frozenset({1})}),
         )
     assert budgets == [60]
+
+
+def test_no_rights_reuses_feasible_plain_plan_without_pricing_it(
+    known_optimum_players, small_config, monkeypatch
+):
+    import squadopt.planning.chip_strategy as strategy
+
+    actual = strategy.optimize_transfer_plan
+    calls = []
+
+    def unproved(*args, **kwargs):
+        calls.append(args[2].solver_deterministic_time_limit)
+        solved = actual(*args, **kwargs)
+        return replace(
+            solved,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={**solved.diagnostics, "absolute_optimality_gap": 2.0},
+        )
+
+    monkeypatch.setattr(strategy, "optimize_transfer_plan", unproved)
+    result = optimize_chip_strategy(
+        PlanningHorizon(_horizon_table(known_optimum_players)),
+        OPTIMAL_INITIAL,
+        replace(small_config, solver_deterministic_time_limit=20),
+        TransferPlanningConfig(),
+        ChipAvailability(),
+    )
+    assert calls == [20]
+    assert result.solver_status is SolverStatus.FEASIBLE
+    assert result.diagnostics["absolute_optimality_gap"] == 2.0
+    assert result.diagnostics["chip_strategy"]["reservations"] == []

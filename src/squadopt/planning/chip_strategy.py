@@ -94,11 +94,11 @@ def optimize_chip_strategy(
     control = optimize_transfer_plan(
         horizon,
         initial,
-        reference,
+        reference if chips.available else optimization,
         transfer,
         linearization_level=linearization_level,
     )
-    if control.solver_status is not SolverStatus.OPTIMAL:
+    if chips.available and control.solver_status is not SolverStatus.OPTIMAL:
         raise SolverExecutionError("Chip opportunity reference must be proved optimal.")
     samples: dict[str, list[float]] = {name: [] for name in chips.available}
     probe_statuses: list[str] = []
@@ -149,13 +149,17 @@ def optimize_chip_strategy(
             )
         priced[name] = tuple(periods)
     availability = replace(chips, use_windows=priced)
-    plan = optimize_transfer_plan(
-        horizon,
-        initial,
-        optimization,
-        transfer,
-        chips=availability,
-        linearization_level=linearization_level,
+    plan = (
+        optimize_transfer_plan(
+            horizon,
+            initial,
+            optimization,
+            transfer,
+            chips=availability,
+            linearization_level=linearization_level,
+        )
+        if chips.available
+        else control
     )
     return replace(
         plan,
