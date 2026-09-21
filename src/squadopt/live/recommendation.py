@@ -99,6 +99,19 @@ class InSeasonProjection:
     model_version: str
     feature_contract_version: str
     expected_points: Mapping[int, float]
+    appearance_probability: Mapping[int, float] | None = None
+    """The chance each player appears at all, where the producer estimated one.
+
+    Optional twice over, and the two absences mean different things. ``None`` is a
+    producer that does not estimate appearance, which is every route but the component
+    one; a player missing from a mapping that is present is a player that producer did
+    not model, which the direct-control route leaves by contract. Neither is a zero, and
+    a consumer meeting either applies whatever rule it applies without this number.
+
+    It travels beside ``expected_points`` rather than inside it because the two answer
+    different questions: the points are what the player is worth this week, and this is
+    how much of that is the chance of being there at all. The bench rule needs them
+    apart (#531)."""
     evidence_fingerprint: str | None = None
     diagnostics: Mapping[str, object] = field(default_factory=dict)
     contract_version: str = PROJECTION_HANDOFF_CONTRACT_VERSION
@@ -165,6 +178,38 @@ class InSeasonProjection:
             )
         object.__setattr__(self, "expected_points", MappingProxyType(points))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
+        object.__setattr__(self, "appearance_probability", self._appearance())
+
+    def _appearance(self) -> Mapping[int, float] | None:
+        """Validate the optional appearance mapping, or leave it absent.
+
+        A probability outside ``[0, 1]`` is refused rather than clipped. The bench rule
+        divides by this number, so a value above one would quietly reorder a bench and a
+        negative one would flip it, and neither is a thing a clip can repair into a fact.
+        A player the producer did not model is absent from the mapping, never zero: zero
+        is the claim that the player will certainly not appear, which is what a blank
+        gameweek says and not what an unmodelled player says.
+        """
+
+        if self.appearance_probability is None:
+            return None
+        chances: dict[int, float] = {}
+        for player, value in dict(self.appearance_probability).items():
+            if isinstance(player, bool) or not isinstance(player, int):
+                raise DataSourceError("Projection handoff player ids must be integers.")
+            number = float(value)
+            if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+                raise DataSourceError(
+                    f"Projection handoff appearance_probability for {player} is {number!r}; "
+                    "a chance lies in [0, 1]."
+                )
+            if int(player) not in self.expected_points:
+                raise DataSourceError(
+                    f"Projection handoff states an appearance chance for {player}, which it "
+                    "gives no expected points for. The two describe the same projection."
+                )
+            chances[int(player)] = number
+        return MappingProxyType(chances)
 
     @property
     def fingerprint(self) -> str:
@@ -182,6 +227,15 @@ class InSeasonProjection:
         }
         if self.evidence_fingerprint is not None:
             payload["evidence_fingerprint"] = self.evidence_fingerprint
+        # Added only when present, so a handoff that states no appearance chance keeps
+        # exactly the fingerprint it has today and an old file still verifies. Two
+        # handoffs agreeing on every point and differing here are different projections:
+        # they order a bench differently, so the identity has to tell them apart.
+        if self.appearance_probability is not None:
+            payload["appearance_probability"] = {
+                str(player): f"{value:.9f}"
+                for player, value in sorted(self.appearance_probability.items())
+            }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
@@ -205,9 +259,32 @@ def write_projection_handoff(path: Path, projection: InSeasonProjection) -> Path
     }
     if projection.evidence_fingerprint is not None:
         document["evidence_fingerprint"] = projection.evidence_fingerprint
+    if projection.appearance_probability is not None:
+        document["appearance_probability"] = {
+            str(player): value
+            for player, value in sorted(projection.appearance_probability.items())
+        }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+def _read_appearance(document: Mapping[str, object]) -> Mapping[int, float] | None:
+    """The optional appearance mapping of a handoff document, or nothing.
+
+    A file written before this key existed has no key, which is the same fact as a
+    producer that does not estimate appearance, and both read as ``None``. A key that is
+    present and not an object is a malformed document rather than an absence.
+    """
+
+    rows = document.get("appearance_probability")
+    if rows is None:
+        return None
+    if not isinstance(rows, dict):
+        raise DataSourceError(
+            "Projection handoff appearance_probability must map player codes to chances."
+        )
+    return {int(player): float(value) for player, value in rows.items()}
 
 
 def read_projection_handoff(path: Path) -> InSeasonProjection:
@@ -230,6 +307,7 @@ def read_projection_handoff(path: Path) -> InSeasonProjection:
             model_version=str(document.get("model_version", "")),
             feature_contract_version=str(document.get("feature_contract_version", "")),
             expected_points={int(player): float(value) for player, value in rows.items()},
+            appearance_probability=_read_appearance(document),
             evidence_fingerprint=(
                 str(document["evidence_fingerprint"])
                 if document.get("evidence_fingerprint") is not None
@@ -482,6 +560,15 @@ def _project_in_season(
         deep=True
     )
     table["expected_points"] = [float(handoff.expected_points[code]) for code in codes]
+    if handoff.appearance_probability is not None:
+        # Absent where the producer did not model the player, which is the direct-control
+        # route's contract, and absent rather than zero because zero is the claim that the
+        # player will certainly not appear. The column is added only when the producer
+        # states something, so a handoff without one leaves this pool exactly as it is.
+        chances = handoff.appearance_probability
+        table["appearance_probability"] = pd.Series(
+            [chances.get(code) for code in codes], index=table.index, dtype="float64"
+        )
     adjusted = apply_availability(table, inputs.availability, config=availability_config)
     return Projection(
         table=adjusted.table,

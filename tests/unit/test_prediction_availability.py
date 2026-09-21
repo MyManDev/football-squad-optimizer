@@ -239,3 +239,71 @@ def test_the_config_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         config.unknown_is_available = False  # type: ignore[misc]
+
+
+# --- the appearance chance the rule is news about ---------------------------
+
+
+def test_the_chance_of_appearing_is_scaled_by_the_same_multiplier() -> None:
+    """This rule is news about appearing, so it belongs in both numbers or neither.
+
+    A stated chance of playing is a chance of appearing and an injured status is the
+    claim that the player will not, so a rule that moved only the points would leave
+    behind an appearance probability from before the news.
+    """
+
+    projection = _projection().assign(appearance_probability=0.8)
+
+    adjusted = apply_availability(projection, _availability([_record("d", 25)]))
+
+    assert adjusted.table.loc[0, "expected_points"] == pytest.approx(1.0)
+    assert adjusted.table.loc[0, "appearance_probability"] == pytest.approx(0.2)
+
+
+def test_the_composition_survives_this_step() -> None:
+    """The property the bench rule of #531 rests on.
+
+    The component producer composes ``expected_points = appearance_probability *
+    points_if_appearance``, and the bench is ordered by the quotient of the two. Scale
+    one side only and the quotient stops being the conditional mean either number meant:
+    a player doubtful at a quarter would be ordered at a quarter of what they are worth
+    *if* they play, which is the one thing the exchange argument says must not happen.
+    """
+
+    conditional = 5.0
+    projection = _projection(points=0.8 * conditional).assign(appearance_probability=0.8)
+
+    table = apply_availability(projection, _availability([_record("d", 25)])).table
+    quotient = table.loc[0, "expected_points"] / table.loc[0, "appearance_probability"]
+
+    assert quotient == pytest.approx(conditional)
+
+
+def test_a_projection_that_states_no_chance_is_left_exactly_as_it_is() -> None:
+    """Every producer but the component one is on this path and must not move."""
+
+    adjusted = apply_availability(_projection(), _availability([_record("d", 25)]))
+
+    assert "appearance_probability" not in adjusted.table.columns
+
+
+def test_an_unmodelled_player_keeps_its_absence_through_the_rule() -> None:
+    """Absent is not zero here either: scaling nothing must not produce a number."""
+
+    projection = _projection(players=2).assign(appearance_probability=[0.8, None])
+
+    table = apply_availability(
+        projection, _availability([_record("d", 25, 1), _record("d", 25, 2)])
+    ).table
+
+    assert table.loc[0, "appearance_probability"] == pytest.approx(0.2)
+    assert pd.isna(table.loc[1, "appearance_probability"])
+
+
+def test_an_unavailable_player_reaches_zero_on_both_numbers() -> None:
+    projection = _projection().assign(appearance_probability=0.9)
+
+    table = apply_availability(projection, _availability([_record("i")])).table
+
+    assert table.loc[0, "expected_points"] == pytest.approx(0.0)
+    assert table.loc[0, "appearance_probability"] == pytest.approx(0.0)

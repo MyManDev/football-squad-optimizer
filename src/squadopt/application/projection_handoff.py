@@ -295,6 +295,30 @@ def _component_table(
     return table, diagnostics
 
 
+def _appearance(projected: pd.DataFrame) -> dict[int, float] | None:
+    """The appearance chances this projection states, for the players it states them for.
+
+    ``None`` when the column is not there at all, which is every route but the component
+    one: the legacy blend and its elite variant model points without decomposing them,
+    and a mapping of nothing would claim they had tried. A player the column leaves
+    missing is left out of the mapping rather than entered at zero, because the
+    direct-control route leaves its component inputs absent by contract and that absence
+    means nobody modelled the player rather than that the player will not appear.
+    """
+
+    if "appearance_probability" not in projected.columns:
+        return None
+    stated = projected.loc[projected["appearance_probability"].notna()]
+    return {
+        int(code): float(chance)
+        for code, chance in zip(
+            stated["player_id"].astype("int64").tolist(),
+            stated["appearance_probability"].astype("float64").tolist(),
+            strict=True,
+        )
+    }
+
+
 def build(
     snapshot_root: Path,
     archive_root: Path,
@@ -464,6 +488,7 @@ def build(
         model_version=model_version,
         feature_contract_version=feature_contract_version,
         expected_points=expected,
+        appearance_probability=_appearance(projected_table),
         evidence_fingerprint=evidence_fingerprint,
         diagnostics=diagnostics,
     )
