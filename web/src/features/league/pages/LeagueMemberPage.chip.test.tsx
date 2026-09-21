@@ -77,6 +77,30 @@ function section(container: HTMLElement): string {
 }
 
 describe("a chosen chip on the advice card", () => {
+  it.each(["tr", "en"] as const)(
+    "keeps the next step beside an explained proof in %s",
+    (language) => {
+      for (const solver_status of ["OPTIMAL", "FEASIBLE"] as const) {
+        for (const control_solver_status of ["OPTIMAL", "FEASIBLE"] as const) {
+          const { container } = renderPage(
+            language,
+            chosen("3xc", 6.4, { solver_status, control_solver_status }),
+            "mode=saf-puan&window=1&chip=3xc",
+          );
+          expect(
+            screen.queryAllByText(MESSAGES[language].leagueMembers.unprovenPlanNextStep),
+          ).toHaveLength(solver_status === "FEASIBLE" ? 1 : 0);
+          if (solver_status === "FEASIBLE" || control_solver_status === "FEASIBLE") {
+            expect(section(container)).toContain(CHIP_COPY[language].unproven);
+          } else {
+            expect(section(container)).not.toContain(CHIP_COPY[language].unproven);
+          }
+          cleanup();
+        }
+      }
+    },
+  );
+
   it("states the chip, the signed gain and the honesty sentence, in Turkish", () => {
     const { container } = renderPage(
       "tr",

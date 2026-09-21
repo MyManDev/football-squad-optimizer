@@ -36,6 +36,7 @@ from scripts._experiment_cli import (
     _edge_series,
     _leave_one_out,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
@@ -44,7 +45,7 @@ from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments.control_residuals import build_control_residual_table
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
-from squadopt.optimization import OptimizationConfig, OptimizationResult, optimize_squad
+from squadopt.optimization import OptimizationResult, optimize_squad
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
 from squadopt.scenarios import ScenarioConfig
 from squadopt.scenarios.evaluation import anchored_probability_ahead, rival_edge_draws
@@ -91,7 +92,11 @@ def main() -> int:
     series = _edge_series(REPOSITORY_ROOT / "docs")
     panel = build_panel(arguments.archive_root)
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
-    optimization = OptimizationConfig()
+    # Named rather than inherited. The dataclass default binds on ten wall-clock seconds,
+    # so a busy machine gives the solver less work and the same commit writes a different
+    # record (#590). The measurement limit is deterministic, so the record is the run's
+    # and not the machine's.
+    optimization = measurement_optimization_config()
     provenance_seed = PredictionProvenance(
         model_name="deterministic_baseline",
         model_version="form_window_05_v1",

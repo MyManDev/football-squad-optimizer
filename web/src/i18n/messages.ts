@@ -4,6 +4,11 @@ export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
   suggestionHistory: {
+    recordedPlans: "Recorded Plans and Settings",
+    recordedPlansNote:
+      "One-week plans. Window plans and other rivals are in the week's own record and are not listed here. This does not show what you chose, and these alternatives have not been scored against results here.",
+    unknownPlayer: "Player Not Recorded",
+    noRecordedMoves: "No Moves Listed",
     title: "Weekly Suggestion History",
     overview: "Overview",
     systemNet: "System Suggestion · Net",
@@ -179,7 +184,7 @@ const en = {
     budget: "Budget £100.0m",
     solver: "Solver",
     provedOptimal: "Proved Optimal, Single Thread",
-    notProved: "Not Proved — Reported, Not Recommended",
+    notProved: "Not Proved: Reported, Not Recommended",
     startingXi: "Starting XI",
     starterCount: (count: number) => `${count} Starters · Captain Counted Twice`,
     captain: "Captain",
@@ -212,7 +217,7 @@ const en = {
     deadline: "deadline",
     title: "Suggested Moves",
     chip: "chip",
-    openingTitle: "Opening squad — no transfers to make.",
+    openingTitle: "Opening squad: no transfers to make.",
     openingBeforeLink:
       "Gameweek 1 builds the squad from scratch, so there is nothing to move. The first wildcard and the other chips open in gameweek 2; from then on this page carries the planner's proposed transfers, what they cost in points, and the state they leave the bank and the free transfers in. See the ",
     openingLink: "squad it built",
@@ -314,7 +319,7 @@ const en = {
     noRivalBeforeStatus:
       "A rival comparison needs two things this gameweek does not have: a decision whose risk view was evaluated (this one is ",
     noRivalAfterStatus:
-      "), and a rival squad to score in the same scenarios. Both are being wired up — the template rival comes from the capture's ownership, mini-league rivals from the entry data. Until then this page shows the projections below rather than a probability nobody measured.",
+      "), and a rival squad to score in the same scenarios. Both are being wired up: the template rival comes from the capture's ownership, mini-league rivals from the entry data. Until then this page shows the projections below rather than a probability nobody measured.",
     linksBefore: "Where the squad itself came from is on ",
     squadPage: "the squad page",
     linksMiddle: "; how the season compares with everyone else is on ",
@@ -355,7 +360,7 @@ const en = {
     state: "state",
     note: "SquadOpt's recorded squad net includes captain/chip effects and transfer hits, but no autosubs or vice-captain replacement. It is not directly comparable with official FPL scores.",
     modeNote:
-      "Each row says the mode it was recorded in — live: decided before that deadline, from a capture that run took; replay: recorded after that deadline, or from a capture the run did not take but named. A row with no mode was recorded before the ledger stamped one.",
+      "Each row says the mode it was recorded in: live: decided before that deadline, from a capture that run took; replay: recorded after that deadline, or from a capture the run did not take but named. A row with no mode was recorded before the ledger stamped one.",
     chartReplays: (count: number) =>
       `${count} of the gameweeks drawn here were recorded as replay rather than live; the table below says which.`,
     weeklySummary: (snapshot: string) =>
@@ -367,8 +372,7 @@ const en = {
     meanOwnership: "mean starter ownership",
     meanOwnershipNote: "the average share of the field that owns one of our starters",
     effectiveOwnership: "effective ownership",
-    effectiveOwnershipNote:
-      "starters plus the captain again — the exposure we share with the field",
+    effectiveOwnershipNote: "starters plus the captain again: the exposure we share with the field",
     differentials: "differentials",
     differentialNote: (threshold: number) => `starters owned by ${threshold}% or less`,
     mostOwned: "Most Owned",
@@ -408,7 +412,7 @@ const en = {
       `${count} members have no readable history for this capture; their rows are excluded.`,
     mean: (value: string) =>
       `Mean suggested minus actual net score per member-week: ${value} points.`,
-    weekSummary: "Weekly groups — one row per settled week",
+    weekSummary: "Weekly groups: one row per settled week",
     population: "Members with a recorded suggestion and actual score",
     net: "Transfer costs deducted on both sides",
     week: "GW",
@@ -538,7 +542,7 @@ const en = {
     computeUnavailable:
       "Only the published site is available right now; this combination was not published.",
     computeFailed:
-      "The computation did not finish. The published plan, where one exists, still stands.",
+      "The computation did not finish. The published plan, where one exists, remains available to read.",
     adviceComputedBadge: "Computation result",
     advicePublishedWhileComputing: "The published plan is shown while the computation runs.",
     adviceBaselineWhileComputing:
@@ -588,7 +592,7 @@ const en = {
     } as Record<"saf-puan" | "ortak-koru" | "fark-yarat", { name: string; description: string }>,
     rulePickBadge: "The rule's pick",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
-      `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured — nothing has tested whether following it does better than ignoring it — so it labels an option and never chooses for you.`,
+      `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured; nothing has tested whether following it does better than ignoring it, so it labels an option and never chooses for you.`,
     publicationStates: {
       "published-missing": {
         title: "The listed advice file is unavailable.",
@@ -709,6 +713,8 @@ const en = {
     loadingAdvice: "Loading published advice…",
     entryUnreadable: "This member's squad could not be read.",
     entryUnreadableBody: "The published squad document did not return readable data.",
+    unprovenPlanNextStep:
+      "Review the shown lineup and transfers before deciding. Computing again does not promise a completed proof.",
     unprovenPlanGapUnknown:
       "The proof for this plan is incomplete. The bound on the planner's objective was not published.",
     controlGapUnknown:
@@ -724,6 +730,7 @@ const en = {
       "The advice rules belong to another season.":
         "The advice inputs belong to different seasons.",
       "A member cannot be their own rival.": "The selected member and rival are the same.",
+      not_solved_for_member: "No plan was found for this selection in this publish.",
     } as Record<string, string>,
     publicationReasonUnknown:
       "The publisher supplied a reason, but no translated explanation is available.",
@@ -920,7 +927,7 @@ const en = {
     nothingDue: "Nothing is due.",
     recent: "Recent Run Log",
     newest: "newest first",
-    noLog: "No run log yet — the tick has not run on this machine.",
+    noLog: "No run log yet; the tick has not run on this machine.",
   },
   analysis: {
     types: {
@@ -966,6 +973,11 @@ type MessageSchema<T> = {
 
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
+    recordedPlans: "Kaydedilmiş Planlar ve Ayarlar",
+    recordedPlansNote:
+      "Bir haftalık planlar. Çok haftalık planlar ve diğer rakipler haftanın kendi kaydında bulunur, burada listelenmez. Bu liste hangi planı seçtiğini göstermez; buradaki alternatifler gerçekleşen sonuçlarla puanlanmadı.",
+    unknownPlayer: "Oyuncu Kaydedilmemiş",
+    noRecordedMoves: "Listelenen Hamle Yok",
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",
     systemNet: "Sistem Tavsiyesi · Net",
@@ -1134,7 +1146,7 @@ const tr: MessageSchema<typeof en> = {
     budget: "Bütçe £100.0m",
     solver: "Çözücü",
     provedOptimal: "Optimal Olduğu Kanıtlandı, Tek İş Parçacığı",
-    notProved: "Kanıtlanmadı — Raporlandı, Öneri Değil",
+    notProved: "Kanıtlanmadı: Raporlandı, Öneri Değil",
     startingXi: "İlk 11",
     starterCount: (count) => `${count} İlk 11 Oyuncusu · Kaptan İki Kez Sayılır`,
     captain: "Kaptan",
@@ -1167,7 +1179,7 @@ const tr: MessageSchema<typeof en> = {
     deadline: "son tarih",
     title: "Önerilen Hamleler",
     chip: "çip",
-    openingTitle: "Açılış kadrosu — yapılacak transfer yok.",
+    openingTitle: "Açılış kadrosu: yapılacak transfer yok.",
     openingBeforeLink:
       "İlk oyun haftasında kadro sıfırdan kurulur; bu yüzden yapılacak transfer yoktur. İlk wildcard ve diğer çipler ikinci oyun haftasında açılır. Bu noktadan sonra planlayıcının transfer önerileri, puan maliyetleri, banka ve serbest transfer durumu burada görünür. Oluşturulan ",
     openingLink: "kadroya bakın",
@@ -1310,7 +1322,7 @@ const tr: MessageSchema<typeof en> = {
     state: "durum",
     note: "SquadOpt’un kaydedilen kadro neti kaptan/çip ve transfer cezasını içerir; otomatik değişiklik ve kaptan yedeği uygulanmaz. Resmi FPL puanlarıyla birebir karşılaştırılamaz.",
     modeNote:
-      "Her satır hangi modda kaydedildiğini söyler — live: o son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı; replay: o son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı. Modu olmayan bir satır, ledger mod damgalamaya başlamadan önce kaydedilmiştir.",
+      "Her satır hangi modda kaydedildiğini söyler: live: o son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı; replay: o son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı. Modu olmayan bir satır, ledger mod damgalamaya başlamadan önce kaydedilmiştir.",
     chartReplays: (count) =>
       `Burada çizilen oyun haftalarının ${count} tanesi live değil replay olarak kaydedildi; hangileri olduğunu aşağıdaki tablo söylüyor.`,
     weeklySummary: (snapshot) => `oyunun haftalık özeti · capture ${snapshot.slice(0, 24)}…`,
@@ -1321,7 +1333,7 @@ const tr: MessageSchema<typeof en> = {
     meanOwnership: "ortalama ilk 11 sahipliği",
     meanOwnershipNote: "ilk 11 oyuncularımızdan birine sahip olan saha payının ortalaması",
     effectiveOwnership: "etkin sahiplik",
-    effectiveOwnershipNote: "ilk 11 ve kaptan tekrar — sahayla paylaştığımız maruziyet",
+    effectiveOwnershipNote: "ilk 11 ve kaptan tekrar: sahayla paylaştığımız maruziyet",
     differentials: "diferansiyeller",
     differentialNote: (threshold) => `%${threshold} veya daha az sahiplikli ilk 11 oyuncuları`,
     mostOwned: "En Yüksek Sahiplik",
@@ -1360,7 +1372,7 @@ const tr: MessageSchema<typeof en> = {
     missing: (count) =>
       `${count} üyenin bu yakalamaya ait okunabilir geçmişi yok; satırları dahil edilmedi.`,
     mean: (value) => `Üye-hafta başına önerilen eksi gerçekleşen ortalama net puan: ${value}.`,
-    weekSummary: "Haftalık gruplar — yerleşmiş hafta başına bir satır",
+    weekSummary: "Haftalık gruplar: yerleşmiş hafta başına bir satır",
     population: "Kayıtlı önerisi ve gerçekleşen puanı olan üyeler",
     net: "Her iki tarafta transfer bedeli düşülmüş",
     week: "OH",
@@ -1487,7 +1499,7 @@ const tr: MessageSchema<typeof en> = {
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
-    computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
+    computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, okunabilir.",
     adviceComputedBadge: "Hesap sonucu",
     advicePublishedWhileComputing: "Hesap sürerken yayınlanmış plan gösteriliyor.",
     adviceBaselineWhileComputing:
@@ -1531,7 +1543,7 @@ const tr: MessageSchema<typeof en> = {
     },
     rulePickBadge: "Kuralın seçimi",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
-      `Tanımlı bir kural, iki sayıya bakarak seçeneklerden birini işaretler: ${rival} karşısındaki lig puanın (${gap}) ve oynanacak ${weeks} hafta. Kural yazılı, ölçülmüş değil — uymanın uymamaktan daha iyi olduğu test edilmedi — yani bir seçeneği etiketler, senin yerine seçmez.`,
+      `Tanımlı bir kural, iki sayıya bakarak seçeneklerden birini işaretler: ${rival} karşısındaki lig puanın (${gap}) ve oynanacak ${weeks} hafta. Kural yazılı, ölçülmüş değil; uymanın uymamaktan daha iyi olduğu test edilmedi, yani bir seçeneği etiketler, senin yerine seçmez.`,
     publicationStates: {
       "published-missing": {
         title: "Listelenen öneri dosyası bulunamadı.",
@@ -1647,6 +1659,8 @@ const tr: MessageSchema<typeof en> = {
     loadingAdvice: "Yayımlanan öneri okunuyor…",
     entryUnreadable: "Bu üyenin kadrosu okunamadı.",
     entryUnreadableBody: "Yayımlanan kadro belgesi okunabilir veri döndürmedi.",
+    unprovenPlanNextStep:
+      "Karar vermeden önce gösterilen on biri ve transferleri incele. Yeniden hesaplatmak kanıtın tamamlanacağı anlamına gelmez.",
     unprovenPlanGapUnknown:
       "Bu planın en iyi olduğu kanıtlanamadı. Planlayıcı amaç değeri için sınır yayımlanmamış.",
     controlGapUnknown:
@@ -1661,6 +1675,7 @@ const tr: MessageSchema<typeof en> = {
         "Önerinin girdileri farklı veri kayıtlarına ait.",
       "The advice rules belong to another season.": "Önerinin girdileri farklı sezonlara ait.",
       "A member cannot be their own rival.": "Seçilen üye ve rakip aynı kişi.",
+      not_solved_for_member: "Bu seçim için bu yayında plan bulunamadı.",
     } as Record<string, string>,
     publicationReasonUnknown:
       "Yayıncı bir neden belirtmiş; bu nedenin çevrilmiş açıklaması bulunmuyor.",
@@ -1849,7 +1864,7 @@ const tr: MessageSchema<typeof en> = {
     nothingDue: "Yapılması gereken işlem yok.",
     recent: "Son Çalışma Günlüğü",
     newest: "en yeni önce",
-    noLog: "Henüz çalışma günlüğü yok — tick bu makinede çalışmadı.",
+    noLog: "Henüz çalışma günlüğü yok; tick bu makinede çalışmadı.",
   },
   analysis: {
     types: {

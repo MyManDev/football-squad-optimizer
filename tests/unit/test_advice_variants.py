@@ -23,6 +23,7 @@ import squadopt.application.advice_variants as variants
 import squadopt.application.league_views as views
 from squadopt.application.advice import (
     TOP100_LIMIT,
+    WINDOW_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     advise_entry,
     solve_member_control,
@@ -487,11 +488,14 @@ def test_a_variant_that_fails_is_recorded_at_its_address(
         "strategy": "fark-yarat",
         "rival_entry_id": RIVAL,
         "window": 5,
-        "reason": "no plan in this window",
+        # The index is public and carries one stable code; the planner's text is the note's.
+        "reason": "not_solved_for_member",
     } in index["unavailable"]
     assert not (tmp_path / f"advice/{ENTRY}/fark-yarat/5").exists()
     note = next(member.reason for member in report.members if member.entry_id == ENTRY)
-    assert "fark-yarat 5 weeks vs 202, Top 100 influence 0 not solved" in note
+    assert (
+        "fark-yarat 5 weeks vs 202, Top 100 influence 0 not solved: no plan in this window" in note
+    )
     assert "Top 100 influence 50 not solved: The strategy's window at 0 did not solve." in note
 
 
@@ -551,6 +555,15 @@ def test_rows_that_do_not_land_on_the_published_total_are_not_published() -> Non
         )
         is None
     )
+
+
+def test_a_member_window_is_solved_at_the_window_linearization_level(
+    world: dict[str, Any],
+) -> None:
+    mine = world["provider"].picks(ENTRY, SEASON, 1)
+    horizon = window_horizon(world["inputs"], 3, world["builder"])
+    plan = solve_window_plan(mine, world["inputs"], world["rules"], horizon, window=3)
+    assert plan.diagnostics["linearization_level"] == WINDOW_LINEARIZATION_LEVEL == 2
 
 
 def test_an_unproven_ceiling_carries_the_bench_the_bound_leaves_out(

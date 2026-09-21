@@ -15,18 +15,23 @@ import errno
 import hashlib
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 import tests.unit.test_live_transfers as world_module
 
+import squadopt.application.advice_record as advice_records
+import squadopt.application.league_views as league_views
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
     RECORD_FILE,
     AdviceRecordConflictError,
     AdviceRecordError,
     AdviceRecordNotLandedError,
+    PublishedAdvice,
+    _advice_document,
     entry_directory,
     load_member_advice_record,
     load_member_advice_record_for_deadline,
@@ -177,6 +182,91 @@ def _digests(root: Path) -> dict[str, str]:
         path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(root.rglob("*.json"))
     }
+
+
+def test_every_published_switch_is_recorded_with_its_bytes_and_replays(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = league_views.render_member
+
+    def with_switches(task, **kwargs):
+        rendered = original(task, **kwargs)
+        assert rendered.baseline is not None
+        base = rendered.baseline
+        rival = 202 if task.entry_id == 101 else 101
+        word = {**base, "evidence": {"binding": False, "applied": []}}
+        return replace(
+            rendered,
+            evidence_payload=word,
+            top100_payloads=(
+                (20, False, {**base, "top100": {"weight": 20}, "expected_points_cost": 2.5}),
+                (20, True, {**word, "top100": {"weight": 20}}),
+            ),
+            variant_payloads=(
+                ("saf-puan", 3, None, 20, {**base, "window": 3}),
+                ("fark-yarat", 3, rival, 0, {**base, "window": 3}),
+                ("fark-yarat", 3, rival, 20, {**base, "window": 3}),
+            ),
+            chip_payloads=(("bboost", {**base, "chip": "bboost"}),),
+        )
+
+    monkeypatch.setattr(league_views, "render_member", with_switches)
+    out, records = tmp_path / "site", tmp_path / "records"
+    _build(world, out, record_root=records)
+    before = _digests(records)
+    for entry in (101, 202):
+        record = load_member_advice_record(records, SEASON, 2, entry, world["gw2_id"])
+        documents = {item["published_path"]: item for item in record["advice"]}
+        published = {
+            path.relative_to(out).as_posix()
+            for path in (out / "advice" / str(entry)).rglob("*.json")
+            if path.name != "index.json"
+        }
+        assert documents.keys() == published
+        assert len(documents) == len(record["advice"])
+        paths = list(documents)
+        rival = 202 if entry == 101 else 101
+        switch_start = paths.index(f"advice/{entry}/saf-puan/1/hoca-sozu.json")
+        assert paths[switch_start:] == [
+            f"advice/{entry}/saf-puan/1/hoca-sozu.json",
+            f"advice/{entry}/saf-puan/1/top100-20.json",
+            f"advice/{entry}/saf-puan/1/top100-20-hoca-sozu.json",
+            f"advice/{entry}/saf-puan/3/top100-20.json",
+            f"advice/{entry}/fark-yarat/3/vs-{rival}.json",
+            f"advice/{entry}/fark-yarat/3/vs-{rival}/top100-20.json",
+            f"advice/{entry}/saf-puan/1/chip-bboost.json",
+        ]
+        assert any("vs-" in path for path in paths[:switch_start])
+        assert any(path.endswith("hoca-sozu.json") for path in published)
+        assert any(path.endswith("top100-20.json") for path in published)
+        assert any(path.endswith("chip-bboost.json") for path in published)
+        priced = documents[f"advice/{entry}/saf-puan/1/top100-20.json"]
+        assert priced["expected_points_cost"] == 2.5
+        assert priced["top100_weight"] == 20
+        assert "expected_points_cost_ceiling" not in priced
+        assert "managers_word" not in priced
+        assert documents[f"advice/{entry}/saf-puan/1/hoca-sozu.json"]["managers_word"] is True
+        for path, document in documents.items():
+            assert (
+                document["published_sha256"]
+                == hashlib.sha256((out / path).read_bytes()).hexdigest()
+            )
+        assert "top100" not in record["told"]["published_path"]
+        assert "chip-" not in record["told"]["published_path"]
+    _build(world, out, record_root=records)
+    assert _digests(records) == before
+
+
+@pytest.mark.parametrize("price", [None, 0, 2.5])
+def test_recorded_price_and_settings_are_only_the_fields_the_payload_carries(price: Any) -> None:
+    payload = {"expected_points_cost": price, "expected_points_cost_ceiling": price}
+    plain = _advice_document(PublishedAdvice("saf-puan", 1, None, "plain.json", payload, b"{}"))
+    for field in ("expected_points_cost", "expected_points_cost_ceiling"):
+        if price is None:
+            assert field not in plain
+        else:
+            assert plain[field] == price
+    assert "top100_weight" not in plain and "managers_word" not in plain
 
 
 def test_the_publish_records_what_each_member_was_told(
@@ -573,6 +663,53 @@ def test_the_record_for_a_deadline_is_the_last_capture_that_preceded_it(
     assert "No advice record for 2026-27 gameweek 3, entry 101" in str(nothing.value)
 
 
+@pytest.mark.parametrize("published", [GW2_DEADLINE, "2026-08-28T17:30:00.001Z"])
+def test_predeadline_capture_published_too_late_cannot_replace_timely_advice(
+    world: dict[str, Any],
+    tmp_path: Path,
+    published: str,
+) -> None:
+    records = tmp_path / "records"
+    _build(world, tmp_path / "early", record_root=records)
+    later = _later_capture(world)
+    _build(
+        world,
+        tmp_path / "late",
+        record_root=records,
+        capture=later,
+        now=datetime.datetime.fromisoformat(published),
+    )
+    record = load_member_advice_record_for_deadline(
+        records,
+        SEASON,
+        2,
+        101,
+        deadline_utc=GW2_DEADLINE,
+    )
+    assert record["capture"]["snapshot_id"] == world["gw2_id"]  # type: ignore[index]
+
+
+def test_a_predeadline_capture_alone_is_not_a_timely_publication(
+    world: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    records = tmp_path / "records"
+    _build(
+        world,
+        tmp_path / "late",
+        record_root=records,
+        now=datetime.datetime.fromisoformat(GW2_DEADLINE),
+    )
+    with pytest.raises(AdviceRecordError, match="published before the deadline"):
+        load_member_advice_record_for_deadline(
+            records,
+            SEASON,
+            2,
+            101,
+            deadline_utc=GW2_DEADLINE,
+        )
+
+
 def test_two_records_sharing_a_capture_instant_are_refused_rather_than_guessed(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
@@ -629,13 +766,12 @@ def test_a_record_in_the_pre_capture_layout_is_refused_rather_than_ignored(
 
 
 def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differed(
-    world: dict[str, Any], tmp_path: Path
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Different advice over a recorded capture is refused, and the refusal is readable.
 
-    This is the property the capture key must not lose. The capture is the whole input, so
-    the same capture producing different advice is a non-determinism in our own code —
-    which is how a real one in the multi-week solves was found. A record that can be
+    This is the property the capture key must not lose. The capture and external evidence
+    inputs can yield different advice after an input or code change. A record that can be
     overwritten proves nothing about what was published, so the second build loses rather
     than the first, and the message names the fields that moved so an operator does not
     have to diff two files by hand.
@@ -647,6 +783,16 @@ def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differe
 
     records = tmp_path / "records"
     _build(world, tmp_path / "first", record_root=records)
+    differences: list[str] = []
+    original_conflict = advice_records._conflict
+
+    def conflict(directory, recorded, incoming):
+        differences.extend(
+            advice_records._differences(*advice_records._reconciled(recorded, incoming))
+        )
+        return original_conflict(directory, recorded, incoming)
+
+    monkeypatch.setattr(advice_records, "_conflict", conflict)
 
     # A second free transfer the source did publish, at a later minute: the state read
     # changed, the week's hit charge went with it, and the message names the input that
@@ -657,8 +803,11 @@ def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differe
     message = str(changed.value)
     assert "state.free_transfers: recorded 1, now 2" in message
     assert "state.free_transfers_known: recorded False, now True" in message
-    assert "transfer_hit_points" in message
-    assert "advice_sha256" in message
+    assert "state.free_transfers_known: recorded False, now True" in differences
+    assert any("transfer_hit_points" in field for field in differences)
+    assert any("advice_sha256" in field for field in differences)
+    assert message.index("state.free_transfers:") < message.index("advice[")
+    assert "rotation table, Top 100 export" in message
     # The clock moved with all of that and is deliberately not named: it is never the
     # reason for a refusal, and naming it invites reading this one as a harmless re-run.
     assert "generated_at_utc" not in message
@@ -807,6 +956,52 @@ def _rival_lands_first(monkeypatch: pytest.MonkeyPatch, winner: Path) -> list[fl
     return pauses
 
 
+def test_forecast_keeps_exact_published_fragment_and_index_digest() -> None:
+    forecast = {"status": "available", "forecast": {"chips": [{"name": "3xc", "gain": 4}]}}
+    raw = json.dumps(
+        {"generated_at_utc": "now", "payload": {"chip_forecast": forecast}}, indent=2
+    ).encode()
+    block = advice_records._published_forecast(("advice/101/index.json", raw))
+    kept = str(block["document_json"]).encode()
+    assert kept in raw and json.loads(kept) == forecast
+    assert block["document_sha256"] == hashlib.sha256(kept).hexdigest()
+    assert block["published_index_sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+def test_forecast_clock_replay_never_rewrites_original_bytes(tmp_path: Path) -> None:
+    record = _bare_record()
+    record["chip_forecast"] = {
+        "document_json": '{"gain": 4}',
+        "document_sha256": "forecast-digest",
+        "published_index_path": "advice/101/index.json",
+        "published_index_sha256": "first",
+    }
+    directory = record_member_advice(tmp_path, record)
+    before = (directory / RECORD_FILE).read_bytes()
+    incoming = copy.deepcopy(record)
+    incoming["chip_forecast"]["published_index_sha256"] = "later-clock"
+    assert record_member_advice(tmp_path, incoming) == directory
+    assert (directory / RECORD_FILE).read_bytes() == before
+    for key, value in [
+        ("document_json", '{"gain": 5}'),
+        ("document_sha256", "changed"),
+        ("published_index_path", "advice/102/index.json"),
+    ]:
+        changed = copy.deepcopy(incoming)
+        changed["chip_forecast"][key] = value
+        with pytest.raises(AdviceRecordConflictError, match=key):
+            record_member_advice(tmp_path, changed)
+    missing = copy.deepcopy(record)
+    del missing["chip_forecast"]
+    with pytest.raises(AdviceRecordConflictError, match="chip_forecast"):
+        record_member_advice(tmp_path, missing)
+    old_root = tmp_path / "old"
+    record_member_advice(old_root, missing)
+    with pytest.raises(AdviceRecordConflictError, match="chip_forecast"):
+        record_member_advice(old_root, record)
+    assert (directory / RECORD_FILE).read_bytes() == before
+
+
 def test_a_landing_rename_refused_for_a_moment_does_not_destroy_the_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -930,3 +1125,23 @@ def test_a_record_that_could_not_land_still_leaves_every_other_member_recorded(
     recorded = load_member_advice_record(records, SEASON, 2, 202, world["gw2_id"])
     assert recorded["entry_id"] == 202
     assert list(entry_directory(records, SEASON, 2, 101).iterdir()) == []
+
+
+def test_the_record_keeps_an_absent_budget_flag_absent_rather_than_false() -> None:
+    """A document published before the producer carried these says nothing about them.
+
+    Reading a missing field as `False` would turn silence into the claim that the wall clock
+    did not stop the search, which is exactly the absent-is-not-zero rule in its boolean form.
+    A non-boolean is also absent: a string "true" is a document this reader does not
+    understand, not a fact it may assert.
+    """
+
+    from squadopt.application.advice_record import _flag
+
+    key = "wall_clock_stopped_the_search"
+    assert _flag({}, key) is None
+    assert _flag({key: None}, key) is None
+    assert _flag({key: "true"}, key) is None
+    assert _flag({key: 1}, key) is None
+    assert _flag({key: False}, key) is False
+    assert _flag({key: True}, key) is True

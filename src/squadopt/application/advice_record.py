@@ -75,6 +75,15 @@ from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLI
 #: ``v1`` was one record per season, gameweek and entry, addressed at ``entry-<id>/`` with
 #: no capture anywhere in it, so the two shapes cannot be read as one — see
 #: ``LEGACY_LAYOUT_NOTE`` for why no migration is written.
+#:
+#: A nullable field added to the document does not move this. The version separates shapes
+#: that cannot be read as one, which is what v1 and v2 are: a reader of v2 that meets a key
+#: it does not know ignores it, and a reader that wants a key an older document lacks gets
+#: ``None``, which the document means rather than a value it is missing. Moving the version
+#: for an additive field would make every older record unreadable to gain nothing, and this
+#: string is read nowhere outside this module, so the move would be inert as well. A field
+#: whose absence cannot be read as absent, or a changed meaning for an existing key, is what
+#: moves it.
 MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks
@@ -90,8 +99,9 @@ RECORD_FILE: Final = "advice.json"
 #: How many differing fields a refusal names before it stops listing them.
 _DIFFERENCE_LIMIT: Final = 12
 #: What may be a capture's path segment. A snapshot identifier is
-#: ``{source}-{stamp}-{digest}`` (``data/snapshots.py``) and so is already safe, but this is
-#: the segment of a path that is written to, so it is checked rather than trusted: no
+#: ``{source}-{stamp}-{digest}`` (``src/squadopt/data/snapshots.py``) and so is already
+#: safe, but this is the segment of a path that is written to, so it is checked rather
+#: than trusted: no
 #: separator, no ``.``/``..``, and a length bound because the whole record path has to stay
 #: inside Windows' limit with a staging sibling's name on top of it.
 _CAPTURE_SEGMENT: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}")
@@ -316,6 +326,18 @@ def _number(payload: Mapping[str, object], key: str) -> float | None:
     return None if value is None else float(str(value))
 
 
+def _flag(payload: Mapping[str, object], key: str) -> bool | None:
+    """A published boolean, or ``None`` where the document does not carry one.
+
+    A missing field is not ``False``. A document published before its producer
+    carried this says nothing about which budget stopped its search, and a record
+    that read it as ``False`` would say the clock did not, which nobody measured.
+    """
+
+    value = payload.get(key)
+    return value if isinstance(value, bool) else None
+
+
 def _text(values: Mapping[str, object], key: str) -> str | None:
     value = values.get(key)
     return None if value is None else str(value)
@@ -367,7 +389,18 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     bench = _lineup_ids(payload, "bench")
     captain = _player_id(payload, "captain")
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    settings: dict[str, object] = {
+        key: _number(payload, key)
+        for key in ("expected_points_cost", "expected_points_cost_ceiling")
+        if payload.get(key) is not None
+    }
+    top100 = payload.get("top100")
+    if isinstance(top100, Mapping) and top100.get("weight") is not None:
+        settings["top100_weight"] = int(str(top100["weight"]))
+    if "evidence" in payload:
+        settings["managers_word"] = True
     return {
+        **settings,
         # Which document this is. Several are published per member — the pure-points
         # baseline, each rival strategy against each rival, each solved window — and only
         # one of them is what the member's page points at, so every one carries its own
@@ -390,6 +423,16 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         # with the measured bound gap beside it.
         "solver_status": _text(payload, "solver_status"),
         "optimality_gap": _number(payload, "optimality_gap"),
+        # And whether the wall clock stopped it, so a settled record can tell a plan the
+        # budget ended from one that was a property of the machine's load. The work spent
+        "wall_clock_stopped_the_search": _flag(payload, "wall_clock_stopped_the_search"),
+        # The work spent is deliberately not here, and the reason is reproducibility rather
+        # than path. Two runs of the same publish disagree on it in the last decimal digit:
+        # member 2199732 read 1.2949777377880984 and then ...82 on the same capture under the
+        # same budget, measured against the committed `member_plan_determinism` record. The
+        # record of a capture must be rebuildable to the same bytes, so a field that wobbles
+        # below the last digit anyone would read cannot be in it. What ends the search is a
+        # category and does not wobble.
         # Whether this document can be scored at all. A competitive mode's payload is
         # published without a lineup (the selector chose a transfer decision, not a week),
         # and the record says so rather than presenting an empty eleven as a decision.
@@ -431,6 +474,28 @@ def _players_block(
     return players, unresolved
 
 
+def _published_forecast(index: tuple[str, bytes]) -> dict[str, object]:
+    """Keep the exact forecast fragment emitted by the member index writer."""
+    path, raw = index
+    try:
+        document = json.loads(raw)["payload"]["chip_forecast"]
+        # The index writer uses indent=2; this field is inside its payload. Keep
+        # its actual indentation too, then prove these exact bytes are present.
+        fragment = json.dumps(document, indent=2).replace("\n", "\n    ").encode("utf-8")
+        if raw.count(fragment) != 1:
+            raise ValueError("The exact forecast fragment is not unique in its index.")
+    except (KeyError, TypeError, ValueError) as error:
+        raise AdviceRecordError(
+            "The published index does not carry an exact chip forecast."
+        ) from error
+    return {
+        "document_json": fragment.decode("utf-8"),
+        "document_sha256": _sha256(fragment),
+        "published_index_path": path,
+        "published_index_sha256": _sha256(raw),
+    }
+
+
 def build_member_advice_record(
     picks: EntryPicks,
     projection: Projection,
@@ -443,6 +508,7 @@ def build_member_advice_record(
     told: Mapping[str, object] | None = None,
     transfer_config_fingerprint: str | None = None,
     commit: str | None = None,
+    published_index: tuple[str, bytes] | None = None,
 ) -> dict[str, object]:
     """Assemble one member's record for one gameweek from what was just published.
 
@@ -556,6 +622,7 @@ def build_member_advice_record(
         # them. Listing the ids keeps the gap visible instead of silently shortening a map.
         "unresolved_player_ids": unresolved,
         "advice": documents,
+        **({"chip_forecast": _published_forecast(published_index)} if published_index else {}),
     }
 
 
@@ -624,13 +691,15 @@ _REPLAYED: Final = "<moved by the publication clock>"
 def _without_publication_clock(record: Mapping[str, object]) -> dict[str, object]:
     """The record with the fields a re-publish moves for no reason blanked out.
 
-    Two of them, and only two. ``generated_at_utc`` is the clock the published envelopes
+    ``generated_at_utc`` is the clock the published envelopes
     carry, and every ``published_sha256`` is a digest of bytes that carry it, so all of
     them move when one capture is published again and not a word of the advice changes.
+    The optional forecast's index digest also includes that same publication clock.
+    Its exact document bytes, document digest and path are still compared.
 
     Every other field is left alone and compared — ``advice_sha256`` above all, the digest
     of the payload alone, which is precisely the field that says whether what the member
-    was told changed. Blanking two named fields rather than comparing a list of allowed
+    was told changed. Blanking named clock fields rather than comparing a list of allowed
     ones means a field added to the record later is compared by default: a new way for two
     builds to disagree is refused until someone decides otherwise, not forgiven by silence.
     """
@@ -641,6 +710,11 @@ def _without_publication_clock(record: Mapping[str, object]) -> dict[str, object
     advice = stripped.get("advice")
     if isinstance(advice, list):
         stripped["advice"] = [_document_without_publication_clock(item) for item in advice]
+    forecast = stripped.get("chip_forecast")
+    if isinstance(forecast, Mapping) and "published_index_sha256" in forecast:
+        # Blanked because the index it digests carries the publication clock,
+        # not because index digests are unimportant. The stored bytes never change.
+        stripped["chip_forecast"] = {**forecast, "published_index_sha256": _REPLAYED}
     return stripped
 
 
@@ -716,13 +790,14 @@ def _conflict(directory: Path, recorded: Mapping[str, object], record: Mapping[s
     """
 
     differences = _differences(*_reconciled(recorded, record))
+    differences.sort(key=lambda field: field.startswith(("advice[", "advice:")))
     shown = differences[:_DIFFERENCE_LIMIT]
     more = len(differences) - len(shown)
     lines = [
         f"An advice record already exists at {directory} and this build of the same capture "
         "advises something different. Recorded advice is immutable: it is the only evidence "
-        "of what the member was told, so it is refused rather than rewritten. The capture is "
-        "the whole input, so a difference here is a difference our own code produced. The "
+        "of what the member was told, so it is refused rather than rewritten. Check the "
+        "capture, rotation table, Top 100 export and code revision for changes. The "
         "publication's own clock is not listed; a re-publish that moved only that is a replay "
         "and would not have been refused.",
     ]
@@ -807,12 +882,14 @@ def recorded_captures(
 def load_member_advice_record_for_deadline(
     root: Path, season: str, gameweek: int, entry_id: int, *, deadline_utc: str
 ) -> dict[str, object]:
-    """The record from the last capture *preceding* ``deadline_utc`` — what the member saw.
+    """The latest capture whose recorded publication also precedes ``deadline_utc``.
 
     This is the question a review page asks, and the only one it may ask: its whole claim
     is "this is what we told you", and a week is published more than once, so the record
     that matters is the last one a member could still have acted on. Later captures are not
-    that; earlier ones were superseded before the deadline.
+    that; neither is an earlier capture first published after entries locked. Ordering
+    remains by capture time for this legacy reader; the evaluation reader separately
+    selects by publication time.
 
     Strictly preceding: a capture taken at the deadline instant is not information the
     member had before entries locked, and half a second either side of a lock is exactly
@@ -850,6 +927,24 @@ def load_member_advice_record_for_deadline(
             "later one is not returned instead: it says what we would have advised, not "
             "what we did."
         )
+    records: dict[str, dict[str, object]] = {}
+    for capture in before:
+        record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
+        stamp = record.get("generated_at_utc")
+        if not isinstance(stamp, str):
+            raise AdviceRecordError("Recorded publication time is missing.")
+        try:
+            published = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
+        except DataError as error:
+            raise AdviceRecordError(str(error)) from error
+        if published < deadline:
+            records[capture.snapshot_id] = record
+    before = [capture for capture in before if capture.snapshot_id in records]
+    if not before:
+        raise AdviceRecordError(
+            "No advice record was published before the deadline; a pre-deadline capture "
+            "does not establish that its advice was available in time."
+        )
     latest = before[-1]
     tied = [capture for capture in before if capture.instant == latest.instant]
     if len(tied) > 1:
@@ -860,7 +955,7 @@ def load_member_advice_record_for_deadline(
             "Which of them a member saw is not recorded, and file timestamps are not "
             "evidence of it, so one is not chosen for you."
         )
-    return load_member_advice_record(root, season, gameweek, entry_id, latest.snapshot_id)
+    return records[latest.snapshot_id]
 
 
 def _deadline_instant(deadline_utc: str) -> datetime:
@@ -892,9 +987,9 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
     that can be rewritten proves nothing about what was published.
 
     A rebuild of that same capture that produces *different advice* is the case that
-    matters: the capture is the whole input, so the same capture solving to different
-    advice is a non-determinism in our own code, and it has been. So it is refused, with
-    the difference named — and a clock that moved alongside it does not soften that.
+    matters: advice also depends on the projection handoff, switch artifacts, settings
+    and code revision. Changed advice at the same capture's address is refused with
+    the difference named; a changed publication clock does not soften that refusal.
 
     A *different* capture is not that. It is the next publish of the week — the mid-week
     build and the one taken shortly before the deadline are both real advice — and it lands

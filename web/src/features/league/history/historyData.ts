@@ -1,5 +1,8 @@
 import { withRequestDeadline, type RequestOptions } from "../../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
+import { isMemberStrategy } from "../types";
+import { isMemberChip } from "../advice/chipChoice";
+import { isTop100Weight } from "../advice/top100";
 
 export interface WeeklyScore {
   gross_points: number;
@@ -28,6 +31,20 @@ export interface PlayerReview {
   forecast_error: number | null;
 }
 
+export interface RecordedPlan {
+  published_path: string;
+  strategy: string;
+  window: number;
+  rival_entry_id: number | null;
+  chip: SuggestedScore["chip"];
+  captain: string | null;
+  moves: { player_out: string | null; player_in: string | null }[];
+  top100_weight?: number;
+  managers_word?: true;
+  expected_points_cost?: number;
+  expected_points_cost_ceiling?: number;
+}
+
 export interface WeekReview {
   gameweek: number;
   status: "available" | "unsettled" | "unavailable";
@@ -45,6 +62,7 @@ export interface WeekReview {
   actual_reason: string | null;
   net_difference: number | null;
   players: PlayerReview[];
+  recorded_plans?: RecordedPlan[];
 }
 
 export interface SuggestionHistory {
@@ -133,6 +151,44 @@ export function checkedHistory(value: unknown, entryId: number): SuggestionHisto
         (text(row.advice_sha256) && /^[a-f0-9]{64}$/.test(row.advice_sha256)),
     );
     requireThat(Array.isArray(row.players));
+    if (row.recorded_plans !== undefined) {
+      requireThat(Array.isArray(row.recorded_plans));
+      const supportedPlans = row.recorded_plans.filter((item) => {
+        const plan = object(item);
+        return (
+          (isMemberStrategy(plan.strategy) ||
+            ["garantici", "agresif", "asiri-agresif"].includes(String(plan.strategy))) &&
+          (plan.top100_weight === undefined || isTop100Weight(plan.top100_weight))
+        );
+      });
+      row.recorded_plans = supportedPlans;
+      const paths = new Set<string>();
+      for (const item of supportedPlans) {
+        const plan = object(item);
+        requireThat(
+          text(plan.published_path) &&
+            plan.published_path.startsWith(`advice/${entryId}/`) &&
+            !paths.has(plan.published_path),
+        );
+        paths.add(plan.published_path);
+        requireThat(plan.window === 1);
+        requireThat(
+          plan.rival_entry_id === null ||
+            (Number.isSafeInteger(plan.rival_entry_id) && Number(plan.rival_entry_id) > 0),
+        );
+        requireThat(plan.chip === null || isMemberChip(plan.chip));
+        requireThat(plan.captain === null || text(plan.captain));
+        requireThat(plan.managers_word === undefined || plan.managers_word === true);
+        for (const key of ["expected_points_cost", "expected_points_cost_ceiling"])
+          requireThat(plan[key] === undefined || number(plan[key]));
+        requireThat(Array.isArray(plan.moves));
+        for (const value of plan.moves) {
+          const move = object(value);
+          requireThat(move.player_out === null || text(move.player_out));
+          requireThat(move.player_in === null || text(move.player_in));
+        }
+      }
+    }
     if (row.status !== "available") {
       requireThat(
         text(row.reason) &&

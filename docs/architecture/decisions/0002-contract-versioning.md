@@ -63,7 +63,7 @@ Concretely:
 4. **Source vocabularies are named as such.** `live/rules.py:29` defines a second
    `POSITIONS = ("GKP", "DEF", "MID", "FWD")`. That is not a bug — it is the FPL API's own
    vocabulary, used to validate the scoring table the capture publishes, and it is mapped to
-   canonical `GK` by `POSITION_ALIASES` at `data/schema.py:340`. But two constants with the same
+   canonical `GK` by `POSITION_ALIASES` at `src/squadopt/data/schema.py:340`. But two constants with the same
    name and different values in one codebase is a trap. It becomes `FPL_POSITION_CODES`. The
    rule: an external vocabulary is named after its source, never after the concept it maps to.
 

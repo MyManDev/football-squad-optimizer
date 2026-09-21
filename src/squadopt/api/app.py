@@ -30,6 +30,7 @@ from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
     AdviceNotComputedError,
     AdviceReadStore,
+    ChipUnavailableError,
     LeagueNotConnectedError,
     ManagersWordUnavailableError,
     Top100InputsUnavailableError,
@@ -39,11 +40,17 @@ from squadopt.platform.advice_read import (
 )
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
+    DeadlinePassedError,
     IdempotencyConflictError,
     MalformedIdempotencyKeyError,
+    OpenJobLimitedError,
     RateLimitedError,
 )
-from squadopt.platform.api_contract import ADVISE_TOP100_WEIGHTS, BackendApiContractError
+from squadopt.platform.api_contract import (
+    ADVISE_CHIPS,
+    ADVISE_TOP100_WEIGHTS,
+    BackendApiContractError,
+)
 from squadopt.platform.queue_contracts import (
     AdviceQueueError,
     AdviceQueueIntegrityError,
@@ -81,7 +88,7 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
-def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
+def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, str | None]:
     """The AdviseRequestBody schema, enforced in one place.
 
     Exactly the declared keys (additionalProperties: false), a string strategy, an
@@ -95,7 +102,7 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
 
     if not isinstance(body, dict):
         raise BackendApiContractError("The POST body must be an object.")
-    allowed = {"strategy", "window", "rival_entry_id", "top100_weight", "managers_word"}
+    allowed = {"strategy", "window", "rival_entry_id", "top100_weight", "managers_word", "chip"}
     unexpected = set(body) - allowed
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
@@ -120,7 +127,10 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool]:
     word = body.get("managers_word", False)
     if not isinstance(word, bool):
         raise BackendApiContractError("managers_word must be true or false.")
-    return strategy, window, rival, weight, word
+    chip = body.get("chip")
+    if chip is not None and chip not in ADVISE_CHIPS:
+        raise BackendApiContractError("Unknown chip choice.")
+    return strategy, window, rival, weight, word, chip
 
 
 def create_app(
@@ -132,6 +142,7 @@ def create_app(
     allowed_origins: tuple[str, ...] = (),
     metrics: AdviceMetrics | None = None,
     queue_depth: Callable[[], int] | None = None,
+    jobs_by_status: Callable[[], Mapping[str, int]] | None = None,
     readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
 ) -> FastAPI:
@@ -243,6 +254,10 @@ def create_app(
     ) -> JSONResponse:
         return _contract_error(422, "MANAGERS_WORD_UNAVAILABLE", str(error))
 
+    @application.exception_handler(ChipUnavailableError)
+    async def chip_unavailable(_request: Request, error: ChipUnavailableError) -> JSONResponse:
+        return _contract_error(422, error.code, str(error))
+
     @application.exception_handler(MalformedIdempotencyKeyError)
     async def idempotency_key_malformed(
         _request: Request, error: MalformedIdempotencyKeyError
@@ -308,6 +323,53 @@ def create_app(
             429, "RATE_LIMITED", str(error), retry_after_seconds=error.retry_after_seconds
         )
 
+    @application.exception_handler(OpenJobLimitedError)
+    async def open_job_limited(_request: Request, _error: OpenJobLimitedError) -> JSONResponse:
+        if metrics is not None:
+            metrics.increment("advice_open_job_refused_total")
+        message = (
+            "This connection already has several computations open. "
+            "Wait for one to finish, then try again."
+        )
+        document = ApiErrorResponse(
+            ApiError(
+                code="OPEN_JOB_LIMITED",
+                message=message,
+                details={
+                    "public_reason": {
+                        "en": message,
+                        "tr": (
+                            "Bu bağlant\u0131da zaten birkaç hesaplama aç\u0131k. "
+                            "Birinin bitmesini bekleyip yeniden dene."
+                        ),
+                    }
+                },
+            )
+        ).to_dict()
+        return JSONResponse(status_code=429, content=document)
+
+    @application.exception_handler(DeadlinePassedError)
+    async def deadline_passed(_request: Request, _error: DeadlinePassedError) -> JSONResponse:
+        if metrics is not None:
+            metrics.increment("advice_deadline_refused_total")
+        message = "This gameweek's deadline has passed. Previously computed plans remain available."
+        document = ApiErrorResponse(
+            ApiError(
+                code="DEADLINE_PASSED",
+                message=message,
+                details={
+                    "public_reason": {
+                        "en": message,
+                        "tr": (
+                            "Bu oyun haftas\u0131n\u0131n son tarihi geçti. "
+                            "Önceden hesaplanan planlara erişebilirsin."
+                        ),
+                    }
+                },
+            )
+        ).to_dict()
+        return JSONResponse(status_code=422, content=document)
+
     @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
     def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
         if advice_store is None:
@@ -340,6 +402,7 @@ def create_app(
         rival: Annotated[int | None, Query(ge=1)] = None,
         top100_weight: Annotated[int, Query()] = 0,
         managers_word: Annotated[bool, Query()] = False,
+        chip: Annotated[str | None, Query()] = None,
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
@@ -360,6 +423,7 @@ def create_app(
                 rival_entry_id=rival,
                 top100_weight=top100_weight,
                 managers_word=managers_word,
+                chip=chip,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -395,7 +459,7 @@ def create_app(
         except Exception:
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
         try:
-            strategy, window, rival, top100_weight, managers_word = _parse_advise_body(body)
+            strategy, window, rival, top100_weight, managers_word, chip = _parse_advise_body(body)
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         current = datetime.now(UTC) if utc_now is None else utc_now()
@@ -413,6 +477,7 @@ def create_app(
             at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             top100_weight=top100_weight,
             managers_word=managers_word,
+            chip=chip,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:
@@ -449,9 +514,14 @@ def create_app(
     def metrics_endpoint() -> Response:
         if metrics is None:
             return _contract_error(404, "NOT_FOUND", "Metrics are not enabled here.")
-        depth = queue_depth() if queue_depth is not None else None
+        statuses = jobs_by_status() if jobs_by_status is not None else None
+        depth: int | None
+        if statuses is not None:
+            depth = statuses.get("queued", 0) + statuses.get("running", 0)
+        else:
+            depth = queue_depth() if queue_depth is not None else None
         return Response(
-            content=metrics.render(queue_depth=depth),
+            content=metrics.render(queue_depth=depth, jobs_by_status=statuses),
             media_type="text/plain; version=0.0.4",
         )
 

@@ -111,8 +111,17 @@ Until a matching historical opening-week residual export exists, the expected li
   are centred on projections that are optimistic by construction for a selected squad
   (`docs/scenario_calibration_correction_note.md`: mean PIT 0.07 → 0.55). The shift and
   its source are in the diagnostics (`location_shift_points`, `selection_optimism_source`)
-  and named in the stated limits. `selection_optimism=None` leaves the scores uncorrected
-  and says so.
+  and named in the stated limits. The profile now carries the exact model name, version,
+  feature contract and post-processing contract. The historical profile belongs to
+  `deterministic_baseline / form_window_06_v1 / form_window_v1 / none`; it is not evidence
+  for opening carry-over, the in-season blend, captured availability or Phase C.
+  On mismatch, matched residuals can still support raw scenario summaries, but the shift
+  is zero, its applied source is absent, and `selection_optimism_status=model_mismatch`
+  and the stated limits explicitly disclose the missing correction. This is not a
+  calibrated lower-tail claim. `selection_optimism=None` similarly leaves scores
+  uncorrected (`not_requested`). A nonzero caller-supplied shift takes precedence and
+  is labelled `explicit_shift`, without attributing it to the historical profile.
+  New coefficients require a separately measured profile; none were fitted here.
 - **Scenario sampling interval.** `probability_below_threshold_interval` is the Wilson
   90% interval for the reported probability given the scenario count; the report prints
   it beside the point value.

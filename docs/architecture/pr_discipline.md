@@ -72,9 +72,14 @@ the wrong place.
 **Ruff does cover `scripts/`.** Gates 1 and 2 run `ruff check .` and `ruff format --check .`
 over the repository, and the format gate reports 77 files there. Ruff's `src` setting names
 `src` and `tests`, but that controls first-party *import resolution*, not which files are
-checked. The two gates that stop at the package boundary are:
+checked. For measurement scripts, the two gates that still stop at the package boundary are:
 
-- **mypy**, because `[tool.mypy]` sets `files = ["src/squadopt"]`;
+- **mypy**: the configured file set covers `src/squadopt` and four operator scripts
+  (`backend_status.py`, `release/verify_live.py`, `check_league_tree.py`,
+  `release/clean_body.py`); CI runs `python -m mypy` so it checks that complete set.
+  The 19 September scan of all 121 scripts, using `--explicit-package-bases` to resolve
+  duplicate-module discovery, found 125 errors in 26 files; measurement runners remain
+  outside this task;
 - **`lint-imports`**, which analyses 167 files — exactly the number of modules under
   `src/squadopt` — so the layering contract in [dependency rules](dependency_rules.md) is not
   enforced in `scripts/` at all.
@@ -134,7 +139,7 @@ Zones are in [ownership](ownership.md). In practice:
 
 - Stay in your zone. A change that needs someone else's zone is a conversation first, not a
   larger PR.
-- Shared boundaries — `contracts/`, `data/schema.py`, `optimization/config.py`, `backtest/` —
+- Shared boundaries — `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` —
   need one approving review from each of the other two roles.
 - If two people must work in the same area at once, split by file, not by function, and say so
   before starting.

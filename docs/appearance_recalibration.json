@@ -1,0 +1,4300 @@
+{
+  "contract_version": "appearance_recalibration_v1",
+  "prereg": "docs/appearance_recalibration_prereg.md",
+  "declaration_commit": "d1a4443fdbb1992a6e4d92e686d7817efe556247",
+  "declaration_sha256": "1ad8f39d98cb67d043923e50e56099822468e9a2475022f0dc72999777af72ef",
+  "runner_commit": "c11b309590cb2eafa235bc8ed029d2d3b584ee7e",
+  "gate_fingerprint": "798c82f567e97874b98055277ae5ced42b1916c2a568258b59553ad2cb613f11",
+  "generated_at_utc": "2026-09-20T20:12:37.759366+00:00",
+  "operational_control_changed": false,
+  "locked_holdout_accessed": false,
+  "verdict": "fails",
+  "gate": {
+    "ranking": "fails",
+    "error": "passes",
+    "decision": "fails",
+    "policy_fingerprint": "798c82f567e97874b98055277ae5ced42b1916c2a568258b59553ad2cb613f11"
+  },
+  "table_sha256": "707f36a1fdee3f86b21701e697143246bc799ff9c91d11671f4e5cbfe0eee6f6",
+  "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+  "manifest_sha256": "69545f95de4a9871e653d8296dc9bb4e28e1e526e2d3e7c8ee28ca0f24f5f3ff",
+  "producer_repository_commit": "ba6d2a3a0be1490ab237906dcd615ea4114862ca",
+  "solver": {
+    "solver_time_limit_seconds": 600.0,
+    "solver_deterministic_time_limit": 5.0,
+    "binding_limit": "deterministic_time",
+    "solver_status_counts": {
+      "FEASIBLE": 84,
+      "OPTIMAL": 210
+    }
+  },
+  "bootstrap": {
+    "confidence_level": 0.9,
+    "resamples": 2000,
+    "block_length": 4,
+    "base_seed": 0,
+    "candidate_id": "appearance_recalibration_v1"
+  },
+  "software": {
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.0",
+    "ortools": "9.15.6755"
+  },
+  "python": "3.13.5",
+  "probabilities": {
+    "2021-22": {
+      "base": {
+        "rows": 21939,
+        "brier": 0.11871594095977411,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 5436,
+            "mean_prediction": 0.08728423903348051,
+            "observed_appearance": 0.036055923473142015
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 4669,
+            "mean_prediction": 0.127203806767402,
+            "observed_appearance": 0.09809381023773828
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1264,
+            "mean_prediction": 0.24696942117009496,
+            "observed_appearance": 0.3639240506329114
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 912,
+            "mean_prediction": 0.34721083899671057,
+            "observed_appearance": 0.4682017543859649
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 655,
+            "mean_prediction": 0.451653344129771,
+            "observed_appearance": 0.5343511450381679
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 750,
+            "mean_prediction": 0.5513049164093333,
+            "observed_appearance": 0.5773333333333334
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1071,
+            "mean_prediction": 0.6544394002464986,
+            "observed_appearance": 0.6797385620915033
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 1032,
+            "mean_prediction": 0.7504925265358527,
+            "observed_appearance": 0.7344961240310077
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 2964,
+            "mean_prediction": 0.8678785890050607,
+            "observed_appearance": 0.8481781376518218
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 3186,
+            "mean_prediction": 0.9307796711839298,
+            "observed_appearance": 0.9042686754551161
+          }
+        ]
+      },
+      "candidate": {
+        "rows": 21939,
+        "brier": 0.11690163180266601,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 7105,
+            "mean_prediction": 0.040126729977628645,
+            "observed_appearance": 0.047149894440534836
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 2943,
+            "mean_prediction": 0.1302020774453035,
+            "observed_appearance": 0.10397553516819572
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 484,
+            "mean_prediction": 0.2546069094348283,
+            "observed_appearance": 0.3119834710743802
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 851,
+            "mean_prediction": 0.35064984662526893,
+            "observed_appearance": 0.4136310223266745
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 947,
+            "mean_prediction": 0.45066835603056854,
+            "observed_appearance": 0.4635691657866948
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 1207,
+            "mean_prediction": 0.5424239387803416,
+            "observed_appearance": 0.5368682684341343
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1401,
+            "mean_prediction": 0.6777898463792232,
+            "observed_appearance": 0.683083511777302
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 1381,
+            "mean_prediction": 0.7597888818317797,
+            "observed_appearance": 0.7588703837798697
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 2696,
+            "mean_prediction": 0.8738972359367158,
+            "observed_appearance": 0.8638724035608308
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 2924,
+            "mean_prediction": 0.9142783462654613,
+            "observed_appearance": 0.9028727770177839
+          }
+        ]
+      },
+      "candidate_minus_base_brier": -0.0018143091571081044
+    },
+    "2022-23": {
+      "base": {
+        "rows": 24179,
+        "brier": 0.1059232071313945,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 9519,
+            "mean_prediction": 0.0764821167142557,
+            "observed_appearance": 0.04097069019855027
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 2058,
+            "mean_prediction": 0.13540960874441205,
+            "observed_appearance": 0.1890184645286686
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1067,
+            "mean_prediction": 0.24457193095407687,
+            "observed_appearance": 0.3889409559512652
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 776,
+            "mean_prediction": 0.3460744123878866,
+            "observed_appearance": 0.45103092783505155
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 547,
+            "mean_prediction": 0.4542274330877514,
+            "observed_appearance": 0.5648994515539305
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 740,
+            "mean_prediction": 0.5536857192297296,
+            "observed_appearance": 0.6472972972972973
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 933,
+            "mean_prediction": 0.6513213620310825,
+            "observed_appearance": 0.6591639871382636
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 1088,
+            "mean_prediction": 0.752883525046875,
+            "observed_appearance": 0.7242647058823529
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 4031,
+            "mean_prediction": 0.8684663947888862,
+            "observed_appearance": 0.8737286033242372
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 3420,
+            "mean_prediction": 0.9263117263444445,
+            "observed_appearance": 0.9353801169590643
+          }
+        ]
+      },
+      "candidate": {
+        "rows": 24179,
+        "brier": 0.10386111771080256,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 10543,
+            "mean_prediction": 0.035269405170123266,
+            "observed_appearance": 0.04818362894811724
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 785,
+            "mean_prediction": 0.14859372951956396,
+            "observed_appearance": 0.2394904458598726
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 408,
+            "mean_prediction": 0.2642997668126319,
+            "observed_appearance": 0.3431372549019608
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 624,
+            "mean_prediction": 0.3628480573702592,
+            "observed_appearance": 0.391025641025641
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 871,
+            "mean_prediction": 0.43674421830250926,
+            "observed_appearance": 0.42020665901262916
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 1107,
+            "mean_prediction": 0.5485378540885081,
+            "observed_appearance": 0.5826558265582655
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1510,
+            "mean_prediction": 0.665604474222407,
+            "observed_appearance": 0.6649006622516557
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 1317,
+            "mean_prediction": 0.7591864326098424,
+            "observed_appearance": 0.7555049354593774
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 2211,
+            "mean_prediction": 0.8519192284789452,
+            "observed_appearance": 0.8670284938941656
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 4803,
+            "mean_prediction": 0.9127126509947253,
+            "observed_appearance": 0.9262960649594004
+          }
+        ]
+      },
+      "candidate_minus_base_brier": -0.0020620894205919393
+    },
+    "2023-24": {
+      "base": {
+        "rows": 27877,
+        "brier": 0.10213376998653799,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 12989,
+            "mean_prediction": 0.07342247078073756,
+            "observed_appearance": 0.04072676880437293
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 1897,
+            "mean_prediction": 0.13567512359462308,
+            "observed_appearance": 0.18397469688982604
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1147,
+            "mean_prediction": 0.248059991157803,
+            "observed_appearance": 0.4489973844812554
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 786,
+            "mean_prediction": 0.34503137124300254,
+            "observed_appearance": 0.44529262086513993
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 576,
+            "mean_prediction": 0.45227916131597223,
+            "observed_appearance": 0.5555555555555556
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 864,
+            "mean_prediction": 0.5522819438969907,
+            "observed_appearance": 0.6145833333333334
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1108,
+            "mean_prediction": 0.6507067338122744,
+            "observed_appearance": 0.6552346570397112
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 962,
+            "mean_prediction": 0.7529217415945946,
+            "observed_appearance": 0.7266112266112266
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 3822,
+            "mean_prediction": 0.8698426574152276,
+            "observed_appearance": 0.8524332810047096
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 3726,
+            "mean_prediction": 0.9240615575010734,
+            "observed_appearance": 0.9310252281266774
+          }
+        ]
+      },
+      "candidate": {
+        "rows": 27877,
+        "brier": 0.09907495726455016,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 13911,
+            "mean_prediction": 0.03469189165764376,
+            "observed_appearance": 0.045144130544173676
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 515,
+            "mean_prediction": 0.14517449450083014,
+            "observed_appearance": 0.1883495145631068
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 354,
+            "mean_prediction": 0.2572844480224191,
+            "observed_appearance": 0.3333333333333333
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 442,
+            "mean_prediction": 0.3367739187916246,
+            "observed_appearance": 0.4457013574660634
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 1458,
+            "mean_prediction": 0.42869454501332266,
+            "observed_appearance": 0.43621399176954734
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 876,
+            "mean_prediction": 0.5463328555718356,
+            "observed_appearance": 0.54337899543379
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1887,
+            "mean_prediction": 0.6512639488683019,
+            "observed_appearance": 0.652888182299947
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 1367,
+            "mean_prediction": 0.7498048673352523,
+            "observed_appearance": 0.7403072421360644
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 1955,
+            "mean_prediction": 0.8487591810499594,
+            "observed_appearance": 0.8265984654731457
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 5112,
+            "mean_prediction": 0.9188685047542386,
+            "observed_appearance": 0.926056338028169
+          }
+        ]
+      },
+      "candidate_minus_base_brier": -0.0030588127219878247
+    },
+    "2024-25": {
+      "base": {
+        "rows": 26135,
+        "brier": 0.10465685991934023,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 11403,
+            "mean_prediction": 0.07192175920582303,
+            "observed_appearance": 0.045163553450846265
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 1501,
+            "mean_prediction": 0.14067643536175883,
+            "observed_appearance": 0.20253164556962025
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1061,
+            "mean_prediction": 0.24738049639396795,
+            "observed_appearance": 0.44957587181903863
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 715,
+            "mean_prediction": 0.3460890194055944,
+            "observed_appearance": 0.46573426573426574
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 530,
+            "mean_prediction": 0.4515627805188679,
+            "observed_appearance": 0.5584905660377358
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 809,
+            "mean_prediction": 0.5542119150370829,
+            "observed_appearance": 0.6279357231149567
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1140,
+            "mean_prediction": 0.6512661465149124,
+            "observed_appearance": 0.6780701754385965
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 895,
+            "mean_prediction": 0.7472885059687151,
+            "observed_appearance": 0.7363128491620111
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 3785,
+            "mean_prediction": 0.8675499109815059,
+            "observed_appearance": 0.8428005284015853
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 4296,
+            "mean_prediction": 0.9248092096515362,
+            "observed_appearance": 0.9390130353817505
+          }
+        ]
+      },
+      "candidate": {
+        "rows": 26135,
+        "brier": 0.10155027766243041,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 12062,
+            "mean_prediction": 0.03634245033106272,
+            "observed_appearance": 0.049079754601226995
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 382,
+            "mean_prediction": 0.16405063861744248,
+            "observed_appearance": 0.24083769633507854
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 231,
+            "mean_prediction": 0.25101234450760573,
+            "observed_appearance": 0.23809523809523808
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 481,
+            "mean_prediction": 0.3403238397806792,
+            "observed_appearance": 0.43243243243243246
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 1461,
+            "mean_prediction": 0.4325883691849988,
+            "observed_appearance": 0.44969199178644764
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 732,
+            "mean_prediction": 0.550940044277357,
+            "observed_appearance": 0.546448087431694
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 1768,
+            "mean_prediction": 0.650567761762854,
+            "observed_appearance": 0.6679864253393665
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 1476,
+            "mean_prediction": 0.7464172199493352,
+            "observed_appearance": 0.744579945799458
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 2147,
+            "mean_prediction": 0.8451037554335745,
+            "observed_appearance": 0.8341872380065207
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 5395,
+            "mean_prediction": 0.9237020075163913,
+            "observed_appearance": 0.9293790546802595
+          }
+        ]
+      },
+      "candidate_minus_base_brier": -0.0031065822569098234
+    },
+    "pooled": {
+      "base": {
+        "rows": 100130,
+        "brier": 0.1073406211310611,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 39347,
+            "mean_prediction": 0.07564283644455738,
+            "observed_appearance": 0.04142628408773223
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 10125,
+            "mean_prediction": 0.13245615679308642,
+            "observed_appearance": 0.14814814814814814
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 4539,
+            "mean_prediction": 0.24677750941154444,
+            "observed_appearance": 0.4113240801938753
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 3189,
+            "mean_prediction": 0.3461456054719348,
+            "observed_appearance": 0.45782376920664786
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 2308,
+            "mean_prediction": 0.45239879414948003,
+            "observed_appearance": 0.5524263431542461
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 3163,
+            "mean_prediction": 0.5528723232149858,
+            "observed_appearance": 0.6168194751817895
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 4252,
+            "mean_prediction": 0.6519317724670743,
+            "observed_appearance": 0.6683913452492944
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 3977,
+            "mean_prediction": 0.7510131986150365,
+            "observed_appearance": 0.7301986421926074
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 14602,
+            "mean_prediction": 0.8684697455767019,
+            "observed_appearance": 0.8549513765237639
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 14628,
+            "mean_prediction": 0.9262704309818156,
+            "observed_appearance": 0.928561662564944
+          }
+        ]
+      },
+      "candidate": {
+        "rows": 100130,
+        "brier": 0.10478270204354007,
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "rows": 43621,
+            "mean_prediction": 0.03617311148168135,
+            "observed_appearance": 0.047293734669081405
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "rows": 4625,
+            "mean_prediction": 0.137786594640903,
+            "observed_appearance": 0.1476756756756757
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "rows": 1477,
+            "mean_prediction": 0.25736397779770076,
+            "observed_appearance": 0.3141503046716317
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "rows": 2398,
+            "mean_prediction": 0.3491951819506049,
+            "observed_appearance": 0.41743119266055045
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "rows": 4737,
+            "mean_prediction": 0.4357685035489005,
+            "observed_appearance": 0.4428963478995145
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "rows": 3922,
+            "mean_prediction": 0.5466121347465079,
+            "observed_appearance": 0.5530341662417134
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "rows": 6566,
+            "mean_prediction": 0.6600342986847911,
+            "observed_appearance": 0.6661590009137983
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "rows": 5541,
+            "mean_prediction": 0.7536206547282726,
+            "observed_appearance": 0.7496841725320339
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "rows": 9009,
+            "mean_prediction": 0.8561862941637127,
+            "observed_appearance": 0.8494838494838495
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "rows": 18234,
+            "mean_prediction": 0.9179410372963954,
+            "observed_appearance": 0.9233848853789624
+          }
+        ]
+      },
+      "candidate_minus_base_brier": -0.002557919087521038
+    }
+  },
+  "historical_brier_reference": 0.10734,
+  "row_readings": {
+    "2021-22": {
+      "rows": 22676,
+      "arms": {
+        "base": {
+          "mae": 1.2539799740110171,
+          "nonplayer_forecast_mass": 0.2447158006305352
+        },
+        "candidate": {
+          "mae": 1.2276098588740307,
+          "nonplayer_forecast_mass": 0.23467129581752846
+        }
+      },
+      "within_position_rank": {
+        "GK": {
+          "rows": 2596,
+          "pair": [
+            0.6833219852211257,
+            0.6884342884374651
+          ]
+        },
+        "DEF": {
+          "rows": 7691,
+          "pair": [
+            0.5942671284909129,
+            0.5958368968419999
+          ]
+        },
+        "MID": {
+          "rows": 9375,
+          "pair": [
+            0.673800102470404,
+            0.6748860529301307
+          ]
+        },
+        "FWD": {
+          "rows": 3014,
+          "pair": [
+            0.6870666601817467,
+            0.6831965612052695
+          ]
+        }
+      }
+    },
+    "2022-23": {
+      "rows": 24384,
+      "arms": {
+        "base": {
+          "mae": 1.1141346591965136,
+          "nonplayer_forecast_mass": 0.20014265109353632
+        },
+        "candidate": {
+          "mae": 1.0889448408356173,
+          "nonplayer_forecast_mass": 0.1877545748816662
+        }
+      },
+      "within_position_rank": {
+        "GK": {
+          "rows": 2566,
+          "pair": [
+            0.685668139364743,
+            0.6899505885414428
+          ]
+        },
+        "DEF": {
+          "rows": 8447,
+          "pair": [
+            0.6132500156736854,
+            0.6143153392856527
+          ]
+        },
+        "MID": {
+          "rows": 10500,
+          "pair": [
+            0.7359570943300152,
+            0.7357801610911038
+          ]
+        },
+        "FWD": {
+          "rows": 2871,
+          "pair": [
+            0.6943767485001731,
+            0.6935527659950427
+          ]
+        }
+      }
+    },
+    "2023-24": {
+      "rows": 28084,
+      "arms": {
+        "base": {
+          "mae": 0.9947698390075864,
+          "nonplayer_forecast_mass": 0.2185629491076191
+        },
+        "candidate": {
+          "mae": 0.9697870846815724,
+          "nonplayer_forecast_mass": 0.20324944717285648
+        }
+      },
+      "within_position_rank": {
+        "GK": {
+          "rows": 3222,
+          "pair": [
+            0.6446102455671578,
+            0.6463386562141626
+          ]
+        },
+        "DEF": {
+          "rows": 9080,
+          "pair": [
+            0.5850793829840738,
+            0.5871949193687082
+          ]
+        },
+        "MID": {
+          "rows": 12143,
+          "pair": [
+            0.717474839619468,
+            0.720219363289963
+          ]
+        },
+        "FWD": {
+          "rows": 3639,
+          "pair": [
+            0.7082743553638108,
+            0.7068033260403059
+          ]
+        }
+      }
+    },
+    "2024-25": {
+      "rows": 26303,
+      "arms": {
+        "base": {
+          "mae": 1.0224534754769117,
+          "nonplayer_forecast_mass": 0.19387644351053715
+        },
+        "candidate": {
+          "mae": 1.0037617008398345,
+          "nonplayer_forecast_mass": 0.18383248903784452
+        }
+      },
+      "within_position_rank": {
+        "GK": {
+          "rows": 2761,
+          "pair": [
+            0.6684027113904544,
+            0.6688418353669562
+          ]
+        },
+        "DEF": {
+          "rows": 8821,
+          "pair": [
+            0.6193358605948752,
+            0.6223726267605044
+          ]
+        },
+        "MID": {
+          "rows": 11808,
+          "pair": [
+            0.7243280810279504,
+            0.7246206454340776
+          ]
+        },
+        "FWD": {
+          "rows": 2913,
+          "pair": [
+            0.7406721746553159,
+            0.7412728573007765
+          ]
+        }
+      }
+    },
+    "pooled": {
+      "rows": 101447,
+      "arms": {
+        "base": {
+          "mae": 1.088578463085945,
+          "nonplayer_forecast_mass": 0.21452472801104933
+        },
+        "candidate": {
+          "mae": 1.0648669419711836,
+          "nonplayer_forecast_mass": 0.20251914349999542
+        }
+      },
+      "within_position_rank": {
+        "GK": {
+          "rows": 11145,
+          "pair": [
+            0.6680261883433956,
+            0.6732641028969796
+          ]
+        },
+        "DEF": {
+          "rows": 34039,
+          "pair": [
+            0.601297533082612,
+            0.605583029579768
+          ]
+        },
+        "MID": {
+          "rows": 43826,
+          "pair": [
+            0.7153920163201555,
+            0.7169834929302997
+          ]
+        },
+        "FWD": {
+          "rows": 12437,
+          "pair": [
+            0.7094003373501194,
+            0.7088051640826104
+          ]
+        }
+      }
+    }
+  },
+  "training_counts": [
+    {
+      "fold_id": "2021-22-gw02",
+      "earlier_decisions": 0,
+      "earlier_rows": 0,
+      "eligible_rows": 0,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw03",
+      "earlier_decisions": 0,
+      "earlier_rows": 0,
+      "eligible_rows": 566,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw04",
+      "earlier_decisions": 1,
+      "earlier_rows": 566,
+      "eligible_rows": 577,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw05",
+      "earlier_decisions": 2,
+      "earlier_rows": 1143,
+      "eligible_rows": 599,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw06",
+      "earlier_decisions": 3,
+      "earlier_rows": 1742,
+      "eligible_rows": 606,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw07",
+      "earlier_decisions": 4,
+      "earlier_rows": 2348,
+      "eligible_rows": 611,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw08",
+      "earlier_decisions": 5,
+      "earlier_rows": 2959,
+      "eligible_rows": 613,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw09",
+      "earlier_decisions": 6,
+      "earlier_rows": 3572,
+      "eligible_rows": 617,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw10",
+      "earlier_decisions": 7,
+      "earlier_rows": 4189,
+      "eligible_rows": 618,
+      "fitted": false
+    },
+    {
+      "fold_id": "2021-22-gw11",
+      "earlier_decisions": 8,
+      "earlier_rows": 4807,
+      "eligible_rows": 623,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw12",
+      "earlier_decisions": 9,
+      "earlier_rows": 5430,
+      "eligible_rows": 624,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw13",
+      "earlier_decisions": 10,
+      "earlier_rows": 6054,
+      "eligible_rows": 572,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw14",
+      "earlier_decisions": 11,
+      "earlier_rows": 6626,
+      "eligible_rows": 633,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw15",
+      "earlier_decisions": 12,
+      "earlier_rows": 7259,
+      "eligible_rows": 636,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw16",
+      "earlier_decisions": 13,
+      "earlier_rows": 7895,
+      "eligible_rows": 576,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw17",
+      "earlier_decisions": 14,
+      "earlier_rows": 8471,
+      "eligible_rows": 451,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw18",
+      "earlier_decisions": 15,
+      "earlier_rows": 8922,
+      "eligible_rows": 257,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw19",
+      "earlier_decisions": 16,
+      "earlier_rows": 9179,
+      "eligible_rows": 446,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw20",
+      "earlier_decisions": 17,
+      "earlier_rows": 9625,
+      "eligible_rows": 457,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw21",
+      "earlier_decisions": 18,
+      "earlier_rows": 10082,
+      "eligible_rows": 609,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw22",
+      "earlier_decisions": 19,
+      "earlier_rows": 10691,
+      "eligible_rows": 613,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw23",
+      "earlier_decisions": 20,
+      "earlier_rows": 11304,
+      "eligible_rows": 688,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw24",
+      "earlier_decisions": 21,
+      "earlier_rows": 11992,
+      "eligible_rows": 627,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw25",
+      "earlier_decisions": 22,
+      "earlier_rows": 12619,
+      "eligible_rows": 631,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw26",
+      "earlier_decisions": 23,
+      "earlier_rows": 13250,
+      "eligible_rows": 707,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw27",
+      "earlier_decisions": 24,
+      "earlier_rows": 13957,
+      "eligible_rows": 599,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw28",
+      "earlier_decisions": 25,
+      "earlier_rows": 14556,
+      "eligible_rows": 714,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw29",
+      "earlier_decisions": 26,
+      "earlier_rows": 15270,
+      "eligible_rows": 714,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw30",
+      "earlier_decisions": 27,
+      "earlier_rows": 15984,
+      "eligible_rows": 292,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw31",
+      "earlier_decisions": 28,
+      "earlier_rows": 16276,
+      "eligible_rows": 714,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw32",
+      "earlier_decisions": 29,
+      "earlier_rows": 16990,
+      "eligible_rows": 720,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw33",
+      "earlier_decisions": 30,
+      "earlier_rows": 17710,
+      "eligible_rows": 608,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw34",
+      "earlier_decisions": 31,
+      "earlier_rows": 18318,
+      "eligible_rows": 726,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw35",
+      "earlier_decisions": 32,
+      "earlier_rows": 19044,
+      "eligible_rows": 728,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw36",
+      "earlier_decisions": 33,
+      "earlier_rows": 19772,
+      "eligible_rows": 730,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw37",
+      "earlier_decisions": 34,
+      "earlier_rows": 20502,
+      "eligible_rows": 701,
+      "fitted": true
+    },
+    {
+      "fold_id": "2021-22-gw38",
+      "earlier_decisions": 35,
+      "earlier_rows": 21203,
+      "eligible_rows": 736,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw02",
+      "earlier_decisions": 36,
+      "earlier_rows": 21939,
+      "eligible_rows": 573,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw03",
+      "earlier_decisions": 37,
+      "earlier_rows": 22512,
+      "eligible_rows": 581,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw04",
+      "earlier_decisions": 38,
+      "earlier_rows": 23093,
+      "eligible_rows": 592,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw05",
+      "earlier_decisions": 39,
+      "earlier_rows": 23685,
+      "eligible_rows": 601,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw06",
+      "earlier_decisions": 40,
+      "earlier_rows": 24286,
+      "eligible_rows": 608,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw08",
+      "earlier_decisions": 41,
+      "earlier_rows": 24894,
+      "eligible_rows": 433,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw09",
+      "earlier_decisions": 42,
+      "earlier_rows": 25327,
+      "eligible_rows": 631,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw10",
+      "earlier_decisions": 43,
+      "earlier_rows": 25958,
+      "eligible_rows": 638,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw11",
+      "earlier_decisions": 44,
+      "earlier_rows": 26596,
+      "eligible_rows": 641,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw12",
+      "earlier_decisions": 45,
+      "earlier_rows": 27237,
+      "eligible_rows": 583,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw13",
+      "earlier_decisions": 46,
+      "earlier_rows": 27820,
+      "eligible_rows": 645,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw14",
+      "earlier_decisions": 47,
+      "earlier_rows": 28465,
+      "eligible_rows": 648,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw15",
+      "earlier_decisions": 48,
+      "earlier_rows": 29113,
+      "eligible_rows": 656,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw16",
+      "earlier_decisions": 49,
+      "earlier_rows": 29769,
+      "eligible_rows": 661,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw17",
+      "earlier_decisions": 50,
+      "earlier_rows": 30430,
+      "eligible_rows": 667,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw18",
+      "earlier_decisions": 51,
+      "earlier_rows": 31097,
+      "eligible_rows": 675,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw19",
+      "earlier_decisions": 52,
+      "earlier_rows": 31772,
+      "eligible_rows": 678,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw20",
+      "earlier_decisions": 53,
+      "earlier_rows": 32450,
+      "eligible_rows": 689,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw21",
+      "earlier_decisions": 54,
+      "earlier_rows": 33139,
+      "eligible_rows": 699,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw22",
+      "earlier_decisions": 55,
+      "earlier_rows": 33838,
+      "eligible_rows": 707,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw23",
+      "earlier_decisions": 56,
+      "earlier_rows": 34545,
+      "eligible_rows": 740,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw24",
+      "earlier_decisions": 57,
+      "earlier_rows": 35285,
+      "eligible_rows": 745,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw25",
+      "earlier_decisions": 58,
+      "earlier_rows": 36030,
+      "eligible_rows": 602,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw26",
+      "earlier_decisions": 59,
+      "earlier_rows": 36632,
+      "eligible_rows": 746,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw27",
+      "earlier_decisions": 60,
+      "earlier_rows": 37378,
+      "eligible_rows": 747,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw28",
+      "earlier_decisions": 61,
+      "earlier_rows": 38125,
+      "eligible_rows": 538,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw29",
+      "earlier_decisions": 62,
+      "earlier_rows": 38663,
+      "eligible_rows": 751,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw30",
+      "earlier_decisions": 63,
+      "earlier_rows": 39414,
+      "eligible_rows": 754,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw31",
+      "earlier_decisions": 64,
+      "earlier_rows": 40168,
+      "eligible_rows": 754,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw32",
+      "earlier_decisions": 65,
+      "earlier_rows": 40922,
+      "eligible_rows": 610,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw33",
+      "earlier_decisions": 66,
+      "earlier_rows": 41532,
+      "eligible_rows": 760,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw34",
+      "earlier_decisions": 67,
+      "earlier_rows": 42292,
+      "eligible_rows": 761,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw35",
+      "earlier_decisions": 68,
+      "earlier_rows": 43053,
+      "eligible_rows": 762,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw36",
+      "earlier_decisions": 69,
+      "earlier_rows": 43815,
+      "eligible_rows": 763,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw37",
+      "earlier_decisions": 70,
+      "earlier_rows": 44578,
+      "eligible_rows": 765,
+      "fitted": true
+    },
+    {
+      "fold_id": "2022-23-gw38",
+      "earlier_decisions": 71,
+      "earlier_rows": 45343,
+      "eligible_rows": 775,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw02",
+      "earlier_decisions": 72,
+      "earlier_rows": 46118,
+      "eligible_rows": 585,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw03",
+      "earlier_decisions": 73,
+      "earlier_rows": 46703,
+      "eligible_rows": 668,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw04",
+      "earlier_decisions": 74,
+      "earlier_rows": 47371,
+      "eligible_rows": 685,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw05",
+      "earlier_decisions": 75,
+      "earlier_rows": 48056,
+      "eligible_rows": 703,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw06",
+      "earlier_decisions": 76,
+      "earlier_rows": 48759,
+      "eligible_rows": 717,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw07",
+      "earlier_decisions": 77,
+      "earlier_rows": 49476,
+      "eligible_rows": 718,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw08",
+      "earlier_decisions": 78,
+      "earlier_rows": 50194,
+      "eligible_rows": 722,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw09",
+      "earlier_decisions": 79,
+      "earlier_rows": 50916,
+      "eligible_rows": 725,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw10",
+      "earlier_decisions": 80,
+      "earlier_rows": 51641,
+      "eligible_rows": 730,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw11",
+      "earlier_decisions": 81,
+      "earlier_rows": 52371,
+      "eligible_rows": 731,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw12",
+      "earlier_decisions": 82,
+      "earlier_rows": 53102,
+      "eligible_rows": 733,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw13",
+      "earlier_decisions": 83,
+      "earlier_rows": 53835,
+      "eligible_rows": 743,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw14",
+      "earlier_decisions": 84,
+      "earlier_rows": 54578,
+      "eligible_rows": 747,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw15",
+      "earlier_decisions": 85,
+      "earlier_rows": 55325,
+      "eligible_rows": 753,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw16",
+      "earlier_decisions": 86,
+      "earlier_rows": 56078,
+      "eligible_rows": 757,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw17",
+      "earlier_decisions": 87,
+      "earlier_rows": 56835,
+      "eligible_rows": 679,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw18",
+      "earlier_decisions": 88,
+      "earlier_rows": 57514,
+      "eligible_rows": 696,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw19",
+      "earlier_decisions": 89,
+      "earlier_rows": 58210,
+      "eligible_rows": 769,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw20",
+      "earlier_decisions": 90,
+      "earlier_rows": 58979,
+      "eligible_rows": 771,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw21",
+      "earlier_decisions": 91,
+      "earlier_rows": 59750,
+      "eligible_rows": 773,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw22",
+      "earlier_decisions": 92,
+      "earlier_rows": 60523,
+      "eligible_rows": 787,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw23",
+      "earlier_decisions": 93,
+      "earlier_rows": 61310,
+      "eligible_rows": 799,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw24",
+      "earlier_decisions": 94,
+      "earlier_rows": 62109,
+      "eligible_rows": 809,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw25",
+      "earlier_decisions": 95,
+      "earlier_rows": 62918,
+      "eligible_rows": 814,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw26",
+      "earlier_decisions": 96,
+      "earlier_rows": 63732,
+      "eligible_rows": 644,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw27",
+      "earlier_decisions": 97,
+      "earlier_rows": 64376,
+      "eligible_rows": 828,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw28",
+      "earlier_decisions": 98,
+      "earlier_rows": 65204,
+      "eligible_rows": 832,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw29",
+      "earlier_decisions": 99,
+      "earlier_rows": 66036,
+      "eligible_rows": 344,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw30",
+      "earlier_decisions": 100,
+      "earlier_rows": 66380,
+      "eligible_rows": 838,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw31",
+      "earlier_decisions": 101,
+      "earlier_rows": 67218,
+      "eligible_rows": 842,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw32",
+      "earlier_decisions": 102,
+      "earlier_rows": 68060,
+      "eligible_rows": 844,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw33",
+      "earlier_decisions": 103,
+      "earlier_rows": 68904,
+      "eligible_rows": 846,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw34",
+      "earlier_decisions": 104,
+      "earlier_rows": 69750,
+      "eligible_rows": 810,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw35",
+      "earlier_decisions": 105,
+      "earlier_rows": 70560,
+      "eligible_rows": 856,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw36",
+      "earlier_decisions": 106,
+      "earlier_rows": 71416,
+      "eligible_rows": 859,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw37",
+      "earlier_decisions": 107,
+      "earlier_rows": 72275,
+      "eligible_rows": 859,
+      "fitted": true
+    },
+    {
+      "fold_id": "2023-24-gw38",
+      "earlier_decisions": 108,
+      "earlier_rows": 73134,
+      "eligible_rows": 861,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw02",
+      "earlier_decisions": 109,
+      "earlier_rows": 73995,
+      "eligible_rows": 616,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw03",
+      "earlier_decisions": 110,
+      "earlier_rows": 74611,
+      "eligible_rows": 627,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw04",
+      "earlier_decisions": 111,
+      "earlier_rows": 75238,
+      "eligible_rows": 648,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw05",
+      "earlier_decisions": 112,
+      "earlier_rows": 75886,
+      "eligible_rows": 659,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw06",
+      "earlier_decisions": 113,
+      "earlier_rows": 76545,
+      "eligible_rows": 661,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw07",
+      "earlier_decisions": 114,
+      "earlier_rows": 77206,
+      "eligible_rows": 664,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw08",
+      "earlier_decisions": 115,
+      "earlier_rows": 77870,
+      "eligible_rows": 666,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw09",
+      "earlier_decisions": 116,
+      "earlier_rows": 78536,
+      "eligible_rows": 667,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw10",
+      "earlier_decisions": 117,
+      "earlier_rows": 79203,
+      "eligible_rows": 670,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw11",
+      "earlier_decisions": 118,
+      "earlier_rows": 79873,
+      "eligible_rows": 674,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw12",
+      "earlier_decisions": 119,
+      "earlier_rows": 80547,
+      "eligible_rows": 678,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw13",
+      "earlier_decisions": 120,
+      "earlier_rows": 81225,
+      "eligible_rows": 684,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw14",
+      "earlier_decisions": 121,
+      "earlier_rows": 81909,
+      "eligible_rows": 690,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw15",
+      "earlier_decisions": 122,
+      "earlier_rows": 82599,
+      "eligible_rows": 630,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw16",
+      "earlier_decisions": 123,
+      "earlier_rows": 83229,
+      "eligible_rows": 693,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw17",
+      "earlier_decisions": 124,
+      "earlier_rows": 83922,
+      "eligible_rows": 701,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw18",
+      "earlier_decisions": 125,
+      "earlier_rows": 84623,
+      "eligible_rows": 701,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw19",
+      "earlier_decisions": 126,
+      "earlier_rows": 85324,
+      "eligible_rows": 705,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw20",
+      "earlier_decisions": 127,
+      "earlier_rows": 86029,
+      "eligible_rows": 709,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw21",
+      "earlier_decisions": 128,
+      "earlier_rows": 86738,
+      "eligible_rows": 711,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw22",
+      "earlier_decisions": 129,
+      "earlier_rows": 87449,
+      "eligible_rows": 724,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw23",
+      "earlier_decisions": 130,
+      "earlier_rows": 88173,
+      "eligible_rows": 729,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw24",
+      "earlier_decisions": 131,
+      "earlier_rows": 88902,
+      "eligible_rows": 736,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw25",
+      "earlier_decisions": 132,
+      "earlier_rows": 89638,
+      "eligible_rows": 742,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw26",
+      "earlier_decisions": 133,
+      "earlier_rows": 90380,
+      "eligible_rows": 759,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw27",
+      "earlier_decisions": 134,
+      "earlier_rows": 91139,
+      "eligible_rows": 763,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw28",
+      "earlier_decisions": 135,
+      "earlier_rows": 91902,
+      "eligible_rows": 764,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw29",
+      "earlier_decisions": 136,
+      "earlier_rows": 92666,
+      "eligible_rows": 623,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw30",
+      "earlier_decisions": 137,
+      "earlier_rows": 93289,
+      "eligible_rows": 769,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw31",
+      "earlier_decisions": 138,
+      "earlier_rows": 94058,
+      "eligible_rows": 771,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw32",
+      "earlier_decisions": 139,
+      "earlier_rows": 94829,
+      "eligible_rows": 772,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw33",
+      "earlier_decisions": 140,
+      "earlier_rows": 95601,
+      "eligible_rows": 778,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw34",
+      "earlier_decisions": 141,
+      "earlier_rows": 96379,
+      "eligible_rows": 628,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw35",
+      "earlier_decisions": 142,
+      "earlier_rows": 97007,
+      "eligible_rows": 780,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw36",
+      "earlier_decisions": 143,
+      "earlier_rows": 97787,
+      "eligible_rows": 781,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw37",
+      "earlier_decisions": 144,
+      "earlier_rows": 98568,
+      "eligible_rows": 781,
+      "fitted": true
+    },
+    {
+      "fold_id": "2024-25-gw38",
+      "earlier_decisions": 145,
+      "earlier_rows": 99349,
+      "eligible_rows": 781,
+      "fitted": true
+    }
+  ],
+  "direct_control_rows": 1317,
+  "blank_rows": 0,
+  "decisions": {
+    "complete_for_gate": true,
+    "pairs": [
+      {
+        "fold_id": "2021-22-gw02",
+        "season": "2021-22",
+        "base": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw03",
+        "season": "2021-22",
+        "base": {
+          "score": 72.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 72.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw04",
+        "season": "2021-22",
+        "base": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw05",
+        "season": "2021-22",
+        "base": {
+          "score": 75.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 75.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw06",
+        "season": "2021-22",
+        "base": {
+          "score": 40.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 40.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw07",
+        "season": "2021-22",
+        "base": {
+          "score": 48.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 48.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw08",
+        "season": "2021-22",
+        "base": {
+          "score": 62.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 62.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw09",
+        "season": "2021-22",
+        "base": {
+          "score": 81.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 81.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw10",
+        "season": "2021-22",
+        "base": {
+          "score": 36.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 36.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw11",
+        "season": "2021-22",
+        "base": {
+          "score": 32.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 35.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 3.0
+      },
+      {
+        "fold_id": "2021-22-gw12",
+        "season": "2021-22",
+        "base": {
+          "score": 50.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 41.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -9.0
+      },
+      {
+        "fold_id": "2021-22-gw13",
+        "season": "2021-22",
+        "base": {
+          "score": 35.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 35.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw14",
+        "season": "2021-22",
+        "base": {
+          "score": 61.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 69.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 8.0
+      },
+      {
+        "fold_id": "2021-22-gw15",
+        "season": "2021-22",
+        "base": {
+          "score": 59.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 44.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -15.0
+      },
+      {
+        "fold_id": "2021-22-gw16",
+        "season": "2021-22",
+        "base": {
+          "score": 87.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 77.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -10.0
+      },
+      {
+        "fold_id": "2021-22-gw17",
+        "season": "2021-22",
+        "base": {
+          "score": 49.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 49.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw18",
+        "season": "2021-22",
+        "base": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw19",
+        "season": "2021-22",
+        "base": {
+          "score": 39.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 39.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw20",
+        "season": "2021-22",
+        "base": {
+          "score": 39.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 47.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 8.0
+      },
+      {
+        "fold_id": "2021-22-gw21",
+        "season": "2021-22",
+        "base": {
+          "score": 59.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 1.0
+      },
+      {
+        "fold_id": "2021-22-gw22",
+        "season": "2021-22",
+        "base": {
+          "score": 52.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 69.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 17.0
+      },
+      {
+        "fold_id": "2021-22-gw23",
+        "season": "2021-22",
+        "base": {
+          "score": 35.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 51.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 16.0
+      },
+      {
+        "fold_id": "2021-22-gw24",
+        "season": "2021-22",
+        "base": {
+          "score": 67.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 67.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw25",
+        "season": "2021-22",
+        "base": {
+          "score": 70.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -4.0
+      },
+      {
+        "fold_id": "2021-22-gw26",
+        "season": "2021-22",
+        "base": {
+          "score": 119.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 119.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw27",
+        "season": "2021-22",
+        "base": {
+          "score": 46.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 37.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -9.0
+      },
+      {
+        "fold_id": "2021-22-gw28",
+        "season": "2021-22",
+        "base": {
+          "score": 85.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 85.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw29",
+        "season": "2021-22",
+        "base": {
+          "score": 107.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 107.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw30",
+        "season": "2021-22",
+        "base": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw31",
+        "season": "2021-22",
+        "base": {
+          "score": 72.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -14.0
+      },
+      {
+        "fold_id": "2021-22-gw32",
+        "season": "2021-22",
+        "base": {
+          "score": 59.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 70.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 11.0
+      },
+      {
+        "fold_id": "2021-22-gw33",
+        "season": "2021-22",
+        "base": {
+          "score": 93.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 93.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw34",
+        "season": "2021-22",
+        "base": {
+          "score": 82.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 82.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw35",
+        "season": "2021-22",
+        "base": {
+          "score": 74.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 74.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw36",
+        "season": "2021-22",
+        "base": {
+          "score": 103.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 93.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -10.0
+      },
+      {
+        "fold_id": "2021-22-gw37",
+        "season": "2021-22",
+        "base": {
+          "score": 72.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 72.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2021-22-gw38",
+        "season": "2021-22",
+        "base": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw02",
+        "season": "2022-23",
+        "base": {
+          "score": 41.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 41.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw03",
+        "season": "2022-23",
+        "base": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw04",
+        "season": "2022-23",
+        "base": {
+          "score": 70.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 70.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw05",
+        "season": "2022-23",
+        "base": {
+          "score": 66.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw06",
+        "season": "2022-23",
+        "base": {
+          "score": 77.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -11.0
+      },
+      {
+        "fold_id": "2022-23-gw08",
+        "season": "2022-23",
+        "base": {
+          "score": 61.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 68.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2022-23-gw09",
+        "season": "2022-23",
+        "base": {
+          "score": 76.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 79.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 3.0
+      },
+      {
+        "fold_id": "2022-23-gw10",
+        "season": "2022-23",
+        "base": {
+          "score": 68.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 68.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw11",
+        "season": "2022-23",
+        "base": {
+          "score": 49.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 40.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -9.0
+      },
+      {
+        "fold_id": "2022-23-gw12",
+        "season": "2022-23",
+        "base": {
+          "score": 55.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 55.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw13",
+        "season": "2022-23",
+        "base": {
+          "score": 61.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 75.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 14.0
+      },
+      {
+        "fold_id": "2022-23-gw14",
+        "season": "2022-23",
+        "base": {
+          "score": 67.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 65.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -2.0
+      },
+      {
+        "fold_id": "2022-23-gw15",
+        "season": "2022-23",
+        "base": {
+          "score": 56.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 59.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 3.0
+      },
+      {
+        "fold_id": "2022-23-gw16",
+        "season": "2022-23",
+        "base": {
+          "score": 51.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 45.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -6.0
+      },
+      {
+        "fold_id": "2022-23-gw17",
+        "season": "2022-23",
+        "base": {
+          "score": 61.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 2.0
+      },
+      {
+        "fold_id": "2022-23-gw18",
+        "season": "2022-23",
+        "base": {
+          "score": 44.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 44.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw19",
+        "season": "2022-23",
+        "base": {
+          "score": 74.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 74.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw20",
+        "season": "2022-23",
+        "base": {
+          "score": 75.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 76.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 1.0
+      },
+      {
+        "fold_id": "2022-23-gw21",
+        "season": "2022-23",
+        "base": {
+          "score": 77.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 84.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2022-23-gw22",
+        "season": "2022-23",
+        "base": {
+          "score": 77.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 85.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 8.0
+      },
+      {
+        "fold_id": "2022-23-gw23",
+        "season": "2022-23",
+        "base": {
+          "score": 76.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 76.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw24",
+        "season": "2022-23",
+        "base": {
+          "score": 59.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2022-23-gw25",
+        "season": "2022-23",
+        "base": {
+          "score": 91.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 91.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw26",
+        "season": "2022-23",
+        "base": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 74.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 3.0
+      },
+      {
+        "fold_id": "2022-23-gw27",
+        "season": "2022-23",
+        "base": {
+          "score": 82.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 86.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 4.0
+      },
+      {
+        "fold_id": "2022-23-gw28",
+        "season": "2022-23",
+        "base": {
+          "score": 56.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 56.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw29",
+        "season": "2022-23",
+        "base": {
+          "score": 78.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 78.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw30",
+        "season": "2022-23",
+        "base": {
+          "score": 50.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 50.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw31",
+        "season": "2022-23",
+        "base": {
+          "score": 82.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 75.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -7.0
+      },
+      {
+        "fold_id": "2022-23-gw32",
+        "season": "2022-23",
+        "base": {
+          "score": 52.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 52.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw33",
+        "season": "2022-23",
+        "base": {
+          "score": 64.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -1.0
+      },
+      {
+        "fold_id": "2022-23-gw34",
+        "season": "2022-23",
+        "base": {
+          "score": 98.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 98.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw35",
+        "season": "2022-23",
+        "base": {
+          "score": 56.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 56.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw36",
+        "season": "2022-23",
+        "base": {
+          "score": 117.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 122.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 5.0
+      },
+      {
+        "fold_id": "2022-23-gw37",
+        "season": "2022-23",
+        "base": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2022-23-gw38",
+        "season": "2022-23",
+        "base": {
+          "score": 74.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 74.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw02",
+        "season": "2023-24",
+        "base": {
+          "score": 26.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 26.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw03",
+        "season": "2023-24",
+        "base": {
+          "score": 31.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 31.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw04",
+        "season": "2023-24",
+        "base": {
+          "score": 80.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 75.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -5.0
+      },
+      {
+        "fold_id": "2023-24-gw05",
+        "season": "2023-24",
+        "base": {
+          "score": 44.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 44.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw06",
+        "season": "2023-24",
+        "base": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw07",
+        "season": "2023-24",
+        "base": {
+          "score": 45.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 45.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw08",
+        "season": "2023-24",
+        "base": {
+          "score": 50.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 8.0
+      },
+      {
+        "fold_id": "2023-24-gw09",
+        "season": "2023-24",
+        "base": {
+          "score": 81.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 100.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 19.0
+      },
+      {
+        "fold_id": "2023-24-gw10",
+        "season": "2023-24",
+        "base": {
+          "score": 57.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 6.0
+      },
+      {
+        "fold_id": "2023-24-gw11",
+        "season": "2023-24",
+        "base": {
+          "score": 29.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 33.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 4.0
+      },
+      {
+        "fold_id": "2023-24-gw12",
+        "season": "2023-24",
+        "base": {
+          "score": 69.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 69.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw13",
+        "season": "2023-24",
+        "base": {
+          "score": 35.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 35.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw14",
+        "season": "2023-24",
+        "base": {
+          "score": 61.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 56.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -5.0
+      },
+      {
+        "fold_id": "2023-24-gw15",
+        "season": "2023-24",
+        "base": {
+          "score": 35.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 35.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw16",
+        "season": "2023-24",
+        "base": {
+          "score": 50.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 50.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw17",
+        "season": "2023-24",
+        "base": {
+          "score": 37.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 37.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw18",
+        "season": "2023-24",
+        "base": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw19",
+        "season": "2023-24",
+        "base": {
+          "score": 41.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 44.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 3.0
+      },
+      {
+        "fold_id": "2023-24-gw20",
+        "season": "2023-24",
+        "base": {
+          "score": 69.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 75.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 6.0
+      },
+      {
+        "fold_id": "2023-24-gw21",
+        "season": "2023-24",
+        "base": {
+          "score": 38.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 39.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 1.0
+      },
+      {
+        "fold_id": "2023-24-gw22",
+        "season": "2023-24",
+        "base": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 51.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -7.0
+      },
+      {
+        "fold_id": "2023-24-gw23",
+        "season": "2023-24",
+        "base": {
+          "score": 69.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 2.0
+      },
+      {
+        "fold_id": "2023-24-gw24",
+        "season": "2023-24",
+        "base": {
+          "score": 47.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 47.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw25",
+        "season": "2023-24",
+        "base": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw26",
+        "season": "2023-24",
+        "base": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw27",
+        "season": "2023-24",
+        "base": {
+          "score": 64.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 71.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2023-24-gw28",
+        "season": "2023-24",
+        "base": {
+          "score": 46.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 46.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw29",
+        "season": "2023-24",
+        "base": {
+          "score": 29.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 28.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -1.0
+      },
+      {
+        "fold_id": "2023-24-gw30",
+        "season": "2023-24",
+        "base": {
+          "score": 46.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 46.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw31",
+        "season": "2023-24",
+        "base": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -6.0
+      },
+      {
+        "fold_id": "2023-24-gw32",
+        "season": "2023-24",
+        "base": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw33",
+        "season": "2023-24",
+        "base": {
+          "score": 77.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 85.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 8.0
+      },
+      {
+        "fold_id": "2023-24-gw34",
+        "season": "2023-24",
+        "base": {
+          "score": 119.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 142.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 23.0
+      },
+      {
+        "fold_id": "2023-24-gw35",
+        "season": "2023-24",
+        "base": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw36",
+        "season": "2023-24",
+        "base": {
+          "score": 91.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 102.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 11.0
+      },
+      {
+        "fold_id": "2023-24-gw37",
+        "season": "2023-24",
+        "base": {
+          "score": 110.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 110.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2023-24-gw38",
+        "season": "2023-24",
+        "base": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw02",
+        "season": "2024-25",
+        "base": {
+          "score": 73.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 73.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw03",
+        "season": "2024-25",
+        "base": {
+          "score": 71.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 71.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw04",
+        "season": "2024-25",
+        "base": {
+          "score": 51.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 51.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw05",
+        "season": "2024-25",
+        "base": {
+          "score": 64.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 2.0
+      },
+      {
+        "fold_id": "2024-25-gw06",
+        "season": "2024-25",
+        "base": {
+          "score": 49.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 49.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw07",
+        "season": "2024-25",
+        "base": {
+          "score": 43.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 43.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw08",
+        "season": "2024-25",
+        "base": {
+          "score": 29.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 43.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 14.0
+      },
+      {
+        "fold_id": "2024-25-gw09",
+        "season": "2024-25",
+        "base": {
+          "score": 67.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -4.0
+      },
+      {
+        "fold_id": "2024-25-gw10",
+        "season": "2024-25",
+        "base": {
+          "score": 62.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 44.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -18.0
+      },
+      {
+        "fold_id": "2024-25-gw11",
+        "season": "2024-25",
+        "base": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw12",
+        "season": "2024-25",
+        "base": {
+          "score": 62.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 62.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw13",
+        "season": "2024-25",
+        "base": {
+          "score": 81.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 88.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2024-25-gw14",
+        "season": "2024-25",
+        "base": {
+          "score": 86.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 83.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -3.0
+      },
+      {
+        "fold_id": "2024-25-gw15",
+        "season": "2024-25",
+        "base": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 64.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 4.0
+      },
+      {
+        "fold_id": "2024-25-gw16",
+        "season": "2024-25",
+        "base": {
+          "score": 60.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 56.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -4.0
+      },
+      {
+        "fold_id": "2024-25-gw17",
+        "season": "2024-25",
+        "base": {
+          "score": 97.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 89.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -8.0
+      },
+      {
+        "fold_id": "2024-25-gw18",
+        "season": "2024-25",
+        "base": {
+          "score": 80.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 78.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -2.0
+      },
+      {
+        "fold_id": "2024-25-gw19",
+        "season": "2024-25",
+        "base": {
+          "score": 59.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 59.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw20",
+        "season": "2024-25",
+        "base": {
+          "score": 75.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 43.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -32.0
+      },
+      {
+        "fold_id": "2024-25-gw21",
+        "season": "2024-25",
+        "base": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 41.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -13.0
+      },
+      {
+        "fold_id": "2024-25-gw22",
+        "season": "2024-25",
+        "base": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 54.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw23",
+        "season": "2024-25",
+        "base": {
+          "score": 84.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 72.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": -12.0
+      },
+      {
+        "fold_id": "2024-25-gw24",
+        "season": "2024-25",
+        "base": {
+          "score": 134.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 140.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 6.0
+      },
+      {
+        "fold_id": "2024-25-gw25",
+        "season": "2024-25",
+        "base": {
+          "score": 82.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 88.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 6.0
+      },
+      {
+        "fold_id": "2024-25-gw26",
+        "season": "2024-25",
+        "base": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 63.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw27",
+        "season": "2024-25",
+        "base": {
+          "score": 52.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 52.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw28",
+        "season": "2024-25",
+        "base": {
+          "score": 70.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 70.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw29",
+        "season": "2024-25",
+        "base": {
+          "score": 60.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 66.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 6.0
+      },
+      {
+        "fold_id": "2024-25-gw30",
+        "season": "2024-25",
+        "base": {
+          "score": 55.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 55.0,
+          "status": "FEASIBLE",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw31",
+        "season": "2024-25",
+        "base": {
+          "score": 31.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 38.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2024-25-gw32",
+        "season": "2024-25",
+        "base": {
+          "score": 93.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 93.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw33",
+        "season": "2024-25",
+        "base": {
+          "score": 67.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 74.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 7.0
+      },
+      {
+        "fold_id": "2024-25-gw34",
+        "season": "2024-25",
+        "base": {
+          "score": 65.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 65.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw35",
+        "season": "2024-25",
+        "base": {
+          "score": 53.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 46.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": -7.0
+      },
+      {
+        "fold_id": "2024-25-gw36",
+        "season": "2024-25",
+        "base": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 58.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw37",
+        "season": "2024-25",
+        "base": {
+          "score": 48.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 48.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      },
+      {
+        "fold_id": "2024-25-gw38",
+        "season": "2024-25",
+        "base": {
+          "score": 56.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "candidate": {
+          "score": 56.0,
+          "status": "OPTIMAL",
+          "clock_stopped": false
+        },
+        "difference": 0.0
+      }
+    ],
+    "paired_decisions": 147,
+    "mean_difference": 0.3469387755102041,
+    "interval": [
+      -0.6265306122448984,
+      1.3136054421768701
+    ],
+    "by_season": {
+      "2021-22": -0.1891891891891892,
+      "2022-23": 0.7777777777777778,
+      "2023-24": 2.0,
+      "2024-25": -1.1891891891891893
+    },
+    "wins": 40,
+    "ties": 79,
+    "losses": 28,
+    "changed_squads": 80
+  },
+  "elapsed_seconds": 3522.062801
+}

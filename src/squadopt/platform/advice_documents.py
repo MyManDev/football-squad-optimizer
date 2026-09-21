@@ -24,6 +24,8 @@ from typing import Any, Final
 
 import jsonschema
 
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 LEAGUE_CAPABILITIES_CONTRACT_VERSION: Final = "league_capabilities_v1"
 ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
@@ -96,6 +98,7 @@ def advice_read_schema() -> dict[str, Any]:
             "rival_label": {"type": ["string", "null"]},
             "rival_entry_id": {"type": "integer", "minimum": 1},
             "solver_status": {"type": ["string", "null"]},
+            "wall_clock_stopped_the_search": {"type": ["boolean", "null"]},
             "control_solver_status": {"type": ["string", "null"]},
             "optimality_gap": nullable_number,
             "control_optimality_gap": nullable_number,
@@ -231,7 +234,7 @@ def advice_read_schema() -> dict[str, Any]:
         "title": "SquadOpt served advice document",
         "type": "object",
         "properties": {
-            "contract_version": {"type": "string", "const": "provisional_league_ui_v1"},
+            "contract_version": {"type": "string", "const": LEAGUE_VIEW_CONTRACT_VERSION},
             "generated_at_utc": {"type": "string", "pattern": "Z$"},
             "source_kind": {"enum": ["live", "example"]},
             "payload": {
@@ -377,6 +380,24 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "additionalProperties": False,
             },
             "managers_word": flag,
+            "chips": {
+                "type": "object",
+                "properties": {
+                    "held_by_entry": {
+                        "type": "object",
+                        "patternProperties": {
+                            "^[1-9][0-9]*$": {
+                                "type": "array",
+                                "items": {"enum": ["wildcard", "freehit", "bboost", "3xc"]},
+                                "uniqueItems": True,
+                            }
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["held_by_entry"],
+                "additionalProperties": False,
+            },
         },
         "required": [
             "contract_version",

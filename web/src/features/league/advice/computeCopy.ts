@@ -18,11 +18,14 @@ import type { WindowSize } from "../../moves/modePrices";
 export interface ComputeCopy {
   notPrecomputed: string;
   notComputable: string;
-  chipNotComputed: string;
+  chipUnavailable: string;
+  chipDurationUnknown: string;
   duration: Record<WindowSize, string>;
   durationNote: string;
   leaveOpen: string;
   serviceUnreachable: string;
+  serviceUnreachablePublished: string;
+  serviceUnreachableAbsent: string;
   otherCapture: string;
   /** The gameweek this page advises on has closed; `when` is the formatted deadline. */
   deadlinePassedTitle: string;
@@ -41,8 +44,9 @@ const en: ComputeCopy = {
     "This selection was not computed ahead of time for this publish. You can compute it now.",
   notComputable:
     "The service does not compute this selection right now. Change the selection to use Compute.",
-  chipNotComputed:
-    "A plan with a chosen chip is shown as it was published; the service does not compute chips yet.",
+  chipUnavailable:
+    "The service cannot confirm this chip is available for this selection. The published plan, if any, remains available to read.",
+  chipDurationUnknown: "The time to compute a chosen chip has not been measured.",
   duration: {
     1: "A one-week plan takes between a few seconds and half a minute to compute; a rival strategy and the settings you switch on make it longer.",
     3: "A 3-week plan takes about a minute and a half to compute, and up to two and a half minutes for a rival strategy.",
@@ -53,7 +57,11 @@ const en: ComputeCopy = {
   leaveOpen:
     "You can leave this page open; the plan appears here when the computation finishes. If you reload, the wait picks up where it was.",
   serviceUnreachable:
-    "The compute service cannot be reached right now. The published plans are below, as always.",
+    "The compute service could not be reached. The published plan for this selection could not be confirmed. Retry reading the published plan or try again when the service is available.",
+  serviceUnreachablePublished:
+    "The compute service could not be reached. You can read the published plan for this selection below. Try computing again when the service is available.",
+  serviceUnreachableAbsent:
+    "The compute service could not be reached. No plan has been published for this selection. Choose another published option or try again when the service is available.",
   otherCapture:
     "The compute service is working from a different data capture than this page, so only the published plans are shown.",
   deadlinePassedTitle: "This gameweek's deadline has passed",
@@ -74,6 +82,9 @@ const en: ComputeCopy = {
       "The service has no Top 100 selections for this gameweek. Set the influence to 0 and try again.",
     MANAGERS_WORD_UNAVAILABLE:
       "The service has no club news for this gameweek. Switch the manager's word off and try again.",
+    CHIP_NOT_HELD:
+      "This member cannot play the chosen chip this gameweek. Choose another chip or no chip.",
+    CHIP_HISTORY_UNKNOWN: "The service could not confirm which chips this member holds.",
     UNKNOWN_ENTRY: "The service could not find this member or this rival in the league.",
     LEAGUE_NOT_CONNECTED: "This league is not connected to the compute service.",
     UNKNOWN_STRATEGY: "The service does not compute this strategy.",
@@ -83,23 +94,29 @@ const en: ComputeCopy = {
     IDEMPOTENCY_CONFLICT: "The request collided with another one. You can press Compute again.",
     REQUEST_CONFLICT: "The request collided with another one. You can press Compute again.",
     RATE_LIMITED: "Too many requests arrived in a short time. Wait a little and try again.",
+    OPEN_JOB_LIMITED:
+      "This connection already has several computations open. Wait for one to finish, then try again.",
+    DEADLINE_PASSED:
+      "This gameweek's deadline has passed. Previously computed plans remain available.",
     NOT_READY: "The compute service is not ready yet. Try again in a little while.",
     QUEUE_UNAVAILABLE:
       "The queue could not take the request just now. Try again in a little while.",
     QUEUE_INTEGRITY_ERROR:
-      "The compute service cannot answer right now. The published plan, if any, still stands.",
+      "The compute service cannot answer right now. The published plan, if any, remains available to read.",
     ADVICE_BACKEND_DISABLED:
-      "The compute service cannot answer right now. The published plan, if any, still stands.",
+      "The compute service cannot answer right now. The published plan, if any, remains available to read.",
     INTERNAL_ERROR:
-      "The compute service cannot answer right now. The published plan, if any, still stands.",
+      "The compute service cannot answer right now. The published plan, if any, remains available to read.",
     SERVICE_UNREACHABLE:
-      "The compute service could not be reached. The published plan, if any, still stands.",
+      "The compute service could not be reached. The published plan, if any, remains available to read.",
     ADVICE_FAILED:
-      "The service could not solve this plan. The published plan, if any, still stands.",
+      "The service could not solve this plan. The published plan, if any, remains available to read.",
     CONTEXT_UNAVAILABLE:
       "The service's data capture changed while this was computing. Reload the page and try again.",
     ENTRY_NOT_IN_CAPTURE: "The service's data capture has no squad for this member or this rival.",
     TOO_MANY_ATTEMPTS: "The service tried this computation several times and could not finish it.",
+    PLAN_NOT_FOUND:
+      "The service found no plan for this selection. The published plan, if any, remains available to read.",
     SWITCH_INPUTS_CHANGED:
       "The Top 100 selections or the club news were refreshed while this was computing. Press Compute again.",
     REQUEST_UNREADABLE: "The service could not read the request. You can press Compute again.",
@@ -110,15 +127,17 @@ const en: ComputeCopy = {
     ANSWER_MISMATCH: "The returned answer does not match this selection, so it is not shown.",
     ANSWER_OTHER_CAPTURE:
       "The service computed this from a different data capture than this page shows, so it is not shown. Reload the page and try again.",
-    unknown: "The computation did not complete. The published plan, if any, still stands.",
+    unknown:
+      "The computation did not complete. The published plan, if any, remains available to read.",
   },
 };
 
 const tr: ComputeCopy = {
   notPrecomputed: "Bu seçim bu yayın için önceden hesaplanmadı. Şimdi hesaplatabilirsin.",
   notComputable: "Servis bu seçimi şu an hesaplamıyor. Hesapla için seçimi değiştir.",
-  chipNotComputed:
-    "Çip seçilmiş plan yayınlandığı haliyle gösterilir; servis henüz çip hesaplamıyor.",
+  chipUnavailable:
+    "Servis bu seçim için çipin kullanılabilir olduğunu doğrulayamıyor. Yayımlanmış plan varsa okunabilir.",
+  chipDurationUnknown: "Seçilen çipin hesaplama süresi ölçülmedi.",
   duration: {
     1: "Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer; rakip stratejisi ve açtığın ayarlar süreyi uzatır.",
     3: "3 haftalık planın hesabı yaklaşık bir buçuk dakika, rakip stratejisinde iki buçuk dakikaya kadar sürer.",
@@ -129,7 +148,11 @@ const tr: ComputeCopy = {
   leaveOpen:
     "Sayfayı açık bırakabilirsin; hesap bitince plan burada görünür. Sayfayı yenilersen bekleme kaldığı yerden sürer.",
   serviceUnreachable:
-    "Hesaplama servisine şu an ulaşılamıyor. Yayınlanmış planlar her zamanki gibi aşağıda.",
+    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan doğrulanamadı. Yayımlanmış planı okumayı veya servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
+  serviceUnreachablePublished:
+    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış planı aşağıda okuyabilirsin. Servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
+  serviceUnreachableAbsent:
+    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan yok. Yayımlanmış başka bir seçeneği seç veya servis erişilebilir olduğunda yeniden dene.",
   otherCapture:
     "Hesaplama servisi şu an bu sayfadakinden farklı bir veri kaydıyla çalışıyor; bu yüzden yalnız yayınlanmış planlar gösteriliyor.",
   deadlinePassedTitle: "Bu oyun haftasının son tarihi geçti",
@@ -149,6 +172,8 @@ const tr: ComputeCopy = {
       "Serviste bu hafta için Top 100 seçimleri yok. Etkiyi 0 yapıp yeniden dene.",
     MANAGERS_WORD_UNAVAILABLE:
       "Serviste bu hafta için kulüp haberi yok. Hocanın sözünü kapatıp yeniden dene.",
+    CHIP_NOT_HELD: "Bu üye seçilen çipi bu hafta oynayamıyor. Başka bir çip seç ya da çipi kapat.",
+    CHIP_HISTORY_UNKNOWN: "Servis bu üyenin hangi çiplere sahip olduğunu doğrulayamadı.",
     UNKNOWN_ENTRY: "Servis bu üyeyi ya da bu rakibi ligde bulamadı.",
     LEAGUE_NOT_CONNECTED: "Bu lig hesaplama servisine bağlı değil.",
     UNKNOWN_STRATEGY: "Servis bu stratejiyi hesaplamıyor.",
@@ -157,22 +182,24 @@ const tr: ComputeCopy = {
     IDEMPOTENCY_CONFLICT: "İstek başka bir istekle çakıştı. Yeniden Hesapla'ya basabilirsin.",
     REQUEST_CONFLICT: "İstek başka bir istekle çakıştı. Yeniden Hesapla'ya basabilirsin.",
     RATE_LIMITED: "Kısa sürede çok fazla istek geldi. Biraz bekleyip yeniden dene.",
+    OPEN_JOB_LIMITED:
+      "Bu bağlantıda zaten birkaç hesaplama açık. Birinin bitmesini bekleyip yeniden dene.",
+    DEADLINE_PASSED:
+      "Bu oyun haftasının son tarihi geçti. Önceden hesaplanan planlara erişebilirsin.",
     NOT_READY: "Hesaplama servisi henüz hazır değil. Biraz sonra yeniden dene.",
     QUEUE_UNAVAILABLE: "Hesap sırası isteği şu an alamadı. Biraz sonra yeniden dene.",
     QUEUE_INTEGRITY_ERROR:
-      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
+      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, okunabilir.",
     ADVICE_BACKEND_DISABLED:
-      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
-    INTERNAL_ERROR:
-      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
-    SERVICE_UNREACHABLE:
-      "Hesaplama servisine ulaşılamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
-    ADVICE_FAILED:
-      "Servis bu planı çözemedi. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
+      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, okunabilir.",
+    INTERNAL_ERROR: "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, okunabilir.",
+    SERVICE_UNREACHABLE: "Hesaplama servisine ulaşılamadı. Yayınlanmış plan, varsa, okunabilir.",
+    ADVICE_FAILED: "Servis bu planı çözemedi. Yayınlanmış plan, varsa, okunabilir.",
     CONTEXT_UNAVAILABLE:
       "Hesap sürerken servisin veri kaydı değişti. Sayfayı yenileyip yeniden dene.",
     ENTRY_NOT_IN_CAPTURE: "Servisin veri kaydında bu üyenin ya da bu rakibin kadrosu yok.",
     TOO_MANY_ATTEMPTS: "Servis bu hesabı birkaç kez denedi ve bitiremedi.",
+    PLAN_NOT_FOUND: "Servis bu seçim için plan bulamadı. Yayımlanmış plan varsa okunabilir.",
     SWITCH_INPUTS_CHANGED:
       "Hesap sürerken Top 100 seçimleri ya da kulüp haberleri yenilendi. Yeniden Hesapla'ya bas.",
     REQUEST_UNREADABLE: "Servis isteği okuyamadı. Yeniden Hesapla'ya basabilirsin.",
@@ -183,7 +210,7 @@ const tr: ComputeCopy = {
     ANSWER_MISMATCH: "Dönen cevap bu seçimle eşleşmiyor; bu yüzden gösterilmiyor.",
     ANSWER_OTHER_CAPTURE:
       "Servis bunu bu sayfadakinden farklı bir veri kaydıyla hesapladı; bu yüzden gösterilmiyor. Sayfayı yenileyip yeniden dene.",
-    unknown: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
+    unknown: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, okunabilir.",
   },
 };
 

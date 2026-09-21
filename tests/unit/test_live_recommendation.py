@@ -34,6 +34,7 @@ from squadopt.live import (
     read_inputs,
     render,
 )
+from squadopt.live.recommendation import InSeasonProjection
 from squadopt.live.report import (
     LIVE_DETERMINISTIC_UNITS,
     LIVE_WALL_CEILING_SECONDS,
@@ -792,19 +793,17 @@ def test_live_residual_history_copies_input_and_rejects_missing_columns() -> Non
         )
 
 
-def test_available_risk_is_shifted_for_selection_optimism_and_states_it(tmp_path: Path) -> None:
-    from squadopt.live.risk import DEVELOPMENT_SELECTION_OPTIMISM
-
+def test_opening_risk_does_not_inherit_the_midseason_control_shift(tmp_path: Path) -> None:
     recommendation = _recommend_with_risk(tmp_path)
     risk = recommendation.risk
     assert risk.status is LiveRiskStatus.AVAILABLE
-    expected_shift = DEVELOPMENT_SELECTION_OPTIMISM.location_shift(11)
-    assert risk.diagnostics["location_shift_points"] == pytest.approx(expected_shift)
-    assert expected_shift == pytest.approx(-(11 * 2.951 + 3.863))
-    assert risk.diagnostics["selection_optimism_source"].startswith("selection_optimism_profile_v1")
+    assert risk.diagnostics["location_shift_points"] == 0.0
+    assert risk.diagnostics["selection_optimism_status"] == "model_mismatch"
+    assert risk.diagnostics["selection_optimism_source"] is None
     limits = risk.diagnostics["stated_limits"]
     assert isinstance(limits, list)
-    assert any("shifted by" in limit for limit in limits)
+    assert any("different model identity" in limit for limit in limits)
+    assert any("No selection-optimism correction" in limit for limit in limits)
     assert any("calendar-blind" in limit for limit in limits)
     # The raw squad-level spread is stated as such (the audit measured it slightly narrow).
     assert any("raw scenario spread" in limit for limit in limits)
@@ -813,6 +812,112 @@ def test_available_risk_is_shifted_for_selection_optimism_and_states_it(tmp_path
     assert risk.metrics is not None
     assert interval[0] <= risk.metrics.probability_below_threshold <= interval[1]
     assert "90% [" in render(recommendation)
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        None,
+        "model_name",
+        "model_version",
+        "feature_contract_version",
+        "post_processing_contract_version",
+    ],
+)
+def test_only_a_fully_matching_selection_profile_can_shift_risk(
+    tmp_path: Path,
+    mismatch: str | None,
+) -> None:
+    from squadopt.live.risk import SelectionOptimism, evaluate_live_risk
+
+    inputs = read_inputs(_capture(tmp_path), season=SEASON)
+    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
+    # A synthetic component identity with its own matching residuals. The regression
+    # must not depend on a residual mismatch accidentally hiding the shift defect.
+    projection = replace(
+        projection,
+        diagnostics={
+            **projection.diagnostics,
+            "model_version": "phase_c_control_components_v1",
+            "feature_contract_version": "synthetic-components-v1",
+        },
+    )
+    history = replace(
+        _risk_history(projection),
+        model_version="phase_c_control_components_v1",
+        feature_contract_version="synthetic-components-v1",
+    )
+    decision = optimize_squad(projection.table, OptimizationConfig())
+    profile = SelectionOptimism(
+        per_starter_points=1.0,
+        captain_points=2.0,
+        source="synthetic-only",
+        model_name=history.model_name,
+        model_version=history.model_version,
+        feature_contract_version=history.feature_contract_version,
+        post_processing_contract_version=history.post_processing_contract_version,
+    )
+    if mismatch is not None:
+        profile = replace(profile, **{mismatch: "another-contract"})
+    scenario_config = ScenarioConfig(
+        scenario_count=64, min_history_folds=2, min_player_observations=2
+    )
+    uncorrected = evaluate_live_risk(
+        inputs,
+        projection,
+        decision,
+        history,
+        scenario_config=scenario_config,
+        selection_optimism=None,
+    )
+    risk = evaluate_live_risk(
+        inputs,
+        projection,
+        decision,
+        history,
+        scenario_config=scenario_config,
+        selection_optimism=profile,
+    )
+    historical = evaluate_live_risk(
+        inputs,
+        projection,
+        decision,
+        history,
+        scenario_config=scenario_config,
+    )
+    assert risk.status is LiveRiskStatus.AVAILABLE
+    assert historical.diagnostics["selection_optimism_status"] == "model_mismatch"
+    assert historical.metrics == uncorrected.metrics
+    assert uncorrected.diagnostics["selection_optimism_status"] == "not_requested"
+    assert risk.diagnostics["selection_optimism_status"] == (
+        "applied" if mismatch is None else "model_mismatch"
+    )
+    assert risk.diagnostics["location_shift_points"] == (-13.0 if mismatch is None else 0.0)
+    assert risk.diagnostics["selection_optimism_source"] == (
+        "synthetic-only" if mismatch is None else None
+    )
+    if mismatch is not None:
+        assert risk.metrics == uncorrected.metrics
+    explicit = evaluate_live_risk(
+        inputs,
+        projection,
+        decision,
+        history,
+        scenario_config=scenario_config,
+        selection_optimism=profile,
+        evaluation_config=ScenarioEvaluationConfig(location_shift_points=-7.0),
+    )
+    assert explicit.diagnostics["selection_optimism_status"] == "explicit_shift"
+    assert explicit.diagnostics["selection_optimism_source"] is None
+    assert explicit.diagnostics["location_shift_points"] == -7.0
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), True])
+def test_selection_profile_refuses_nonfinite_or_boolean_coefficients(value: float) -> None:
+    from squadopt.live.risk import DEVELOPMENT_SELECTION_OPTIMISM
+
+    with pytest.raises(LiveRiskValidationError, match="finite"):
+        replace(DEVELOPMENT_SELECTION_OPTIMISM, per_starter_points=value)
 
 
 def test_rivals_are_compared_in_the_same_scenarios_and_reported(tmp_path: Path) -> None:
@@ -905,3 +1010,67 @@ def test_build_recommendation_passes_the_calendar_and_rivals_to_the_risk_layer(
     assert risk.status is LiveRiskStatus.AVAILABLE
     assert risk.diagnostics["double_gameweek_scale"] == 1.45
     assert not any("calendar-blind" in limit for limit in risk.diagnostics["stated_limits"])
+
+
+# --- the appearance chance reaching the decision pool -----------------------
+
+
+def _in_season(chances: dict[int, float] | None, snapshot_id: str) -> Any:
+    """A handoff covering the whole captured roster, with the chances the caller states."""
+
+    codes = [int(record["code"]) for record in _elements()]
+    return InSeasonProjection(
+        season=SEASON,
+        gameweek=2,
+        source_snapshot_id=snapshot_id,
+        model_name=CONTROL_MODEL_NAME,
+        model_version="synthetic-in-season-v0",
+        feature_contract_version="synthetic-in-season-features-v0",
+        expected_points=dict.fromkeys(codes, 4.0),
+        appearance_probability=chances,
+    )
+
+
+def test_a_stated_appearance_chance_reaches_the_decision_pool(tmp_path: Path) -> None:
+    """Where the bench rule of #531 will read it, one step short of reading it."""
+
+    inputs = read_inputs(_capture(tmp_path), season=SEASON, gameweek=2)
+    handoff = _in_season({1001: 0.92, 1004: 0.35}, inputs.snapshot_id)
+
+    table = project(inputs, in_season=handoff).table.set_index("player_id")
+
+    assert table.loc[1001, "appearance_probability"] == pytest.approx(0.92)
+    assert table.loc[1004, "appearance_probability"] == pytest.approx(0.35)
+    # Covered by the handoff's points and not by its chances: nobody modelled this one.
+    assert pd.isna(table.loc[1012, "appearance_probability"])
+
+
+def test_a_handoff_that_states_no_chance_leaves_the_pool_as_it_is(tmp_path: Path) -> None:
+    inputs = read_inputs(_capture(tmp_path), season=SEASON, gameweek=2)
+
+    table = project(inputs, in_season=_in_season(None, inputs.snapshot_id)).table
+
+    assert "appearance_probability" not in table.columns
+
+
+def test_availability_news_moves_the_chance_in_the_pool_too(tmp_path: Path) -> None:
+    """End to end, the property the bench rule rests on.
+
+    The producer's chance is news from before the deadline; the capture's status is news
+    from the club. Both are statements about appearing, so the pool carries their
+    product, and the quotient with the points stays the conditional mean.
+    """
+
+    elements = _elements()
+    elements[3]["status"] = "d"
+    elements[3]["chance_of_playing_next_round"] = 50
+    inputs = read_inputs(
+        _capture(tmp_path / "b", _bootstrap(elements=elements)), season=SEASON, gameweek=2
+    )
+    handoff = _in_season({1004: 0.8}, inputs.snapshot_id)
+
+    row = project(inputs, in_season=handoff).table.set_index("player_id").loc[1004]
+
+    assert row["appearance_probability"] == pytest.approx(0.4)
+    assert row["expected_points"] == pytest.approx(2.0)
+    assert row["expected_points"] / row["appearance_probability"] == pytest.approx(5.0)

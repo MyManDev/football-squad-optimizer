@@ -22,7 +22,7 @@ export interface StoredAdviceJob {
 
 /** The question a request asks, as one string: every field that changes the answer. */
 export function adviceRequestKey(request: AdviceRequest): string {
-  return [
+  const key = [
     request.leagueId,
     request.entryId,
     request.strategy,
@@ -33,6 +33,7 @@ export function adviceRequestKey(request: AdviceRequest): string {
     request.season ?? "",
     request.gameweek ?? "",
   ].join(":");
+  return request.chip == null ? key : `${key}:chip:${request.chip}`;
 }
 
 function storage(): Storage | null {

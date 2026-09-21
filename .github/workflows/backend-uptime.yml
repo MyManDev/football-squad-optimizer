@@ -1,0 +1,139 @@
+# Standard hosted-runner minutes are free for this public repository. Private copies
+# consume their plan's allowance: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+name: Backend uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the issue transition without changing issues
+        type: boolean
+        default: true
+      health_url:
+        description: Optional test URL, accepted only for a dry run
+        type: string
+        default: ""
+      exercise:
+        description: Open and close a labelled exercise issue without probing health (dry_run must be false)
+        type: boolean
+        default: false
+
+permissions:
+  issues: write
+
+concurrency:
+  group: backend-uptime
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe health and update the incident
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DRY_RUN: ${{ inputs.dry_run || false }}
+          TEST_HEALTH_URL: ${{ inputs.health_url }}
+          EXERCISE: ${{ github.event_name == 'workflow_dispatch' && inputs.exercise == true }}
+        with:
+          script: |
+            const dryRun = process.env.DRY_RUN === "true";
+            const testUrl = process.env.TEST_HEALTH_URL?.trim();
+            const exercise = context.eventName === "workflow_dispatch" && process.env.EXERCISE === "true";
+            if (exercise && (dryRun || testUrl)) {
+              core.setFailed("The issue exercise requires dry_run=false and no health_url.");
+              return;
+            }
+            if (testUrl && !dryRun) {
+              core.setFailed("A test URL is allowed only in a dry run.");
+              return;
+            }
+            const url = testUrl || "https://squadopt-api.mymandev.com/health";
+            let healthy = false;
+            let status = exercise ? "synthetic failed observation (no health request)" : undefined;
+            for (let attempt = 0; !exercise && attempt < 2; attempt += 1) {
+              try {
+                const response = await fetch(url, {
+                  method: "GET",
+                  headers: { "User-Agent": "squadopt-backend-uptime/1" },
+                  signal: AbortSignal.timeout(10_000),
+                  redirect: "error",
+                });
+                status = `HTTP ${response.status}`;
+                healthy = response.status === 200;
+                await response.body?.cancel();
+              } catch (error) {
+                healthy = false;
+                status = ["TimeoutError", "AbortError"].includes(error.name)
+                  ? "request timed out" : "request failed";
+              }
+              if (healthy) break;
+              if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 20_000));
+            }
+            const label = exercise ? "backend-uptime-exercise" : "backend-down";
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = `EXERCISE run ${context.runId}, attempt ${process.env.GITHUB_RUN_ATTEMPT || "1"}`;
+            const incidents = exercise ? [] : (await github.paginate(github.rest.issues.listForRepo, {
+              ...context.repo, state: "open", labels: label, per_page: 100,
+            })).filter((issue) => !issue.pull_request);
+            if (incidents.length > 1) {
+              core.setFailed("Multiple backend-down issues exist; reconcile them before the next run.");
+              return;
+            }
+            const incident = incidents[0];
+            const action = healthy ? (incident ? "recover and close" : "no change")
+              : (incident ? "no change" : "open incident");
+            core.info(`${dryRun ? "Dry run: would " : "Health: "}${action}; ${status}`);
+            if (dryRun) return;
+            const at = new Date().toISOString();
+            if (!healthy && !incident) {
+              try {
+                await github.rest.issues.getLabel({ ...context.repo, name: label });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ ...context.repo, name: label, color: "d73a4a" });
+              }
+              const created = (await github.rest.issues.create({
+                ...context.repo,
+                title: exercise ? `[EXERCISE] Backend alarm permission, run ${context.runId}` : "Backend health check failed",
+                labels: [label],
+                body: exercise
+                  ? `${marker} at ${at}.\n\n${run}\n\nSynthetic failure and recovery. This is not a production incident.`
+                  : `The health check failed twice. Observed at ${at}. Result: ${status}.`,
+              })).data;
+              if (!exercise) return;
+              core.info(`Exercise issue created: ${created.html_url}`);
+              // Recover only the issue this invocation created. Never search for
+              // backend-down here: a real incident must survive this exercise.
+              const own = (await github.rest.issues.get({
+                ...context.repo, issue_number: created.number,
+              })).data;
+              const labels = own.labels.map((item) => typeof item === "string" ? item : item.name);
+              if (own.number !== created.number || own.pull_request || own.state !== "open"
+                  || !labels.includes(label) || labels.includes("backend-down")
+                  || own.title !== `[EXERCISE] Backend alarm permission, run ${context.runId}`
+                  || own.body?.split(/\r?\n/)[0] !== `${marker} at ${at}.`) {
+                throw new Error("Refusing to close an issue not owned by this exercise.");
+              }
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: created.number,
+                body: `${marker}: synthetic healthy recovery at ${new Date().toISOString()}. No health request was made.`,
+              });
+              await github.rest.issues.update({
+                ...context.repo, issue_number: created.number, state: "closed",
+              });
+              const closed = (await github.rest.issues.get({
+                ...context.repo, issue_number: created.number,
+              })).data;
+              if (closed.state !== "closed") throw new Error("Exercise issue did not close.");
+              core.info(`Exercise issue closed: ${created.html_url}`);
+            } else if (healthy && incident) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: incident.number,
+                body: `Health recovered at ${at}. Result: ${status}.`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number: incident.number, state: "closed" });
+            }

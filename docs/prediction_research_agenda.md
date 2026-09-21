@@ -1,5 +1,24 @@
 # Prediction Research Agenda
 
+## Applicability boundary: historical points and live DEFCON scoring
+
+The 2021–25 development measurements use the historical scoring regime without DEFCON.
+Live 2026–27 `total_points` already includes defensive-contribution points, but the current
+canonical training schema has no DEFCON label and the component model does not model that
+contribution explicitly. Historical ranking, error, calibration and squad-decision verdicts
+therefore apply to their recorded scoring regime; they do not establish the same performance
+under live scoring. A historical improvement must not be described as proof of live improvement.
+
+**Do not fit or backfill a DEFCON component here.** The available raw DEFCON season is
+2025–26, the locked holdout for this v1 research path; its presence is not permission to read
+it, derive labels, or reinterpret it as additional development data. A DEFCON study requires
+an explicit new data/target/scoring declaration and owner authorization. Existing separately
+authorized v2 studies do not grant that permission to this programme's v1 candidates.
+
+This limitation narrows the applicability of existing verdicts without changing their
+historical measurements, original gates or operational model. See the
+[measurements index](measurements_index.md) and [review scope](prediction_e2e_review_scope.md).
+
 Owner: data / data mining. The question this side owns:
 
 > How do we produce the best available, leakage-safe, calibrated future information for the
@@ -50,8 +69,9 @@ conclusions.
 
 ## The open queue
 
-Strictly sequential, because both open candidates change the same component —
-`expected_points_rate` — and measuring them together would make the result unattributable.
+It was strictly sequential while both candidates were open, because both change the same
+component, `expected_points_rate`, and measuring them together would have made the result
+unattributable. One of the two is now closed.
 
 ### 1. Issue #43 — a learned rate combined with the calendar
 
@@ -64,9 +84,19 @@ three owners (`issue43_handoff_acceptance.md:45`).
 When it runs, the record must name the executing machine — `fit_learned_rate` solves a ridge
 system through LAPACK, which is not bit-identical across machines.
 
-### 2. Issue #88 — give the scoring rate the opponent it faces
+### 2. Issue #88: closed as superseded on 2026-09-19
 
-Does not start until #43's verdict is recorded. The signal evidence is already measured
+Closed on the owner's decision, not measured. The candidate adds two inputs to the ridge rate
+of the two-stage model, and since #395 the live decision is made by the Phase C component
+base, which has no such rate; a verdict would have been about a model nothing reads. The same
+fitted signals were also measured where they would have been used, as an adjustment at the
+decision, and lost 0.91 points per fold (`experiments/opponent_projection.py`). The frozen
+declaration (`route_a_declaration.md`) and the signal study stay as history. A future
+opponent-aware candidate is a new declaration against the component base, frozen before any
+fold is read, and it has to answer that decision-level negative first. With this closed,
+nothing waits on #43 any more.
+
+What was known when it was opened, kept for whoever writes that declaration. The signal evidence is already measured
 (`opponent_strength_signal.md`): attackers spread +0.162 across opponent-defence quartiles and
 are monotone across all four; goalkeepers and defenders spread +0.322 against opponent attacks
 but are not monotone.
@@ -84,7 +114,7 @@ Not scheduled. Ordered by what each one needs from the ones before it.
 
 **Time-of-knowledge as a first-class property.** Today the guarantee is a `shift(1)` inside one
 primitive (`features/rolling.py:101`) plus a per-column timing classification in
-`data/schema.py` (`PRE_MATCH_COLUMNS`, `OUTCOME_COLUMNS`, `AMBIGUOUS_TIMING_COLUMNS`), and it is
+`src/squadopt/data/schema.py` (`PRE_MATCH_COLUMNS`, `OUTCOME_COLUMNS`, `AMBIGUOUS_TIMING_COLUMNS`), and it is
 enforced by mutation tests rather than by types. That is stronger than most projects manage and
 it is still a convention. The live path already has the real concept — a capture instant
 compared against a published deadline — and the archive cannot prove the same thing. Making the

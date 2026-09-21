@@ -35,13 +35,14 @@ deadline escape, and it prints both paths so the published tree can be attribute
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from squadopt.live.runlog import LOG_ROOT_NAME
+from squadopt.contracts.run_logs import LOG_ROOT_NAME
 
 KINDS = ("decision", "settled")
 
@@ -209,8 +210,11 @@ class PublishNames:
     season: str
     gameweek: int
     kind: str
+    suffix: str = ""
 
     def __post_init__(self) -> None:
+        if self.suffix and not re.fullmatch(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", self.suffix):
+            raise PublishError("Publish suffix must contain letters, digits or single hyphens.")
         if self.kind not in KINDS:
             raise PublishError(f"kind must be one of {KINDS}, got {self.kind!r}.")
         if not 1 <= int(self.gameweek) <= 38:
@@ -221,11 +225,13 @@ class PublishNames:
 
     @property
     def branch(self) -> str:
-        return f"feature/gw{self.gameweek:02d}-{self.kind}-site"
+        suffix = f"-{self.suffix}" if self.suffix else ""
+        return f"feature/gw{self.gameweek:02d}-{self.kind}-site{suffix}"
 
     @property
     def worktree_directory(self) -> str:
-        return f".codex-tmp/publications/gw{self.gameweek:02d}-{self.kind}"
+        suffix = f"-{self.suffix}" if self.suffix else ""
+        return f".codex-tmp/publications/gw{self.gameweek:02d}-{self.kind}{suffix}"
 
     @property
     def site_tag(self) -> str:
@@ -390,7 +396,7 @@ def publish(
     if branch_exists and not force_branch:
         raise PublishError(
             f"Branch {names.branch} already exists on origin. Re-running a publish is fine, "
-            "but say so: pass --force-branch to reuse it."
+            "but say so: pass --force-branch to reuse it or choose another --publish-suffix."
         )
     if dry_run:
         print(f"dry run: would create {names.branch} in {worktree}, build, commit, push, PR.")

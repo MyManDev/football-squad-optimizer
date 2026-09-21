@@ -1,14 +1,19 @@
 """The POST: a hit, one open job per request, idempotency, CORS, and rate limits."""
 
 import json
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import create_app
 from squadopt.platform.advice_cache import FileAdviceCache
+from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
+from squadopt.platform.advice_observability import API_COUNTER_FAMILIES, AdviceMetrics
 from squadopt.platform.advice_queue import FileJobQueue, run_advice_worker_once
 from squadopt.platform.advice_read import (
     AdviceReadStore,
@@ -19,7 +24,7 @@ from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
 )
-from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.jobs_contract import AdviceJob, JobError
 
 LEAGUE_ID = 352490
 CONTEXT = AdviceRequestContext(
@@ -78,7 +83,15 @@ def _publish_members(root: Path, *, gameweek: int = 3) -> None:
     path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
 
 
-def _world(tmp_path: Path, *, allowed_origins: tuple[str, ...] = (), **app_kwargs: object):
+def _world(
+    tmp_path: Path,
+    *,
+    allowed_origins: tuple[str, ...] = (),
+    metrics: AdviceMetrics | None = None,
+    submit_services: list[AdviceSubmitService] | None = None,
+    utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
+    **app_kwargs: object,
+):
     _publish_members(tmp_path / "site")
     cache = FileAdviceCache(tmp_path / "cache")
     queue = FileJobQueue(tmp_path / "jobs")
@@ -89,15 +102,104 @@ def _world(tmp_path: Path, *, allowed_origins: tuple[str, ...] = (), **app_kwarg
         {"saf-puan": False, "fark-yarat": True},
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
+    if submit_services is not None:
+        submit_services.append(submit)
     application = create_app(
         data_root=tmp_path / "site",
         advice_store=reader,
         advice_submit=submit,
+        metrics=metrics,
         allowed_origins=allowed_origins,
-        utc_now=lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
+        utc_now=utc_now,
     )
     client = TestClient(application, raise_server_exceptions=False)
     return client, cache, queue
+
+
+@pytest.mark.parametrize(
+    ("now", "status"),
+    [("2026-08-28T17:29:59Z", 202), ("2026-08-28T17:30:00Z", 422), ("2026-08-29T12:00:00Z", 422)],
+)
+def test_only_new_work_is_refused_at_the_captured_deadline(
+    tmp_path: Path, now: str, status: int
+) -> None:
+    metrics = AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)
+    services: list[AdviceSubmitService] = []
+    client, _cache, queue = _world(
+        tmp_path,
+        metrics=metrics,
+        submit_services=services,
+        specs=FileAdviceJobSpecStore(tmp_path / "specs"),
+        deadline_for=lambda context: "2026-08-28T17:30:00Z",
+        utc_now=lambda: datetime.fromisoformat(now),
+    )
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*.json")}
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == status
+    if status == 422:
+        assert response.json()["error"]["code"] == "DEADLINE_PASSED"
+        reasons = response.json()["error"]["details"]["public_reason"]
+        assert "Previously computed plans" in reasons["en"]
+        assert "Önceden hesaplanan" in reasons["tr"]
+        assert "Retry-After" not in response.headers
+        assert before == {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*.json")}
+        assert not queue.jobs()
+        assert not services[0]._client_jobs
+        assert "advice_deadline_refused_total 1\n" in metrics.render()
+    else:
+        assert len(queue.jobs()) == 1
+        assert "advice_deadline_refused_total 0\n" in metrics.render()
+
+
+def test_deadline_preserves_replays_cache_and_read_routes(tmp_path: Path) -> None:
+    now = [datetime(2026, 8, 27, 12, 0, tzinfo=UTC)]
+    client, cache, queue = _world(
+        tmp_path,
+        deadline_for=lambda context: "2026-08-28T17:30:00Z",
+        utc_now=lambda: now[0],
+    )
+    headers = {"Idempotency-Key": "before-deadline"}
+    first = client.post(ADVICE_URL, json=BODY, headers=headers)
+    assert first.status_code == 202
+    capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
+    readiness = client.get("/ready").json()
+    now[0] = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
+    for replay_headers in (headers, {}):
+        replay = client.post(ADVICE_URL, json=BODY, headers=replay_headers)
+        assert replay.status_code == 202
+        assert replay.json()["job_id"] == first.json()["job_id"]
+    assert client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json() == capabilities
+    assert client.get("/ready").json() == readiness
+    run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc=now[0].isoformat()
+    )
+    assert client.post(ADVICE_URL, json=BODY).content == _valid_advice_document()
+    assert client.get(ADVICE_URL, params=BODY).content == _valid_advice_document()
+    assert len(queue.jobs()) == 1
+
+
+def test_late_cache_hit_is_served_without_checking_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unexpected_deadline(_context: AdviceRequestContext) -> str:
+        pytest.fail("a cache hit must not consult the deadline")
+
+    client, cache, queue = _world(tmp_path, deadline_for=unexpected_deadline)
+    read = cache.get
+    calls = 0
+
+    def late_hit(key: str):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            cache.put(key, _valid_advice_document())
+        return read(key)
+
+    monkeypatch.setattr(cache, "get", late_hit)
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == 200
+    assert response.content == _valid_advice_document()
+    assert not queue.jobs()
 
 
 def test_the_whole_story_get_404_post_202_worker_poll_second_post_200(
@@ -171,6 +273,156 @@ def test_rate_limits_answer_429(tmp_path: Path) -> None:
     third = client.post(ADVICE_URL, json=BODY)
     assert third.status_code == 429
     assert third.json()["error"]["code"] == "RATE_LIMITED"
+
+
+def test_four_open_jobs_include_running_and_refusal_writes_no_job_or_spec(tmp_path: Path) -> None:
+    metrics = AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)
+    client, _cache, queue = _world(
+        tmp_path, specs=FileAdviceJobSpecStore(tmp_path / "specs"), metrics=metrics
+    )
+    other_url = ADVICE_URL.replace("313686", "2199732")
+    for window in (1, 3, 5):
+        assert client.post(ADVICE_URL, json={**BODY, "window": window}).status_code == 202
+    assert client.post(other_url, json=BODY).status_code == 202
+    assert queue.claim(at_utc="2026-08-27T12:01:00Z") is not None
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*.json")}
+    refused = client.post(other_url, json={**BODY, "window": 3})
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "OPEN_JOB_LIMITED"
+    reasons = refused.json()["error"]["details"]["public_reason"]
+    assert "Wait for one to finish" in reasons["en"]
+    assert "Birinin bitmesini bekleyip" in reasons["tr"]
+    assert "Retry-After" not in refused.headers  # There is no known completion time.
+    assert before == {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*.json")}
+    assert "advice_open_job_refused_total 1\n" in metrics.render()
+    assert all(b"testclient" not in content for content in before.values())
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        assert other.post(other_url, json={**BODY, "window": 3}).status_code == 202
+
+
+def test_dedup_replay_and_cache_hits_do_not_consume_or_require_a_slot(tmp_path: Path) -> None:
+    client, cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    headers = {"Idempotency-Key": "first-request"}
+    first = client.post(ADVICE_URL, json=BODY, headers=headers)
+    for replay_headers in (headers, {"Idempotency-Key": "second-request"}, {}):
+        replay = client.post(ADVICE_URL, json=BODY, headers=replay_headers)
+        assert replay.status_code == 202
+        assert replay.json()["job_id"] == first.json()["job_id"]
+    assert len(queue.jobs()) == 1
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 429
+    cache.put(queue.jobs()[0].cache_key, _valid_advice_document())
+    assert client.post(ADVICE_URL, json=BODY).status_code == 200
+
+
+@pytest.mark.parametrize("terminal", ["completed", "failed", "missing"])
+def test_admission_releases_finished_or_missing_jobs(tmp_path: Path, terminal: str) -> None:
+    client, cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    first = client.post(ADVICE_URL, json=BODY)
+    if terminal == "completed":
+        run_advice_worker_once(
+            queue, cache, lambda _job: _valid_advice_document(), at_utc="2026-08-27T12:01:00Z"
+        )
+    elif terminal == "failed":
+        claimed = queue.claim(at_utc="2026-08-27T12:01:00Z")
+        queue.store(
+            claimed.transition(
+                "failed", at_utc="2026-08-27T12:01:01Z", error=JobError("ADVICE_FAILED", "fixture")
+            )
+        )
+    else:
+        (tmp_path / "jobs" / f"{first.json()['job_id']}.json").unlink()
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+
+
+def test_simultaneous_submissions_cannot_overbook_one_address(tmp_path: Path) -> None:
+    client, _cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    ready = Barrier(3)
+
+    def post(window: int) -> int:
+        with TestClient(client.app) as requester:
+            ready.wait(timeout=10)
+            return requester.post(ADVICE_URL, json={**BODY, "window": window}).status_code
+
+    with ThreadPoolExecutor(max_workers=3) as callers:
+        assert sorted(callers.map(post, (1, 3, 5))) == [202, 429, 429]
+    assert len(queue.jobs()) == 1
+
+
+def test_a_late_cache_publication_is_not_refused_at_the_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    original = FileJobQueue.submit_unless_cached
+
+    def publish_before_transaction(self, job, **kwargs):
+        cache.put(job.cache_key, _valid_advice_document())
+        return original(self, job, **kwargs)
+
+    monkeypatch.setattr(FileJobQueue, "submit_unless_cached", publish_before_transaction)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 200
+    assert len(queue.jobs()) == 1
+
+
+def test_a_new_api_process_does_not_recover_client_addresses_from_disk(tmp_path: Path) -> None:
+    client, _cache, _queue = _world(tmp_path, max_open_jobs_per_client=1)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    restarted, _cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    assert restarted.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    assert len(queue.jobs()) == 2
+
+
+def test_two_api_processes_have_independent_caps_over_one_store(tmp_path: Path) -> None:
+    first, _cache, queue = _world(tmp_path, max_open_jobs_per_client=1)
+    second, _cache, _queue = _world(tmp_path, max_open_jobs_per_client=1)
+    assert first.post(ADVICE_URL, json=BODY).status_code == 202
+    assert second.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    for client in (first, second):
+        assert client.post(ADVICE_URL, json={**BODY, "window": 5}).status_code == 429
+    assert len(queue.jobs()) == 2
+
+
+def test_admission_does_not_add_another_full_history_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _cache, queue = _world(tmp_path)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    original = queue.jobs
+    calls = 0
+
+    def history():
+        nonlocal calls
+        calls += 1
+        assert calls == 1  # Only the existing idempotency/attempt history lookup.
+        return original()
+
+    monkeypatch.setattr(queue, "jobs", history)
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    assert calls == 1
+
+
+@pytest.mark.parametrize("failure", ["spec", "queue"])
+def test_failed_preparation_or_publication_leaves_no_job_or_occupied_slot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    specs = FileAdviceJobSpecStore(tmp_path / "specs")
+    services: list[AdviceSubmitService] = []
+    client, _cache, queue = _world(
+        tmp_path, specs=specs, max_open_jobs_per_client=1, submit_services=services
+    )
+
+    def fail(*_args):
+        raise OSError("fixture write failure")
+
+    with monkeypatch.context() as patch:
+        if failure == "spec":
+            patch.setattr(specs, "put", fail)
+        else:
+            patch.setattr(queue, "submit_unique", fail)
+        assert client.post(ADVICE_URL, json=BODY).status_code == 500
+    assert services[0]._client_jobs == {}  # Free now, before another admission prunes.
+    assert queue.jobs() == ()
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
 
 
 def test_a_cache_hit_spends_no_rate_limit_token(tmp_path: Path) -> None:
