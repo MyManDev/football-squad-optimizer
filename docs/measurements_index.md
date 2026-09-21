@@ -59,6 +59,19 @@ were **not** re-run here, so their multi-week numbers are not reproducible from 
 code and it was not measured whether any of them moves. Their verdicts are left standing as
 recorded; re-running one is a new measurement, not a regeneration.
 
+## Scoring-regime limit on historical prediction evidence
+
+The 2021–25 prediction-development records below use historical points **without DEFCON**.
+Live 2026–27 total points include defensive contributions that the component model does not
+explicitly model. Their ranking, error and paired-decision verdicts retain their original
+meaning on the recorded population; none is proof of performance under live DEFCON scoring.
+The canonical schema lacks DEFCON training labels, and raw 2025–26 availability does not
+authorize accessing that locked holdout for this v1 research path. No DEFCON model, label
+backfill or live promotion follows from these records. The
+[research agenda](prediction_research_agenda.md#applicability-boundary-historical-points-and-live-defcon-scoring)
+states the research boundary; separately authorized holdout/v2 records remain separately
+identified below rather than being silently pooled with v1 evidence.
+
 ## Deterministic policy
 
 | Artifact | Finding | PR |
