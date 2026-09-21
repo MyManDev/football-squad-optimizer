@@ -32,6 +32,7 @@ export interface AdviceCapabilities {
   gameweek: number;
   strategies: Record<string, StrategyCapability>;
   /** The settings the service would accept now; zero is always one of them. */
+  models?: ("current" | "football")[];
   top100Weights: Top100Weight[];
   managersWord: boolean;
   /** Missing member means unknown history; an empty list means no held chips. */
@@ -114,7 +115,14 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       chipsByEntry[entry] = chips;
     }
   }
+  if (
+    value.models !== undefined &&
+    (!Array.isArray(value.models) ||
+      !value.models.every((m) => m === "current" || m === "football"))
+  )
+    throw new AdviceCapabilitiesError("Invalid model capabilities.");
   return {
+    ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
     season: value.season,
