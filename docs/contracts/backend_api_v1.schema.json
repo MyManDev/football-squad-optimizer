@@ -39,6 +39,12 @@
         "managers_word": {
           "type": "boolean"
         },
+        "model": {
+          "enum": [
+            "current",
+            "football"
+          ]
+        },
         "operation": {
           "const": "league.advise",
           "type": "string"
@@ -117,6 +123,12 @@
         },
         "managers_word": {
           "type": "boolean"
+        },
+        "model": {
+          "enum": [
+            "current",
+            "football"
+          ]
         },
         "rival_entry_id": {
           "anyOf": [

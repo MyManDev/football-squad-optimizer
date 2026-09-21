@@ -92,7 +92,8 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null) &&
     (left.top100Weight ?? 0) === (right.top100Weight ?? 0) &&
     (left.managersWord ?? false) === (right.managersWord ?? false) &&
-    (left.chip ?? null) === (right.chip ?? null)
+    (left.chip ?? null) === (right.chip ?? null) &&
+    (left.model ?? "current") === (right.model ?? "current")
   );
 }
 
