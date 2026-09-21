@@ -35,7 +35,13 @@ from pathlib import Path
 from typing import Final, cast
 
 import pandas as pd
-from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, REPOSITORY_ROOT, artifact_metadata
+from scripts._experiment_cli import (
+    DEFAULT_ARCHIVE_ROOT,
+    REPOSITORY_ROOT,
+    artifact_metadata,
+    measurement_optimization_config,
+    solver_record,
+)
 from scripts.measure_component_fidelity import METRIC_NAMES as FIDELITY_METRIC_NAMES
 from scripts.measure_component_fidelity import OBSERVATION_UNIT as FIDELITY_OBSERVATION_UNIT
 
@@ -72,7 +78,7 @@ from squadopt.experiments.component_squad_calibration import (
 )
 from squadopt.experiments.shadow_report import ShadowReportError, write_document_once
 from squadopt.features import CrossSeasonConfig
-from squadopt.optimization import OptimizationConfig, OptimizationResult, decision_signature
+from squadopt.optimization import OptimizationResult, decision_signature
 from squadopt.prediction import (
     PredictionProvenance,
     PredictionSnapshot,
@@ -545,9 +551,15 @@ def _decision_identity(result: OptimizationResult) -> dict[str, object]:
 
 
 def _solver_profile() -> dict[str, object]:
-    """The fixed optimization profile the walk-forward controls are solved under."""
+    """The fixed optimization profile the walk-forward controls are solved under.
 
-    settings = OptimizationConfig()
+    The note this used to carry described a wall clock and the repeat it could not
+    promise. That was accurate and it is no longer the profile: the limit that binds is
+    deterministic solver work, which a busy machine cannot shorten (#590), so the note
+    says what a reader still has to know instead of what used to go wrong.
+    """
+
+    settings = measurement_optimization_config()
     return {
         "solver_time_limit_seconds": settings.solver_time_limit_seconds,
         "solver_deterministic_time_limit": settings.solver_deterministic_time_limit,
@@ -556,9 +568,11 @@ def _solver_profile() -> dict[str, object]:
         "bench_weight": settings.bench_weight,
         "scoring_policy": ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value,
         "note": (
-            "A wall-clock budget: a fold whose solve ends FEASIBLE may return a different "
-            "decision on a repeat, and a repeat is expected to reproduce a fold only when "
-            "its solve ends OPTIMAL. Neither is changed to pass a pilot."
+            "A deterministic budget with the wall clock far above it as a cap, so a repeat "
+            "reproduces a fold whatever else the machine was doing. A fold whose solve ends "
+            "FEASIBLE is still an incumbent rather than the optimum; the reproducibility is "
+            "of the number, not a claim that it is the best one. Neither limit is changed "
+            "to pass a pilot."
         ),
     }
 
@@ -976,6 +990,7 @@ def _measure_development(
     evaluation = evaluate_prepared_folds(
         candidates,
         EvaluationConfig(
+            optimization_config=measurement_optimization_config(),
             scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2,
             run_metadata={"study": DEVELOPMENT_REPORT_VERSION},
         ),
@@ -1100,6 +1115,10 @@ def _measure_development(
             },
             "config": asdict(settings),
             "solver_profile": _solver_profile(),
+            # This runner writes two records, and each one gets its own block. Pooling the
+            # development and binding statuses would count solves from two measurements
+            # into one number that describes neither.
+            "solver": solver_record(evaluation),
             "sampler_fidelity_verified": fidelity_digest is not None,
             "candidate": _candidate_record(candidate_sampler, reference=DEVELOPMENT_REPORT_VERSION),
             "sampler_contract_version": (
@@ -1154,6 +1173,7 @@ def _measure_binding(
     evaluation = evaluate_prepared_folds(
         candidates,
         EvaluationConfig(
+            optimization_config=measurement_optimization_config(),
             scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2,
             run_metadata={"study": REPORT_VERSION},
         ),
@@ -1220,6 +1240,8 @@ def _measure_binding(
                 "fidelity_artifact_sha256": fidelity_sha256,
             },
             "config": asdict(settings),
+            "solver_profile": _solver_profile(),
+            "solver": solver_record(evaluation),
             "candidate": _candidate_record(candidate_sampler),
             "population": {
                 "full_fold_count": len(all_ids),
