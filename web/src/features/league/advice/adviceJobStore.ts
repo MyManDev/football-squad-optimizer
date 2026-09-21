@@ -33,7 +33,8 @@ export function adviceRequestKey(request: AdviceRequest): string {
     request.season ?? "",
     request.gameweek ?? "",
   ].join(":");
-  return request.chip == null ? key : `${key}:chip:${request.chip}`;
+  const modelKey = request.model === "football" ? `${key}:model:football` : key;
+  return request.chip == null ? modelKey : `${modelKey}:chip:${request.chip}`;
 }
 
 function storage(): Storage | null {

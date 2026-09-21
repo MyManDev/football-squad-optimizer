@@ -98,6 +98,28 @@ describe("StaticOnlyAdviceClient", () => {
 });
 
 describe("HttpAdviceClient", () => {
+  it("carries the football identity in GET and POST without a published fallback", async () => {
+    const transport = vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === "POST"
+        ? jsonResponse(202, { job_id: "job-1", status: "queued" })
+        : jsonResponse(404, { error: { code: "NOT_COMPUTED" } }),
+    );
+    const client = new HttpAdviceClient("https://api.example", transport);
+    const selected = { ...REQUEST, model: "football", window: 5, top100Weight: 20 } as const;
+    await client.readAdvice(selected);
+    expect(transport.mock.calls[0]![0]).toContain("model=football");
+    await client.requestAdvice(selected);
+    expect(JSON.parse(String(transport.mock.calls[1]![1]?.body))).toMatchObject({
+      model: "football",
+      window: 5,
+      top100_weight: 20,
+    });
+    const loader = vi.fn(async () => mockEntryAdviceEnvelope(101, "saf-puan", 1));
+    expect((await new StaticOnlyAdviceClient(loader).readAdvice(selected)).kind).toBe(
+      "not-computed",
+    );
+    expect(loader).not.toHaveBeenCalled();
+  });
   it("calls browser fetch with a valid receiver for reads, requests and job polls", async () => {
     // Native browser fetch rejects a client instance as its receiver. Injected
     // arrow-function fetch stubs do not exercise that browser requirement.

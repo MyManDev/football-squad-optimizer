@@ -658,6 +658,31 @@
             "null"
           ]
         },
+        "prediction_model": {
+          "additionalProperties": false,
+          "properties": {
+            "experimental": {
+              "const": true
+            },
+            "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "id": {
+              "const": "football"
+            },
+            "version": {
+              "const": "football_team_share_v1"
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "experimental",
+            "fingerprint"
+          ],
+          "type": "object"
+        },
         "rival_entry_id": {
           "minimum": 1,
           "type": "integer"

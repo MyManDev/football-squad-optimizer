@@ -58,6 +58,16 @@
       ],
       "type": "object"
     },
+    "models": {
+      "items": {
+        "enum": [
+          "current",
+          "football"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
     "season": {
       "minLength": 1,
       "type": "string"
