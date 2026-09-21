@@ -6,7 +6,7 @@ where it came from. Every artifact here is measurement-only in the sense that ma
 has since been acted on, and that qualification is spelled out below rather than left to
 the row.
 
-**Two** artifacts have measured on the locked 2025-26 holdout, and they did it under
+**Two earlier** artifacts measured on the locked 2025-26 holdout under
 different rules, so both are named here rather than left to their rows. `fw10_holdout`
 **spent** the holdout as an unseen final test, once, under the pre-registered protocol in
 `fw10_holdout_plan.md`, with three owner approvals recorded first; it did not promote its
@@ -45,6 +45,10 @@ that runner covers — the covered set is whatever
 gate to keep passing rather than a gate it fails. The count is deliberately not written here:
 this line said "eight" while the code named seven, and a number copied into prose drifts the
 next time a kind is added. Read the constant.
+
+The 21 September `football_candidate_development_record` also reads 2025-26 explicitly
+as reused development data, alongside 2024-25. Its equal-solver sensitivity and future-role
+ablations are not another unseen holdout test and authorize no live model promotion.
 `tests/unit/test_measurements_index.py` holds the rule that every committed artifact appears
 here (ADR 0003, rule 1).
 
@@ -76,6 +80,7 @@ identified below rather than being silently pooled with v1 evidence.
 
 | Artifact | Finding | PR |
 | --- | --- | --- |
+| [`football_candidate_development_record`](research/football_candidate_development_record.json) / [readout](research/football_candidate_results.md) | 56 paired development weeks with all 112 primary/tie proofs: team-share +4.9821 points/week, descriptive 97.5% block interval [1.6158, 8.2857]. Production port/scorer parity passed. Future-role and full-match-CS ablations rejected; recourse/rival checks synthetic only. No independent evidence or promotion. | This change |
 | `baseline_bayesopt` | First real BO run: best observed `fw10-bw0` at 56.50 mean realized points (147 folds) | #57 |
 | `baseline_policy_grid` | Exhaustive 56-cell ground truth; fw10 column holds ranks 1–7; **BO regret 0.0000**, optimum found at iteration 3 | #61 |
 | `fw10_screening` + `fw10_frozen_candidate` | Official screening DoE froze `fw10-bw0` as the eligible challenger; holdout plan in `fw10_holdout_plan.md` (run deferred) | #65 |
