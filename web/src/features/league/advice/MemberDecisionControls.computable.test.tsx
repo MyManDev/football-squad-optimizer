@@ -94,6 +94,24 @@ describe("the controls without capabilities", () => {
 });
 
 describe("the controls with the service's capabilities", () => {
+  it.each([3, 5])(
+    "retains the %s-week window and Top100 weight when switching models",
+    (window) => {
+      renderControls(`mode=saf-puan&window=${window}&top100=20`, {
+        ...WHOLE_MENU,
+        models: ["current", "football"],
+      });
+      fireEvent.click(inputs("prediction-model").find((input) => input.value === "football")!);
+      expect(query().get("model")).toBe("football");
+      expect(query().get("window")).toBe(String(window));
+      expect(query().get("top100")).toBe("20");
+      expect(enabledValues("window")).toEqual(["1", "3", "5"]);
+      expect(enabledValues("top100")).toEqual(TOP100_WEIGHTS.map(String));
+      fireEvent.click(inputs("prediction-model").find((input) => input.value === "current")!);
+      expect(query().get("model")).not.toBe("football");
+      expect(query().get("top100")).toBe("20");
+    },
+  );
   it("enables an unpublished held chip and excludes incompatible switches", () => {
     renderControls("", { ...WHOLE_MENU, chipsByEntry: { [ENTRY]: ["bboost"] } });
     expect(enabledValues("chip")).toEqual(["", "bboost"]);

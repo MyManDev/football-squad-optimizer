@@ -60,6 +60,7 @@ export function useMemberAdviceView(
       ? selection.computable.selection
       : selection.status === "ready" && plainSelection && canComputeAdvice(request));
   const baselineAvailable =
+    request.model !== "football" &&
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
   const requestKey = [

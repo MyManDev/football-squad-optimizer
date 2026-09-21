@@ -8,6 +8,7 @@ import { points } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
+import { ModelComparison } from "../advice/ModelComparison";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
@@ -311,6 +312,16 @@ function LeagueMemberContent({
         <p className={styles.selectionSummary} data-testid="member-selection-summary">
           {selectionSummary}
         </p>
+        {capabilities?.models?.includes("football") && computeAvailable && (
+          <ModelComparison
+            request={request}
+            selected={shown?.envelope ?? null}
+            snapshot={view.source_snapshot_id}
+            client={client}
+            deadlinePassed={deadlinePassed !== null}
+            busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
+          />
+        )}
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (
