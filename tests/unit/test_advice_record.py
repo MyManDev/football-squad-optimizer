@@ -663,6 +663,53 @@ def test_the_record_for_a_deadline_is_the_last_capture_that_preceded_it(
     assert "No advice record for 2026-27 gameweek 3, entry 101" in str(nothing.value)
 
 
+@pytest.mark.parametrize("published", [GW2_DEADLINE, "2026-08-28T17:30:00.001Z"])
+def test_predeadline_capture_published_too_late_cannot_replace_timely_advice(
+    world: dict[str, Any],
+    tmp_path: Path,
+    published: str,
+) -> None:
+    records = tmp_path / "records"
+    _build(world, tmp_path / "early", record_root=records)
+    later = _later_capture(world)
+    _build(
+        world,
+        tmp_path / "late",
+        record_root=records,
+        capture=later,
+        now=datetime.datetime.fromisoformat(published),
+    )
+    record = load_member_advice_record_for_deadline(
+        records,
+        SEASON,
+        2,
+        101,
+        deadline_utc=GW2_DEADLINE,
+    )
+    assert record["capture"]["snapshot_id"] == world["gw2_id"]  # type: ignore[index]
+
+
+def test_a_predeadline_capture_alone_is_not_a_timely_publication(
+    world: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    records = tmp_path / "records"
+    _build(
+        world,
+        tmp_path / "late",
+        record_root=records,
+        now=datetime.datetime.fromisoformat(GW2_DEADLINE),
+    )
+    with pytest.raises(AdviceRecordError, match="published before the deadline"):
+        load_member_advice_record_for_deadline(
+            records,
+            SEASON,
+            2,
+            101,
+            deadline_utc=GW2_DEADLINE,
+        )
+
+
 def test_two_records_sharing_a_capture_instant_are_refused_rather_than_guessed(
     world: dict[str, Any], tmp_path: Path
 ) -> None:

@@ -882,12 +882,14 @@ def recorded_captures(
 def load_member_advice_record_for_deadline(
     root: Path, season: str, gameweek: int, entry_id: int, *, deadline_utc: str
 ) -> dict[str, object]:
-    """The record from the last capture *preceding* ``deadline_utc`` — what the member saw.
+    """The latest capture whose recorded publication also precedes ``deadline_utc``.
 
     This is the question a review page asks, and the only one it may ask: its whole claim
     is "this is what we told you", and a week is published more than once, so the record
     that matters is the last one a member could still have acted on. Later captures are not
-    that; earlier ones were superseded before the deadline.
+    that; neither is an earlier capture first published after entries locked. Ordering
+    remains by capture time for this legacy reader; the evaluation reader separately
+    selects by publication time.
 
     Strictly preceding: a capture taken at the deadline instant is not information the
     member had before entries locked, and half a second either side of a lock is exactly
@@ -925,6 +927,24 @@ def load_member_advice_record_for_deadline(
             "later one is not returned instead: it says what we would have advised, not "
             "what we did."
         )
+    records: dict[str, dict[str, object]] = {}
+    for capture in before:
+        record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
+        stamp = record.get("generated_at_utc")
+        if not isinstance(stamp, str):
+            raise AdviceRecordError("Recorded publication time is missing.")
+        try:
+            published = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
+        except DataError as error:
+            raise AdviceRecordError(str(error)) from error
+        if published < deadline:
+            records[capture.snapshot_id] = record
+    before = [capture for capture in before if capture.snapshot_id in records]
+    if not before:
+        raise AdviceRecordError(
+            "No advice record was published before the deadline; a pre-deadline capture "
+            "does not establish that its advice was available in time."
+        )
     latest = before[-1]
     tied = [capture for capture in before if capture.instant == latest.instant]
     if len(tied) > 1:
@@ -935,7 +955,7 @@ def load_member_advice_record_for_deadline(
             "Which of them a member saw is not recorded, and file timestamps are not "
             "evidence of it, so one is not chosen for you."
         )
-    return load_member_advice_record(root, season, gameweek, entry_id, latest.snapshot_id)
+    return records[latest.snapshot_id]
 
 
 def _deadline_instant(deadline_utc: str) -> datetime:

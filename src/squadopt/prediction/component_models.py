@@ -13,9 +13,11 @@ Three estimators are fitted, and one is deliberately not:
 * **start -- not fitted.** The pre-registration requires
   ``p_start = p_appearance * q_start_given_appearance`` and forbids composing two
   independently fitted probabilities, so the admissible start model is a *conditional*
-  one; and its label does not exist in this panel
-  (:mod:`squadopt.features.component_targets`). ``start_probability`` is therefore missing,
-  not zero.
+  one. Start labels now exist in :mod:`squadopt.features.component_targets`, and the
+  separate :mod:`squadopt.prediction.participation` experiment fits that conditional
+  estimator. It has not been promoted into this frozen control (see
+  ``docs/participation_calibration.md``). This control's ``start_probability`` remains
+  missing, not zero; label availability is not a promotion decision.
 
 Scaling is inside the estimator pipeline, so it is fitted on the training rows and only
 those. The pre-registration requires exactly that: preprocessing is fitted on rows strictly
@@ -435,8 +437,10 @@ def predict_components(
             "appearance_probability": appearance,
             # The admissible start model is conditional -- the pre-registration requires
             # `p_start = p_appearance * q_start_given_appearance` and forbids composing two
-            # independently fitted probabilities -- and its label does not exist in this
-            # panel. Both halves are therefore unavailable rather than zero, and both are
+            # independently fitted probabilities. The separately measured conditional
+            # start estimator has not been promoted into this frozen control, despite
+            # labels being available in supported seasons. Both halves remain missing,
+            # not zero, and both are
             # named so a consumer finds an explicit absence instead of a missing column.
             "q_start_given_appearance": pd.Series(pd.NA, index=index, dtype="Float64"),
             "start_probability": pd.Series(pd.NA, index=index, dtype="Float64"),
