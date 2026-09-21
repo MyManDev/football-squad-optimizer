@@ -44,7 +44,7 @@ from squadopt.application.entries import (
     chip_states,
     held_squad_from_picks,
 )
-from squadopt.application.lineup_publication import best_lineup_points_with_chip
+from squadopt.application.lineup_publication import best_eleven_basis, best_lineup_points_with_chip
 from squadopt.live import Projection, RecommendationInputs, SeasonRules, plan_transfers
 from squadopt.live.rules import CHIP_NAMES
 from squadopt.optimization import (
@@ -203,7 +203,13 @@ def _published_chip_points(payload: Mapping[str, object], chip: str) -> float:
 
 
 def _rows_on_chip_basis(
-    payload: dict[str, object], picks: EntryPicks, projection: Projection, chip: str
+    payload: dict[str, object],
+    picks: EntryPicks,
+    projection: Projection,
+    chip: str | None,
+    *,
+    choice_points: Mapping[int, float] | None = None,
+    expected_total: float | None = None,
 ) -> None:
     """Restate the move rows and the gain against holding on the chip week's own basis.
 
@@ -227,6 +233,14 @@ def _rows_on_chip_basis(
     def value_of(players: Sequence[int]) -> float | None:
         if any(player not in lookup for player in players):
             return None
+        if choice_points is not None:
+            if any(player not in choice_points for player in players):
+                return None
+            return best_eleven_basis(
+                ((lookup[p][0], choice_points[p], lookup[p][1], True, True, p) for p in players),
+                chip=chip,
+            )
+        assert chip is not None
         return best_lineup_points_with_chip((lookup[player] for player in players), chip)
 
     squad = [int(player) for player in picks.squad]
@@ -251,6 +265,9 @@ def _rows_on_chip_basis(
             break
         gains.append(value - previous)
         previous = value
+    if gains and expected_total is not None and previous is not None:
+        # The last step ends at the actual selected lineup, including solver tie choices.
+        gains[-1] += expected_total - previous
     for index, move in enumerate(moves):
         if isinstance(move, dict):
             move["expected_points_delta"] = None if gains is None else gains[index]
