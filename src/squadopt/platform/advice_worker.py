@@ -70,6 +70,7 @@ from squadopt.platform.advice_queue import (
 from squadopt.platform.advice_switches import (
     CHIP_SWITCH,
     MANAGERS_WORD_SWITCH,
+    MODEL_SWITCH,
     TOP100_SWITCH,
     SwitchInputUnavailable,
     switch_identity,
@@ -112,8 +113,9 @@ def _stamp(moment: datetime) -> str:
 
 #: The switches this worker computes, and the code a job fails with when the capture has
 #: no input for one. A switch that needs no per-capture input is added to the first only.
-_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH})
+_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH, MODEL_SWITCH})
 _SWITCH_REFUSAL_CODES: Final = {
+    MODEL_SWITCH: "MODEL_INPUTS_UNAVAILABLE",
     TOP100_SWITCH: "TOP100_INPUTS_UNAVAILABLE",
     MANAGERS_WORD_SWITCH: "MANAGERS_WORD_UNAVAILABLE",
 }
@@ -127,6 +129,9 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     job would be filed under names an input the answer was not computed from.
     """
 
+    model = spec.switch(MODEL_SWITCH).get("name", "current")
+    if model not in ("current", "football"):
+        raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unknown prediction model.")
     top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
     weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
     word = MANAGERS_WORD_SWITCH in spec.switches
@@ -145,6 +150,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
             top100_weight=weight,
             managers_word=word,
             chip=chip if isinstance(chip, str) else None,
+            model=str(model),
         )
     except SwitchInputUnavailable as error:
         raise AdviceComputeRefused(_SWITCH_REFUSAL_CODES[error.switch], str(error)) from error
@@ -205,6 +211,9 @@ def build_advice_compute(
             configuration_fingerprint=spec.context.configuration_fingerprint,
             rival_entry_id=address.rival_entry_id,
             strategy_uses_rival=uses_rival[address.strategy],
+            switches={MODEL_SWITCH: spec.switches[MODEL_SWITCH]}
+            if MODEL_SWITCH in spec.switches
+            else {},
         )
         held = cache.get(key)
         if held is None:
@@ -258,6 +267,11 @@ def build_advice_compute(
                 "answers from; ask again to be answered from the current one.",
             )
         request = _menu_request(spec, capture)
+        football = capture.switches.football if MODEL_SWITCH in spec.switches else None
+        projection = football.projection if football is not None else capture.projection
+        horizon_builder = (
+            football.build_horizon if football is not None else capture.horizon_builder
+        )
         for label, entry in (("Entry", spec.entry_id), ("Rival", spec.rival_entry_id)):
             if entry is not None and not capture.provider.holds(entry, spec.context.gameweek - 1):
                 # The member directory and the capture are published separately, so a
@@ -272,12 +286,12 @@ def build_advice_compute(
                 request,
                 provider=capture.provider,
                 inputs=capture.inputs,
-                projection=capture.projection,
+                projection=projection,
                 rules=capture.rules,
-                horizon_builder=capture.horizon_builder,
+                horizon_builder=horizon_builder,
                 top100_counts=capture.top100_counts,
                 manager_words=capture.manager_words,
-                chip_forecast_source=capture.chip_forecast_source,
+                chip_forecast_source=capture.chip_forecast_source if football is None else None,
                 prerequisite=lambda address: cached_plain(spec, address),
             )
         except ChipUnavailable as error:
@@ -296,6 +310,18 @@ def build_advice_compute(
                 "PLAN_NOT_FOUND",
                 "No plan was found for this selection from this capture.",
             ) from error
+        if football is not None:
+            advice["prediction_model"] = {
+                "id": "football",
+                "version": football.horizon.model_version,
+                "experimental": True,
+                "fingerprint": football.fingerprint,
+            }
+            existing_limits = advice.get("stated_limits")
+            advice["stated_limits"] = [
+                *(existing_limits if isinstance(existing_limits, list) else []),
+                "Experimental football model; independent predictive superiority is unverified.",
+            ]
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

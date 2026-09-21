@@ -219,6 +219,37 @@ export function MemberDecisionControls({
       aside={<Badge tone="accent">{messages.decision.shareable}</Badge>}
     >
       <p className={styles.intro}>{copy.strategyIntro}</p>
+      {(capabilities?.models?.includes("football") || searchParams.get("model") === "football") && (
+        <fieldset className={styles.fieldset}>
+          <legend>{language === "tr" ? "Tahmin modeli" : "Prediction model"}</legend>
+          <div className={styles.options}>
+            {(["current", "football"] as const).map((model) => (
+              <label className={styles.option} key={model}>
+                <input
+                  type="radio"
+                  name="prediction-model"
+                  value={model}
+                  checked={(searchParams.get("model") ?? "current") === model}
+                  disabled={model === "football" && !capabilities?.models?.includes("football")}
+                  onChange={() => update({ model: model === "current" ? null : model })}
+                />
+                {model === "current"
+                  ? language === "tr"
+                    ? "Mevcut model"
+                    : "Current model"
+                  : language === "tr"
+                    ? "Futbol modeli · Deneysel"
+                    : "Football model · Experimental"}
+              </label>
+            ))}
+          </div>
+          <p>
+            {language === "tr"
+              ? "Futbol modeli gol, asist, gol yememe ve DEFCON bileşenlerini fikstürlere göre hesaplar. Canlı üstünlüğü henüz doğrulanmadı. Top100 etkisi seçtiğiniz modele uygulanır."
+              : "The football model forecasts goals, assists, clean sheets and DEFCON per fixture. Live superiority is unverified. Top100 influence applies to the selected model."}
+          </p>
+        </fieldset>
+      )}
       <div className={styles.controls}>
         <fieldset className={styles.fieldset}>
           <legend>{copy.strategyLegend}</legend>
@@ -320,7 +351,13 @@ export function MemberDecisionControls({
             ))}
           </div>
           <p className={styles.note}>
-            {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
+            {selection.request.model === "football"
+              ? language === "tr"
+                ? "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır; boş haftalar sıfır, çift maçlı haftalar maçların toplamıdır. Gelecekteki uygunluk ve fiyatlar kayıt anındaki haliyle sabit tutulur; planlayıcının transfer sınırları geçerlidir."
+                : "Each week's forecast uses that week's fixtures: blanks are zero and double gameweeks sum both matches. Future availability and prices stay at their captured values; the planner's transfer limits still apply."
+              : windows.length > 1
+                ? copy.windowLimits
+                : copy.windowNotComputed}
           </p>
         </fieldset>
 

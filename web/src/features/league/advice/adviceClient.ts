@@ -35,6 +35,7 @@ export interface AdviceRequest {
    * as it did before the switches existed. A request that states them (the page does once
    * a compute service is configured) also asks for the answer to be held to them.
    */
+  model?: "current" | "football";
   top100Weight?: number;
   managersWord?: boolean;
   chip?: MemberChip | null;
@@ -92,7 +93,12 @@ export interface AdviceJobStatus {
 
 /** Whether a request asks for a Top 100 setting or the manager's word. */
 export function isSwitchedRequest(request: AdviceRequest): boolean {
-  return (request.top100Weight ?? 0) !== 0 || request.managersWord === true || request.chip != null;
+  return (
+    request.model === "football" ||
+    (request.top100Weight ?? 0) !== 0 ||
+    request.managersWord === true ||
+    request.chip != null
+  );
 }
 
 type AdviceLoader = (
@@ -233,7 +239,8 @@ export class HttpAdviceClient implements AdviceClient {
       `?strategy=${encodeURIComponent(request.strategy)}&window=${request.window}${rival}` +
       weight +
       word +
-      chip
+      chip +
+      (request.model === "football" ? "&model=football" : "")
     );
   }
 
@@ -296,6 +303,7 @@ export class HttpAdviceClient implements AdviceClient {
           strategy: request.strategy,
           window: request.window,
           rival_entry_id: request.rivalEntryId ?? null,
+          ...(request.model === "football" ? { model: "football" } : {}),
           ...(request.top100Weight ? { top100_weight: request.top100Weight } : {}),
           ...(request.managersWord === true ? { managers_word: true } : {}),
           ...(request.chip == null ? {} : { chip: request.chip }),

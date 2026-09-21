@@ -88,7 +88,15 @@ export function selectedAdviceRequest(
   ) {
     rivalEntryId = defaultRivalEntryId;
   }
-  return { leagueId, entryId, strategy, window, rivalEntryId, ...context };
+  return {
+    leagueId,
+    entryId,
+    strategy,
+    window,
+    rivalEntryId,
+    ...context,
+    ...(searchParams.get("model") === "football" ? { model: "football" as const } : {}),
+  };
 }
 
 /**
@@ -327,7 +335,9 @@ export function resolvePublishedAdvice(
     (context &&
       (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
   ) {
-    return published;
+    return searchParams.get("model") === "football"
+      ? { ...published, status: "not-listed", path: null, windows: [], strategies: [] }
+      : published;
   }
   return withComputable(published, searchParams, entryId, members, index, capabilities);
 }
@@ -377,13 +387,16 @@ function withComputable(
   ) {
     return { ...published, computable: notComputable(strategies) };
   }
+  const football = published.request.model === "football";
   const declaredFor = (rivalEntryId: number | null, size: WindowSize) =>
-    index.unavailable.find(
-      (row) =>
-        row.strategy === strategy &&
-        (row.rival_entry_id ?? null) === rivalEntryId &&
-        (row.window ?? index.window) === size,
-    );
+    football
+      ? undefined
+      : index.unavailable.find(
+          (row) =>
+            row.strategy === strategy &&
+            (row.rival_entry_id ?? null) === rivalEntryId &&
+            (row.window ?? index.window) === size,
+        );
   const windows = capability.windows.filter(
     (size) => capability.requiresRival || !declaredFor(null, size),
   );
@@ -449,12 +462,14 @@ function withComputable(
     };
   }
   const sameAsPublished =
+    !football &&
     published.status === "ready" &&
     (published.request.rivalEntryId ?? null) === rivalEntryId &&
     published.evidence.on === wordOn &&
     published.top100.weight === weight &&
     published.chip.chip === chip;
   const canAsk =
+    (!football || capabilities.models?.includes("football") === true) &&
     windowComputable &&
     (chip === null || chips.includes(chip)) &&
     (!capability.requiresRival || rivalEntryId !== null) &&
