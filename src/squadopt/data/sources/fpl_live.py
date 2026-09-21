@@ -1336,6 +1336,13 @@ def live_event_outcomes(live: bytes, bootstrap: bytes, *, gameweek: int) -> pd.D
     _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
 
     rows: list[dict[str, object]] = []
+    # Older captured documents may predate card metadata. Preserve that legacy
+    # shape, but refuse a partially supplied card contract rather than invent zeros.
+    include_cards = any(
+        isinstance(card_stats := record.get("stats"), dict)
+        and any(key in card_stats for key in ("yellow_cards", "red_cards"))
+        for record in records
+    )
     for record in records:
         element = _integer(record, "id", "Live element")
         stats = record.get("stats")
@@ -1371,12 +1378,22 @@ def live_event_outcomes(live: bytes, bootstrap: bytes, *, gameweek: int) -> pd.D
             }
         )
 
+        if include_cards:
+            counts = [
+                _integer(stats, key, f"Live element {element} stats")
+                for key in ("yellow_cards", "red_cards")
+            ]
+            if any(value < 0 for value in counts):
+                raise InvalidValueError("Card counts must be non-negative.")
+            rows[-1]["card_participation"] = any(value > 0 for value in counts)
+
     if not rows:
         raise DataSourceError(
             f"Live payload for gameweek {week} scores no players, so it describes no outcome."
         )
 
-    frame = pd.DataFrame(rows, columns=list(LIVE_OUTCOME_COLUMNS))
+    columns = [*LIVE_OUTCOME_COLUMNS, *(["card_participation"] if include_cards else [])]
+    frame = pd.DataFrame(rows, columns=columns)
     frame["player_id"] = frame["player_id"].astype("int64")
     frame["appearance"] = frame["appearance"].astype("boolean")
     frame["start"] = frame["start"].astype("boolean")
