@@ -95,6 +95,17 @@ def advice_read_schema() -> dict[str, Any]:
     optional_fields.update(
         {
             "source_snapshot_id": {"type": ["string", "null"]},
+            "prediction_model": {
+                "type": "object",
+                "properties": {
+                    "id": {"const": "football"},
+                    "version": {"const": "football_team_share_v1"},
+                    "experimental": {"const": True},
+                    "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                },
+                "required": ["id", "version", "experimental", "fingerprint"],
+                "additionalProperties": False,
+            },
             "rival_label": {"type": ["string", "null"]},
             "rival_entry_id": {"type": "integer", "minimum": 1},
             "solver_status": {"type": ["string", "null"]},
@@ -378,6 +389,11 @@ def league_capabilities_schema() -> dict[str, Any]:
                 },
                 "required": ["available", "weights"],
                 "additionalProperties": False,
+            },
+            "models": {
+                "type": "array",
+                "items": {"enum": ["current", "football"]},
+                "uniqueItems": True,
             },
             "managers_word": flag,
             "chips": {

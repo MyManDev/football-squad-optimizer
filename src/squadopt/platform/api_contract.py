@@ -152,6 +152,7 @@ class ApiCommandRequest:
     capture_snapshot_id: str | None = None
     """Server-resolved, never client-supplied: which capture answers this request.
     Part of the advise fingerprint so deduplication cannot outlive the capture."""
+    model: str = "current"
     top100_weight: int = 0
     managers_word: bool = False
     """The member menu's switches on ``league.advise``. Off is the default and is **left
@@ -248,6 +249,10 @@ class ApiCommandRequest:
             )
         if not isinstance(self.managers_word, bool):
             raise BackendApiContractError("managers_word must be boolean.")
+        if self.model not in ("current", "football"):
+            raise BackendApiContractError("Unknown prediction model.")
+        if self.operation != "league.advise" and self.model != "current":
+            raise BackendApiContractError("Model selection is only supported for league.advise.")
         self._validate_shape()
 
     def _validate_shape(self) -> None:
@@ -368,6 +373,8 @@ class ApiCommandRequest:
                 }
             )
             # Only when on: an absent switch and an off switch are one request.
+            if self.model != "current":
+                payload["model"] = self.model
             if self.top100_weight:
                 payload["top100_weight"] = self.top100_weight
             if self.managers_word:
@@ -430,7 +437,9 @@ class ApiCommandRequest:
         }[operation]
         expected = common | specific
         optional = (
-            {"top100_weight", "managers_word", "chip"} if operation == "league.advise" else set()
+            {"top100_weight", "managers_word", "chip", "model"}
+            if operation == "league.advise"
+            else set()
         )
         actual = set(document) - optional
         if actual != expected:
@@ -456,6 +465,7 @@ class ApiCommandRequest:
             window=document.get("window"),  # type: ignore[arg-type]
             rival_entry_id=document.get("rival_entry_id"),  # type: ignore[arg-type]
             capture_snapshot_id=document.get("capture_snapshot_id"),  # type: ignore[arg-type]
+            model=document.get("model", "current"),  # type: ignore[arg-type]
             top100_weight=document.get("top100_weight", 0),  # type: ignore[arg-type]
             managers_word=document.get("managers_word", False),  # type: ignore[arg-type]
         )
@@ -717,6 +727,7 @@ def backend_api_schema() -> dict[str, Any]:
     # Optional on both shapes, and absent means off: a request written before the
     # switches existed is still exactly one valid document.
     advise_switches = {
+        "model": {"enum": ["current", "football"]},
         "top100_weight": {"type": "integer", "enum": list(ADVISE_TOP100_WEIGHTS)},
         "managers_word": {"type": "boolean"},
         "chip": {"enum": [None, *ADVISE_CHIPS]},

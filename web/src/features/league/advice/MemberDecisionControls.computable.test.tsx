@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdviceIndex } from "../types";
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import { chipPath } from "./chipChoice";
@@ -94,6 +95,30 @@ describe("the controls without capabilities", () => {
 });
 
 describe("the controls with the service's capabilities", () => {
+  it.each([3, 5])(
+    "retains the %s-week window and Top100 weight when switching models",
+    (window) => {
+      const { container } = renderControls(`mode=saf-puan&window=${window}&top100=20`, {
+        ...WHOLE_MENU,
+        models: ["current", "football"],
+      });
+      expect(container).toHaveTextContent(MESSAGES.tr.leagueMembers.windowLimits);
+      fireEvent.click(inputs("prediction-model").find((input) => input.value === "football")!);
+      expect(container).toHaveTextContent(
+        "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır",
+      );
+      expect(container).not.toHaveTextContent(MESSAGES.tr.leagueMembers.windowLimits);
+      expect(query().get("model")).toBe("football");
+      expect(query().get("window")).toBe(String(window));
+      expect(query().get("top100")).toBe("20");
+      expect(enabledValues("window")).toEqual(["1", "3", "5"]);
+      expect(enabledValues("top100")).toEqual(TOP100_WEIGHTS.map(String));
+      fireEvent.click(inputs("prediction-model").find((input) => input.value === "current")!);
+      expect(container).toHaveTextContent(MESSAGES.tr.leagueMembers.windowLimits);
+      expect(query().get("model")).not.toBe("football");
+      expect(query().get("top100")).toBe("20");
+    },
+  );
   it("enables an unpublished held chip and excludes incompatible switches", () => {
     renderControls("", { ...WHOLE_MENU, chipsByEntry: { [ENTRY]: ["bboost"] } });
     expect(enabledValues("chip")).toEqual(["", "bboost"]);

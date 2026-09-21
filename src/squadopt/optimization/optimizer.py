@@ -9,6 +9,7 @@ from time import perf_counter
 import pandas as pd
 from ortools.sat.python import cp_model
 
+from squadopt.contracts import order_outfield_bench
 from squadopt.optimization.coefficients import (
     objective_coefficients,
     scale_bench_coefficient,
@@ -605,14 +606,13 @@ def _optimize_squad_with_objective_points(
     starting_xi = ordered_players.iloc[starter_indices].reset_index(drop=True).copy(deep=True)
     # The bench is an ordered decision, not a set: on an automatic substitution the game
     # walks it top to bottom, so the goalkeeper takes the fixed first slot and the
-    # outfield players follow by descending expectation (player id breaks ties, keeping
-    # the output deterministic). Index order alone would order them by player id — an
-    # accident of determinism, not a choice.
+    # outfield players follow by what they are worth given that they appear. Index order
+    # alone would order them by player id, an accident of determinism, not a choice.
+    # `order_outfield_bench` is shared with the official scorer and the member page so the
+    # three cannot drift; it says there what the rule is and when it falls back.
     bench_frame = ordered_players.iloc[bench_indices]
     keeper_rows = bench_frame.loc[bench_frame["position"] == "GK"]
-    outfield_rows = bench_frame.loc[bench_frame["position"] != "GK"].sort_values(
-        ["expected_points", "player_id"], ascending=[False, True], kind="mergesort"
-    )
+    outfield_rows = order_outfield_bench(bench_frame.loc[bench_frame["position"] != "GK"])
     bench = pd.concat([keeper_rows, outfield_rows]).reset_index(drop=True).copy(deep=True)
     captain = ordered_players.iloc[captain_indices[0]].copy(deep=True)
     captain.name = None

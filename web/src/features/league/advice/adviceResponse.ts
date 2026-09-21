@@ -51,6 +51,10 @@ export function checkedAdvice(
   // weighted document names its weight and the plain one names none, and the plan with the
   // manager's word carries its evidence and the plain one does not. A request that states
   // neither (every request of a static build) is held to nothing here, as before.
+  const identity = payload.prediction_model;
+  const model = record(identity) ? identity.id : "current";
+  if (model !== (request.model ?? "current"))
+    throw new AdviceContextError("Advice uses another prediction model.");
   const top100 = payload.top100;
   const chosenChip = record(payload.chip_choice) ? payload.chip_choice.chip : null;
   if (

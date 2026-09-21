@@ -43,6 +43,7 @@ from squadopt.platform.advice_documents import (
 )
 from squadopt.platform.advice_switches import (
     MANAGERS_WORD_SWITCH,
+    MODEL_SWITCH,
     TOP100_SWITCH,
     AdviceSwitchInputs,
     SwitchIdentity,
@@ -83,6 +84,10 @@ class UnsupportedAdviceRequestError(AdviceReadError):
 
 class Top100InputsUnavailableError(AdviceReadError):
     """A Top 100 setting was asked for and this capture has no usable counts."""
+
+
+class ModelInputsUnavailableError(AdviceReadError):
+    """The requested model has no verified forecast for this capture."""
 
 
 class ManagersWordUnavailableError(AdviceReadError):
@@ -410,6 +415,8 @@ class AdviceReadStore:
                 },
             },
         }
+        if inputs.football is not None:
+            document["models"] = ["current", "football"]
         validate_league_capabilities(document)
         return document
 
@@ -424,6 +431,7 @@ class AdviceReadStore:
         top100_weight: int = 0,
         managers_word: bool = False,
         chip: str | None = None,
+        model: str = "current",
     ) -> ResolvedAdviceRequest:
         """Validate one request against what this deployment knows and address it.
 
@@ -432,6 +440,8 @@ class AdviceReadStore:
         the cache disagree about what exists.
         """
 
+        if model not in ("current", "football"):
+            raise UnsupportedAdviceRequestError("Unknown prediction model.")
         if strategy not in self._strategies:
             raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
         payload = self._directory.league(league_id)
@@ -475,19 +485,22 @@ class AdviceReadStore:
                 raise ChipUnavailableError(
                     "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
                 )
-        if top100_weight or managers_word or chip is not None:
+        if top100_weight or managers_word or chip is not None or model != "current":
             # Refused here, before a job exists: a switch whose input this capture does
             # not have can never be computed, and a queued job would only say so later.
             try:
                 switches = switch_identity(
                     self._switch_inputs(context)
-                    if top100_weight or managers_word
+                    if top100_weight or managers_word or model != "current"
                     else AdviceSwitchInputs(),
                     top100_weight=top100_weight,
                     managers_word=managers_word,
                     chip=chip,
+                    model=model,
                 )
             except SwitchInputUnavailable as error:
+                if error.switch == MODEL_SWITCH:
+                    raise ModelInputsUnavailableError(str(error)) from error
                 if error.switch == TOP100_SWITCH:
                     raise Top100InputsUnavailableError(str(error)) from error
                 assert error.switch == MANAGERS_WORD_SWITCH
@@ -521,6 +534,7 @@ class AdviceReadStore:
         top100_weight: int = 0,
         managers_word: bool = False,
         chip: str | None = None,
+        model: str = "current",
     ) -> tuple[str, AdviceRequestContext]:
         """``resolve`` for a caller that needs only the address and its context."""
 
@@ -533,6 +547,7 @@ class AdviceReadStore:
             top100_weight=top100_weight,
             managers_word=managers_word,
             chip=chip,
+            model=model,
         )
         return resolved.key, resolved.context
 
@@ -567,6 +582,7 @@ class AdviceReadStore:
         top100_weight: int = 0,
         managers_word: bool = False,
         chip: str | None = None,
+        model: str = "current",
     ) -> bytes:
         """The cached answer under the complete key, or a typed refusal."""
 
@@ -579,6 +595,7 @@ class AdviceReadStore:
             top100_weight=top100_weight,
             managers_word=managers_word,
             chip=chip,
+            model=model,
         )
         cached = self.cached(key)
         if cached is None:

@@ -19,6 +19,16 @@ const array =
   (value) =>
     Array.isArray(value) && value.every(check);
 
+const predictionModel: Predicate = (value) =>
+  record(value) &&
+  Object.keys(value).length === 4 &&
+  fields(value, {
+    id: oneOf("football"),
+    version: oneOf("football_team_share_v1"),
+    experimental: oneOf(true),
+    fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
+  });
+
 function fields(
   value: unknown,
   required: Record<string, Predicate>,
@@ -133,6 +143,7 @@ export function isAdvicePayload(value: unknown): boolean {
     },
     {
       source_snapshot_id: nullable(text),
+      prediction_model: predictionModel,
       rival_entry_id: identity,
       rival_label: nullable(text),
       transfer_hit_points: finite,

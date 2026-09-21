@@ -396,6 +396,12 @@ export interface AdvicePlanWeek {
 }
 
 export interface EntryAdvice {
+  prediction_model?: {
+    id: "football";
+    version: string;
+    experimental: boolean;
+    fingerprint: string;
+  };
   chip_forecast?: unknown;
   league_id: number;
   season: string;
