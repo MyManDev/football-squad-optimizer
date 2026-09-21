@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from squadopt.contracts import identifier_sort_key, order_outfield_bench
 from squadopt.evaluation.models import (
     EvaluationValidationError,
     FrozenSquadDecision,
@@ -21,7 +22,17 @@ from squadopt.optimization.config import POSITIONS, Position
 
 REALIZED_POINTS_COLUMNS: tuple[str, str] = ("player_id", "total_points")
 MAX_ERROR_EXAMPLES = 10
-OPTIMIZER_COMPLETION_POLICY = "optimizer_projection_order_v1"
+#: How a decision's bench and vice-captain were completed. The token names the **code** that
+#: completed the decision, never the branch it took: a bench whose players carry no appearance
+#: chance falls back to descending expected points and is still stamped with this version,
+#: because stamping the older one there would break the property that re-completing a record
+#: with the same code reproduces the same token.
+#:
+#: ``optimizer_projection_order_v1`` ordered the outfield bench by decision-time expected
+#: points alone. ``v2`` orders it by expected points given an appearance where the projection
+#: supplies the chance (#531); see ``squadopt.contracts.order_outfield_bench``. Records on disk
+#: keep whichever token completed them and are never rewritten.
+OPTIMIZER_COMPLETION_POLICY = "optimizer_projection_order_v2"
 FPL_SQUAD_POSITION_LIMITS: dict[str, int] = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
 FPL_STARTING_POSITION_MIN: dict[str, int] = {"GK": 1, "DEF": 3, "MID": 2, "FWD": 1}
 FPL_STARTING_POSITION_MAX: dict[str, int] = {"GK": 1, "DEF": 5, "MID": 5, "FWD": 3}
@@ -114,12 +125,6 @@ def _validate_realized_points(realized_points: pd.DataFrame) -> pd.DataFrame:
     )
 
     return validated
-
-
-def _identifier_sort_key(value: object) -> tuple[int, str]:
-    if isinstance(value, Integral) and not isinstance(value, bool):
-        return (0, f"{int(value):+030d}")
-    return (1, str(value))
 
 
 def _validate_frozen_decision(decision: FrozenSquadDecision) -> pd.DataFrame:
@@ -269,7 +274,7 @@ def complete_optimization_decision(
             "A completed optimizer bench requires exactly one goalkeeper."
         )
 
-    def ranking(row: pd.Series[Any]) -> tuple[Decimal, tuple[int, str]]:
+    def _decision_points(row: pd.Series[Any]) -> Decimal:
         try:
             points = Decimal(str(row["expected_points"]))
         except (InvalidOperation, ValueError, OverflowError) as error:
@@ -278,13 +283,19 @@ def complete_optimization_decision(
             ) from error
         if not points.is_finite():
             raise EvaluationValidationError("Decision-time expected_points must be finite numbers.")
-        return (-points, _identifier_sort_key(row["player_id"]))
+        return points
 
-    outfield_records = [row for _, row in bench_outfield.iterrows()]
-    outfield_records.sort(key=ranking)
+    def ranking(row: pd.Series[Any]) -> tuple[Decimal, tuple[int, str]]:
+        return (-_decision_points(row), identifier_sort_key(row["player_id"]))
+
+    # The refusal stays here while the sort moves out. `order_outfield_bench` says what an
+    # unusable number means for an *ordering* and goes on; a frozen decision is a record,
+    # and a record whose points cannot be read is not one worth completing quietly.
+    for _, row in bench_outfield.iterrows():
+        _decision_points(row)
     bench = (
         bench_goalkeepers.iloc[0]["player_id"],
-        *(row["player_id"] for row in outfield_records),
+        *order_outfield_bench(bench_outfield)["player_id"].tolist(),
     )
 
     starter_frame = squad.loc[squad["player_id"].isin(starters)]
