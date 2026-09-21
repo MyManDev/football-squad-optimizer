@@ -13,7 +13,8 @@
             "wildcard",
             "freehit",
             "bboost",
-            "3xc"
+            "3xc",
+            "auto"
           ]
         },
         "contract_version": {
@@ -118,7 +119,8 @@
             "wildcard",
             "freehit",
             "bboost",
-            "3xc"
+            "3xc",
+            "auto"
           ]
         },
         "managers_word": {

@@ -65,7 +65,7 @@ def menu_capabilities() -> dict[str, AdviceCapability]:
             False,
             top100_windows=MEMBER_WINDOWS,
             managers_word_windows=(COMPUTED_WINDOW,),
-            chip_windows=(COMPUTED_WINDOW,),
+            chip_windows=MEMBER_WINDOWS,
         )
     }
     for slug in _rival_strategies():
@@ -114,9 +114,9 @@ def validate_advice_selection(
     if managers_word and window not in capability.managers_word_windows:
         raise EntryError("The manager's word applies to the one-week pure-points plan only.")
     if chip is not None:
-        if chip not in CHIP_NAMES:
+        if chip not in (*CHIP_NAMES, "auto"):
             raise EntryError("Unknown chip choice.")
-        if window not in capability.chip_windows or top100_weight or managers_word:
+        if window not in capability.chip_windows or managers_word:
             raise EntryError(
-                "A chip requires the one-week pure-points plan with other switches off."
+                "A chip requires a supported pure-points window with the manager's word off."
             )

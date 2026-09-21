@@ -13,6 +13,8 @@ from squadopt.contracts.players import (
     REQUIRED_COLUMNS,
     Position,
     canonical_columns_present,
+    identifier_sort_key,
+    order_outfield_bench,
     sort_players_by_id,
 )
 
@@ -27,5 +29,7 @@ __all__ = [
     "FactorKind",
     "Position",
     "canonical_columns_present",
+    "identifier_sort_key",
+    "order_outfield_bench",
     "sort_players_by_id",
 ]

@@ -22,6 +22,7 @@ import pytest
 import tests.unit.test_advice_worker as worker_fixture
 import tests.unit.test_backend_runtime as deployment_fixture
 import tests.unit.test_player_evidence as evidence_fixture
+from tests.unit.test_projection_horizon_builder import _calendar
 
 from squadopt.application.entries import EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
@@ -260,7 +261,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
                 events=[dict(world.EVENTS[0], finished=True), *world.EVENTS[1:]],
                 elements=world._elements(event_points=2),
             ),
-            world.FIXTURES_PAYLOAD: b"[]",
+            world.FIXTURES_PAYLOAD: _calendar(gameweeks=(1, 2, 3)),
             **{
                 name: value
                 for entry in entries

@@ -168,10 +168,8 @@ export function AdviceCard({
   // A Triple Captain or Bench Boost week scores on its own basis, and the producer states
   // the rows, the gain and the lineup total on it; the sentences name that basis.
   const chipCopy = CHIP_COPY[language];
-  const chipBasis =
-    view.chip_choice && chipRescores(view.chip_choice.chip)
-      ? chipCopy.basis[view.chip_choice.chip]
-      : null;
+  const scoredChip = view.chip_strategy?.selected_chip ?? view.chip_choice?.chip;
+  const chipBasis = scoredChip && chipRescores(scoredChip) ? chipCopy.basis[scoredChip] : null;
   return (
     <Card
       title={copy.advice}
@@ -341,6 +339,7 @@ export function AdviceCard({
       <EvidenceSection view={view} />
       <Top100Section view={view} />
       <ChipChoiceSection view={view} />
+      <ChipStrategySection view={view} />
       <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
       <WindowComparison view={view} control={windowControl?.payload ?? null} />
@@ -613,6 +612,63 @@ function Top100Section({ view }: { view: EntryAdvice }) {
  * A gain, so it is never worded as something given up, and never as a reason to play the
  * chip now. Rendered only on a chip document.
  */
+function ChipStrategySection({ view }: { view: EntryAdvice }) {
+  const { language, locale, messages } = useLanguage();
+  const strategy = view.chip_strategy;
+  if (!strategy) return null;
+  const tr = language === "tr";
+  const name = (chip: string | null) =>
+    chip ? (messages.leagueMembers.chipNames[chip] ?? chip) : tr ? "Sakla" : "Hold";
+  return (
+    <section className={styles.adviceSection} data-testid="chip-strategy">
+      <h3 className={styles.lineupTitle}>{tr ? "Çip stratejisi" : "Chip strategy"}</h3>
+      <p>
+        {strategy.mode === "auto"
+          ? tr
+            ? "Otomatik plan · bu hafta: "
+            : "Automatic plan · this week: "
+          : tr
+            ? "Senin seçimin · bu hafta: "
+            : "Your choice · this week: "}
+        <strong>{name(strategy.selected_chip)}</strong>
+      </p>
+      <p>{(view.plan_weeks ?? []).map((w) => `GW${w.gameweek}: ${name(w.chip)}`).join(" · ")}</p>
+      {strategy.mode === "auto" && (
+        <>
+          <p className={styles.honesty}>
+            {tr
+              ? "Saklama değerleri seçilen modelin bu yakalamadaki fırsatlarından hesaplanan bir yaklaşımdır. Sezon boyunca üstünlük veya tam stokastik MDP kanıtı değildir. Sonraki tarihler yeni veride yeniden planlanır."
+              : "Holding values approximate future opportunities from the selected model in this capture. They do not prove season-long superiority or a full stochastic MDP. Later dates are replanned with new data."}
+          </p>
+          <p>
+            {tr
+              ? "Gelecek fırsatlar sabit bir dağılım varsayar; sakatlıklar ve çipler arası rekabet bu değeri değiştirebilir. Wildcard'ın tahmin penceresi dışındaki uzun vadeli etkisi ölçülmüş değildir."
+              : "Future opportunities assume a stationary distribution; injuries and competition between chips may change their value. Wildcard effects beyond the forecast window are unmeasured."}
+          </p>
+          <ul>
+            {strategy.reservations.map((r) => (
+              <li key={`${r.chip}-${r.first_gameweek}`}>
+                {name(r.chip)} · {tr ? "son hafta" : "expiry"} GW{r.last_gameweek} ·{" "}
+                {tr ? "saklama değeri" : "holding value"} {points(r.holding_value, 1, locale)}
+                {" · "}
+                {r.remaining_opportunities}{" "}
+                {tr ? "pencere sonrası fırsat" : "opportunities beyond the window"}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className={styles.muted}>
+        {tr
+          ? `Top100 etkisi: %${strategy.top100_weight}. Saklama değeri ve çözüm açığı seçim faydası birimindedir; maç puanı tahmini değildir.`
+          : `Top100 influence: ${strategy.top100_weight}%. Holding values and the solver gap are selection utility, not match-point forecasts.`}
+        {strategy.objective_gap !== null &&
+          ` ${tr ? "Çözüm açığı" : "Solver gap"}: ${points(strategy.objective_gap, 2, locale)}.`}
+      </p>
+    </section>
+  );
+}
+
 function ChipChoiceSection({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();
   const copy = CHIP_COPY[language];

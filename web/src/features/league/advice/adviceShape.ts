@@ -127,6 +127,30 @@ const chipChoice: Predicate = (value) =>
     { windows_left: record },
   );
 
+const chipStrategy: Predicate = (value) =>
+  fields(value, {
+    version: oneOf("model_opportunity_reservation_v1"),
+    mode: oneOf("auto", "manual"),
+    requested_chip: oneOf("auto", "bboost", "3xc", "wildcard", "freehit"),
+    selected_chip: chip,
+    top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),
+    objective_gap: nullable(finite),
+    objective_basis: oneOf("selection_utility_with_chip_reserve"),
+    experimental: oneOf(true, false),
+    reservations: array((row) =>
+      fields(row, {
+        chip: oneOf("bboost", "3xc", "wildcard", "freehit"),
+        first_gameweek: identity,
+        last_gameweek: identity,
+        remaining_opportunities: integer,
+        holding_value: finite,
+        sample_min: finite,
+        sample_max: finite,
+      }),
+    ),
+    limits: array(text),
+  });
+
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
@@ -164,6 +188,7 @@ export function isAdvicePayload(value: unknown): boolean {
       evidence,
       top100,
       chip_choice: chipChoice,
+      chip_strategy: chipStrategy,
       expected_own_points: nullable(finite),
       captain: nullable(player),
       vice_captain: nullable(player),

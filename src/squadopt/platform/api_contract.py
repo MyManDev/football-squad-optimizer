@@ -36,7 +36,7 @@ _RUN_STATUSES: Final = frozenset({"completed", "failed"})
 #: The Top 100 settings ``league.advise`` accepts; zero is off. A wire contract states its
 #: own enum, and a test holds it equal to the application's ``TOP100_WEIGHTS``.
 ADVISE_TOP100_WEIGHTS: Final[tuple[int, ...]] = (0, 5, 10, 20, 30, 40, 50)
-ADVISE_CHIPS: Final[tuple[str, ...]] = ("wildcard", "freehit", "bboost", "3xc")
+ADVISE_CHIPS: Final[tuple[str, ...]] = ("wildcard", "freehit", "bboost", "3xc", "auto")
 _IDENTIFIER_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _IDEMPOTENCY_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 _SEASON_PATTERN: Final = re.compile(r"^[0-9]{4}-[0-9]{2}$")

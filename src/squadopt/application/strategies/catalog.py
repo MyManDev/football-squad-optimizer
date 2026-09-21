@@ -121,6 +121,7 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # expected-points totals for one gameweek; what the chip would be worth in a
         # later one is not measured, and the document says so beside it.
         "chip_choice",
+        "chip_strategy",
         # Capture-bound fixture scaling of existing expected gains and declared rule
         # thresholds, with refusal/provenance labels; no probability or calibrated spread.
         "chip_forecast",
