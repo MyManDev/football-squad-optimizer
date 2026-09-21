@@ -174,10 +174,14 @@ export function MemberDecisionControls({
   // the chips are off while either of those is on.
   const chipCopy = CHIP_COPY[language];
   const chip = selection.chip;
+  const chipOptions = [
+    ...new Set([...chip.options, ...(capabilities?.chipsByEntry?.[entryId] ?? [])]),
+  ];
+  const chipsAvailable = chipOptions.length > 0;
   const chipChosen = chip.chip !== null;
-  const chipApplies = chip.available && strategy === "saf-puan" && windowSize === 1;
+  const chipApplies = chipsAvailable && strategy === "saf-puan" && windowSize === 1;
   const chipBlocked = selection.evidence.on || top100.weight !== 0;
-  const chipNote = !chip.available
+  const chipNote = !chipsAvailable
     ? chipsUnavailable(chipCopy, chip.reason)
     : !chipApplies
       ? chipCopy.onlyBaseline
@@ -191,7 +195,7 @@ export function MemberDecisionControls({
   // Why a chip the member cannot choose is off: already played, its window not open, a
   // Free Hit last gameweek, or no plan solved. Said per chip, in the producer's codes.
   const chipReasons = CHIP_NAMES.filter(
-    (name) => !chip.options.includes(name) && (chip.available || chip.reasons[name] !== undefined),
+    (name) => !chipOptions.includes(name) && (chipsAvailable || chip.reasons[name] !== undefined),
   ).map((name) =>
     chipCopy.chipReasonLine(copy.chipNames[name] ?? name, chipReason(chipCopy, chip.reasons[name])),
   );
@@ -394,7 +398,7 @@ export function MemberDecisionControls({
                 value=""
                 checked={!chipChosen}
                 // Nothing to choose from and nothing in the link to clear: the row is inert.
-                disabled={!chip.available && !searchParams.has(CHIP_PARAMETER)}
+                disabled={!chipsAvailable && !searchParams.has(CHIP_PARAMETER)}
                 onChange={() => update({ [CHIP_PARAMETER]: null })}
                 // "None" reads as checked while the link carries a chip the page cannot
                 // show; a click on it still has to clear that chip from the link.
@@ -411,7 +415,7 @@ export function MemberDecisionControls({
                   name={CHIP_PARAMETER}
                   value={name}
                   checked={chip.chip === name}
-                  disabled={!chipApplies || chipBlocked || !chip.options.includes(name)}
+                  disabled={!chipApplies || chipBlocked || !chipOptions.includes(name)}
                   onChange={() => update({ [CHIP_PARAMETER]: name })}
                 />
                 <span>{copy.chipNames[name] ?? name}</span>

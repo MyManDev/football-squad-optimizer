@@ -150,8 +150,9 @@ ROSTER_CONTRACT_VERSION = "phase_c_decision_roster_v1"
 # one table two contracts.
 #
 # Ownership is deliberately absent. `selected_by_percent` is the only candidate the panel
-# carries and `data/schema.py` classifies it in `AMBIGUOUS_TIMING_COLUMNS`: its snapshot
-# timing cannot be proven from the schema, so it fails the "only if timing is verified"
+# carries, and `src/squadopt/data/schema.py` classifies it in `AMBIGUOUS_TIMING_COLUMNS`:
+# its snapshot timing cannot be proven from the schema, so it fails the "only if timing is
+# verified"
 # condition rather than passing it quietly.
 ROSTER_COLUMNS = (
     "contract_version",
@@ -276,7 +277,7 @@ class FoldRecord:
     """One fold's provenance, as the evaluation side has to be able to check it.
 
     ``decision_timestamp_utc`` and ``training_cutoff_utc`` are ``None`` on every archive
-    fold, and that is not an omission. ``data/schema.py`` leaves both empty for
+    fold, and that is not an omission. ``src/squadopt/data/schema.py`` leaves both empty for
     archive-backfilled rows because "a deadline the archive never published cannot be
     recovered from a kickoff time", and forging one would forge the single field every
     leakage argument rests on.
@@ -499,9 +500,9 @@ def build_oof_table(
     table["feature_contract_version"] = FEATURE_CONTRACT_VERSION
     table["target_contract_version"] = TARGET_CONTRACT_VERSION
     table["dataset_contract_version"] = DATASET_CONTRACT_VERSION
-    # The archive publishes no deadline, and `data/schema.py` refuses to recover one from a
-    # kickoff time: fabricating it would forge the single field every leakage argument
-    # rests on. Missing, and the manifest says what guarantees these rows instead.
+    # The archive publishes no deadline, and `src/squadopt/data/schema.py` refuses to recover
+    # one from a kickoff time: fabricating it would forge the single field every leakage
+    # argument rests on. Missing, and the manifest says what guarantees these rows instead.
     table["decision_timestamp_utc"] = pd.Series(pd.NA, index=table.index, dtype="string")
     table = _round_and_derive(table)
     table = (

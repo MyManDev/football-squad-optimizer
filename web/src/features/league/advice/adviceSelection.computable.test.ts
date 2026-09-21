@@ -66,6 +66,23 @@ const WHOLE_MENU: AdviceCapabilities = {
 };
 const NO_SWITCHES: AdviceCapabilities = { ...WHOLE_MENU, top100Weights: [0], managersWord: false };
 
+it("offers a held unpublished chip without mistaking the plain file for its answer", () => {
+  const caps: AdviceCapabilities = { ...WHOLE_MENU, chipsByEntry: { [ENTRY]: ["bboost"] } };
+  const selection = resolve("chip=bboost", caps);
+  expect(selection).toMatchObject({
+    status: "not-listed",
+    path: null,
+    request: { chip: "bboost", managersWord: false, top100Weight: 0 },
+    chip: { chip: "bboost", notOffered: false },
+    computable: { selection: true, chips: ["bboost"] },
+  });
+  expect(resolve("chip=wildcard", caps).computable?.selection).toBe(false);
+  for (const link of ["chip=bboost&top100=20", "chip=bboost&llm=on", "chip=bboost&window=3"]) {
+    expect(resolve(link, caps).request.chip).toBeNull();
+  }
+  expect(resolve("chip=bboost", { ...caps, chipsByEntry: { [ENTRY]: [] } }).chip.chip).toBeNull();
+});
+
 function resolve(
   link: string,
   capabilities: AdviceCapabilities | null,

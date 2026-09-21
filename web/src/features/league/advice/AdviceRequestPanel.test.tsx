@@ -132,7 +132,7 @@ describe("with the service answering", () => {
     cleanup();
     const chip = renderPanel({ service: "ready", computable: false, chipChosen: true });
     expect(chip.button).toBeDisabled();
-    expect(chip.container).toHaveTextContent(tr.chipNotComputed);
+    expect(chip.container).toHaveTextContent(tr.chipUnavailable);
   });
 
   it("tells a waiting member the page can be left open", () => {
@@ -146,18 +146,25 @@ describe("with the service answering", () => {
     expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
-  it.each(["tr", "en"] as const)("says a coded failure as a sentence in %s", (language) => {
+  it.each([
+    ["tr", "TOP100_INPUTS_UNAVAILABLE"],
+    ["en", "TOP100_INPUTS_UNAVAILABLE"],
+    ["tr", "OPEN_JOB_LIMITED"],
+    ["en", "OPEN_JOB_LIMITED"],
+    ["tr", "DEADLINE_PASSED"],
+    ["en", "DEADLINE_PASSED"],
+  ] as const)("says a coded failure in %s: %s", (language, reason) => {
     const copy = COMPUTE_COPY[language];
     const { container } = renderPanel(
       {
         service: "ready",
         computable: true,
-        state: { phase: "failed", request: REQUEST, reason: "TOP100_INPUTS_UNAVAILABLE" },
+        state: { phase: "failed", request: REQUEST, reason },
       },
       language,
     );
-    expect(container).toHaveTextContent(copy.failures.TOP100_INPUTS_UNAVAILABLE!);
-    expect(container).not.toHaveTextContent("TOP100_INPUTS_UNAVAILABLE");
+    expect(container).toHaveTextContent(copy.failures[reason]!);
+    expect(container).not.toHaveTextContent(reason);
   });
 
   it("names the rate limit's wait, and an unknown code only generally", () => {
@@ -188,6 +195,35 @@ describe("with the service answering", () => {
 });
 
 describe("with a service that cannot help right now", () => {
+  it.each(["tr", "en"] as const)("distinguishes all three publication states in %s", (language) => {
+    const copy = COMPUTE_COPY[language];
+    for (const published of [true, false, undefined]) {
+      const { container } = renderPanel({ service: "unreachable", published }, language);
+      const expected =
+        published === true
+          ? copy.serviceUnreachablePublished
+          : published === false
+            ? copy.serviceUnreachableAbsent
+            : copy.serviceUnreachable;
+      expect(container).toHaveTextContent(expected);
+      for (const other of [
+        copy.serviceUnreachablePublished,
+        copy.serviceUnreachableAbsent,
+        copy.serviceUnreachable,
+      ]) {
+        if (other !== expected) expect(container).not.toHaveTextContent(other);
+      }
+      cleanup();
+    }
+  });
+
+  it("keeps an unconfirmed publication unknown while preserving the ready-service duration", () => {
+    const { container } = renderPanel({ service: "ready", computable: true });
+    expect(container).not.toHaveTextContent(tr.notPrecomputed);
+    expect(container).toHaveTextContent(tr.duration[3]);
+    expect(container).toHaveTextContent(tr.durationNote);
+  });
+
   it("leaves a short notice and the static rule when it is down", () => {
     const { container, button } = renderPanel({
       service: "unreachable",
@@ -212,6 +248,25 @@ describe("with a service that cannot help right now", () => {
 });
 
 describe("a gameweek whose deadline has passed", () => {
+  it.each(["tr", "en"] as const)(
+    "describes retained plans as readable after failure in %s",
+    (language) => {
+      for (const phase of ["failed", "unavailable"] as const) {
+        const { container, button } = renderPanel(
+          {
+            deadlinePassed: true,
+            state: { phase, request: REQUEST, reason: "SERVICE_UNREACHABLE" },
+          },
+          language,
+        );
+        expect(button).toBeDisabled();
+        expect(container).toHaveTextContent(language === "tr" ? "okunabilir" : "available to read");
+        expect(container).not.toHaveTextContent(/geçerli|still stands/);
+        cleanup();
+      }
+    },
+  );
+
   it("asks nothing of a ready service and says why, in both languages", () => {
     for (const language of ["tr", "en"] as const) {
       const { button, compute } = renderPanel(

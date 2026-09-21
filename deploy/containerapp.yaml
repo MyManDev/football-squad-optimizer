@@ -79,6 +79,7 @@ properties:
           - "0.0.0.0"
           - "--port"
           - "8000"
+          - "--proxy-headers"
         resources:
           # UNVERIFIED: the allowed cpu/memory pairs and whether the per-replica sum across
           # containers must itself be an allowed pair.
@@ -90,6 +91,9 @@ properties:
           - volumeName: inputs
             mountPath: /mnt/squadopt-inputs
         env: &backend_environment
+          # FORWARDED_ALLOW_IPS is deliberately unset: the Azure ingress peer is UNVERIFIED.
+          # Add only its verified proxy peer/network allowlist before enabling public use.
+          # API startup refuses any wildcard entry in this allowlist.
           # The one shared ReadWrite mount, as a subdirectory of it rather than its root: a
           # share root's mode and owner are the platform's, a subdirectory is ours, and the
           # runtime runs as uid 10001. The directory must exist before the first start; the

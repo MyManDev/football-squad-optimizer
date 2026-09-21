@@ -156,6 +156,22 @@ describe("HttpAdviceClient", () => {
 });
 
 describe("FallbackAdviceClient", () => {
+  it.each([404, 503])(
+    "an on-open read never guesses a static file after HTTP %s",
+    async (status) => {
+      const fallback = vi.fn(async () => mockEntryAdviceEnvelope(101, "saf-puan", 1));
+      const client = new FallbackAdviceClient(
+        new HttpAdviceClient("https://api.example", async () =>
+          jsonResponse(status, { error: { code: "NOT_COMPUTED", message: "missing" } }),
+        ),
+        new StaticOnlyAdviceClient(fallback),
+      );
+      const read = client.readAdvice(REQUEST, { publishedFallback: false });
+      if (status === 404) await expect(read).resolves.toEqual({ kind: "not-computed" });
+      else await expect(read).rejects.toBeDefined();
+      expect(fallback).not.toHaveBeenCalled();
+    },
+  );
   it("a dead backend degrades to the static tree and says so", async () => {
     const dead = new HttpAdviceClient("https://api.example", async () => {
       throw new TypeError("fetch failed");

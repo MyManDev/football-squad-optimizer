@@ -39,7 +39,7 @@ export function AdviceRequestPanel({
   selectionAvailable = true,
   service = "static",
   computable = false,
-  published = true,
+  published,
   chipChosen = false,
   pending = false,
   deadlinePassed = false,
@@ -50,9 +50,9 @@ export function AdviceRequestPanel({
   service?: ComputeService;
   /** With a ready service: whether it can answer this exact selection now. */
   computable?: boolean;
-  /** With a ready service: whether the published tree already answers this selection. */
+  /** Whether a readable published plan answers this selection; undefined is unconfirmed. */
   published?: boolean;
-  /** A chosen chip is shown from the published tree only; the service computes none yet. */
+  /** A chip computation has no measured duration to display. */
   chipChosen?: boolean;
   /**
    * A service is configured and has not said yet what it computes. The static build's
@@ -86,20 +86,32 @@ export function AdviceRequestPanel({
           {service !== "ready"
             ? copy.computeUnsupportedSelection
             : chipChosen
-              ? computeCopy.chipNotComputed
+              ? computeCopy.chipUnavailable
               : computeCopy.notComputable}
         </p>
       ) : null}
       {!deadlinePassed && service === "unreachable" ? (
-        <p role="note">{computeCopy.serviceUnreachable}</p>
+        <p role="note">
+          {published === true
+            ? computeCopy.serviceUnreachablePublished
+            : published === false
+              ? computeCopy.serviceUnreachableAbsent
+              : computeCopy.serviceUnreachable}
+        </p>
       ) : null}
       {!deadlinePassed && service === "other-capture" ? (
         <p role="note">{computeCopy.otherCapture}</p>
       ) : null}
       {service === "ready" && supported ? (
-        <p role="note">
-          {published ? null : <>{computeCopy.notPrecomputed} </>}
-          {computeCopy.duration[request.window]} {computeCopy.durationNote}
+        <p role="note" className={styles.durationNote}>
+          {published === false ? <>{computeCopy.notPrecomputed} </> : null}
+          {chipChosen ? (
+            computeCopy.chipDurationUnknown
+          ) : (
+            <>
+              {computeCopy.duration[request.window]} {computeCopy.durationNote}
+            </>
+          )}
         </p>
       ) : null}
       <div className={styles.controls}>

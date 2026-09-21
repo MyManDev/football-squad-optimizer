@@ -44,6 +44,34 @@ explicitly distinguishes this from a net forecast. No accuracy percentage is inf
 
 ## Publication and UI
 
+The optional `weeks[].recorded_plans` lists one-week decisions with no rival or the
+publication's default rival. Windows and other rivals remain in the archive.
+Default-rival aliases are omitted only when their digests match the explicit rival row.
+The list is
+collapsed by default on the member history page. It includes strategy, window,
+rival id, moves and captain, plus chip and any explicitly recorded Top 100,
+manager's-word and expected-points cost fields. Player names come from that record;
+an unresolved player retains their recorded id. No switched plan is solved or scored
+against results here. The existing baseline comparison and horizon are unchanged.
+
+Histories and archives written before the settings were recorded have no such field.
+Missing settings or prices are not reconstructed, labelled off or shown as zero.
+Each optional row comes from the exact capture already selected for that week, under
+the same pre-deadline publication rule, reusing the verified selected record.
+Plain pure-points and chip rows have no displayed price. A priced setting shows its
+recorded ceiling when present, otherwise its cost, and never a negative value.
+The published path identifies a row but is not displayed.
+
+The additive schema is `docs/contracts/weekly_suggestion_history_v1.schema.json`.
+Regenerate it from the repository root with:
+
+```sh
+python -c "from squadopt.platform.history_documents import write_history_schema; write_history_schema()"
+```
+
+The browser retains its identity and arithmetic checks in addition to this shape.
+Both the legacy history fixture and the optional rows are covered on both sides.
+
 The existing league publisher writes derived JSON under
 `data/league/history/{entry_id}.json` with contract `weekly_suggestion_history_v1`.
 `history_record_root` allows preview runs to read existing records without writing

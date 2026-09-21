@@ -18,6 +18,7 @@ produce a column of nulls.
 """
 
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -547,6 +548,24 @@ def _fixture_status(record: Mapping[str, object], label: str) -> str:
     if _boolean(record, "finished", label):
         return "final"
     return "provisional" if _boolean(record, "provisional_start_time", label) else "scheduled"
+
+
+def unscheduled_fixture_count(fixtures: bytes) -> int:
+    """How many fixtures the capture holds with no gameweek.
+
+    :func:`fixture_snapshot` excludes these, which is right: a club whose match was
+    postponed genuinely has no fixture that gameweek, and inventing a row for one that
+    has no date would put a match in a week nobody has scheduled it in. But the
+    exclusion is silent, and what it hides is not nothing. Each of these fixtures will
+    be given a gameweek, and that gameweek can be one a caller is already planning
+    over, so a count of zero and a count of three are different statements about how
+    settled a calendar is.
+
+    Counted here rather than at the caller so it is counted the same way the exclusion
+    is decided: one field, ``event``, in one place.
+    """
+
+    return sum(1 for record in _array_records(fixtures, "Fixture") if record.get("event") is None)
 
 
 def fixture_snapshot(
@@ -1589,6 +1608,29 @@ def fpl_league_standings_page(
     )
 
 
+def fpl_league_name(standings: bytes, *, league_id: int) -> str | None:
+    """The league's own name as its standings payload states it, or ``None``.
+
+    A payload that declares another league is refused, as the member reader refuses it.
+    A payload that states no name, or a blank one, has no name: the caller says so in
+    its own words rather than this reader inventing one.
+    """
+
+    identifier = _positive(league_id, "league id")
+    league = _document(standings, "League standings").get("league")
+    if not isinstance(league, dict):
+        return None
+    declared = league.get("id")
+    if isinstance(declared, int) and not isinstance(declared, bool) and declared != identifier:
+        raise DataSourceError(
+            f"League standings payload declares league {declared}, not {identifier}."
+        )
+    name = league.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return name.strip()
+
+
 def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueStanding, ...]:
     """Return a classic league's members, in the order the page ranks them.
 
@@ -2108,3 +2150,40 @@ def fpl_entry_picks(
         source_snapshot_id=source_snapshot_id,
         active_chip=active_chip,
     )
+
+
+def game_forecast(bootstrap: bytes) -> Mapping[int, float]:
+    """Return the game's own next-gameweek forecast (``ep_next``), keyed on the persistent code.
+
+    The platform publishes, for every player, the points it expects of him in the next
+    gameweek, already adjusted for the availability it shows. It costs nothing, it was made
+    with the information of the capture's own instant, and nothing in this repository read
+    it until the live projection audit needed a yardstick.
+
+    It is a yardstick and never an input. A forecast somebody else made is not a feature this
+    repository can account for, and a model that read it would inherit whatever it rests on
+    without being able to say what that is.
+
+    The field is a decimal string, or null. A null or an unparseable value is **left out**
+    rather than read as zero: a player the game has no forecast for is not a player it
+    expects nothing of. Entries that are not squad-eligible players are skipped, as
+    :func:`player_snapshot` skips them.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, ("code", "element_type", "ep_next"), "Element")
+    forecast: dict[int, float] = {}
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        raw = record.get("ep_next")
+        if raw is None:
+            continue
+        try:
+            value = float(raw) if isinstance(raw, (str, int, float)) else None
+        except ValueError:
+            value = None
+        if isinstance(raw, bool) or value is None or not math.isfinite(value):
+            continue
+        forecast[_integer(record, "code", "Element")] = value
+    return MappingProxyType(forecast)

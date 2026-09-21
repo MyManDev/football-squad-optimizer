@@ -445,6 +445,99 @@ def test_wall_clock_limits_do_not_choose_the_plan(
         )
 
 
+def test_the_tiebreak_is_budgeted_on_solver_work_not_on_what_the_clock_left(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both phases are handed the ceiling; neither is handed the remainder of it.
+
+    The primary already stops on deterministic work. The tie-break used to receive
+    ``deadline - perf_counter()``, so the phase that settles bench order, the captain among
+    equals and the choice between two equal-value fifteens was a function of the CPU share
+    the process happened to receive: the same dependence the deterministic budget was
+    introduced to remove from the primary (#247), and the one ``optimization/optimizer.py``
+    removed from its own tie-break in #192 by flooring that phase's wall limit at the caller's
+    budget instead of its leftover.
+
+    ``member_plan_determinism`` cut this phase with the clock 24 times and the published plan
+    did not move once, so this pins a property that was measured to hold rather than repairing
+    an observed defect.
+
+    ``test_wall_clock_limits_do_not_choose_the_plan`` above cannot see this. It brings no
+    deterministic budget, so the planner raises both of its arms to ``PLAN_WALL_CEILING_SECONDS``
+    and the two runs agree on the wall figure that reaches the solver. A caller that brings its
+    own budget keeps its own ceiling, and that is the caller whose tie-break was cut short.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = replace(
+        small_config,
+        solver_time_limit_seconds=45.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    walls: list[float] = []
+    original = planning_optimizer.configure_solver
+
+    def record(
+        solver: cp_model.CpSolver,
+        configuration: OptimizationConfig,
+        time_limit_seconds: float,
+        deterministic_time_limit: float | None = None,
+    ) -> None:
+        walls.append(float(time_limit_seconds))
+        original(solver, configuration, time_limit_seconds, deterministic_time_limit)
+
+    monkeypatch.setattr(planning_optimizer, "configure_solver", record)
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+
+    assert result.diagnostics["tiebreak_attempted"] is True
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    # Two phases, two configured solvers, and the same ceiling for each. A tie-break that got
+    # less than the primary would be reading the clock.
+    assert walls == [45.0, 45.0]
+
+
+def test_an_expired_clock_does_not_stop_the_tiebreak_from_being_attempted(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gate half of the change, which the budget test above cannot reach.
+
+    A test that only checks the budget handed to the tie-break also passes for an
+    implementation that still *gates* on the clock, because this fixture proves in
+    milliseconds and a clock gate never binds on it. So move the clock instead of the
+    problem: the counter jumps far past any deadline the old code would have computed, while
+    the primary still proves optimal.
+
+    Under the old gate ``remaining_time`` would be hugely negative and the phase skipped. The
+    tie-break is now gated on remaining deterministic work, which the jump does not touch, so
+    it is still attempted.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = replace(
+        small_config,
+        solver_time_limit_seconds=45.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    calls = {"n": 0}
+
+    def jumped_clock() -> float:
+        calls["n"] += 1
+        # The first reading is the start; every later one is long past any deadline.
+        return 0.0 if calls["n"] == 1 else 1_000_000.0
+
+    monkeypatch.setattr(planning_optimizer, "perf_counter", jumped_clock)
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.diagnostics["tiebreak_attempted"] is True
+
+
 def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
@@ -463,6 +556,38 @@ def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
     assert result.diagnostics["deterministic_budget_source"] == "caller"
     assert result.diagnostics["solver_deterministic_time_limit"] == 2.0
     assert result.diagnostics["wall_time_limit_seconds"] == 30.0
+
+
+def test_a_linearization_level_is_the_callers_choice_and_never_the_default(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A search parameter: it may change the work, never the model or a silent default."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    seen: list[int] = []
+    solve = planning_optimizer._solve
+
+    def recording(model: cp_model.CpModel, solver: cp_model.CpSolver) -> object:
+        seen.append(int(solver.parameters.linearization_level))
+        return solve(model, solver)
+
+    monkeypatch.setattr(planning_optimizer, "_solve", recording)
+    default = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config)
+    solver_default = seen[0]
+    assert "linearization_level" not in default.diagnostics
+    seen.clear()
+
+    chosen = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, linearization_level=2)
+
+    # The primary solve and the tie-break both run at the chosen level.
+    assert seen == [2, 2] and solver_default != 2
+    assert chosen.diagnostics["linearization_level"] == 2
+    assert chosen.solver_status is default.solver_status is SolverStatus.OPTIMAL
+    assert chosen.objective_value == default.objective_value
+    for ours, theirs in zip(chosen.weeks, default.weeks, strict=True):
+        assert_frame_equal(ours.selected_squad, theirs.selected_squad)
 
 
 def test_unknown_solver_status_is_structured(
@@ -582,7 +707,7 @@ def test_a_wildcard_rebuilds_the_squad_without_hits(
     assert sorted(week.selected_squad["player_id"]) == ["DEF_A", "FWD_A", "GK_A", "MID_A"]
     if preserves:
         assert week.free_transfers_unused == 1
-        assert week.free_transfers_for_next_gameweek == 2
+        assert week.free_transfers_for_next_gameweek == 1
     else:
         assert week.free_transfers_unused == 0
         assert week.free_transfers_for_next_gameweek == 1
@@ -835,11 +960,68 @@ def test_a_free_hit_rebuilds_for_one_week_and_reverts_the_squad_and_bank(
     # Week two starts from the weak squad and the pre-chip bank, free transfers kept.
     assert set(second.transfers_out["player_id"]).issubset({"GK_B", "DEF_B", "MID_B", "FWD_B"})
     assert second.bank_before_tenths == 30
-    assert second.free_transfers_before == 2
+    assert second.free_transfers_before == 1
     held_after_two = set(second.selected_squad["player_id"])
     assert held_after_two == (
         {"GK_B", "DEF_B", "MID_B", "FWD_B"} - set(second.transfers_out["player_id"])
     ) | set(second.transfers_in["player_id"])
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+@pytest.mark.parametrize("free", [1, 2, 4, 5])
+@pytest.mark.parametrize("accrual", [0, 1, 2])
+def test_rebuild_retains_the_entering_total_then_ordinary_accrual_resumes(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    chip: str,
+    free: int,
+    accrual: int,
+) -> None:
+    # External rule: Premier League FAQ 4661030, "saved transfers" and "missing a
+    # free transfer". Checking 5 alone hid the old double-accrual bug at the cap.
+    result = optimize_transfer_plan(
+        PlanningHorizon(_horizon_table(known_optimum_players)),
+        replace(OPTIMAL_INITIAL, free_transfers=free),
+        small_config,
+        TransferPlanningConfig(free_transfer_accrual=accrual),
+        chips=ChipAvailability({chip: {1}}, forced={1: chip}),
+    )
+
+    first, second = result.weeks
+    assert result.solver_status == SolverStatus.OPTIMAL
+    assert first.free_transfers_for_next_gameweek == free
+    assert second.free_transfers_before == free
+    assert second.transfer_count == 0
+    assert second.free_transfers_for_next_gameweek == min(5, free + accrual)
+    assert result.contract_version == "deterministic_transfer_planning_v3"
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+def test_rebuild_cannot_pay_for_a_following_weeks_move_with_an_invented_transfer(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    chip: str,
+) -> None:
+    table = _horizon_table(known_optimum_players)
+    # Even the bench upgrade is worth more than a hit, so both weeks have a unique
+    # squad optimum. Start from A: FH returns to A and WC keeps A after week one.
+    prefers_a = table["gameweek"].eq(1)
+    is_a = table["player_id"].str.endswith("_A")
+    table["expected_points"] = (prefers_a == is_a).astype(float) * 100
+    result = optimize_transfer_plan(
+        PlanningHorizon(table),
+        OPTIMAL_INITIAL,
+        small_config,
+        chips=ChipAvailability({chip: {1}}, forced={1: chip}),
+    )
+
+    first, second = result.weeks
+    assert result.solver_status == SolverStatus.OPTIMAL
+    assert first.transfer_count == 0
+    assert second.transfer_count == 4
+    assert second.paid_transfer_count == 3
+    assert second.transfer_hit_points == 12.0
+    assert second.free_transfers_for_next_gameweek == 1
 
 
 def test_a_free_hit_is_played_where_the_temporary_squad_is_worth_most(

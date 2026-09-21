@@ -14,7 +14,9 @@ import numpy as np
 import pandas as pd
 
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, ARCHIVE_REPOSITORY, SUPPORTED_SEASONS
+from squadopt.evaluation import EvaluationResult
 from squadopt.experiments import SCREENING_EXPERIMENT_CONTRACT_VERSION
+from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import FEATURE_GENERATION_CONTRACT_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +58,23 @@ def _git_revision() -> tuple[str, bool]:
     return revision, dirty
 
 
+def repository_provenance() -> dict[str, object]:
+    """Which code produced a record, for a runner that reads no archive.
+
+    ``artifact_metadata`` stamps this beside the dataset and feature provenance a panel
+    measurement needs. A runner that measures the live planner reads no archive, so an
+    archive commit and a manifest digest would name a dataset the run never opened, and a
+    record naming inputs it did not read is worse than one naming fewer. It still has to say
+    which code ran, and that is what this is, so the narrow case has somewhere to call.
+
+    ``working_tree_dirty`` travels with the commit rather than being inferred from it,
+    because a SHA recorded from a modified checkout describes none of the bytes that ran.
+    """
+
+    revision, dirty = _git_revision()
+    return {"repository_commit": revision, "working_tree_dirty": dirty}
+
+
 def artifact_metadata(
     *,
     panel_rows: int,
@@ -68,12 +87,10 @@ def artifact_metadata(
     that load the full supported range may omit it and keep the historical default.
     """
 
-    revision, dirty = _git_revision()
     return {
         "created_utc": created_utc or datetime.now(UTC).isoformat(timespec="seconds"),
         "provenance": {
-            "repository_commit": revision,
-            "working_tree_dirty": dirty,
+            **repository_provenance(),
             "archive_repository": ARCHIVE_REPOSITORY,
             "archive_commit": ARCHIVE_COMMIT,
             "archive_manifest_sha256": _sha256(MANIFEST_PATH),
@@ -134,3 +151,56 @@ def _bootstrap_gap_interval(
         pick = generator.integers(0, n, size=n)
         gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
     return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
+
+
+#: The deterministic work a measurement's solve may spend. Chosen from a sweep of the rotation
+#: ceiling's 147 control folds on 2026-09-18: at 0.5 (the production benchmark's limit) 29 solves
+#: were proved and 118 returned an incumbent; at 2.0, 89 and 58; at 5.0, 117 and 30; at 15.0, 130
+#: and 17, for 1.7 times the run time of 5.0 and a mean realized score 0.007 away from it. The
+#: limit does not buy reproducibility (every value reproduces); it buys proofs, and 5.0 is where
+#: most solves are proved and the next step costs more than it returns.
+MEASUREMENT_DETERMINISTIC_TIME_LIMIT = 5.0
+#: A cap, never the binding limit: about forty times the wall time a 5.0 solve took when quiet.
+MEASUREMENT_WALL_TIME_LIMIT_SECONDS = 600.0
+
+
+def measurement_optimization_config() -> OptimizationConfig:
+    """The solver limits of a run that writes a committed record.
+
+    ``OptimizationConfig()`` binds on ten wall-clock seconds, so a busy machine gives the
+    solver less work, a solve that would have been proved returns an incumbent, and the same
+    commit writes a different record (#590: the rotation ceiling moved from 0.959 to 0.667 and
+    lost five folds under load). Deterministic time measures solver work, not elapsed seconds,
+    so it is the binding limit here and the wall clock is a cap far above it.
+    """
+
+    return OptimizationConfig(
+        solver_time_limit_seconds=MEASUREMENT_WALL_TIME_LIMIT_SECONDS,
+        solver_deterministic_time_limit=MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
+    )
+
+
+def solver_record(*results: EvaluationResult) -> dict[str, object]:
+    """What a record has to say about the solves it rests on.
+
+    The limits the solver ran under, and how many of the solves were proved and how many
+    returned an incumbent. A number over unproven solves is still a number; a reader who
+    cannot tell which kind it is cannot tell whether a re-run may move it.
+    """
+
+    config = results[0].config.optimization_config
+    statuses: dict[str, int] = {}
+    for result in results:
+        for fold in result.folds:
+            name = fold.optimization_result.solver_status.value
+            statuses[name] = statuses.get(name, 0) + 1
+    return {
+        "solver_time_limit_seconds": config.solver_time_limit_seconds,
+        "solver_deterministic_time_limit": config.solver_deterministic_time_limit,
+        "binding_limit": (
+            "deterministic_time"
+            if config.solver_deterministic_time_limit is not None
+            else "wall_clock"
+        ),
+        "solver_status_counts": dict(sorted(statuses.items())),
+    }

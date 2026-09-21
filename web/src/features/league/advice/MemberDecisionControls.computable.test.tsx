@@ -94,6 +94,26 @@ describe("the controls without capabilities", () => {
 });
 
 describe("the controls with the service's capabilities", () => {
+  it("enables an unpublished held chip and excludes incompatible switches", () => {
+    renderControls("", { ...WHOLE_MENU, chipsByEntry: { [ENTRY]: ["bboost"] } });
+    expect(enabledValues("chip")).toEqual(["", "bboost"]);
+    fireEvent.click(inputs("chip").find((input) => input.value === "bboost")!);
+    expect(query().get("chip")).toBe("bboost");
+    expect(inputs("chip").find((input) => input.value === "bboost")).toBeChecked();
+    expect(enabledValues("top100")).toEqual(["0"]);
+    expect(inputs("llm")[0]).toBeDisabled();
+  });
+  it.each(["mode=saf-puan&window=3", "mode=ortak-koru&window=1"])(
+    "explains why service-only chips are disabled for %s",
+    (search) => {
+      const { container } = renderControls(search, {
+        ...WHOLE_MENU,
+        chipsByEntry: { [ENTRY]: ["bboost"] },
+      });
+      expect(container).toHaveTextContent(CHIP_COPY.tr.onlyBaseline);
+      expect(inputs("chip").find((input) => input.value === "bboost")).toBeDisabled();
+    },
+  );
   it("open a rival strategy's longer windows and every setting, and say how", () => {
     const { container } = renderControls("mode=ortak-koru", WHOLE_MENU);
     expect(enabledValues("window")).toEqual(["1", "3", "5"]);

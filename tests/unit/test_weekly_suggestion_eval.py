@@ -84,6 +84,23 @@ def recorded(
     }
 
 
+def test_recorded_switches_do_not_become_additional_baselines() -> None:
+    record = recorded()
+    baseline = record["advice"][0]
+    baseline["published_path"] = "advice/101/saf-puan/1.json"
+    record["advice"] = [
+        {**baseline, "published_path": f"advice/101/saf-puan/1/{switch}.json"}
+        for switch in ("hoca-sozu", "top100-20", "top100-20-hoca-sozu", "chip-bboost")
+    ]
+    with pytest.raises(review.SuggestionEvaluationError, match="missing_advice"):
+        review._advice(record)
+    record["advice"].append(baseline)
+    assert review._advice(record) is baseline
+    record["advice"].append(copy.deepcopy(baseline))
+    with pytest.raises(review.SuggestionEvaluationError, match="ambiguous_advice"):
+        review._advice(record)
+
+
 def points() -> pd.DataFrame:
     return pd.DataFrame({"player_id": range(1, 16), "total_points": 2.0, "minutes": 90})
 

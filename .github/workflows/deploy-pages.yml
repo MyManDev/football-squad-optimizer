@@ -449,6 +449,35 @@ jobs:
           echo "No upload occurred. Investigate unexpected deployments; do not silently bypass the cap." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
+      - name: Refuse a production commit behind or unrelated to live
+        if: steps.budget.outputs.decision == 'deploy'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          RELEASE_TAG: ${{ needs.production_meta.outputs.release_tag }}
+          SOURCE_SHA: ${{ needs.production_meta.outputs.commit_sha }}
+        with:
+          script: |
+            const { pathToFileURL } = require("node:url");
+            const { resolve } = require("node:path");
+            const { verifyProductionAdvance } = await import(pathToFileURL(
+              resolve("trusted/web/scripts/verify-cloudflare-deployment.mjs"),
+            ).href);
+            try {
+              core.info(await verifyProductionAdvance({
+                accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+                apiToken: process.env.CLOUDFLARE_API_TOKEN,
+                project: process.env.CLOUDFLARE_PAGES_PROJECT,
+                releaseTag: process.env.RELEASE_TAG,
+                commitSha: process.env.SOURCE_SHA,
+                compareCommits: (refs) => github.rest.repos.compareCommits({ ...context.repo, ...refs }),
+              }));
+            } catch (error) {
+              core.setFailed(`Production identity/comparison unreadable or refused: ${error.message}`);
+            }
+
       - name: Deploy exact production artifact
         id: deploy
         if: steps.budget.outputs.decision == 'deploy'

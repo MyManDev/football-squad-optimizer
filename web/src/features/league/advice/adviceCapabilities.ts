@@ -15,6 +15,7 @@
 
 import type { WindowSize } from "../../moves/modePrices";
 import { LeagueDataError } from "../data";
+import { isMemberChip, type MemberChip } from "./chipChoice";
 import { isTop100Weight, type Top100Weight } from "./top100";
 
 export const LEAGUE_CAPABILITIES_CONTRACT = "league_capabilities_v1";
@@ -33,6 +34,8 @@ export interface AdviceCapabilities {
   /** The settings the service would accept now; zero is always one of them. */
   top100Weights: Top100Weight[];
   managersWord: boolean;
+  /** Missing member means unknown history; an empty list means no held chips. */
+  chipsByEntry?: Record<string, MemberChip[]>;
 }
 
 export class AdviceCapabilitiesError extends LeagueDataError {}
@@ -92,6 +95,25 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   }
   // A setting this page has no radio for is not offered here; zero needs no offer.
   const offered = available ? weights.filter(isTop100Weight).filter((weight) => weight !== 0) : [];
+  let chipsByEntry: Record<string, MemberChip[]> | undefined;
+  if (value.chips !== undefined) {
+    if (!record(value.chips) || !record(value.chips.held_by_entry)) {
+      throw new AdviceCapabilitiesError("The capabilities have no member chip list.");
+    }
+    chipsByEntry = {};
+    for (const [entry, chips] of Object.entries(value.chips.held_by_entry)) {
+      if (
+        !/^[1-9][0-9]*$/.test(entry) ||
+        !Number.isSafeInteger(Number(entry)) ||
+        !Array.isArray(chips) ||
+        !chips.every(isMemberChip) ||
+        new Set(chips).size !== chips.length
+      ) {
+        throw new AdviceCapabilitiesError("The capabilities have an invalid member chip list.");
+      }
+      chipsByEntry[entry] = chips;
+    }
+  }
   return {
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
@@ -100,6 +122,7 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     strategies,
     top100Weights: [0, ...new Set(offered)],
     managersWord: value.managers_word.available,
+    ...(chipsByEntry === undefined ? {} : { chipsByEntry }),
   };
 }
 

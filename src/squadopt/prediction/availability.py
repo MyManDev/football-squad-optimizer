@@ -187,6 +187,19 @@ def apply_availability(
             "availability is applied."
         )
     table["expected_points"] = points.mul(multiplier.to_numpy()).clip(lower=0.0)
+    # The same multiplier applies to the appearance chance where the projection carries
+    # one, and that is not symmetry for its own sake. This rule is *news about
+    # appearing*: a stated chance of playing is a chance of appearing, and a status of
+    # injured or suspended is the claim that the player will not. A producer that
+    # composes `expected_points = appearance_probability * points_if_appearance` and a
+    # rule that scaled only the left side would leave a pair whose quotient is no longer
+    # the conditional mean either of them meant, and the bench rule of #531 reads exactly
+    # that quotient: a player doubtful at a quarter would be ordered at a quarter of what
+    # they are worth *if* they play, which is the one thing the exchange argument says
+    # must not happen. Scaling both keeps the identity true through this step.
+    if "appearance_probability" in table.columns:
+        chance = pd.to_numeric(table["appearance_probability"], errors="coerce").astype("float64")
+        table["appearance_probability"] = chance.mul(multiplier.to_numpy()).clip(0.0, 1.0)
 
     unavailable = tuple(
         int(value) for value in table.loc[multiplier.to_numpy() <= 0.0, "player_id"].tolist()

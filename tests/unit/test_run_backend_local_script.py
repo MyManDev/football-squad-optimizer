@@ -12,18 +12,21 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from squadopt.platform.backend_runtime import SITE_ORIGINS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = REPOSITORY_ROOT / "scripts" / "run_backend_local.ps1"
+LOGON = REPOSITORY_ROOT / "scripts" / "start_backend_at_logon.ps1"
 TUNNEL = REPOSITORY_ROOT / "deploy" / "cloudflared" / "config.example.yml"
 BACKEND_RUNTIME = REPOSITORY_ROOT / "src" / "squadopt" / "platform" / "backend_runtime.py"
 
 
-def _launcher_code() -> str:
+def _launcher_code(path: Path = LAUNCHER) -> str:
     """The script without its comments, so a commented-out variable is not counted."""
 
-    text = LAUNCHER.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8")
     text = re.sub(r"<#.*?#>", "", text, flags=re.DOTALL)
     return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
 
@@ -49,15 +52,24 @@ def test_every_backend_variable_the_launcher_sets_is_one_the_backend_reads() -> 
     assert sorted(name for name in names if f'"{name}"' not in known) == []
 
 
-def test_the_launcher_parses_under_windows_powershell_5_1() -> None:
+@pytest.mark.parametrize("path", [LAUNCHER, LOGON], ids=["launcher", "logon"])
+def test_the_launcher_parses_under_windows_powershell_5_1(path: Path) -> None:
     """5.1 reads a file without a byte order mark as ANSI, and has neither && nor ?:."""
 
-    raw = LAUNCHER.read_bytes()
+    raw = path.read_bytes()
     assert all(byte < 128 for byte in raw), "non-ASCII bytes would be misread by 5.1"
-    code = _launcher_code()
+    code = _launcher_code(path)
     assert "&&" not in code
     assert "||" not in code
     assert re.search(r"\?\s*[^:\n]+\s*:\s", code) is None, "a ternary is PowerShell 7 syntax"
+
+
+def test_logon_forwarded_options_exist_in_the_launcher_param_block() -> None:
+    parameters = _launcher_code().split("param(", 1)[1].split("\n)", 1)[0]
+    forwarded = _launcher_code(LOGON).split("-ArgumentList @(", 1)[1].split(")", 1)[0]
+    for name in ("Workers", "Port"):
+        assert f'"-{name}"' in forwarded
+        assert re.search(rf"\${name}\s*=", parameters)
 
 
 def test_the_api_listens_on_loopback_and_trusts_only_loopback_for_forwarded_headers() -> None:

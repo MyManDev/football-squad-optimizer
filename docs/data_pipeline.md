@@ -25,18 +25,18 @@ none of it: not source names, not cleaning rules, not the loader.
 
 | Module | Responsibility | Status |
 | --- | --- | --- |
-| `data/schema.py` | Canonical columns, key, orderings, position vocabulary, price factor, time-of-knowledge classes | **implemented** |
-| `data/errors.py` | `DataError` hierarchy, disjoint from optimization errors | **implemented** |
-| `data/loaders.py` | Local CSV/Parquet reading, no transformation | **implemented** |
-| `data/adapters.py` | Explicit raw-to-canonical column mapping | **implemented** |
-| `data/validation.py` | Canonical dataset integrity checks with actionable errors | **implemented** |
-| `data/cleaning.py` | Position/price/dtype coercion — the only place types change | **implemented** |
-| `data/pipeline.py` | `build_canonical_dataset()` composing the above, and ordering | **implemented** |
+| `src/squadopt/data/schema.py` | Canonical columns, key, orderings, position vocabulary, price factor, time-of-knowledge classes | **implemented** |
+| `src/squadopt/data/errors.py` | `DataError` hierarchy, disjoint from optimization errors | **implemented** |
+| `src/squadopt/data/loaders.py` | Local CSV/Parquet reading, no transformation | **implemented** |
+| `src/squadopt/data/adapters.py` | Explicit raw-to-canonical column mapping | **implemented** |
+| `src/squadopt/data/validation.py` | Canonical dataset integrity checks with actionable errors | **implemented** |
+| `src/squadopt/data/cleaning.py` | Position/price/dtype coercion — the only place types change | **implemented** |
+| `src/squadopt/data/pipeline.py` | `build_canonical_dataset()` composing the above, and ordering | **implemented** |
 | `features/config.py` | `FeatureConfig`: windows, `min_periods`, feature naming | **implemented** |
 | `features/rolling.py` | The single shifted-rolling primitive | **implemented** |
 | `features/builder.py` | `build_feature_dataset()` | **implemented** |
 | `features/cross_season.py` | Carry-over from completed earlier seasons | **implemented** |
-| `data/sources/vaastav.py` | The real historical archive: layout, identity, corrections | **implemented** |
+| `src/squadopt/data/sources/vaastav.py` | The real historical archive: layout, identity, corrections | **implemented** |
 | `prediction/config.py` | `BaselineProjectionConfig`: windows, fitted opening-price prior | **implemented** |
 | `prediction/baseline.py` | Deterministic `expected_points` | **implemented** |
 | `prediction/projection.py` | `build_projection_table(season=…, gameweek=t)` | **implemented** |
@@ -493,10 +493,15 @@ The archive publishes a gameweek after it has been played, so it cannot answer w
 roster looked like before a deadline. A live season needs its own capture.
 
 ```bash
-python -m scripts.capture_deadline_snapshot --dry-run   # read and report, write nothing
-python -m scripts.capture_deadline_snapshot             # capture
-python -m scripts.capture_deadline_snapshot --list      # what is held locally
+squadopt season tick --dry-run   # inspect due actions
+squadopt season tick             # execute due actions
 ```
+
+The tick can capture, decide and settle according to the current season state; it is
+not a capture-only command. Dry-run does not execute those actions, but still records
+the CLI request, run manifest and registry bookkeeping. The snapshot API's
+`list_snapshot_ids` and `read_snapshot` provide local inventory and replay access;
+the retired capture shell's `--list` option has no tick equivalent.
 
 The source and the reasoning behind choosing it are in
 [live_data_source_options.md](live_data_source_options.md). Three properties of the

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -174,7 +175,7 @@ class SelectionOptimism:
     """The winner's curse the scenarios must be shifted by for a *selected* squad.
 
     Scenarios are centred on the projections; the projections of the players an
-    optimizer selects are optimistic by construction. `selection_optimism_profile_v1`
+    optimizer selects can be optimistic after selection. `selection_optimism_profile_v1`
     measured it on the control over 147 development folds: -2.951 points per starter,
     -3.863 for the captain (once more, doubled in the score). The squad-level shift is
     what the scenario audit found uncorrected (+34.5) and corrected (-4.4 with the
@@ -185,6 +186,37 @@ class SelectionOptimism:
     per_starter_points: float
     captain_points: float
     source: str
+    model_name: str
+    model_version: str
+    feature_contract_version: str
+    post_processing_contract_version: str
+
+    def __post_init__(self) -> None:
+        for name in ("per_starter_points", "captain_points"):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int | float)
+                or not math.isfinite(value)
+            ):
+                raise LiveRiskValidationError(f"{name} must be finite.")
+        for name in (
+            "source",
+            "model_name",
+            "model_version",
+            "feature_contract_version",
+            "post_processing_contract_version",
+        ):
+            object.__setattr__(self, name, _text(getattr(self, name), name))
+
+    @property
+    def model_identity(self) -> tuple[str, str, str, str]:
+        return (
+            self.model_name,
+            self.model_version,
+            self.feature_contract_version,
+            self.post_processing_contract_version,
+        )
 
     def location_shift(self, starters: int = 11) -> float:
         return -(starters * self.per_starter_points + self.captain_points)
@@ -194,6 +226,13 @@ DEVELOPMENT_SELECTION_OPTIMISM: Final = SelectionOptimism(
     per_starter_points=2.951,
     captain_points=3.863,
     source="selection_optimism_profile_v1 (control, 147 development folds, fw06)",
+    # The historical runner calls build_projection_table with FormWindowMapping(6),
+    # as in scenario_audit. It does not apply live captured availability or use the
+    # opening carry-over / in-season / Phase C estimator. Do not alias these models.
+    model_name="deterministic_baseline",
+    model_version="form_window_06_v1",
+    feature_contract_version="form_window_v1",
+    post_processing_contract_version="none",
 )
 
 
@@ -303,8 +342,9 @@ def evaluate_live_risk(
 ) -> LiveRiskDiagnostics:
     """Evaluate a fixed live decision only when model and target evidence match.
 
-    ``selection_optimism`` shifts the chosen squad's scenario scores by the measured
-    winner's curse (None or a zero shift leaves them uncorrected, and says so).
+    ``selection_optimism`` shifts the chosen squad's scenario scores only when its
+    measured model identity matches. None, a mismatch or a zero shift leaves them
+    uncorrected, and says so. An explicit nonzero evaluation shift takes precedence.
     ``fixture_counts`` (player code → fixtures this gameweek) lets the scenario config's
     ``double_gameweek_scale`` widen doubles; without it the calendar-blind limit is
     stated. ``rivals`` are scored in the same scenarios and the difference is reported.
@@ -314,13 +354,6 @@ def evaluate_live_risk(
         raise LiveRiskValidationError("residual_history must be a LiveResidualHistory instance.")
     scenarios = ScenarioConfig() if scenario_config is None else scenario_config
     evaluation = ScenarioEvaluationConfig() if evaluation_config is None else evaluation_config
-    if selection_optimism is not None and evaluation.location_shift_points == 0.0:
-        evaluation = replace(
-            evaluation,
-            location_shift_points=selection_optimism.location_shift(
-                len(optimization_result.starting_xi)
-            ),
-        )
     if scenarios.double_gameweek_scale != 1.0 and fixture_counts is None:
         raise LiveRiskValidationError(
             "scenario_config.double_gameweek_scale differs from one; fixture_counts are "
@@ -337,6 +370,30 @@ def evaluate_live_risk(
         str(projection.diagnostics.get("feature_contract_version", "")),
         str(projection.diagnostics.get("availability_contract_version", "")),
     )
+    applied_optimism = None
+    if evaluation.location_shift_points != 0.0:
+        optimism_status = "explicit_shift"
+    elif selection_optimism is None:
+        optimism_status = "not_requested"
+    elif selection_optimism.model_identity != expected_identity:
+        optimism_status = "model_mismatch"
+    else:
+        optimism_status = "applied"
+        applied_optimism = selection_optimism
+        evaluation = replace(
+            evaluation,
+            location_shift_points=selection_optimism.location_shift(
+                len(optimization_result.starting_xi)
+            ),
+        )
+    optimism_diagnostics = {
+        "selection_optimism_status": optimism_status,
+        "selection_optimism_source": None if applied_optimism is None else applied_optimism.source,
+        "selection_optimism_requested_identity": (
+            None if selection_optimism is None else list(selection_optimism.model_identity)
+        ),
+        "selection_optimism_target_identity": list(expected_identity),
+    }
     observed_identity = (
         residual_history.model_name,
         residual_history.model_version,
@@ -377,6 +434,7 @@ def evaluate_live_risk(
             blockers=unique_blockers,
             residual_provenance=provenance,
             diagnostics={
+                **optimism_diagnostics,
                 "metrics_fabricated": False,
                 "decision_reoptimized_per_scenario": False,
                 "scenario_count": scenarios.scenario_count,
@@ -441,9 +499,7 @@ def evaluate_live_risk(
             "worst_fraction": evaluation.worst_fraction,
             "points_threshold": evaluation.points_threshold,
             "location_shift_points": evaluation.location_shift_points,
-            "selection_optimism_source": (
-                None if selection_optimism is None else selection_optimism.source
-            ),
+            **optimism_diagnostics,
             "double_gameweek_scale": scenarios.double_gameweek_scale,
             "double_gameweek_players": scenario_set.diagnostics.get("double_gameweek_players"),
             "probability_below_threshold_interval": result.diagnostics.get(
@@ -460,7 +516,20 @@ def evaluate_live_risk(
                 }
                 for comparison in comparisons
             ],
-            "stated_limits": _stated_limits(evaluation, scenarios, fixture_counts),
+            "stated_limits": _stated_limits(evaluation, scenarios, fixture_counts)
+            + (
+                [
+                    "The selection-optimism profile has a different model identity; no correction "
+                    "from that profile was applied."
+                ]
+                if optimism_status == "model_mismatch"
+                else [
+                    "The location shift was supplied explicitly; no model-bound selection-optimism "
+                    "profile was applied."
+                ]
+                if optimism_status == "explicit_shift"
+                else []
+            ),
         },
     )
 
@@ -474,20 +543,21 @@ def _stated_limits(
     if evaluation.location_shift_points == 0.0:
         limits.append(
             "No selection-optimism correction was applied: the chosen squad's scenario "
-            "scores are centred on projections that are optimistic by construction "
-            "(about +34 points at squad level in the scenario audit)."
+            "scores are centred on projections that can be optimistic after selection "
+            "(about +34 points for the historical control in the scenario audit, not a "
+            "measured bias for every model)."
         )
     else:
         limits.append(
             f"The lower tail is shifted by {evaluation.location_shift_points:+.1f} points for "
-            "selection optimism measured on development folds, not yet on this season's "
-            "ledger."
+            "location adjustment; this is not validation on this season's ledger."
         )
     if evaluation.dispersion_scale == 1.0:
         limits.append(
-            "The squad-level spread is the raw scenario spread: the audit measured it about "
+            "The squad-level spread is the raw scenario spread: the historical control audit "
+            "measured it about "
             "15% narrow (PIT tails 0.14 against 0.10 on 37 folds, intervals including "
-            "nominal), so the lower tail is if anything slightly optimistic."
+            "nominal); this is not a coverage guarantee for another model."
         )
     else:
         limits.append(

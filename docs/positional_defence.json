@@ -1,0 +1,401 @@
+{
+  "accuracy": {
+    "binding_on_appeared_rows": {
+      "by_season": {
+        "2022-23": {
+          "candidate": 2.199588570928744,
+          "control": 2.141298149962782,
+          "rows": 3681
+        },
+        "2023-24": {
+          "candidate": 2.1207796291635503,
+          "control": 2.03936403546717,
+          "rows": 3975
+        },
+        "2024-25": {
+          "candidate": 2.064025561651893,
+          "control": 2.001629657374539,
+          "rows": 4069
+        }
+      },
+      "improves_every_judged_season": false,
+      "interval": [
+        -0.0784540564931899,
+        -0.05789292330687874
+      ],
+      "interval_lower_above_zero": false,
+      "mean_difference": -0.06794371230580248,
+      "passes": false
+    },
+    "floor_over_surviving_rows": {
+      "candidate": 0.985882828343237,
+      "control": 0.9677398289755491,
+      "not_worse": false,
+      "passes": false
+    },
+    "passes": false
+  },
+  "contract_version": "positional_defence_v1",
+  "created_utc": "2026-09-20T01:18:01+00:00",
+  "decision": {
+    "arms": {
+      "candidate": {
+        "mean_realized_points": 63.50961538461539,
+        "proved_decisions": 89,
+        "proven_share": 0.8557692307692307,
+        "scored_decisions": 104,
+        "solved_decisions": 104
+      },
+      "control": {
+        "mean_realized_points": 64.02884615384616,
+        "proved_decisions": 75,
+        "proven_share": 0.7211538461538461,
+        "scored_decisions": 104,
+        "solved_decisions": 104
+      }
+    },
+    "at_most_one_losing_season": false,
+    "by_season": {
+      "2022-23": -1.3823529411764706,
+      "2023-24": 1.5142857142857142,
+      "2024-25": -1.7142857142857142
+    },
+    "interval": [
+      -1.7600961538461541,
+      0.8846153846153846
+    ],
+    "interval_gates": false,
+    "losing_seasons": [
+      "2022-23",
+      "2024-25"
+    ],
+    "maximum_losing_seasons": 1,
+    "mean_at_least_zero": false,
+    "mean_difference": -0.5192307692307693,
+    "paired_decisions": 104,
+    "passes": false
+  },
+  "detail": {
+    "bonus_by_position": {
+      "2022-23": {
+        "DEF": 0.22952677812411448,
+        "GK": 0.29842931937172773
+      },
+      "2023-24": {
+        "DEF": 0.21644821857116486,
+        "GK": 0.3128807658833769
+      },
+      "2024-25": {
+        "DEF": 0.20644545888124277,
+        "GK": 0.30448926480156147
+      }
+    },
+    "minimum_training_rows": 200,
+    "population": {
+      "appeared_before_drops": 12270,
+      "appeared_rows": 11725,
+      "blank_gameweek_dropped": 0,
+      "blank_gameweek_rule_note": "The protocol drops a row whose club has no fixture that gameweek beside the doubles. On this population that rule binds on nothing: `fixture_count` takes only the values 1 and 2. It is implemented and its zero is reported anyway, because a rule that binds on nothing today and is quietly left out is a rule that binds on something tomorrow and is not there.",
+      "direct_control_dropped": 219,
+      "double_gameweek_dropped": 1289,
+      "dropped_by_both": 10,
+      "rows": 31737,
+      "rows_before_drops": 33235,
+      "rows_the_candidate_could_not_price": 0,
+      "rows_without_a_club_rating": 0,
+      "rows_without_a_long_indicator": 0
+    },
+    "rating": {
+      "calibration_first_gameweek": 6,
+      "club_gameweeks_with_two_fixtures": 75,
+      "half_life_grid": [
+        60.0,
+        120.0,
+        180.0,
+        300.0,
+        500.0
+      ],
+      "inherited_from": "experiments/team_rating_cs.py CsRemeasureConfig",
+      "protocol_fixed_these": false,
+      "ridge_grid": [
+        0.5,
+        1.0,
+        2.0,
+        5.0
+      ],
+      "seasons": [
+        "2020-21",
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "selected_by_season": {
+        "2022-23": {
+          "calibration_intercept": -0.009526660971913601,
+          "calibration_slope": 1.0652320291550281,
+          "half_life_days": 500.0,
+          "promoted_prior": [
+            -0.26784104126268127,
+            -0.38116581912530406
+          ],
+          "ridge": 2.0,
+          "training_seasons": [
+            "2020-21",
+            "2021-22"
+          ]
+        },
+        "2023-24": {
+          "calibration_intercept": -0.010275058612389665,
+          "calibration_slope": 1.0293348657467092,
+          "half_life_days": 180.0,
+          "promoted_prior": [
+            -0.14191109742370467,
+            -0.26022403708951114
+          ],
+          "ridge": 5.0,
+          "training_seasons": [
+            "2020-21",
+            "2021-22",
+            "2022-23"
+          ]
+        },
+        "2024-25": {
+          "calibration_intercept": -0.061782973463987687,
+          "calibration_slope": 1.0508835161345005,
+          "half_life_days": 180.0,
+          "promoted_prior": [
+            -0.13112611111289596,
+            -0.32595042076906194
+          ],
+          "ridge": 5.0,
+          "training_seasons": [
+            "2020-21",
+            "2021-22",
+            "2022-23",
+            "2023-24"
+          ]
+        }
+      }
+    },
+    "seasons_refused_for_thin_training": [],
+    "training_rows_by_season": {
+      "2022-23": 8586,
+      "2023-24": 13132,
+      "2024-25": 17751
+    }
+  },
+  "elapsed_seconds": 1279.179497,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "gate": {
+    "clauses": {
+      "accuracy": false,
+      "decision": false,
+      "ordering": true
+    },
+    "failing_clauses": [
+      "accuracy",
+      "decision"
+    ],
+    "passes": false,
+    "verdict": "fails"
+  },
+  "generated_at_utc": "2026-09-20T00:56:42+00:00",
+  "judged_seasons": [
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "locked_holdout_accessed": false,
+  "machine": "Other sessions share this machine. Both solver limits are deterministic, so no measured number moves under that load; `elapsed_seconds` does, and is not a quiet-machine timing.",
+  "manifest_sha256": "1a06b69abb3d7fe98afde6983885a9a7723463d351a2432dc9e0a11082f5eba8",
+  "operational_control_changed": false,
+  "ordering": {
+    "passes": true,
+    "readings": {
+      "2022-23": {
+        "DEF": {
+          "candidate": 0.23860228810258136,
+          "control": 0.1939002829071156,
+          "passes": true,
+          "rank_shortfall": -0.044702005195465744
+        },
+        "GK": {
+          "candidate": 0.16126236320563053,
+          "control": 0.10688376848116395,
+          "passes": true,
+          "rank_shortfall": -0.054378594724466586
+        }
+      },
+      "2023-24": {
+        "DEF": {
+          "candidate": 0.2525898449851244,
+          "control": 0.19792551731439126,
+          "passes": true,
+          "rank_shortfall": -0.05466432767073312
+        },
+        "GK": {
+          "candidate": 0.09688779845370628,
+          "control": 0.028355275374604402,
+          "passes": true,
+          "rank_shortfall": -0.06853252307910188
+        }
+      },
+      "2024-25": {
+        "DEF": {
+          "candidate": 0.25861719137247774,
+          "control": 0.23698377397483017,
+          "passes": true,
+          "rank_shortfall": -0.02163341739764757
+        },
+        "GK": {
+          "candidate": 0.07623572837529896,
+          "control": 0.016839140323782427,
+          "passes": true,
+          "rank_shortfall": -0.059396588051516534
+        }
+      },
+      "pooled": {
+        "DEF": {
+          "candidate": 0.2499364414867278,
+          "control": 0.20960319139877903,
+          "passes": true,
+          "rank_shortfall": -0.040333250087948774
+        },
+        "GK": {
+          "candidate": 0.11146196334487858,
+          "control": 0.050692728059850256,
+          "passes": true,
+          "rank_shortfall": -0.060769235285028325
+        }
+      }
+    },
+    "representation_guard": 1e-12,
+    "tolerance": 0.01
+  },
+  "prereg": "docs/positional_defence_prereg.md",
+  "producer_repository_commit": "a43c0ec558f43750cf9311eabd14c216c27a3014",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "repository_commit": "6d8b7430ce0bd7dad29f3801b1e64efef603e698",
+    "working_tree_dirty": false
+  },
+  "reported_not_gated": {
+    "by_position_on_appeared_rows": {
+      "DEF": {
+        "appeared_rows": 9745,
+        "candidate": 2.116978249705341,
+        "control": 2.0382699167038476
+      },
+      "GK": {
+        "appeared_rows": 1980,
+        "candidate": 2.1693694558064776,
+        "control": 2.156707711400505
+      }
+    },
+    "clean_sheet_calibration_by_decile": [
+      {
+        "decile": 1,
+        "mean_predicted": 0.07259337480750076,
+        "realized_rate": 0.08320201701859439,
+        "rows": 3173
+      },
+      {
+        "decile": 2,
+        "mean_predicted": 0.12349437509031205,
+        "realized_rate": 0.12318840579710146,
+        "rows": 3174
+      },
+      {
+        "decile": 3,
+        "mean_predicted": 0.16012016451221422,
+        "realized_rate": 0.19092627599243855,
+        "rows": 3174
+      },
+      {
+        "decile": 4,
+        "mean_predicted": 0.19132666755672942,
+        "realized_rate": 0.21266540642722118,
+        "rows": 3174
+      },
+      {
+        "decile": 5,
+        "mean_predicted": 0.22027124150283414,
+        "realized_rate": 0.1922470847778128,
+        "rows": 3173
+      },
+      {
+        "decile": 6,
+        "mean_predicted": 0.25024343787942643,
+        "realized_rate": 0.22904851921865155,
+        "rows": 3174
+      },
+      {
+        "decile": 7,
+        "mean_predicted": 0.2854595886069927,
+        "realized_rate": 0.29017013232514177,
+        "rows": 3174
+      },
+      {
+        "decile": 8,
+        "mean_predicted": 0.32196898234695365,
+        "realized_rate": 0.3506616257088847,
+        "rows": 3174
+      },
+      {
+        "decile": 9,
+        "mean_predicted": 0.37218251048801,
+        "realized_rate": 0.29174543163201005,
+        "rows": 3174
+      },
+      {
+        "decile": 10,
+        "mean_predicted": 0.46229274504178636,
+        "realized_rate": 0.3763000315159155,
+        "rows": 3173
+      }
+    ],
+    "error_by_whether_the_clean_sheet_happened": {
+      "clean_sheet": {
+        "candidate": 3.9365097426047426,
+        "control": 4.078231525167686,
+        "rows": 2779
+      },
+      "conceded": {
+        "candidate": 1.563351664562575,
+        "control": 1.430786518937067,
+        "rows": 8946
+      }
+    }
+  },
+  "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+  "solver": {
+    "binding_limit": "deterministic_time",
+    "solver_deterministic_time_limit": 5.0,
+    "solver_status_counts": {
+      "FEASIBLE": 44,
+      "OPTIMAL": 164
+    },
+    "solver_time_limit_seconds": 600.0
+  },
+  "table_sha256": "b05f10c3fd3ab5058fe1ff720cc6ef0a4b1362a70a19dd979ad0eb0f47d12c01"
+}

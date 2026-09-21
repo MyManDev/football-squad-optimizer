@@ -36,6 +36,7 @@ from typing import Final
 
 import pandas as pd
 
+from squadopt.contracts import OPTIONAL_COLUMNS
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
@@ -135,6 +136,36 @@ def _team_bridge(bootstrap: bytes, season: str) -> pd.DataFrame:
             "code": [codes[identifier] for identifier in sorted(names)],
         }
     )
+
+
+def _carried(components: pd.DataFrame) -> list[str]:
+    """The optional projection columns a producer actually estimated this week.
+
+    Two readings of "actually" are needed here, and both of them are about telling an estimate
+    apart from a consequence of the week's shape.
+
+    A column **every** row leaves absent does not travel. It would reach the solve as an
+    all-absent column, which is the promise of a number rather than a number, and a consumer
+    meeting it falls back to exactly what it does when the column is not there. A column
+    **some** rows fill does travel: the direct-control route leaves its component inputs
+    missing by contract, so an absence there means nobody modelled that player, and that is a
+    fact the consumer has to be able to read rather than one the handoff should hide.
+
+    A row with no fixture is not evidence either way. :func:`~squadopt.prediction.components`
+    writes zero into every number of a blank gameweek's row, so a producer that estimates
+    nothing still leaves zeros behind wherever the week is blank. Counting those would make
+    the carried set depend on whether some player's club happens to be idle, and would hand
+    the consumer a column whose only filled rows say "will not start" about players who are
+    not playing. ``start_probability`` is exactly that case today: the snapshot's own
+    ``start_component_status`` reads ``unavailable``, and the column stays out.
+    """
+
+    estimated = components["fixture_count"].astype("int64").gt(0)
+    return [
+        name
+        for name in OPTIONAL_COLUMNS
+        if name in components.columns and bool(components.loc[estimated, name].notna().any())
+    ]
 
 
 def _component_table(
@@ -245,15 +276,47 @@ def _component_table(
         "component_history_gameweeks": sorted(event_payloads),
         "component_history_incomplete_players": len(incomplete_players),
     }
-    table = snapshot.table.loc[:, ["player_id", "expected_points"]]
+    carried = _carried(snapshot.table)
+    table = snapshot.table.loc[:, ["player_id", "expected_points", *carried]]
     if include_components:
         diagnostics["component_training_cutoff"] = provenance.training_cutoff
         diagnostics["component_training_data_fingerprint"] = provenance.training_data_fingerprint
         # The sampler needs the raw conditional point mean, including negative values.
         raw = rows.drop(columns="expected_points_if_appearance").copy()
         raw["raw_expected_points_if_appearance"] = predicted["raw_expected_points_if_appearance"]
-        table = raw.merge(table, on="player_id", validate="one_to_one")
+        # The sampler's frame already carries the producer's own copy of every carried column,
+        # under the same name, so the projection's copy is dropped before the join rather than
+        # arriving beside it as ``_x`` and ``_y``, which is a name no consumer looks for.
+        table = raw.merge(
+            table.drop(columns=[name for name in carried if name in raw.columns]),
+            on="player_id",
+            validate="one_to_one",
+        )
     return table, diagnostics
+
+
+def _appearance(projected: pd.DataFrame) -> dict[int, float] | None:
+    """The appearance chances this projection states, for the players it states them for.
+
+    ``None`` when the column is not there at all, which is every route but the component
+    one: the legacy blend and its elite variant model points without decomposing them,
+    and a mapping of nothing would claim they had tried. A player the column leaves
+    missing is left out of the mapping rather than entered at zero, because the
+    direct-control route leaves its component inputs absent by contract and that absence
+    means nobody modelled the player rather than that the player will not appear.
+    """
+
+    if "appearance_probability" not in projected.columns:
+        return None
+    stated = projected.loc[projected["appearance_probability"].notna()]
+    return {
+        int(code): float(chance)
+        for code, chance in zip(
+            stated["player_id"].astype("int64").tolist(),
+            stated["appearance_probability"].astype("float64").tolist(),
+            strict=True,
+        )
+    }
 
 
 def build(
@@ -425,6 +488,7 @@ def build(
         model_version=model_version,
         feature_contract_version=feature_contract_version,
         expected_points=expected,
+        appearance_probability=_appearance(projected_table),
         evidence_fingerprint=evidence_fingerprint,
         diagnostics=diagnostics,
     )

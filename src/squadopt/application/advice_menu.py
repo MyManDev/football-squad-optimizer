@@ -13,7 +13,8 @@ A plain request, no setting and no word, on a combination ``advise_entry`` answe
 
 **Adding a switch.** A switch is a field on ``MenuRequest`` with an off default, a tuple
 of windows on ``AdviceCapability``, a per-capture input handed in as a keyword that may be
-``None``, and one more branch in ``advise_menu_entry``. A chip would be the third.
+``None``, and one more branch in ``advise_menu_entry``. A chosen chip reads the member's
+captured history and needs no separate artifact.
 """
 
 from collections.abc import Callable, Mapping
@@ -36,15 +37,23 @@ from squadopt.application.advice_capabilities import (
     menu_capabilities,
     validate_advice_selection,
 )
+from squadopt.application.advice_chips import advise_with_chip, member_chip_menu
 from squadopt.application.advice_variants import (
     advise_rival_window,
     advise_rival_with_top100,
     advise_window_with_top100,
 )
+from squadopt.application.chip_forecast_publication import (
+    ForecastSource,
+    member_chip_forecast,
+    published_chip_gains,
+)
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
 from squadopt.live import Projection, RecommendationInputs, SeasonRules
+from squadopt.optimization import SolverExecutionError
+from squadopt.planning import TransferPlanningError
 
 __all__ = [
     "MANAGER_WORDS_INPUT",
@@ -58,6 +67,12 @@ __all__ = [
 
 TOP100_COUNTS_INPUT = "top100_counts"
 MANAGER_WORDS_INPUT = "manager_words"
+
+
+#: What the planner raises when it finds no plan for a selection. Their text is a solver's
+#: diagnostic (deterministic time, gaps, player ids), so a caller that serves its failures
+#: to the public names the outcome and keeps the text on its own side.
+PLAN_NOT_FOUND_ERRORS: tuple[type[Exception], ...] = (SolverExecutionError, TransferPlanningError)
 
 
 class MenuInputUnavailable(EntryError):
@@ -78,6 +93,14 @@ class ManagersWordNotSolved(EntryError):
     """
 
 
+class ChipUnavailable(EntryError):
+    """The captured history cannot support the member's declared chip."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__("This chip is not available from the member's captured history.")
+        self.code = code
+
+
 @dataclass(frozen=True, slots=True)
 class MenuRequest:
     """One address on the member menu: an ``AdviseEntryRequest`` plus the switches."""
@@ -91,6 +114,7 @@ class MenuRequest:
     rival_entry_id: int | None = None
     top100_weight: int = 0
     managers_word: bool = False
+    chip: str | None = None
 
     def __post_init__(self) -> None:
         self.entry_request()  # the shared fields are refused by the type that owns them
@@ -114,7 +138,20 @@ class MenuRequest:
 
     @property
     def is_plain(self) -> bool:
-        return self.top100_weight == 0 and not self.managers_word
+        return self.top100_weight == 0 and not self.managers_word and self.chip is None
+
+
+def held_member_chips(
+    request: AdviseEntryRequest,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    rules: SeasonRules,
+) -> tuple[str, ...] | None:
+    """Read captured chip availability without solving; None means unknown history."""
+    picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
+    menu = member_chip_menu(rules, request.gameweek, picks.chips_used)
+    return menu.held if menu.known else None
 
 
 #: Where a document this computation depends on may already exist: handed the address,
@@ -153,6 +190,7 @@ def advise_menu_entry(
     top100_counts: Top100Counts | None = None,
     manager_words: ManagerWords | None = None,
     prerequisite: PrerequisiteLookup | None = None,
+    chip_forecast_source: ForecastSource | None = None,
 ) -> dict[str, object]:
     """Compute one document of the member menu from the member's own picks.
 
@@ -173,6 +211,7 @@ def advise_menu_entry(
         capabilities=menu_capabilities(),
         top100_weight=request.top100_weight,
         managers_word=request.managers_word,
+        chip=request.chip,
     )
     if request.top100_weight and top100_counts is None:
         raise MenuInputUnavailable(
@@ -188,6 +227,33 @@ def advise_menu_entry(
         )
     _require_capture(request, inputs, rules)
     plain = request.entry_request()
+    if request.chip is not None:
+        held_chips = held_member_chips(plain, provider=provider, inputs=inputs, rules=rules)
+        if held_chips is None or request.chip not in held_chips:
+            raise ChipUnavailable("CHIP_HISTORY_UNKNOWN" if held_chips is None else "CHIP_NOT_HELD")
+        try:
+            payload = advise_with_chip(
+                plain,
+                chip=request.chip,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+            ).payload
+            if chip_forecast_source is not None:
+                picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
+                payload["chip_forecast"] = member_chip_forecast(
+                    league_id=request.league_id,
+                    picks=picks,
+                    inputs=inputs,
+                    projection=projection,
+                    rules=rules,
+                    source=chip_forecast_source,
+                    gains=published_chip_gains(((request.chip, payload),)),
+                )
+            return payload
+        except EntryError as error:
+            raise TransferPlanningError(str(error)) from error
 
     def at_zero(address: MenuRequest) -> dict[str, object]:
         """A document this one depends on: taken from the caller when held, else solved."""

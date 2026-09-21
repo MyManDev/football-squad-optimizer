@@ -11,6 +11,8 @@ from squadopt.api.app import create_app
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_observability import (
     ADVICE_LOGGER_NAME,
+    API_COUNTER_FAMILIES,
+    WORKER_COUNTER_FAMILIES,
     AdviceLog,
     AdviceMetrics,
     configure_advice_logging,
@@ -110,6 +112,43 @@ def test_the_worker_reports_solve_seconds_and_outcomes(tmp_path: Path) -> None:
     assert 'advice_jobs_total{outcome="completed"} 1' in body
     assert "advice_solve_seconds_count 1" in body
     assert 'advice_solve_seconds_bucket{le="+Inf"} 1' in body
+
+
+def test_unincremented_counters_are_zero_without_invented_label_values() -> None:
+    assert "advice_cache_hits_total" not in AdviceMetrics().render()
+    metrics = AdviceMetrics(zero_counters=API_COUNTER_FAMILIES)
+    body = metrics.render()
+    assert "advice_cache_hits_total 0\n" in body
+    assert "advice_rejected_total 0\n" in body
+    assert "advice_open_job_refused_total 0\n" in body
+    assert "advice_deadline_refused_total 0\n" in body
+    assert "advice_jobs_total" not in body
+    assert "advice_jobs{" not in body  # no queue reader was supplied
+    metrics.rejected("UnknownEntryError")
+    metrics.rejected("UnknownEntryError")
+    body = metrics.render()
+    assert 'advice_rejected_total{reason="UnknownEntryError"} 2' in body
+    assert "advice_rejected_total 0\n" not in body
+    assert body.count("# TYPE advice_rejected_total counter") == 1
+
+
+@pytest.mark.parametrize(
+    ("own", "foreign"),
+    [
+        (API_COUNTER_FAMILIES, WORKER_COUNTER_FAMILIES),
+        (WORKER_COUNTER_FAMILIES, API_COUNTER_FAMILIES),
+    ],
+)
+def test_each_role_only_initializes_counters_it_can_observe(
+    own: tuple[str, ...], foreign: tuple[str, ...]
+) -> None:
+    metrics = AdviceMetrics(zero_counters=own)
+    for family in own:
+        assert f"{family} 0\n" in metrics.render()
+    assert all(family not in metrics.render() for family in foreign)
+    metrics.increment(own[0])
+    assert f"{own[0]} 1\n" in metrics.render()
+    assert all(family not in metrics.render() for family in foreign)
 
 
 def test_readiness_is_separate_from_liveness(tmp_path: Path) -> None:

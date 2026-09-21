@@ -1,0 +1,47 @@
+# Prediction inconsistency ledger — 20 September 2026
+
+M2 of [#749](https://github.com/MyManDev/football-squad-optimizer/issues/749).
+Read-only source audit at `054baa56cff8a6390bb5738bca2e36a2141cd140`; all file:line
+references below refer to that commit. The [scope](prediction_e2e_review_scope.md) and
+[decision map](prediction_decision_path.md) define the boundaries. No candidate was fitted,
+no fold or live runtime state was read, and no executable line was changed for this audit.
+
+The seeds in the assignment are hypotheses to check. In particular, a raw column's existence
+is not an admissible label, a diagnostic comparison is not a projection correction, and a
+model's presence in the repository is not evidence of its operational promotion.
+
+## Findings
+
+| ID / classification | First artifact | Second artifact | Finding and follow-up |
+| --- | --- | --- | --- |
+| L1 — stale prose | `src/squadopt/prediction/component_models.py:13–18` and `:436–442` say the start label does not exist. | `src/squadopt/features/component_targets.py:47–48,91–96` declares it available for 2023–24 and 2024–25; `src/squadopt/prediction/participation.py:159–212` fits a conditional model. | Narrow the explanation to the frozen base model's scope. Its missing start estimate is intentional; a globally absent label is no longer the reason. Refer the comment-only correction to the data owner. No model fitting needed. |
+| L2 — recorded deferral | `src/squadopt/data/sources/vaastav.py:112–126` records a raw 2022–23 `starts` column but unpopulated GW1–GW15 and excludes that whole season. | `docs/participation_composition.md:7` and `src/squadopt/features/component_targets.py:47–48` admit only two development seasons. | The assignment's “three of four seasons have starts” is not three usable label seasons. Preserve the exclusion; no new archive scan and no opportunistic 2022–23 inclusion. The data owner must declare any changed label population before fitting. |
+| L3 — stale prose | `docs/prediction_research_agenda.md:117–118` says integration drops everything outside six columns. | `src/squadopt/prediction/integration.py:107–108,152–153` carries declared optional columns; `src/squadopt/contracts/players.py:55` names appearance and start. | Correct the roadmap's prerequisite: a supplied optional probability can cross the generic table boundary already. This does not make arbitrary uncertainty fields admissible or fix the persisted scalar handoff. Documentation-only closure, no measurement needed. |
+| L4 — stale prose | `docs/architecture/ownership.md:159–168` describes the calibration seam as losing everything outside six columns. | `src/squadopt/prediction/integration.py:107–108,152–153` preserves the recognized optional tier. | Update this second copy with the same distinction as L3; distributional contract expansion still needs the owners. Documentation-only closure. |
+| L5 — recorded deferral | `src/squadopt/application/projection_handoff.py:279–280` retains optional component estimates in an intermediate table. | The same producer at `:451–468` constructs only a player-to-points map; `src/squadopt/live/recommendation.py:101,178–181,484–485` persists/fingerprints/consumes the scalar values. | The disappearance is real at the serialization seam. #748 owns carrying appearance through it and is still open at this snapshot. Track that existing PR; do not duplicate it. No claim that its changes reached GW04/GW05. |
+| L6 — recorded deferral | `src/squadopt/prediction/participation.py:60,159–212,218–239` defines the fitted conditional-start estimator. | `scripts/measure_participation_calibration.py:203–214` and `scripts/measure_participation_composition.py:184–199` call it, while `src/squadopt/prediction/component_models.py:441–442` emits absent start values. | A search of tracked `src/` and `scripts/` found research callers, no production caller. `docs/participation_composition.md:3,65–67` explicitly withholds promotion pending further evidence. Do not wire a descriptive model into production as a bug fix. |
+| L7 — stale prose / interpretation | `src/squadopt/live/calibration.py:39–42,214` supplies historical comparison references. | Its module contract at `:3–9` says it only reports; `src/squadopt/live/report.py:284–311` chooses the plan before optional risk evaluation. | The assignment's combined claim that these calibration constants correct the live decision is too broad. Keep the distinction in this ledger: calibration reports historical gaps; it does not change projections or selection. This clarification needs no measurement. |
+| L8 — actual defect, limited to risk evidence applicability | `src/squadopt/live/risk.py:193–196,300,317–323` defaults to the historical selection shift regardless of the projection model. | `src/squadopt/application/projection_handoff.py:415–418` selects the component default; `src/squadopt/live/risk.py:334–348` validates residual identity but has no corresponding model identity on `SelectionOptimism`. | A component-matched residual history can still inherit a shift measured on a different control. Refer a model-bound shift/refusal decision to the live owner; a replacement number requires its own evidence. This is a conditional risk-report defect, not proof that today's production call had matching residuals or that its chosen squad changed. |
+| L9 — stale attribution in the assignment, resolved here | `src/squadopt/experiments/selection_optimism.py:24,120–125` calls `build_projection_table`; `docs/selection_optimism.md:4,12` records form-window six and the selection gap. | `src/squadopt/prediction/projection.py:15,96–99,117–118` identifies that builder as the deterministic baseline, calling `baseline_expected_points`, rather than the Ridge reference in `src/squadopt/backtest/learned.py:1,71`. | The checked runner does not support calling this a Ridge profile. Preserve the narrower claim “historical deterministic control”; do not relabel the artifact as component evidence. The JSON does not independently carry a model identity. No remeasurement needed to correct the attribution; reconstructing the historical environment was not performed. |
+| L10 — recorded deferral | `src/squadopt/contracts/players.py:46–54` explains the conditional bench ordering `expected_points / appearance_probability`. | `src/squadopt/application/lineup_publication.py:261–262,288–303` still orders outfield bench by unconditional points; `src/squadopt/optimization/optimizer.py:593–603` does the same for opening solves. | Recognizing/carrying a probability is not consuming it. Keep conditional ordering as separate owner work after the seam is resolved; #748's title alone cannot establish completion. No ranking policy change in this audit. |
+| L11 — recorded evidence limitation | `docs/top100_effect_prereg.md:35–41` records GW04 base as a post-deadline replay and GW05 weighted plans as published but not retained in the older advice record. | `src/squadopt/application/advice_record.py:13–26` describes current scoring-complete immutable retention; `docs/live_projection_audit.md:38–44` labels the GW04 control replay. | The current contract does not retroactively manufacture missing historical advice. Treat the GW04 operational elite handoff and control replay separately; do not reconstruct GW05 weighted plans by solving. This is an archival limit, not permission to mutate records. |
+
+## Closure accounting
+
+There are **11 rows: five stale-prose/attribution rows (L1, L3, L4, L7, L9), one actual
+defect (L8), and five recorded deferrals/limitations (L2, L5, L6, L10, L11)**.
+
+**Five can close without measurement:** L1/L3/L4 require wording-only changes on the proper
+owner's surface; L7/L9 are resolved by the source distinctions recorded here. This audit
+does not claim those three existing documents/comments have already been edited. Merely
+adding a tracking link is not closing L8. The five deferrals are not experiments waiting
+to be rerun: they retain their separate dependencies, and L11 cannot be repaired by a new solve.
+
+The risk follow-up must preserve the two different quantities: `selection_optimism.md:9`
+reports selected-starter residual **−2.956**; `:12` reports the selected-minus-roster gap
+**−2.951**. `live/risk.py:194` uses the latter. Their small difference is not a typo to fix.
+
+The path was read through capture parsing, producer composition, persisted handoff,
+availability, planner, optional risk report and published lineup completion. No fresh claim
+about private captures, the running backend or historical byte identity is made. The
+worktree's line anchors make this a dated audit, not a claim about future `develop`.

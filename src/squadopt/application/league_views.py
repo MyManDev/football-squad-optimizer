@@ -75,6 +75,11 @@ from squadopt.application.advice_variants import (
     advise_window_with_top100,
     band_level_with_one_transfer,
 )
+from squadopt.application.chip_forecast_publication import (
+    ForecastSource,
+    member_chip_forecast,
+    published_chip_gains,
+)
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
@@ -98,6 +103,7 @@ from squadopt.application.top100_weight import (
     Top100Counts,
     top100_file,
 )
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION as LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data.errors import DataError
 from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
@@ -106,11 +112,10 @@ from squadopt.live import (
     SeasonRules,
 )
 from squadopt.live.transfers import plan_transfer_menu
+from squadopt.optimization import wall_clock_stopped_the_search
 from squadopt.planning import TransferPlanResult
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
-
-LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
 
 
 def computable_rival_strategies() -> tuple[str, ...]:
@@ -125,6 +130,31 @@ def computable_rival_strategies() -> tuple[str, ...]:
             or strategy.constraints.overlap_ceiling is not None
         )
     )
+
+
+#: The refusals the page has a sentence for. They name a member's own selection, never a
+#: solver, and the page keys its translation on them.
+PUBLIC_REASON_SENTENCES = frozenset(
+    {
+        "The advice rules belong to another capture.",
+        "The advice rules belong to another season.",
+        "A member cannot be their own rival.",
+    }
+)
+#: What the index says about a plan that did not solve, whatever the cause was.
+NOT_SOLVED_FOR_MEMBER = "not_solved_for_member"
+
+
+def public_reason(detail: str) -> str:
+    """The reason a member's index may carry for a plan that was not published.
+
+    ``detail`` is an exception's text, and a planner's text names deterministic time, gaps
+    and player ids: an operator's diagnostic, not a member's reason. The index is a public
+    file, so it carries a sentence the page translates or one stable code, and the detail
+    travels on the member's note in the run's receipt.
+    """
+
+    return detail if detail in PUBLIC_REASON_SENTENCES else NOT_SOLVED_FOR_MEMBER
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,6 +226,7 @@ class MemberRender:
     chip_payloads: tuple[tuple[str, dict[str, object]], ...] = ()
     chip_unavailable: tuple[tuple[str, str, str], ...] = ()
     chip_notes: tuple[str, ...] = ()
+    chip_forecast: dict[str, Any] | None = None
 
 
 def render_member(
@@ -208,6 +239,7 @@ def render_member(
     horizon_builder: HorizonBuilder | None = None,
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
+    chip_forecast_source: ForecastSource | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
     every saf-puan window and Top 100 weight the task names.
@@ -446,6 +478,19 @@ def render_member(
         chip_payloads=tuple(chip_payloads),
         chip_unavailable=tuple(chip_unavailable),
         chip_notes=tuple(chip_notes),
+        chip_forecast=(
+            member_chip_forecast(
+                league_id=task.league_id,
+                picks=picks,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                source=chip_forecast_source,
+                gains=published_chip_gains(chip_payloads),
+            )
+            if chip_forecast_source is not None
+            else None
+        ),
     )
 
 
@@ -1159,6 +1204,7 @@ def build_league_views(
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
     top100_unavailable_reason: str | None = None,
+    chip_forecast_source: ForecastSource | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -1215,8 +1261,8 @@ def build_league_views(
     envelopes below are stamped with ``generated``, which moves whenever ``now`` is not
     passed — and no caller here passes it — so the same advice re-published is never the
     same bytes. What is still refused is a rebuild of one capture that produces different
-    *advice*: the capture is the whole input, so that is our own non-determinism, and it
-    raises ``AdviceRecordConflictError`` naming the difference.
+    *advice*: the handoff, switch artifacts, settings and code also affect that advice.
+    The immutable address still raises ``AdviceRecordConflictError`` naming the difference.
 
     The records are written after every member's files are on disk, so a refusal can never
     stop the advice being published; the refusal is raised once, after every writable record
@@ -1376,6 +1422,7 @@ def build_league_views(
                 horizon_builder=horizon_builder,
                 manager_words=manager_words,
                 top100_counts=top100_counts,
+                chip_forecast_source=chip_forecast_source,
             ),
             tasks,
         )
@@ -1398,6 +1445,7 @@ def build_league_views(
     # digest it was solved under, and every advice document with the bytes that landed.
     # Records are written from this after the whole tree is on disk.
     publications: list[tuple[EntryPicks, str, list[PublishedAdvice], dict[str, object]]] = []
+    published_indexes: dict[int, tuple[str, bytes]] = {}
     #: Members with no advice this week, whose index names why.
     refused: set[int] = set()
 
@@ -1454,6 +1502,7 @@ def build_league_views(
         # Every advice document this member gets, kept with the bytes that landed so the
         # record digests what was published rather than a re-rendering of the payload.
         emitted: list[PublishedAdvice] = []
+        switches: list[PublishedAdvice] = []
 
         relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json"
         emitted.append(
@@ -1478,7 +1527,16 @@ def build_league_views(
         evidence_index: dict[str, object]
         if render.evidence_payload is not None:
             relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}/{MANAGERS_WORD_FILE}"
-            _write(relative, render.evidence_payload)
+            switches.append(
+                PublishedAdvice(
+                    COMPUTED_MODE,
+                    COMPUTED_WINDOW,
+                    None,
+                    relative,
+                    render.evidence_payload,
+                    _write(relative, render.evidence_payload),
+                )
+            )
             source = render.evidence_payload.get("evidence")
             source = source if isinstance(source, Mapping) else {}
             applied = source.get("applied")
@@ -1527,7 +1585,16 @@ def build_league_views(
                 f"{top100_directory}/"
                 f"{top100_file(weight, word_file=MANAGERS_WORD_FILE if word else None)}"
             )
-            _write(relative, payload)
+            switches.append(
+                PublishedAdvice(
+                    COMPUTED_MODE,
+                    COMPUTED_WINDOW,
+                    None,
+                    relative,
+                    payload,
+                    _write(relative, payload),
+                )
+            )
             (word_paths if word else paths)[str(weight)] = relative
         # The menu beyond the one-week pure-points plan, each document at its own address.
         documents: list[dict[str, object]] = []
@@ -1535,7 +1602,11 @@ def build_league_views(
         variant_computed: list[dict[str, object]] = []
         for strategy, window, rival_id, weight, payload in render.variant_payloads:
             relative = variant_path(entry_id, strategy, window, rival_id, weight)
-            _write(relative, payload)
+            switches.append(
+                PublishedAdvice(
+                    strategy, window, rival_id, relative, payload, _write(relative, payload)
+                )
+            )
             if weight:
                 documents.append(
                     {
@@ -1561,7 +1632,16 @@ def build_league_views(
         chip_paths: dict[str, str] = {}
         for chip, payload in render.chip_payloads:
             relative = f"{top100_directory}/{chip_file(chip)}"
-            _write(relative, payload)
+            switches.append(
+                PublishedAdvice(
+                    COMPUTED_MODE,
+                    COMPUTED_WINDOW,
+                    None,
+                    relative,
+                    payload,
+                    _write(relative, payload),
+                )
+            )
             chip_paths[chip] = relative
         kept_variants = {
             *paths.values(),
@@ -1675,9 +1755,13 @@ def build_league_views(
         suggested = _suggested_strategy(
             task, placings=placings, gameweek=gameweek, scored_gameweek=scored_gameweek
         )
-        if rival_menu or task.windows:
+        if rival_menu or task.windows or render.chip_forecast is not None:
             unavailable: list[dict[str, object]] = [
-                {"strategy": strategy, "rival_entry_id": rival_id, "reason": reason}
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "reason": public_reason(reason),
+                }
                 for strategy, rival_id, reason in render.unavailable
             ]
             # A window that did not solve is a recorded reason at the same address the
@@ -1687,7 +1771,7 @@ def build_league_views(
                     "strategy": COMPUTED_MODE,
                     "rival_entry_id": None,
                     "window": window,
-                    "reason": reason,
+                    "reason": public_reason(reason),
                 }
                 for window, reason in render.window_unavailable
             )
@@ -1697,13 +1781,14 @@ def build_league_views(
                     "strategy": strategy,
                     "rival_entry_id": rival_id,
                     "window": window,
-                    "reason": reason,
+                    "reason": public_reason(reason),
                 }
                 for strategy, window, rival_id, weight, reason in render.variant_unavailable
                 if weight == 0
             )
-            _write(
-                f"advice/{entry_id}/index.json",
+            index_path = f"advice/{entry_id}/index.json"
+            index_raw = _write(
+                index_path,
                 {
                     "league_id": int(league_id),
                     "season": season,
@@ -1713,6 +1798,11 @@ def build_league_views(
                     "evidence": evidence_index,
                     "top100": top100_index,
                     "chips": chips_index,
+                    **(
+                        {"chip_forecast": render.chip_forecast}
+                        if render.chip_forecast is not None
+                        else {}
+                    ),
                     # Per strategy, the windows whose file exists: saf-puan's solved
                     # windows, every rival strategy at one week.
                     "windows": {
@@ -1737,6 +1827,8 @@ def build_league_views(
                     "unavailable": unavailable,
                 },
             )
+            if render.chip_forecast is not None:
+                published_indexes[entry_id] = (index_path, index_raw)
 
         mode_note = ""
         rival = (
@@ -1776,6 +1868,10 @@ def build_league_views(
                         expected_points_cost=item.expected_points_cost,
                         rival_label=item.rival_label,
                         solver_status=chosen_plan.solver_status.name,
+                        # The same solve the status and the gap below come from.
+                        clock_stopped_the_search=wall_clock_stopped_the_search(
+                            chosen_plan.solver_status, chosen_plan.diagnostics
+                        ),
                         optimality_gap=(float(str(chosen_gap)) if chosen_gap is not None else None),
                     )
                     mode_relative = f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json"
@@ -1800,6 +1896,7 @@ def build_league_views(
         # the rule could not be stated, or its file did not solve, the page shows the
         # pure-points baseline, and the record says which of the two it was rather than
         # leaving a later reader to re-apply a rule from inputs that have since moved.
+        emitted.extend(switches)
         emitted_paths = {item.relative_path for item in emitted}
         suggested_slug = str(suggested["strategy"]) if suggested is not None else None
         suggested_path = (
@@ -1833,6 +1930,18 @@ def build_league_views(
         # What was changed about this member's own name before it was published travels
         # on their row of the report, so the operator running the publish sees it. A name
         # we altered and never mentioned would be the quiet half of this fix.
+        plan_note = "; ".join(
+            (
+                *(
+                    f"{strategy} vs {rival_id} not solved: {reason}"
+                    for strategy, rival_id, reason in render.unavailable
+                ),
+                *(
+                    f"{COMPUTED_MODE} {window} weeks not solved: {reason}"
+                    for window, reason in render.window_unavailable
+                ),
+            )
+        )
         word_note = (
             f"manager's word not solved: {render.evidence_unavailable}"
             if render.evidence_unavailable
@@ -1869,6 +1978,7 @@ def build_league_views(
             for part in (
                 *name_notes.get(entry_id, ()),
                 mode_note,
+                plan_note,
                 word_note,
                 top100_note,
                 chip_note,
@@ -1934,6 +2044,7 @@ def build_league_views(
                 told=told,
                 transfer_config_fingerprint=fingerprint or None,
                 commit=commit,
+                published_index=published_indexes.get(picks.entry_id),
             )
             try:
                 record_member_advice(Path(advice_record_root), record)

@@ -13,6 +13,7 @@ locked holdout is never read.
 import argparse
 import logging
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,13 +21,14 @@ from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
     artifact_metadata,
+    measurement_optimization_config,
     write_json,
     write_text,
 )
 
 from squadopt.backtest import season_ranks
 from squadopt.data.sources.vaastav import build_panel
-from squadopt.optimization import OptimizationConfig, optimize_squad
+from squadopt.optimization import optimize_squad
 from squadopt.prediction import build_opening_projection_table
 
 LOGGER = logging.getLogger(__name__)
@@ -108,7 +110,7 @@ def main() -> int:
                         "expected_points",
                     ],
                 ],
-                OptimizationConfig(bench_weight=bench_weight),
+                replace(measurement_optimization_config(), bench_weight=bench_weight),
             )
             if not result.has_solution or result.captain is None:
                 print(f"Season {season} bench_weight {bench_weight}: no feasible squad.")

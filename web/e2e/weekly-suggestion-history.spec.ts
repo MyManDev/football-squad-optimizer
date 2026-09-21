@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import fixture from "../src/fixtures/weeklySuggestionHistory.json" with { type: "json" };
+import recordedPlans from "../src/fixtures/recordedPlanRows.json" with { type: "json" };
+import { TOP100_COPY } from "../src/features/league/advice/top100Copy";
+import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
@@ -10,6 +13,52 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({ contentType: "text/css", body: "" }),
   );
 });
+
+for (const language of ["tr", "en"] as const) {
+  test(`recorded settings expand without inventing settled scores in ${language}`, async ({
+    page,
+  }) => {
+    const historyDocument = structuredClone(fixture);
+    Object.assign(historyDocument.payload.weeks[0], {
+      status: "unsettled",
+      reason: "not_settled",
+      suggested: null,
+      actual: null,
+      net_difference: null,
+      players: [],
+      outcome_snapshot_id: null,
+      outcome_captured_at_utc: null,
+      recorded_plans: recordedPlans,
+    });
+    await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    await page.route("**/data/league/history/101.json", (route) =>
+      route.fulfill({ json: historyDocument }),
+    );
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto("/league/members/101/history");
+    await page.getByRole("combobox").selectOption("4");
+    const copy = MESSAGES[language].suggestionHistory;
+    const details = page
+      .locator("details")
+      .filter({ has: page.getByText(copy.recordedPlans, { exact: true }) });
+    await expect(details).not.toHaveAttribute("open");
+    await expect(page.getByRole("table")).toHaveCount(0);
+    await details.locator("summary").click();
+    await expect(details.getByText(new RegExp(`${TOP100_COPY[language].legend} 20`))).toBeVisible();
+    await expect(details.getByText(/Player 1/)).toBeVisible();
+    await expect(details).toContainText("#17");
+    await expect(details).toContainText(
+      TOP100_COPY[language].combinedCostAtMost(language === "tr" ? "4,0" : "4.0"),
+    );
+    await expect(details).toContainText(MESSAGES[language].leagueMembers.chipNames.bboost);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.reload();
+    await page.getByRole("combobox").selectOption("4");
+    await expect(details).not.toHaveAttribute("open");
+  });
+}
 
 test("member can open recorded history and inspect the Python-scored result on mobile", async ({
   page,

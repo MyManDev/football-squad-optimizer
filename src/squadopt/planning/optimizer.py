@@ -35,7 +35,6 @@ from squadopt.optimization.decisions import (
 from squadopt.optimization.optimizer import (
     CP_SAT_SAFE_INTEGER_MAX,
     MIN_TIEBREAK_DETERMINISTIC_TIME,
-    MIN_TIEBREAK_TIME_SECONDS,
     _deterministic_time_used,
     _map_solver_status,
     _raw_status_name,
@@ -57,6 +56,10 @@ from squadopt.planning.models import (
     TransferPlanResult,
 )
 
+# The wall ceiling bounds each phase rather than being divided between them, so a solve
+# that reached it in both phases would stop at twice this value. That is the shape
+# `optimization/optimizer.py` has had since #192.
+#
 # A wall-clock budget only decides anything when it is what stops the search -- and then
 # the answer is a function of the CPU share the process happened to receive. Fifteen
 # members solved back to back inherit exactly that: which of them proves its plan optimal
@@ -395,10 +398,19 @@ def _build_model(
             transfer_config.max_free_transfers,
             f"free_next_gw{gameweek}",
         )
+        # The chip consumes this week's new entitlement: retaining the entering total
+        # already includes the next deadline's replacement. Adding one again invents
+        # a free move. The non-preserving alternative keeps its configured accounting.
+        accrual = transfer_config.free_transfer_accrual
+        earned = (
+            accrual * (1 - rebuild)
+            if transfer_config.wildcard_preserves_free_transfers
+            else accrual
+        )
         model.add_min_equality(
             free_next,
             [
-                free_unused + transfer_config.free_transfer_accrual,
+                free_unused + earned,
                 transfer_config.max_free_transfers,
             ],
         )
@@ -686,7 +698,12 @@ def _extract_plan(
             raise SolverExecutionError("Unused free transfers failed verification.")
         expected_next = min(
             transfer_config.max_free_transfers,
-            free_unused + transfer_config.free_transfer_accrual,
+            free_unused
+            + (
+                0
+                if wildcard_played and transfer_config.wildcard_preserves_free_transfers
+                else transfer_config.free_transfer_accrual
+            ),
         )
         if free_next != expected_next:
             raise SolverExecutionError("Free-transfer carry failed verification.")
@@ -918,8 +935,18 @@ def optimize_transfer_plan(
     first_week_overlap: FirstWeekOverlap | None = None,
     first_week_transfer_cap: int | None = None,
     first_week_exclusion: FirstWeekExclusion | None = None,
+    linearization_level: int | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
+
+    ``linearization_level`` is CP-SAT's own parameter, left at the solver's default
+    when ``None`` so every existing caller solves exactly as before. At 2 the solver
+    linearizes more of the model (most likely the two-literal rows: starter implies
+    squad, captain implies starter; the cause was not isolated), and the effect is
+    measured in ``docs/member_window_proofs.md``: on the fifteen members of capture
+    ``fpl-live-20260918T122516Z`` it took the three-week windows from 0 to 15 proved
+    and the five-week windows from 0 to 12, inside the unchanged deterministic budget.
+    It changes how hard the solver works on the bound, never what the model says.
 
     ``chips`` names the chips that may be played in which gameweeks of this horizon
     (bench boost, triple captain, wildcard); omitted or empty, the planner is exactly
@@ -1015,7 +1042,6 @@ def optimize_transfer_plan(
         deterministic_limit = PLAN_DETERMINISTIC_TIME_LIMIT
         wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
         deterministic_budget_source = "planner_default"
-    deadline = started_at + wall_limit
     primary_solver = cp_model.CpSolver()
     configure_solver(
         primary_solver,
@@ -1023,6 +1049,8 @@ def optimize_transfer_plan(
         wall_limit,
         deterministic_limit,
     )
+    if linearization_level is not None:
+        primary_solver.parameters.linearization_level = linearization_level
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
     primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
@@ -1091,6 +1119,9 @@ def optimize_transfer_plan(
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if linearization_level is not None:
+        # Only when a caller chose one, so every other plan's diagnostics stay as they were.
+        diagnostics["linearization_level"] = linearization_level
     if primary_status in {SolverStatus.INFEASIBLE, SolverStatus.UNKNOWN}:
         return _empty_result(primary_status, verified_horizon, diagnostics)
 
@@ -1105,7 +1136,6 @@ def optimize_transfer_plan(
         relative_gap = absolute_gap / max(1.0, abs(model_objective))
 
     result_solver = primary_solver
-    remaining_time = deadline - perf_counter()
     remaining_deterministic_time = _remaining_deterministic_time(
         deterministic_limit,
         primary_deterministic_time,
@@ -1114,11 +1144,27 @@ def optimize_transfer_plan(
         remaining_deterministic_time is None
         or remaining_deterministic_time > MIN_TIEBREAK_DETERMINISTIC_TIME
     )
-    if (
-        primary_status is SolverStatus.OPTIMAL
-        and remaining_time > MIN_TIEBREAK_TIME_SECONDS
-        and deterministic_budget_available
-    ):
+    # The tie-break is gated and budgeted on deterministic work alone. It used to be handed
+    # whatever wall time the primary left over, which made the phase that settles bench order,
+    # the captain among equals and the choice between two equal-value fifteens a function of
+    # the CPU share the process received: exactly the dependence the deterministic budget was
+    # introduced to remove from the primary (#247, #275).
+    #
+    # `optimization/optimizer.py` settled this the same way for the one-week path in #192,
+    # where the tie-break's wall limit is floored at the caller's own budget rather than the
+    # leftover. This file was the one that still divided the ceiling between its phases.
+    #
+    # What this does NOT claim: `member_plan_determinism` cut this phase with the clock 24
+    # times on the gameweek 5 capture and the published plan did not move once. The five of
+    # fifteen members who read a different plan there had their primary search cut, which is
+    # a different phase and is not addressed here. This makes a property guaranteed that was
+    # measured to hold anyway.
+    #
+    # The ceiling keeps the job its comment gives it, a stop so that a pathological run still
+    # ends, but it now bounds each phase instead of being divided between them, so the stop
+    # is at twice its value. That is the bound `optimization/optimizer.py` has accepted since
+    # #192; the budget that decides the answer is deterministic in both phases.
+    if primary_status is SolverStatus.OPTIMAL and deterministic_budget_available:
         diagnostics["tiebreak_attempted"] = True
         # Hint the tie-break with the primary's solution: a known-feasible,
         # objective-optimal start turns most tie-break solves into a fast proof
@@ -1136,9 +1182,11 @@ def optimize_transfer_plan(
         configure_solver(
             tiebreak_solver,
             optimization_config,
-            remaining_time,
+            wall_limit,
             remaining_deterministic_time,
         )
+        if linearization_level is not None:
+            tiebreak_solver.parameters.linearization_level = linearization_level
         raw_tiebreak_status = _solve(artifacts.model, tiebreak_solver)
         tiebreak_status = _map_solver_status(raw_tiebreak_status)
         tiebreak_deterministic_time = _deterministic_time_used(

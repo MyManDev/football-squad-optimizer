@@ -12,7 +12,11 @@ from typing import Final
 import pandas as pd
 
 from squadopt.contracts import sort_players_by_id
-from squadopt.data.schema import POSITIONS, PROJECTION_REQUIRED_COLUMNS
+from squadopt.data.schema import (
+    POSITIONS,
+    PROJECTION_OPTIONAL_COLUMNS,
+    PROJECTION_REQUIRED_COLUMNS,
+)
 from squadopt.prediction.config import PredictionConfigurationError
 
 PREDICTION_TO_OPTIMIZATION_CONTRACT_VERSION: Final = "prediction_to_optimization_v1"
@@ -80,7 +84,16 @@ def _frame(
     *,
     label: str,
     required_columns: tuple[str, ...],
+    optional_columns: tuple[str, ...] = (),
 ) -> pd.DataFrame:
+    """Narrow a supplied frame to the columns a contract recognises, and check them.
+
+    ``optional_columns`` are carried when the producer supplied them and not invented when it
+    did not, which is the whole of the optional tier at this boundary. They are deliberately
+    exempt from the missing-value check: a start probability the model has no opinion about is
+    absent on purpose, and a rule that refused it would make an optional column a required one
+    with extra steps.
+    """
     if not isinstance(value, pd.DataFrame):
         raise PredictionConfigurationError(f"{label} must be a pandas DataFrame.")
     duplicates = value.columns[value.columns.duplicated()].tolist()
@@ -91,7 +104,8 @@ def _frame(
     missing = [column for column in required_columns if column not in value.columns]
     if missing:
         raise PredictionConfigurationError(f"{label} is missing columns: {missing!r}.")
-    selected = value.loc[:, list(required_columns)].copy(deep=True)
+    carried = [name for name in optional_columns if name in value.columns]
+    selected = value.loc[:, [*required_columns, *carried]].copy(deep=True)
     if selected.empty:
         raise PredictionConfigurationError(f"{label} must contain at least one player row.")
     missing_values = [column for column in required_columns if bool(selected[column].isna().any())]
@@ -136,6 +150,7 @@ def _validate_projection_table(table: object) -> pd.DataFrame:
         table,
         label="Optimizer projection",
         required_columns=tuple(PROJECTION_REQUIRED_COLUMNS),
+        optional_columns=tuple(PROJECTION_OPTIONAL_COLUMNS),
     )
     _validate_identifiers(validated, "player_id", "Optimizer projection")
     _validate_identifiers(validated, "team_id", "Optimizer projection")
