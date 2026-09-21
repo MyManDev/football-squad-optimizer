@@ -18,16 +18,15 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 
-#: Runners that still solve under the inherited wall clock. Each entry is one pull request of
-#: task 2 on #621, and removing the last of them is what finishes it. A name may leave this
-#: list only when its runner names the configuration, never by being quietly deleted.
-NOT_YET_NAMED: frozenset[str] = frozenset(
-    {
-        "evaluate_phase_c_components.py",
-        "measure_in_season_blend.py",
-        "run_component_squad_calibration.py",
-    }
-)
+#: Runners that still solve under the inherited wall clock. Each entry was one pull request
+#: of task 2 on #621, and removing the last of them finished it. A name may leave this list
+#: only when its runner names the configuration, never by being quietly deleted.
+#:
+#: **It is empty, and the empty set is the point.** Keeping the constant rather than deleting
+#: it with the last name means the next runner that inherits the default is an offender
+#: against a list that excuses nobody, and adding a name back is a visible act with a reason
+#: attached rather than a default nobody notices.
+NOT_YET_NAMED: frozenset[str] = frozenset()
 
 #: Solved under a budget of its own, measured and recorded rather than inherited. The rank
 #: objective has carried its own deterministic budget since #244, so the squad model's number
@@ -94,7 +93,11 @@ def test_every_runner_that_solves_names_its_limits_or_is_named_here() -> None:
 
 
 def test_the_exemption_list_names_only_runners_that_still_need_the_work() -> None:
-    """A stale exemption is worse than none: it hides a rule that is already held."""
+    """A stale exemption is worse than none: it hides a rule that is already held.
+
+    The list is empty now, so what this holds is that it stays empty by the same rule it
+    shrank by rather than by nobody looking.
+    """
 
     trees = _solving_runners()
     still_inheriting = {name for name, tree in trees.items() if _inherits_the_wall_clock(tree)}
@@ -125,6 +128,12 @@ def test_the_converted_runners_name_the_measurement_configuration() -> None:
         "run_transfer_discipline_seasons.py",
         "probe_phase_e_runtime.py",
         "run_scenario_benchmark.py",
+        # The last three, and the two the exemption list took longest over: these build an
+        # `EvaluationConfig` rather than solving directly, so the limit reaches the solve
+        # through `optimization_config` and nowhere else.
+        "evaluate_phase_c_components.py",
+        "measure_in_season_blend.py",
+        "run_component_squad_calibration.py",
     ):
         assert _calls(trees[name], "measurement_optimization_config"), name
         assert not _inherits_the_wall_clock(trees[name]), name
