@@ -22,7 +22,7 @@ import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
 import type { AdviceStrategy, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { checkedCapabilities, type AdviceCapabilities } from "./adviceCapabilities";
 import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
-import type { MemberChip } from "./chipChoice";
+import type { ChipSelection } from "./chipChoice";
 
 export interface AdviceRequest {
   leagueId: number;
@@ -38,7 +38,7 @@ export interface AdviceRequest {
   model?: "current" | "football";
   top100Weight?: number;
   managersWord?: boolean;
-  chip?: MemberChip | null;
+  chip?: ChipSelection | null;
   /** Display context only; the server resolves its own immutable computation inputs. */
   season?: string;
   gameweek?: number;

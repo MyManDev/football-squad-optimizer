@@ -213,6 +213,130 @@
           ],
           "type": "object"
         },
+        "chip_strategy": {
+          "additionalProperties": false,
+          "properties": {
+            "experimental": {
+              "type": "boolean"
+            },
+            "limits": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "mode": {
+              "enum": [
+                "auto",
+                "manual"
+              ]
+            },
+            "objective_basis": {
+              "const": "selection_utility_with_chip_reserve"
+            },
+            "objective_gap": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "requested_chip": {
+              "enum": [
+                "auto",
+                "bboost",
+                "3xc",
+                "wildcard",
+                "freehit"
+              ]
+            },
+            "reservations": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "chip": {
+                    "enum": [
+                      "bboost",
+                      "3xc",
+                      "wildcard",
+                      "freehit"
+                    ]
+                  },
+                  "first_gameweek": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "holding_value": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "last_gameweek": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "remaining_opportunities": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "sample_max": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "sample_min": {
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "chip",
+                  "first_gameweek",
+                  "last_gameweek",
+                  "remaining_opportunities",
+                  "holding_value",
+                  "sample_min",
+                  "sample_max"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "selected_chip": {
+              "enum": [
+                null,
+                "bboost",
+                "3xc",
+                "wildcard",
+                "freehit"
+              ]
+            },
+            "top100_weight": {
+              "enum": [
+                0,
+                5,
+                10,
+                20,
+                30,
+                40,
+                50
+              ]
+            },
+            "version": {
+              "const": "model_opportunity_reservation_v1"
+            }
+          },
+          "required": [
+            "version",
+            "mode",
+            "requested_chip",
+            "selected_chip",
+            "top100_weight",
+            "objective_gap",
+            "objective_basis",
+            "experimental",
+            "reservations",
+            "limits"
+          ],
+          "type": "object"
+        },
         "control_optimality_gap": {
           "type": [
             "number",

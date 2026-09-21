@@ -12,6 +12,7 @@ import squadopt.planning.optimizer as planning_optimizer
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     ChipAvailability,
+    ChipUseWindow,
     InitialSquadState,
     PlanningHorizon,
     TransferPlanningConfig,
@@ -1400,3 +1401,55 @@ def test_an_invalid_first_week_transfer_cap_is_rejected(cap: object) -> None:
             _STAGED_CONFIG,
             first_week_transfer_cap=cap,  # type: ignore[arg-type]
         )
+
+
+def test_chip_rights_renew_across_separate_windows(known_optimum_players, small_config):
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (19, 20)))
+    chips = ChipAvailability(
+        available={"3xc": frozenset({19, 20})},
+        use_windows={"3xc": (ChipUseWindow(frozenset({19}), 0), ChipUseWindow(frozenset({20}), 0))},
+    )
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.chips_played == {19: "3xc", 20: "3xc"}
+    assert result.diagnostics["terminal_chip_holding_value"] == 0
+
+
+def test_holding_value_belongs_to_its_own_chip_right(known_optimum_players, small_config):
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (19, 20)))
+    chips = ChipAvailability(
+        available={"3xc": frozenset({19, 20})},
+        use_windows={
+            "3xc": (ChipUseWindow(frozenset({19}), 0), ChipUseWindow(frozenset({20}), 100))
+        },
+    )
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+    assert result.chips_played == {19: "3xc"}
+    assert result.diagnostics["terminal_chip_holding_value"] == 100
+    legacy = ChipAvailability(available=chips.available)
+    assert chips.availability_fingerprint != legacy.availability_fingerprint
+
+
+def test_renewed_free_hit_cannot_be_forced_in_consecutive_weeks(
+    known_optimum_players, small_config
+):
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (19, 20)))
+    chips = ChipAvailability(
+        available={"freehit": frozenset({19, 20})},
+        forced={19: "freehit", 20: "freehit"},
+        use_windows={"freehit": (ChipUseWindow(frozenset({19})), ChipUseWindow(frozenset({20})))},
+    )
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+    assert result.solver_status is SolverStatus.INFEASIBLE
+
+
+@pytest.mark.parametrize(
+    "periods",
+    [
+        (ChipUseWindow(frozenset({1})), ChipUseWindow(frozenset({1, 2}))),
+        (ChipUseWindow(frozenset({1})),),
+    ],
+)
+def test_chip_use_windows_are_a_partition(periods):
+    with pytest.raises(TransferPlanningValidationError):
+        ChipAvailability(available={"3xc": frozenset({1, 2})}, use_windows={"3xc": periods})
