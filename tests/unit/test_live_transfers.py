@@ -765,7 +765,7 @@ def test_a_wildcard_rebuilds_without_hits_and_keeps_the_free_transfer(
     assert block["chip"] == "wildcard"
     assert block["transfer_count"] >= 2
     assert block["paid_transfer_count"] == 0 and block["transfer_hit_points"] == 0.0
-    assert block["free_transfers_after"] == 2  # the banked one plus the weekly accrual
+    assert block["free_transfers_after"] == 1  # retained; no extra accrual on the chip week
 
 
 def test_a_free_hit_week_is_temporary_in_the_ledger(

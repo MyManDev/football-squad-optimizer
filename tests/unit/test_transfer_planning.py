@@ -707,7 +707,7 @@ def test_a_wildcard_rebuilds_the_squad_without_hits(
     assert sorted(week.selected_squad["player_id"]) == ["DEF_A", "FWD_A", "GK_A", "MID_A"]
     if preserves:
         assert week.free_transfers_unused == 1
-        assert week.free_transfers_for_next_gameweek == 2
+        assert week.free_transfers_for_next_gameweek == 1
     else:
         assert week.free_transfers_unused == 0
         assert week.free_transfers_for_next_gameweek == 1
@@ -960,11 +960,68 @@ def test_a_free_hit_rebuilds_for_one_week_and_reverts_the_squad_and_bank(
     # Week two starts from the weak squad and the pre-chip bank, free transfers kept.
     assert set(second.transfers_out["player_id"]).issubset({"GK_B", "DEF_B", "MID_B", "FWD_B"})
     assert second.bank_before_tenths == 30
-    assert second.free_transfers_before == 2
+    assert second.free_transfers_before == 1
     held_after_two = set(second.selected_squad["player_id"])
     assert held_after_two == (
         {"GK_B", "DEF_B", "MID_B", "FWD_B"} - set(second.transfers_out["player_id"])
     ) | set(second.transfers_in["player_id"])
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+@pytest.mark.parametrize("free", [1, 2, 4, 5])
+@pytest.mark.parametrize("accrual", [0, 1, 2])
+def test_rebuild_retains_the_entering_total_then_ordinary_accrual_resumes(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    chip: str,
+    free: int,
+    accrual: int,
+) -> None:
+    # External rule: Premier League FAQ 4661030, "saved transfers" and "missing a
+    # free transfer". Checking 5 alone hid the old double-accrual bug at the cap.
+    result = optimize_transfer_plan(
+        PlanningHorizon(_horizon_table(known_optimum_players)),
+        replace(OPTIMAL_INITIAL, free_transfers=free),
+        small_config,
+        TransferPlanningConfig(free_transfer_accrual=accrual),
+        chips=ChipAvailability({chip: {1}}, forced={1: chip}),
+    )
+
+    first, second = result.weeks
+    assert result.solver_status == SolverStatus.OPTIMAL
+    assert first.free_transfers_for_next_gameweek == free
+    assert second.free_transfers_before == free
+    assert second.transfer_count == 0
+    assert second.free_transfers_for_next_gameweek == min(5, free + accrual)
+    assert result.contract_version == "deterministic_transfer_planning_v3"
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+def test_rebuild_cannot_pay_for_a_following_weeks_move_with_an_invented_transfer(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    chip: str,
+) -> None:
+    table = _horizon_table(known_optimum_players)
+    # Even the bench upgrade is worth more than a hit, so both weeks have a unique
+    # squad optimum. Start from A: FH returns to A and WC keeps A after week one.
+    prefers_a = table["gameweek"].eq(1)
+    is_a = table["player_id"].str.endswith("_A")
+    table["expected_points"] = (prefers_a == is_a).astype(float) * 100
+    result = optimize_transfer_plan(
+        PlanningHorizon(table),
+        OPTIMAL_INITIAL,
+        small_config,
+        chips=ChipAvailability({chip: {1}}, forced={1: chip}),
+    )
+
+    first, second = result.weeks
+    assert result.solver_status == SolverStatus.OPTIMAL
+    assert first.transfer_count == 0
+    assert second.transfer_count == 4
+    assert second.paid_transfer_count == 3
+    assert second.transfer_hit_points == 12.0
+    assert second.free_transfers_for_next_gameweek == 1
 
 
 def test_a_free_hit_is_played_where_the_temporary_squad_is_worth_most(

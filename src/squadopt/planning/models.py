@@ -15,7 +15,8 @@ from squadopt.optimization import SolverStatus
 from squadopt.optimization.config import POSITIONS
 
 PLANNING_HORIZON_CONTRACT_VERSION: Final = "planning_horizon_v1"
-TRANSFER_PLANNING_CONTRACT_VERSION: Final = "deterministic_transfer_planning_v2"
+TRANSFER_PLANNING_CONTRACT_VERSION: Final = "deterministic_transfer_planning_v3"
+# v3 retains the entering FT total after a preserving rebuild, without an extra accrual.
 # The chips this planner models. Free hit arrived with contract v2: it makes one week's
 # squad temporary and restores the previous squad and bank the week after, which the
 # model carries as a per-week "base" state that reverts under the chip.
@@ -397,10 +398,10 @@ class TransferPlanningConfig:
     """Controls transfer accounting and deterministic horizon weighting.
 
     ``wildcard_preserves_free_transfers`` states the rule this planner assumes for a
-    wildcard week: transfers made under the chip do not consume banked free transfers,
-    and accrual continues as usual. It is a flag rather than a constant because the
-    source's payload does not publish it; if the rule turns out otherwise, one flag
-    changes and nothing else.
+    wildcard or free-hit week: the entering free-transfer total is retained for the
+    next deadline, with no additional accrual. This is the modern FPL rule. False
+    retains the alternative accounting mode: moves consume the bank and the ordinary
+    configured accrual follows, even under a rebuild.
     """
 
     max_free_transfers: int = 5

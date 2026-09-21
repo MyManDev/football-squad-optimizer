@@ -398,10 +398,19 @@ def _build_model(
             transfer_config.max_free_transfers,
             f"free_next_gw{gameweek}",
         )
+        # The chip consumes this week's new entitlement: retaining the entering total
+        # already includes the next deadline's replacement. Adding one again invents
+        # a free move. The non-preserving alternative keeps its configured accounting.
+        accrual = transfer_config.free_transfer_accrual
+        earned = (
+            accrual * (1 - rebuild)
+            if transfer_config.wildcard_preserves_free_transfers
+            else accrual
+        )
         model.add_min_equality(
             free_next,
             [
-                free_unused + transfer_config.free_transfer_accrual,
+                free_unused + earned,
                 transfer_config.max_free_transfers,
             ],
         )
@@ -689,7 +698,12 @@ def _extract_plan(
             raise SolverExecutionError("Unused free transfers failed verification.")
         expected_next = min(
             transfer_config.max_free_transfers,
-            free_unused + transfer_config.free_transfer_accrual,
+            free_unused
+            + (
+                0
+                if wildcard_played and transfer_config.wildcard_preserves_free_transfers
+                else transfer_config.free_transfer_accrual
+            ),
         )
         if free_next != expected_next:
             raise SolverExecutionError("Free-transfer carry failed verification.")

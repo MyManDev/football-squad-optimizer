@@ -143,9 +143,13 @@ hard-codes a season. `forced` pins a chip to a gameweek (hand-timed play).
 - **Wildcard**: paid transfers move to inequality form (`paid ≥ count − free_before −
   squad_size × wildcard`, `paid ≥ 0`), so the negative-weighted variable takes its old
   value without the chip and zero under it. `TransferPlanningConfig.
-  wildcard_preserves_free_transfers` (default `True`) states the assumed rule that transfers
-  under a wildcard do not consume banked free transfers; the source does not publish this,
-  so it is a flag rather than a constant.
+  wildcard_preserves_free_transfers` (default `True`) retains the entering free-transfer
+  total after a Wildcard or Free Hit, with no extra accrual. The
+  [official FAQ](https://www.premierleague.com/en/news/4661030) explains that activating
+  either chip consumes that week's new entitlement and preserves earlier savings.
+  Thus entering with two gives two at the next deadline, not three. Ordinary weeks
+  still accrue up to the cap. Setting the flag to `False` retains the alternative mode
+  where moves consume the bank and normal configured accrual follows.
 - Wildcard free-transfer accounting is pinned in both directions (`consumed = count`
   without the chip, `0` under it): the bank it feeds is not always in the objective (a
   horizon's last week, a full bank), and a free variable there left the accounting
@@ -160,7 +164,7 @@ hard-codes a season. `forced` pins a chip to a gameweek (hand-timed play).
   free-transfer bank per the flag, full bench value and tripled captain in the reported
   contribution) and reports `chips_played`; `chip_availability_fingerprint` and
   `chips_available` are in the diagnostics.
-- **Free hit** (contract `deterministic_transfer_planning_v2`): the week's squad is
+- **Free hit** (introduced in contract `deterministic_transfer_planning_v2`): the week's squad is
   temporary. Transfers under it cost no hits and (per the flag) leave the free-transfer
   bank alone, the per-gameweek cap is lifted, and the next week starts from the squad and
   bank the free-hit week started from — carried as per-week *base* variables pinned to
@@ -170,6 +174,12 @@ hard-codes a season. `forced` pins a chip to a gameweek (hand-timed play).
   and bank after a free-hit week and verifies continuity against the base.
 
 ## Current limitations
+
+Contract `deterministic_transfer_planning_v3` corrects rebuild free-transfer carry in
+both the solver and extraction validation. Its configuration fingerprint differs from
+v2 so plans produced under the old accounting cannot share its identity. Historical
+chip and terminal-value measurements remain historical; this correction does not
+remeasure or promote them.
 
 - Projections are deterministic; scenario-aware multi-stage recourse is not implemented.
 - The player universe must remain constant across the horizon.
