@@ -37,6 +37,7 @@ from squadopt.application.advice_capabilities import (
     menu_capabilities,
     validate_advice_selection,
 )
+from squadopt.application.advice_chip_strategy import advise_chip_strategy
 from squadopt.application.advice_chips import advise_with_chip, member_chip_menu
 from squadopt.application.advice_variants import (
     advise_rival_window,
@@ -227,6 +228,20 @@ def advise_menu_entry(
         )
     _require_capture(request, inputs, rules)
     plain = request.entry_request()
+    if request.chip is not None and (
+        request.chip == "auto" or request.window != 1 or request.top100_weight
+    ):
+        return advise_chip_strategy(
+            plain,
+            chip=request.chip,
+            top100_weight=request.top100_weight,
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+            horizon_builder=horizon_builder,
+            counts=top100_counts,
+        )
     if request.chip is not None:
         held_chips = held_member_chips(plain, provider=provider, inputs=inputs, rules=rules)
         if held_chips is None or request.chip not in held_chips:

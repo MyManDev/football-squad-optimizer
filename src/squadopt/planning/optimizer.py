@@ -4,6 +4,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from itertools import pairwise
 from time import perf_counter
 from typing import Final
 
@@ -183,6 +184,7 @@ def _validate_integer_bounds(
     discount_weights: list[int],
     hit_cost_scaled: int,
     banked_value_scaled: int,
+    chips: ChipAvailability,
 ) -> int:
     objective_bound = 0
     bank_bound = initial_state.bank_tenths
@@ -202,15 +204,25 @@ def _validate_integer_bounds(
         objective_bound += (
             discount_weight * abs(banked_value_scaled) * transfer_config.max_free_transfers
         )
-        objective_bound += discount_weight * sum(
-            abs(scale_expected_points(value, optimization_config.expected_points_scale))
-            for value in transfer_config.chip_holding_value_points.values()
-        )
         largest_sell_prices = sorted(
             (int(value) for value in players["sell_price_tenths"]),
             reverse=True,
         )[: optimization_config.squad_size]
         bank_bound += sum(largest_sell_prices)
+    objective_bound += discount_weights[-1] * sum(
+        abs(
+            scale_expected_points(
+                (
+                    transfer_config.chip_holding_value_points.get(name, 0.0)
+                    if p.holding_value_points is None
+                    else p.holding_value_points
+                ),
+                optimization_config.expected_points_scale,
+            )
+        )
+        for name in chips.available
+        for p in chips.windows_for(name)
+    )
     if objective_bound > CP_SAT_SAFE_INTEGER_MAX:
         raise SolverExecutionError(
             "Transfer-plan objective exceeds the safe CP-SAT integer range; reduce the horizon, "
@@ -250,9 +262,18 @@ def _build_model(
             model.add(week_chips[forced] == 1)
         chip_vars.append(week_chips)
     for name in chips.available:
-        plays = [week[name] for week in chip_vars if name in week]
-        if len(plays) > 1:
-            model.add(cp_model.LinearExpr.sum(plays) <= 1)
+        for period in chips.windows_for(name):
+            plays = [
+                week[name]
+                for gw, week in zip(horizon_gameweeks, chip_vars, strict=True)
+                if name in week and gw in period.gameweeks
+            ]
+            if len(plays) > 1:
+                model.add(cp_model.LinearExpr.sum(plays) <= 1)
+    # Two separate Free Hit rights still cannot be used in consecutive gameweeks.
+    for left, right in pairwise(chip_vars):
+        if "freehit" in left and "freehit" in right:
+            model.add(left["freehit"] + right["freehit"] <= 1)
     discount_weights = _discount_weights(week_count, transfer_config)
     hit_cost_scaled = scale_expected_points(
         transfer_config.transfer_hit_cost_points,
@@ -270,6 +291,7 @@ def _build_model(
         discount_weights,
         hit_cost_scaled,
         banked_value_scaled,
+        chips,
     )
 
     squad_vars: list[list[cp_model.IntVar]] = []
@@ -518,16 +540,24 @@ def _build_model(
         # otherwise see.
         objective_terms.append(discount_weights[-1] * banked_value_scaled * free_next_vars[-1])
     for name in sorted(chips.available):
-        holding_value = transfer_config.chip_holding_value_points.get(name, 0.0)
-        if holding_value == 0.0:
-            continue
-        # Terminal value of a chip left unplayed: one minus its plays in the horizon.
-        holding_scaled = scale_expected_points(
-            holding_value, optimization_config.expected_points_scale
-        )
-        plays = [week[name] for week in chip_vars if name in week]
-        held = 1 - cp_model.LinearExpr.sum(plays)
-        objective_terms.append(discount_weights[-1] * holding_scaled * held)
+        for period in chips.windows_for(name):
+            holding_value = (
+                transfer_config.chip_holding_value_points.get(name, 0.0)
+                if period.holding_value_points is None
+                else period.holding_value_points
+            )
+            if holding_value == 0.0:
+                continue
+            holding_scaled = scale_expected_points(
+                holding_value, optimization_config.expected_points_scale
+            )
+            plays = [
+                week[name]
+                for gw, week in zip(horizon_gameweeks, chip_vars, strict=True)
+                if name in week and gw in period.gameweeks
+            ]
+            held = 1 - cp_model.LinearExpr.sum(plays)
+            objective_terms.append(discount_weights[-1] * holding_scaled * held)
     primary_objective = cp_model.LinearExpr.sum(objective_terms)
     model.maximize(primary_objective)
     return _PlanArtifacts(
@@ -775,8 +805,18 @@ def _extract_plan(
         total_objective += contribution
 
     for name in artifacts.chips.available:
-        if sum(1 for played_name in chips_played.values() if played_name == name) > 1:
-            raise SolverExecutionError(f"Chip {name!r} was played more than once in the horizon.")
+        for period in artifacts.chips.windows_for(name):
+            if (
+                sum(
+                    1
+                    for gw, played in chips_played.items()
+                    if played == name and gw in period.gameweeks
+                )
+                > 1
+            ):
+                raise SolverExecutionError(
+                    f"Chip {name!r} was played more than once in its window."
+                )
     diagnostics["chips_played"] = dict(chips_played)
     terminal_value = (
         transfer_config.banked_transfer_value_points
@@ -787,9 +827,14 @@ def _extract_plan(
     total_objective += terminal_value
     last_discount = transfer_config.horizon_discount_factor ** (len(weeks) - 1)
     holding_value = sum(
-        transfer_config.chip_holding_value_points.get(name, 0.0)
+        (
+            transfer_config.chip_holding_value_points.get(name, 0.0)
+            if period.holding_value_points is None
+            else period.holding_value_points
+        )
         for name in artifacts.chips.available
-        if name not in chips_played.values()
+        for period in artifacts.chips.windows_for(name)
+        if not any(played == name and gw in period.gameweeks for gw, played in chips_played.items())
     )
     diagnostics["terminal_chip_holding_value"] = holding_value * last_discount
     total_objective += holding_value * last_discount

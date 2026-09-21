@@ -340,6 +340,35 @@ class FirstWeekOverlap:
 
 
 @dataclass(frozen=True, slots=True)
+class ChipUseWindow:
+    """One non-renewable chip right, priced separately from the next period's right.
+
+    Weeks may include dates beyond the solve horizon. The caller prices the right
+    remaining after that horizon, and must assign zero when the right expires there.
+    None preserves the legacy transfer-config holding value for existing callers.
+    """
+
+    gameweeks: frozenset[int]
+    holding_value_points: float | None = None
+
+    def __post_init__(self) -> None:
+        weeks = frozenset(_state_integer(w, "chip window gameweek", 1) for w in self.gameweeks)
+        if not weeks:
+            raise TransferPlanningValidationError("A chip use window must contain gameweeks.")
+        value = self.holding_value_points
+        if value is not None and (
+            isinstance(value, bool)
+            or not isinstance(value, Real)
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            raise TransferPlanningValidationError(
+                "Chip holding value must be finite and non-negative."
+            )
+        object.__setattr__(self, "gameweeks", weeks)
+
+
+@dataclass(frozen=True, slots=True)
 class ChipAvailability:
     """Which chips the planner may play in which gameweeks of one horizon.
 
@@ -348,12 +377,14 @@ class ChipAvailability:
     hand-timed case — and a forced chip must also be available there. The caller
     derives both from the season's published rules and the chips already used; the
     planner does not know about seasons or halves, only about this horizon, and it
-    plays each available chip at most once inside it. An empty availability is the
-    chip-less planner exactly.
+    plays each chip at most once per explicit use window (one right by default).
+    Period-specific holding values replace the legacy per-name value where supplied.
+    An empty availability is the chip-less planner exactly.
     """
 
     available: Mapping[str, frozenset[int]] = field(default_factory=dict)
     forced: Mapping[int, str] = field(default_factory=dict)
+    use_windows: Mapping[str, tuple[ChipUseWindow, ...]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         available: dict[str, frozenset[int]] = {}
@@ -377,18 +408,53 @@ class ChipAvailability:
             forced[gameweek] = name
         object.__setattr__(self, "available", MappingProxyType(available))
         object.__setattr__(self, "forced", MappingProxyType(forced))
+        windows: dict[str, tuple[ChipUseWindow, ...]] = {}
+        for name, periods in self.use_windows.items():
+            if name not in available or not periods:
+                raise TransferPlanningValidationError("Chip use windows require an available chip.")
+            covered: set[int] = set()
+            for period in periods:
+                if not isinstance(period, ChipUseWindow) or covered.intersection(period.gameweeks):
+                    raise TransferPlanningValidationError(
+                        "Chip use windows must be distinct and disjoint."
+                    )
+                covered.update(period.gameweeks)
+            if covered != set(available[name]):
+                raise TransferPlanningValidationError(
+                    "Chip use windows must partition availability."
+                )
+            windows[name] = tuple(sorted(periods, key=lambda p: min(p.gameweeks)))
+        object.__setattr__(self, "use_windows", MappingProxyType(windows))
 
     def gameweeks_for(self, name: str) -> frozenset[int]:
         return self.available.get(name, frozenset())
+
+    def windows_for(self, name: str) -> tuple[ChipUseWindow, ...]:
+        """Legacy availability is a single right; explicit periods renew independently."""
+        if name in self.use_windows:
+            return self.use_windows[name]
+        weeks = self.gameweeks_for(name)
+        return (ChipUseWindow(weeks),) if weeks else ()
 
     @property
     def availability_fingerprint(self) -> str:
         """Stable digest of the availability and any forced plays."""
 
-        payload = {
+        payload: dict[str, object] = {
             "available": {name: sorted(weeks) for name, weeks in self.available.items()},
             "forced": {str(week): name for week, name in sorted(self.forced.items())},
         }
+        if self.use_windows:
+            payload["use_windows"] = {
+                name: [
+                    {
+                        "gameweeks": sorted(p.gameweeks),
+                        "holding_value_points": p.holding_value_points,
+                    }
+                    for p in periods
+                ]
+                for name, periods in sorted(self.use_windows.items())
+            }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 

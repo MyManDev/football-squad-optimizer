@@ -471,6 +471,26 @@ export interface EntryAdvice {
   top100?: AdviceTop100;
   /** Present only on a document solved with a chip the member chose. */
   chip_choice?: AdviceChipChoice;
+  chip_strategy?: {
+    version: "model_opportunity_reservation_v1";
+    mode: "auto" | "manual";
+    requested_chip: "auto" | "bboost" | "3xc" | "wildcard" | "freehit";
+    selected_chip: "bboost" | "3xc" | "wildcard" | "freehit" | null;
+    top100_weight: number;
+    objective_gap: number | null;
+    objective_basis: "selection_utility_with_chip_reserve";
+    experimental: boolean;
+    reservations: {
+      chip: string;
+      first_gameweek: number;
+      last_gameweek: number;
+      remaining_opportunities: number;
+      holding_value: number;
+      sample_min: number;
+      sample_max: number;
+    }[];
+    limits: string[];
+  };
   /**
    * The transfer rule the strategy played under: the free transfers it could spend
    * without hits, the overlap it asked for, the overlap it applied, and which of the

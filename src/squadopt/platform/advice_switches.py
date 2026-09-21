@@ -45,6 +45,7 @@ from squadopt.live.football_artifact import (
     football_artifact_path,
     read_football_forecast,
 )
+from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 
 __all__ = [
     "CHIP_SWITCH",
@@ -118,7 +119,11 @@ def switch_identity(
             )
         identity[MODEL_SWITCH] = {"name": model, "fingerprint": inputs.football.fingerprint}
     if chip is not None:
-        identity[CHIP_SWITCH] = {"chip": chip, "basis": CHIP_CHOICE_BASIS}
+        identity[CHIP_SWITCH] = {
+            "chip": chip,
+            "basis": CHIP_CHOICE_BASIS,
+            "strategy_version": CHIP_STRATEGY_VERSION,
+        }
     if top100_weight:
         counts = inputs.top100_counts
         if counts is None:

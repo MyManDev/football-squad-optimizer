@@ -100,6 +100,8 @@ def best_eleven_basis(
     squad: Iterable[
         tuple[str, float, float, bool, bool] | tuple[str, float, float, bool, bool, int]
     ],
+    *,
+    chip: str | None = None,
 ) -> float | None:
     """The published basis of the eleven a fifteen would field, chosen on other points.
 
@@ -172,9 +174,16 @@ def best_eleven_basis(
                         + captain_choice
                         + _LINEUP_DEFAULTS.bench_weight * (total - sum(chosen))
                     )
+                    basis = sum(stated) + captain_basis
+                    if chip == "3xc":
+                        objective += captain_choice
+                        basis += captain_basis
+                    elif chip == "bboost":
+                        objective = total + captain_choice
+                        basis = sum(row[2] for row in players) + captain_basis
                     if best_objective is None or objective > best_objective:
                         best_objective = objective
-                        best_basis = sum(stated) + captain_basis
+                        best_basis = basis
     return best_basis
 
 

@@ -410,6 +410,10 @@ class AdviceReadStore:
             "top100": {"available": top100, "weights": list(TOP100_WEIGHTS) if top100 else [0]},
             "managers_word": {"available": word},
             "chips": {
+                "strategy": {
+                    "version": "model_opportunity_reservation_v1",
+                    "windows": [1, 3, 5],
+                },
                 "held_by_entry": {
                     str(entry): list(held) for entry, held in chips.items() if held is not None
                 },
@@ -481,7 +485,7 @@ class AdviceReadStore:
         switches: SwitchIdentity = {}
         if chip is not None:
             held = self._held_chips(context, league_id, (entry_id,)).get(entry_id)
-            if held is None or chip not in held:
+            if held is None or (chip != "auto" and chip not in held):
                 raise ChipUnavailableError(
                     "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
                 )

@@ -42,6 +42,7 @@ from squadopt.planning import (
     sell_price_tenths,
     spending_power,
 )
+from squadopt.planning.chip_strategy import optimize_chip_strategy
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -813,6 +814,7 @@ def plan_transfer_horizon(
     first_week_transfer_cap: int | None = None,
     first_week_exclusion: FirstWeekExclusion | None = None,
     linearization_level: int | None = None,
+    chip_strategy: bool = False,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -929,16 +931,35 @@ def plan_transfer_horizon(
         bank_tenths=budget.bank_tenths,
         free_transfers=min(held.free_transfers, planning_policy.max_free_transfers),
     )
-    plan = optimize_transfer_plan(
-        PlanningHorizon(planning_table),
-        state,
-        settings,
-        planning_policy,
-        chips=chips,
-        first_week_overlap=first_week_overlap,
-        first_week_transfer_cap=first_week_transfer_cap,
-        first_week_exclusion=first_week_exclusion,
-        linearization_level=linearization_level,
+    if chip_strategy and (
+        first_week_overlap is not None
+        or first_week_transfer_cap is not None
+        or first_week_exclusion is not None
+    ):
+        raise DataSourceError(
+            "Automatic chip strategy currently supports the pure-points path only."
+        )
+    plan = (
+        optimize_chip_strategy(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips or ChipAvailability(),
+            linearization_level=linearization_level,
+        )
+        if chip_strategy
+        else optimize_transfer_plan(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips=chips,
+            first_week_overlap=first_week_overlap,
+            first_week_transfer_cap=first_week_transfer_cap,
+            first_week_exclusion=first_week_exclusion,
+            linearization_level=linearization_level,
+        )
     )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
