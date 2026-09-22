@@ -19,6 +19,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, Literal, Protocol, TypeAlias
 
+from squadopt.contracts.preferences import NO_PREFERENCES, preferences_schema
+from squadopt.contracts.preferences import DecisionPreferences as DecisionPreferences
+
 BACKEND_API_CONTRACT_VERSION: Final = "backend_api_v1"
 BACKEND_API_VERSION: Final = "v1"
 BACKEND_API_SCHEMA_PATH: Final = Path("docs") / "contracts" / "backend_api_v1.schema.json"
@@ -153,6 +156,7 @@ class ApiCommandRequest:
     """Server-resolved, never client-supplied: which capture answers this request.
     Part of the advise fingerprint so deduplication cannot outlive the capture."""
     model: str = "current"
+    preferences: DecisionPreferences = NO_PREFERENCES
     top100_weight: int = 0
     managers_word: bool = False
     """The member menu's switches on ``league.advise``. Off is the default and is **left
@@ -162,6 +166,10 @@ class ApiCommandRequest:
     contract_version: str = BACKEND_API_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
+        if not isinstance(self.preferences, DecisionPreferences):
+            raise BackendApiContractError("Invalid preferences.")
+        if self.preferences.active and self.operation != "league.advise":
+            raise BackendApiContractError("Only advice accepts preferences.")
         if self.contract_version != BACKEND_API_CONTRACT_VERSION:
             raise BackendApiContractError(
                 f"contract_version must be {BACKEND_API_CONTRACT_VERSION!r}."
@@ -275,6 +283,12 @@ class ApiCommandRequest:
                 f"{self.operation} accepts no top100_weight or managers_word."
             )
         if self.operation == "league.advise":
+            try:
+                self.preferences.validate_selection(
+                    self.strategy or "", self.managers_word, self.chip
+                )
+            except ValueError as error:
+                raise BackendApiContractError(str(error)) from error
             if self.chip is not None and self.chip not in ADVISE_CHIPS:
                 raise BackendApiContractError("Unknown chip choice.")
             if (
@@ -373,6 +387,10 @@ class ApiCommandRequest:
                 }
             )
             # Only when on: an absent switch and an off switch are one request.
+            if self.preferences.active:
+                payload["preferences"] = _json_object(
+                    self.preferences.payload(), label="preferences"
+                )
             if self.model != "current":
                 payload["model"] = self.model
             if self.top100_weight:
@@ -437,7 +455,7 @@ class ApiCommandRequest:
         }[operation]
         expected = common | specific
         optional = (
-            {"top100_weight", "managers_word", "chip", "model"}
+            {"top100_weight", "managers_word", "chip", "model", "preferences"}
             if operation == "league.advise"
             else set()
         )
@@ -448,6 +466,10 @@ class ApiCommandRequest:
                 f"missing={sorted(expected - actual)!r}, "
                 f"unexpected={sorted(actual - expected)!r}."
             )
+        try:
+            preferences = DecisionPreferences.parse(document.get("preferences"))
+        except ValueError as error:
+            raise BackendApiContractError(str(error)) from error
         request = cls(
             contract_version=document["contract_version"],  # type: ignore[arg-type]
             operation=document["operation"],  # type: ignore[arg-type]
@@ -465,6 +487,7 @@ class ApiCommandRequest:
             window=document.get("window"),  # type: ignore[arg-type]
             rival_entry_id=document.get("rival_entry_id"),  # type: ignore[arg-type]
             capture_snapshot_id=document.get("capture_snapshot_id"),  # type: ignore[arg-type]
+            preferences=preferences,
             model=document.get("model", "current"),  # type: ignore[arg-type]
             top100_weight=document.get("top100_weight", 0),  # type: ignore[arg-type]
             managers_word=document.get("managers_word", False),  # type: ignore[arg-type]
@@ -727,6 +750,7 @@ def backend_api_schema() -> dict[str, Any]:
     # Optional on both shapes, and absent means off: a request written before the
     # switches existed is still exactly one valid document.
     advise_switches = {
+        "preferences": preferences_schema(),
         "model": {"enum": ["current", "football"]},
         "top100_weight": {"type": "integer", "enum": list(ADVISE_TOP100_WEIGHTS)},
         "managers_word": {"type": "boolean"},

@@ -2,6 +2,7 @@ import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
 import { adviceRequestKey } from "./adviceJobStore";
 import { checkedAdvice } from "./adviceResponse";
+import { preferencesKey } from "./decisionPreferences";
 
 export interface DecisionCandidate {
   id: string;
@@ -139,7 +140,8 @@ export function saveDecisionBoard(
 /** Reopen settings only; no automatic job, transfer or chip activation. */
 export function decisionParams(current: URLSearchParams, r: AdviceRequest): URLSearchParams {
   const next = new URLSearchParams(current);
-  for (const key of ["mode", "window", "rival", "model", "top100", "llm", "chip"]) next.delete(key);
+  for (const key of ["mode", "window", "rival", "model", "top100", "llm", "chip", "preferences"])
+    next.delete(key);
   next.set("mode", r.strategy);
   next.set("window", String(r.window));
   if (r.rivalEntryId != null) next.set("rival", String(r.rivalEntryId));
@@ -147,5 +149,6 @@ export function decisionParams(current: URLSearchParams, r: AdviceRequest): URLS
   if (r.top100Weight) next.set("top100", String(r.top100Weight));
   if (r.managersWord) next.set("llm", "on");
   if (r.chip) next.set("chip", r.chip);
+  if (preferencesKey(r.preferences)) next.set("preferences", preferencesKey(r.preferences));
   return next;
 }

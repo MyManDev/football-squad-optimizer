@@ -1,4 +1,6 @@
 /** Runtime counterpart of docs/contracts/advice_read_v1.schema.json. */
+import { checkedPreferences } from "./decisionPreferences";
+
 type Predicate = (value: unknown) => boolean;
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -28,6 +30,16 @@ const predictionModel: Predicate = (value) =>
     experimental: oneOf(true),
     fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
   });
+
+const preferences: Predicate = (value) => {
+  if (!record(value)) return false;
+  try {
+    checkedPreferences(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 function fields(
   value: unknown,
@@ -168,6 +180,9 @@ export function isAdvicePayload(value: unknown): boolean {
     {
       source_snapshot_id: nullable(text),
       prediction_model: predictionModel,
+      preferences,
+      preferences_scope: oneOf("all_selected_weeks"),
+      selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),
       rival_entry_id: identity,
       rival_label: nullable(text),
       transfer_hit_points: finite,

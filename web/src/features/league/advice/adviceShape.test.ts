@@ -48,3 +48,20 @@ it("checks exactly the payload keys the served schema declares", () => {
     Object.keys(schema.properties.payload.properties).sort(),
   );
 });
+
+it("refuses malformed preference metadata instead of accepting an unverified plan", () => {
+  const payload = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
+  expect(isAdvicePayload({ ...payload, preferences: { keep_players: [101], no_hits: true } })).toBe(
+    true,
+  );
+  for (const preferences of [
+    null,
+    { no_hits: "true" },
+    { keep_players: [101], avoid_players: [101] },
+    { hidden: true },
+  ]) {
+    expect(isAdvicePayload({ ...payload, preferences })).toBe(false);
+  }
+  expect(isAdvicePayload({ ...payload, preferences_scope: "first_week" })).toBe(false);
+  expect(isAdvicePayload({ ...payload, selection_top100_weight: 99 })).toBe(false);
+});

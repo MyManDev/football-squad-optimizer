@@ -34,6 +34,7 @@ export interface LeagueMemberViewProps {
   onRetryAdvice?: () => void;
   onRetryIndex?: () => void;
   members?: EntryView[];
+  outcomeFreshness?: { publishedAt: string; scoredGameweek: number | null };
   index?: EntryAdviceIndex | null;
   client?: AdviceClient;
   /** What the compute service answers for this page; absent or null on a static build. */

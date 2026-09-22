@@ -22,7 +22,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { WindowSize } from "../../moves/modePrices";
 import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
 import { AdviceApiError, StaticOnlyAdviceClient, newIdempotencyKey } from "./adviceClient";
-import { forgetJob, recallJob, rememberJob, type StoredAdviceJob } from "./adviceJobStore";
+import {
+  adviceRequestKey,
+  forgetJob,
+  recallJob,
+  rememberJob,
+  type StoredAdviceJob,
+} from "./adviceJobStore";
 import { AdviceContextError, AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 
@@ -83,6 +89,7 @@ export interface AdviceJob {
 /** Whether two requests ask the same question: same member, strategy, window, rival and switches. */
 export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): boolean {
   return (
+    adviceRequestKey(left) === adviceRequestKey(right) &&
     left.leagueId === right.leagueId &&
     left.entryId === right.entryId &&
     left.strategy === right.strategy &&

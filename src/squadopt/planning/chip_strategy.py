@@ -11,8 +11,10 @@ import math
 from collections.abc import Sequence
 from dataclasses import replace
 
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import (
     OptimizationConfig,
+    OptimizationResult,
     SolverExecutionError,
     SolverStatus,
     optimize_squad,
@@ -67,6 +69,8 @@ def optimize_chip_strategy(
     chips: ChipAvailability,
     *,
     linearization_level: int | None = None,
+    preferences: DecisionPreferences | None = None,
+    protect_hold: bool = False,
 ) -> TransferPlanResult:
     """Price remaining rights from the selected model, then optimize jointly.
 
@@ -97,6 +101,8 @@ def optimize_chip_strategy(
         reference if chips.available else optimization,
         transfer,
         linearization_level=linearization_level,
+        preferences=preferences,
+        protect_hold=protect_hold,
     )
     if chips.available and control.solver_status is not SolverStatus.OPTIMAL:
         raise SolverExecutionError("Chip opportunity reference must be proved optimal.")
@@ -118,7 +124,29 @@ def optimize_chip_strategy(
             # Probe in the post-control state; use conservative sell proceeds, not
             # the roster's full purchase price when it contains price gains.
             budget = week.bank_after_tenths + int(held.sell_price_tenths.sum())
-            rebuilt = optimize_squad(table, replace(optimization, budget_tenths=budget))
+            rebuilt: TransferPlanResult | OptimizationResult
+            if preferences is not None and preferences.active:
+                # A rebuild opportunity must obey the same human constraints as
+                # the final plan. A one-week wildcard removes transfer costs while
+                # retaining the captured bank and sale values.
+                rebuilt = optimize_transfer_plan(
+                    PlanningHorizon(table),
+                    InitialSquadState(
+                        tuple(week.selected_squad.player_id),
+                        bank_tenths=week.bank_after_tenths,
+                        free_transfers=week.free_transfers_for_next_gameweek,
+                    ),
+                    reference,
+                    transfer,
+                    chips=ChipAvailability(
+                        available={"wildcard": frozenset({week.gameweek})},
+                        forced={week.gameweek: "wildcard"},
+                    ),
+                    preferences=preferences,
+                    linearization_level=linearization_level,
+                )
+            else:
+                rebuilt = optimize_squad(table, replace(optimization, budget_tenths=budget))
             if rebuilt.solver_status is not SolverStatus.OPTIMAL or rebuilt.objective_value is None:
                 raise SolverExecutionError("Chip rebuild reference must be proved optimal.")
             probe_statuses.append(rebuilt.solver_status.name)
@@ -157,6 +185,8 @@ def optimize_chip_strategy(
             transfer,
             chips=availability,
             linearization_level=linearization_level,
+            preferences=preferences,
+            protect_hold=protect_hold,
         )
         if chips.available
         else control

@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Protocol
 
+from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
 from squadopt.platform.advice_read import (
@@ -196,6 +197,7 @@ class AdviceSubmitService:
         managers_word: bool = False,
         chip: str | None = None,
         model: str = "current",
+        preferences: DecisionPreferences = NO_PREFERENCES,
     ) -> SubmitOutcome:
         """Validate, answer from the cache, rate-limit, dedupe, and enqueue, in that order.
 
@@ -235,6 +237,7 @@ class AdviceSubmitService:
             managers_word=managers_word,
             chip=chip,
             model=model,
+            preferences=preferences,
         )
         cache_key, context = resolved.key, resolved.context
         cached = self._reader.cached(cache_key)
@@ -269,6 +272,7 @@ class AdviceSubmitService:
             managers_word=managers_word,
             chip=chip,
             model=model,
+            preferences=preferences,
         )
         fingerprint = command.request_fingerprint
 

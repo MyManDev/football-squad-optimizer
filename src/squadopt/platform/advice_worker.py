@@ -52,6 +52,7 @@ from squadopt.application.advice_menu import (
     advise_menu_entry,
 )
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
@@ -113,7 +114,9 @@ def _stamp(moment: datetime) -> str:
 
 #: The switches this worker computes, and the code a job fails with when the capture has
 #: no input for one. A switch that needs no per-capture input is added to the first only.
-_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH, MODEL_SWITCH})
+_KNOWN_SWITCHES: Final = frozenset(
+    {TOP100_SWITCH, MANAGERS_WORD_SWITCH, CHIP_SWITCH, MODEL_SWITCH, "preferences"}
+)
 _SWITCH_REFUSAL_CODES: Final = {
     MODEL_SWITCH: "MODEL_INPUTS_UNAVAILABLE",
     TOP100_SWITCH: "TOP100_INPUTS_UNAVAILABLE",
@@ -129,6 +132,13 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     job would be filed under names an input the answer was not computed from.
     """
 
+    try:
+        preference_value = spec.switch("preferences").get("value", "null")
+        if not isinstance(preference_value, str):
+            raise ValueError("Invalid preference identity.")
+        preferences = DecisionPreferences.parse(json.loads(preference_value))
+    except (ValueError, TypeError) as error:
+        raise AdviceComputeRefused("REQUEST_UNREADABLE", "Invalid preferences.") from error
     model = spec.switch(MODEL_SWITCH).get("name", "current")
     if model not in ("current", "football"):
         raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unknown prediction model.")
@@ -151,6 +161,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
             managers_word=word,
             chip=chip if isinstance(chip, str) else None,
             model=str(model),
+            preferences=preferences,
         )
     except SwitchInputUnavailable as error:
         raise AdviceComputeRefused(_SWITCH_REFUSAL_CODES[error.switch], str(error)) from error
@@ -170,6 +181,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
         rival_entry_id=spec.rival_entry_id,
         top100_weight=weight,
         managers_word=word,
+        preferences=preferences,
         chip=chip if isinstance(chip, str) else None,
     )
 

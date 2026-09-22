@@ -52,6 +52,7 @@ from squadopt.application.chip_forecast_publication import (
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
+from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.live import Projection, RecommendationInputs, SeasonRules
 from squadopt.optimization import SolverExecutionError
 from squadopt.planning import TransferPlanningError
@@ -116,9 +117,14 @@ class MenuRequest:
     top100_weight: int = 0
     managers_word: bool = False
     chip: str | None = None
+    preferences: DecisionPreferences = NO_PREFERENCES
 
     def __post_init__(self) -> None:
         self.entry_request()  # the shared fields are refused by the type that owns them
+        try:
+            self.preferences.validate_selection(self.strategy, self.managers_word, self.chip)
+        except ValueError as error:
+            raise EntryError(str(error)) from error
         if isinstance(self.top100_weight, bool) or not isinstance(self.top100_weight, int):
             raise EntryError("top100_weight must be an integer.")
         if not isinstance(self.managers_word, bool):
@@ -139,7 +145,12 @@ class MenuRequest:
 
     @property
     def is_plain(self) -> bool:
-        return self.top100_weight == 0 and not self.managers_word and self.chip is None
+        return (
+            self.top100_weight == 0
+            and not self.managers_word
+            and self.chip is None
+            and not self.preferences.active
+        )
 
 
 def held_member_chips(
@@ -228,8 +239,9 @@ def advise_menu_entry(
         )
     _require_capture(request, inputs, rules)
     plain = request.entry_request()
-    if request.chip is not None and (
-        request.chip == "auto" or request.window != 1 or request.top100_weight
+    if request.preferences.active or (
+        request.chip is not None
+        and (request.chip == "auto" or request.window != 1 or request.top100_weight)
     ):
         return advise_chip_strategy(
             plain,
@@ -241,6 +253,7 @@ def advise_menu_entry(
             rules=rules,
             horizon_builder=horizon_builder,
             counts=top100_counts,
+            preferences=request.preferences,
         )
     if request.chip is not None:
         held_chips = held_member_chips(plain, provider=provider, inputs=inputs, rules=rules)
