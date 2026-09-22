@@ -169,9 +169,8 @@ export function MemberDecisionControls({
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
     (top100Computable && computable!.top100Weights.some((offered) => offered === weight));
-  // A chip the member chose is the plain one-week plan with that chip forced. It combines
-  // with nothing, so the word and the settings above 0 are off while one is chosen, and
-  // the chips are off while either of those is on.
+  // Legacy published chips exclude both switches. The live chip strategy permits Top100,
+  // but still excludes the manager's word; explain only the applicable restriction.
   const chipCopy = CHIP_COPY[language];
   const chip = selection.chip;
   const chipOptions = [
@@ -183,6 +182,16 @@ export function MemberDecisionControls({
   const chipApplies =
     chipsAvailable && strategy === "saf-puan" && (windowSize === 1 || chipStrategy);
   const chipBlocked = selection.evidence.on || (top100.weight !== 0 && !chipStrategy);
+  const chipSwitchesOff = chipStrategy
+    ? language === "tr"
+      ? "Çip stratejisi teknik direktör yorumuyla birleştirilmez. Yorumu kullanmak için Çipleri sakla seçeneğine geç. Top100 etkisi çip stratejisiyle kullanılabilir."
+      : "Chip strategy cannot be combined with the manager's word. Choose Hold chips to use that input. Top100 influence remains available with chip strategy."
+    : chipCopy.switchesOff;
+  const chipBlockedNote = chipStrategy
+    ? language === "tr"
+      ? "Çip stratejisini seçmek için teknik direktör yorumunu kapat. Top100 etkisini koruyabilirsin."
+      : "Switch the manager's word off to choose a chip strategy. You can keep the Top100 influence."
+    : chipCopy.blockedBySwitches;
   const chipNote =
     chipStrategy && !chipBlocked
       ? language === "tr"
@@ -193,7 +202,7 @@ export function MemberDecisionControls({
         : !chipApplies
           ? chipCopy.onlyBaseline
           : chipBlocked
-            ? chipCopy.blockedBySwitches
+            ? chipBlockedNote
             : chip.chip !== null
               ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
               : chip.notOffered
@@ -388,7 +397,7 @@ export function MemberDecisionControls({
           </label>
           <p className={styles.note}>
             {chipChosen
-              ? chipCopy.switchesOff
+              ? chipSwitchesOff
               : !selection.evidence.available && evidenceComputable
                 ? computeCopy.wordComputable
                 : !selection.evidence.available
