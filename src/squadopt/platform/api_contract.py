@@ -467,7 +467,7 @@ class ApiCommandRequest:
                 f"unexpected={sorted(actual - expected)!r}."
             )
         try:
-            preferences = DecisionPreferences.parse(document.get("preferences"))
+            preferences = DecisionPreferences.parse(document.get("preferences", {}))
         except ValueError as error:
             raise BackendApiContractError(str(error)) from error
         request = cls(

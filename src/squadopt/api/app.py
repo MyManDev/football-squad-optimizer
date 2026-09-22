@@ -147,7 +147,9 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
     if model not in ("current", "football"):
         raise BackendApiContractError("Unknown prediction model.")
     try:
-        DecisionPreferences.parse(body.get("preferences")).validate_selection(strategy, word, chip)
+        DecisionPreferences.parse(body.get("preferences", {})).validate_selection(
+            strategy, word, chip
+        )
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
     return strategy, window, rival, weight, word, chip, model
@@ -459,7 +461,7 @@ def create_app(
             )
         try:
             selected_preferences = DecisionPreferences.parse(
-                json.loads(preferences) if preferences else None
+                json.loads(preferences) if preferences is not None else {}
             )
             selected_preferences.validate_selection(strategy, managers_word, chip)
         except ValueError as error:
@@ -533,7 +535,7 @@ def create_app(
             managers_word=managers_word,
             chip=chip,
             model=model,
-            preferences=DecisionPreferences.parse(body.get("preferences")),
+            preferences=DecisionPreferences.parse(body.get("preferences", {})),
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

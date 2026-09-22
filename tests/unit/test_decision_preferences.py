@@ -15,6 +15,9 @@ from squadopt.planning import ChipAvailability, InitialSquadState, PlanningHoriz
 @pytest.mark.parametrize(
     "value",
     [
+        None,
+        "",
+        [],
         {"keep_players": [True]},
         {"avoid_players": [0]},
         {"keep_players": [1, 1]},

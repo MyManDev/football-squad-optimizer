@@ -133,7 +133,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     """
 
     try:
-        preference_value = spec.switch("preferences").get("value", "null")
+        preference_value = spec.switch("preferences").get("value", "{}")
         if not isinstance(preference_value, str):
             raise ValueError("Invalid preference identity.")
         preferences = DecisionPreferences.parse(json.loads(preference_value))

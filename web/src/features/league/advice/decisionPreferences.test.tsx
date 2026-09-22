@@ -41,6 +41,9 @@ it("keeps request, waiting job and board identities distinct and reopens the exa
 it("refuses conflicting or malformed URL constraints without displaying the ordinary plan", () => {
   const index = mockEntryAdviceIndex(entry).payload;
   for (const raw of [
+    "null",
+    "",
+    "[]",
     "{",
     '{"no_hits":1}',
     '{"keep_players":[1],"avoid_players":[1]}',

@@ -7,8 +7,9 @@ export interface DecisionPreferences {
 }
 
 export function checkedPreferences(value: unknown): DecisionPreferences {
-  if (value === undefined || value === null) value = {};
-  if (typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid preferences");
+  if (value === undefined) value = {};
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Invalid preferences");
   const row = value as Record<string, unknown>;
   if (
     Object.keys(row).some(

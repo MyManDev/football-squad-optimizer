@@ -51,8 +51,6 @@ class DecisionPreferences:
 
     @classmethod
     def parse(cls, value: object) -> "DecisionPreferences":
-        if value is None:
-            return cls()
         if not isinstance(value, dict) or set(value) - {
             "keep_players",
             "avoid_players",

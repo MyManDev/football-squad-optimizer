@@ -1248,6 +1248,20 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         route, json={**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
     )
     assert invalid.status_code == 422
+    for malformed in (None, "", []):
+        invalid = client.post(route, json={**body, "preferences": malformed})
+        assert invalid.status_code == 422
+        invalid_read = client.get(
+            route,
+            params={"strategy": "saf-puan", "window": 1, "preferences": json.dumps(malformed)},
+        )
+        assert invalid_read.status_code == 422
+    assert (
+        client.get(
+            route, params={"strategy": "saf-puan", "window": 1, "preferences": ""}
+        ).status_code
+        == 422
+    )
 
 
 def _export_top100(
