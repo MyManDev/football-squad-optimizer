@@ -1,16 +1,18 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-09-18T14:01:50Z",
+  "generated_at_utc": "2026-09-22T15:12:16Z",
   "payload": {
     "actions": [
       {
-        "gameweek": 5,
+        "gameweek": 6,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 5 is already decided; nothing to do until its outcome",
-        "reason_code": "already_decided",
+        "reason": "gameweek 6 deadline in 426.8 h; capture opens 3 h before it",
+        "reason_code": "before_window",
         "reason_params": {
-          "gameweek": 5
+          "gameweek": 6,
+          "hours_left": 426.8,
+          "window_hours": 3.0
         },
         "snapshot_id": null
       }
@@ -20,201 +22,18 @@
       4,
       5
     ],
-    "hours_to_deadline": 3.47,
+    "hours_to_deadline": 426.8,
     "is_idle": true,
-    "latest_capture": "fpl-live-20260918T122516Z-cd5c04029774",
-    "next_deadline_utc": "2026-09-18T17:30:00Z",
-    "next_gameweek": 5,
-    "now_utc": "2026-09-18T14:01:50Z",
-    "recent_events": [
-      {
-        "fields": {
-          "stage": "site"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T14:01:43.153+00:00"
-      },
-      {
-        "fields": {
-          "stage": "league"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T14:01:43.151+00:00"
-      },
-      {
-        "fields": {
-          "stage": "league"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:55.158+00:00"
-      },
-      {
-        "fields": {
-          "stage": "decide"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:53.986+00:00"
-      },
-      {
-        "fields": {
-          "directory": ".../2026-27/gw05",
-          "gameweek": 5,
-          "season": "2026-27",
-          "snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774"
-        },
-        "level": "INFO",
-        "message": "ledger.decision.recorded",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:53.865+00:00"
-      },
-      {
-        "fields": {
-          "stage": "decide"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:52.082+00:00"
-      },
-      {
-        "fields": {
-          "stage": "handoff"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:52.082+00:00"
-      },
-      {
-        "fields": {
-          "stage": "handoff"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:24.816+00:00"
-      },
-      {
-        "fields": {
-          "stage": "rotation"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:24.816+00:00"
-      },
-      {
-        "fields": {
-          "stage": "rotation"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:24.210+00:00"
-      },
-      {
-        "fields": {
-          "stage": "settled_outcomes"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:24.210+00:00"
-      },
-      {
-        "fields": {
-          "stage": "settled_outcomes"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:20.142+00:00"
-      },
-      {
-        "fields": {
-          "stage": "capture"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:20.142+00:00"
-      },
-      {
-        "fields": {
-          "stage": "capture"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:00.476+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_evidence"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:00.476+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_evidence"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:00.125+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_picks"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:25:00.125+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_picks"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:24:33.573+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_cohort"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:24:33.572+00:00"
-      },
-      {
-        "fields": {
-          "stage": "top100_cohort"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "gw05-decision-20260918",
-        "ts": "2026-09-18T12:24:31.988+00:00"
-      }
-    ],
+    "latest_capture": "fpl-live-20260922T151216Z-974899b97250",
+    "next_deadline_utc": "2026-10-10T10:00:00Z",
+    "next_gameweek": 6,
+    "now_utc": "2026-09-22T15:12:16.749186Z",
+    "recent_events": [],
     "season": "2026-27",
     "settled_gameweeks": [
       1,
-      4
+      4,
+      5
     ],
     "tick_contract_version": "season_tick_v1"
   }

@@ -176,7 +176,7 @@ def create_app(
     if contributions is not None:
         from squadopt.api.contributions import ContributionError, contribution_routes
 
-        application.include_router(contribution_routes(contributions, store))
+        application.include_router(contribution_routes(contributions, Path(data_root)))
 
         @application.exception_handler(ContributionError)
         async def contribution_error(_request: Request, error: ContributionError) -> JSONResponse:
