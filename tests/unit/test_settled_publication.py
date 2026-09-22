@@ -46,6 +46,10 @@ def world(
 ) -> publication.SettledPublicationRequest:
     accepted = tmp_path / "accepted"
     bootstrap = {
+        "teams": [
+            {"id": 1, "name": "Arsenal", "short_name": "ARS"},
+            {"id": 2, "name": "Chelsea", "short_name": "CHE"},
+        ],
         "events": [
             {
                 "id": 1,
@@ -78,6 +82,20 @@ def world(
         "elements": [{"id": i + 100, "code": i, "selected_by_percent": "10"} for i in range(1, 16)],
     }
     payloads = {
+        "fixtures.json": json.dumps(
+            [
+                {
+                    "id": 50,
+                    "event": 5,
+                    "team_h": 1,
+                    "team_a": 2,
+                    "finished": True,
+                    "kickoff_time": "2026-09-20T14:00:00Z",
+                    "team_h_score": 2,
+                    "team_a_score": 1,
+                }
+            ]
+        ).encode(),
         "bootstrap-static.json": json.dumps(bootstrap).encode(),
         "event-gw05-live.json": json.dumps(
             {
@@ -140,7 +158,13 @@ def world(
             recorded(
                 gameweek=5,
                 entry_id=entry_id,
-                digest=hashlib.sha256(advice_path.read_bytes()).hexdigest(),
+                digest=hashlib.sha256(
+                    json.dumps(
+                        json.loads(advice_path.read_bytes())["payload"],
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode()
+                ).hexdigest(),
             ),
         )
     metadata = write_snapshot(
@@ -335,6 +359,11 @@ def test_historical_evidence_that_cannot_be_carried_refuses(tmp_path: Path, defe
 
 def test_real_publish_retains_every_protected_byte(tmp_path: Path) -> None:
     request = world(tmp_path)
+    # Reformatting or a new envelope clock must not be confused with new advice.
+    path = request.accepted_dir / "data/league/advice/101/saf-puan/1.json"
+    document = json.loads(path.read_text())
+    document["generated_at_utc"] = "2026-09-18T12:01:00Z"
+    path.write_text(json.dumps(document, indent=4))
     before = inventory(request.accepted_dir)
     inputs = {name: inventory(tmp_path / name) for name in ("snapshots", "records", "ledger")}
     result = publication.publish_settled(request)
@@ -346,6 +375,14 @@ def test_real_publish_retains_every_protected_byte(tmp_path: Path) -> None:
     )
     assert result.changed_files == actual_diff
     assert "data/league/series-horizon.json" in result.changed_files
+    assert "data/fixtures.json" in result.changed_files
+    fixtures = json.loads(after["data/fixtures.json"])["payload"]
+    assert fixtures["source_snapshot_id"] == request.snapshot_id
+    assert fixtures["current_gameweek"] == 6
+    five_fixtures = next(w for w in fixtures["gameweeks"] if w["gameweek"] == 5)
+    assert five_fixtures["fixtures"][0]["home_score"] == 2
+    assert five_fixtures["fixtures"][0]["away_score"] == 1
+    assert five_fixtures["fixtures"][0]["finished"] is True
     assert (
         "data/league/series-horizon.json" not in after
     )  # One settled week cannot support a horizon.
@@ -354,7 +391,7 @@ def test_real_publish_retains_every_protected_byte(tmp_path: Path) -> None:
             "advice/" in name
             or "entries/" in name
             or name.startswith("data/schema/")
-            or name in ("data/index.json", "data/fixtures.json")
+            or name == "data/index.json"
         ):
             assert after[name] == content
     members = json.loads(after["data/league/members.json"])
