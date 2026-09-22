@@ -47,6 +47,9 @@ const AdminPage = lazy(() =>
 const FixturesPage = lazy(() =>
   import("../features/fixtures/FixturesPage").then((m) => ({ default: m.FixturesPage })),
 );
+const ContributePage = lazy(() =>
+  import("../features/contributions/ContributePage").then((m) => ({ default: m.ContributePage })),
+);
 const FixturePanels = lazy(() =>
   import("../features/fixtures/FixturePanels").then((m) => ({ default: m.FixturePanels })),
 );
@@ -104,6 +107,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                 element={<LeagueMemberHistoryPage />}
               />
               <Route path="/fixtures" element={<FixturesPage />} />
+              <Route path="/contribute" element={<ContributePage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />

@@ -89,6 +89,12 @@ test("skip link and primary navigation expose visible keyboard focus", async ({ 
   await expect(league).toBeFocused();
   await expect(league).toHaveCSS("outline-style", "solid");
 
+  for (const name of ["Fikstür", "Katkıda bulun"]) {
+    await page.keyboard.press("Tab");
+    const link = page.getByRole("navigation").getByRole("link", { name, exact: true });
+    await expect(link).toBeFocused();
+    await expect(link).toHaveCSS("outline-style", "solid");
+  }
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: /^TR/ })).toBeFocused();
 });

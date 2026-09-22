@@ -1,6 +1,6 @@
 /*
  * The rails live in the margins beside the shell's 1080px column and never narrow it.
- * 1500px is that column plus two rails of at least 12.5rem and a scrollbar; the shell's
+ * At 1280px the column contracts to fit two rails of at least 200px; the shell's
  * grid (PageShell.module.css) switches at the same width, so keep the two in step.
  */
 .rail {
@@ -39,7 +39,11 @@
   min-width: 0;
 }
 
-@media (min-width: 1500px) {
+.stackedBody > p {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 1280px) {
   .rail {
     display: flex;
     flex-direction: column;

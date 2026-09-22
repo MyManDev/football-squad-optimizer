@@ -29,8 +29,8 @@ export interface FixturesCopy {
 }
 
 const en: FixturesCopy = {
-  thisWeek: "This week",
-  nextWeek: "Next week",
+  thisWeek: "Upcoming gameweek",
+  nextWeek: "Following gameweek",
   deadline: (when) => `Deadline ${when}`,
   versus: "v",
   unscheduled: "TBC",
@@ -50,7 +50,7 @@ const en: FixturesCopy = {
 };
 
 const tr: FixturesCopy = {
-  thisWeek: "Bu hafta",
+  thisWeek: "Oynanacak hafta",
   nextWeek: "Gelecek hafta",
   deadline: (when) => `Son tarih ${when}`,
   versus: "-",
