@@ -29,6 +29,7 @@ from squadopt.planning.models import (
 )
 
 PROJECTION_HORIZON_CONTRACT_VERSION: Final = "projection_horizon_v1"
+APPEARANCE_HORIZON_CONTRACT_VERSION: Final = "projection_horizon_appearance_v2"
 PROJECTION_HORIZON_COLUMNS: Final = (
     "gameweek",
     "player_id",
@@ -85,7 +86,10 @@ class ProjectionHorizon:
     horizon_fingerprint: str = field(init=False)
 
     def __post_init__(self) -> None:
-        if self.contract_version != PROJECTION_HORIZON_CONTRACT_VERSION:
+        if self.contract_version not in (
+            PROJECTION_HORIZON_CONTRACT_VERSION,
+            APPEARANCE_HORIZON_CONTRACT_VERSION,
+        ):
             raise TransferPlanningValidationError(
                 "Unsupported projection horizon contract_version."
             )
@@ -103,7 +107,27 @@ class ProjectionHorizon:
             raise TransferPlanningValidationError(
                 f"Projection horizon is missing required columns: {missing!r}."
             )
-        table = self.table.loc[:, list(PROJECTION_HORIZON_COLUMNS)].copy(deep=True)
+        columns = list(PROJECTION_HORIZON_COLUMNS)
+        if self.contract_version == APPEARANCE_HORIZON_CONTRACT_VERSION:
+            if "appearance_probability" not in self.table:
+                raise TransferPlanningValidationError("Appearance horizon requires probabilities.")
+            columns.append("appearance_probability")
+        table = self.table.loc[:, columns].copy(deep=True)
+        if "appearance_probability" in table:
+            for value in table.appearance_probability:
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, Real)
+                    or not math.isfinite(value)
+                    or not 0 <= float(value) <= 1
+                ):
+                    raise TransferPlanningValidationError(
+                        "Appearance probability must be in [0, 1]."
+                    )
+            if (table.fixture_count.eq(0) & table.appearance_probability.ne(0)).any():
+                raise TransferPlanningValidationError(
+                    "A blank week has zero appearance probability."
+                )
         if table.empty:
             raise TransferPlanningValidationError(
                 "Projection horizon must contain at least one row."
@@ -217,6 +241,8 @@ class ProjectionHorizon:
                         "home_fixture_count": int(row["home_fixture_count"]),
                     }
                 )
+                if "appearance_probability" in table:
+                    rows[-1]["appearance_probability"] = float(row["appearance_probability"]).hex()
         payload = {
             "contract_version": self.contract_version,
             "season": self.season,
@@ -279,4 +305,6 @@ def to_planning_horizon(horizon: ProjectionHorizon) -> PlanningHorizon:
     ].copy(deep=True)
     table["buy_price_tenths"] = horizon.table["price_tenths"].astype("int64")
     table["sell_price_tenths"] = horizon.table["price_tenths"].astype("int64")
+    if "appearance_probability" in horizon.table:
+        table["appearance_probability"] = horizon.table["appearance_probability"]
     return PlanningHorizon(table)
