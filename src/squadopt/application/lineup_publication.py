@@ -283,16 +283,10 @@ def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
     ``expected_own_points`` is the eleven plus the captain's double: expected points,
     nothing else.
 
-    Delegating rather than sorting here is the point, and the call is not dead work even
-    though it returns today's order. A planning week carries no ``appearance_probability``:
-    the projection horizon narrows it away, and widening
-    ``PROJECTION_HORIZON_COLUMNS``/``PLANNING_HORIZON_COLUMNS`` is a versioned contract
-    change with its own question (what an appearance chance means in week three of a
-    horizon, where expected points are re-derived from fixture counts). So the shared rule
-    meets no chance here, falls back, and produces exactly what a local sort would. What it
-    buys is that "what is shown is what would be scored" holds **by construction** rather
-    than by two hand-written sorts happening to agree, and that the day the horizon carries
-    the column this page follows with no edit here at all.
+    Legacy projection horizons omit ``appearance_probability``, so the shared bench rule
+    uses its expected-points fallback. The versioned appearance horizon carries the chance
+    of at least one appearance in that gameweek through to this function. The same rule
+    then uses that probability without a separate publication-only ordering formula.
     """
 
     eleven = [row for _, row in week.starting_xi.iterrows()]

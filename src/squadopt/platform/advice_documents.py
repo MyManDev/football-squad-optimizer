@@ -99,7 +99,7 @@ def advice_read_schema() -> dict[str, Any]:
                 "type": "object",
                 "properties": {
                     "id": {"const": "football"},
-                    "version": {"const": "football_team_share_v1"},
+                    "version": {"enum": ["football_team_share_v1", "football_contextual_v3"]},
                     "experimental": {"const": True},
                     "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
                 },

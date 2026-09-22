@@ -427,8 +427,27 @@ def test_football_candidate_application_e2e_from_fitted_history_to_official_scor
         candidate_count=1,
         samples=8,
         seed=5,
+        scenario_selection=True,
     )
     assert preview.control.has_solution and preview.recourse is not None
+    assert preview.scenario_mean_diagnostics["draws"] == 8
+    assert preview.scenario_selection_evaluation["draws"] == 4
+    assert preview.recommendation.startswith("recourse_")
+    selected = preview.recourse.candidates[int(preview.recommendation.split("_")[1])]
+    evaluation_scores = preview.scenario_scores.loc[
+        preview.scenario_scores.candidate.eq(preview.recommendation)
+        & preview.scenario_scores.scenario_partition.eq("evaluation")
+    ]
+    assert preview.scenario_selection_evaluation["first_week_mean_net_points"] == pytest.approx(
+        evaluation_scores.net_points.mean()
+    )
+    assert preview.scenario_selection_evaluation[
+        "analytic_continuation_net_points"
+    ] == pytest.approx(
+        selected.expected_net_points
+        - selected.first_week.projected_score
+        + selected.first_week.transfer_hit_points
+    )
     assert preview.recommendation in preview.decisions
     assert preview.scenario_scores.net_points.notna().all()
     assert preview.scenario_scores.groupby("candidate").size().eq(8).all()
