@@ -796,7 +796,7 @@
               "const": "football"
             },
             "version": {
-              "const": "football_team_share_v1"
+              "enum": ["football_team_share_v1", "football_contextual_v3"]
             }
           },
           "required": [

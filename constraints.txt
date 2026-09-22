@@ -71,3 +71,15 @@ typing_extensions==4.16.0
 types-jsonschema==4.26.0.20260518
 tzdata==2026.3
 uvicorn==0.52.4
+
+# Optional research-bo numerical stack measured on 2026-09-22, CPU double precision.
+# Constraints do not install this extra in the normal api/dev environment. The local
+# torch build was 2.6.0+cu124; the public version pin also permits CPU/platform wheels.
+# This is not a complete cross-platform lock of torch's platform-specific dependencies.
+botorch==0.18.1
+gpytorch==1.15.2
+linear_operator==0.6.1
+multipledispatch==0.6.0
+ninja==1.13.0
+pyre_extensions==0.0.32
+torch==2.6.0

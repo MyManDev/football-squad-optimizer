@@ -24,6 +24,7 @@ from squadopt.platform.advice_switches import AdviceSwitchInputs
 from squadopt.platform.advice_worker import build_advice_compute
 from squadopt.platform.api_contract import ApiCommandRequest
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
 from squadopt.prediction.football_features import BASE_FEATURES
 
 
@@ -43,7 +44,7 @@ def test_live_training_does_not_use_same_week_or_later_labels(football_fixture):
         normalize_history(history.assign(expected_assists=-1))
 
 
-def _forecast(inputs):
+def _forecast(inputs, *, contextual=False):
     frames = []
     for week in range(2, 7):
         table = inputs.players.copy()
@@ -62,20 +63,27 @@ def _forecast(inputs):
         "captured_at_utc": inputs.captured_at_utc,
         "rows": pd.concat(frames).to_dict("records"),
     }
+    if contextual:
+        result.update(
+            model_version=CONTEXTUAL_MODEL_VERSION,
+            availability_application="before_team_shares_v1",
+            projection_contract="projection_horizon_appearance_v2",
+        )
     result["fingerprint"] = forecast_digest(result)
     return result
 
 
 @pytest.mark.parametrize("window", [1, 3, 5])
 @pytest.mark.parametrize("weight", [0, 20])
-def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, weight):
+@pytest.mark.parametrize("contextual", [False, True])
+def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, weight, contextual):
     artifacts = tmp_path / "artifacts"
     world = _deployment(tmp_path, monkeypatch, artifact_root=artifacts)
     backend = world["backend"]
     identity = backend.contexts.identity()
     path = football_artifact_path(artifacts, world["snapshot_id"])
     path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(_forecast(identity.inputs)))
+    path.write_text(json.dumps(_forecast(identity.inputs, contextual=contextual)))
     football = read_football_forecast(path, identity.inputs)
     capture = backend.contexts.capture(identity.context)
     capture = replace(capture, switches=AdviceSwitchInputs(football=football, top100_counts=COUNTS))
@@ -102,6 +110,11 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     assert served.status_code == 200, served.text
     result = served.json()["payload"]
     assert result["prediction_model"]["fingerprint"] == football.fingerprint
+    assert result["prediction_model"]["version"] == (
+        CONTEXTUAL_MODEL_VERSION if contextual else FOOTBALL_MODEL_VERSION
+    )
+    if contextual:
+        assert football.horizon.table.appearance_probability.eq(0.8).all()
     assert result["window"] == window
     assert result.get("top100", {}).get("weight", 0) == weight
     if window > 1:

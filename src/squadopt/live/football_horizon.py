@@ -8,13 +8,33 @@ from typing import cast
 
 import pandas as pd
 
-from squadopt.planning.horizon import ProjectionHorizon
+from squadopt.planning.horizon import (
+    APPEARANCE_HORIZON_CONTRACT_VERSION,
+    PROJECTION_HORIZON_CONTRACT_VERSION,
+    ProjectionHorizon,
+)
 from squadopt.prediction.football import (
     FOOTBALL_MODEL_VERSION,
     ROLE_MODEL_VERSION,
     FixtureFootballModel,
 )
 from squadopt.prediction.football_features import football_features
+
+
+def weekly_appearance(group: pd.DataFrame) -> float:
+    """One captured eligibility state across a double week, then conditional appearances.
+
+    Each fixture's marginal already contains the multiplier. Reusing the same health
+    information cannot create independent extra chances to recover within the week.
+    Conditional fixture appearances remain an explicit independence approximation.
+    """
+    if group.availability_multiplier.nunique() != 1:
+        raise ValueError("A player-week requires one shared captured availability state.")
+    eligibility = float(group.availability_multiplier.iloc[0])
+    if eligibility == 0:
+        return 0.0
+    conditional = (group.appearance_probability.to_numpy(float) / eligibility).clip(0, 1)
+    return eligibility * (1 - float((1 - conditional).prod()))
 
 
 def build_football_horizon(
@@ -81,6 +101,7 @@ def build_football_horizon(
             target_parts.append(pd.concat([target, prediction], axis=1))
     components = pd.concat(target_parts, ignore_index=True) if target_parts else pd.DataFrame()
     rows: list[pd.DataFrame] = []
+    contextual = model.model_version != FOOTBALL_MODEL_VERSION
     for week in weeks:
         part = roster[["player_id", "name", "team_id", "position", "price_tenths"]].copy()
         part["gameweek"] = week
@@ -100,14 +121,34 @@ def build_football_horizon(
                 part[col] = part.player_id.map(data[col]).fillna(0)
         for col in ("fixture_count", "home_fixture_count"):
             part[col] = part[col].astype(int)
+        if contextual:
+            chance = (
+                pd.Series(
+                    {
+                        player: weekly_appearance(group)
+                        for player, group in components.loc[components.GW.eq(week)].groupby(
+                            "player_code"
+                        )
+                    },
+                    dtype=float,
+                )
+                if not components.empty
+                else pd.Series(dtype=float)
+            )
+            part["appearance_probability"] = part.player_id.map(chance).fillna(0)
         rows.append(part)
     horizon = ProjectionHorizon(
         pd.concat(rows, ignore_index=True),
         season,
         source_snapshot_id,
         "fixture_football_candidate",
-        ROLE_MODEL_VERSION if role_transitions else FOOTBALL_MODEL_VERSION,
+        ROLE_MODEL_VERSION if role_transitions else model.model_version,
         "causal_football_fixture_features_v1",
         "fixture_sum_blank_zero_v1",
+        contract_version=(
+            APPEARANCE_HORIZON_CONTRACT_VERSION
+            if contextual
+            else PROJECTION_HORIZON_CONTRACT_VERSION
+        ),
     )
     return horizon, components

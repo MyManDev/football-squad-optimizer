@@ -12,6 +12,7 @@ from dataclasses import dataclass, replace
 
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning.models import (
+    ChipAvailability,
     FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
@@ -22,6 +23,7 @@ from squadopt.planning.models import (
 )
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths
+from squadopt.planning.recourse_chips import net_week_points, remaining_chips, restrict_first_chip
 
 
 @dataclass(frozen=True)
@@ -63,8 +65,12 @@ def _proved(result: TransferPlanResult) -> None:
 
 def _continuation_horizon(node: ObservationNode, week: PlanningWeekResult) -> PlanningHorizon:
     table = node.horizon.validated_copy().table.copy()
-    bought = dict(
-        week.transfers_in[["player_id", "buy_price_tenths"]].itertuples(index=False, name=None)
+    bought = (
+        {}
+        if week.chip == "freehit"
+        else dict(
+            week.transfers_in[["player_id", "buy_price_tenths"]].itertuples(index=False, name=None)
+        )
     )
     for index, row in table.iterrows():
         if row.player_id in bought:
@@ -83,15 +89,23 @@ def optimize_observed_recourse(
     *,
     candidate_count: int = 3,
     value_extra_free_transfer: bool = True,
+    chips: ChipAvailability | None = None,
 ) -> RecourseResult:
     """Keep hold/control candidates; choose today before tomorrow's observation.
 
-    No chips in v1. The baseline produces the deterministic control menu. Future
+    Explicit chips enable v2's per-chip restricted menu. The baseline produces the menu. Future
     purchase prices are rebased for new buys; old holdings use their input sell prices.
     FT value is a paired continuation diagnostic, not a fitted terminal constant.
     """
     baseline = baseline.validated_copy()
     transfer = transfer or TransferPlanningConfig()
+    rights = chips or ChipAvailability()
+    if any(
+        p.holding_value_points not in (None, 0)
+        for name in rights.available
+        for p in rights.windows_for(name)
+    ):
+        raise ValueError("Recourse requires explicit zero terminal chip values.")
     if (
         isinstance(candidate_count, bool)
         or not isinstance(candidate_count, int)
@@ -142,26 +156,38 @@ def optimize_observed_recourse(
                 raise ValueError("Observation changes roster identity or position.")
     menu: list[PlanningWeekResult] = []
     excluded: list[frozenset[object]] = []
-    for _ in range(candidate_count):
-        result = optimize_transfer_plan(
-            baseline,
-            initial,
-            optimization,
-            transfer,
-            excluded_squads=excluded,
-            linearization_level=2,
-        )
-        if result.solver_status is SolverStatus.INFEASIBLE:
-            break
-        _proved(result)
-        week = result.weeks[0]
-        menu.append(week)
-        excluded.append(frozenset(week.selected_squad.player_id))
+    first = baseline.gameweeks[0]
+    choices: list[str | None] = [
+        None,
+        *sorted(name for name in rights.available if first in rights.gameweeks_for(name)),
+    ]
+    if first in rights.forced:
+        choices = [rights.forced[first]]
+    for choice in choices:
+        excluded = []
+        permitted = restrict_first_chip(rights, first, choice)
+        for _ in range(candidate_count):
+            result = optimize_transfer_plan(
+                baseline,
+                initial,
+                optimization,
+                transfer,
+                chips=permitted,
+                excluded_squads=excluded,
+                linearization_level=2,
+            )
+            if result.solver_status is SolverStatus.INFEASIBLE:
+                break
+            _proved(result)
+            week = result.weeks[0]
+            menu.append(week)
+            excluded.append(frozenset(week.selected_squad.player_id))
     held = optimize_transfer_plan(
         baseline,
         initial,
         optimization,
         transfer,
+        chips=restrict_first_chip(rights, first, rights.forced.get(first)),
         first_week_overlap=FirstWeekOverlap(
             frozenset(initial.squad_player_ids), minimum=optimization.squad_size
         ),
@@ -170,26 +196,33 @@ def optimize_observed_recourse(
     hold_feasible = held.solver_status is not SolverStatus.INFEASIBLE
     if hold_feasible:
         _proved(held)
-        if frozenset(held.weeks[0].selected_squad.player_id) not in excluded:
+        if not any(
+            (frozenset(w.selected_squad.player_id), w.chip)
+            == (frozenset(held.weeks[0].selected_squad.player_id), held.weeks[0].chip)
+            for w in menu
+        ):
             menu.append(held.weeks[0])
     if not menu:
         raise TransferPlanningValidationError("No feasible first-week decision is available.")
     scored: list[RecourseCandidate] = []
     for week in menu:
         state = InitialSquadState(
-            tuple(week.selected_squad.player_id),
-            week.bank_after_tenths,
+            initial.squad_player_ids
+            if week.chip == "freehit"
+            else tuple(week.selected_squad.player_id),
+            initial.bank_tenths if week.chip == "freehit" else week.bank_after_tenths,
             week.free_transfers_for_next_gameweek,
         )
         continuations: list[ContinuationValue] = []
-        value = week.projected_score - week.transfer_hit_points
+        value = net_week_points(week)
+        remaining = remaining_chips(rights, week)
         for node in nodes:
             horizon = _continuation_horizon(node, week)
             plan = optimize_transfer_plan(
-                horizon, state, optimization, transfer, linearization_level=2
+                horizon, state, optimization, transfer, chips=remaining, linearization_level=2
             )
             _proved(plan)
-            net = sum(w.projected_score - w.transfer_hit_points for w in plan.weeks)
+            net = sum(net_week_points(w) for w in plan.weeks)
             marginal: float | None = None
             if value_extra_free_transfer:
                 if state.free_transfers >= transfer.max_free_transfers:
@@ -197,16 +230,24 @@ def optimize_observed_recourse(
                 else:
                     richer = replace(state, free_transfers=state.free_transfers + 1)
                     extra = optimize_transfer_plan(
-                        horizon, richer, optimization, transfer, linearization_level=2
+                        horizon,
+                        richer,
+                        optimization,
+                        transfer,
+                        chips=remaining,
+                        linearization_level=2,
                     )
                     _proved(extra)
-                    marginal = (
-                        sum(w.projected_score - w.transfer_hit_points for w in extra.weeks) - net
-                    )
+                    marginal = sum(net_week_points(w) for w in extra.weeks) - net
             continuations.append(
                 ContinuationValue(node.observation_id, node.probability, plan, marginal)
             )
             value += node.probability * net
         scored.append(RecourseCandidate(week, value, tuple(continuations)))
     chosen = max(range(len(scored)), key=lambda i: (scored[i].expected_net_points, -i))
-    return RecourseResult(tuple(scored), chosen, hold_feasible)
+    return RecourseResult(
+        tuple(scored),
+        chosen,
+        hold_feasible,
+        "observed_chip_recourse_v2" if rights.available else "observed_two_stage_recourse_v1",
+    )
