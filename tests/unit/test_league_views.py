@@ -559,6 +559,16 @@ def test_a_vice_captain_the_member_left_on_the_bench_is_published_with_the_bench
     assert wearing == [squad[12]]
 
 
+def test_a_substituted_captain_keeps_the_captured_bench_flag(world: dict[str, Any]) -> None:
+    squad = _legal_squad(world)
+    picks = dataclasses.replace(_member_picks(world, 101, squad), captain=squad[13])
+    payload = _squad_payload(world, picks)
+    assert not any(player["is_captain"] for player in payload["starting_xi"])
+    assert [player["player_id"] for player in payload["bench"] if player["is_captain"]] == [
+        squad[13]
+    ]
+
+
 @pytest.mark.parametrize(
     "case", ["the_captain_himself", "a_player_not_in_the_squad", "unprojected"]
 )

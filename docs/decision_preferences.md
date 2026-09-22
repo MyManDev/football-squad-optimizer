@@ -52,3 +52,12 @@ The member page separates the decision squad publication and decision gameweek f
 the latest scored week/outcome publication. Updating fixtures or outcomes does not
 rewrite frozen forecasts. Early upcoming-week plans omit later news and must be
 refreshed before the deadline; they are not deadline-day evidence or model promotion.
+
+Settled FPL picks can keep the original captain flag on a benched non-player after an
+automatic substitution. The capture reader accepts this only with one matching
+entry/week/outgoing-captain/incoming-starter substitution, preserves the original
+armbands and published order, and uses the fifteen holdings for the next decision.
+It neither invents a captain nor reconstructs an unknown pre-match bench order.
+Such a benched-captain observation is refused as a frozen pre-match scoring decision.
+FPL describes the end-of-week substitutions and vice-captain inheritance in its
+[official FAQ](https://www.premierleague.com/en/news/4661030).

@@ -1066,7 +1066,7 @@ def _entry_squad_payload(
                 _entry_player(
                     row,
                     role="bench",
-                    is_captain=False,
+                    is_captain=int(player_id) == int(picks.captain),
                     bench_order=bench_index,
                     is_vice_captain=wears_vice,
                 )

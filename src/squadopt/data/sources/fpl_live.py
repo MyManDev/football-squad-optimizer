@@ -1971,10 +1971,10 @@ class EntryPicksRecord:
                 f"Entry {self.entry_id} gameweek {self.gameweek} must start "
                 f"{_STARTING_SIZE} of its own squad."
             )
-        if self.captain not in self.starting_xi:
+        if self.captain not in self.squad:
             raise InvalidValueError(
                 f"Entry {self.entry_id} gameweek {self.gameweek} names a captain who is "
-                "not in the starting eleven."
+                "not in the squad."
             )
         if self.vice_captain not in self.squad:
             raise InvalidValueError(
@@ -2136,6 +2136,33 @@ def fpl_entry_picks(
             f"Entry {identifier} gameweek {week} picks must carry an 'entry_history' "
             f"object, got {type(entry_history).__name__}."
         )
+
+    # After automatic substitutions FPL can retain the original captain flag on a
+    # benched DNP while the vice carries multiplier=2. Preserve that observation:
+    # inventing a new captain or reversing the source's order would rewrite history.
+    # A bench captain without a matching, identified substitution is still refused.
+    if named.captain not in named.starting_xi:
+        substitutions = document.get("automatic_subs", [])
+        matches = []
+        if isinstance(substitutions, list):
+            for substitution in substitutions:
+                if not isinstance(substitution, dict):
+                    continue
+                fields = ("entry", "event", "element_out", "element_in")
+                if not all(type(substitution.get(key)) is int for key in fields):
+                    continue
+                if (
+                    substitution["entry"] == identifier
+                    and substitution["event"] == week
+                    and substitution["element_out"] == named.captain
+                    and substitution["element_in"] in named.starting_xi
+                ):
+                    matches.append(substitution)
+        if len(matches) != 1:
+            raise InvalidValueError(
+                f"Entry {identifier} gameweek {week} names a captain who is not in the "
+                "starting eleven and has no unique matching automatic substitution."
+            )
 
     active_chip = entry_active_chip(picks, entry_id=identifier, gameweek=week)
     chips_used = _chips_used(history, entry_id=identifier)

@@ -48,11 +48,20 @@ def test_picks_validate_the_shape_of_a_team() -> None:
     with pytest.raises(EntryError, match="eleven"):
         _picks(starting_xi=XI[:10])
     with pytest.raises(EntryError, match="captain"):
-        _picks(captain=SQUAD[14])
+        _picks(captain=99999)
     with pytest.raises(EntryError, match="positive"):
         _picks(entry_id=0)
     with pytest.raises(EntryError, match="negative"):
         _picks(bank_tenths=-1)
+
+
+def test_a_captured_bench_captain_preserves_holdings_but_cannot_be_replayed() -> None:
+    picks = _picks(captain=SQUAD[14])
+    held = held_squad_from_picks(picks, current_prices={p: 50 for p in SQUAD})
+    assert held.squad_player_ids == SQUAD
+    assert picks.captain == SQUAD[14]
+    with pytest.raises(EntryError, match="not a frozen pre-match decision"):
+        frozen_decision_from_picks(picks, player_pool=pd.DataFrame(), player_codes={})
 
 
 def test_the_held_squad_uses_purchase_prices_and_falls_back_to_current_ones() -> None:
