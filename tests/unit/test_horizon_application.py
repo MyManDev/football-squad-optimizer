@@ -112,6 +112,44 @@ def test_plan_horizon_returns_a_structured_replay_safe_result(tmp_path: Path) ->
     assert first.document == second.document
 
 
+def test_native_counter_noise_does_not_change_artifact_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(_world(tmp_path), tmp_path)
+    original = horizon_service.plan_transfer_horizon
+    counters = iter((0.0010179221583522338, 0.001017922158352234))
+
+    def noisy(*args: Any, **kwargs: Any) -> tuple[TransferPlanResult, TransferPlanningConfig]:
+        plan, config = original(*args, **kwargs)
+        counter = next(counters)
+        hold = dict(plan.diagnostics["hold_protection"])  # type: ignore[arg-type]
+        hold["deterministic_time"] = counter
+        return replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "primary_deterministic_time": counter,
+                "hold_protection": hold,
+            },
+        ), config
+
+    monkeypatch.setattr(horizon_service, "plan_transfer_horizon", noisy)
+    first, second = plan_horizon(request), plan_horizon(request)
+    assert first.created and not second.created
+    assert first.artifact_fingerprint == second.artifact_fingerprint
+    assert first.document == second.document
+    assert (
+        first.plan.diagnostics["primary_deterministic_time"]
+        != second.plan.diagnostics["primary_deterministic_time"]
+    )
+    assert (
+        first.document["diagnostics"]["hold_protection"]["objective_value"]
+        == (  # type: ignore[index]
+            first.plan.diagnostics["hold_protection"]["objective_value"]  # type: ignore[index]
+        )
+    )
+
+
 def test_cli_is_a_thin_adapter_over_the_application_operation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

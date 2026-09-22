@@ -43,6 +43,7 @@ SUPPORTED_HORIZON_LENGTHS: Final = frozenset({1, 3, 5})
 _RUNTIME_DIAGNOSTICS: Final = frozenset(
     {
         "solve_time_seconds",
+        "primary_deterministic_time",
         "deterministic_time_used",
         "tiebreak_deterministic_time",
         "tiebreak_deterministic_time_limit",
@@ -187,6 +188,14 @@ def horizon_plan_document(
     diagnostics = {
         key: value for key, value in plan.diagnostics.items() if key not in _RUNTIME_DIAGNOSTICS
     }
+    # Native work counters can differ in the final floating-point bit even when
+    # the solution and proof are identical. Keep them on the raw plan for runtime
+    # checks, like the primary/tiebreak counters above, not in replay identity.
+    hold = diagnostics.get("hold_protection")
+    if isinstance(hold, Mapping):
+        diagnostics["hold_protection"] = {
+            key: value for key, value in hold.items() if key != "deterministic_time"
+        }
     document: dict[str, object] = {
         "artifact_type": "live_transfer_horizon",
         "contract_version": HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION,
