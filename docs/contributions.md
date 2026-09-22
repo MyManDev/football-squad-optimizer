@@ -1,17 +1,32 @@
 # Player contributions
 
-The `/contribute` page accepts observations about players from the current published player
-pool. This can be a subset of the complete FPL roster; the page says so. It uses the configured
+The `/contribute` page accepts observations about the complete captured FPL roster through
+Team → Position → Player filters. This includes players outside the optimizer's candidate
+pool. Changing team or position clears the player and their draft to prevent misattribution.
+The capture timestamp is shown; this is a published roster, not a real-time feed. It uses the configured
 advice API origin and its existing CORS allowlist. Comments do not enter prediction, news,
 optimizer, MDP or training inputs. Display names are self-declared, not verified accounts.
 
 An explicit publication checkbox is required. The server validates the season/player against
-the published pool, limits a JSON body to 12,000 bytes and a comment to 1,500 characters, and
+the published roster, limits a JSON body to 12,000 bytes and a comment to 1,500 characters, and
 accepts only HTTPS source links. It never fetches those links. React renders comments as text;
 source links use `noopener noreferrer nofollow ugc`. Moderators should check sources before
 approval and avoid publishing personal information or unsubstantiated private health claims.
 
 ## Persistence and moderation
+
+The roster needs no new database. Generate `data/players.json` in the publication from an
+immutable FPL capture, alongside fixture publication, using:
+
+```console
+python -m scripts.build_player_catalog --snapshot-root data/snapshots --snapshot-id <capture-id> --out <public-directory>
+```
+
+This producer includes every element, uses persistent player codes (preserving existing
+comment associations), and validates team and position identities. Publish this file with
+both the site and backend checkout. Missing or invalid catalogs return 503; the API never
+silently falls back to the restricted optimizer pool. Refresh it when publishing a new
+capture, including transfers and new registrations. Comment storage remains separate.
 
 The existing backend composition creates `contributions.sqlite3` under its configured store
 root on first access. SQLite is in the Python standard library; no additional dependency or

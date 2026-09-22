@@ -1,5 +1,6 @@
 """Exercise durable moderation and the actual HTTP boundary with isolated storage."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -12,13 +13,45 @@ from squadopt.platform.contributions import ContributionsLimitedError, Contribut
 BASE = "/api/v1/contributions"
 
 
-class Views:
-    def seasons(self):
-        return {"payload": {"latest": {"season": "2026-27", "gameweek": 5}}}
+@pytest.mark.parametrize("content", [None, "not-json", "{}"])
+def test_missing_or_invalid_roster_refuses_submission(tmp_path, content):
+    path = tmp_path / "players.json"
+    if content is None:
+        path.unlink()
+    else:
+        path.write_text(content)
+    store = ContributionStore(tmp_path / "inbox.db")
+    with TestClient(create_app(data_root=tmp_path, contributions=store)) as client:
+        assert client.get(BASE + "/players").status_code == 503
+        assert client.post(BASE, json=body()).status_code == 503
+    assert store.pending() == []
 
-    def pool(self, season, gameweek):
-        assert (season, gameweek) == ("2026-27", 5)
-        return {"payload": {"players": [{"player_id": 1, "name": "Player", "team": "ARS"}]}}
+
+def test_roster_player_outside_prediction_pool_can_contribute(tmp_path, published_catalog):
+    published_catalog["players"].append(
+        {"id": 998877, "name": "Reserve", "team_id": 10, "team": "Arsenal", "position": "DEF"}
+    )
+    (tmp_path / "players.json").write_text(json.dumps(published_catalog))
+    store = ContributionStore(tmp_path / "inbox.db")
+    with TestClient(create_app(data_root=tmp_path, contributions=store)) as client:
+        assert client.post(BASE, json=body(player_id=998877)).status_code == 202
+    assert store.pending()[0]["player_id"] == 998877
+
+
+@pytest.fixture(autouse=True)
+def published_catalog(tmp_path):
+    document = {
+        "contract_version": "player_catalog_v1",
+        "season": "2026-27",
+        "source_snapshot_id": "fpl-live-test",
+        "captured_at_utc": "2026-09-22T12:00:00Z",
+        "teams": [{"id": 10, "name": "Arsenal"}],
+        "players": [
+            {"id": 1, "name": "Player", "team_id": 10, "team": "Arsenal", "position": "GK"}
+        ],
+    }
+    (tmp_path / "players.json").write_text(json.dumps(document))
+    return document
 
 
 def body(**changes):
@@ -38,7 +71,7 @@ def test_real_http_submission_moderation_restart_and_retraction(tmp_path):
     store = ContributionStore(path)
     with TestClient(
         create_app(
-            view_store=Views(), contributions=store, allowed_origins=("https://site.example",)
+            data_root=tmp_path, contributions=store, allowed_origins=("https://site.example",)
         )
     ) as client:
         assert client.get(BASE + "/players").json()["players"][0]["id"] == 1
@@ -90,14 +123,14 @@ def test_real_http_submission_moderation_restart_and_retraction(tmp_path):
 )
 def test_invalid_input_never_saved(tmp_path, change):
     store = ContributionStore(tmp_path / "inbox.db")
-    with TestClient(create_app(view_store=Views(), contributions=store)) as client:
+    with TestClient(create_app(data_root=tmp_path, contributions=store)) as client:
         assert client.post(BASE, json=body(**change)).status_code == 422
         assert store.pending() == []
 
 
 def test_bounded_body_and_content_type(tmp_path):
     with TestClient(
-        create_app(view_store=Views(), contributions=ContributionStore(tmp_path / "db"))
+        create_app(data_root=tmp_path, contributions=ContributionStore(tmp_path / "db"))
     ) as client:
         assert (
             client.post(
@@ -161,6 +194,6 @@ def test_store_unavailable_fails_honestly(tmp_path: Path):
     path = tmp_path / "not-a-database"
     path.write_text("broken database")
     with TestClient(
-        create_app(view_store=Views(), contributions=ContributionStore(path))
+        create_app(data_root=tmp_path, contributions=ContributionStore(path))
     ) as client:
         assert client.post(BASE, json=body()).status_code == 503

@@ -7,6 +7,9 @@ for (const language of ["tr", "en"] as const) {
     let posts = 0;
     await page.setViewportSize({ width: 375, height: 812 });
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    // External font availability is unrelated to the contribution contract.
+    await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
+    await page.route("https://fonts.gstatic.com/**", (route) => route.abort());
     await page.route("**/api/v1/contributions**", async (route) => {
       const request = route.request();
       if (request.method() === "POST") {
@@ -16,11 +19,27 @@ for (const language of ["tr", "en"] as const) {
       }
       return route.fulfill({
         json: request.url().endsWith("/players")
-          ? { season: "2026-27", players: [{ id: 1, name: "Example Player", team: "ARS" }] }
+          ? {
+              season: "2026-27",
+              captured_at_utc: "2026-09-22T12:00:00Z",
+              teams: [{ id: 10, name: "Arsenal" }],
+              players: [
+                { id: 1, name: "Example Player", team_id: 10, team: "Arsenal", position: "GK" },
+              ],
+            }
           : { comments: [] },
       });
     });
     await page.goto("/contribute");
+    await expect(
+      page.getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true }),
+    ).toBeDisabled();
+    await page
+      .getByRole("combobox", { name: tr ? "Takım" : "Team", exact: true })
+      .selectOption("10");
+    await page
+      .getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true })
+      .selectOption("GK");
     await page
       .getByRole("combobox", { name: tr ? "Oyuncu" : "Player", exact: true })
       .selectOption("1");
@@ -46,6 +65,12 @@ for (const language of ["tr", "en"] as const) {
       fullPage: true,
     });
     await page.reload();
+    await page
+      .getByRole("combobox", { name: tr ? "Takım" : "Team", exact: true })
+      .selectOption("10");
+    await page
+      .getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true })
+      .selectOption("GK");
     await page
       .getByRole("combobox", { name: tr ? "Oyuncu" : "Player", exact: true })
       .selectOption("1");
