@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AS_A_CHANCE } from "../../testSupport/honesty";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import type { Language } from "../../i18n/messages";
-import { fixtureWeeks, loadFixtures } from "./data";
+import { fixtureWeeks, upcomingFixtureWeeks, loadFixtures } from "./data";
 import { FixturePanels } from "./FixturePanels";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { FixturesPage } from "./FixturesPage";
@@ -105,7 +105,11 @@ async function settled(fetchMock: ReturnType<typeof serve>) {
   });
 }
 
+beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-18T10:00:00Z"));
+});
 afterEach(() => {
+  vi.restoreAllMocks();
   cleanup();
   vi.unstubAllGlobals();
 });
@@ -140,7 +144,7 @@ describe("the fixture rails", () => {
   it("shows a finished fixture's score and an unfinished one's kickoff, never a score", async () => {
     serve(published(payload()));
     render(surface(<FixturePanels />));
-    const left = await screen.findByRole("complementary", { name: "This week" });
+    const left = await screen.findByRole("complementary", { name: "Upcoming gameweek" });
     const [finished, scheduled] = within(left).getAllByRole("listitem");
 
     expect(finished).toHaveTextContent("CHE1 - 2ARS");
@@ -154,7 +158,7 @@ describe("the fixture rails", () => {
   it("labels a fixture with no kickoff from the copy and prints no time for it", async () => {
     serve(published(payload()));
     render(surface(<FixturePanels />));
-    const left = await screen.findByRole("complementary", { name: "This week" });
+    const left = await screen.findByRole("complementary", { name: "Upcoming gameweek" });
     expect(within(left).getByText(FIXTURES_COPY.en.unscheduled)).toBeInTheDocument();
     const row = within(left).getAllByRole("listitem")[2]!;
     expect(row).toHaveTextContent("ARSvBRE");
@@ -164,7 +168,7 @@ describe("the fixture rails", () => {
   it("keeps the same two lists closed under the page for a narrow screen", async () => {
     serve(published(payload()));
     const { container } = render(surface(<FixturePanels />));
-    await screen.findByRole("complementary", { name: "This week" });
+    await screen.findByRole("complementary", { name: "Upcoming gameweek" });
     const stacked = container.querySelector("details")!;
     expect(stacked.open).toBe(false);
     expect(within(stacked).getByText(FIXTURES_COPY.en.summary)).toBeInTheDocument();
@@ -174,8 +178,8 @@ describe("the fixture rails", () => {
   it("omits next week when the current gameweek is the last one published", async () => {
     serve(published(payload(4)));
     render(surface(<FixturePanels />));
-    await screen.findByRole("complementary", { name: "This week" });
-    expect(screen.queryByRole("complementary", { name: "Next week" })).toBeNull();
+    await screen.findByRole("complementary", { name: "Upcoming gameweek" });
+    expect(screen.queryByRole("complementary", { name: "Following gameweek" })).toBeNull();
   });
 
   it.each([
@@ -211,8 +215,8 @@ describe("the fixtures page", () => {
     render(surface(<FixturesPage />, "en", "/fixtures"));
     await screen.findByRole("heading", { level: 1, name: "Fixtures" });
     expect(screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent)).toEqual([
-      "This week · Gameweek 3",
-      "Next week · Gameweek 4",
+      "Upcoming gameweek · Gameweek 3",
+      "Following gameweek · Gameweek 4",
       "Past gameweeks",
       "Gameweek 2",
       "Gameweek 1",
@@ -230,6 +234,19 @@ describe("the fixtures page", () => {
 });
 
 describe("the fixture document", () => {
+  it("advances an old capture to the next open deadline without inventing scores", () => {
+    const view = payload();
+    const upcoming = upcomingFixtureWeeks(view, Date.parse("2026-09-22T12:00:00Z"));
+    expect(upcoming.current?.gameweek).toBe(4);
+    expect(upcoming.next).toBeNull();
+    expect(view.current_gameweek).toBe(3);
+    // A closed FPL deadline does not hide fixtures still to be played this weekend.
+    expect(upcomingFixtureWeeks(view, Date.parse("2026-09-19T12:00:00Z")).current?.gameweek).toBe(
+      3,
+    );
+    expect(view.gameweeks[2]!.fixtures[1]!.finished).toBe(false);
+    expect(upcomingFixtureWeeks(view, Date.parse("2027-01-01T00:00:00Z")).current).toBeNull();
+  });
   it("rolls by itself: a later current gameweek moves next to current and current to past", () => {
     const before = fixtureWeeks(payload(3));
     const after = fixtureWeeks(payload(4));

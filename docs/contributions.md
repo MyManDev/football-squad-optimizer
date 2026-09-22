@@ -1,0 +1,70 @@
+# Player contributions
+
+The `/contribute` page accepts observations about players from the current published player
+pool. This can be a subset of the complete FPL roster; the page says so. It uses the configured
+advice API origin and its existing CORS allowlist. Comments do not enter prediction, news,
+optimizer, MDP or training inputs. Display names are self-declared, not verified accounts.
+
+An explicit publication checkbox is required. The server validates the season/player against
+the published pool, limits a JSON body to 12,000 bytes and a comment to 1,500 characters, and
+accepts only HTTPS source links. It never fetches those links. React renders comments as text;
+source links use `noopener noreferrer nofollow ugc`. Moderators should check sources before
+approval and avoid publishing personal information or unsubstantiated private health claims.
+
+## Persistence and moderation
+
+The existing backend composition creates `contributions.sqlite3` under its configured store
+root on first access. SQLite is in the Python standard library; no additional dependency or
+service is required. This file is separate from prediction artifacts and advice queues.
+Deployment must preserve this backend directory and restrict filesystem access to the host
+operator. The public read returns only approved comments, newest first, with a limit of 50;
+the API's optional `before` cursor supports older pages. The UI currently shows the latest 50.
+Read responses are not cached, so retracted comments disappear on refresh.
+
+New submissions return 202 `pending`. Approval is a host operation using existing OS access,
+not an unauthenticated admin web page. With the backend environment loaded:
+
+```console
+python -m scripts.moderate_contributions pending
+python -m scripts.moderate_contributions approve 42
+python -m scripts.moderate_contributions reject 42
+```
+
+For isolated testing, `--db <existing-test-database>` selects an explicit database. The CLI
+refuses a missing file. Rejection can retract a previously approved comment. Moderation does
+not delete records; preserve the file for audit and use SQLite's backup API for consistent
+backups while the service is running. Review the pending inbox regularly. There is no email
+notification, authentication/account system, automatic approval or new scheduled task.
+
+## Abuse limits and operational limits
+
+Each daily keyed visitor digest can submit three comments per hour; the entire site accepts
+at most 50 per hour. Transactions serialize quota checks and insertion across concurrent
+requests. An identical pending submission within 24 hours returns the same receipt, avoiding
+duplicates after a lost response. A hard limit of 10,000 retained comments fails closed.
+Quota refusal returns 429 and Retry-After 3600; unavailable storage returns 503. The browser
+keeps failed text in memory and only clears it after a validated pending receipt.
+
+Raw visitor addresses are never stored in the database. Daily HMAC digests require the random
+local database salt; quota entries older than 24 hours are removed on the next accepted
+transaction. These are abuse controls, not proof of identity. Shared networks share a quota,
+and distributed attackers can still exhaust the global quota. Existing proxy trust must stay
+restricted; do not trust client-supplied forwarded headers. Infrastructure access logs retain
+their existing policy. No new analytics are added.
+
+## Fixtures and release acceptance
+
+At widths of at least 1280px the two side rails show the first gameweek with an open deadline
+or an unfinished future kickoff, and its numbered successor from the published calendar.
+Closing the FPL deadline does not hide remaining weekend fixtures. They include the capture date; this is not
+a real-time scores service. Between 1280 and 1500px the central column fits between the rails;
+wider screens retain 1080px. Phones have a prominent Fixtures navigation link and collapsible
+lists below the page. Advancing the clock selects later weeks but never invents a score,
+reschedules a fixture, edits the publication or runs a capture.
+
+Verify browser submission, the pending/public separation, approval, reload, retraction,
+storage restart, invalid requests, quotas and errors with an isolated database. Production
+checks should use the real API player list and read-only comment views; any production test
+comment must be clearly labelled and kept unapproved/rejected. Do not approve invented player
+news for a smoke test. The UI alone cannot enable this feature: deploy the tested backend
+revision through the standard guarded rollout as well as the static site.
