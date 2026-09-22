@@ -172,7 +172,7 @@ def test_a_recorded_decision_round_trips_with_full_provenance(
     assert set(entry.decision["ordered_bench_player_ids"]) == set(
         entry.decision["bench_player_ids"]
     )
-    assert entry.decision["completion_policy"] == "optimizer_projection_order_v1"
+    assert entry.decision["completion_policy"] == "optimizer_projection_order_v2"
     assert len(list(entry.decision["squad_player_ids"])) == 15  # type: ignore[arg-type]
     assert entry.outcome is None
     stored = pd.read_csv(directory / "projections.csv")
@@ -814,7 +814,7 @@ def test_completion_refusal_leaves_no_ledger_entry_and_allows_a_corrected_retry(
     assert not root.exists()
     record_decision(root, recommendation, projection, report_text="corrected")
     assert (
-        load_entry(root, SEASON, 1).decision["completion_policy"] == "optimizer_projection_order_v1"
+        load_entry(root, SEASON, 1).decision["completion_policy"] == "optimizer_projection_order_v2"
     )
 
 

@@ -64,3 +64,45 @@ describe("nested published advice", () => {
     expect(checkedAdvice(envelope, request)).toBe(envelope);
   });
 });
+
+it("separates automatic hold/play, manual choice and Top100 identities", () => {
+  const base = mockEntryAdviceEnvelope(101, "saf-puan", 3);
+  const request = {
+    leagueId: base.payload.league_id,
+    entryId: 101,
+    strategy: "saf-puan" as const,
+    window: 3 as const,
+    chip: "auto" as const,
+    top100Weight: 20 as const,
+  };
+  for (const selected_chip of [null, "3xc"] as const) {
+    const answer = {
+      ...base,
+      payload: {
+        ...base.payload,
+        chip: selected_chip,
+        chip_strategy: {
+          version: "model_opportunity_reservation_v1",
+          mode: "auto",
+          requested_chip: "auto",
+          selected_chip,
+          top100_weight: 20,
+          objective_gap: 0,
+          objective_basis: "selection_utility_with_chip_reserve",
+          experimental: true,
+          reservations: [],
+          limits: [],
+        },
+      },
+    };
+    expect(checkedAdvice(answer, request)).toBe(answer);
+    expect(() => checkedAdvice(answer, { ...request, chip: null })).toThrow(AdviceResponseError);
+    expect(() => checkedAdvice(answer, { ...request, chip: "3xc" })).toThrow(AdviceResponseError);
+    expect(() => checkedAdvice(answer, { ...request, top100Weight: 0 })).toThrow(
+      AdviceResponseError,
+    );
+    expect(() =>
+      checkedAdvice({ ...answer, payload: { ...answer.payload, chip: "bboost" } }, request),
+    ).toThrow(AdviceResponseError);
+  }
+});

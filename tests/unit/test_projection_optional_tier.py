@@ -20,6 +20,7 @@ from squadopt.contracts import (
     OPTIONAL_COLUMNS,
     REQUIRED_COLUMNS,
     canonical_columns_present,
+    order_outfield_bench,
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.prediction import PredictionConfigurationError
@@ -190,3 +191,116 @@ def test_the_optimizer_accepts_a_pool_that_carries_one() -> None:
     validated = validate_players(pool, OptimizationConfig())
 
     assert "start_probability" in validated.columns
+
+
+# --- the bench that reads it ------------------------------------------------
+
+
+def _bench(
+    points: list[float], chances: list[object] | None = None, **extra: object
+) -> pd.DataFrame:
+    frame = pd.DataFrame({"player_id": [10, 20, 30], "expected_points": points})
+    if chances is not None:
+        frame["appearance_probability"] = chances
+    for column, values in extra.items():
+        frame[column] = values
+    return frame
+
+
+def _order(frame: pd.DataFrame) -> list[int]:
+    return [int(value) for value in order_outfield_bench(frame)["player_id"].tolist()]
+
+
+def test_the_bench_is_ordered_by_points_given_an_appearance() -> None:
+    """The two orders disagree here, which is the only way to see which one ran.
+
+    By total the order is 30, 20, 10. Given an appearance it is 10, 20, 30: the player
+    worth 1.0 with a one-in-ten chance is worth 10 if he turns up, and the bench costs
+    nothing when he does not.
+    """
+
+    frame = _bench([1.0, 2.0, 3.0], [0.1, 0.5, 0.9])
+
+    assert _order(frame) == [10, 20, 30]
+    assert _order(frame.drop(columns="appearance_probability")) == [30, 20, 10]
+
+
+def test_a_bench_with_no_chance_column_orders_exactly_as_it_did_before() -> None:
+    assert _order(_bench([1.0, 3.0, 2.0])) == [20, 30, 10]
+
+
+def test_one_unmodelled_row_sends_the_whole_bench_back_to_the_old_rule() -> None:
+    """The decision this rests on, built so per-row and whole-bench disagree.
+
+    Per row, player 10 would divide to 4.0 and lead. Whole bench, the old order stands
+    and player 30 leads on 3.0. Per row is not "use what is available": it is reading the
+    absent chance as one, and the absence means nobody modelled that player.
+    """
+
+    frame = _bench([2.0, 1.0, 3.0], [0.5, 0.5, None])
+
+    assert _order(frame) == [30, 10, 20]
+
+
+def test_a_blank_gameweek_row_does_not_divide_by_zero() -> None:
+    """``_compose`` writes zero into every number of a no-fixture row, both of them."""
+
+    frame = _bench([0.0, 2.0, 3.0], [0.0, 0.5, 0.9])
+
+    assert _order(frame) == [30, 20, 10]
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -0.5, "0.8", True, None])
+def test_a_chance_that_cannot_be_divided_by_is_a_fallback_not_a_raise(bad: object) -> None:
+    assert _order(_bench([1.0, 3.0, 2.0], [bad, 0.5, 0.5])) == [20, 30, 10]
+
+
+def test_a_chance_above_one_is_used_rather_than_refused() -> None:
+    """Nothing validates this column, so a sort cannot tell wrong from implausible.
+
+    Refusing 1.2 would tie a frozen bench order to a threshold no contract declares, and
+    would hide a producer defect inside a sort instead of surfacing it in the producer.
+    """
+
+    frame = _bench([3.0, 2.0, 1.0], [1.2, 0.5, 0.9])
+
+    # 3.0/1.2 = 2.5, 2.0/0.5 = 4.0, 1.0/0.9 = 1.11. Falling back would have given 10, 20, 30.
+    assert _order(frame) == [20, 10, 30]
+
+
+def test_an_exact_tie_is_broken_by_the_identifier() -> None:
+    frame = _bench([1.0, 2.0, 3.0], [0.5, 1.0, 1.5])
+
+    assert _order(frame) == [10, 20, 30]
+
+
+def test_a_text_identifier_sorts_after_a_number_without_raising() -> None:
+    """``PlanningHorizon`` permits a text id, and a bench order must not depend on luck."""
+
+    frame = pd.DataFrame({"player_id": ["b", 7, "a"], "expected_points": [2.0, 2.0, 2.0]})
+
+    assert [str(value) for value in order_outfield_bench(frame)["player_id"]] == ["7", "a", "b"]
+
+
+@pytest.mark.parametrize("rows", [0, 1])
+def test_an_empty_or_single_bench_returns_without_raising(rows: int) -> None:
+    frame = pd.DataFrame(
+        {
+            "player_id": [10][:rows],
+            "expected_points": [1.0][:rows],
+            "appearance_probability": [0.5][:rows],
+        }
+    )
+
+    assert len(order_outfield_bench(frame)) == rows
+
+
+def test_the_input_frame_is_left_alone_and_the_answer_is_independent() -> None:
+    frame = _bench([1.0, 2.0, 3.0], [0.1, 0.5, 0.9])
+    before = frame.copy(deep=True)
+
+    ordered = order_outfield_bench(frame)
+    ordered.loc[0, "expected_points"] = 99.0
+
+    assert frame.equals(before)
+    assert list(ordered.index) == [0, 1, 2]

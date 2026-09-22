@@ -310,3 +310,25 @@ describe("the resolver with the service's capabilities", () => {
     expect(resolve(link, capabilities).computable).toBeUndefined();
   });
 });
+
+it.each([1, 3, 5])("offers automatic chip timing with Top100 over %i weeks", (window) => {
+  const caps: AdviceCapabilities = {
+    ...WHOLE_MENU,
+    chipStrategyWindows: [1, 3, 5],
+    chipsByEntry: { [ENTRY]: ["3xc"] },
+  };
+  for (const chip of ["auto", "3xc"]) {
+    expect(resolve(`chip=${chip}&window=${window}&top100=20`, caps)).toMatchObject({
+      status: "not-listed",
+      path: null,
+      request: { chip, top100Weight: 20 },
+      computable: { selection: true, chipStrategy: true },
+    });
+  }
+  expect(
+    resolve(`chip=auto&window=${window}`, { ...caps, chipsByEntry: { [ENTRY]: [] } }).request.chip,
+  ).toBe("auto");
+  expect(
+    resolve(`chip=auto&window=${window}`, { ...caps, chipsByEntry: {} }).request.chip,
+  ).not.toBe("auto");
+});

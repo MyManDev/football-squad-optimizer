@@ -129,15 +129,22 @@ export function useMemberAdviceView(
         throw new Error("The advice document does not match the manager's-word switch.");
       }
       // A weighted document names its weight, and the plain one names none.
-      if ((checked.payload.top100?.weight ?? 0) !== selection.top100.weight) {
+      if (
+        (checked.payload.chip_strategy?.top100_weight ?? checked.payload.top100?.weight ?? 0) !==
+        selection.top100.weight
+      ) {
         throw new Error("The advice document does not match the Top 100 setting.");
       }
       // A chip document names the chip the member chose, twice: as the choice and as the
       // chip the plan plays. The plain one names none.
       const chosen = selection.chip.chip;
       if (
-        (checked.payload.chip_choice?.chip ?? null) !== chosen ||
-        (chosen !== null && checked.payload.chip !== chosen)
+        (checked.payload.chip_strategy?.requested_chip ??
+          checked.payload.chip_choice?.chip ??
+          null) !== chosen ||
+        (chosen !== null &&
+          checked.payload.chip !== (checked.payload.chip_strategy?.selected_chip ?? chosen) &&
+          !(chosen === "auto" && checked.payload.chip == null))
       ) {
         throw new Error("The advice document does not match the chosen chip.");
       }

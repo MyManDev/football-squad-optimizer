@@ -15,6 +15,10 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 from scripts import run_component_squad_calibration as runner
+from scripts._experiment_cli import (
+    MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
+    MEASUREMENT_WALL_TIME_LIMIT_SECONDS,
+)
 from scripts.measure_component_fidelity import DevelopmentInputs as FidelityInputs
 from scripts.measure_component_fidelity import (
     FidelityBindingError,
@@ -526,9 +530,14 @@ def test_the_development_report_has_its_own_contract_and_the_fixed_solver_profil
     )
     assert _report_contract_version(None) == REPORT_VERSION
 
+    # The profile is the measurement budget rather than the dataclass default, and it is
+    # read from the one place that declares it so the record and the solve cannot drift.
+    # The deterministic limit being present is the whole of #590: a wall clock lets a busy
+    # machine decide how much work a fold's solve got, and the record then describes the
+    # machine as much as the run.
     profile = _solver_profile()
-    assert profile["solver_time_limit_seconds"] == 10.0
-    assert profile["solver_deterministic_time_limit"] is None
+    assert profile["solver_time_limit_seconds"] == MEASUREMENT_WALL_TIME_LIMIT_SECONDS
+    assert profile["solver_deterministic_time_limit"] == MEASUREMENT_DETERMINISTIC_TIME_LIMIT
     assert profile["deterministic_seed"] == 0
     assert profile["num_search_workers"] == 1
 
@@ -730,7 +739,11 @@ def _patch_measurement(
                     realized_squad_points=None if fold.fold_id in unscored else 40.0,
                 )
             )
-        return SimpleNamespace(folds=folds)
+        # The double carries the configuration back the way the real evaluator does: the
+        # record states the limits its solves ran under, and it reads them off the result
+        # rather than rebuilding them, so a double that swallowed the argument would let
+        # the runner claim limits nothing had checked.
+        return SimpleNamespace(folds=folds, config=config)
 
     def fake_measure_fold(
         handoff: PhaseCComponentHandoff,

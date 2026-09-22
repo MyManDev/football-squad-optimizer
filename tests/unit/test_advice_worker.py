@@ -23,6 +23,7 @@ import tests.unit.test_source_fpl_live as payload_module
 import tests.unit.test_top100_weight as top100_tests
 from fastapi.testclient import TestClient
 from tests.fixtures.backend_app import app_for_capture
+from tests.unit.test_projection_horizon_builder import _calendar
 
 import squadopt.application.top100_weight as switches_module_top100
 import squadopt.platform.advice_switches as switches_module
@@ -90,7 +91,7 @@ def _capture_with_entries(snapshot_root: Path) -> str:
             BOOTSTRAP_PAYLOAD: world_module._bootstrap(
                 events=gw1_finished, elements=world_module._elements(event_points=2)
             ),
-            FIXTURES_PAYLOAD: b"[]",
+            FIXTURES_PAYLOAD: _calendar(gameweeks=(1, 2, 3)),
             **_entry_payloads(ENTRY_ID, 1),
         },
     )
@@ -467,7 +468,7 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
-@pytest.mark.parametrize("chip", [None, "bboost"])
+@pytest.mark.parametrize("chip", [None, "bboost", "auto"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
     chip: str | None,
@@ -481,7 +482,7 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     if chip is not None:
         body["chip"] = chip
         capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
-        assert chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
+        assert chip == "auto" or chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
@@ -496,12 +497,13 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
         should_stop=_stop_after(3),
         max_jobs=1,
         metrics=backend.metrics,
+        log=backend.log,
         job_log_fields=fields,
     )
     assert processed == 1
     assert fields == {"window": COMPUTED_WINDOW, "strategy": COMPUTED_MODE}
     finished = client.get(f"/api/v1/advice-jobs/{job_id}").json()
-    assert finished["status"] == "completed", finished
+    assert finished["status"] == "completed", json.dumps(finished)
 
     served = client.get(route, params=body)
     assert served.status_code == 200, served.text
@@ -516,7 +518,9 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["window"] == COMPUTED_WINDOW
     assert isinstance(payload["moves"], list)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
-    if chip is not None:
+    if chip == "auto":
+        assert payload["chip_strategy"]["requested_chip"] == chip
+    elif chip is not None:
         assert payload["chip_choice"]["chip"] == chip
 
     # A second ask is answered from the cache and starts no second solve.

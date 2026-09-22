@@ -265,13 +265,49 @@ def test_preserves_extra_input_columns(
 def test_bench_is_ordered_keeper_first_then_by_descending_expectation(
     baseline_result: OptimizationResult,
 ) -> None:
-    """The bench is an ordered decision: automatic substitutions walk it top to bottom."""
+    """The bench is an ordered decision: automatic substitutions walk it top to bottom.
+
+    The baseline pool states no appearance chance, which is the path every producer but
+    the component one is on, and this holds that the order there has not moved.
+    """
 
     bench = baseline_result.bench
     assert len(bench) == 4
     assert bench.iloc[0]["position"] == "GK"
+    assert "appearance_probability" not in bench.columns
     outfield_points = [float(v) for v in bench.iloc[1:]["expected_points"]]
     assert outfield_points == sorted(outfield_points, reverse=True)
+
+
+def test_a_pool_that_states_the_chance_benches_by_points_given_an_appearance(
+    baseline_players: pd.DataFrame,
+) -> None:
+    """The solve reads the column the projection now carries (#531, #621 task 4.3).
+
+    The chance rises with the player id, so the players the old rule put first are the
+    ones most likely to turn up, and the two orders disagree on every pair. A bench
+    ordered by total points would come back descending; this one does not.
+    """
+
+    players = baseline_players.assign(
+        appearance_probability=[
+            0.2 + 0.8 * index / (len(baseline_players) - 1)
+            for index in range(len(baseline_players))
+        ]
+    )
+
+    bench = optimize_squad(players, OptimizationConfig()).bench
+    outfield = bench.iloc[1:]
+    conditional = [
+        float(row["expected_points"]) / float(row["appearance_probability"])
+        for _, row in outfield.iterrows()
+    ]
+
+    assert bench.iloc[0]["position"] == "GK"
+    assert conditional == sorted(conditional, reverse=True)
+    assert [float(v) for v in outfield["expected_points"]] != sorted(
+        [float(v) for v in outfield["expected_points"]], reverse=True
+    )
 
 
 def test_the_tiebreak_is_attempted_and_completes_on_the_baseline(

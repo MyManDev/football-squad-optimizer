@@ -177,21 +177,28 @@ export function MemberDecisionControls({
   const chipOptions = [
     ...new Set([...chip.options, ...(capabilities?.chipsByEntry?.[entryId] ?? [])]),
   ];
-  const chipsAvailable = chipOptions.length > 0;
+  const chipStrategy = computable?.chipStrategy === true;
+  const chipsAvailable = chipOptions.length > 0 || chipStrategy;
   const chipChosen = chip.chip !== null;
-  const chipApplies = chipsAvailable && strategy === "saf-puan" && windowSize === 1;
-  const chipBlocked = selection.evidence.on || top100.weight !== 0;
-  const chipNote = !chipsAvailable
-    ? chipsUnavailable(chipCopy, chip.reason)
-    : !chipApplies
-      ? chipCopy.onlyBaseline
-      : chipBlocked
-        ? chipCopy.blockedBySwitches
-        : chip.chip !== null
-          ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
-          : chip.notOffered
-            ? chipCopy.notOffered
-            : chipCopy.plain;
+  const chipApplies =
+    chipsAvailable && strategy === "saf-puan" && (windowSize === 1 || chipStrategy);
+  const chipBlocked = selection.evidence.on || (top100.weight !== 0 && !chipStrategy);
+  const chipNote =
+    chipStrategy && !chipBlocked
+      ? language === "tr"
+        ? "Otomatik: çipleri kullanma veya saklama zamanını transferlerle birlikte planlar. Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz."
+        : "Automatic plans chip timing and transfers together. A named chip forces this week; hold preserves all chips throughout the window."
+      : !chipsAvailable
+        ? chipsUnavailable(chipCopy, chip.reason)
+        : !chipApplies
+          ? chipCopy.onlyBaseline
+          : chipBlocked
+            ? chipCopy.blockedBySwitches
+            : chip.chip !== null
+              ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
+              : chip.notOffered
+                ? chipCopy.notOffered
+                : chipCopy.plain;
   // Why a chip the member cannot choose is off: already played, its window not open, a
   // Free Hit last gameweek, or no plan solved. Said per chip, in the producer's codes.
   const chipReasons = CHIP_NAMES.filter(
@@ -199,19 +206,20 @@ export function MemberDecisionControls({
   ).map((name) =>
     chipCopy.chipReasonLine(copy.chipNames[name] ?? name, chipReason(chipCopy, chip.reasons[name])),
   );
-  const top100Note = chipChosen
-    ? chipCopy.switchesOff
-    : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
-      ? computeCopy.top100Computable
-      : !top100.available
-        ? top100Unavailable(top100Copy, top100.reason)
-        : !top100Applies
-          ? top100Copy.notForSelection
-          : top100.notOffered
-            ? top100Copy.notOffered
-            : top100.weights.length < TOP100_WEIGHTS.length
-              ? top100Copy.notSolved
-              : top100Copy.published;
+  const top100Note =
+    chipChosen && !chipStrategy
+      ? chipCopy.switchesOff
+      : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
+        ? computeCopy.top100Computable
+        : !top100.available
+          ? top100Unavailable(top100Copy, top100.reason)
+          : !top100Applies
+            ? top100Copy.notForSelection
+            : top100.notOffered
+              ? top100Copy.notOffered
+              : top100.weights.length < TOP100_WEIGHTS.length
+                ? top100Copy.notSolved
+                : top100Copy.published;
 
   return (
     <Card
@@ -403,7 +411,9 @@ export function MemberDecisionControls({
                   name={TOP100_PARAMETER}
                   value={weight}
                   checked={top100.weight === weight}
-                  disabled={!weightSelectable(weight) || (chipChosen && weight !== 0)}
+                  disabled={
+                    !weightSelectable(weight) || (chipChosen && weight !== 0 && !chipStrategy)
+                  }
                   onChange={() =>
                     update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
                   }
@@ -443,8 +453,27 @@ export function MemberDecisionControls({
                   if (searchParams.has(CHIP_PARAMETER)) update({ [CHIP_PARAMETER]: null });
                 }}
               />
-              <span>{chipCopy.none}</span>
+              <span>
+                {chipStrategy
+                  ? language === "tr"
+                    ? "Çipleri sakla"
+                    : "Hold chips"
+                  : chipCopy.none}
+              </span>
             </label>
+            {chipStrategy && (
+              <label className={styles.windowOption}>
+                <input
+                  type="radio"
+                  name={CHIP_PARAMETER}
+                  value="auto"
+                  checked={chip.chip === "auto"}
+                  disabled={chipBlocked}
+                  onChange={() => update({ [CHIP_PARAMETER]: "auto" })}
+                />
+                <span>{language === "tr" ? "Otomatik strateji" : "Automatic strategy"}</span>
+              </label>
+            )}
             {CHIP_NAMES.map((name) => (
               <label className={styles.windowOption} key={name}>
                 <input
@@ -461,7 +490,7 @@ export function MemberDecisionControls({
           </div>
           <p className={styles.note}>{chipNote}</p>
           {chipReasons.length > 0 ? <p className={styles.note}>{chipReasons.join(" ")}</p> : null}
-          {chipApplies ? <p className={styles.note}>{chipCopy.help}</p> : null}
+          {chipApplies && !chipStrategy ? <p className={styles.note}>{chipCopy.help}</p> : null}
         </fieldset>
       </div>
       {computable && computable.strategies.length > 0 ? (

@@ -43,7 +43,13 @@ from types import MappingProxyType
 from typing import Final
 
 import pandas as pd
-from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, write_json, write_text
+from scripts._experiment_cli import (
+    DEFAULT_ARCHIVE_ROOT,
+    measurement_optimization_config,
+    solver_record,
+    write_json,
+    write_text,
+)
 
 from squadopt.backtest.splits import (
     BacktestConfigurationError,
@@ -324,7 +330,11 @@ def _score(
         )
         for decision in decisions
     )
-    return evaluate_prepared_folds(folds, EvaluationConfig())
+    # Every configuration solves under the measurement budget rather than the dataclass
+    # default, so a busy machine cannot decide how much work a fold's solve got (#590).
+    return evaluate_prepared_folds(
+        folds, EvaluationConfig(optimization_config=measurement_optimization_config())
+    )
 
 
 def _solve_health(result: EvaluationResult) -> dict[str, object]:
@@ -551,6 +561,11 @@ def measure(
         "configurations": entries,
         "paired_against_declared": comparisons,
         "reproducibility": _reproducibility(entries, compare_to),
+        # One block for the whole run: every configuration here solves under the same
+        # limits, so the counts are comparable and a single block is the honest shape.
+        # `solve_health` beside each entry counts statuses per configuration and says
+        # nothing about the budget; this says what bound them and nothing per entry.
+        "solver": solver_record(*scored.values()),
         **dict(RECORD_PROVENANCE),
     }
 

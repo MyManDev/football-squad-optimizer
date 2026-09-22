@@ -172,6 +172,58 @@ def advice_read_schema() -> dict[str, Any]:
             # above the member's own no-chip plan net of hits, and the chip's windows as
             # the member stands before this gameweek. One gameweek's difference, never a
             # reading of when the chip is best played.
+            "chip_strategy": {
+                "type": "object",
+                "properties": {
+                    "version": {"const": "model_opportunity_reservation_v1"},
+                    "mode": {"enum": ["auto", "manual"]},
+                    "requested_chip": {"enum": ["auto", "bboost", "3xc", "wildcard", "freehit"]},
+                    "selected_chip": chip,
+                    "top100_weight": {"enum": [0, 5, 10, 20, 30, 40, 50]},
+                    "objective_gap": nullable_number,
+                    "objective_basis": {"const": "selection_utility_with_chip_reserve"},
+                    "experimental": {"type": "boolean"},
+                    "reservations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "chip": {"enum": ["bboost", "3xc", "wildcard", "freehit"]},
+                                "first_gameweek": {"type": "integer", "minimum": 1},
+                                "last_gameweek": {"type": "integer", "minimum": 1},
+                                "remaining_opportunities": {"type": "integer", "minimum": 0},
+                                "holding_value": {"type": "number", "minimum": 0},
+                                "sample_min": {"type": "number", "minimum": 0},
+                                "sample_max": {"type": "number", "minimum": 0},
+                            },
+                            "required": [
+                                "chip",
+                                "first_gameweek",
+                                "last_gameweek",
+                                "remaining_opportunities",
+                                "holding_value",
+                                "sample_min",
+                                "sample_max",
+                            ],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "limits": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": [
+                    "version",
+                    "mode",
+                    "requested_chip",
+                    "selected_chip",
+                    "top100_weight",
+                    "objective_gap",
+                    "objective_basis",
+                    "experimental",
+                    "reservations",
+                    "limits",
+                ],
+                "additionalProperties": False,
+            },
             "chip_choice": {
                 "type": "object",
                 "properties": {
@@ -399,6 +451,19 @@ def league_capabilities_schema() -> dict[str, Any]:
             "chips": {
                 "type": "object",
                 "properties": {
+                    "strategy": {
+                        "type": "object",
+                        "properties": {
+                            "version": {"const": "model_opportunity_reservation_v1"},
+                            "windows": {
+                                "type": "array",
+                                "items": {"enum": [1, 3, 5]},
+                                "uniqueItems": True,
+                            },
+                        },
+                        "required": ["version", "windows"],
+                        "additionalProperties": False,
+                    },
                     "held_by_entry": {
                         "type": "object",
                         "patternProperties": {

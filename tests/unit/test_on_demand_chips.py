@@ -34,25 +34,25 @@ def _advise(**changes: object) -> ApiCommandRequest:
 
 
 def test_chip_identity_roundtrips_and_preserves_the_plain_fingerprint() -> None:
-    assert ADVISE_CHIPS == CHIP_NAMES
+    assert set(ADVISE_CHIPS) == {*CHIP_NAMES, "auto"}
     assert _advise().request_fingerprint == _advise(chip=None).request_fingerprint
     fingerprints = {_advise().request_fingerprint}
     for chip in ADVISE_CHIPS:
         command = _advise(chip=chip)
         assert ApiCommandRequest.from_dict(command.to_dict()) == command
         fingerprints.add(command.request_fingerprint)
-    assert len(fingerprints) == 5
+    assert len(fingerprints) == 6
 
 
 def test_post_get_cache_and_capabilities_carry_each_chip(
     tmp_path: Path, chip_http: dict[str, Any]
 ) -> None:
-    state = chip_http["build"](ADVISE_CHIPS)
+    state = chip_http["build"](CHIP_NAMES)
     client = state["client"]
     caps = client.get(f"/api/v1/leagues/{LEAGUE}/capabilities").json()
-    assert caps["chips"]["held_by_entry"]["313686"] == list(ADVISE_CHIPS)
+    assert caps["chips"]["held_by_entry"]["313686"] == list(CHIP_NAMES)
     keys = set()
-    for chip in ADVISE_CHIPS:
+    for chip in CHIP_NAMES:
         response = client.post(chip_http["url"], json={**chip_http["body"], "chip": chip})
         assert response.status_code == 202, response.text
         job = state["queue"].load(response.json()["job_id"])
@@ -88,11 +88,11 @@ def test_unknown_or_spent_chip_is_refused_before_queueing(
     assert not state["queue"].jobs()
 
 
-@pytest.mark.parametrize("extra", [{"top100_weight": 5}, {"managers_word": True}, {"window": 3}])
+@pytest.mark.parametrize("extra", [{"managers_word": True}])
 def test_chip_cannot_combine_with_other_switches(
     chip_http: dict[str, Any], extra: dict[str, Any]
 ) -> None:
-    state = chip_http["build"](ADVISE_CHIPS)
+    state = chip_http["build"](CHIP_NAMES)
     response = state["client"].post(
         chip_http["url"], json={**chip_http["body"], "chip": "bboost", **extra}
     )
@@ -121,7 +121,7 @@ def test_three_members_match_every_published_chip_file(
     )
     fields = ("moves", "captain", "starting_xi", "expected_own_points", "chip_choice")
     for entry in picks:
-        for chip in ADVISE_CHIPS:
+        for chip in CHIP_NAMES:
             published = json.loads(
                 (tmp_path / f"advice/{entry}/saf-puan/1/chip-{chip}.json").read_text(
                     encoding="utf-8"
