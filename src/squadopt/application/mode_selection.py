@@ -99,6 +99,10 @@ class MemberModeSelection:
 def rival_squad_from_picks(picks: EntryPicks, *, label: str) -> RivalSquad:
     """A member's public eleven as the fixed rival the scenario scorer prices."""
 
+    if picks.captain not in picks.starting_xi:
+        raise ModeSelectionError(
+            "Post-autosub picks with a benched captain cannot define a fixed rival eleven."
+        )
     return RivalSquad(
         label=label,
         starter_ids=tuple(picks.starting_xi),

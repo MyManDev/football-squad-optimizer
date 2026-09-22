@@ -79,12 +79,16 @@ def _legal_squad(world: dict[str, Any]) -> list[int]:
     return codes
 
 
+@pytest.mark.parametrize("benched_captain", [False, True])
 def test_the_builder_renders_members_and_advice_and_survives_one_failure(
-    world: dict[str, Any], tmp_path: Path
+    world: dict[str, Any], tmp_path: Path, benched_captain: bool
 ) -> None:
     inputs, projection, rules = _world_context(world)
     squad = _legal_squad(world)
-    provider = _Provider({101: _member_picks(world, 101, squad)})
+    picks = _member_picks(world, 101, squad)
+    if benched_captain:
+        picks = dataclasses.replace(picks, captain=squad[-1])
+    provider = _Provider({101: picks})
     registrations = (
         EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
         EntryRegistration(999, "member-missing", "2026-08-23T00:00:00Z"),
