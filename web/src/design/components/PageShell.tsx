@@ -15,7 +15,7 @@ const navLabel = (messages: ReturnType<typeof useLanguage>["messages"], key: Nav
 
 /** `rails` is whatever sits beside the column on a wide screen and under it on a narrow one. */
 export function PageShell({ children, rails }: { children: ReactNode; rails?: ReactNode }) {
-  const { messages } = useLanguage();
+  const { messages, language } = useLanguage();
   return (
     <div className={styles.shell}>
       <a className="visually-hidden" href="#main">
@@ -37,6 +37,18 @@ export function PageShell({ children, rails }: { children: ReactNode; rails?: Re
               {navLabel(messages, item.key)}
             </NavLink>
           ))}
+          <NavLink
+            to="/fixtures"
+            className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
+          >
+            {language === "tr" ? "Fikstür" : "Fixtures"}
+          </NavLink>
+          <NavLink
+            to="/contribute"
+            className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
+          >
+            {language === "tr" ? "Katkıda bulun" : "Contribute"}
+          </NavLink>
         </nav>
         <div className={styles.preferences}>
           <LanguageToggle />

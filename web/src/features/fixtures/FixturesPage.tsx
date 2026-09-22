@@ -2,7 +2,7 @@ import { Card } from "../../design/components/Card";
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
 import { local } from "../../lib/format";
-import { fixtureWeeks, useFixtures } from "./data";
+import { upcomingFixtureWeeks, useFixtures } from "./data";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { GameweekFixtures } from "./GameweekFixtures";
 import type { FixtureGameweek } from "./types";
@@ -15,7 +15,7 @@ export function FixturesPage() {
   const { data, isPending } = useFixtures();
   if (isPending) return <EmptyState title={messages.common.loading} />;
   if (!data) return <EmptyState title={copy.notPublished} />;
-  const { current, next, past } = fixtureWeeks(data);
+  const { current, next, past } = upcomingFixtureWeeks(data);
 
   const week = (entry: FixtureGameweek, label?: string) => (
     <Card

@@ -87,7 +87,7 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
       {finished.length === 0 ? (
         <p className={styles.notice}>{copy.noGameweek}</p>
       ) : (
-        <div className={styles.tableWrap}>
+        <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.caption}>
           <table className={styles.table}>
             <caption className="visually-hidden">{copy.caption}</caption>
             <thead>

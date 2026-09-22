@@ -103,7 +103,7 @@ for (const language of ["tr", "en"] as const) {
       await page
         .locator("header nav a, footer a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/status"]);
+    ).toEqual(["/", "/fixtures", "/contribute", "/status"]);
     await expect(
       page.locator(
         'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',

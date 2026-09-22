@@ -117,3 +117,24 @@ export function fixtureWeeks(payload: FixturesPayload): FixtureWeeks {
       .sort((left, right) => right.gameweek - left.gameweek),
   };
 }
+
+/** Upcoming fixtures from the published calendar, even after its capture ages.
+ * No results are inferred from the clock. A missing next numbered week stays missing.
+ */
+export function upcomingFixtureWeeks(payload: FixturesPayload, now = Date.now()): FixtureWeeks {
+  if (payload.current_gameweek === null) return fixtureWeeks(payload);
+  const upcoming = [...payload.gameweeks]
+    .sort((a, b) => a.gameweek - b.gameweek)
+    .find(
+      (week) =>
+        week.gameweek >= payload.current_gameweek! &&
+        (Date.parse(week.deadline_utc) > now ||
+          week.fixtures.some(
+            (fixture) =>
+              !fixture.finished &&
+              fixture.kickoff_utc !== null &&
+              Date.parse(fixture.kickoff_utc) > now,
+          )),
+    );
+  return fixtureWeeks({ ...payload, current_gameweek: upcoming?.gameweek ?? null });
+}

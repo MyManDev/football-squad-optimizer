@@ -36,6 +36,7 @@ from squadopt.platform.advice_observability import (
     configure_advice_logging,
 )
 from squadopt.platform.backend_runtime import AdviceBackend, backend_from_environment
+from squadopt.platform.contributions import ContributionStore
 
 __all__ = ["app_for_backend", "build_app"]
 
@@ -110,6 +111,7 @@ def app_for_backend(
         jobs_by_status=backend.jobs_by_status,
         readiness=backend.readiness,
         utc_now=utc_now,
+        contributions=ContributionStore(backend.config.store_root / "contributions.sqlite3"),
     )
 
 
