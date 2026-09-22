@@ -14,7 +14,16 @@ for (const language of ["tr", "en"] as const) {
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.goto("/league/members/35249001?mode=saf-puan&window=3");
     const copy = MESSAGES[language];
-    const details = page.locator("main details");
+    // Only these two context panels auto-expand on desktop. Other decision help
+    // disclosures have their own state and must not change this responsive check.
+    const details = page
+      .locator("main details")
+      .filter({ has: page.locator("summary", { hasText: copy.leagueMembers.memberSquad }) })
+      .or(
+        page.locator("main details").filter({
+          has: page.locator("summary", { hasText: copy.memberResources.chipsTitle }),
+        }),
+      );
     await expect(details).toHaveCount(2);
     for (const detail of await details.all()) {
       await expect(detail).not.toHaveAttribute("open");

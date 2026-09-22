@@ -1,10 +1,10 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-09-18T14:01:50Z",
+  "generated_at_utc": "2026-09-22T15:12:16Z",
   "payload": {
-    "captured_at_utc": "2026-09-18T12:25:16.241963Z",
-    "league_total_average_score": 119.0,
-    "our_total_realized_net_score": 94.0,
+    "captured_at_utc": "2026-09-22T15:12:16.749186Z",
+    "league_total_average_score": 167.0,
+    "our_total_realized_net_score": 168.0,
     "ownership": {
       "differential_threshold_percent": 10.0,
       "differentials": [
@@ -13,32 +13,32 @@
         494521,
         503139
       ],
-      "effective_ownership": 303.1,
+      "effective_ownership": 312.79999999999995,
       "gameweek": 5,
       "least_owned_starter": 494521,
-      "mean_starter_ownership": 20.90909090909091,
+      "mean_starter_ownership": 21.745454545454546,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "204936": 7.9,
-        "216616": 2.8,
-        "219168": 21.8,
-        "223094": 73.1,
-        "226182": 5.4,
-        "244723": 6.1,
-        "244850": 39.3,
-        "437730": 15.0,
-        "446008": 21.9,
-        "490145": 1.2,
-        "494521": 3.1,
-        "503139": 5.8,
-        "60307": 20.3,
-        "67089": 17.6,
-        "97032": 16.4
+        "204936": 7.6,
+        "216616": 2.7,
+        "219168": 22.3,
+        "223094": 73.6,
+        "226182": 6.8,
+        "244723": 6.0,
+        "244850": 40.3,
+        "437730": 15.4,
+        "446008": 20.8,
+        "490145": 1.1,
+        "494521": 3.0,
+        "503139": 5.7,
+        "60307": 27.5,
+        "67089": 17.2,
+        "97032": 16.2
       },
       "squad": [
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 2.0,
           "expected_points": 3.404906686111741,
           "is_captain": false,
           "name": "Gianluigi Donnarumma",
@@ -51,7 +51,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 5.0,
           "expected_points": 3.5912977776990163,
           "is_captain": false,
           "name": "Jayden Bogle",
@@ -64,7 +64,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 8.0,
           "expected_points": 3.555548676659022,
           "is_captain": false,
           "name": "Virgil van Dijk",
@@ -77,7 +77,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 2.0,
           "expected_points": 3.032407163737452,
           "is_captain": false,
           "name": "Adrien Truffert",
@@ -90,7 +90,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 17.0,
           "expected_points": 4.620473859853053,
           "is_captain": false,
           "name": "Antoine Semenyo",
@@ -103,7 +103,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 2.0,
           "expected_points": 4.415892336727386,
           "is_captain": false,
           "name": "Bryan Mbeumo",
@@ -116,7 +116,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 2.0,
           "expected_points": 4.414905789016978,
           "is_captain": false,
           "name": "Morgan Rogers",
@@ -129,7 +129,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 14.0,
           "expected_points": 4.206689328780451,
           "is_captain": false,
           "name": "Pascal Groß",
@@ -142,7 +142,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 2.0,
           "expected_points": 4.141082332576842,
           "is_captain": false,
           "name": "Alex Scott",
@@ -155,7 +155,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 6.0,
           "expected_points": 8.417342366821867,
           "is_captain": true,
           "name": "Erling Haaland",
@@ -168,7 +168,7 @@
         },
         {
           "bench_order": null,
-          "event_points": null,
+          "event_points": 8.0,
           "expected_points": 4.897045438301909,
           "is_captain": false,
           "name": "Alexander Isak",
@@ -181,7 +181,7 @@
         },
         {
           "bench_order": 1,
-          "event_points": null,
+          "event_points": 0.0,
           "expected_points": 0.1002701557944728,
           "is_captain": false,
           "name": "Martin Dubravka",
@@ -194,7 +194,7 @@
         },
         {
           "bench_order": 2,
-          "event_points": null,
+          "event_points": 2.0,
           "expected_points": 2.0903160097915183,
           "is_captain": false,
           "name": "Dara O'Shea",
@@ -207,7 +207,7 @@
         },
         {
           "bench_order": 3,
-          "event_points": null,
+          "event_points": 7.0,
           "expected_points": 2.582386742483201,
           "is_captain": false,
           "name": "Tyrick Mitchell",
@@ -220,7 +220,7 @@
         },
         {
           "bench_order": 4,
-          "event_points": null,
+          "event_points": 0.0,
           "expected_points": 0.0,
           "is_captain": false,
           "name": "Dane Scarlett",
@@ -233,17 +233,17 @@
         }
       ]
     },
-    "scored_gameweeks": 2,
+    "scored_gameweeks": 3,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
-    "total_difference_to_average": -25.0,
-    "verdict": "-25 points against the game's average over 2 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 21% ownership.",
+    "source_snapshot_id": "fpl-live-20260922T151216Z-974899b97250",
+    "total_difference_to_average": 1.0,
+    "verdict": "+1 points against the game's average over 3 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 22% ownership.",
     "verdict_code": "standing",
     "verdict_params": {
       "caveat": "noise",
-      "difference": -25.0,
-      "mean_starter_ownership": 20.9,
-      "scored": 2
+      "difference": 1.0,
+      "mean_starter_ownership": 21.7,
+      "scored": 3
     },
     "weeks": [
       {
@@ -291,15 +291,15 @@
         "our_realized_score": 68.0
       },
       {
-        "average_entry_score": null,
+        "average_entry_score": 48.0,
         "deadline_utc": "2026-09-18T17:30:00Z",
-        "difference_to_average": null,
-        "finished": false,
+        "difference_to_average": 26.0,
+        "finished": true,
         "gameweek": 5,
-        "highest_score": null,
+        "highest_score": 126.0,
         "our_projected_score": 57.11493412310759,
-        "our_realized_net_score": null,
-        "our_realized_score": null
+        "our_realized_net_score": 74.0,
+        "our_realized_score": 74.0
       },
       {
         "average_entry_score": null,
@@ -347,7 +347,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-11-07T13:30:00Z",
+        "deadline_utc": "2026-11-06T18:30:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 10,
@@ -358,7 +358,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-11-21T13:30:00Z",
+        "deadline_utc": "2026-11-21T11:00:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 11,
@@ -369,7 +369,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-11-28T13:30:00Z",
+        "deadline_utc": "2026-11-27T18:30:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 12,

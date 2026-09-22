@@ -24,7 +24,7 @@ const predictionModel: Predicate = (value) =>
   Object.keys(value).length === 4 &&
   fields(value, {
     id: oneOf("football"),
-    version: oneOf("football_team_share_v1"),
+    version: oneOf("football_team_share_v1", "football_contextual_v3"),
     experimental: oneOf(true),
     fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
   });

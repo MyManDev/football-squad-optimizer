@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from squadopt.application.football_live import produce_football_forecast
+from squadopt.application.manager_words import load_manager_words
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import infer_season, read_inputs
 from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
@@ -17,9 +18,25 @@ def main() -> None:
     parser.add_argument("--snapshot-id", required=True)
     parser.add_argument("--archive-root", type=Path, required=True)
     parser.add_argument("--artifact-root", type=Path, required=True)
+    parser.add_argument("--contextual", action="store_true", help="Build football_contextual_v3.")
+    parser.add_argument("--rotation-evidence", type=Path)
+    parser.add_argument("--club-news-source", type=Path)
     args = parser.parse_args()
     snapshot = read_snapshot(args.snapshot_root, args.snapshot_id)
-    document = produce_football_forecast(snapshot, args.archive_root)
+    if bool(args.rotation_evidence) != bool(args.club_news_source):
+        parser.error("--rotation-evidence and --club-news-source must be supplied together")
+    words = (
+        load_manager_words(
+            args.rotation_evidence,
+            club_news_source=args.club_news_source,
+            snapshot_root=args.snapshot_root,
+        )
+        if args.rotation_evidence
+        else None
+    )
+    document = produce_football_forecast(
+        snapshot, args.archive_root, contextual=args.contextual, manager_words=words
+    )
     target = football_artifact_path(args.artifact_root, args.snapshot_id)
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():

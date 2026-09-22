@@ -100,6 +100,14 @@ for (const language of ["en", "tr"] as const) {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await card.screenshot({ path: testInfo.outputPath("series-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
+    const scrollRegion = page.getByRole("region", { name: copy.leagueScoreboard.caption });
+    await scrollRegion.focus();
+    await expect(scrollRegion).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() => scrollRegion.evaluate((region) => region.scrollLeft))
+      .toBeGreaterThan(0);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     const summaryWidth = await card
       .getByRole("table")
       .first()
