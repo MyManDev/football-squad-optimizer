@@ -46,8 +46,8 @@ class WeekError(RuntimeError):
     """A step refused; the message says which and why."""
 
 
-def _require_capture_name(value: str) -> None:
-    """Refuse a club-news capture that is not a capture name.
+def _require_capture_name(value: str, flag: str) -> None:
+    """Refuse an operator-typed capture identifier that is not a capture name.
 
     The runner joins this value onto the snapshot root and hands the result to the journal,
     which walks the directory and digests every file it finds. A snapshot identifier is a
@@ -61,6 +61,10 @@ def _require_capture_name(value: str) -> None:
     because the format belongs to ``snapshots`` and a new source name must not have to come
     back and change this refusal too.
 
+    ``flag`` is the option the operator actually typed, and it is in every message. Four
+    inputs share this rule now, so a refusal that named only the rule would tell an operator
+    that something was mistyped without telling them which of four things.
+
     Both separators are named explicitly rather than left to ``Path``. A backslash is a
     separator on Windows and an ordinary filename character on Linux, so ``Path(value).name``
     alone refuses ``nested\\name`` on the operator's machine and accepts it in CI. A refusal
@@ -70,15 +74,15 @@ def _require_capture_name(value: str) -> None:
 
     if not value or value.strip() != value:
         raise WeekError(
-            "A club-news capture name must not be empty or padded with spaces. An empty name "
-            "reads as the snapshot root, which is every capture we hold rather than the one "
-            "the week was read from."
+            f"{flag} must not be empty or padded with spaces. An empty name reads as the "
+            "snapshot root, which is every capture we hold rather than the one the week "
+            "was read from."
         )
     if value in {".", ".."} or "/" in value or "\\" in value or Path(value).name != value:
         raise WeekError(
-            f"A club-news capture must be named by its own directory name, not by a path: "
-            f"{value!r}. The runner joins this onto the snapshot root, so a separator or a "
-            "parent reference points the week's evidence somewhere that is not a capture."
+            f"{flag} must be named by its own directory name, not by a path: {value!r}. "
+            "The runner joins this onto the snapshot root, so a separator or a parent "
+            "reference points the week's evidence somewhere that is not a capture."
         )
 
 
@@ -130,8 +134,24 @@ class WeeklyRequest:
                 "read it is not in this week's plan. Naming a source for a step nobody asked "
                 "for is the kind of silence that looks like a run and is not one."
             )
-        if self.rotation_capture is not None:
-            _require_capture_name(self.rotation_capture)
+        # Every operator-typed capture identifier is checked here, before any stage runs.
+        # #570 gave `--rotation-capture` this refusal and the three beside it reach the
+        # journal the same way: the runner joins the value onto the snapshot root and the
+        # journal walks and digests whatever that resolves to, so a mistyped identifier does
+        # not fail late, it succeeds at reading the wrong thing.
+        #
+        # Measured on develop before this change: `--cohort-snapshot` and `--elite-snapshot`
+        # accepted all seven bad shapes, and `--snapshot-id` accepted the empty string and
+        # accepted every other shape as well once `--skip-top100` was passed. Its apparent
+        # refusal came from an unrelated Top-100 rule, which is a shield rather than a check.
+        for flag, value in (
+            ("--snapshot-id", self.snapshot_id),
+            ("--cohort-snapshot", self.cohort_snapshot),
+            ("--elite-snapshot", self.elite_snapshot),
+            ("--rotation-capture", self.rotation_capture),
+        ):
+            if value is not None:
+                _require_capture_name(value, flag)
         return plan_week(
             season=self.season,
             gameweek=self.gameweek,

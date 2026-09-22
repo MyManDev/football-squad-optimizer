@@ -40,6 +40,12 @@ from squadopt.application.top100_weight import (
 from squadopt.application.weekly_plan import evidence_artifact, rotation_artifact
 from squadopt.data.errors import DataError
 from squadopt.live import Projection, RecommendationInputs
+from squadopt.live.football_artifact import (
+    FootballForecast,
+    football_artifact_path,
+    read_football_forecast,
+)
+from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 
 __all__ = [
     "CHIP_SWITCH",
@@ -56,6 +62,7 @@ __all__ = [
 ]
 
 CHIP_SWITCH: Final = "chip"
+MODEL_SWITCH: Final = "model"
 TOP100_SWITCH: Final = "top100"
 MANAGERS_WORD_SWITCH: Final = "managers_word"
 #: Where the weekly run writes the two artifacts, under the repository's ``artifacts/``.
@@ -84,6 +91,7 @@ class AdviceSwitchInputs:
     rotation_table_sha256: str | None = None
     #: Why an input is absent, for the operator's log and never for a response.
     notes: tuple[str, ...] = ()
+    football: FootballForecast | None = None
 
 
 def switch_identity(
@@ -92,6 +100,7 @@ def switch_identity(
     top100_weight: int = 0,
     managers_word: bool = False,
     chip: str | None = None,
+    model: str = "current",
 ) -> SwitchIdentity:
     """What the switched-on part of a request adds to its address; empty when all are off.
 
@@ -103,8 +112,18 @@ def switch_identity(
     """
 
     identity: SwitchIdentity = {}
+    if model != "current":
+        if model != "football" or inputs.football is None:
+            raise SwitchInputUnavailable(
+                MODEL_SWITCH, "This capture has no usable football forecast."
+            )
+        identity[MODEL_SWITCH] = {"name": model, "fingerprint": inputs.football.fingerprint}
     if chip is not None:
-        identity[CHIP_SWITCH] = {"chip": chip, "basis": CHIP_CHOICE_BASIS}
+        identity[CHIP_SWITCH] = {
+            "chip": chip,
+            "basis": CHIP_CHOICE_BASIS,
+            "strategy_version": CHIP_STRATEGY_VERSION,
+        }
     if top100_weight:
         counts = inputs.top100_counts
         if counts is None:
@@ -179,6 +198,7 @@ def discovery_signature(
     if artifact_root is None:
         return ()
     found: list[tuple[str, int, int]] = []
+    found.append(_stat(football_artifact_path(artifact_root, capture_snapshot_id)))
     for table in _evidence_candidates(artifact_root, season, gameweek):
         found.extend((_stat(table), _stat(top100_manifest_path(table))))
     if club_news_source is not None:
@@ -251,9 +271,17 @@ def load_switch_inputs(
                 # An unreadable table turns the switch off; it does not stop the backend.
                 notes.append(f"managers_word {table.name}: {error}")
                 words, digest = None, None
+    football = None
+    try:
+        football = read_football_forecast(
+            football_artifact_path(artifact_root, inputs.snapshot_id), inputs
+        )
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        notes.append(f"football: {error}")
     return AdviceSwitchInputs(
         top100_counts=counts,
         manager_words=words,
         rotation_table_sha256=digest,
         notes=tuple(notes),
+        football=football,
     )

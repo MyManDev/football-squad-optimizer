@@ -12,7 +12,7 @@ from typing import Any, Final
 import pandas as pd
 
 from squadopt.application.entries import EntryError
-from squadopt.contracts import POSITIONS, Position
+from squadopt.contracts import POSITIONS, Position, order_outfield_bench
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import PlanningWeekResult
 
@@ -100,6 +100,8 @@ def best_eleven_basis(
     squad: Iterable[
         tuple[str, float, float, bool, bool] | tuple[str, float, float, bool, bool, int]
     ],
+    *,
+    chip: str | None = None,
 ) -> float | None:
     """The published basis of the eleven a fifteen would field, chosen on other points.
 
@@ -172,9 +174,16 @@ def best_eleven_basis(
                         + captain_choice
                         + _LINEUP_DEFAULTS.bench_weight * (total - sum(chosen))
                     )
+                    basis = sum(stated) + captain_basis
+                    if chip == "3xc":
+                        objective += captain_choice
+                        basis += captain_basis
+                    elif chip == "bboost":
+                        objective = total + captain_choice
+                        basis = sum(row[2] for row in players) + captain_basis
                     if best_objective is None or objective > best_objective:
                         best_objective = objective
-                        best_basis = sum(stated) + captain_basis
+                        best_basis = basis
     return best_basis
 
 
@@ -267,11 +276,23 @@ def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
 
     Transfers alone are not a gameweek: the member still has to name a captain, a
     vice-captain, an eleven and a bench order, and decide whether a chip is played.
-    The planner decides the eleven, the captain and the chip; the vice-captain and the
-    bench order follow the same completion rule the official scorer applies to an
-    optimizer decision (highest expected points first, ties by player id, the bench
-    goalkeeper first) so what is shown is what would be scored. ``expected_own_points``
-    is the eleven plus the captain's double: expected points, nothing else.
+    The planner decides the eleven, the captain and the chip; the vice-captain follows the
+    same rule the official scorer applies (highest expected points first, ties by player
+    id), and the bench order is **delegated to the function the official scorer calls**,
+    :func:`~squadopt.contracts.order_outfield_bench`, with the bench goalkeeper first.
+    ``expected_own_points`` is the eleven plus the captain's double: expected points,
+    nothing else.
+
+    Delegating rather than sorting here is the point, and the call is not dead work even
+    though it returns today's order. A planning week carries no ``appearance_probability``:
+    the projection horizon narrows it away, and widening
+    ``PROJECTION_HORIZON_COLUMNS``/``PLANNING_HORIZON_COLUMNS`` is a versioned contract
+    change with its own question (what an appearance chance means in week three of a
+    horizon, where expected points are re-derived from fixture counts). So the shared rule
+    meets no chance here, falls back, and produces exactly what a local sort would. What it
+    buys is that "what is shown is what would be scored" holds **by construction** rather
+    than by two hand-written sorts happening to agree, and that the day the horizon carries
+    the column this page follows with no edit here at all.
     """
 
     eleven = [row for _, row in week.starting_xi.iterrows()]
@@ -286,9 +307,10 @@ def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
     if not vice_candidates:
         raise EntryError("The plan's eleven has no vice-captain candidate.")
     goalkeepers = [row for row in bench if str(row["position"]) == "GK"]
-    outfield = sorted((row for row in bench if str(row["position"]) != "GK"), key=_ranking)
     if len(goalkeepers) != 1:
         raise EntryError("The plan's bench must hold exactly one goalkeeper.")
+    outfield_frame = week.bench.loc[week.bench["position"].astype("string") != "GK"]
+    outfield = [row for _, row in order_outfield_bench(outfield_frame).iterrows()]
     ordered_eleven = sorted(
         eleven, key=lambda row: (_POSITION_ORDER.index(str(row["position"])), _ranking(row))
     )

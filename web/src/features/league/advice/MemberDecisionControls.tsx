@@ -169,29 +169,45 @@ export function MemberDecisionControls({
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
     (top100Computable && computable!.top100Weights.some((offered) => offered === weight));
-  // A chip the member chose is the plain one-week plan with that chip forced. It combines
-  // with nothing, so the word and the settings above 0 are off while one is chosen, and
-  // the chips are off while either of those is on.
+  // Legacy published chips exclude both switches. The live chip strategy permits Top100,
+  // but still excludes the manager's word; explain only the applicable restriction.
   const chipCopy = CHIP_COPY[language];
   const chip = selection.chip;
   const chipOptions = [
     ...new Set([...chip.options, ...(capabilities?.chipsByEntry?.[entryId] ?? [])]),
   ];
-  const chipsAvailable = chipOptions.length > 0;
+  const chipStrategy = computable?.chipStrategy === true;
+  const chipsAvailable = chipOptions.length > 0 || chipStrategy;
   const chipChosen = chip.chip !== null;
-  const chipApplies = chipsAvailable && strategy === "saf-puan" && windowSize === 1;
-  const chipBlocked = selection.evidence.on || top100.weight !== 0;
-  const chipNote = !chipsAvailable
-    ? chipsUnavailable(chipCopy, chip.reason)
-    : !chipApplies
-      ? chipCopy.onlyBaseline
-      : chipBlocked
-        ? chipCopy.blockedBySwitches
-        : chip.chip !== null
-          ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
-          : chip.notOffered
-            ? chipCopy.notOffered
-            : chipCopy.plain;
+  const chipApplies =
+    chipsAvailable && strategy === "saf-puan" && (windowSize === 1 || chipStrategy);
+  const chipBlocked = selection.evidence.on || (top100.weight !== 0 && !chipStrategy);
+  const chipSwitchesOff = chipStrategy
+    ? language === "tr"
+      ? "Çip stratejisi teknik direktör yorumuyla birleştirilmez. Yorumu kullanmak için Çipleri sakla seçeneğine geç. Top100 etkisi çip stratejisiyle kullanılabilir."
+      : "Chip strategy cannot be combined with the manager's word. Choose Hold chips to use that input. Top100 influence remains available with chip strategy."
+    : chipCopy.switchesOff;
+  const chipBlockedNote = chipStrategy
+    ? language === "tr"
+      ? "Çip stratejisini seçmek için teknik direktör yorumunu kapat. Top100 etkisini koruyabilirsin."
+      : "Switch the manager's word off to choose a chip strategy. You can keep the Top100 influence."
+    : chipCopy.blockedBySwitches;
+  const chipNote =
+    chipStrategy && !chipBlocked
+      ? language === "tr"
+        ? "Otomatik: çipleri kullanma veya saklama zamanını transferlerle birlikte planlar. Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz."
+        : "Automatic plans chip timing and transfers together. A named chip forces this week; hold preserves all chips throughout the window."
+      : !chipsAvailable
+        ? chipsUnavailable(chipCopy, chip.reason)
+        : !chipApplies
+          ? chipCopy.onlyBaseline
+          : chipBlocked
+            ? chipBlockedNote
+            : chip.chip !== null
+              ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
+              : chip.notOffered
+                ? chipCopy.notOffered
+                : chipCopy.plain;
   // Why a chip the member cannot choose is off: already played, its window not open, a
   // Free Hit last gameweek, or no plan solved. Said per chip, in the producer's codes.
   const chipReasons = CHIP_NAMES.filter(
@@ -199,19 +215,20 @@ export function MemberDecisionControls({
   ).map((name) =>
     chipCopy.chipReasonLine(copy.chipNames[name] ?? name, chipReason(chipCopy, chip.reasons[name])),
   );
-  const top100Note = chipChosen
-    ? chipCopy.switchesOff
-    : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
-      ? computeCopy.top100Computable
-      : !top100.available
-        ? top100Unavailable(top100Copy, top100.reason)
-        : !top100Applies
-          ? top100Copy.notForSelection
-          : top100.notOffered
-            ? top100Copy.notOffered
-            : top100.weights.length < TOP100_WEIGHTS.length
-              ? top100Copy.notSolved
-              : top100Copy.published;
+  const top100Note =
+    chipChosen && !chipStrategy
+      ? chipCopy.switchesOff
+      : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
+        ? computeCopy.top100Computable
+        : !top100.available
+          ? top100Unavailable(top100Copy, top100.reason)
+          : !top100Applies
+            ? top100Copy.notForSelection
+            : top100.notOffered
+              ? top100Copy.notOffered
+              : top100.weights.length < TOP100_WEIGHTS.length
+                ? top100Copy.notSolved
+                : top100Copy.published;
 
   return (
     <Card
@@ -219,6 +236,37 @@ export function MemberDecisionControls({
       aside={<Badge tone="accent">{messages.decision.shareable}</Badge>}
     >
       <p className={styles.intro}>{copy.strategyIntro}</p>
+      {(capabilities?.models?.includes("football") || searchParams.get("model") === "football") && (
+        <fieldset className={styles.fieldset}>
+          <legend>{language === "tr" ? "Tahmin modeli" : "Prediction model"}</legend>
+          <div className={styles.options}>
+            {(["current", "football"] as const).map((model) => (
+              <label className={styles.option} key={model}>
+                <input
+                  type="radio"
+                  name="prediction-model"
+                  value={model}
+                  checked={(searchParams.get("model") ?? "current") === model}
+                  disabled={model === "football" && !capabilities?.models?.includes("football")}
+                  onChange={() => update({ model: model === "current" ? null : model })}
+                />
+                {model === "current"
+                  ? language === "tr"
+                    ? "Mevcut model"
+                    : "Current model"
+                  : language === "tr"
+                    ? "Futbol modeli · Deneysel"
+                    : "Football model · Experimental"}
+              </label>
+            ))}
+          </div>
+          <p>
+            {language === "tr"
+              ? "Futbol modeli gol, asist, gol yememe ve DEFCON bileşenlerini fikstürlere göre hesaplar. Canlı üstünlüğü henüz doğrulanmadı. Top100 etkisi seçtiğiniz modele uygulanır."
+              : "The football model forecasts goals, assists, clean sheets and DEFCON per fixture. Live superiority is unverified. Top100 influence applies to the selected model."}
+          </p>
+        </fieldset>
+      )}
       <div className={styles.controls}>
         <fieldset className={styles.fieldset}>
           <legend>{copy.strategyLegend}</legend>
@@ -320,7 +368,13 @@ export function MemberDecisionControls({
             ))}
           </div>
           <p className={styles.note}>
-            {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
+            {selection.request.model === "football"
+              ? language === "tr"
+                ? "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır; boş haftalar sıfır, çift maçlı haftalar maçların toplamıdır. Gelecekteki uygunluk ve fiyatlar kayıt anındaki haliyle sabit tutulur; planlayıcının transfer sınırları geçerlidir."
+                : "Each week's forecast uses that week's fixtures: blanks are zero and double gameweeks sum both matches. Future availability and prices stay at their captured values; the planner's transfer limits still apply."
+              : windows.length > 1
+                ? copy.windowLimits
+                : copy.windowNotComputed}
           </p>
         </fieldset>
 
@@ -343,7 +397,7 @@ export function MemberDecisionControls({
           </label>
           <p className={styles.note}>
             {chipChosen
-              ? chipCopy.switchesOff
+              ? chipSwitchesOff
               : !selection.evidence.available && evidenceComputable
                 ? computeCopy.wordComputable
                 : !selection.evidence.available
@@ -366,7 +420,9 @@ export function MemberDecisionControls({
                   name={TOP100_PARAMETER}
                   value={weight}
                   checked={top100.weight === weight}
-                  disabled={!weightSelectable(weight) || (chipChosen && weight !== 0)}
+                  disabled={
+                    !weightSelectable(weight) || (chipChosen && weight !== 0 && !chipStrategy)
+                  }
                   onChange={() =>
                     update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
                   }
@@ -406,8 +462,27 @@ export function MemberDecisionControls({
                   if (searchParams.has(CHIP_PARAMETER)) update({ [CHIP_PARAMETER]: null });
                 }}
               />
-              <span>{chipCopy.none}</span>
+              <span>
+                {chipStrategy
+                  ? language === "tr"
+                    ? "Çipleri sakla"
+                    : "Hold chips"
+                  : chipCopy.none}
+              </span>
             </label>
+            {chipStrategy && (
+              <label className={styles.windowOption}>
+                <input
+                  type="radio"
+                  name={CHIP_PARAMETER}
+                  value="auto"
+                  checked={chip.chip === "auto"}
+                  disabled={chipBlocked}
+                  onChange={() => update({ [CHIP_PARAMETER]: "auto" })}
+                />
+                <span>{language === "tr" ? "Otomatik strateji" : "Automatic strategy"}</span>
+              </label>
+            )}
             {CHIP_NAMES.map((name) => (
               <label className={styles.windowOption} key={name}>
                 <input
@@ -424,7 +499,7 @@ export function MemberDecisionControls({
           </div>
           <p className={styles.note}>{chipNote}</p>
           {chipReasons.length > 0 ? <p className={styles.note}>{chipReasons.join(" ")}</p> : null}
-          {chipApplies ? <p className={styles.note}>{chipCopy.help}</p> : null}
+          {chipApplies && !chipStrategy ? <p className={styles.note}>{chipCopy.help}</p> : null}
         </fieldset>
       </div>
       {computable && computable.strategies.length > 0 ? (

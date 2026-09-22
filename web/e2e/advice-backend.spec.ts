@@ -51,7 +51,7 @@ function windowsApiPids(apiPid: number, fixturePid: number, port: number): numbe
 test("member selections compute, reload uses cache, and a stopped backend leaves the published plan", async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   // These are the Python fixture's captured squad and member documents. No route,
   // including the API, is intercepted; Chromium enforces the cross-origin request.
   await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
@@ -194,6 +194,17 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
       payload: { mode: "ortak-koru", rival_entry_id: context.rivalId },
     },
     {
+      query: "chip=auto&top100=20",
+      body: {
+        strategy: "saf-puan",
+        window: 1,
+        rival_entry_id: null,
+        chip: "auto",
+        top100_weight: 20,
+      },
+      payload: { mode: "saf-puan", chip_strategy: { requested_chip: "auto", top100_weight: 20 } },
+    },
+    {
       query: "chip=bboost",
       body: { strategy: "saf-puan", window: 1, rival_entry_id: null, chip: "bboost" },
       payload: { mode: "saf-puan", chip_choice: { chip: "bboost" } },
@@ -226,11 +237,18 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     });
     await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
     await expect(advice).toBeVisible();
+    if (selection.body.chip === "auto") {
+      await expect(
+        page.getByRole("radio", { name: "Otomatik strateji", exact: true }),
+      ).toBeChecked();
+      await expect(page.getByTestId("chip-strategy")).toBeVisible();
+      await expect(page.getByTestId("chip-strategy")).toContainText("saklama değeri");
+    }
     for (const move of selectedAnswer.payload.moves) {
       if (move.player_in) await expect(advice).toContainText(move.player_in.name);
     }
   }
-  expect(jobs.size).toBe(4);
+  expect(jobs.size).toBe(5);
 
   // Last step only: restore the real published plan, then stop this fixture's API tree.
   const baseline = JSON.parse(await readFile(context.baselineCopy, "utf8"));

@@ -188,6 +188,39 @@ def test_a_roll_carries_a_legacy_entry_as_it_is(tmp_path: Path) -> None:
     assert _block(entry.decision)["free_transfers_after"] == 2
 
 
+def test_an_entry_completed_under_the_older_policy_still_loads_and_rolls(
+    tmp_path: Path,
+) -> None:
+    """No migration is owed when the bench rule changes, and this is the proof.
+
+    ``completion_policy`` records which rule completed a decision, so a ledger that
+    refused a token it did not recognise would turn every later rule into a migration of
+    everything already on disk. The field is carried, never checked against a list.
+    """
+
+    root = _opening(tmp_path)
+    directory = root / SEASON / "gw01"
+    decision_path = directory / "decision.json"
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    assert decision["completion_policy"] == "optimizer_projection_order_v2"
+    decision["completion_policy"] = "optimizer_projection_order_v1"
+    decision_path.write_text(
+        json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    write_manifest(directory)
+
+    assert load_entry(root, SEASON, 1).decision["completion_policy"] == (
+        "optimizer_projection_order_v1"
+    )
+
+    _roll(root, 2)
+
+    # The rolled week's order genuinely is the old one, so it keeps the old token.
+    assert load_entry(root, SEASON, 2).decision["completion_policy"] == (
+        "optimizer_projection_order_v1"
+    )
+
+
 @pytest.mark.parametrize("reason", ["", "   "])
 def test_a_roll_without_a_reason_is_refused(tmp_path: Path, reason: str) -> None:
     root = _opening(tmp_path)

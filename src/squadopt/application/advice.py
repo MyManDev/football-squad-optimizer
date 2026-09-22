@@ -742,6 +742,12 @@ def window_stated_limits(projection: Projection) -> list[str]:
     """
 
     carries_uplift = projection.diagnostics.get("projection_evidence_fingerprint") is not None
+    if projection.diagnostics.get("projection_source") == "live_football_artifact":
+        return [
+            "Each future fixture is forecast separately from captured history; blank weeks "
+            "are zero only in that week. No future outcomes or injury updates are assumed.",
+            *[sentence for sentence in WINDOW_STATED_LIMITS[1:] if sentence != WINDOW_TOP100_LIMIT],
+        ]
     return [
         sentence
         for sentence in WINDOW_STATED_LIMITS

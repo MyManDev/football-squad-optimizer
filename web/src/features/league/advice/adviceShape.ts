@@ -19,6 +19,16 @@ const array =
   (value) =>
     Array.isArray(value) && value.every(check);
 
+const predictionModel: Predicate = (value) =>
+  record(value) &&
+  Object.keys(value).length === 4 &&
+  fields(value, {
+    id: oneOf("football"),
+    version: oneOf("football_team_share_v1"),
+    experimental: oneOf(true),
+    fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
+  });
+
 function fields(
   value: unknown,
   required: Record<string, Predicate>,
@@ -117,6 +127,30 @@ const chipChoice: Predicate = (value) =>
     { windows_left: record },
   );
 
+const chipStrategy: Predicate = (value) =>
+  fields(value, {
+    version: oneOf("model_opportunity_reservation_v1"),
+    mode: oneOf("auto", "manual"),
+    requested_chip: oneOf("auto", "bboost", "3xc", "wildcard", "freehit"),
+    selected_chip: chip,
+    top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),
+    objective_gap: nullable(finite),
+    objective_basis: oneOf("selection_utility_with_chip_reserve"),
+    experimental: oneOf(true, false),
+    reservations: array((row) =>
+      fields(row, {
+        chip: oneOf("bboost", "3xc", "wildcard", "freehit"),
+        first_gameweek: identity,
+        last_gameweek: identity,
+        remaining_opportunities: integer,
+        holding_value: finite,
+        sample_min: finite,
+        sample_max: finite,
+      }),
+    ),
+    limits: array(text),
+  });
+
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
@@ -133,6 +167,7 @@ export function isAdvicePayload(value: unknown): boolean {
     },
     {
       source_snapshot_id: nullable(text),
+      prediction_model: predictionModel,
       rival_entry_id: identity,
       rival_label: nullable(text),
       transfer_hit_points: finite,
@@ -153,6 +188,7 @@ export function isAdvicePayload(value: unknown): boolean {
       evidence,
       top100,
       chip_choice: chipChoice,
+      chip_strategy: chipStrategy,
       expected_own_points: nullable(finite),
       captain: nullable(player),
       vice_captain: nullable(player),

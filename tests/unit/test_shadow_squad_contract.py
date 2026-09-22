@@ -97,6 +97,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "evidence",
         "top100",
         "chip_choice",
+        "chip_strategy",
         "chip_forecast",
         "transfer_hit_points",
         "expected_own_points",

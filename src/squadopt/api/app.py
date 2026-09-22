@@ -33,6 +33,7 @@ from squadopt.platform.advice_read import (
     ChipUnavailableError,
     LeagueNotConnectedError,
     ManagersWordUnavailableError,
+    ModelInputsUnavailableError,
     Top100InputsUnavailableError,
     UnknownEntryError,
     UnknownStrategyError,
@@ -88,7 +89,7 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
-def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, str | None]:
+def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, str | None, str]:
     """The AdviseRequestBody schema, enforced in one place.
 
     Exactly the declared keys (additionalProperties: false), a string strategy, an
@@ -102,7 +103,15 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
 
     if not isinstance(body, dict):
         raise BackendApiContractError("The POST body must be an object.")
-    allowed = {"strategy", "window", "rival_entry_id", "top100_weight", "managers_word", "chip"}
+    allowed = {
+        "strategy",
+        "window",
+        "rival_entry_id",
+        "top100_weight",
+        "managers_word",
+        "chip",
+        "model",
+    }
     unexpected = set(body) - allowed
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
@@ -130,7 +139,10 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
     chip = body.get("chip")
     if chip is not None and chip not in ADVISE_CHIPS:
         raise BackendApiContractError("Unknown chip choice.")
-    return strategy, window, rival, weight, word, chip
+    model = body.get("model", "current")
+    if model not in ("current", "football"):
+        raise BackendApiContractError("Unknown prediction model.")
+    return strategy, window, rival, weight, word, chip, model
 
 
 def create_app(
@@ -241,6 +253,10 @@ def create_app(
         _request: Request, error: UnsupportedAdviceRequestError
     ) -> JSONResponse:
         return _contract_error(422, "UNSUPPORTED_ADVICE_REQUEST", str(error))
+
+    @application.exception_handler(ModelInputsUnavailableError)
+    async def model_unavailable(_request: Request, error: ModelInputsUnavailableError) -> Response:
+        return _contract_error(422, "MODEL_INPUTS_UNAVAILABLE", str(error))
 
     @application.exception_handler(Top100InputsUnavailableError)
     async def top100_unavailable(
@@ -403,11 +419,14 @@ def create_app(
         top100_weight: Annotated[int, Query()] = 0,
         managers_word: Annotated[bool, Query()] = False,
         chip: Annotated[str | None, Query()] = None,
+        model: Annotated[str, Query()] = "current",
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         if window not in (1, 3, 5):
             return _contract_error(422, "VALIDATION_FAILED", "window must be 1, 3, or 5.")
+        if model not in ("current", "football"):
+            return _contract_error(422, "VALIDATION_FAILED", "Unknown prediction model.")
         if top100_weight not in ADVISE_TOP100_WEIGHTS:
             return _contract_error(
                 422,
@@ -424,6 +443,7 @@ def create_app(
                 top100_weight=top100_weight,
                 managers_word=managers_word,
                 chip=chip,
+                model=model,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -459,7 +479,9 @@ def create_app(
         except Exception:
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
         try:
-            strategy, window, rival, top100_weight, managers_word, chip = _parse_advise_body(body)
+            strategy, window, rival, top100_weight, managers_word, chip, model = _parse_advise_body(
+                body
+            )
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         current = datetime.now(UTC) if utc_now is None else utc_now()
@@ -478,6 +500,7 @@ def create_app(
             top100_weight=top100_weight,
             managers_word=managers_word,
             chip=chip,
+            model=model,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

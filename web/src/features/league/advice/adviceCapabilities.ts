@@ -32,9 +32,11 @@ export interface AdviceCapabilities {
   gameweek: number;
   strategies: Record<string, StrategyCapability>;
   /** The settings the service would accept now; zero is always one of them. */
+  models?: ("current" | "football")[];
   top100Weights: Top100Weight[];
   managersWord: boolean;
   /** Missing member means unknown history; an empty list means no held chips. */
+  chipStrategyWindows?: WindowSize[];
   chipsByEntry?: Record<string, MemberChip[]>;
 }
 
@@ -95,10 +97,22 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
   }
   // A setting this page has no radio for is not offered here; zero needs no offer.
   const offered = available ? weights.filter(isTop100Weight).filter((weight) => weight !== 0) : [];
+  let chipStrategyWindows: WindowSize[] | undefined;
   let chipsByEntry: Record<string, MemberChip[]> | undefined;
   if (value.chips !== undefined) {
     if (!record(value.chips) || !record(value.chips.held_by_entry)) {
       throw new AdviceCapabilitiesError("The capabilities have no member chip list.");
+    }
+    if (value.chips.strategy !== undefined) {
+      const strategy = value.chips.strategy;
+      if (
+        !record(strategy) ||
+        strategy.version !== "model_opportunity_reservation_v1" ||
+        !Array.isArray(strategy.windows) ||
+        !strategy.windows.every(isWindow)
+      )
+        throw new AdviceCapabilitiesError("Invalid chip strategy capabilities.");
+      chipStrategyWindows = [...new Set(strategy.windows as WindowSize[])];
     }
     chipsByEntry = {};
     for (const [entry, chips] of Object.entries(value.chips.held_by_entry)) {
@@ -114,7 +128,14 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       chipsByEntry[entry] = chips;
     }
   }
+  if (
+    value.models !== undefined &&
+    (!Array.isArray(value.models) ||
+      !value.models.every((m) => m === "current" || m === "football"))
+  )
+    throw new AdviceCapabilitiesError("Invalid model capabilities.");
   return {
+    ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,
     season: value.season,
@@ -122,6 +143,7 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     strategies,
     top100Weights: [0, ...new Set(offered)],
     managersWord: value.managers_word.available,
+    ...(chipStrategyWindows === undefined ? {} : { chipStrategyWindows }),
     ...(chipsByEntry === undefined ? {} : { chipsByEntry }),
   };
 }

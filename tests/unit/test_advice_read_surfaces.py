@@ -26,6 +26,7 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "mode",  # address: the strategy slug the document answers for
         "window",  # address: how many weeks the plan spans (1, 3, 5)
         "source_snapshot_id",  # provenance: the capture the advice was computed from
+        "prediction_model",  # provenance: selected experimental forecast version and digest
         "rival_entry_id",  # provenance: the rival the strategy was solved against
         "rival_label",  # provenance: that rival's display name, or null
         "data_quality",  # the producer's account of what it could read

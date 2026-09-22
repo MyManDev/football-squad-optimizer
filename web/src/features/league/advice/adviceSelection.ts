@@ -13,7 +13,7 @@ import {
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import type { AdviceRequest } from "./adviceClient";
 import { CHIP_NAMES } from "../chipShape";
-import { chipPath, parseChip, type MemberChip } from "./chipChoice";
+import { chipPath, parseChip, type ChipSelection, type MemberChip } from "./chipChoice";
 import {
   TOP100_WEIGHTS,
   parseTop100,
@@ -88,7 +88,15 @@ export function selectedAdviceRequest(
   ) {
     rivalEntryId = defaultRivalEntryId;
   }
-  return { leagueId, entryId, strategy, window, rivalEntryId, ...context };
+  return {
+    leagueId,
+    entryId,
+    strategy,
+    window,
+    rivalEntryId,
+    ...context,
+    ...(searchParams.get("model") === "football" ? { model: "football" as const } : {}),
+  };
 }
 
 /**
@@ -155,7 +163,7 @@ export interface PublishedAdviceSelection {
     available: boolean;
     held: MemberChip[];
     options: MemberChip[];
-    chip: MemberChip | null;
+    chip: ChipSelection | null;
     notOffered: boolean;
     reason: string | null;
     reasons: Partial<Record<MemberChip, string>>;
@@ -185,6 +193,7 @@ export interface ComputableAdvice {
   word: boolean;
   /** Held chips the service can compute for this strategy and window. */
   chips: MemberChip[];
+  chipStrategy?: boolean;
 }
 
 /** The URL parameter that switches the manager's word on: `llm=on`. */
@@ -327,7 +336,9 @@ export function resolvePublishedAdvice(
     (context &&
       (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
   ) {
-    return published;
+    return searchParams.get("model") === "football"
+      ? { ...published, status: "not-listed", path: null, windows: [], strategies: [] }
+      : published;
   }
   return withComputable(published, searchParams, entryId, members, index, capabilities);
 }
@@ -377,13 +388,16 @@ function withComputable(
   ) {
     return { ...published, computable: notComputable(strategies) };
   }
+  const football = published.request.model === "football";
   const declaredFor = (rivalEntryId: number | null, size: WindowSize) =>
-    index.unavailable.find(
-      (row) =>
-        row.strategy === strategy &&
-        (row.rival_entry_id ?? null) === rivalEntryId &&
-        (row.window ?? index.window) === size,
-    );
+    football
+      ? undefined
+      : index.unavailable.find(
+          (row) =>
+            row.strategy === strategy &&
+            (row.rival_entry_id ?? null) === rivalEntryId &&
+            (row.window ?? index.window) === size,
+        );
   const windows = capability.windows.filter(
     (size) => capability.requiresRival || !declaredFor(null, size),
   );
@@ -408,8 +422,24 @@ function withComputable(
   const baseline = strategy === "saf-puan" && window === 1;
   const word = capabilities.managersWord && baseline && windowComputable;
   const settings: Top100Weight[] = windowComputable ? capabilities.top100Weights : [0];
-  const chips = baseline && windowComputable ? (capabilities.chipsByEntry?.[entryId] ?? []) : [];
-  const computable = { strategies, windows, rivals, top100Weights: settings, word, chips };
+  const chipStrategy =
+    strategy === "saf-puan" &&
+    windowComputable &&
+    capabilities.chipStrategyWindows?.includes(window) === true &&
+    capabilities.chipsByEntry?.[entryId] !== undefined;
+  const chips =
+    (baseline || chipStrategy) && windowComputable
+      ? (capabilities.chipsByEntry?.[entryId] ?? [])
+      : [];
+  const computable = {
+    strategies,
+    windows,
+    rivals,
+    top100Weights: settings,
+    word,
+    chips,
+    chipStrategy,
+  };
 
   // The switches as asked, wherever the published tree or the service can honour them.
   const wordOn =
@@ -423,11 +453,13 @@ function withComputable(
     (settings.includes(asked) || top100Weights(index, entryId, wordOn, target).includes(asked))
       ? asked
       : 0;
-  const switched = wordOn || weight !== 0;
+  const switched = wordOn || (weight !== 0 && !chipStrategy);
   const askedChip = parseChip(searchParams).chip;
   const chip = switched
     ? null
-    : baseline && askedChip !== null && chips.includes(askedChip)
+    : (baseline || chipStrategy) &&
+        askedChip !== null &&
+        (askedChip === "auto" ? chipStrategy : chips.includes(askedChip))
       ? askedChip
       : published.chip.chip;
   const request: AdviceRequest = {
@@ -449,14 +481,16 @@ function withComputable(
     };
   }
   const sameAsPublished =
+    !football &&
     published.status === "ready" &&
     (published.request.rivalEntryId ?? null) === rivalEntryId &&
     published.evidence.on === wordOn &&
     published.top100.weight === weight &&
     published.chip.chip === chip;
   const canAsk =
+    (!football || capabilities.models?.includes("football") === true) &&
     windowComputable &&
-    (chip === null || chips.includes(chip)) &&
+    (chip === null || (chip === "auto" ? chipStrategy : chips.includes(chip))) &&
     (!capability.requiresRival || rivalEntryId !== null) &&
     (weight === 0 || settings.includes(weight)) &&
     (!wordOn || word);
@@ -562,7 +596,9 @@ function resolveFromIndex(
     ...chips,
     chip: null,
     notOffered:
-      !chipAsked.known || (chipAsked.chip !== null && !chips.options.includes(chipAsked.chip)),
+      !chipAsked.known ||
+      chipAsked.chip === "auto" ||
+      (chipAsked.chip !== null && !chips.options.includes(chipAsked.chip)),
   };
   result.strategies = [...new Set(index.strategies.filter(isMemberStrategy))];
   result.windows = availableWindows(index, request.strategy);
@@ -639,6 +675,7 @@ function resolveFromIndex(
       !switched &&
       top100.weight === 0 &&
       chipAsked.chip !== null &&
+      chipAsked.chip !== "auto" &&
       result.chip.options.includes(chipAsked.chip)
         ? chipAsked.chip
         : null;

@@ -27,6 +27,30 @@
             }
           },
           "type": "object"
+        },
+        "strategy": {
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "const": "model_opportunity_reservation_v1"
+            },
+            "windows": {
+              "items": {
+                "enum": [
+                  1,
+                  3,
+                  5
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "version",
+            "windows"
+          ],
+          "type": "object"
         }
       },
       "required": [
@@ -57,6 +81,16 @@
         "available"
       ],
       "type": "object"
+    },
+    "models": {
+      "items": {
+        "enum": [
+          "current",
+          "football"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
     },
     "season": {
       "minLength": 1,

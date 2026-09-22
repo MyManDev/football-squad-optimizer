@@ -13,7 +13,8 @@
             "wildcard",
             "freehit",
             "bboost",
-            "3xc"
+            "3xc",
+            "auto"
           ]
         },
         "contract_version": {
@@ -38,6 +39,12 @@
         },
         "managers_word": {
           "type": "boolean"
+        },
+        "model": {
+          "enum": [
+            "current",
+            "football"
+          ]
         },
         "operation": {
           "const": "league.advise",
@@ -112,11 +119,18 @@
             "wildcard",
             "freehit",
             "bboost",
-            "3xc"
+            "3xc",
+            "auto"
           ]
         },
         "managers_word": {
           "type": "boolean"
+        },
+        "model": {
+          "enum": [
+            "current",
+            "football"
+          ]
         },
         "rival_entry_id": {
           "anyOf": [

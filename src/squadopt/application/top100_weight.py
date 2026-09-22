@@ -250,7 +250,10 @@ def rebased_week(week: PlanningWeekResult, points: Mapping[int, float]) -> Plann
         captain=captain,
         transfers_in=_rebased(week.transfers_in, points),
         transfers_out=_rebased(week.transfers_out, points),
-        projected_score=float(starting_xi["expected_points"].sum() + captain["expected_points"]),
+        projected_score=float(
+            starting_xi["expected_points"].sum()
+            + (2 if week.chip == "3xc" else 1) * captain["expected_points"]
+        ),
         projected_bench_points=float(bench["expected_points"].sum()),
     )
 
