@@ -9,6 +9,7 @@ import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { ModelComparison } from "../advice/ModelComparison";
+import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
@@ -356,6 +357,17 @@ function LeagueMemberContent({
             canCompute={computeAvailable}
           />
         )}
+        <DecisionWorkbench
+          request={{
+            ...request,
+            top100Weight: selection.top100.weight,
+            managersWord: selection.evidence.on,
+            chip: selection.chip.chip,
+          }}
+          selected={shown?.envelope ?? null}
+          squad={squad}
+          loading={adviceLoading}
+        />
       </section>
     </div>
   );
