@@ -1,69 +1,70 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-18T12:26:35Z",
+  "generated_at_utc": "2026-09-22T22:04:06Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 5,
+    "gameweek": 6,
     "entry_id": 6654210,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
     "moves": [
       {
-        "move_id": "gw05-1",
+        "move_id": "gw06-1",
         "player_out": {
-          "player_id": 439509,
-          "name": "Christos Tzolis",
-          "short_name": "Tzolis",
-          "position": "MID",
-          "team": "Arsenal"
+          "player_id": 67089,
+          "name": "Martin Dubravka",
+          "short_name": "Dubravka",
+          "position": "GK",
+          "team": "Spurs"
         },
         "player_in": {
-          "player_id": 204580,
-          "name": "Vitaly Janelt",
-          "short_name": "Janelt",
-          "position": "MID",
-          "team": "Brentford"
+          "player_id": 116535,
+          "name": "Alisson Becker",
+          "short_name": "Becker",
+          "position": "GK",
+          "team": "Liverpool"
         },
-        "expected_points_delta": 0.40016957718903257,
+        "expected_points_delta": 3.5971759928579345,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-2",
+        "move_id": "gw06-2",
         "player_out": {
-          "player_id": 631786,
-          "name": "Jonah Kusi-Asare",
-          "short_name": "Kusi-Asare",
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
           "position": "FWD",
-          "team": "Fulham"
+          "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 647850,
-          "name": "Charalampos Kostoulas",
-          "short_name": "Kostoulas",
+          "player_id": 441264,
+          "name": "Brian Brobbey",
+          "short_name": "Brobbey",
           "position": "FWD",
-          "team": "Brighton"
+          "team": "Sunderland"
         },
-        "expected_points_delta": 3.1905243754178514,
+        "expected_points_delta": 0.7142930253910436,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 3.590693952606884,
+    "expected_gain_vs_hold": 4.311469018248978,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 62.77910215777383,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 61.98917358161898,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.417342366821867
+      "expected_points": 7.9988702038468515
     },
     "vice_captain": {
       "player_id": 141746,
@@ -71,16 +72,16 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.421694651064867
+      "expected_points": 6.34884146494046
     },
     "starting_xi": [
       {
-        "player_id": 67089,
-        "name": "Martin Dubravka",
-        "short_name": "Dubravka",
+        "player_id": 116535,
+        "name": "Alisson Becker",
+        "short_name": "Becker",
         "position": "GK",
-        "team": "Spurs",
-        "expected_points": 0.10027015579447286
+        "team": "Liverpool",
+        "expected_points": 3.6792367596625866
       },
       {
         "player_id": 97032,
@@ -88,15 +89,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.555548676659022
-      },
-      {
-        "player_id": 191866,
-        "name": "Kristoffer Ajer",
-        "short_name": "Ajer",
-        "position": "DEF",
-        "team": "Brentford",
-        "expected_points": 2.780518913256247
+        "expected_points": 4.0220554791262675
       },
       {
         "player_id": 244723,
@@ -104,23 +97,23 @@
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
-        "expected_points": 2.582386742483201
+        "expected_points": 3.0234430953770746
       },
       {
-        "player_id": 95658,
-        "name": "Harry Maguire",
-        "short_name": "Maguire",
+        "player_id": 220237,
+        "name": "Sven Botman",
+        "short_name": "Botman",
         "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.4986285568677755
+        "team": "Newcastle",
+        "expected_points": 2.6661832060505577
       },
       {
-        "player_id": 449429,
-        "name": "Jacob Greaves",
-        "short_name": "Greaves",
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
         "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 1.8900683591077632
+        "team": "Brentford",
+        "expected_points": 2.6426087370777593
       },
       {
         "player_id": 141746,
@@ -128,7 +121,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.421694651064867
+        "expected_points": 6.34884146494046
       },
       {
         "player_id": 446008,
@@ -136,7 +129,7 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.415892336727386
+        "expected_points": 4.5145936666230195
       },
       {
         "player_id": 60307,
@@ -144,15 +137,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.206689328780451
+        "expected_points": 4.118277294857414
       },
       {
-        "player_id": 204580,
-        "name": "Vitaly Janelt",
-        "short_name": "Janelt",
+        "player_id": 439509,
+        "name": "Christos Tzolis",
+        "short_name": "Tzolis",
         "position": "MID",
-        "team": "Brentford",
-        "expected_points": 3.4703464585699018
+        "team": "Arsenal",
+        "expected_points": 3.387458336586019
       },
       {
         "player_id": 223094,
@@ -160,7 +153,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.417342366821867
+        "expected_points": 7.9988702038468515
+      },
+      {
+        "player_id": 441264,
+        "name": "Brian Brobbey",
+        "short_name": "Brobbey",
+        "position": "FWD",
+        "team": "Sunderland",
+        "expected_points": 3.5809830416422095
       }
     ],
     "bench": [
@@ -170,15 +171,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.8238320826783507
-      },
-      {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 3.539796717037047
+        "expected_points": 3.937285604836282
       },
       {
         "player_id": 513545,
@@ -186,15 +179,23 @@
         "short_name": "Sangar\u00e9",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 3.3442643683372464
+        "expected_points": 2.5464318519096416
       },
       {
-        "player_id": 647850,
-        "name": "Charalampos Kostoulas",
-        "short_name": "Kostoulas",
+        "player_id": 449429,
+        "name": "Jacob Greaves",
+        "short_name": "Greaves",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 1.4196976731573054
+      },
+      {
+        "player_id": 631786,
+        "name": "Jonah Kusi-Asare",
+        "short_name": "Kusi-Asare",
         "position": "FWD",
-        "team": "Brighton",
-        "expected_points": 3.3144800767663556
+        "team": "Fulham",
+        "expected_points": 0.10433696207867839
       }
     ],
     "chip": "bboost",
@@ -210,7 +211,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 6.042125302454629,
+      "gain_vs_no_chip": 5.838807257929936,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {
