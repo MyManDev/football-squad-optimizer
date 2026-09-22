@@ -25,9 +25,16 @@ function serve(status = 202) {
     if (url.endsWith("/players"))
       return Response.json({
         season: "2026-27",
+        captured_at_utc: "2026-09-22T12:00:00Z",
+        teams: [
+          { id: 10, name: "Arsenal" },
+          { id: 20, name: "Chelsea" },
+        ],
         players: [
-          { id: 1, name: "Test Player", team: "ARS" },
-          { id: 2, name: "Other Player", team: "CHE" },
+          { id: 1, name: "Test Player", team_id: 10, team: "Arsenal", position: "GK" },
+          { id: 2, name: "Other Player", team_id: 10, team: "Arsenal", position: "GK" },
+          { id: 3, name: "Defender", team_id: 10, team: "Arsenal", position: "DEF" },
+          { id: 4, name: "Midfielder", team_id: 20, team: "Chelsea", position: "MID" },
         ],
       });
     if (options?.method === "POST") return Response.json({ id: 42, status: "pending" }, { status });
@@ -50,6 +57,8 @@ it("requires consent, preserves untrusted text as text and reports pending rathe
   const mock = serve();
   const user = userEvent.setup();
   mount();
+  await user.selectOptions(await screen.findByLabelText("Takım"), "10");
+  await user.selectOptions(screen.getByLabelText("Pozisyon"), "GK");
   await user.selectOptions(await screen.findByLabelText("Oyuncu"), "1");
   expect(await screen.findByText("<img src=x onerror=alert(1)>")).toBeInTheDocument();
   expect(document.querySelector("img")).toBeNull();
@@ -74,6 +83,8 @@ it("preserves a failed submission and resets it when changing players", async ()
   serve(503);
   const user = userEvent.setup();
   mount();
+  await user.selectOptions(await screen.findByLabelText("Takım"), "10");
+  await user.selectOptions(screen.getByLabelText("Pozisyon"), "GK");
   await user.selectOptions(await screen.findByLabelText("Oyuncu"), "1");
   await user.type(screen.getByLabelText(/Görünen ad/), "Scout");
   await user.type(screen.getByLabelText("Oyuncu hakkında yorum"), "Dakikaları ve rolü değişti.");
@@ -84,4 +95,35 @@ it("preserves a failed submission and resets it when changing players", async ()
   await user.selectOptions(screen.getByLabelText("Oyuncu"), "2");
   expect(screen.getByLabelText("Oyuncu hakkında yorum")).toHaveValue("");
   expect(screen.getByRole("checkbox")).not.toBeChecked();
+});
+
+it("filters the complete roster in order and clears drafts when upstream filters change", async () => {
+  serve();
+  const user = userEvent.setup();
+  mount();
+  const team = await screen.findByLabelText("Takım");
+  expect(screen.getByLabelText("Pozisyon")).toBeDisabled();
+  expect(screen.getByLabelText("Oyuncu")).toBeDisabled();
+  await user.selectOptions(team, "10");
+  expect(screen.getByLabelText("Oyuncu")).toBeDisabled();
+  await user.selectOptions(screen.getByLabelText("Pozisyon"), "GK");
+  expect(screen.queryByRole("option", { name: /Defender|Midfielder/ })).toBeNull();
+  await user.selectOptions(screen.getByLabelText("Oyuncu"), "1");
+  await user.type(
+    screen.getByLabelText("Oyuncu hakkında yorum"),
+    "This belongs to the goalkeeper.",
+  );
+  await user.click(screen.getByRole("checkbox"));
+  await user.selectOptions(screen.getByLabelText("Pozisyon"), "DEF");
+  expect(screen.getByLabelText("Oyuncu")).toHaveValue("");
+  expect(screen.queryByRole("option", { name: /Test Player/ })).toBeNull();
+  await user.selectOptions(screen.getByLabelText("Oyuncu"), "3");
+  expect(screen.getByLabelText("Oyuncu hakkında yorum")).toHaveValue("");
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  await user.selectOptions(team, "20");
+  expect(screen.getByLabelText("Pozisyon")).toHaveValue("");
+  expect(screen.getByLabelText("Oyuncu")).toBeDisabled();
+  await user.selectOptions(screen.getByLabelText("Pozisyon"), "MID");
+  await user.selectOptions(screen.getByLabelText("Oyuncu"), "4");
+  expect(screen.queryByRole("option", { name: /Defender/ })).toBeNull();
 });

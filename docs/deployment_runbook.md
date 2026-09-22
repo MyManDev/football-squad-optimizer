@@ -138,10 +138,14 @@ changed-file list and the independent scoreboard cells before/after in #632 befo
 PR. This checker does not replace verification of rebuilt season documents against the frozen
 schemas or of the frozen root index against the candidate's file list. The producer preserves
 accepted member advice bytes and never re-solves them. If an accepted advice document was
-re-rendered after its immutable record was written, even to add a reporting field, its hash
+changed after its immutable record was written, even to add a payload reporting field, its hash
 can differ and publication refuses with "Recorded comparison does not match accepted advice".
+The compared digest is the canonical payload, not the envelope's clock or formatting.
 That refusal is the evidence guard working, not a silent overwrite or a producer defect.
 Stop and reconcile which accepted bytes and records belong together; do not bypass the guard.
+The GW5 outcome refresh also updates `data/fixtures.json` from the same completed capture;
+accepted advice and entry files remain byte-identical. Generate the complete contribution
+roster with `scripts.build_player_catalog` from that capture before the site-data PR.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved

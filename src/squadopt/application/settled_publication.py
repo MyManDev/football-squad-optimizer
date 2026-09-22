@@ -47,7 +47,6 @@ from squadopt.live.tick import HeldSnapshot, LedgerState, plan_tick
 _SEASON_AUXILIARIES = frozenset(
     (
         "index.json",
-        "fixtures.json",
         "schema/ui_view_v1.schema.json",
         "schema/live_score_v1.schema.json",
         "schema/fixtures_v1.schema.json",
@@ -107,6 +106,7 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
         "data/league/members.json",
         "data/league/scoreboard.json",
         "data/league/series-horizon.json",
+        "data/fixtures.json",
     ):
         return True
     path = Path(name)
@@ -217,10 +217,15 @@ def _preflight(
         if reviewed.outcome_snapshot_id != request.snapshot_id:
             raise DataError(f"Member {entry_id} history did not settle on the named capture.")
         advice_path = f"data/league/advice/{entry_id}/saf-puan/1.json"
-        if (
-            advice_path not in accepted
-            or hashlib.sha256(accepted[advice_path]).hexdigest() != reviewed.advice_sha256
-        ):
+        # WeekReview carries advice_sha256: the canonical payload digest, not
+        # published_sha256 (the envelope's original bytes and publication clock).
+        payload = (
+            _document(accepted[advice_path], advice_path)["payload"]
+            if advice_path in accepted
+            else None
+        )
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        if payload is None or hashlib.sha256(encoded).hexdigest() != reviewed.advice_sha256:
             raise DataError(f"Recorded comparison does not match accepted advice: {advice_path}")
     ledger = load_ledger(request.ledger_root, request.season)
     if any(entry.gameweek > request.gameweek for entry in ledger):
@@ -364,7 +369,7 @@ def publish_settled(request: SettledPublicationRequest) -> SettledPublicationRes
             now=datetime.fromisoformat(stamp.replace("Z", "+00:00")),
         )
         for path, content in _files(season_stage / "data").items():
-            if path.startswith(f"{request.season}/"):
+            if path.startswith(f"{request.season}/") or path == "fixtures.json":
                 target = candidate / "data" / path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)

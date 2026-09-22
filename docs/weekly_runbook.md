@@ -353,10 +353,11 @@ are separate commands run by a person; the weekly command decides only when `--d
 asks it to, and never settles.
 
 **Do not re-publish a capture whose advice has already been accepted.** The advice record is
-immutable within one capture and the settled publisher checks each accepted document's hash
-against it, so a second publication of the same capture refuses as soon as the producer emits
-a different byte, which it will whenever the payload has gained a field since the record was
-written. That refusal is the guard working and the answer is to stop, not to force it: the
+immutable within one capture and the settled publisher checks each accepted document's
+canonical payload digest (`advice_sha256`) against it. It must not compare this digest to
+the full envelope bytes (`published_sha256`); a changed publication clock or JSON formatting
+does not change advice. A changed payload, including any added field, still refuses.
+That refusal is the guard working and the answer is to stop, not to force it: the
 accepted documents are the ones members read before the deadline and the record is what proves
 it. Restarting the backend does not re-publish anything (`scripts/release/restart_backend.ps1`
 verifies the published site, fast-forwards the checkout and restarts the launcher), so the

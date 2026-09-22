@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Any, cast
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from jsonschema import ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from squadopt.api.views import PublishedViewStore
+from squadopt.application.player_catalog import validate_catalog
 from squadopt.platform.contributions import ContributionsLimitedError, ContributionStore
 
 
@@ -18,21 +20,14 @@ class ContributionError(HTTPException):
     """A bounded public message whose status must survive the API's generic handler."""
 
 
-def contribution_routes(store: ContributionStore, views: PublishedViewStore) -> APIRouter:
+def contribution_routes(store: ContributionStore, data_root: Path) -> APIRouter:
     router = APIRouter(prefix="/api/v1/contributions")
 
     def catalog() -> dict[str, Any]:
-        latest = cast(dict[str, Any], views.seasons()["payload"])["latest"]
-        if latest is None:
-            raise ContributionError(503, "Player list is unavailable")
-        pool = cast(dict[str, Any], views.pool(latest["season"], latest["gameweek"])["payload"])
-        return {
-            "season": latest["season"],
-            "players": [
-                {"id": p["player_id"], "name": p["name"], "team": p["team"]}
-                for p in pool["players"]
-            ],
-        }
+        try:
+            return validate_catalog(json.loads((data_root / "players.json").read_text("utf-8")))
+        except (OSError, ValueError, ValidationError) as exc:
+            raise ContributionError(503, "Player list is unavailable") from exc
 
     @router.get("/players")
     def players(response: Response) -> dict[str, Any]:
@@ -88,7 +83,7 @@ def contribution_routes(store: ContributionStore, views: PublishedViewStore) -> 
         current = await run_in_threadpool(catalog)
         player = next((p for p in current["players"] if p["id"] == body["player_id"]), None)
         if type(body["player_id"]) is not int or body["season"] != current["season"] or not player:
-            raise ContributionError(422, "Choose a player from the current published list")
+            raise ContributionError(422, "Choose a player from the current published roster")
         try:
             identity = await run_in_threadpool(
                 store.submit,

@@ -7,7 +7,9 @@ import styles from "./ContributePage.module.css";
 
 interface Catalog {
   season: string;
-  players: { id: number; name: string; team: string }[];
+  captured_at_utc: string;
+  teams: { id: number; name: string }[];
+  players: { id: number; name: string; team_id: number; team: string; position: string }[];
 }
 interface Comment {
   id: number;
@@ -38,10 +40,18 @@ function catalog(value: unknown): Catalog {
   if (
     !data ||
     typeof data.season !== "string" ||
+    !Number.isFinite(Date.parse(data.captured_at_utc)) ||
+    !Array.isArray(data.teams) ||
+    !data.teams.every((t) => t && Number.isInteger(t.id) && typeof t.name === "string") ||
     !Array.isArray(data.players) ||
     !data.players.every(
       (p) =>
-        p && Number.isInteger(p.id) && typeof p.name === "string" && typeof p.team === "string",
+        p &&
+        Number.isInteger(p.id) &&
+        typeof p.name === "string" &&
+        typeof p.team === "string" &&
+        data.teams.some((t) => t.id === p.team_id && t.name === p.team) &&
+        ["GK", "DEF", "MID", "FWD"].includes(p.position),
     )
   )
     throw new Error("unavailable");
@@ -80,6 +90,8 @@ export function ContributePage() {
   const { language, locale } = useLanguage();
   const tr = language === "tr";
   const [playerId, setPlayerId] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [position, setPosition] = useState("");
   const [author, setAuthor] = useState("");
   const [body, setBody] = useState("");
   const [source, setSource] = useState("");
@@ -90,6 +102,11 @@ export function ContributePage() {
     retry: false,
   });
   const season = players.data?.season;
+  const teamPlayers = players.data?.players.filter((p) => String(p.team_id) === teamId) ?? [];
+  const filteredPlayers = teamPlayers.filter((p) => p.position === position);
+  const positions = tr
+    ? { GK: "Kaleci", DEF: "Defans", MID: "Orta saha", FWD: "Forvet" }
+    : { GK: "Goalkeeper", DEF: "Defender", MID: "Midfielder", FWD: "Forward" };
   const feed = useQuery({
     queryKey: ["contributions", season, playerId],
     enabled: !!season && !!playerId,
@@ -125,6 +142,13 @@ export function ContributePage() {
     event.preventDefault();
     if (!submit.isPending) submit.mutate();
   }
+  function resetPlayer(next = "") {
+    setPlayerId(next);
+    submit.reset();
+    setBody("");
+    setSource("");
+    setConsent(false);
+  }
   return (
     <section className={styles.page}>
       <header>
@@ -154,20 +178,55 @@ export function ContributePage() {
       ) : (
         <>
           <label>
+            {tr ? "Takım" : "Team"}
+            <select
+              value={teamId}
+              disabled={submit.isPending}
+              onChange={(event) => {
+                setTeamId(event.target.value);
+                setPosition("");
+                resetPlayer();
+              }}
+            >
+              <option value="">{tr ? "Takım seç" : "Choose a team"}</option>
+              {players.data?.teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {tr ? "Pozisyon" : "Position"}
+            <select
+              value={position}
+              disabled={!teamId || submit.isPending}
+              onChange={(event) => {
+                setPosition(event.target.value);
+                resetPlayer();
+              }}
+            >
+              <option value="">{tr ? "Pozisyon seç" : "Choose a position"}</option>
+              {Object.entries(positions).map(([code, name]) => (
+                <option
+                  key={code}
+                  value={code}
+                  disabled={!teamPlayers.some((p) => p.position === code)}
+                >
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             {tr ? "Oyuncu" : "Player"}
             <select
               value={playerId}
-              disabled={submit.isPending}
-              onChange={(event) => {
-                setPlayerId(event.target.value);
-                submit.reset();
-                setBody("");
-                setSource("");
-                setConsent(false);
-              }}
+              disabled={!teamId || !position || submit.isPending}
+              onChange={(event) => resetPlayer(event.target.value)}
             >
               <option value="">{tr ? "Oyuncu seç" : "Choose a player"}</option>
-              {players.data?.players.map((player) => (
+              {filteredPlayers.map((player) => (
                 <option key={player.id} value={player.id}>
                   {player.name} · {player.team}
                 </option>
@@ -175,7 +234,9 @@ export function ContributePage() {
             </select>
           </label>
           <small>
-            {tr ? "Yayımlanmış oyuncu havuzu" : "Published player pool"} · {season}
+            {tr ? "Tüm FPL oyuncuları" : "Complete FPL roster"} · {season} ·{" "}
+            {players.data?.players.length} {tr ? "oyuncu" : "players"} ·{" "}
+            {players.data && new Date(players.data.captured_at_utc).toLocaleString(locale)}
           </small>
           {playerId && (
             <>
