@@ -17,7 +17,7 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
   return (
     <section aria-label={copy.title}>
       <h3>{copy.title}</h3>
-      <div className={styles.tableWrap}>
+      <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.title}>
         <table className={styles.table}>
           <caption className="visually-hidden">{copy.title}</caption>
           <thead>
