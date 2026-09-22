@@ -19,8 +19,10 @@ import pandas as pd
 from squadopt.application.football_candidate import preview_football_candidate
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import InitialSquadState, PlanningHorizon
+from squadopt.planning.models import ChipAvailability, ChipUseWindow
 from squadopt.planning.recourse import ObservationNode
 from squadopt.prediction.football import FixtureFootballModel
+from squadopt.prediction.football_contextual import ContextualFootballModel
 
 
 def _identifier(value: object) -> int | str:
@@ -38,6 +40,9 @@ def run(bundle: Path, output: Path, *, samples: int = 256, seed: int = 0) -> dic
     config = json.loads(bundle.read_text(encoding="utf-8"))
     if config.get("contract_version") != "football_candidate_bundle_v1":
         raise ValueError("Unsupported candidate bundle contract.")
+    for flag in ("contextual", "scenario_selection"):
+        if not isinstance(config.get(flag, False), bool):
+            raise ValueError(f"{flag} must be a boolean.")
     hashes = {"bundle": hashlib.sha256(bundle.read_bytes()).hexdigest()}
 
     def read(name: str, file: str) -> pd.DataFrame:
@@ -57,7 +62,11 @@ def run(bundle: Path, output: Path, *, samples: int = 256, seed: int = 0) -> dic
     roster = read("roster", config["roster"])
     calendar = read("calendar", config["calendar"])
     cutoff = pd.Timestamp(config["decision_cutoff"])
-    model = FixtureFootballModel(train, history, cutoff=cutoff)
+    model = (
+        ContextualFootballModel(train, history, cutoff=cutoff)
+        if config.get("contextual", False)
+        else FixtureFootballModel(train, history, cutoff=cutoff)
+    )
     holdings = config["holdings"]
     initial = InitialSquadState(
         tuple(h["player_id"] for h in holdings), config["bank_tenths"], config["free_transfers"]
@@ -68,6 +77,18 @@ def run(bundle: Path, output: Path, *, samples: int = 256, seed: int = 0) -> dic
         )
         for n in config.get("observations", [])
     ]
+    chip_config = config.get("chips", {})
+    chips = ChipAvailability(
+        {name: frozenset(weeks) for name, weeks in chip_config.get("available", {}).items()},
+        {int(week): name for week, name in chip_config.get("forced", {}).items()},
+        {
+            name: tuple(
+                ChipUseWindow(frozenset(p["gameweeks"]), p.get("holding_value_points"))
+                for p in periods
+            )
+            for name, periods in chip_config.get("use_windows", {}).items()
+        },
+    )
     result = preview_football_candidate(
         model,
         history,
@@ -87,6 +108,8 @@ def run(bundle: Path, output: Path, *, samples: int = 256, seed: int = 0) -> dic
         candidate_count=config.get("candidate_count", 3),
         samples=samples,
         seed=seed,
+        chips=chips,
+        scenario_selection=config.get("scenario_selection", False),
     )
     decision = result.decisions[result.recommendation]
     recourse = result.recourse
@@ -96,6 +119,10 @@ def run(bundle: Path, output: Path, *, samples: int = 256, seed: int = 0) -> dic
         "source_snapshot_id": result.projections.source_snapshot_id,
         "horizon_fingerprint": result.projections.horizon_fingerprint,
         "recommendation": result.recommendation,
+        "scenario_selection": config.get("scenario_selection", False),
+        "scenario_mean_diagnostics": dict(result.scenario_mean_diagnostics),
+        "scenario_selection_evaluation": result.scenario_selection_evaluation,
+        "chip_availability_fingerprint": chips.availability_fingerprint,
         "squad": [_identifier(x) for x in decision.squad.player_id],
         "starting_xi": [_identifier(x) for x in decision.starting_xi],
         "bench": [_identifier(x) for x in decision.bench],
@@ -114,6 +141,7 @@ def run(bundle: Path, output: Path, *, samples: int = 256, seed: int = 0) -> dic
             "hold_feasible": recourse.hold_feasible,
             "candidates": [
                 {
+                    "first_week_chip": c.first_week.chip,
                     "expected_net_points": c.expected_net_points,
                     "continuations": [
                         {

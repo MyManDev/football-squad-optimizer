@@ -53,7 +53,11 @@ Recourse comparison requires zero bench and terminal weights, discount one and t
 hit charge in both the objective and reported scores. Its conditional value otherwise
 would be comparing different objectives. Buy/sell accounting carries the owner's purchase
 book and rebases purchases made at the first deadline before the continuation. Chips are
-not modeled on this new path; existing chip-aware production paths remain separate.
+optional on the extended recourse path: rights/renewals and expiry are carried through
+each observation, Free Hit restores holdings and bank, and the paired FT value is solved
+with the remaining chips. This extension uses explicit zero terminal values; it is not
+a fitted joint terminal value for bank/FT/chips. See the
+[contextual development record](football_contextual_development.md).
 
 The scoring adapter also preserves explicit card participation. A player receiving a card
 without minutes participates for autosub purposes; real minutes are unchanged and captain

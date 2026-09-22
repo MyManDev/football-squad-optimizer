@@ -118,6 +118,8 @@ def _horizon_fingerprint(table: pd.DataFrame, contract_version: str) -> str:
                     "expected_points": float(row["expected_points"]).hex(),
                 }
             )
+            if "appearance_probability" in table:
+                rows[-1]["appearance_probability"] = float(row["appearance_probability"]).hex()
     payload = {"contract_version": contract_version, "rows": rows}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
@@ -144,6 +146,17 @@ class PlanningHorizon:
                 f"Planning horizon is missing required columns: {missing!r}."
             )
         table = self.table.copy(deep=True)
+        if "appearance_probability" in table:
+            for value in table.appearance_probability:
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, Real)
+                    or not math.isfinite(value)
+                    or not 0 <= float(value) <= 1
+                ):
+                    raise TransferPlanningValidationError(
+                        "Appearance probability must be in [0, 1]."
+                    )
         if table.empty:
             raise TransferPlanningValidationError("Planning horizon must contain at least one row.")
         if bool(table.loc[:, PLANNING_HORIZON_COLUMNS].isna().any().any()):

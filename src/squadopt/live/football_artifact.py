@@ -11,9 +11,10 @@ from typing import Any
 import pandas as pd
 
 from squadopt.live.recommendation import Projection, RecommendationInputs
-from squadopt.planning.horizon import ProjectionHorizon
+from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION, ProjectionHorizon
 from squadopt.prediction.availability import apply_availability
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
 
 FOOTBALL_CHOICE = "football"
 MODEL_CHOICES = ("current", FOOTBALL_CHOICE)
@@ -57,9 +58,16 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
     document = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict) or document.get("fingerprint") != forecast_digest(document):
         raise ValueError("Football forecast fingerprint mismatch.")
+    contextual = document.get("model_version") == CONTEXTUAL_MODEL_VERSION
+    version = CONTEXTUAL_MODEL_VERSION if contextual else FOOTBALL_MODEL_VERSION
+    if contextual and (
+        document.get("availability_application") != "before_team_shares_v1"
+        or document.get("projection_contract") != APPEARANCE_HORIZON_CONTRACT_VERSION
+    ):
+        raise ValueError("Contextual football requires pre-allocation availability and appearance.")
     for key, expected in {
         "contract_version": ARTIFACT_CONTRACT,
-        "model_version": FOOTBALL_MODEL_VERSION,
+        "model_version": version,
         "season": inputs.season,
         "source_snapshot_id": inputs.snapshot_id,
         "captured_at_utc": inputs.captured_at_utc,
@@ -74,9 +82,10 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         inputs.season,
         inputs.snapshot_id,
         "fixture_football_candidate",
-        FOOTBALL_MODEL_VERSION,
+        version,
         FEATURE_CONTRACT,
         "fixture_sum_blank_zero_v1",
+        **({"contract_version": APPEARANCE_HORIZON_CONTRACT_VERSION} if contextual else {}),
     )
     if set(horizon.table.gameweek) != set(range(first, min(first + 5, 39))):
         raise ValueError("Football forecast must cover the full available five-week window.")
@@ -95,16 +104,23 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         chance = pd.to_numeric(frame["appearance_probability"], errors="raise")
         if not chance.between(0, 1).all():
             raise ValueError("Football appearance probability outside [0, 1].")
-        result = apply_availability(frame, inputs.availability)
-        adjusted.append(result.table)
+        result = None if contextual else apply_availability(frame, inputs.availability)
+        adjusted_frame = frame if result is None else result.table
+        adjusted.append(adjusted_frame)
         if week == first:
             first_projection = Projection(
-                result.table,
-                result.unavailable_players,
+                adjusted_frame,
+                tuple(adjusted_frame.loc[adjusted_frame.appearance_probability.eq(0), "player_id"])
+                if result is None
+                else result.unavailable_players,
                 {
-                    **dict(result.diagnostics),
+                    **(
+                        {"availability_application": "before_team_shares_v1"}
+                        if result is None
+                        else dict(result.diagnostics)
+                    ),
                     "model_name": "fixture_football_candidate",
-                    "model_version": FOOTBALL_MODEL_VERSION,
+                    "model_version": version,
                     "feature_contract_version": FEATURE_CONTRACT,
                     "projection_source": "live_football_artifact",
                     "projection_handoff_fingerprint": document["fingerprint"],

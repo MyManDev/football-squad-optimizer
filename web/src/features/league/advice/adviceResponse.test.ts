@@ -24,6 +24,17 @@ describe("nested published advice", () => {
     );
     expect(() => checkedAdvice(football, request)).toThrow(AdviceResponseError);
     expect(checkedAdvice(football, { ...request, model: "football" })).toBe(football);
+    const contextual = {
+      ...football,
+      payload: {
+        ...football.payload,
+        prediction_model: {
+          ...football.payload.prediction_model,
+          version: "football_contextual_v3",
+        },
+      },
+    };
+    expect(checkedAdvice(contextual, { ...request, model: "football" })).toBe(contextual);
     for (const patch of [{ fingerprint: "" }, { experimental: false }, { version: "other" }]) {
       expect(() =>
         checkedAdvice(

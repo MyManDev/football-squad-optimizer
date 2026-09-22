@@ -57,6 +57,8 @@ def _dispersion(y: Array, mu: Array) -> float:
 class FixtureFootballModel:
     """Fit on precomputed causal features; predict each fixture from one information state."""
 
+    model_version = FOOTBALL_MODEL_VERSION
+
     def __init__(self, train: pd.DataFrame, history: pd.DataFrame, *, cutoff: pd.Timestamp):
         if cutoff.tzinfo is None or train.empty or history.empty:
             raise ValueError("A timezone-aware cutoff and nonempty history/training are required.")
