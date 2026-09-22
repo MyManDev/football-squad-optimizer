@@ -22,18 +22,20 @@ class StrengthState:
     defence_rate: float = 8.0
     updated_at: pd.Timestamp | None = None
 
-    def at(self, instant: pd.Timestamp) -> StrengthState:
+    def at(
+        self, instant: pd.Timestamp, half_life_days: float = 90, prior: float = 8
+    ) -> StrengthState:
         if self.updated_at is None:
-            return StrengthState(updated_at=instant)
+            return StrengthState(prior, prior, prior, prior, instant)
         days = (instant - self.updated_at).total_seconds() / 86400
         if days < 0:
             raise ValueError("Team state cannot travel backwards in time.")
-        retain = math.exp(-math.log(2) * days / 90)
+        retain = math.exp(-math.log(2) * days / half_life_days)
         return StrengthState(
-            8 + (self.attack_shape - 8) * retain,
-            8 + (self.attack_rate - 8) * retain,
-            8 + (self.defence_shape - 8) * retain,
-            8 + (self.defence_rate - 8) * retain,
+            prior + (self.attack_shape - prior) * retain,
+            prior + (self.attack_rate - prior) * retain,
+            prior + (self.defence_shape - prior) * retain,
+            prior + (self.defence_rate - prior) * retain,
             instant,
         )
 
@@ -41,7 +43,19 @@ class StrengthState:
 class DynamicTeamStrength:
     """One observation per team/fixture, independent of roster size or player order."""
 
-    def __init__(self, history: pd.DataFrame, *, cutoff: pd.Timestamp):
+    def __init__(
+        self,
+        history: pd.DataFrame,
+        *,
+        cutoff: pd.Timestamp,
+        half_life_days: float = 90,
+        prior: float = 8,
+    ):
+        if any(
+            isinstance(v, bool) or not math.isfinite(v) or v <= 0 for v in (half_life_days, prior)
+        ):
+            raise ValueError("Team strength half-life and prior must be finite and positive.")
+        self.half_life_days, self.prior = half_life_days, prior
         if cutoff.tzinfo is None or history.empty:
             raise ValueError("Team strength requires history and an aware cutoff.")
         if not (history.kickoff + pd.Timedelta(hours=3) < cutoff).all():
@@ -82,7 +96,10 @@ class DynamicTeamStrength:
         for kickoff, matches in teams.groupby("kickoff", sort=True):
             instant = pd.Timestamp(str(kickoff))
             clubs = set(matches.club) | set(matches.opponent)
-            before = {club: self.states.get(club, StrengthState()).at(instant) for club in clubs}
+            before = {
+                club: self.states.get(club, StrengthState()).at(instant, half_life_days, prior)
+                for club in clubs
+            }
             if matches.club.duplicated().any():
                 raise ValueError("A club cannot play simultaneous fixtures.")
             for row in matches.to_dict("records"):
@@ -104,8 +121,10 @@ class DynamicTeamStrength:
     ) -> tuple[float, float]:
         if kickoff.tzinfo is None or kickoff < self.cutoff or home not in (0, 1):
             raise ValueError("Team forecast must name an aware future kickoff and venue.")
-        attack = self.states.get(club, StrengthState()).at(kickoff)
-        defence = self.states.get(opponent, StrengthState()).at(kickoff)
+        attack = self.states.get(club, StrengthState()).at(kickoff, self.half_life_days, self.prior)
+        defence = self.states.get(opponent, StrengthState()).at(
+            kickoff, self.half_life_days, self.prior
+        )
         mean = (
             self.base[home]
             * attack.attack_shape
