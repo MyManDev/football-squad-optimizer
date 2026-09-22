@@ -35,8 +35,21 @@ permission: see the note under the table for what that means and what it does no
 | Host | Terms URL | What the terms say about automated reading | `robots.txt` verdict for our path | Read by | Date |
 | --- | --- | --- | --- | --- | --- |
 | `www.liverpoolfc.com` | [/legal/terms-and-conditions](https://www.liverpoolfc.com/legal/terms-and-conditions) | The page is a ticketing and membership document. Read in full, 276 lines, its only restriction of this kind is 8.5, on reselling tickets "without the prior written consent of the Club". **It says nothing about reading the website, automated access, reproduction or publication.** Silent, not permissive. | `robots.txt` read 2026-09-22 for `/news` and `squadopt/1.0`: allowed | İbrahim Ersan Özdemir | 2026-09-22 |
-| `www.nufc.co.uk` | [/en/terms](https://www.nufc.co.uk/en/terms) | The page lists twenty ticketing, hospitality, membership and competition documents and publishes no website terms of use. **No document there governs reading the site.** Silent, not permissive. | `robots.txt` read 2026-09-22 for `/news` and `squadopt/1.0`: allowed | İbrahim Ersan Özdemir | 2026-09-22 |
+| `www.newcastleunited.com` | [/en/terms](https://www.newcastleunited.com/en/terms) | The page lists twenty ticketing, hospitality, membership and competition documents and publishes no website terms of use. **No document there governs reading the site.** Silent, not permissive. | `robots.txt` read 2026-09-23 for `/en/news` and `squadopt/1.0`: allowed | İbrahim Ersan Özdemir | 2026-09-23 |
 | `club.example` | — | Placeholder. Not a real host; the fixture serves it offline and no request is ever made. | not applicable | — | — |
+
+**Newcastle is registered at the host that serves the bytes, and it was not at first.**
+The first registration named `www.nufc.co.uk/news`, which **redirects** to
+`www.newcastleunited.com/en/news`; `/en/terms` redirects the same way to the same document.
+The first real run surfaced it, because the model cited the final URL and the capture's
+`final_url` confirmed the redirect was the source rather than an invention.
+
+That mattered for two reasons and only one of them is tidiness. A reading is a judgement
+about a named host, and a row naming one host while another serves the content is a reading
+of something nobody read. And the lane asks `robots.txt` of the **requested** origin, so a
+cross-host redirect was being followed without the serving host's preference ever being
+consulted. Both origins allow our path, so nothing was read against a refusal; the row now
+names the origin that answers, and the robots gap is fixed separately.
 
 **What these two rows are, exactly.** Neither club said yes. Each publishes a document
 called terms and conditions which, read in full, is about tickets, and neither publishes
