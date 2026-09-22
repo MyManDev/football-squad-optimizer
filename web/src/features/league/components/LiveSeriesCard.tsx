@@ -52,7 +52,12 @@ export function LiveSeriesCard({
       )}
       {series.rows.length > 0 && (
         <>
-          <div className={styles.tableWrap}>
+          <div
+            className={styles.tableWrap}
+            tabIndex={0}
+            role="region"
+            aria-label={copy.weekSummary}
+          >
             <table className={`${styles.table} ${styles.summaryTable}`}>
               <caption>{copy.weekSummary}</caption>
               <thead>
@@ -73,7 +78,7 @@ export function LiveSeriesCard({
               </tbody>
             </table>
           </div>
-          <div className={styles.tableWrap}>
+          <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.population}>
             <table className={styles.table}>
               <caption>
                 {copy.population} · {messages.scoreboardComparisons.official} · {copy.net}

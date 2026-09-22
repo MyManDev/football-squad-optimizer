@@ -52,6 +52,7 @@ from squadopt.platform.api_contract import (
     ADVISE_TOP100_WEIGHTS,
     BackendApiContractError,
 )
+from squadopt.platform.contributions import ContributionStore
 from squadopt.platform.queue_contracts import (
     AdviceQueueError,
     AdviceQueueIntegrityError,
@@ -157,6 +158,7 @@ def create_app(
     jobs_by_status: Callable[[], Mapping[str, int]] | None = None,
     readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
+    contributions: ContributionStore | None = None,
 ) -> FastAPI:
     """Build the API with an injectable read adapter and no solver startup work.
 
@@ -171,6 +173,20 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
+    if contributions is not None:
+        from squadopt.api.contributions import ContributionError, contribution_routes
+
+        application.include_router(contribution_routes(contributions, store))
+
+        @application.exception_handler(ContributionError)
+        async def contribution_error(_request: Request, error: ContributionError) -> JSONResponse:
+            response = _contract_error(
+                error.status_code, "CONTRIBUTION_REJECTED", str(error.detail)
+            )
+            response.headers.update(error.headers or {})
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
     if allowed_origins:
         # An allowlist, never a wildcard: the origins are the Pages domains, read from
         # configuration by the composition root. No origins configured means no CORS
