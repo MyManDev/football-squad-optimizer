@@ -107,6 +107,13 @@ def test_a_rival_squad_is_the_members_public_eleven() -> None:
     assert rival.captain_id == 3
 
 
+def test_a_post_autosub_captain_does_not_invent_a_fixed_rival_armband() -> None:
+    picks = _picks(7, captain=15)
+    assert picks.vice_captain in picks.starting_xi
+    with pytest.raises(ModeSelectionError, match="Post-autosub"):
+        rival_squad_from_picks(picks, label="Observed FC")
+
+
 def test_the_rival_is_the_nearest_member_above() -> None:
     squads = {n: RivalSquad(f"entry-{n}", tuple(PLAYERS[:11]), 1) for n in (10, 20, 30)}
     ranks = {10: 1, 20: 2, 30: 3, 40: 4}

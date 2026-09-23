@@ -27,6 +27,9 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "window",  # address: how many weeks the plan spans (1, 3, 5)
         "source_snapshot_id",  # provenance: the capture the advice was computed from
         "prediction_model",  # provenance: selected experimental forecast version and digest
+        "preferences",  # inputs: canonical user constraints applied by the producer
+        "preferences_scope",  # inputs: these constraints bind every selected week
+        "selection_top100_weight",  # inputs: selection weight, not a measured points cost
         "rival_entry_id",  # provenance: the rival the strategy was solved against
         "rival_label",  # provenance: that rival's display name, or null
         "data_quality",  # the producer's account of what it could read

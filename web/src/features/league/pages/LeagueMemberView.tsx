@@ -8,6 +8,7 @@ import { points } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
+import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
@@ -50,6 +51,7 @@ function LeagueMemberContent({
   onRetryAdvice,
   onRetryIndex,
   members = [],
+  outcomeFreshness,
   index = null,
   client,
   capabilities = null,
@@ -253,6 +255,43 @@ function LeagueMemberContent({
             </p>
           </Card>
         ) : null}
+        <Card
+          tone="muted"
+          title={language === "tr" ? "Karar ve sonuç verisi" : "Decision and outcome data"}
+        >
+          <p>
+            {language === "tr" ? "Karar haftası" : "Decision gameweek"}: GW{view.gameweek} ·{" "}
+            {language === "tr" ? "Kadro yayını" : "Squad published"}:{" "}
+            {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
+              new Date(squad.generated_at_utc),
+            )}
+          </p>
+          {outcomeFreshness && (
+            <p>
+              {language === "tr" ? "Son puanlanan hafta" : "Latest scored gameweek"}:{" "}
+              {outcomeFreshness.scoredGameweek == null
+                ? "—"
+                : `GW${outcomeFreshness.scoredGameweek}`}{" "}
+              ·{" "}
+              {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
+                new Date(outcomeFreshness.publishedAt),
+              )}
+            </p>
+          )}
+          <p>
+            {language === "tr"
+              ? "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri görüntüsü gerekir. Erken planlar son dakika kadro bilgisi içermez."
+              : "Refreshing fixtures or outcomes does not refresh forecasts. This plan uses the selected decision capture; later news and transfers require a new capture. Early plans do not include deadline-day team news."}
+          </p>
+          {outcomeFreshness?.scoredGameweek != null &&
+            outcomeFreshness.scoredGameweek >= view.gameweek && (
+              <p role="status">
+                {language === "tr"
+                  ? "Bu karar haftası artık oynandı; sonuçlarla geriye dönük yeniden tahmin yapılmadı. Yeni haftanın karar verisi bekleniyor."
+                  : "This decision week has been played. Forecasts were not rewritten using outcomes; the next decision capture is pending."}
+              </p>
+            )}
+        </Card>
         <ChipForecastCard
           published={indexReadable ? index?.chip_forecast : undefined}
           computed={computedForecast}
@@ -274,6 +313,7 @@ function LeagueMemberContent({
           index={selection.status === "index-error" ? null : index}
           capabilities={capabilities}
         />
+        <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
         <div className={styles.computeDock} data-compute-dock>
           <AdviceRequestPanel
             request={request}

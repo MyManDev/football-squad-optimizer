@@ -9,6 +9,7 @@
  * missing, full or forbidden only means there is nothing to resume.
  */
 
+import { preferencesKey } from "./decisionPreferences";
 import type { AdviceRequest } from "./adviceClient";
 
 const PREFIX = "squadopt.advice-job:";
@@ -34,7 +35,9 @@ export function adviceRequestKey(request: AdviceRequest): string {
     request.gameweek ?? "",
   ].join(":");
   const modelKey = request.model === "football" ? `${key}:model:football` : key;
-  return request.chip == null ? modelKey : `${modelKey}:chip:${request.chip}`;
+  const chipKey = request.chip == null ? modelKey : `${modelKey}:chip:${request.chip}`;
+  const preferences = preferencesKey(request.preferences);
+  return preferences ? `${chipKey}:preferences:${preferences}` : chipKey;
 }
 
 function storage(): Storage | null {

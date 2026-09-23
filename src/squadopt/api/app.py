@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Callable, Mapping
@@ -51,6 +52,7 @@ from squadopt.platform.api_contract import (
     ADVISE_CHIPS,
     ADVISE_TOP100_WEIGHTS,
     BackendApiContractError,
+    DecisionPreferences,
 )
 from squadopt.platform.contributions import ContributionStore
 from squadopt.platform.queue_contracts import (
@@ -112,6 +114,7 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
         "managers_word",
         "chip",
         "model",
+        "preferences",
     }
     unexpected = set(body) - allowed
     if unexpected:
@@ -143,6 +146,12 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
     model = body.get("model", "current")
     if model not in ("current", "football"):
         raise BackendApiContractError("Unknown prediction model.")
+    try:
+        DecisionPreferences.parse(body.get("preferences", {})).validate_selection(
+            strategy, word, chip
+        )
+    except ValueError as error:
+        raise BackendApiContractError(str(error)) from error
     return strategy, window, rival, weight, word, chip, model
 
 
@@ -436,6 +445,7 @@ def create_app(
         managers_word: Annotated[bool, Query()] = False,
         chip: Annotated[str | None, Query()] = None,
         model: Annotated[str, Query()] = "current",
+        preferences: Annotated[str | None, Query(max_length=1500)] = None,
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
@@ -450,6 +460,13 @@ def create_app(
                 f"top100_weight must be one of {list(ADVISE_TOP100_WEIGHTS)}.",
             )
         try:
+            selected_preferences = DecisionPreferences.parse(
+                json.loads(preferences) if preferences is not None else {}
+            )
+            selected_preferences.validate_selection(strategy, managers_word, chip)
+        except ValueError as error:
+            return _contract_error(422, "VALIDATION_FAILED", str(error))
+        try:
             payload = advice_store.read_advice(
                 league_id=league_id,
                 entry_id=entry_id,
@@ -460,6 +477,7 @@ def create_app(
                 managers_word=managers_word,
                 chip=chip,
                 model=model,
+                preferences=selected_preferences,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -517,6 +535,7 @@ def create_app(
             managers_word=managers_word,
             chip=chip,
             model=model,
+            preferences=DecisionPreferences.parse(body.get("preferences", {})),
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

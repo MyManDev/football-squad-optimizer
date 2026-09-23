@@ -24,7 +24,10 @@ import { checkedCapabilities, type AdviceCapabilities } from "./adviceCapabiliti
 import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { ChipSelection } from "./chipChoice";
 
+import { preferencesKey, type DecisionPreferences } from "./decisionPreferences";
+
 export interface AdviceRequest {
+  preferences?: DecisionPreferences;
   leagueId: number;
   entryId: number;
   strategy: AdviceStrategy;
@@ -94,6 +97,7 @@ export interface AdviceJobStatus {
 /** Whether a request asks for a Top 100 setting or the manager's word. */
 export function isSwitchedRequest(request: AdviceRequest): boolean {
   return (
+    !!preferencesKey(request.preferences) ||
     request.model === "football" ||
     (request.top100Weight ?? 0) !== 0 ||
     request.managersWord === true ||
@@ -240,6 +244,9 @@ export class HttpAdviceClient implements AdviceClient {
       weight +
       word +
       chip +
+      (preferencesKey(request.preferences)
+        ? `&preferences=${encodeURIComponent(preferencesKey(request.preferences))}`
+        : "") +
       (request.model === "football" ? "&model=football" : "")
     );
   }
@@ -300,6 +307,7 @@ export class HttpAdviceClient implements AdviceClient {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({
+          ...(preferencesKey(request.preferences) ? { preferences: request.preferences } : {}),
           strategy: request.strategy,
           window: request.window,
           rival_entry_id: request.rivalEntryId ?? null,

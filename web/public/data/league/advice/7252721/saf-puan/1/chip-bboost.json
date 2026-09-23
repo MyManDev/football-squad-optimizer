@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-18T12:26:35Z",
+  "generated_at_utc": "2026-09-22T22:04:06Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 5,
+    "gameweek": 6,
     "entry_id": 7252721,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
     "moves": [
       {
-        "move_id": "gw05-1",
+        "move_id": "gw06-1",
         "player_out": {
           "player_id": 67089,
           "name": "Martin Dubravka",
@@ -27,32 +27,33 @@
           "position": "GK",
           "team": "Arsenal"
         },
-        "expected_points_delta": 3.723561926883889,
+        "expected_points_delta": 3.8552248380316385,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 3.723561926883889,
+    "expected_gain_vs_hold": 3.8552248380316385,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 65.46570071663268,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 64.40412489899911,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.417342366821867
+      "expected_points": 7.9988702038468515
     },
     "vice_captain": {
-      "player_id": 222531,
-      "name": "Morgan Gibbs-White",
-      "short_name": "Gibbs-White",
+      "player_id": 437730,
+      "name": "Antoine Semenyo",
+      "short_name": "Semenyo",
       "position": "MID",
-      "team": "Nott'm Forest",
-      "expected_points": 4.887576817860959
+      "team": "Man City",
+      "expected_points": 4.792013121272329
     },
     "starting_xi": [
       {
@@ -61,7 +62,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.8238320826783507
+        "expected_points": 3.937285604836282
       },
       {
         "player_id": 465730,
@@ -69,15 +70,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.5539951801294207
-      },
-      {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.7968548202938828
+        "expected_points": 3.3044915452412056
       },
       {
         "player_id": 244723,
@@ -85,7 +78,15 @@
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
-        "expected_points": 2.582386742483201
+        "expected_points": 3.0234430953770746
+      },
+      {
+        "player_id": 146426,
+        "name": "Semi Ajayi",
+        "short_name": "Ajayi",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.8741759185724285
       },
       {
         "player_id": 219924,
@@ -93,15 +94,7 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.1138840416046176
-      },
-      {
-        "player_id": 222531,
-        "name": "Morgan Gibbs-White",
-        "short_name": "Gibbs-White",
-        "position": "MID",
-        "team": "Nott'm Forest",
-        "expected_points": 4.887576817860959
+        "expected_points": 2.4616547540334857
       },
       {
         "player_id": 437730,
@@ -109,7 +102,15 @@
         "short_name": "Semenyo",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.620473859853053
+        "expected_points": 4.792013121272329
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.553504725956041
       },
       {
         "player_id": 446008,
@@ -117,15 +118,15 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.415892336727386
+        "expected_points": 4.5145936666230195
       },
       {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
+        "player_id": 222531,
+        "name": "Morgan Gibbs-White",
+        "short_name": "Gibbs-White",
         "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.206689328780451
+        "team": "Nott'm Forest",
+        "expected_points": 4.355573252110645
       },
       {
         "player_id": 424876,
@@ -133,7 +134,7 @@
         "short_name": "Szoboszlai",
         "position": "MID",
         "team": "Liverpool",
-        "expected_points": 3.7460561434034036
+        "expected_points": 3.901377512814318
       },
       {
         "player_id": 223094,
@@ -141,7 +142,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.417342366821867
+        "expected_points": 7.9988702038468515
       }
     ],
     "bench": [
@@ -151,7 +152,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 2.9398808352076324
+        "expected_points": 2.7749400703238445
       },
       {
         "player_id": 477424,
@@ -159,7 +160,7 @@
         "short_name": "Gvardiol",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 4.056371668311424
+        "expected_points": 3.699315799275452
       },
       {
         "player_id": 475168,
@@ -167,7 +168,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.539796717037047
+        "expected_points": 2.866690016251166
       },
       {
         "player_id": 661313,
@@ -191,7 +192,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 8.066207484172466,
+      "gain_vs_no_chip": 8.277896474962859,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

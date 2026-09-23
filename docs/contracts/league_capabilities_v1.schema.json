@@ -92,6 +92,18 @@
       "type": "array",
       "uniqueItems": true
     },
+    "preferences": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "available"
+      ],
+      "type": "object"
+    },
     "season": {
       "minLength": 1,
       "type": "string"

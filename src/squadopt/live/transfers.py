@@ -23,6 +23,7 @@ from typing import Final, TypedDict
 
 import pandas as pd
 
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
 from squadopt.live.recommendation import Projection, RecommendationInputs
@@ -815,6 +816,7 @@ def plan_transfer_horizon(
     first_week_exclusion: FirstWeekExclusion | None = None,
     linearization_level: int | None = None,
     chip_strategy: bool = False,
+    preferences: DecisionPreferences | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -906,6 +908,8 @@ def plan_transfer_horizon(
     planning_table = table.loc[
         :, ["gameweek", "player_id", "name", "team_id", "position", "expected_points"]
     ].copy(deep=True)
+    if "appearance_probability" in table:
+        planning_table["appearance_probability"] = table["appearance_probability"]
     planning_table["buy_price_tenths"] = table["price_tenths"].astype("int64")
     planning_table["sell_price_tenths"] = [
         held_sell_prices.get(int(player), int(price))
@@ -947,6 +951,8 @@ def plan_transfer_horizon(
             planning_policy,
             chips or ChipAvailability(),
             linearization_level=linearization_level,
+            preferences=preferences,
+            protect_hold=True,
         )
         if chip_strategy
         else optimize_transfer_plan(
@@ -959,6 +965,8 @@ def plan_transfer_horizon(
             first_week_transfer_cap=first_week_transfer_cap,
             first_week_exclusion=first_week_exclusion,
             linearization_level=linearization_level,
+            preferences=preferences,
+            protect_hold=True,
         )
     )
     if not plan.has_solution or not plan.weeks:

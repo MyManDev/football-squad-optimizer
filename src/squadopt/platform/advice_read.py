@@ -33,6 +33,7 @@ from squadopt.application.advice_capabilities import (
 )
 from squadopt.application.entries import EntryError
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import (
     LEAGUE_CAPABILITIES_CONTRACT_VERSION,
@@ -409,6 +410,7 @@ class AdviceReadStore:
             # The settings that would be accepted now: zero is always one of them.
             "top100": {"available": top100, "weights": list(TOP100_WEIGHTS) if top100 else [0]},
             "managers_word": {"available": word},
+            "preferences": {"available": True},
             "chips": {
                 "strategy": {
                     "version": "model_opportunity_reservation_v1",
@@ -436,6 +438,7 @@ class AdviceReadStore:
         managers_word: bool = False,
         chip: str | None = None,
         model: str = "current",
+        preferences: DecisionPreferences = NO_PREFERENCES,
     ) -> ResolvedAdviceRequest:
         """Validate one request against what this deployment knows and address it.
 
@@ -444,6 +447,10 @@ class AdviceReadStore:
         the cache disagree about what exists.
         """
 
+        try:
+            preferences.validate_selection(strategy, managers_word, chip)
+        except ValueError as error:
+            raise UnsupportedAdviceRequestError(str(error)) from error
         if model not in ("current", "football"):
             raise UnsupportedAdviceRequestError("Unknown prediction model.")
         if strategy not in self._strategies:
@@ -489,7 +496,13 @@ class AdviceReadStore:
                 raise ChipUnavailableError(
                     "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
                 )
-        if top100_weight or managers_word or chip is not None or model != "current":
+        if (
+            top100_weight
+            or managers_word
+            or chip is not None
+            or model != "current"
+            or preferences.active
+        ):
             # Refused here, before a job exists: a switch whose input this capture does
             # not have can never be computed, and a queued job would only say so later.
             try:
@@ -501,6 +514,7 @@ class AdviceReadStore:
                     managers_word=managers_word,
                     chip=chip,
                     model=model,
+                    preferences=preferences,
                 )
             except SwitchInputUnavailable as error:
                 if error.switch == MODEL_SWITCH:
@@ -539,6 +553,7 @@ class AdviceReadStore:
         managers_word: bool = False,
         chip: str | None = None,
         model: str = "current",
+        preferences: DecisionPreferences = NO_PREFERENCES,
     ) -> tuple[str, AdviceRequestContext]:
         """``resolve`` for a caller that needs only the address and its context."""
 
@@ -552,6 +567,7 @@ class AdviceReadStore:
             managers_word=managers_word,
             chip=chip,
             model=model,
+            preferences=preferences,
         )
         return resolved.key, resolved.context
 
@@ -587,6 +603,7 @@ class AdviceReadStore:
         managers_word: bool = False,
         chip: str | None = None,
         model: str = "current",
+        preferences: DecisionPreferences = NO_PREFERENCES,
     ) -> bytes:
         """The cached answer under the complete key, or a typed refusal."""
 
@@ -600,6 +617,7 @@ class AdviceReadStore:
             managers_word=managers_word,
             chip=chip,
             model=model,
+            preferences=preferences,
         )
         cached = self.cached(key)
         if cached is None:

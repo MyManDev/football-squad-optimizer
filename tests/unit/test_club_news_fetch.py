@@ -464,21 +464,69 @@ def test_a_host_serving_no_robots_is_asked_once_and_allows_every_page() -> None:
 
 
 def test_the_committed_registry_reads() -> None:
-    """It ships with a placeholder so the shape is exercised without naming a real host."""
+    """It loads, and it keeps the placeholder the offline fixture serves.
+
+    The placeholder is not scaffolding left behind. It is the entry that exercises the
+    reader when no real host is reachable, and nothing ever requests it.
+    """
 
     sources = load_club_sources(REGISTRY)
 
-    assert [source.club for source in sources] == ["Example FC"]
-    assert all(source.url.startswith("https://club.example") for source in sources)
+    assert "Example FC" in {source.club for source in sources}
+    assert any(source.url.startswith("https://club.example") for source in sources)
 
 
-def test_the_committed_registry_names_no_real_host() -> None:
-    """Until a terms reading exists, the registry permits nothing real."""
+def _reading_rows() -> dict[str, tuple[str, str]]:
+    """Host -> (read by, date), from the readings table in ``docs/club_news_sources.md``."""
+
+    document = REGISTRY.parents[2] / "docs" / "club_news_sources.md"
+    rows: dict[str, tuple[str, str]] = {}
+    for line in document.read_text(encoding="utf-8").splitlines():
+        cells = [cell.strip() for cell in line.split("|")[1:-1]]
+        if len(cells) != 6 or cells[0].startswith(("Host", "---")):
+            continue
+        rows[cells[0].strip("`")] = (cells[4], cells[5])
+    return rows
+
+
+def test_every_registered_host_has_a_signed_reading() -> None:
+    """The rule the registry rests on, held against the document rather than described.
+
+    This replaces a test that asserted no real host was registered, which was true until
+    one was and then said nothing. What it was protecting is this: an entry whose host has
+    no dated, signed reading is a permission nobody granted, and the placeholder is the
+    one host exempt because no request is ever made for it.
+    """
 
     document = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    rows = _reading_rows()
 
-    hosts = {entry["url"].split("/")[2] for entry in document["sources"]}
-    assert hosts == {"club.example"}
+    unsigned = []
+    for entry in document["sources"]:
+        host = entry["url"].split("/")[2]
+        if host == "club.example":
+            continue
+        reader, date = rows.get(host, ("", ""))
+        if not reader or not date or reader == "\u2014" or date == "\u2014":
+            unsigned.append(host)
+
+    assert not unsigned, (
+        "These hosts are registered and have no signed, dated reading in "
+        f"docs/club_news_sources.md: {sorted(unsigned)}. A reading is a person's "
+        "judgement and the registry is what it permits."
+    )
+
+
+def test_the_placeholder_is_the_only_unsigned_row() -> None:
+    """A row without a name is a row nobody stands behind, and only one may exist."""
+
+    unsigned = {
+        host
+        for host, (reader, date) in _reading_rows().items()
+        if not reader.strip("\u2014 ") or not date.strip("\u2014 ")
+    }
+
+    assert unsigned == {"club.example"}
 
 
 def test_every_registered_source_points_at_a_terms_reading(tmp_path: Path) -> None:

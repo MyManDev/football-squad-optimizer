@@ -1,19 +1,19 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-22T15:12:16.749186Z",
+  "generated_at_utc": "2026-09-22T22:04:06Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
-    "league_name": "League 352490",
+    "league_name": "iyi olan kazans\u0131n v4",
     "season": "2026-27",
-    "gameweek": 5,
+    "gameweek": 6,
     "public_after_deadline": true,
     "scored_gameweek": 5,
     "members": [
       {
         "member_kind": "human",
         "entry_id": 2199732,
-        "manager_name": "Ertuğrul Soydal",
+        "manager_name": "Ertu\u011frul Soydal",
         "team_name": "Kepazesaray",
         "rank": 1,
         "gameweek_points": 46,
@@ -26,8 +26,8 @@
       {
         "member_kind": "human",
         "entry_id": 7252721,
-        "manager_name": "Tarık Ziya Aykut",
-        "team_name": "Tarık Ziya's Team",
+        "manager_name": "Tar\u0131k Ziya Aykut",
+        "team_name": "Tar\u0131k Ziya's Team",
         "rank": 2,
         "gameweek_points": 61,
         "transfer_cost": 0,
@@ -39,7 +39,7 @@
       {
         "member_kind": "human",
         "entry_id": 6879786,
-        "manager_name": "Tarık Sevgili",
+        "manager_name": "Tar\u0131k Sevgili",
         "team_name": "tarik",
         "rank": 3,
         "gameweek_points": 52,
@@ -65,7 +65,7 @@
       {
         "member_kind": "human",
         "entry_id": 313686,
-        "manager_name": "Güney Efe Tuğluca",
+        "manager_name": "G\u00fcney Efe Tu\u011fluca",
         "team_name": "fasulyesineoynamam",
         "rank": 5,
         "gameweek_points": 49,
@@ -78,8 +78,8 @@
       {
         "member_kind": "human",
         "entry_id": 6654210,
-        "manager_name": "İbrahim Ersan Özdemir",
-        "team_name": "Mühendis Direktör",
+        "manager_name": "\u0130brahim Ersan \u00d6zdemir",
+        "team_name": "M\u00fchendis Direkt\u00f6r",
         "rank": 6,
         "gameweek_points": 59,
         "transfer_cost": 0,
@@ -104,7 +104,7 @@
       {
         "member_kind": "human",
         "entry_id": 8548384,
-        "manager_name": "Efe Dönmez",
+        "manager_name": "Efe D\u00f6nmez",
         "team_name": "efedb",
         "rank": 8,
         "gameweek_points": 43,
@@ -130,8 +130,8 @@
       {
         "member_kind": "human",
         "entry_id": 5662073,
-        "manager_name": "Ali Yılmaz",
-        "team_name": "beyazboğazlıkazak",
+        "manager_name": "Ali Y\u0131lmaz",
+        "team_name": "beyazbo\u011fazl\u0131kazak",
         "rank": 10,
         "gameweek_points": 39,
         "transfer_cost": 0,
@@ -143,7 +143,7 @@
       {
         "member_kind": "human",
         "entry_id": 8883467,
-        "manager_name": "Hüseyin Baran Oktay",
+        "manager_name": "H\u00fcseyin Baran Oktay",
         "team_name": "barrran",
         "rank": 11,
         "gameweek_points": 58,
@@ -156,7 +156,7 @@
       {
         "member_kind": "human",
         "entry_id": 7018833,
-        "manager_name": "Çağlar Başkan",
+        "manager_name": "\u00c7a\u011flar Ba\u015fkan",
         "team_name": ":d",
         "rank": 12,
         "gameweek_points": 46,
@@ -182,7 +182,7 @@
       {
         "member_kind": "human",
         "entry_id": 5081114,
-        "manager_name": "Asil Göksu Özkan",
+        "manager_name": "Asil G\u00f6ksu \u00d6zkan",
         "team_name": "Zoktay fan clubv2",
         "rank": 14,
         "gameweek_points": 34,
@@ -195,8 +195,8 @@
       {
         "member_kind": "human",
         "entry_id": 3832237,
-        "manager_name": "MEHMED SAİD AY",
-        "team_name": "MEHMED SAİD's Team",
+        "manager_name": "MEHMED SA\u0130D AY",
+        "team_name": "MEHMED SA\u0130D's Team",
         "rank": 15,
         "gameweek_points": 44,
         "transfer_cost": 0,

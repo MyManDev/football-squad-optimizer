@@ -132,10 +132,17 @@ of buried in a single expected-points number.
 
 **Probabilistic prediction.** Quantiles rather than a symmetric conformal radius, so the
 scenario and CVaR machinery consumes a distribution the prediction side produced rather than one
-inferred downstream. **This one has a hard prerequisite:** the hand-off contract cannot carry a
-distribution today — `prediction/integration.py:94` drops every column outside the six required
-ones — so it starts with a change to `REQUIRED_COLUMNS`, which is a shared boundary. See the
-calibration seam in [ownership](architecture/ownership.md).
+inferred downstream. **This one has a prerequisite, and it is narrower than it was.** The
+hand-off boundary already carries a *declared* optional tier: `prediction/integration.py`
+narrows a supplied frame to the required columns plus whichever `PROJECTION_OPTIONAL_COLUMNS`
+the producer actually supplied, and those are exempt from the missing-value check because an
+absence there is deliberate. So a declared optional probability crosses it today (#587, #744).
+What it cannot carry is an *undeclared* field: quantiles, `expected_points_stddev` and
+`prediction_interval_lower` are in neither tuple and are still dropped. So this starts with
+naming them in `contracts/players.py` — `REQUIRED_COLUMNS` if they become mandatory,
+`OPTIONAL_COLUMNS` if not — which is a shared boundary either way. It also does not fix the
+persisted scalar handoff further down: `InSeasonProjection` carries expected points as one
+float per player. See the calibration seam in [ownership](architecture/ownership.md).
 
 **Multi-horizon forecasting.** The horizon builder currently projects one information state and
 scales a later week by its fixture count relative to the decision week's

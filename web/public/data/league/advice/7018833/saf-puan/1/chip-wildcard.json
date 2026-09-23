@@ -1,37 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-18T12:26:35Z",
+  "generated_at_utc": "2026-09-22T22:04:06Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 5,
+    "gameweek": 6,
     "entry_id": 7018833,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260918T122516Z-cd5c04029774",
+    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
     "moves": [
       {
-        "move_id": "gw05-1",
-        "player_out": {
-          "player_id": 97032,
-          "name": "Virgil van Dijk",
-          "short_name": "Dijk",
-          "position": "DEF",
-          "team": "Liverpool"
-        },
-        "player_in": {
-          "player_id": 17761,
-          "name": "James Tarkowski",
-          "short_name": "Tarkowski",
-          "position": "DEF",
-          "team": "Everton"
-        },
-        "expected_points_delta": 0.6034990546773429,
-        "reason_code": "points_gain"
-      },
-      {
-        "move_id": "gw05-2",
+        "move_id": "gw06-1",
         "player_out": {
           "player_id": 204480,
           "name": "Declan Rice",
@@ -46,11 +27,11 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.2899396752118264,
+        "expected_points_delta": 1.0468254955077683,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-3",
+        "move_id": "gw06-2",
         "player_out": {
           "player_id": 204936,
           "name": "Gianluigi Donnarumma",
@@ -59,17 +40,17 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
+          "player_id": 472739,
+          "name": "Carl Rushworth",
+          "short_name": "Rushworth",
           "position": "GK",
-          "team": "Arsenal"
+          "team": "Coventry City"
         },
-        "expected_points_delta": 0.4189253965666069,
+        "expected_points_delta": -0.2491651952072047,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-4",
+        "move_id": "gw06-3",
         "player_out": {
           "player_id": 209036,
           "name": "Marc Gu\u00e9hi",
@@ -78,17 +59,17 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 108416,
-          "name": "John Egan",
-          "short_name": "Egan",
+          "player_id": 17761,
+          "name": "James Tarkowski",
+          "short_name": "Tarkowski",
           "position": "DEF",
-          "team": "Hull City"
+          "team": "Everton"
         },
-        "expected_points_delta": -1.1179921516057618,
+        "expected_points_delta": 0.4624702182395737,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-5",
+        "move_id": "gw06-4",
         "player_out": {
           "player_id": 216646,
           "name": "Yoane Wissa",
@@ -103,11 +84,11 @@
           "position": "FWD",
           "team": "Liverpool"
         },
-        "expected_points_delta": 1.3333454370104505,
+        "expected_points_delta": 2.092354191004297,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-6",
+        "move_id": "gw06-5",
         "player_out": {
           "player_id": 231416,
           "name": "Ferdi Kad\u0131o\u011flu",
@@ -116,17 +97,17 @@
           "team": "Brighton"
         },
         "player_in": {
-          "player_id": 146426,
-          "name": "Semi Ajayi",
-          "short_name": "Ajayi",
+          "player_id": 455084,
+          "name": "Leif Davis",
+          "short_name": "Davis",
           "position": "DEF",
-          "team": "Hull City"
+          "team": "Ipswich Town"
         },
         "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-7",
+        "move_id": "gw06-6",
         "player_out": {
           "player_id": 244850,
           "name": "Morgan Rogers",
@@ -135,17 +116,17 @@
           "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 201658,
-          "name": "Marcus Tavernier",
-          "short_name": "Tavernier",
+          "player_id": 223340,
+          "name": "Bukayo Saka",
+          "short_name": "Saka",
           "position": "MID",
-          "team": "Bournemouth"
+          "team": "Arsenal"
         },
-        "expected_points_delta": -0.34867047644448235,
+        "expected_points_delta": 0.7721254670575348,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-8",
+        "move_id": "gw06-7",
         "player_out": {
           "player_id": 441164,
           "name": "Pedro Porro Sauceda",
@@ -154,17 +135,17 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
+          "player_id": 461102,
+          "name": "Bobby Thomas",
+          "short_name": "Thomas",
           "position": "DEF",
-          "team": "Leeds"
+          "team": "Coventry City"
         },
-        "expected_points_delta": 0.774834381845551,
+        "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-9",
+        "move_id": "gw06-8",
         "player_out": {
           "player_id": 465730,
           "name": "Maxim De Cuyper",
@@ -179,11 +160,11 @@
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 0.5023764881820085,
+        "expected_points_delta": 0.3948242540342477,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-10",
+        "move_id": "gw06-9",
         "player_out": {
           "player_id": 466525,
           "name": "Anton Stach",
@@ -192,17 +173,17 @@
           "team": "Leeds"
         },
         "player_in": {
-          "player_id": 222531,
-          "name": "Morgan Gibbs-White",
-          "short_name": "Gibbs-White",
+          "player_id": 243413,
+          "name": "Regan Slater",
+          "short_name": "Slater",
           "position": "MID",
-          "team": "Nott'm Forest"
+          "team": "Hull City"
         },
-        "expected_points_delta": 1.1864683822104496,
+        "expected_points_delta": -0.521708847799836,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-11",
+        "move_id": "gw06-10",
         "player_out": {
           "player_id": 475168,
           "name": "Jo\u00e3o Pedro Junqueira de Jesus",
@@ -211,17 +192,36 @@
           "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 661313,
-          "name": "Juan Angulo",
-          "short_name": "Angulo",
+          "player_id": 441264,
+          "name": "Brian Brobbey",
+          "short_name": "Brobbey",
           "position": "FWD",
           "team": "Sunderland"
         },
-        "expected_points_delta": -0.36843113248040993,
+        "expected_points_delta": 0.6834571338695099,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-12",
+        "move_id": "gw06-11",
+        "player_out": {
+          "player_id": 489639,
+          "name": "Bart Verbruggen",
+          "short_name": "Verbruggen",
+          "position": "GK",
+          "team": "Brighton"
+        },
+        "player_in": {
+          "player_id": 473284,
+          "name": "Konstantinos Tzolakis",
+          "short_name": "Tzolakis",
+          "position": "GK",
+          "team": "Hull City"
+        },
+        "expected_points_delta": 0.5069475512747061,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw06-12",
         "player_out": {
           "player_id": 494595,
           "name": "Florian Wirtz",
@@ -230,17 +230,17 @@
           "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 503139,
-          "name": "Alex Scott",
-          "short_name": "Scott",
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
           "position": "MID",
-          "team": "Bournemouth"
+          "team": "Man City"
         },
-        "expected_points_delta": 0.497539306613902,
+        "expected_points_delta": 0.834127631144824,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw05-13",
+        "move_id": "gw06-13",
         "player_out": {
           "player_id": 540324,
           "name": "Mohamed Belloumi",
@@ -255,41 +255,42 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 1.0513916848791922,
+        "expected_points_delta": 0.6437255981409322,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 4.823226046666676,
+    "expected_gain_vs_hold": 6.665983497266353,
     "expected_points_cost": 0.0,
     "rival_label": null,
-    "solver_status": "OPTIMAL",
-    "optimality_gap": 0.0,
-    "expected_own_points": 58.88662049319737,
+    "solver_status": "FEASIBLE",
+    "optimality_gap": 4.742000000000004,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 58.16359448800842,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.417342366821867
+      "expected_points": 7.9988702038468515
     },
     "vice_captain": {
-      "player_id": 219168,
-      "name": "Alexander Isak",
-      "short_name": "Isak",
-      "position": "FWD",
-      "team": "Liverpool",
-      "expected_points": 4.897045438301909
+      "player_id": 223340,
+      "name": "Bukayo Saka",
+      "short_name": "Saka",
+      "position": "MID",
+      "team": "Arsenal",
+      "expected_points": 5.325630193013578
     },
     "starting_xi": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 473284,
+        "name": "Konstantinos Tzolakis",
+        "short_name": "Tzolakis",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.8238320826783507
+        "team": "Hull City",
+        "expected_points": 3.3402776987185216
       },
       {
         "player_id": 17761,
@@ -297,7 +298,15 @@
         "short_name": "Tarkowski",
         "position": "DEF",
         "team": "Everton",
-        "expected_points": 4.159047731336366
+        "expected_points": 4.067002584842606
+      },
+      {
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 4.0220554791262675
       },
       {
         "player_id": 477424,
@@ -305,31 +314,23 @@
         "short_name": "Gvardiol",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 4.056371668311424
+        "expected_points": 3.699315799275452
       },
       {
-        "player_id": 226182,
-        "name": "Jayden Bogle",
-        "short_name": "Bogle",
-        "position": "DEF",
-        "team": "Leeds",
-        "expected_points": 3.5912977776990163
-      },
-      {
-        "player_id": 222531,
-        "name": "Morgan Gibbs-White",
-        "short_name": "Gibbs-White",
+        "player_id": 223340,
+        "name": "Bukayo Saka",
+        "short_name": "Saka",
         "position": "MID",
-        "team": "Nott'm Forest",
-        "expected_points": 4.887576817860959
+        "team": "Arsenal",
+        "expected_points": 5.325630193013578
       },
       {
-        "player_id": 513418,
-        "name": "Kevin Schade",
-        "short_name": "Schade",
+        "player_id": 437730,
+        "name": "Antoine Semenyo",
+        "short_name": "Semenyo",
         "position": "MID",
-        "team": "Brentford",
-        "expected_points": 4.222757269435823
+        "team": "Man City",
+        "expected_points": 4.792013121272329
       },
       {
         "player_id": 60307,
@@ -337,23 +338,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.206689328780451
+        "expected_points": 4.118277294857414
       },
       {
-        "player_id": 503139,
-        "name": "Alex Scott",
-        "short_name": "Scott",
+        "player_id": 513418,
+        "name": "Kevin Schade",
+        "short_name": "Schade",
         "position": "MID",
-        "team": "Bournemouth",
-        "expected_points": 4.141082332576842
-      },
-      {
-        "player_id": 201658,
-        "name": "Marcus Tavernier",
-        "short_name": "Tavernier",
-        "position": "MID",
-        "team": "Bournemouth",
-        "expected_points": 4.066235312572494
+        "team": "Brentford",
+        "expected_points": 4.011063640217717
       },
       {
         "player_id": 223094,
@@ -361,7 +354,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.417342366821867
+        "expected_points": 7.9988702038468515
       },
       {
         "player_id": 219168,
@@ -369,41 +362,49 @@
         "short_name": "Isak",
         "position": "FWD",
         "team": "Liverpool",
-        "expected_points": 4.897045438301909
+        "expected_points": 5.209235227348625
+      },
+      {
+        "player_id": 441264,
+        "name": "Brian Brobbey",
+        "short_name": "Brobbey",
+        "position": "FWD",
+        "team": "Sunderland",
+        "expected_points": 3.5809830416422095
       }
     ],
     "bench": [
       {
-        "player_id": 489639,
-        "name": "Bart Verbruggen",
-        "short_name": "Verbruggen",
+        "player_id": 472739,
+        "name": "Carl Rushworth",
+        "short_name": "Rushworth",
         "position": "GK",
-        "team": "Brighton",
-        "expected_points": 2.9398808352076324
+        "team": "Coventry City",
+        "expected_points": 2.833330147443812
       },
       {
-        "player_id": 108416,
-        "name": "John Egan",
-        "short_name": "Egan",
+        "player_id": 455084,
+        "name": "Leif Davis",
+        "short_name": "Davis",
         "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.8164633958534613
+        "team": "Ipswich Town",
+        "expected_points": 2.8975259077726996
       },
       {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
+        "player_id": 461102,
+        "name": "Bobby Thomas",
+        "short_name": "Thomas",
         "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.7968548202938828
+        "team": "Coventry City",
+        "expected_points": 2.8102213805086835
       },
       {
-        "player_id": 661313,
-        "name": "Juan Angulo",
-        "short_name": "Angulo",
-        "position": "FWD",
-        "team": "Sunderland",
-        "expected_points": 1.3473254086181279
+        "player_id": 243413,
+        "name": "Regan Slater",
+        "short_name": "Slater",
+        "position": "MID",
+        "team": "Hull City",
+        "expected_points": 2.6768789872037875
       }
     ],
     "chip": "wildcard",
@@ -419,7 +420,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "wildcard",
-      "gain_vs_no_chip": 3.273184638901455,
+      "gain_vs_no_chip": 3.2690214546867864,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

@@ -38,6 +38,7 @@ from squadopt.application.top100_weight import (
     top100_manifest_path,
 )
 from squadopt.application.weekly_plan import evidence_artifact, rotation_artifact
+from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.data.errors import DataError
 from squadopt.live import Projection, RecommendationInputs
 from squadopt.live.football_artifact import (
@@ -101,6 +102,7 @@ def switch_identity(
     managers_word: bool = False,
     chip: str | None = None,
     model: str = "current",
+    preferences: DecisionPreferences = NO_PREFERENCES,
 ) -> SwitchIdentity:
     """What the switched-on part of a request adds to its address; empty when all are off.
 
@@ -112,6 +114,11 @@ def switch_identity(
     """
 
     identity: SwitchIdentity = {}
+    if preferences.active:
+        identity["preferences"] = {
+            "version": "decision_preferences_v1",
+            "value": preferences.canonical(),
+        }
     if model != "current":
         if model != "football" or inputs.football is None:
             raise SwitchInputUnavailable(

@@ -796,7 +796,10 @@
               "const": "football"
             },
             "version": {
-              "enum": ["football_team_share_v1", "football_contextual_v3"]
+              "enum": [
+                "football_team_share_v1",
+                "football_contextual_v3"
+              ]
             }
           },
           "required": [
@@ -806,6 +809,39 @@
             "fingerprint"
           ],
           "type": "object"
+        },
+        "preferences": {
+          "additionalProperties": false,
+          "properties": {
+            "avoid_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "keep_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "no_hits": {
+              "type": "boolean"
+            },
+            "save_chips": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "preferences_scope": {
+          "const": "all_selected_weeks"
         },
         "rival_entry_id": {
           "minimum": 1,
@@ -819,6 +855,17 @@
         },
         "season": {
           "type": "string"
+        },
+        "selection_top100_weight": {
+          "enum": [
+            0,
+            5,
+            10,
+            20,
+            30,
+            40,
+            50
+          ]
         },
         "solver_status": {
           "type": [
