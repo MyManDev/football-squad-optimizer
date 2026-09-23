@@ -376,6 +376,13 @@ class HostManners:
         return parser
 
 
+def _origin_of(url: str) -> str:
+    """The scheme and host of a URL, spelled as :attr:`ClubSource.origin` spells it."""
+
+    parsed = urllib.parse.urlsplit(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def robots_allows(
     source: ClubSource,
     *,
@@ -451,6 +458,26 @@ def fetch_club_document(
     if manners is not None:
         manners.before_request(source.origin, sleeper)
     read = read_url(source.url, opener=opener, sleeper=sleeper)
+    if check_robots and _origin_of(read.final_url) != source.origin:
+        # `robots_allows` above asked the origin we *requested*. A redirect can be answered
+        # by a different host, whose preference nobody asked and whose terms nobody read, so
+        # following it would let one host's consent stand in for another's. That is not a
+        # hypothetical: `www.nufc.co.uk/news` redirects to `www.newcastleunited.com/en/news`,
+        # and the first real run read one host under a reading signed for the other (#781).
+        #
+        # The request has already gone; the final URL is not knowable before the response,
+        # and a HEAD preflight would double every fetch and still not bind what the GET
+        # returns. So what this refusal buys is narrower and still worth having: the bytes
+        # are not used, the club is recorded as not covered rather than read, and once the
+        # registry names the serving host with a reading of its own the redirect is gone.
+        raise ClubNewsFetchError(
+            f"{source.url} was answered by {_origin_of(read.final_url)}, which is not the "
+            f"origin this run asked for permission at ({source.origin}). Its bytes are not "
+            "read: a registered page is a host whose robots.txt this run consulted and whose "
+            "terms somebody signed a reading for, and a redirect does not carry either of "
+            "those across. Register the serving origin and sign its reading, then this page "
+            "is fetched from the host that answers it."
+        )
     if len(read.content) > MAXIMUM_DOCUMENT_BYTES:
         raise ClubNewsFetchError(
             f"{source.url} served more than {MAXIMUM_DOCUMENT_BYTES} bytes. A team-news "
