@@ -1066,7 +1066,7 @@ def _entry_squad_payload(
                 _entry_player(
                     row,
                     role="bench",
-                    is_captain=False,
+                    is_captain=int(player_id) == int(picks.captain),
                     bench_order=bench_index,
                     is_vice_captain=wears_vice,
                 )
@@ -1360,7 +1360,13 @@ def build_league_views(
         if isinstance(picks_or_error, EntryPicks):
             placing = placings.get(entry_id)
             label = placing.team_name if placing is not None else labels[entry_id]
-            rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
+            try:
+                rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
+            except ModeSelectionError:
+                # Post-autosub holdings remain usable for this member's next plan.
+                # They cannot define the fixed rival eleven without inventing an
+                # armband, so omit only this rival candidate, not the member.
+                continue
     ranks = {entry_id: placing.rank for entry_id, placing in placings.items()}
     prices = {
         int(str(row["player_id"])): int(str(row["price_tenths"]))

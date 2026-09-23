@@ -1,5 +1,6 @@
 /** Raw URL parsing and the single index-authoritative member advice resolver. */
 
+import { preferencesFromUrl, preferencesKey } from "./decisionPreferences";
 import { isPlayMode, type WindowSize } from "../../moves/modePrices";
 import {
   MEMBER_STRATEGIES,
@@ -95,6 +96,9 @@ export function selectedAdviceRequest(
     window,
     rivalEntryId,
     ...context,
+    ...(preferencesFromUrl(searchParams).value
+      ? { preferences: preferencesFromUrl(searchParams).value }
+      : {}),
     ...(searchParams.get("model") === "football" ? { model: "football" as const } : {}),
   };
 }
@@ -329,6 +333,7 @@ export function resolvePublishedAdvice(
   context?: { season: string; gameweek: number },
   capabilities?: AdviceCapabilities | null,
 ): PublishedAdviceSelection {
+  const preferences = preferencesFromUrl(searchParams);
   const published = resolveFromIndex(searchParams, leagueId, entryId, members, index, context);
   if (
     !capabilities ||
@@ -336,11 +341,29 @@ export function resolvePublishedAdvice(
     (context &&
       (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
   ) {
-    return searchParams.get("model") === "football"
+    return !preferences.valid || preferences.value || searchParams.get("model") === "football"
       ? { ...published, status: "not-listed", path: null, windows: [], strategies: [] }
       : published;
   }
-  return withComputable(published, searchParams, entryId, members, index, capabilities);
+  const result = withComputable(published, searchParams, entryId, members, index, capabilities);
+  if (!preferences.valid || preferences.value) {
+    const compatible =
+      preferences.valid &&
+      capabilities.preferences === true &&
+      result.request.strategy === "saf-puan" &&
+      searchParams.get("llm") !== "on" &&
+      !(preferences.value?.save_chips && searchParams.has("chip"));
+    return {
+      ...result,
+      status: "not-listed",
+      path: null,
+      computable: result.computable && {
+        ...result.computable,
+        selection: result.computable.selection && compatible,
+      },
+    };
+  }
+  return result;
 }
 
 function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {
@@ -481,6 +504,7 @@ function withComputable(
     };
   }
   const sameAsPublished =
+    !preferencesKey(published.request.preferences) &&
     !football &&
     published.status === "ready" &&
     (published.request.rivalEntryId ?? null) === rivalEntryId &&

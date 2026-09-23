@@ -13,12 +13,36 @@ from tests.unit.test_member_windows import ENTRY, SEASON
 
 from squadopt.application.advice import NO_CHIP_LIMIT
 from squadopt.application.advice_menu import advise_menu_entry
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.chip_strategy import strategy_chip_availability
 from squadopt.live.rules import ChipWindow
 from squadopt.platform.advice_documents import validate_advice_document
 
 world = variants._world
 window_world = windows._window_world
+
+
+@pytest.mark.parametrize(
+    ("length", "weight", "chip"), [(1, 0, None), (3, 20, None), (5, 50, None), (3, 0, "auto")]
+)
+def test_preferences_are_applied_and_identified_by_real_menu(world, length, weight, chip):
+    w = prepared(world)
+    picks = w["provider"].picks(ENTRY, SEASON, 1)
+    keep = tuple(picks.squad)[:2]
+    preferences = DecisionPreferences(keep_players=keep, no_hits=True, save_chips=chip is None)
+    payload = advise_menu_entry(
+        _request(window=length, chip=chip, top100_weight=weight, preferences=preferences),
+        **_collaborators(w),
+        top100_counts=w["counts"],
+    )
+    assert payload["preferences"] == preferences.payload()
+    assert payload["preferences_scope"] == "all_selected_weeks"
+    selected = {p["player_id"] for p in payload["starting_xi"] + payload["bench"]}
+    assert set(keep) <= selected
+    assert all(w["transfer_hit_points"] == 0 for w in payload["plan_weeks"])
+    if chip is None:
+        assert all(w["chip"] is None for w in payload["plan_weeks"])
+        assert payload.get("selection_top100_weight", 0) == weight
 
 
 def prepared(world):

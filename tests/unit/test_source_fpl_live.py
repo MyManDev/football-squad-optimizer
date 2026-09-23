@@ -1253,6 +1253,37 @@ def test_a_captain_outside_the_starting_eleven_is_rejected() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "invalid", [None, "entry", "event", "element_out", "element_in", "duplicate"]
+)
+def test_a_post_autosub_captain_requires_the_matching_source_substitution(
+    invalid: str | None,
+) -> None:
+    document = json.loads(_picks_payload(captain_position=14))
+    captain = next(row["element"] for row in document["picks"] if row["is_captain"])
+    incoming = document["picks"][4]["element"]
+    for row in document["picks"]:
+        if row["is_captain"]:
+            row["multiplier"] = 0
+        if row["is_vice_captain"]:
+            row["multiplier"] = 2
+    substitution = {"entry": 11, "event": 1, "element_out": captain, "element_in": incoming}
+    if invalid and invalid != "duplicate":
+        substitution[invalid] = 999999
+    document["automatic_subs"] = [substitution] * (2 if invalid == "duplicate" else 1)
+    payload = json.dumps(document).encode()
+    if invalid:
+        with pytest.raises(InvalidValueError, match="automatic substitution"):
+            fpl_entry_picks(payload, _history_payload(), entry_id=11, season="2026-27", gameweek=1)
+    else:
+        record = fpl_entry_picks(
+            payload, _history_payload(), entry_id=11, season="2026-27", gameweek=1
+        )
+        assert record.captain == captain
+        assert record.captain not in record.starting_xi
+        assert record.squad == tuple(row["element"] for row in document["picks"])
+
+
 def test_picks_without_their_entry_history_are_rejected() -> None:
     document = json.loads(_picks_payload().decode("utf-8"))
     del document["entry_history"]

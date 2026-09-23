@@ -28,11 +28,51 @@ use in its terms, and the second is what the table below is for.
 
 ## Readings
 
-No real host is registered yet. The row below is the shape.
+Two real hosts are registered. Both were read on the date in their row, with our own
+reader and our own identity, and both readings are of a **silence** rather than of a
+permission: see the note under the table for what that means and what it does not.
 
 | Host | Terms URL | What the terms say about automated reading | `robots.txt` verdict for our path | Read by | Date |
 | --- | --- | --- | --- | --- | --- |
+| `www.liverpoolfc.com` | [/legal/terms-and-conditions](https://www.liverpoolfc.com/legal/terms-and-conditions) | The page is a ticketing and membership document. Read in full, 276 lines, its only restriction of this kind is 8.5, on reselling tickets "without the prior written consent of the Club". **It says nothing about reading the website, automated access, reproduction or publication.** Silent, not permissive. | `robots.txt` read 2026-09-22 for `/news` and `squadopt/1.0`: allowed | İbrahim Ersan Özdemir | 2026-09-22 |
+| `www.newcastleunited.com` | [/en/terms](https://www.newcastleunited.com/en/terms) | The page lists twenty ticketing, hospitality, membership and competition documents and publishes no website terms of use. **No document there governs reading the site.** Silent, not permissive. | `robots.txt` read 2026-09-23 for `/en/news` and `squadopt/1.0`: allowed | İbrahim Ersan Özdemir | 2026-09-23 |
 | `club.example` | — | Placeholder. Not a real host; the fixture serves it offline and no request is ever made. | not applicable | — | — |
+
+**Newcastle is registered at the host that serves the bytes, and it was not at first.**
+The first registration named `www.nufc.co.uk/news`, which **redirects** to
+`www.newcastleunited.com/en/news`; `/en/terms` redirects the same way to the same document.
+The first real run surfaced it, because the model cited the final URL and the capture's
+`final_url` confirmed the redirect was the source rather than an invention.
+
+That mattered for two reasons and only one of them is tidiness. A reading is a judgement
+about a named host, and a row naming one host while another serves the content is a reading
+of something nobody read. And the lane asks `robots.txt` of the **requested** origin, so a
+cross-host redirect was being followed without the serving host's preference ever being
+consulted. Both origins allow our path, so nothing was read against a refusal; the row now
+names the origin that answers, and the robots gap is fixed separately.
+
+**What these two rows are, exactly.** Neither club said yes. Each publishes a document
+called terms and conditions which, read in full, is about tickets, and neither publishes
+anything that governs reading the website. Proceeding on that is a decision the reader
+takes and signs, which is what the name and date in the row are for, and it can be wrong
+in two ways a later reading would catch: a governing document may exist somewhere neither
+search reached, and a club can publish one tomorrow. That is why a row ages.
+
+**Seventeen clubs are not here, and for three different reasons.** Seven publish terms
+that restrict this directly, and they are not registered: Spurs (2.6.3 forbids extracting,
+scraping and crawling; 2.6.4 forbids use to generate prompts) and Bournemouth (no "robot,
+spider, or other automatic device") forbid the read itself; Leeds (6.5) forbids mass,
+automated or systematic extraction; Arsenal, Brighton, Man City and Man Utd grant a
+licence limited to personal, non-commercial use. Nine could not be read at all: Aston
+Villa, Coventry, Everton, Nott'm Forest, Sunderland, Brentford, Fulham, Ipswich and
+Chelsea serve their terms or policy pages client-side or publish none this reader could
+locate, and **unread is not silent**. Hull City's host did not resolve.
+
+**Crystal Palace was read, considered and rejected on a different ground.** Its
+`robots.txt` allows our path, it publishes an RSS feed, and no terms document could be
+found anywhere on it. But its news page serves markup and no readable text, so
+`fetch_club_document` refuses it. A host this lane cannot read is not a host, whatever its
+terms say.
 
 ### How to fill a row
 

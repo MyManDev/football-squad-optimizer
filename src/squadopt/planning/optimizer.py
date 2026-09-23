@@ -11,6 +11,7 @@ from typing import Final
 import pandas as pd
 from ortools.sat.python import cp_model
 
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import (
     InvalidConfigurationError,
     OptimizationConfig,
@@ -981,6 +982,8 @@ def optimize_transfer_plan(
     first_week_transfer_cap: int | None = None,
     first_week_exclusion: FirstWeekExclusion | None = None,
     linearization_level: int | None = None,
+    preferences: DecisionPreferences | None = None,
+    protect_hold: bool = False,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -1079,6 +1082,25 @@ def optimize_transfer_plan(
             "first_week_transfer_cap must be None or an integer of at least 1."
         )
     _cap_later_week_transfers(artifacts, optimization_config.squad_size, first_week_transfer_cap)
+    if preferences is not None:
+        if not isinstance(preferences, DecisionPreferences):
+            raise TransferPlanningValidationError("Invalid decision preferences.")
+        universe = set(players_by_week[0].player_id)
+        if not set(preferences.keep_players) <= set(initial_state.squad_player_ids):
+            raise TransferPlanningValidationError("Only currently held players can be kept.")
+        if not set(preferences.avoid_players) <= universe:
+            raise TransferPlanningValidationError("Avoided player is outside the forecast roster.")
+        for week, table in enumerate(players_by_week):
+            for index, player in enumerate(table.player_id):
+                if player in preferences.keep_players:
+                    artifacts.model.add(artifacts.squad_vars[week][index] == 1)
+                if player in preferences.avoid_players:
+                    artifacts.model.add(artifacts.squad_vars[week][index] == 0)
+            if preferences.no_hits:
+                artifacts.model.add(artifacts.paid_transfer_vars[week] == 0)
+            if preferences.save_chips:
+                for variable in artifacts.chip_vars[week].values():
+                    artifacts.model.add(variable == 0)
     started_at = perf_counter()
     wall_limit = optimization_config.solver_time_limit_seconds
     deterministic_limit = optimization_config.solver_deterministic_time_limit
@@ -1096,8 +1118,44 @@ def optimize_transfer_plan(
     )
     if linearization_level is not None:
         primary_solver.parameters.linearization_level = linearization_level
+    # Clone after ALL restrictions. A forbidden hold is not a fallback. Variable
+    # indices remain identical, so a verified cloned solution is a valid warm start.
+    hold_solver: cp_model.CpSolver | None = None
+    hold_value: int | None = None
+    hold_status: SolverStatus | None = None
+    hold_deterministic_time = 0.0
+    if protect_hold:
+        hold_model = artifacts.model.clone()
+        for variable in artifacts.transfer_count_vars:
+            hold_model.add(variable == 0)
+        probe = cp_model.CpSolver()
+        configure_solver(probe, optimization_config, min(wall_limit, 30.0), 1.0)
+        if linearization_level is not None:
+            probe.parameters.linearization_level = linearization_level
+        hold_raw = _solve(hold_model, probe)
+        hold_status = _map_solver_status(hold_raw)
+        hold_deterministic_time = _deterministic_time_used(probe, hold_raw)
+        if hold_status is SolverStatus.OPTIMAL or (
+            hold_status is SolverStatus.FEASIBLE
+            and hold_deterministic_time >= 1.0 - MIN_TIEBREAK_DETERMINISTIC_TIME
+        ):
+            hold_solver = probe
+            hold_value = int(probe.value(artifacts.primary_objective))
+            artifacts.model.add(artifacts.primary_objective >= hold_value)
+            for index in range(len(artifacts.model.proto.variables)):
+                variable = artifacts.model.get_int_var_from_proto_index(index)
+                artifacts.model.add_hint(variable, probe.value(variable))
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
+    used_hold = hold_solver is not None and (
+        primary_status is SolverStatus.UNKNOWN
+        or (
+            primary_status is SolverStatus.FEASIBLE
+            and int(primary_solver.value(artifacts.primary_objective)) < int(hold_value or 0)
+        )
+    )
+    if hold_solver is not None and primary_status is SolverStatus.INFEASIBLE:
+        raise SolverExecutionError("Full search contradicts its verified feasible hold plan.")
     primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
     divisor = settings.objective_weight_scale * optimization_config.expected_points_scale
     diagnostics: dict[str, object] = {
@@ -1164,6 +1222,34 @@ def optimize_transfer_plan(
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if preferences is not None and preferences.active:
+        diagnostics["decision_preferences"] = preferences.payload()
+    if protect_hold:
+        diagnostics["hold_protection"] = {
+            "version": "feasible_hold_v1",
+            "status": None if hold_status is None else hold_status.name,
+            "objective_value": None if hold_value is None else hold_value / divisor,
+            "selected": used_hold,
+            "deterministic_time": hold_deterministic_time,
+            "deterministic_time_limit": 1.0,
+        }
+    if used_hold:
+        assert hold_solver is not None and hold_value is not None
+        # The restricted hold optimum is NOT a proof for the unrestricted search.
+        diagnostics["solver_status_name"] = "FEASIBLE"
+        diagnostics["primary_search_status"] = primary_status.name
+        diagnostics["scaled_model_objective_value"] = hold_value / divisor
+        diagnostics["solve_time_seconds"] = perf_counter() - started_at
+        return _extract_plan(
+            hold_solver,
+            SolverStatus.FEASIBLE,
+            artifacts,
+            verified_horizon,
+            initial_state,
+            optimization_config,
+            settings,
+            diagnostics,
+        )
     if linearization_level is not None:
         # Only when a caller chose one, so every other plan's diagnostics stay as they were.
         diagnostics["linearization_level"] = linearization_level
@@ -1211,12 +1297,13 @@ def optimize_transfer_plan(
     # #192; the budget that decides the answer is deterministic in both phases.
     if primary_status is SolverStatus.OPTIMAL and deterministic_budget_available:
         diagnostics["tiebreak_attempted"] = True
+        artifacts.model.clear_hints()  # type: ignore[no-untyped-call]
         # Hint the tie-break with the primary's solution: a known-feasible,
         # objective-optimal start turns most tie-break solves into a fast proof
         # instead of a fresh search that the budget then cuts off arbitrarily (#192).
         for week_vars in (artifacts.squad_vars, artifacts.starter_vars, artifacts.captain_vars):
-            for week in week_vars:
-                for variable in week:
+            for tie_week in week_vars:
+                for variable in tie_week:
                     artifacts.model.add_hint(variable, primary_solver.value(variable))
         for week_chips in artifacts.chip_vars:
             for name in sorted(week_chips):

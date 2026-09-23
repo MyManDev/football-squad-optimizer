@@ -79,12 +79,16 @@ def _legal_squad(world: dict[str, Any]) -> list[int]:
     return codes
 
 
+@pytest.mark.parametrize("benched_captain", [False, True])
 def test_the_builder_renders_members_and_advice_and_survives_one_failure(
-    world: dict[str, Any], tmp_path: Path
+    world: dict[str, Any], tmp_path: Path, benched_captain: bool
 ) -> None:
     inputs, projection, rules = _world_context(world)
     squad = _legal_squad(world)
-    provider = _Provider({101: _member_picks(world, 101, squad)})
+    picks = _member_picks(world, 101, squad)
+    if benched_captain:
+        picks = dataclasses.replace(picks, captain=squad[-1])
+    provider = _Provider({101: picks})
     registrations = (
         EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
         EntryRegistration(999, "member-missing", "2026-08-23T00:00:00Z"),
@@ -557,6 +561,16 @@ def test_a_vice_captain_the_member_left_on_the_bench_is_published_with_the_bench
     assert not any(player["is_vice_captain"] for player in payload["starting_xi"])
     wearing = [player["player_id"] for player in payload["bench"] if player["is_vice_captain"]]
     assert wearing == [squad[12]]
+
+
+def test_a_substituted_captain_keeps_the_captured_bench_flag(world: dict[str, Any]) -> None:
+    squad = _legal_squad(world)
+    picks = dataclasses.replace(_member_picks(world, 101, squad), captain=squad[13])
+    payload = _squad_payload(world, picks)
+    assert not any(player["is_captain"] for player in payload["starting_xi"])
+    assert [player["player_id"] for player in payload["bench"] if player["is_captain"]] == [
+        squad[13]
+    ]
 
 
 @pytest.mark.parametrize(

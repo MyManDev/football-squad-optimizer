@@ -96,6 +96,31 @@ def _inputs(tmp_path: Path, gameweeks: tuple[int, ...]) -> tuple[object, ...]:
     return inputs, horizon, _held(inputs.players), read_season_rules(capture, season=SEASON)
 
 
+@pytest.mark.parametrize("length", [1, 3, 5])
+def test_live_adapter_preserves_appearance_without_rescaling_points(tmp_path, monkeypatch, length):
+    inputs, horizon, held, rules = _inputs(tmp_path, tuple(range(2, 2 + length)))
+    table = horizon.table.copy()
+    table["appearance_probability"] = [
+        0.0 if row.fixture_count == 0 else (0.25 if i % 2 else 1.0)
+        for i, row in enumerate(table.itertuples())
+    ]
+    horizon = replace(horizon, table=table, contract_version="projection_horizon_appearance_v2")
+
+    class Inspected(Exception):
+        pass
+
+    def inspect(planning, *args, **kwargs):
+        expected = table.set_index(["gameweek", "player_id"])
+        actual = planning.table.set_index(["gameweek", "player_id"])
+        assert actual.appearance_probability.to_dict() == expected.appearance_probability.to_dict()
+        assert actual.expected_points.to_dict() == expected.expected_points.to_dict()
+        raise Inspected
+
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", inspect)
+    with pytest.raises(Inspected):
+        plan_transfer_horizon(inputs, horizon, held, rules)
+
+
 @pytest.mark.parametrize("length", [1, 3])
 def test_live_horizon_plans_every_requested_gameweek(tmp_path: Path, length: int) -> None:
     gameweeks = tuple(range(2, 2 + length))

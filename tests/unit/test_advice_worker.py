@@ -1215,6 +1215,55 @@ def _work(backend: Any, jobs: int = 1) -> int:
     )
 
 
+def test_preferences_round_trip_through_http_worker_cache(running):
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    preferences = {
+        "keep_players": [1001, 1004],
+        "avoid_players": [],
+        "no_hits": True,
+        "save_chips": True,
+    }
+    body = {"strategy": "saf-puan", "window": 1, "preferences": preferences}
+    response = client.post(route, json=body, headers={"Idempotency-Key": "preferences:one"})
+    assert response.status_code == 202, response.text
+    assert _work(backend) == 1
+    result = client.get(
+        route, params={"strategy": "saf-puan", "window": 1, "preferences": json.dumps(preferences)}
+    )
+    assert result.status_code == 200, result.text
+    payload = result.json()["payload"]
+    assert payload["preferences"] == preferences
+    assert payload["transfer_hit_points"] == 0
+    assert {1001, 1004} <= {p["player_id"] for p in payload["starting_xi"] + payload["bench"]}
+    assert client.get(route, params={"strategy": "saf-puan", "window": 1}).status_code == 404
+    conflict = client.post(
+        route,
+        json={**body, "preferences": {"no_hits": False}},
+        headers={"Idempotency-Key": "preferences:one"},
+    )
+    assert conflict.status_code == 409
+    invalid = client.post(
+        route, json={**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
+    )
+    assert invalid.status_code == 422
+    for malformed in (None, "", []):
+        invalid = client.post(route, json={**body, "preferences": malformed})
+        assert invalid.status_code == 422
+        invalid_read = client.get(
+            route,
+            params={"strategy": "saf-puan", "window": 1, "preferences": json.dumps(malformed)},
+        )
+        assert invalid_read.status_code == 422
+    assert (
+        client.get(
+            route, params={"strategy": "saf-puan", "window": 1, "preferences": ""}
+        ).status_code
+        == 422
+    )
+
+
 def _export_top100(
     running: dict[str, Any], artifact_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

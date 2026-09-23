@@ -50,6 +50,36 @@
           "const": "league.advise",
           "type": "string"
         },
+        "preferences": {
+          "additionalProperties": false,
+          "properties": {
+            "avoid_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "keep_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "no_hits": {
+              "type": "boolean"
+            },
+            "save_chips": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
         "request_fingerprint": {
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
@@ -131,6 +161,36 @@
             "current",
             "football"
           ]
+        },
+        "preferences": {
+          "additionalProperties": false,
+          "properties": {
+            "avoid_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "keep_players": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 15,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "no_hits": {
+              "type": "boolean"
+            },
+            "save_chips": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
         },
         "rival_entry_id": {
           "anyOf": [

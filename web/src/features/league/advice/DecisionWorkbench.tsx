@@ -123,6 +123,17 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                   {tr ? "Rakip" : "Rival"}: #{c.request.rivalEntryId}
                 </p>
               )}
+              {c.request.preferences && (
+                <p>
+                  {tr ? "Tutulan oyuncu" : "Kept players"}:{" "}
+                  {c.request.preferences.keep_players.length} ·{" "}
+                  {tr ? "Alınmayacak oyuncu" : "Avoided players"}:{" "}
+                  {c.request.preferences.avoid_players.length} · {tr ? "Hit yok" : "No hits"}:{" "}
+                  {c.request.preferences.no_hits ? (tr ? "Evet" : "Yes") : tr ? "Hayır" : "No"} ·{" "}
+                  {tr ? "Çipleri sakla" : "Save chips"}:{" "}
+                  {c.request.preferences.save_chips ? (tr ? "Evet" : "Yes") : tr ? "Hayır" : "No"}
+                </p>
+              )}
               <dl className={styles.metrics}>
                 <dt>{tr ? "İlk hafta net beklenen puan" : "First-week net expected points"}</dt>
                 <dd>{number(m.net)}</dd>

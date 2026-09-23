@@ -25,6 +25,7 @@ from typing import Any, Final
 import jsonschema
 
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.preferences import preferences_schema
 
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 LEAGUE_CAPABILITIES_CONTRACT_VERSION: Final = "league_capabilities_v1"
@@ -95,6 +96,9 @@ def advice_read_schema() -> dict[str, Any]:
     optional_fields.update(
         {
             "source_snapshot_id": {"type": ["string", "null"]},
+            "preferences": preferences_schema(),
+            "preferences_scope": {"const": "all_selected_weeks"},
+            "selection_top100_weight": {"enum": [0, 5, 10, 20, 30, 40, 50]},
             "prediction_model": {
                 "type": "object",
                 "properties": {
@@ -411,6 +415,12 @@ def league_capabilities_schema() -> dict[str, Any]:
             },
             "league_id": {"type": "integer", "minimum": 1},
             "capture_snapshot_id": {"type": "string", "minLength": 1},
+            "preferences": {
+                "type": "object",
+                "properties": {"available": {"type": "boolean"}},
+                "required": ["available"],
+                "additionalProperties": False,
+            },
             "season": {"type": "string", "minLength": 1},
             "gameweek": {"type": "integer", "minimum": 1},
             "strategies": {

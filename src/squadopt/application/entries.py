@@ -60,6 +60,11 @@ class EntryPicks:
     substitution order the platform walks when a starter plays no minutes (#262)."""
     starting_xi: tuple[int, ...]
     captain: int
+    """The captured captain flag; after autosubs this player can be on the bench.
+
+    Such an observed lineup can supply the held squad for a future decision, but is
+    not itself a frozen pre-match decision suitable for replay scoring.
+    """
     vice_captain: int
     """Who inherits the multiplier when the captain plays no minutes. Required rather than
     defaulted: a guessed vice hands the armband to the wrong player in exactly the weeks the
@@ -112,8 +117,8 @@ class EntryPicks:
             raise EntryError("An entry's squad has fifteen distinct players.")
         if len(self.starting_xi) != 11 or not set(self.starting_xi) <= set(self.squad):
             raise EntryError("The starting eleven must be eleven of the squad's players.")
-        if self.captain not in self.starting_xi:
-            raise EntryError("The captain must be in the starting eleven.")
+        if self.captain not in self.squad:
+            raise EntryError("The captain must be in the captured squad.")
         if self.bank_tenths < 0 or self.free_transfers < 0:
             raise EntryError("bank_tenths and free_transfers cannot be negative.")
         if self.purchase_prices and not self.purchase_prices_known:
@@ -340,6 +345,10 @@ def frozen_decision_from_picks(
 
     if not isinstance(picks, EntryPicks):
         raise EntryError("picks must be an EntryPicks instance.")
+    if picks.captain not in picks.starting_xi:
+        raise EntryError(
+            "A captured lineup with a substituted captain is not a frozen pre-match decision."
+        )
     if not isinstance(player_pool, pd.DataFrame):
         raise EntryError("player_pool must be a pandas DataFrame.")
     missing_columns = [
