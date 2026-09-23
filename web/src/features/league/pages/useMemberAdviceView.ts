@@ -52,6 +52,10 @@ export function useMemberAdviceView(
   const plainSelection =
     !selection.evidence.on && selection.top100.weight === 0 && selection.chip.chip === null;
   const computeAvailable =
+    (request.preferences?.keep_players.every((id) =>
+      [...view.starting_xi, ...view.bench].some((p) => p.player_id === id),
+    ) ??
+      true) &&
     // A service on another capture would answer with a plan this page has to refuse.
     computeService !== "other-capture" &&
     !adviceLoading &&
@@ -60,6 +64,7 @@ export function useMemberAdviceView(
       ? selection.computable.selection
       : selection.status === "ready" && plainSelection && canComputeAdvice(request));
   const baselineAvailable =
+    !request.preferences &&
     request.model !== "football" &&
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);

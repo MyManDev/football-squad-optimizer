@@ -32,6 +32,7 @@ export interface AdviceCapabilities {
   gameweek: number;
   strategies: Record<string, StrategyCapability>;
   /** The settings the service would accept now; zero is always one of them. */
+  preferences?: boolean;
   models?: ("current" | "football")[];
   top100Weights: Top100Weight[];
   managersWord: boolean;
@@ -134,7 +135,15 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       !value.models.every((m) => m === "current" || m === "football"))
   )
     throw new AdviceCapabilitiesError("Invalid model capabilities.");
+  if (
+    value.preferences !== undefined &&
+    (!record(value.preferences) || typeof value.preferences.available !== "boolean")
+  )
+    throw new AdviceCapabilitiesError("Invalid preference capabilities.");
   return {
+    ...(value.preferences === undefined
+      ? {}
+      : { preferences: record(value.preferences) && value.preferences.available === true }),
     ...(value.models === undefined ? {} : { models: value.models as ("current" | "football")[] }),
     leagueId,
     captureSnapshotId: value.capture_snapshot_id,

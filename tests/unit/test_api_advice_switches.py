@@ -25,6 +25,7 @@ from tests.unit.test_api_advice_post import (
 from squadopt.application.advice_capabilities import TOP100_WEIGHTS
 from squadopt.application.manager_words import MANAGERS_WORD_RULE_VERSION, ManagerWords
 from squadopt.application.top100_weight import TOP100_PRICE_BASIS, Top100Counts
+from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.platform.advice_cache import (
     ADVICE_CACHE_CONTRACT_VERSION,
     AdviceCacheError,
@@ -134,6 +135,23 @@ def test_a_switch_left_off_moves_no_fingerprint_and_no_byte() -> None:
     explicit = _advise(top100_weight=0, managers_word=False)
     assert explicit == plain and explicit.to_dict() == plain.to_dict()
     assert "top100_weight" not in plain.to_dict() and "managers_word" not in plain.to_dict()
+
+
+def test_preferences_have_separate_canonical_wire_and_cache_identity():
+    preferences = DecisionPreferences(keep_players=(1004, 1001), no_hits=True)
+    request = _advise(preferences=preferences)
+    assert request.request_fingerprint != _advise().request_fingerprint
+    assert ApiCommandRequest.from_dict(request.to_dict()) == request
+    assert _advise(preferences=DecisionPreferences()).to_dict() == _advise().to_dict()
+    schema = backend_api_schema()
+    jsonschema.validate(
+        request.to_dict(), {**schema["$defs"]["AdviseCommandRequest"], "$defs": schema["$defs"]}
+    )
+    identity = switch_identity(
+        AdviceSwitchInputs(), top100_weight=0, managers_word=False, preferences=preferences
+    )
+    assert identity["preferences"]["value"] == preferences.canonical()
+    assert _key(switches=identity) != _key()
 
 
 def test_a_switch_turned_on_is_part_of_the_request() -> None:
@@ -466,6 +484,7 @@ def test_capabilities_say_what_may_be_asked_right_now(tmp_path: Path) -> None:
         },
         "top100": {"available": True, "weights": list(TOP100_WEIGHTS)},
         "managers_word": {"available": True},
+        "preferences": {"available": True},
         "chips": {
             "held_by_entry": {},
             "strategy": {"version": "model_opportunity_reservation_v1", "windows": [1, 3, 5]},

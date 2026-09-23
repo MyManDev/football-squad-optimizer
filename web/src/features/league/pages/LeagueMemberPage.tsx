@@ -96,6 +96,14 @@ export function LeagueMemberPage() {
       onRetryAdvice={() => void advice.refetch()}
       onRetryIndex={() => void indexQuery.refetch()}
       members={members}
+      outcomeFreshness={
+        membersQuery.data
+          ? {
+              publishedAt: membersQuery.data.generated_at_utc,
+              scoredGameweek: membersQuery.data.payload.scored_gameweek,
+            }
+          : undefined
+      }
       index={index}
       client={client}
       capabilities={capabilities}

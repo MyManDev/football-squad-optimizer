@@ -1,3 +1,4 @@
+import { checkedPreferences, preferencesKey } from "./decisionPreferences";
 import { LeagueDataError } from "../data";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
@@ -55,6 +56,16 @@ export function checkedAdvice(
   const model = record(identity) ? identity.id : "current";
   if (model !== (request.model ?? "current"))
     throw new AdviceContextError("Advice uses another prediction model.");
+  try {
+    const actual = preferencesKey(checkedPreferences(payload.preferences));
+    if (
+      actual !== preferencesKey(request.preferences) ||
+      (actual && payload.preferences_scope !== "all_selected_weeks")
+    )
+      throw new Error("Preference mismatch");
+  } catch {
+    throw new AdviceContextError("Advice does not match the selected preferences.");
+  }
   const top100 = payload.top100;
   const strategy = record(payload.chip_strategy) ? payload.chip_strategy : null;
   const chosenChip =
@@ -62,8 +73,10 @@ export function checkedAdvice(
   const selectedChip = strategy ? strategy.selected_chip : chosenChip;
   if (
     (request.top100Weight !== undefined &&
-      (strategy?.top100_weight ?? (record(top100) ? top100.weight : 0) ?? 0) !==
-        request.top100Weight) ||
+      (strategy?.top100_weight ??
+        payload.selection_top100_weight ??
+        (record(top100) ? top100.weight : 0) ??
+        0) !== request.top100Weight) ||
     (request.managersWord !== undefined &&
       (payload.evidence !== undefined) !== request.managersWord) ||
     (request.chip !== undefined &&

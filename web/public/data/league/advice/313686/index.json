@@ -1,399 +1,20 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-18T12:26:35Z",
+  "generated_at_utc": "2026-09-22T22:04:06Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 5,
+    "gameweek": 6,
     "entry_id": 313686,
     "window": 1,
     "evidence": {
-      "available": true,
-      "path": "advice/313686/saf-puan/1/hoca-sozu.json",
-      "applied_count": 1,
-      "source_kind": "synthetic_fixture",
-      "source_label": "club_news_v1.fixture.json",
-      "clubs_covered": [
-        "Arsenal",
-        "Man Utd"
-      ],
-      "rule_version": "managers_word_rule_v1",
-      "binding": false
+      "available": false,
+      "reason": "no_evidence_this_run"
     },
     "top100": {
-      "available": true,
-      "published_weight": 0,
-      "weights": [
-        0,
-        5,
-        10,
-        20,
-        30,
-        40,
-        50
-      ],
-      "paths": {
-        "5": "advice/313686/saf-puan/1/top100-5.json",
-        "10": "advice/313686/saf-puan/1/top100-10.json",
-        "20": "advice/313686/saf-puan/1/top100-20.json",
-        "30": "advice/313686/saf-puan/1/top100-30.json",
-        "40": "advice/313686/saf-puan/1/top100-40.json",
-        "50": "advice/313686/saf-puan/1/top100-50.json"
-      },
-      "word_paths": {
-        "5": "advice/313686/saf-puan/1/top100-5-hoca-sozu.json",
-        "10": "advice/313686/saf-puan/1/top100-10-hoca-sozu.json",
-        "20": "advice/313686/saf-puan/1/top100-20-hoca-sozu.json",
-        "30": "advice/313686/saf-puan/1/top100-30-hoca-sozu.json",
-        "40": "advice/313686/saf-puan/1/top100-40-hoca-sozu.json",
-        "50": "advice/313686/saf-puan/1/top100-50-hoca-sozu.json"
-      },
-      "unavailable": [],
-      "documents": [
-        {
-          "strategy": "saf-puan",
-          "window": 3,
-          "rival_entry_id": null,
-          "weight": 5,
-          "path": "advice/313686/saf-puan/3/top100-5.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 3,
-          "rival_entry_id": null,
-          "weight": 10,
-          "path": "advice/313686/saf-puan/3/top100-10.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 3,
-          "rival_entry_id": null,
-          "weight": 20,
-          "path": "advice/313686/saf-puan/3/top100-20.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 3,
-          "rival_entry_id": null,
-          "weight": 30,
-          "path": "advice/313686/saf-puan/3/top100-30.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 3,
-          "rival_entry_id": null,
-          "weight": 40,
-          "path": "advice/313686/saf-puan/3/top100-40.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 3,
-          "rival_entry_id": null,
-          "weight": 50,
-          "path": "advice/313686/saf-puan/3/top100-50.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 5,
-          "rival_entry_id": null,
-          "weight": 5,
-          "path": "advice/313686/saf-puan/5/top100-5.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 5,
-          "rival_entry_id": null,
-          "weight": 10,
-          "path": "advice/313686/saf-puan/5/top100-10.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 5,
-          "rival_entry_id": null,
-          "weight": 20,
-          "path": "advice/313686/saf-puan/5/top100-20.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 5,
-          "rival_entry_id": null,
-          "weight": 30,
-          "path": "advice/313686/saf-puan/5/top100-30.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 5,
-          "rival_entry_id": null,
-          "weight": 40,
-          "path": "advice/313686/saf-puan/5/top100-40.json"
-        },
-        {
-          "strategy": "saf-puan",
-          "window": 5,
-          "rival_entry_id": null,
-          "weight": 50,
-          "path": "advice/313686/saf-puan/5/top100-50.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 5,
-          "path": "advice/313686/ortak-koru/1/vs-2281624/top100-5.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 10,
-          "path": "advice/313686/ortak-koru/1/vs-2281624/top100-10.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 20,
-          "path": "advice/313686/ortak-koru/1/vs-2281624/top100-20.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 30,
-          "path": "advice/313686/ortak-koru/1/vs-2281624/top100-30.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 40,
-          "path": "advice/313686/ortak-koru/1/vs-2281624/top100-40.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 50,
-          "path": "advice/313686/ortak-koru/1/vs-2281624/top100-50.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 5,
-          "path": "advice/313686/fark-yarat/1/vs-2281624/top100-5.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 10,
-          "path": "advice/313686/fark-yarat/1/vs-2281624/top100-10.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 20,
-          "path": "advice/313686/fark-yarat/1/vs-2281624/top100-20.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 30,
-          "path": "advice/313686/fark-yarat/1/vs-2281624/top100-30.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 40,
-          "path": "advice/313686/fark-yarat/1/vs-2281624/top100-40.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 1,
-          "rival_entry_id": 2281624,
-          "weight": 50,
-          "path": "advice/313686/fark-yarat/1/vs-2281624/top100-50.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 5,
-          "path": "advice/313686/ortak-koru/3/vs-2281624/top100-5.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 10,
-          "path": "advice/313686/ortak-koru/3/vs-2281624/top100-10.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 20,
-          "path": "advice/313686/ortak-koru/3/vs-2281624/top100-20.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 30,
-          "path": "advice/313686/ortak-koru/3/vs-2281624/top100-30.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 40,
-          "path": "advice/313686/ortak-koru/3/vs-2281624/top100-40.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 50,
-          "path": "advice/313686/ortak-koru/3/vs-2281624/top100-50.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 5,
-          "path": "advice/313686/ortak-koru/5/vs-2281624/top100-5.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 10,
-          "path": "advice/313686/ortak-koru/5/vs-2281624/top100-10.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 20,
-          "path": "advice/313686/ortak-koru/5/vs-2281624/top100-20.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 30,
-          "path": "advice/313686/ortak-koru/5/vs-2281624/top100-30.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 40,
-          "path": "advice/313686/ortak-koru/5/vs-2281624/top100-40.json"
-        },
-        {
-          "strategy": "ortak-koru",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 50,
-          "path": "advice/313686/ortak-koru/5/vs-2281624/top100-50.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 5,
-          "path": "advice/313686/fark-yarat/3/vs-2281624/top100-5.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 10,
-          "path": "advice/313686/fark-yarat/3/vs-2281624/top100-10.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 20,
-          "path": "advice/313686/fark-yarat/3/vs-2281624/top100-20.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 30,
-          "path": "advice/313686/fark-yarat/3/vs-2281624/top100-30.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 40,
-          "path": "advice/313686/fark-yarat/3/vs-2281624/top100-40.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 3,
-          "rival_entry_id": 2281624,
-          "weight": 50,
-          "path": "advice/313686/fark-yarat/3/vs-2281624/top100-50.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 5,
-          "path": "advice/313686/fark-yarat/5/vs-2281624/top100-5.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 10,
-          "path": "advice/313686/fark-yarat/5/vs-2281624/top100-10.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 20,
-          "path": "advice/313686/fark-yarat/5/vs-2281624/top100-20.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 30,
-          "path": "advice/313686/fark-yarat/5/vs-2281624/top100-30.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 40,
-          "path": "advice/313686/fark-yarat/5/vs-2281624/top100-40.json"
-        },
-        {
-          "strategy": "fark-yarat",
-          "window": 5,
-          "rival_entry_id": 2281624,
-          "weight": 50,
-          "path": "advice/313686/fark-yarat/5/vs-2281624/top100-50.json"
-        }
-      ],
-      "source": {
-        "cohort_snapshot_id": "fpl-top100-20260918T122433Z-ce78d1e94c1e",
-        "picks_snapshot_id": "fpl-elite-picks-20260918T122458Z-16962131eaa9",
-        "table_sha256": "5a00275686e0002fd145c6421ac26b0e8e20a0824b6f5aecede6b343c12469cf",
-        "picks_gameweek": 4
-      }
+      "available": false,
+      "reason": "no_top100_this_run"
     },
     "chips": {
       "available": true,
@@ -416,221 +37,111 @@
         "3xc"
       ]
     },
+    "chip_forecast": {
+      "season": "2026-27",
+      "league_id": 352490,
+      "entry_id": 313686,
+      "gameweek": 6,
+      "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
+      "squad_player_ids": [
+        489639,
+        466075,
+        199798,
+        108416,
+        244851,
+        141746,
+        424876,
+        222531,
+        60307,
+        586309,
+        223094,
+        112520,
+        465730,
+        551210,
+        631786
+      ],
+      "bench_player_ids": [
+        112520,
+        465730,
+        551210,
+        631786
+      ],
+      "status": "available",
+      "reason": null,
+      "forecast": {
+        "contract_version": "chip_forecast_v1",
+        "decision_gameweek": 6,
+        "threshold_policy": "decaying",
+        "reserve": false,
+        "later_week_basis": "this_week_projection_scaled_by_relative_fixture_count_v1",
+        "players_without_fixture_this_week": [],
+        "chips": [
+          {
+            "name": "freehit",
+            "window": {
+              "first_gameweek": 2,
+              "last_gameweek": 19
+            },
+            "holding_value": 15.0,
+            "verdict": "hold",
+            "hold_reason": "gain_not_above_threshold",
+            "gain_this_week": 3.205925797935741,
+            "threshold_this_week": 11.470588235294118,
+            "reservation_allows_this_week": true,
+            "points_at_gameweek": null,
+            "structured_gameweeks": []
+          },
+          {
+            "name": "3xc",
+            "window": {
+              "first_gameweek": 1,
+              "last_gameweek": 19
+            },
+            "holding_value": 18.0,
+            "verdict": "hold",
+            "hold_reason": "gain_not_above_threshold",
+            "gain_this_week": 7.998870203846849,
+            "threshold_this_week": 13.0,
+            "reservation_allows_this_week": true,
+            "points_at_gameweek": {
+              "gameweek": 12,
+              "estimated_gain": 7.9988702038468515,
+              "threshold": 7.0,
+              "player_ids": [
+                223094
+              ]
+            },
+            "structured_gameweeks": null
+          }
+        ],
+        "limits": [
+          "Later gameweeks repeat this gameweek's projection over the fixture calendar, rescaled by each club's fixture count in that gameweek relative to its count in this one; they are not a forecast of those gameweeks.",
+          "The member's present fifteen and present bench are assumed to be held unchanged in every later gameweek; transfers, injuries and rotation before then are not seen.",
+          "The rule was measured on the system's own squad with this season's two chip windows laid over the development seasons. Those seasons' managers played with one set, so ownership and prices reflect one-set behaviour; the emulation changed our rule, not the world around it. No gain is claimed for the member.",
+          "A named gameweek is a reading of the calendar under the rule as it stands at this capture and is recomputed at every publish; the planner never plays a chip for a member.",
+          "No later gain is estimated for a Free Hit or a Wildcard: each would need a whole-squad solve for every gameweek, and none is spent here."
+        ]
+      },
+      "calendar_has_structure": false,
+      "calendar_range": {
+        "first_gameweek": 7,
+        "last_gameweek": 19
+      }
+    },
     "windows": {
       "saf-puan": [
-        1,
-        3,
-        5
-      ],
-      "ortak-koru": [
-        1,
-        3,
-        5
-      ],
-      "fark-yarat": [
         1,
         3,
         5
       ]
     },
     "strategies": [
-      "saf-puan",
-      "ortak-koru",
-      "fark-yarat"
+      "saf-puan"
     ],
-    "rival_entry_ids": [
-      2199732,
-      2281624,
-      3832237,
-      4287206,
-      5081114,
-      5349883,
-      5662073,
-      6654210,
-      6879786,
-      6880255,
-      7018833,
-      7252721,
-      8548384,
-      8883467
-    ],
-    "default_rival_entry_id": 2281624,
-    "suggested_strategy": {
-      "strategy": "saf-puan",
-      "rule_id": "gap_and_weeks_strategy_rule_v1",
-      "band": "level",
-      "rival_entry_id": 2281624,
-      "points_ahead_of_rival": -1,
-      "scored_gameweek": 4,
-      "gameweeks_remaining": 34,
-      "band_edge_points": 123.6
-    },
-    "computed": [
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 2199732,
-        "path": "advice/313686/ortak-koru/1/vs-2199732.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 2281624,
-        "path": "advice/313686/ortak-koru/1/vs-2281624.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 3832237,
-        "path": "advice/313686/ortak-koru/1/vs-3832237.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 4287206,
-        "path": "advice/313686/ortak-koru/1/vs-4287206.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 5081114,
-        "path": "advice/313686/ortak-koru/1/vs-5081114.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 5349883,
-        "path": "advice/313686/ortak-koru/1/vs-5349883.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 5662073,
-        "path": "advice/313686/ortak-koru/1/vs-5662073.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 6654210,
-        "path": "advice/313686/ortak-koru/1/vs-6654210.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 6879786,
-        "path": "advice/313686/ortak-koru/1/vs-6879786.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 6880255,
-        "path": "advice/313686/ortak-koru/1/vs-6880255.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 7018833,
-        "path": "advice/313686/ortak-koru/1/vs-7018833.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 7252721,
-        "path": "advice/313686/ortak-koru/1/vs-7252721.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 8548384,
-        "path": "advice/313686/ortak-koru/1/vs-8548384.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 8883467,
-        "path": "advice/313686/ortak-koru/1/vs-8883467.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 2199732,
-        "path": "advice/313686/fark-yarat/1/vs-2199732.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 2281624,
-        "path": "advice/313686/fark-yarat/1/vs-2281624.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 3832237,
-        "path": "advice/313686/fark-yarat/1/vs-3832237.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 4287206,
-        "path": "advice/313686/fark-yarat/1/vs-4287206.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 5081114,
-        "path": "advice/313686/fark-yarat/1/vs-5081114.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 5349883,
-        "path": "advice/313686/fark-yarat/1/vs-5349883.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 5662073,
-        "path": "advice/313686/fark-yarat/1/vs-5662073.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 6654210,
-        "path": "advice/313686/fark-yarat/1/vs-6654210.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 6879786,
-        "path": "advice/313686/fark-yarat/1/vs-6879786.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 6880255,
-        "path": "advice/313686/fark-yarat/1/vs-6880255.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 7018833,
-        "path": "advice/313686/fark-yarat/1/vs-7018833.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 7252721,
-        "path": "advice/313686/fark-yarat/1/vs-7252721.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 8548384,
-        "path": "advice/313686/fark-yarat/1/vs-8548384.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 8883467,
-        "path": "advice/313686/fark-yarat/1/vs-8883467.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 2281624,
-        "window": 3,
-        "path": "advice/313686/ortak-koru/3/vs-2281624.json"
-      },
-      {
-        "strategy": "ortak-koru",
-        "rival_entry_id": 2281624,
-        "window": 5,
-        "path": "advice/313686/ortak-koru/5/vs-2281624.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 2281624,
-        "window": 3,
-        "path": "advice/313686/fark-yarat/3/vs-2281624.json"
-      },
-      {
-        "strategy": "fark-yarat",
-        "rival_entry_id": 2281624,
-        "window": 5,
-        "path": "advice/313686/fark-yarat/5/vs-2281624.json"
-      }
-    ],
+    "rival_entry_ids": [],
+    "default_rival_entry_id": null,
+    "suggested_strategy": null,
+    "computed": [],
     "unavailable": []
   }
 }
