@@ -1047,8 +1047,9 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # holds a discretionary member; the value itself is pinned in
 # ``tests/unit/test_live_transfers.py``.
 #
-# It moved once, on 2026-09-23, and not because a plan changed. `tests/unit/test_live_transfers.py`'s
-# `EVENTS` gained `data_checked`, which every real bootstrap event carries, so the synthetic
+# It moved once, on 2026-09-23, and not because a plan changed. ``EVENTS`` in
+# ``tests/unit/test_live_transfers.py`` gained ``data_checked``, which every real bootstrap
+# event carries, so the synthetic
 # capture's bytes and therefore its snapshot id changed; the id is published inside this
 # payload. Every readable assertion above held across that move -- the same two forced swaps,
 # the same deltas, the same gain against holding -- which is why those literals are asserted
