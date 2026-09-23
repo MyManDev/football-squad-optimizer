@@ -1046,7 +1046,14 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # value is ``test_the_member_planning_hit_cost_reaches_the_published_bytes`` above, which
 # holds a discretionary member; the value itself is pinned in
 # ``tests/unit/test_live_transfers.py``.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "d1b56d0f25adbb196f5353c6db6b62669ccd08e5c57019d24cf2c81de217e7a6"
+#
+# It moved once, on 2026-09-23, and not because a plan changed. `tests/unit/test_live_transfers.py`'s
+# `EVENTS` gained `data_checked`, which every real bootstrap event carries, so the synthetic
+# capture's bytes and therefore its snapshot id changed; the id is published inside this
+# payload. Every readable assertion above held across that move -- the same two forced swaps,
+# the same deltas, the same gain against holding -- which is why those literals are asserted
+# before this digest rather than after it.
+IN_SEASON_MEMBER_ADVICE_SHA256 = "8eb88a595a2e1c1700e39b01cee11005e54d98543d98b727b15e3526cb6d0a8c"
 # (player_out, player_in, expected_points_delta) per move, each pair one position. A
 # row is that swap's share of what the plan gains against holding the fifteen, measured
 # on the payload's own basis (the eleven with the captain doubled) with the rows above

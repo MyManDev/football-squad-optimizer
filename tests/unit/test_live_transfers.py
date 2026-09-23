@@ -61,10 +61,28 @@ GW2_CAPTURED_AT = "2026-08-27T09:00:00Z"
 GW2_SETTLE_CAPTURED_AT = "2026-09-01T09:00:00Z"
 IN_SEASON_VERSION = "in-season-carry-over-v1"  # the pinned in-season control
 
+#: A real bootstrap event carries both settlement flags, and the two are not the same
+#: question: `finished` is the last kick-off, `data_checked` is bonus landing. A double that
+#: carried only the first would let a consumer read a running total as a final one.
 EVENTS: list[dict[str, Any]] = [
-    {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": False},
-    {"id": 2, "deadline_time": "2026-08-28T17:30:00Z", "finished": False},
-    {"id": 3, "deadline_time": "2026-09-12T17:30:00Z", "finished": False},
+    {
+        "id": 1,
+        "deadline_time": "2026-08-21T17:30:00Z",
+        "finished": False,
+        "data_checked": False,
+    },
+    {
+        "id": 2,
+        "deadline_time": "2026-08-28T17:30:00Z",
+        "finished": False,
+        "data_checked": False,
+    },
+    {
+        "id": 3,
+        "deadline_time": "2026-09-12T17:30:00Z",
+        "finished": False,
+        "data_checked": False,
+    },
 ]
 TEAMS: list[dict[str, Any]] = [
     {"id": index, "code": index * 3, "name": f"Club {index}", "short_name": f"C{index}"}
@@ -186,7 +204,7 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     )
     # By the GW2 deadline the opening gameweek has finished, two prices have risen and
     # one has fallen, and one player is out injured.
-    gw1_finished = [dict(EVENTS[0], finished=True), EVENTS[1], EVENTS[2]]
+    gw1_finished = [dict(EVENTS[0], finished=True, data_checked=True), EVENTS[1], EVENTS[2]]
     gw2 = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -201,7 +219,11 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             FIXTURES_PAYLOAD: b"[]",
         },
     )
-    gw2_finished = [dict(EVENTS[0], finished=True), dict(EVENTS[1], finished=True), EVENTS[2]]
+    gw2_finished = [
+        dict(EVENTS[0], finished=True, data_checked=True),
+        dict(EVENTS[1], finished=True, data_checked=True),
+        EVENTS[2],
+    ]
     settle = write_snapshot(
         snapshot_root,
         source="fpl-live",
