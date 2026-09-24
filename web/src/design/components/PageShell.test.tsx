@@ -184,7 +184,10 @@ describe("the app shell on a desktop", () => {
   it("collapses to the icon rail and remembers that in this browser", async () => {
     const first = renderShell();
     const collapse = screen.getByRole("button", { name: TR.collapseSidebar });
+    expect(collapse).toHaveAttribute("aria-controls", "sidebar");
     expect(collapse).toHaveAttribute("aria-expanded", "true");
+    // On a desktop the sidebar folds in place; it is not a dialog.
+    expect(collapse).not.toHaveAttribute("aria-haspopup");
     expect(sidebar()).toHaveAttribute("data-mode", "open");
 
     await first.user.click(collapse);
@@ -313,6 +316,8 @@ describe("the shell's slots", () => {
 
     const { user } = renderShell({ path: "/league/members/7", page: <Slots /> });
     const plan = await screen.findByRole("button", { name: TR.changePlan });
+    expect(plan).toHaveAttribute("aria-controls", "sidebar");
+    expect(plan).toHaveAttribute("aria-expanded", "false");
     await user.click(plan);
     expect(sidebar()).toHaveAttribute("data-mode", "open");
     expect(screen.getByRole("radio", { name: "B" })).toHaveFocus();
@@ -404,6 +409,30 @@ describe("the app shell on a phone", () => {
     expect(open).toHaveFocus();
   });
 
+  it("turns the phone bar's 'Fikstür' back into a link when the page withdraws its sheet", async () => {
+    stubLayout("phone");
+    function SheetPage({ offered }: { offered: boolean }) {
+      const register = useShell()?.registerSheet;
+      useEffect(() => (offered ? register?.() : undefined), [offered, register]);
+      return offered ? <div id={FIXTURE_SHEET_ID}>sheet</div> : null;
+    }
+    const { rerender } = renderShell({ path: "/league/members/7", page: <SheetPage offered /> });
+    const bar = () => within(screen.getByRole("banner"));
+    expect(bar().getByRole("button", { name: TR.fixtures })).toBeInTheDocument();
+
+    rerender(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={["/league/members/7"]}>
+          <PageShell>
+            <SheetPage offered={false} />
+          </PageShell>
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    expect(bar().queryByRole("button", { name: TR.fixtures })).toBeNull();
+    expect(bar().getByRole("link", { name: TR.fixtures })).toHaveAttribute("href", "/fixtures");
+  });
+
   it("closes the drawer when the window grows to a desktop", async () => {
     const viewport = stubLayout("phone");
     const { user, container } = renderShell();
@@ -426,7 +455,9 @@ describe("the app shell on a tablet", () => {
     expect(screen.queryByRole("banner")).toBeNull();
     expect(sidebar()).toHaveAttribute("data-mode", "rail");
     const expand = screen.getByRole("button", { name: TR.expandSidebar });
+    expect(expand).toHaveAttribute("aria-controls", "sidebar");
     expect(expand).toHaveAttribute("aria-expanded", "false");
+    expect(expand).toHaveAttribute("aria-haspopup", "dialog");
     expect(navLinks()).toHaveLength(4);
 
     await user.click(expand);
@@ -434,6 +465,9 @@ describe("the app shell on a tablet", () => {
     expect(sidebar()).toHaveAttribute("data-mode", "drawer");
     const close = within(dialog).getByRole("button", { name: TR.closeMenu });
     expect(close).toHaveFocus();
+    // Inside the drawer the button only closes it.
+    expect(close).not.toHaveAttribute("aria-expanded");
+    expect(close).not.toHaveAttribute("aria-controls");
     expect(screen.getByRole("main", { hidden: true })).toHaveAttribute("inert");
 
     await user.click(close);

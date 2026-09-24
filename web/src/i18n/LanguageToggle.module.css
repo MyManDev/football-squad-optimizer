@@ -45,8 +45,8 @@
   border-top: 1px solid var(--color-line);
 }
 
-/* Touch widths: every target is at least 44 px. */
-@media (max-width: 1179px) {
+/* Touch widths, the phone and tablet layouts under 1180 px: every target is at least 44 px. */
+@media (max-width: 1179.98px) {
   .toggle button {
     min-width: 44px;
     min-height: 44px;

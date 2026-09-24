@@ -22,6 +22,14 @@ async function waitForPage(page: import("@playwright/test").Page) {
   await expect(page.locator("main")).not.toContainText(/Yükleniyor|Loading/);
 }
 
+/** The ids of axe's critical and serious findings on the page as it stands. */
+async function blockingViolations(page: import("@playwright/test").Page) {
+  const results = await new AxeBuilder({ page }).analyze();
+  return results.violations
+    .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ""))
+    .map((violation) => violation.id);
+}
+
 // The site has one palette (direction D is light only), so every route is checked in it,
 // in both languages.
 for (const language of ["tr", "en"] as const) {
@@ -82,7 +90,11 @@ test("language buttons are 44 px touch targets below 1180 px wide", async ({ pag
   ] as const) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    if (width < 600) await page.getByRole("button", { name: "Menüyü aç" }).click();
+    if (width < 600) {
+      await page.getByRole("button", { name: "Menüyü aç" }).click();
+      // Measure once the drawer has finished sliding in, not part way through it.
+      await expect(page.locator("#sidebar")).toHaveCSS("transform", "none");
+    }
     for (const name of [/^TR/, /^EN/]) {
       const box = await page.getByRole("button", { name }).boundingBox();
       expect(box, `${String(name)} at ${width}`).not.toBeNull();
@@ -157,12 +169,7 @@ test("the phone menu is a modal drawer that keeps focus and gives it back", asyn
     expect(inside, `focus after ${step + 1} tabs`).toBe(true);
   }
 
-  const results = await new AxeBuilder({ page }).analyze();
-  expect(
-    results.violations
-      .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ""))
-      .map((violation) => violation.id),
-  ).toEqual([]);
+  expect(await blockingViolations(page)).toEqual([]);
 
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
@@ -188,12 +195,21 @@ test("the tablet rail names every icon and opens the sidebar over the page", asy
   expect(rail.width).toBe(72);
 
   const expand = page.getByRole("button", { name: "Kenar çubuğunu aç" });
+  // The rail's other controls are touch targets too.
+  for (const control of [expand, page.getByRole("link", { name: "Operasyon Durumu" })]) {
+    const box = (await control.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  expect(await blockingViolations(page)).toEqual([]);
+
   await expand.click();
   const drawer = page.getByRole("dialog", { name: "Menü" });
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole("button", { name: "Menüyü kapat" })).toBeFocused();
   // The page column does not move under the drawer.
   expect((await page.getByRole("main").boundingBox())!.x).toBeGreaterThanOrEqual(72);
+  expect(await blockingViolations(page)).toEqual([]);
   await page.locator("[class*=scrim]").click({ position: { x: 700, y: 400 } });
   await expect(drawer).toHaveCount(0);
 });
@@ -216,4 +232,5 @@ test("the desktop sidebar collapses to the rail and stays so after a reload", as
     page.getByRole("navigation").getByRole("link", { name: "Lig", exact: true }),
   ).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("squadopt.sidebar"))).toBe("collapsed");
+  expect(await blockingViolations(page)).toEqual([]);
 });

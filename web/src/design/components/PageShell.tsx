@@ -326,12 +326,15 @@ export function PageShell({
                 <BrandMark className={styles.mark} />
                 <span className={rail ? "visually-hidden" : styles.wordmark}>SquadOpt</span>
               </span>
+              {/* Open or collapse the sidebar; in the drawer the same button closes it. */}
               <button
                 ref={toggleRef}
                 type="button"
                 className={styles.toggle}
                 aria-label={toggleLabel}
+                aria-controls={drawerOpen ? undefined : "sidebar"}
                 aria-expanded={drawerOpen ? undefined : layout === "desktop" ? !collapsed : false}
+                aria-haspopup={layout === "tablet" && !drawerOpen ? "dialog" : undefined}
                 onClick={onToggle}
               >
                 {toggleIcon}
@@ -360,6 +363,9 @@ export function PageShell({
                     type="button"
                     className={styles.railButton}
                     aria-label={copy.changePlan}
+                    aria-controls="sidebar"
+                    aria-expanded={false}
+                    aria-haspopup={layout === "desktop" ? undefined : "dialog"}
                     onClick={openPlan}
                   >
                     <PlanIcon />

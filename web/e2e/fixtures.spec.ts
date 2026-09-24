@@ -41,6 +41,13 @@ for (const width of [1280, 1600])
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fikstür");
     const weeks = page.getByRole("main").getByRole("heading", { level: 2 });
     await expect(weeks.first()).toHaveText(`Oynanacak hafta · Oyun haftası ${current}`);
+    // The upcoming week carries every fixture the shipped list names for it.
+    const upcoming = page.getByRole("main").locator("section", {
+      has: page.getByRole("heading", { name: `Oynanacak hafta · Oyun haftası ${current}` }),
+    });
+    await expect(upcoming.getByRole("listitem")).toHaveCount(
+      fixtures.payload.gameweeks[current - 1]!.fixtures.length,
+    );
     await expect(weeks.nth(3)).toHaveText(`Oyun haftası ${current - 1}`);
     await expect(
       page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }),
