@@ -59,6 +59,12 @@ READABLE_CONTENT_TYPES: Final[tuple[str, ...]] = (
     "text/html",
     "text/plain",
     "application/xhtml+xml",
+    # A syndication feed. Registered like any other path and read like any other document:
+    # this is not discovery and nothing follows an item's link. A club whose news page serves
+    # an application shell and no readable text is not a club this lane can cover, and a feed
+    # is often the same words with the shell taken off.
+    "application/rss+xml",
+    "application/atom+xml",
 )
 
 #: Ceiling for one document. A team-news page is tens of kilobytes; this is room for a
