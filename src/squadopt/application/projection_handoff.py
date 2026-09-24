@@ -50,6 +50,7 @@ from squadopt.data.sources.fpl_live import (
     live_payload,
     next_open_deadline,
     player_snapshot,
+    scored_gameweeks,
     team_codes,
     team_names,
 )
@@ -362,8 +363,30 @@ def build(
     target = target_deadline.gameweek
     if development_only and (season != "2026-27" or target <= 1):
         raise SystemExit("--development-only requires a 2026-27 in-season capture target.")
-    # Every gameweek before the target has been played, so that is the in-season sample.
+    # The in-season sample is every gameweek before the target, and the calendar alone is
+    # not evidence that they were played: a capture taken mid-gameweek has a target whose
+    # predecessors are still running, and `played` would count a week nobody has finished
+    # (#224). `scored_gameweeks` is the payload's own answer, gated on `finished` **and**
+    # `data_checked`, because bonus lands per fixture and a score read before it is short by
+    # different amounts for different players.
+    #
+    # This refuses rather than recounting. Deriving the number from the payload would change
+    # the sample size, and the sample size changes the blend, so it is a model change that
+    # owes a measurement rather than a guard that owes nothing. A correct capture is
+    # unaffected: on `fpl-live-20260922T205533Z-7ff2c68eac7f` the target is 6 and the scored
+    # set is {1, 2, 3, 4, 5}, so the two agree and nothing is raised.
+    #
+    # The comparison is over the set and not the count, because a gap in the middle is the
+    # same defect and counting would not see it.
     played = target - 1
+    unplayed = sorted(set(range(1, target)) - scored_gameweeks(bootstrap))
+    if unplayed:
+        raise SystemExit(
+            f"Capture {identifier} is open for gameweek {target}, so the in-season sample "
+            f"would be {played} gameweeks, but {unplayed!r} are not finished and checked in "
+            "this capture's own event list. A mid-gameweek capture looks complete to the "
+            "calendar and is not; take the capture after the previous week has settled."
+        )
 
     roster = player_snapshot(bootstrap)
     history = in_season_totals(bootstrap, fixtures, captured_at_utc=captured_at)
