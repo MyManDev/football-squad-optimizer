@@ -25,6 +25,7 @@ from tests.fixtures.synthetic_rotation_capture import (
     roster_entries,
 )
 
+from squadopt.application.weekly_plan import rotation_pair_is_readable
 from squadopt.data.errors import DataValidationError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
@@ -94,6 +95,27 @@ def _rewrite_manifest(manifest_path: Path, **changes: Any) -> None:
 
 
 # --- the export -------------------------------------------------------------
+
+
+def test_a_stale_export_contract_makes_a_pair_on_disk_unreusable(
+    tmp_path: Path, clean_tree: None
+) -> None:
+    """Existence cannot answer the question the reuse check and the weekly stage both ask.
+
+    The pair is named after the *table's* contract while the manifest declares the *export's*,
+    so moving the export contract alone leaves the previous version's pair sitting under the
+    current version's name. Both files are still there and both are still found; only the
+    reader can tell that they are no longer usable.
+    """
+
+    code, _, output_dir = _run(tmp_path)
+    assert code == 0
+    table, manifest = _pair(output_dir)
+    assert rotation_pair_is_readable(table, manifest)
+
+    _rewrite_manifest(manifest, artifact_contract_version="rotation_evidence_export_v1")
+    assert table.is_file() and manifest.is_file()
+    assert not rotation_pair_is_readable(table, manifest)
 
 
 def test_the_export_writes_a_readable_pair(tmp_path: Path, clean_tree: None) -> None:
