@@ -143,6 +143,23 @@ def _string_list(manifest: Mapping[str, object], key: str) -> tuple[str, ...]:
     return tuple(str(item) for item in value)
 
 
+def _optional_name(manifest: Mapping[str, object], key: str) -> str | None:
+    """A field a manifest may not carry, told apart from one it carries malformed.
+
+    Absent or null reads as ``None``: nobody recorded it, which is the true statement about a
+    fixture week and about an artifact written before the field existed. Anything else must be
+    a name, because a malformed value is a different fault from an unrecorded one and reading
+    both as "nothing" would hide the first.
+    """
+
+    value = manifest.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise DataValidationError(f"Manifest {key!r} must be a non-empty string or absent.")
+    return value
+
+
 def _whole_number(manifest: Mapping[str, object], key: str) -> int:
     value = manifest.get(key)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -343,6 +360,12 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "clubs_partially_covered": _string_list(manifest, "clubs_partially_covered"),
             "documents_read": manifest["documents_read"],
             "document_sha256s": _string_list(manifest, "document_sha256s"),
+            # Not required of the manifest, because artifacts written before the export
+            # contract gained it are still readable and their silence is true. Carried here
+            # all the same: a consumer cannot recover it from the model identifier, since a
+            # fake adapter can report any model name and one vendor's identifier can be
+            # served through another's compatible endpoint.
+            "provider": _optional_name(manifest, "provider"),
             "model_identifier": manifest["model_identifier"],
             "model_version": manifest["model_version"],
             "prompt_sha256": manifest["prompt_sha256"],
