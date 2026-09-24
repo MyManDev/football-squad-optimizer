@@ -42,8 +42,10 @@ from squadopt.features.rotation_evidence import (
 #: is how the pair on disk is shaped, and either can move without the other. It moved to v2
 #: when the manifest gained ``clubs_partially_covered``; the table's own version did not,
 #: because no column changed -- partial coverage is a club-level fact and the manifest is
-#: where club-level facts live.
-ARTIFACT_CONTRACT_VERSION: Final = "rotation_evidence_export_v2"
+#: where club-level facts live. It moved to v3 when the manifest gained ``provider``, for the
+#: same reason and with the same consequence: which adapter was asked is a fact about the
+#: week's instrument, not about a row.
+ARTIFACT_CONTRACT_VERSION: Final = "rotation_evidence_export_v3"
 
 #: Every manifest field the reader requires. A missing one refuses the pair: the manifest is
 #: what makes the table checkable, and a manifest with a hole in it checks less than it claims.

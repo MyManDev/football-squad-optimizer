@@ -258,6 +258,10 @@ def test_a_week_is_acquired_and_exported_without_a_key(
     assert len(table) == manifest["roster_size"]
     # The record names what answered, which is the whole reason genericity is about wiring.
     assert manifest["model_identifier"] == REHEARSAL_MODEL
+    # And which adapter was asked. It is not recoverable from the model identifier: this fake
+    # names a model no vendor serves, and a real vendor's identifier can be served through
+    # another's compatible endpoint. #551's fourth rehearsal item is this line.
+    assert manifest["provider"] == REHEARSAL_PROVIDER
     assert manifest["clubs_covered"], manifest
     assert set(manifest["clubs_covered"]) <= set(manifest["clubs_declared"])
 

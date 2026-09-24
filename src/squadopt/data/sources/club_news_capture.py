@@ -46,6 +46,13 @@ from squadopt.data.sources.club_news_readable import READABLE_TEXT_CONTRACT_VERS
 #: The capture layout's own contract. Bumped when the payload names or the index shape
 #: move, because a capture written under one layout is not readable under another -- and
 #: being readable years later is the only reason it is written at all.
+#:
+#: ``provider`` joined the response index without moving this, deliberately. The rule above
+#: exists to protect readability, and an optional key preserves it in both directions: a
+#: capture written before the field reads it as ``None``, which is the true statement that
+#: nobody recorded it, and one written after reads the name. Demanding it would make the
+#: weeks already on disk unreadable, and a week of club pages cannot be captured again.
+#: ``read_captured_coverage`` records the same judgement for ``clubs_partially_covered``.
 CLUB_NEWS_CAPTURE_CONTRACT_VERSION: Final = "club_news_capture_v2"
 
 #: The index payload. Named so a person listing the directory can see where to start.
@@ -79,6 +86,7 @@ class CodedClub:
     response: ClaimResponse
     prompt_contract_version: str
     prompt_sha256: str
+    provider: str | None = None
 
     def __post_init__(self) -> None:
         if not self.club.strip():
@@ -89,6 +97,12 @@ class CodedClub:
                     f"A coded club must carry {name}; a response with no question behind it "
                     "cannot be read again."
                 )
+        if self.provider is not None and not self.provider.strip():
+            raise InvalidValueError(
+                "A named provider must be a name. A capture written before the field existed "
+                "carries None, which says nobody recorded it; an empty string would claim a "
+                "provider with no name, which is a different and false statement."
+            )
 
 
 def _document_payload(position: int) -> str:
@@ -185,6 +199,7 @@ def capture_payloads(
                 "model_version": entry.response.model_version,
                 "prompt_contract_version": entry.prompt_contract_version,
                 "prompt_sha256": entry.prompt_sha256,
+                "provider": entry.provider,
             }
         )
 
@@ -280,6 +295,19 @@ def _text(entry: Mapping[str, object], key: str) -> str:
     return value
 
 
+def _optional_text(entry: Mapping[str, object], key: str) -> str | None:
+    """Text a capture may not carry, distinguished from text it carries as nothing.
+
+    A key that is absent, or present and null, reads as ``None``: nobody recorded it. A key
+    present as anything else must be a name, because a malformed value is a different fault
+    from an unrecorded one and collapsing them would hide it.
+    """
+
+    if key not in entry or entry[key] is None:
+        return None
+    return _text(entry, key)
+
+
 def _payload_bytes(snapshot: CapturedSnapshot, name: str) -> bytes:
     content = snapshot.payloads.get(name)
     if content is None:
@@ -366,6 +394,7 @@ def read_captured_responses(snapshot: CapturedSnapshot) -> tuple[CodedClub, ...]
                 ),
                 prompt_contract_version=_text(entry, "prompt_contract_version"),
                 prompt_sha256=_text(entry, "prompt_sha256"),
+                provider=_optional_text(entry, "provider"),
             )
         )
     return tuple(coded)
