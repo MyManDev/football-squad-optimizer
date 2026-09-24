@@ -130,8 +130,8 @@ def test_a_read_document_carries_its_club_and_both_urls() -> None:
     assert document.byte_length == len(document.content)
 
 
-def test_a_redirect_is_recorded_as_the_page_that_was_read() -> None:
-    """A citation names the page we read, not the one we asked for."""
+def test_a_redirect_within_the_same_origin_is_followed() -> None:
+    """The same host answering a different path is the case the citation rule is for."""
 
     served = _Reply(final_url=f"{PAGE}/full")
 
@@ -139,6 +139,43 @@ def test_a_redirect_is_recorded_as_the_page_that_was_read() -> None:
 
     assert document.requested_url == PAGE
     assert document.final_url == f"{PAGE}/full"
+
+
+def test_a_redirect_to_another_origin_is_refused() -> None:
+    """Consent does not travel across a redirect, and a real host proved it.
+
+    `robots_allows` asks the origin the registry names. A redirect can be answered by a
+    different host whose preference nobody asked and whose terms nobody read, so following
+    it would let one host's consent stand in for another's. `www.nufc.co.uk/news` redirects
+    to `www.newcastleunited.com/en/news`, and the first real run read one host under a
+    reading signed for the other (#781).
+    """
+
+    served = _Reply(final_url="https://cdn.other.example/team-news")
+
+    with pytest.raises(ClubNewsFetchError) as refusal:
+        fetch_club_document(SOURCE, opener=_opener(served), now=lambda: FIXED_NOW)
+
+    message = str(refusal.value)
+    assert "https://cdn.other.example" in message
+    assert "https://club.example" in message
+
+
+def test_the_origin_refusal_follows_the_robots_switch() -> None:
+    """A caller that has already decided not to ask is not told it failed to ask.
+
+    ``check_robots=False`` is the replay path, where the preference was consulted when the
+    capture was taken and the bytes are being re-read from disk. Refusing there would refuse
+    a page whose consent was established, for a redirect that already happened.
+    """
+
+    served = _Reply(final_url="https://cdn.other.example/team-news")
+
+    document = fetch_club_document(
+        SOURCE, opener=_opener(served), now=lambda: FIXED_NOW, check_robots=False
+    )
+
+    assert document.final_url == "https://cdn.other.example/team-news"
 
 
 def test_the_fetch_instant_comes_from_the_clock_and_not_the_response() -> None:
