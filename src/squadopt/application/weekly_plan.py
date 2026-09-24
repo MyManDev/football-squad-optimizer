@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from squadopt.application.entries import EntryRegistry
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import gameweek_deadlines, next_open_deadline
@@ -13,6 +14,7 @@ from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION as ROTATION_EVIDENCE_CONTRACT_VERSION,
 )
+from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import (
     CHIP_NAMES,
     LedgerError,
@@ -203,11 +205,14 @@ def prepare_week(
             snapshot_id=request.snapshot_id,
         )
     if request.snapshot_id and request.rotation:
+        # The same function the stage uses. The artifact is named after the capture the
+        # *claims* came from, so a preflight that assumed the decision capture would check a
+        # file the stage never opens, and the disagreement would not fail: it would pass.
         check_rotation_for_reused_capture(
             rotation_root,
             season=request.season,
             gameweek=request.gameweek,
-            snapshot_id=request.snapshot_id,
+            snapshot_id=rotation_source_capture(request.snapshot_id, request.rotation_capture),
         )
     skip = None
     if request.decide:
@@ -346,6 +351,29 @@ def rotation_artifact(
     return root / f"{name}.csv", root / f"{name}.manifest.json"
 
 
+def rotation_pair_is_readable(table: Path, manifest: Path) -> bool:
+    """Whether a pair on disk can be read back, rather than merely whether it exists.
+
+    Existence is not readability and the gap is not hypothetical: the file is named after the
+    *table's* contract while the manifest declares the *export's*, so moving the export
+    contract alone leaves last version's pair sitting under this version's name. Asking the
+    reader is the only honest test.
+
+    The two callers want opposite things from a False. The weekly stage exports, because a
+    pair it cannot read is a pair it does not have. The reused-capture check refuses, because
+    re-exporting for a capture already taken stamps the artifact after it, which is the one
+    thing the claim chain does not allow.
+    """
+
+    if not (table.is_file() and manifest.is_file()):
+        return False
+    try:
+        read_rotation_evidence_artifact(table, manifest)
+    except DataError:
+        return False
+    return True
+
+
 def check_rotation_for_reused_capture(
     rotation_root: Path, *, season: str, gameweek: int, snapshot_id: str
 ) -> None:
@@ -364,13 +392,17 @@ def check_rotation_for_reused_capture(
     """
 
     table, manifest = rotation_artifact(rotation_root, season, gameweek, snapshot_id)
-    if table.is_file() and manifest.is_file():
+    if rotation_pair_is_readable(table, manifest):
         return
+    if table.is_file() and manifest.is_file():
+        detail = f"{table.name} is under {rotation_root} but cannot be read back"
+    else:
+        detail = f"{table.name} is not under {rotation_root}"
     raise WeekError(
-        f"Reusing {snapshot_id} with --rotation needs its rotation export already on disk; "
-        f"{table.name} is not under {rotation_root}. Exporting it now would stamp the artifact "
-        f"after that capture was taken, which the claim chain does not allow. Export it for "
-        "that capture first, or run without --rotation."
+        f"Reusing {snapshot_id} with --rotation needs its rotation export already on disk "
+        f"and readable; {detail}. Exporting it now would stamp the artifact after that "
+        "capture was taken, which the claim chain does not allow. Export it for that "
+        "capture first, or run without --rotation."
     )
 
 
