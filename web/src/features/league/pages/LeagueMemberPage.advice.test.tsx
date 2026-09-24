@@ -181,7 +181,7 @@ describe("league member advice flow", () => {
 
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeInTheDocument();
     expect(screen.getByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeInTheDocument();
-    expect(screen.getByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
+    expect(screen.getByText("Plandaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
   });
 
   it("shows the computed moves in the advice card with their origin", async () => {
@@ -298,7 +298,7 @@ describe("league member advice flow", () => {
 
     expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
-    expect(screen.getByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
+    expect(screen.getByText("Plandaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
     await compute();
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ strategy: "saf-puan", window, rivalEntryId: null });

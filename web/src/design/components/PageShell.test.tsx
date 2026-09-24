@@ -354,6 +354,34 @@ describe("the app shell on a phone", () => {
     expect(document.documentElement.style.overflow).toBe("");
   });
 
+  it("leaves the drawer open when a control inside it already answered Escape", async () => {
+    stubLayout("phone");
+    // A control that closes something of its own on Escape and says so.
+    function Answering() {
+      return (
+        <ShellPortal slot="plan">
+          <input
+            aria-label="answers escape"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") event.preventDefault();
+            }}
+          />
+        </ShellPortal>
+      );
+    }
+    const { user } = renderShell({ path: "/league/members/7", page: <Answering /> });
+    await user.click(screen.getByRole("button", { name: TR.openMenu }));
+    await user.click(screen.getByRole("textbox", { name: "answers escape" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: TR.menu })).toBeInTheDocument();
+    // Escape anywhere else still closes it.
+    await user.click(screen.getByRole("button", { name: TR.closeMenu }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(screen.getByRole("button", { name: TR.openMenu }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("closes the drawer from the scrim, the close button and a navigation", async () => {
     stubLayout("phone");
     const { user, container } = renderShell();

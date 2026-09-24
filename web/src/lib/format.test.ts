@@ -4,10 +4,12 @@ import {
   countdown,
   deadlineLong,
   deadlineShort,
+  figure,
   money,
   percent,
   pounds,
   shortDigest,
+  signedFigure,
   signedPoints,
 } from "./format";
 
@@ -66,6 +68,23 @@ describe("format", () => {
     expect(signedPoints(-0.04, 2)).toBe("−0.04");
     expect(signedPoints(-0.06)).toBe("−0.1");
     expect(signedPoints(-0.04, 1, "tr-TR")).toBe("0,0");
+  });
+  it("writes a board figure with one or two decimals, in the reader's notation", () => {
+    // The GW6 plan's own numbers: the two rows add up to the gain on the page.
+    expect(signedFigure(2.3565723928800963, "tr-TR")).toBe("+2,36");
+    expect(signedFigure(0.6539544173418577, "tr-TR")).toBe("+0,65");
+    expect(signedFigure(3.010526810221954, "tr-TR")).toBe("+3,01");
+    expect(figure(7.9988702038468515, "tr-TR")).toBe("8,0");
+    expect(figure(3.6, "en-GB")).toBe("3.6");
+    expect(figure(3.937285604836282, "en-GB")).toBe("3.94");
+    expect(signedFigure(1.7)).toBe("+1.7");
+    expect(signedFigure(-0.4, "tr-TR")).toBe("−0,4");
+  });
+  it("never signs a board figure that rounds to zero", () => {
+    expect(signedFigure(-0.004)).toBe("0.0");
+    expect(signedFigure(0.004, "tr-TR")).toBe("0,0");
+    expect(signedFigure(-0)).toBe("0.0");
+    expect(signedFigure(-0.04)).toBe("−0.04");
   });
   it("counts down in days and hours, and closes", () => {
     const now = new Date("2026-08-19T10:00:00Z");

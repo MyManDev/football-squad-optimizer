@@ -37,6 +37,9 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(rival).toBeVisible();
   await rival.selectOption({ index: 1 });
   await expect(page).toHaveURL(/rival=\d+/);
+  // The week's hit is a fact beside the gain; the sentences behind it are in the disclosure.
+  await expect(page.getByText("0 ceza puanı")).toBeVisible();
+  await page.locator("main details summary", { hasText: "Nasıl hesaplandı?" }).click();
   await expect(page.getByText(/beklenen puan maliyeti/).first()).toBeVisible();
   await expect(page.getByText(/yalnızca senin kadrondan/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kaydedilen puan farkı" })).toHaveCount(0);
@@ -114,12 +117,12 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByText(copy.viewerSelected(firstMember.manager_name!))).toBeVisible();
     await expect(page.getByText(copy.viewerBody)).toBeVisible();
 
-    await page.getByRole("link", { name: copy.viewerChange }).click();
+    await page.getByRole("link", { name: copy.viewerChange, exact: true }).click();
     await page.getByRole("link", { name: secondMember.manager_name! }).click();
     await expect(page).toHaveURL(`/league/members/${secondMember.entry_id}`);
     await expect(page.getByText(copy.viewerSelected(`#${firstMember.entry_id}`))).toBeVisible();
 
-    await page.getByRole("link", { name: copy.viewerChange }).click();
+    await page.getByRole("link", { name: copy.viewerChange, exact: true }).click();
     const secondRow = page
       .getByRole("row")
       .filter({ has: page.getByRole("link", { name: secondMember.manager_name! }) });
@@ -157,7 +160,11 @@ for (const language of ["tr", "en"] as const) {
     await page.reload();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByRole("button", { name: copy.viewerClear })).toHaveCount(0);
-    await page.getByRole("link", { name: copy.backToMembers }).click();
+    // The sidebar's member block is the way back to the list.
+    await page
+      .locator("#sidebar")
+      .getByRole("link", { name: MESSAGES[language].shell.changeMember })
+      .click();
     await expect(page.getByRole("button", { name: copy.viewerSelect }).first()).toBeVisible();
     await page
       .getByRole("row")

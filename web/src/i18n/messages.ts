@@ -531,7 +531,6 @@ const en = {
   },
   leagueMembers: {
     loading: "Loading league members…",
-    computeTitle: "Compute this plan",
     computeBodySelf: "Compute this plan from your own squad.",
     computeBodyOther:
       "You are viewing another member. The computation starts from this member's public squad.",
@@ -541,7 +540,8 @@ const en = {
     computeQueued: "Queued",
     computeRunning: "Computing",
     computeWaiting: "The answer will appear here when the computation finishes.",
-    computeWaitingWithFallback: "Showing the previously published plan below while this computes.",
+    computeWaitingWithFallback:
+      "Showing the previously published plan on the page while this computes.",
     computeDone: "Plan available",
     computePublished: "Published plan",
     computeUnsupportedSelection:
@@ -556,7 +556,7 @@ const en = {
     advicePublishedWhileComputing: "The published plan is shown while the computation runs.",
     adviceBaselineWhileComputing:
       "This is the published pure-points, one-week plan; the requested combination is still computing.",
-    adviceRequestHint: "You can ask for it with Compute above.",
+    adviceRequestHint: "You can ask for it with Compute in the plan.",
     viewerTitle: "Which one is you?",
     viewerBody:
       "Pick your own row to get advice from your squad. Select again whenever you reopen or refresh the site. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
@@ -572,9 +572,8 @@ const en = {
     notYourPageTitle: "Not your page",
     notYourPageBody: "You picked another row as yourself; this page advises this member.",
     notYourPageLink: "Go to my page →",
-    strategyTitle: "Your play",
     strategyIntro:
-      "Every option below was solved from your own squad; a rival strategy names the member you play against.",
+      "Every option was solved from your own squad; a rival strategy names the member you play against.",
     strategyLegend: "Strategy",
     strategies: {
       "saf-puan": {
@@ -587,18 +586,24 @@ const en = {
         // free of hits.
         description:
           "Points alone, no rival in the equation. The plan is chosen on the eleven, the captain and the bench together, so another option can still show more expected points for the eleven and captain.",
+        short: "Points alone, no rival in the equation.",
       },
       "ortak-koru": {
         name: "Keep the shared core",
         description:
           "Requests at least 9 shared players between your recommended 15 and the rival's XI. This minimum may be lowered to fit the free-transfer limit; the published plan states the applied bound.",
+        short: "Asks for at least 9 of your 15 in the rival's eleven.",
       },
       "fark-yarat": {
         name: "Create a gap",
         description:
           "Requests at most 5 shared players between your recommended 15 and the rival's XI. This maximum may be raised to fit the free-transfer limit; the published plan states the applied bound.",
+        short: "Asks for at most 5 of your 15 in the rival's eleven.",
       },
-    } as Record<"saf-puan" | "ortak-koru" | "fark-yarat", { name: string; description: string }>,
+    } as Record<
+      "saf-puan" | "ortak-koru" | "fark-yarat",
+      { name: string; description: string; short: string }
+    >,
     rulePickBadge: "The rule's pick",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
       `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured; nothing has tested whether following it does better than ignoring it, so it labels an option and never chooses for you.`,
@@ -639,7 +644,6 @@ const en = {
     rivalPlayersNone: "None",
     rivalPlayersUnavailable:
       "Player names cannot be compared: matching league, season, gameweek, capture and complete player lists are required.",
-    rivalLegend: "Rival",
     rivalLabel: "The member you are playing against",
     rivalChoose: "Choose a rival",
     rivalDefaultSuffix: "(nearest above in the standings)",
@@ -749,11 +753,11 @@ const en = {
       "The site publishes the decisions it actually solved from your squad: pure points, and each strategy against each rival where a plan exists. A pair that has no plan says so in the rival list.",
     adviceUnreadable: "This member's advice could not be read.",
     adviceUnreadableBody:
-      "The squad above came from this build and the advice document did not answer, so this is a fault in reading the site rather than a combination nobody solved. Reloading, or reporting it, is the right move.",
+      "The squad on this page came from this build and the advice document did not answer, so this is a fault in reading the site rather than a combination nobody solved. Reloading, or reporting it, is the right move.",
     freeHitSquadBasis: (week: number) =>
       `Free Hit played; this advice stands on your GW ${week} squad.`,
     squadBasisUnconfirmed:
-      "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen above against your own team before using the moves below.",
+      "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen on this page against your own team before using these moves.",
     entryNotAvailable: "This member’s squad document is not published.",
     entryNotAvailableBody: "Return to the member list or try again after the next publication.",
     invalidEntry: "This entry ID is not valid.",
@@ -796,7 +800,6 @@ const en = {
     benchCount: (count: number) => `${count} substitutes`,
     emptySquad: "No squad is available for this member.",
     emptySquadBody: "The published member record does not contain squad data.",
-    advice: "Suggested Moves",
     honestyRule:
       "Advice shows expected-point trade-offs. Strategy labels follow declared rules; the published solver status and bounds state what was established.",
     independentAdviceRule:
@@ -818,14 +821,9 @@ const en = {
       `The solver could not finish the proof for this plan. Its planner objective, taken over all ${weeks} gameweeks of the plan at once, is within ${gap} of the best value the search could prove. That objective is each week's eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, so it is neither a points total nor a figure for any one gameweek. This is the best plan the search found, not a plan shown to be the best one.`,
     out: "Out",
     in: "In",
-    projectedGain: (points: string) => `${points} for the eleven with the captain doubled`,
     projectedGainUnknown: "This move's share of the plan's gain was not published.",
     moveRowsBasis:
-      "Each row is what the eleven with the captain doubled moves by once that swap is added to the rows above it, so the rows add up to the whole plan's gain below.",
-    planGainVsHold: (points: string) =>
-      `${points} expected points against keeping the squad you hold, for the eleven with the captain doubled.`,
-    planGainVsHoldBeforeCost: (points: string, cost: string) =>
-      `${points} expected points against keeping the squad you hold, for the eleven with the captain doubled, before this week's transfer cost of ${cost}.`,
+      "Each change is what the eleven with the captain doubled moves by once that swap is added to the changes before it, so the changes add up to the whole plan's gain.",
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     windowValueReason: "Part of the multiweek plan using published projections.",
@@ -860,6 +858,97 @@ const en = {
     linkBody:
       "Every member row opens that member's public post-deadline squad and the moves suggested from it.",
     linkLabel: "Open league members →",
+    // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
+    decisionTitle: "This week's move",
+    top100Weight: (weight: number) => `Top 100 weight ${weight}`,
+    weekLabel: (gameweek: number) => `Gameweek ${gameweek}`,
+    deadlineLabel: "Deadline",
+    deadlinePassedLabel: "Deadline passed",
+    rankLabel: "Rank",
+    pointsLabel: "Points",
+    lastWeekLabel: "Last week",
+    bankLabel: "Bank",
+    freeTransfersLabel: "Free transfers",
+    memberLine: (manager: string, entryId: number) => `${manager} · #${entryId}`,
+    planTitle: "Plan",
+    planNow: (summary: string) => `now: ${summary}`,
+    optionNotes: "About these options",
+    modelLegend: "Model",
+    modelNames: { current: "Current model", football: "Football model" } as Record<
+      "current" | "football",
+      string
+    >,
+    experimentalTag: "Experimental",
+    modelNote:
+      "The football model forecasts goals, assists, clean sheets and DEFCON per fixture. Live superiority is unverified. The Top 100 weight applies to the selected model.",
+    modelWindowNote:
+      "Each week's forecast uses that week's fixtures: blanks are zero and double gameweeks sum both matches. Future availability and prices stay at their captured values; the planner's transfer limits still apply.",
+    computeEcho: (state: string) => `Compute: ${state}`,
+    computeEchoStates: {
+      requesting: "request sent",
+      queued: "queued",
+      running: "running",
+      done: "plan available",
+      published: "published plan",
+      failed: "did not finish",
+      unavailable: "not available",
+    },
+    boardChange: (index: number, count: number) => `Change ${index}/${count}`,
+    boardNew: "New",
+    boardGainLabel: "expected points",
+    fixtureHome: "H",
+    fixtureAway: "A",
+    fixtureNone: "no match",
+    fixtureStrip: (first: number, last: number) => `Fixtures, gameweeks ${first} to ${last}`,
+    gainCaption:
+      "expected points against keeping the squad you hold, for the eleven with the captain doubled",
+    gainCaptionBeforeCost: (cost: string) =>
+      `expected points against keeping the squad you hold, for the eleven with the captain doubled, before this week's transfer cost of ${cost}`,
+    freeTransfersUsed: (used: number, free: number) => `${used}/${free} free transfers`,
+    hitPointsFact: (points: string) => `${points} hit points`,
+    stampOptimal: "PROVEN · OPTIMAL",
+    stampOptimalCaption: "The solver proved this plan is the best one for its own objective.",
+    captainMark: "C",
+    viceMark: "V",
+    honestyModel: "Expected points are a model's estimate, not a promise.",
+    honestyDecision: "You make the decision; SquadOpt does not make transfers for you.",
+    howComputed: "How was this worked out?",
+    freshnessTitle: "Decision and outcome data",
+    freshnessDecision: (gameweek: number, published: string) =>
+      `Decision gameweek: GW${gameweek} · Squad published: ${published}`,
+    freshnessScored: (gameweek: string, published: string) =>
+      `Latest scored gameweek: ${gameweek} · ${published}`,
+    freshnessNoScored: "no record",
+    freshnessNote:
+      "Refreshing fixtures or outcomes does not refresh forecasts. This plan uses the selected decision capture; later news and transfers require a new capture. Early plans do not include deadline-day team news.",
+    freshnessPlayed:
+      "This decision week has been played. Forecasts were not rewritten using outcomes; the next decision capture is pending.",
+    advancedSettings: "Advanced settings",
+    decisionTools: "Decision tools",
+    chipsAndTransfers: "Chips and free transfers",
+    chipStrategy: {
+      title: "Chip strategy",
+      autoThisWeek: "Automatic plan · this week",
+      ownThisWeek: "Your choice · this week",
+      hold: "Hold",
+      autoHonesty:
+        "Holding values approximate future opportunities from the selected model in this capture. They do not prove season-long superiority or a full stochastic MDP. Later dates are replanned with new data.",
+      autoFuture:
+        "Future opportunities assume a stationary distribution; injuries and competition between chips may change their value. Wildcard effects beyond the forecast window are unmeasured.",
+      expiry: "expiry",
+      holdingValue: "holding value",
+      opportunities: "opportunities beyond the window",
+      utilityNote: (weight: number) =>
+        `Top 100 weight ${weight}. Holding values and the solver gap are selection utility, not match-point forecasts.`,
+      solverGap: "Solver gap",
+      holdChips: "Hold chips",
+      automatic: "Automatic strategy",
+      switchesOff:
+        "Chip strategy cannot be combined with the manager's word. Choose Hold chips to use that input. The Top 100 weight remains available with chip strategy.",
+      blocked:
+        "Switch the manager's word off to choose a chip strategy. You can keep the Top 100 weight.",
+      note: "Automatic plans chip timing and transfers together. A named chip forces this week; hold preserves all chips throughout the window.",
+    },
   },
   reasonCodes: {
     no_capture: () => "no capture is held; the calendar is unknown",
@@ -1498,7 +1587,6 @@ const tr: MessageSchema<typeof en> = {
     },
   },
   leagueMembers: {
-    computeTitle: "Bu planı hesapla",
     computeBodySelf: "Bu planı kendi kadrondan hesaplat.",
     computeBodyOther:
       "Başka bir üyeye bakıyorsun. Hesap bu üyenin herkese açık kadrosundan başlar.",
@@ -1508,7 +1596,7 @@ const tr: MessageSchema<typeof en> = {
     computeQueued: "Kuyrukta",
     computeRunning: "Hesaplanıyor",
     computeWaiting: "Hesap bitince cevap burada görünecek.",
-    computeWaitingWithFallback: "Hesap sürerken aşağıda daha önce yayınlanmış plan gösteriliyor.",
+    computeWaitingWithFallback: "Hesap sürerken sayfada daha önce yayınlanmış plan gösteriliyor.",
     computeDone: "Plan hazır",
     computePublished: "Yayınlanmış plan",
     computeUnsupportedSelection:
@@ -1521,7 +1609,7 @@ const tr: MessageSchema<typeof en> = {
     advicePublishedWhileComputing: "Hesap sürerken yayınlanmış plan gösteriliyor.",
     adviceBaselineWhileComputing:
       "Bu, yayınlanmış saf puan / 1 hafta planı; istenen kombinasyon hâlâ hesaplanıyor.",
-    adviceRequestHint: "Yukarıdaki Hesapla ile isteyebilirsin.",
+    adviceRequestHint: "Plandaki Hesapla ile isteyebilirsin.",
     viewerTitle: "Hangisi sensin?",
     viewerBody:
       "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Siteyi yeniden açtığında veya yenilediğinde tekrar seçim yapmalısın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
@@ -1537,25 +1625,27 @@ const tr: MessageSchema<typeof en> = {
     notYourPageTitle: "Bu senin sayfan değil",
     notYourPageBody: "Kendin olarak başka bir satırı seçtin; bu sayfa bu üyeye öneri verir.",
     notYourPageLink: "Kendi sayfama git →",
-    strategyTitle: "Oyunun",
     strategyIntro:
-      "Aşağıdaki her seçenek senin kadrondan çözüldü; rakip stratejisi karşısında oynadığın üyeyi adlandırır.",
+      "Her seçenek senin kadrondan çözüldü; rakip stratejisi karşısında oynadığın üyeyi adlandırır.",
     strategyLegend: "Strateji",
     strategies: {
       "saf-puan": {
         name: "Saf puan",
         description:
           "Yalnız puan; denklemde rakip yok. Plan, ilk on bir, kaptan ve yedek kulübesi birlikte değerlendirilerek seçilir; bu yüzden başka bir seçenek ilk on bir ve kaptan için daha yüksek beklenen puan gösterebilir.",
+        short: "Yalnız puan; denklemde rakip yok.",
       },
       "ortak-koru": {
         name: "Ortak çekirdeği koru",
         description:
           "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en az 9 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu alt sınır düşürülebilir; yayımlanan plan uygulanan sınırı belirtir.",
+        short: "15'inle rakibin ilk 11'i arasında en az 9 ortak oyuncu ister.",
       },
       "fark-yarat": {
         name: "Fark yarat",
         description:
           "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu üst sınır yükseltilebilir; yayımlanan plan uygulanan sınırı belirtir.",
+        short: "15'inle rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister.",
       },
     },
     rulePickBadge: "Kuralın seçimi",
@@ -1598,7 +1688,6 @@ const tr: MessageSchema<typeof en> = {
     rivalPlayersNone: "Yok",
     rivalPlayersUnavailable:
       "Oyuncu adları karşılaştırılamıyor: lig, sezon, oyun haftası ve veri kesiti eşleşmeli; oyuncu listeleri tam olmalı.",
-    rivalLegend: "Rakip",
     rivalLabel: "Karşısında oynadığın üye",
     rivalChoose: "Bir rakip seç",
     rivalDefaultSuffix: "(sıralamada hemen üstün)",
@@ -1702,10 +1791,10 @@ const tr: MessageSchema<typeof en> = {
       "Site, kadrondan gerçekten çözdüğü kararları yayınlar: saf puan ve plan bulunan her rakibe karşı her strateji. Planı olmayan bir çift rakip listesinde bunu söyler.",
     adviceUnreadable: "Bu üyenin önerisi okunamadı.",
     adviceUnreadableBody:
-      "Yukarıdaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
+      "Bu sayfadaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
     freeHitSquadBasis: (week: number) => `Free Hit oynadın; bu öneri GW ${week} kadrona göre.`,
     squadBasisUnconfirmed:
-      "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Aşağıdaki hamleleri kullanmadan önce yukarıdaki on beş oyuncuyu kendi takımınla karşılaştır.",
+      "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
     entryNotAvailable: "Bu üyenin kadro belgesi yayımlanmamış.",
     entryNotAvailableBody: "Üye listesine dönebilir veya sonraki yayında yeniden deneyebilirsin.",
     invalidEntry: "Bu üye numarası geçerli değil.",
@@ -1748,7 +1837,6 @@ const tr: MessageSchema<typeof en> = {
     benchCount: (count) => `${count} yedek`,
     emptySquad: "Bu üye için kadro bulunmuyor.",
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
-    advice: "Önerilen Hamleler",
     honestyRule:
       "Öneriler beklenen puan ödünleşimlerini gösterir. Strateji etiketleri tanımlı kurallara dayanır; yayımlanan çözücü durumu ve sınırlar, kanıtın kapsamını belirtir.",
     independentAdviceRule:
@@ -1767,14 +1855,9 @@ const tr: MessageSchema<typeof en> = {
       `Çözücü bu plan için kanıtı tamamlayamadı. Planın ${weeks} oyun haftasının tamamı için birlikte hesaplanan planlayıcı amaç değeri, aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu amaç değeri, her haftanın ilk on biri (kaptan iki kat) artı yedeklerin onda biri eksi transfer cezalarıdır; ne bir puan toplamıdır ne de tek bir haftaya ait bir değerdir. Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
     out: "Çıkan",
     in: "Giren",
-    projectedGain: (pointsValue) => `ilk on bir için ${pointsValue} (kaptan iki kat)`,
     projectedGainUnknown: "Bu hamlenin plandaki kazanç payı yayımlanmamış.",
     moveRowsBasis:
-      "Her satır, o takas kendisinden önceki satırlara eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden satırlar aşağıdaki toplam kazancı verir.",
-    planGainVsHold: (pointsValue) =>
-      `Mevcut kadronu korumaya göre ${pointsValue} beklenen puan (ilk on bir, kaptan iki kat).`,
-    planGainVsHoldBeforeCost: (pointsValue, cost) =>
-      `Mevcut kadronu korumaya göre ${pointsValue} beklenen puan (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce.`,
+      "Her değişiklik, kendinden önceki değişikliklere eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden değişiklikler planın toplam kazancını verir.",
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     windowValueReason: "Yayımlanan puan tahminlerini kullanan çok haftalı planın bir parçası.",
@@ -1806,6 +1889,91 @@ const tr: MessageSchema<typeof en> = {
     linkBody:
       "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",
+    decisionTitle: "Bu haftanın hamlesi",
+    top100Weight: (weight) => `Top 100 ağırlığı ${weight}`,
+    weekLabel: (gameweek) => `${gameweek}. hafta`,
+    deadlineLabel: "Son karar",
+    deadlinePassedLabel: "Son karar geçti",
+    rankLabel: "Sıra",
+    pointsLabel: "Puan",
+    lastWeekLabel: "Son hafta",
+    bankLabel: "Banka",
+    freeTransfersLabel: "Ücretsiz transfer",
+    memberLine: (manager, entryId) => `${manager} · #${entryId}`,
+    planTitle: "Plan",
+    planNow: (summary) => `şu an: ${summary}`,
+    optionNotes: "Seçenekler hakkında",
+    modelLegend: "Model",
+    modelNames: { current: "Mevcut model", football: "Futbol modeli" },
+    experimentalTag: "Deneysel",
+    modelNote:
+      "Futbol modeli gol, asist, gol yememe ve DEFCON bileşenlerini fikstürlere göre hesaplar. Canlı üstünlüğü henüz doğrulanmadı. Top 100 ağırlığı seçtiğin modele uygulanır.",
+    modelWindowNote:
+      "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır; boş haftalar sıfır, çift maçlı haftalar maçların toplamıdır. Gelecekteki uygunluk ve fiyatlar kayıt anındaki haliyle sabit tutulur; planlayıcının transfer sınırları geçerlidir.",
+    computeEcho: (state) => `Hesap: ${state}`,
+    computeEchoStates: {
+      requesting: "istek gönderildi",
+      queued: "kuyrukta",
+      running: "hesaplanıyor",
+      done: "plan hazır",
+      published: "yayınlanmış plan",
+      failed: "tamamlanamadı",
+      unavailable: "yapılamadı",
+    },
+    boardChange: (index, count) => `Değişiklik ${index}/${count}`,
+    boardNew: "Yeni",
+    boardGainLabel: "beklenen puan",
+    fixtureHome: "E",
+    fixtureAway: "D",
+    fixtureNone: "maç yok",
+    fixtureStrip: (first, last) => `${first}-${last}. hafta fikstürü`,
+    gainCaption: "beklenen puan, mevcut kadronu korumaya göre (ilk on bir, kaptan iki kat)",
+    gainCaptionBeforeCost: (cost) =>
+      `beklenen puan, mevcut kadronu korumaya göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
+    freeTransfersUsed: (used, free) => `${used}/${free} ücretsiz transfer`,
+    hitPointsFact: (points) => `${points} ceza puanı`,
+    stampOptimal: "KANITLANDI · OPTIMAL",
+    stampOptimalCaption: "Çözücü, bu planın kendi hedefi için en iyisi olduğunu kanıtladı.",
+    captainMark: "C",
+    viceMark: "V",
+    honestyModel: "Beklenen puan bir model tahminidir, söz değildir.",
+    honestyDecision: "Kararı sen verirsin; SquadOpt senin yerine transfer yapmaz.",
+    howComputed: "Nasıl hesaplandı?",
+    freshnessTitle: "Karar ve sonuç verisi",
+    freshnessDecision: (gameweek, published) =>
+      `Karar haftası: OH${gameweek} · Kadro yayını: ${published}`,
+    freshnessScored: (gameweek, published) => `Son puanlanan hafta: ${gameweek} · ${published}`,
+    freshnessNoScored: "kayıt yok",
+    freshnessNote:
+      "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri görüntüsü gerekir. Erken planlar son dakika kadro bilgisi içermez.",
+    freshnessPlayed:
+      "Bu karar haftası artık oynandı; sonuçlarla geriye dönük yeniden tahmin yapılmadı. Yeni haftanın karar verisi bekleniyor.",
+    advancedSettings: "Gelişmiş ayarlar",
+    decisionTools: "Karar araçları",
+    chipsAndTransfers: "Çipler ve transfer hakkı",
+    chipStrategy: {
+      title: "Çip stratejisi",
+      autoThisWeek: "Otomatik plan · bu hafta",
+      ownThisWeek: "Senin seçimin · bu hafta",
+      hold: "Sakla",
+      autoHonesty:
+        "Saklama değerleri seçilen modelin bu yakalamadaki fırsatlarından hesaplanan bir yaklaşımdır. Sezon boyunca üstünlük veya tam stokastik MDP kanıtı değildir. Sonraki tarihler yeni veride yeniden planlanır.",
+      autoFuture:
+        "Gelecek fırsatlar sabit bir dağılım varsayar; sakatlıklar ve çipler arası rekabet bu değeri değiştirebilir. Wildcard'ın tahmin penceresi dışındaki uzun vadeli etkisi ölçülmüş değildir.",
+      expiry: "son hafta",
+      holdingValue: "saklama değeri",
+      opportunities: "pencere sonrası fırsat",
+      utilityNote: (weight) =>
+        `Top 100 ağırlığı ${weight}. Saklama değeri ve çözüm açığı seçim faydası birimindedir; maç puanı tahmini değildir.`,
+      solverGap: "Çözüm açığı",
+      holdChips: "Çipleri sakla",
+      automatic: "Otomatik strateji",
+      switchesOff:
+        "Çip stratejisi teknik direktör yorumuyla birleştirilmez. Yorumu kullanmak için Çipleri sakla seçeneğine geç. Top 100 ağırlığı çip stratejisiyle kullanılabilir.",
+      blocked:
+        "Çip stratejisini seçmek için teknik direktör yorumunu kapat. Top 100 ağırlığını koruyabilirsin.",
+      note: "Otomatik: çipleri kullanma veya saklama zamanını transferlerle birlikte planlar. Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz.",
+    },
   },
   reasonCodes: {
     no_capture: () => "elde capture yok; takvim bilinmiyor",

@@ -50,6 +50,9 @@ it("only computes on click, keeping the same five-week Top100 question under the
   );
   expect(requestAdvice).toHaveBeenCalledTimes(1);
   expect(screen.getByText(/yüksek sayı daha başarılı model demek değildir/)).toBeVisible();
+  // The Top 100 setting is named as the weight it is, never as a share.
+  expect(screen.getByText(/Top 100 ağırlığı 20/)).toBeInTheDocument();
+  expect(view.container.textContent).not.toContain("%");
 });
 
 it("does not compare an old baseline or submit after the deadline", async () => {

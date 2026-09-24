@@ -120,6 +120,32 @@ for (const language of ["tr", "en"] as const) {
   });
 }
 
+test("a member page's sidebar adds only its member block to the chrome", async ({ page }) => {
+  await page.goto("/league/members/35249001");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
+  // The member block goes back to the member list; the rest is the navigation with this
+  // member's week and squad, and the operations link.
+  expect(
+    await page
+      .locator("#sidebar a")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+  ).toEqual([
+    "/league/members",
+    "/league/members/35249001",
+    "/league/members/35249001#kadro",
+    "/league/members",
+    "/fixtures",
+    "/contribute",
+    "/status",
+  ]);
+  await expect(
+    page.locator(
+      'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
+    ),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+});
+
 test("the page applies its one light palette", async ({ page }) => {
   await page.goto("/");
 

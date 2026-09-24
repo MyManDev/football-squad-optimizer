@@ -9,6 +9,7 @@ import { points } from "../../../lib/format";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { LeagueDataMissing, loadLeagueMembers } from "../data";
 import { useViewerEntry } from "../identity/useViewerEntry";
+import { netWeekPoints } from "../standing";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMembersPage.module.css";
 
@@ -35,24 +36,6 @@ export function LeagueMembersPage() {
     );
   }
   return <LeagueMembersView envelope={query.data} />;
-}
-
-/**
- * The week on the column's one basis: the score after the transfer hits taken that week.
- *
- * That is the number the league total actually advances by — the source's own arithmetic
- * has `total_points` move by `points` minus `event_transfers_cost` — so it is the only
- * basis on which our row and a member's row are the same measurement.
- *
- * Both halves must be known. A missing hit is not a hit of zero: the producer publishes
- * null when nothing proves one, and a row like that shows no week rather than its gross
- * score under a heading that says net.
- */
-function netWeekPoints(member: EntryView): number | null {
-  const gross = member.gameweek_points;
-  const cost = member.transfer_cost;
-  if (gross === null || typeof cost !== "number") return null;
-  return gross - cost;
 }
 
 export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<LeagueMembers> }) {

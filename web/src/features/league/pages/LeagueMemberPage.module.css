@@ -1,11 +1,542 @@
+/*
+ * The member page in direction D: a top bar pinned at the top of the main column, the
+ * decision (heading row, boards, gain strip, captain line), the two honesty lines, and
+ * the secondary tools as closed sections. The plan and Hesapla render in the sidebar.
+ */
+
 .page,
-.adviceSection,
 .squadContext,
 .systemPage {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
+
+.page {
+  gap: var(--space-5);
+}
+
+/* ---- Top bar ---- */
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  min-height: 64px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-bg);
+}
+
+/* Pinned at the top of the main column from 600 px up; on a phone only the phone bar is. */
+@media (min-width: 600px) {
+  .topBar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
+    padding: var(--space-2) var(--space-5);
+  }
+
+  :global(html):has(.topBar) {
+    scroll-padding-top: 80px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .topBar {
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-6)) 0;
+    padding: var(--space-2) var(--space-6);
+  }
+}
+
+.topIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.teamName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.topWeek {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.weekLabel {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 26px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.deadline {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.deadlineLabel {
+  color: var(--color-text-muted);
+}
+
+.deadlineLong,
+.deadlineShort {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.deadlineShort {
+  display: none;
+}
+
+.scoreBug {
+  display: flex;
+  margin: 0 0 0 auto;
+}
+
+.scoreCell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 var(--space-3);
+}
+
+.scoreCell + .scoreCell {
+  border-left: 1px solid var(--color-line);
+}
+
+.scoreCell:last-child {
+  padding-right: 0;
+}
+
+.scoreCell dt {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.scoreCell dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+/* Below 1180 px the score bug takes its own line under the team and the week. */
+@media (max-width: 1179.98px) {
+  .scoreBug {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .scoreCell:first-child {
+    padding-left: 0;
+  }
+}
+
+/* The phone's compact bar: the team, the week with the short deadline on one line, and
+   the score bug as label-and-figure pairs that wrap onto a second line. */
+@media (max-width: 599.98px) {
+  .topBar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+    min-height: 0;
+    margin-top: calc(-1 * var(--space-2));
+    padding: 0 0 var(--space-3);
+  }
+
+  .teamName {
+    font-size: 20px;
+    line-height: 24px;
+  }
+
+  .topWeek {
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .weekLabel {
+    font-size: 18px;
+    line-height: 22px;
+  }
+
+  .deadline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 var(--space-1);
+  }
+
+  .deadlineLong {
+    display: none;
+  }
+
+  .deadlineShort {
+    display: inline;
+  }
+
+  .scoreBug {
+    flex-wrap: wrap;
+    gap: 2px var(--space-4);
+    margin-top: var(--space-1);
+  }
+
+  .scoreCell,
+  .scoreCell:first-child,
+  .scoreCell:last-child {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    padding: 0;
+  }
+
+  .scoreCell + .scoreCell {
+    border-left: 0;
+  }
+
+  .scoreCell dd {
+    font-size: 16px;
+    line-height: 20px;
+  }
+}
+
+/* ---- WHO block, in the sidebar (surface-2: labels are ink2, never ink3) ---- */
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.whoLeague {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.whoLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 40px;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-s);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.whoLink:hover {
+  background: var(--color-bg);
+}
+
+.whoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.whoTeam {
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.whoManager {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1179.98px) {
+  .whoLink {
+    min-height: 48px;
+  }
+}
+
+/* ---- Hesapla under the plan; pinned to the bottom of the phone and tablet drawer ---- */
+
+.computeDock {
+  margin-top: var(--space-3);
+}
+
+:global(#sidebar[data-mode="drawer"]) .computeDock {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  max-height: 45dvh;
+  overflow-y: auto;
+  margin: var(--space-3) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-3) var(--space-4) calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-2);
+}
+
+/* ---- Notices that change how the page reads ---- */
+
+.notice {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+}
+
+section.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--color-text);
+}
+
+section.notice p {
+  margin: 0;
+}
+
+.noticeTitle {
+  margin: 0;
+  font-size: var(--step-1);
+}
+
+.notice a {
+  color: var(--color-text);
+}
+
+/* ---- The decision ---- */
+
+.adviceSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.headingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.headingText {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
+  min-width: 0;
+}
+
+.decisionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.selectionSummary {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* On a phone the proof stamp follows the gain strip, as the phone artboard draws it, and
+   the captain line and the plan's sentences follow the stamp. */
+@media (max-width: 599.98px) {
+  .headingRow {
+    display: contents;
+  }
+}
+
+.echo {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
+}
+
+/* ---- Honesty: two lines and the disclosure ---- */
+
+.honestyBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+.honestyLines {
+  flex: 1 1 320px;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  line-height: 18px;
+}
+
+.honestyLines p {
+  margin: 0;
+}
+
+.how {
+  flex: 0 1 auto;
+}
+
+.how[open] {
+  flex-basis: 100%;
+  order: 3;
+}
+
+.howSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-size: var(--step--1);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.howSummary::-webkit-details-marker {
+  display: none;
+}
+
+.howBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure);
+  padding-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.howBody p {
+  margin: 0;
+}
+
+.howTitle {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text);
+  font-size: var(--step-0);
+}
+
+.historyLink {
+  flex-basis: 100%;
+  order: 4;
+  margin: 0;
+  font-size: var(--step--1);
+}
+
+@media (max-width: 1179.98px) {
+  .howSummary {
+    min-height: 44px;
+  }
+
+  .historyLink a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
+/* ---- Secondary tools, each closed until asked for ---- */
+
+.tools {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool {
+  border-top: 1px solid var(--color-line);
+}
+
+.tool:last-child {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.toolSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.toolSummary::-webkit-details-marker {
+  display: none;
+}
+
+.toolIcon {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.tool[open] .toolIcon {
+  transform: rotate(90deg);
+}
+
+.toolBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-1) 0 var(--space-5);
+}
+
+@media (max-width: 1179.98px) {
+  .toolSummary {
+    min-height: 48px;
+  }
+}
+
+/* ---- The held squad, until it moves under the pitch ---- */
 
 .contextDetails > summary {
   padding: var(--space-3);
@@ -15,11 +546,6 @@
   font-weight: 600;
 }
 
-.selectionSummary {
-  margin: 0;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
 .contextDetails > summary > h2 {
   display: inline;
   font: inherit;
@@ -32,24 +558,18 @@
   }
 }
 
+@media (max-width: 640px) {
+  .squadContext > section:first-child > header > h2 {
+    display: none;
+  }
+}
+
+/* ---- Shared by the advice sections ---- */
+
 .assumptionList {
   margin: 0;
   padding-left: 1.2rem;
   color: var(--color-text-muted);
-}
-
-.comparison {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--step-2);
-  font-weight: 700;
-}
-
-.head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
 }
 
 .back {
@@ -59,36 +579,16 @@
   font-weight: 600;
 }
 
-.kicker,
 .muted,
 .diagnostic {
   color: var(--color-text-muted);
   font-size: var(--step--1);
 }
 
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--step-4);
-  font-weight: 700;
-  line-height: 1.05;
-}
-
-.lede,
 .notice,
 .honesty,
 .diagnostic {
-  margin: var(--space-2) 0 0;
   max-width: var(--measure);
-}
-
-.notice,
-.diagnostic {
-  color: var(--color-text-muted);
-}
-
-.notice a {
-  color: var(--color-text);
 }
 
 .honesty {
@@ -104,14 +604,13 @@
   color: var(--color-text-muted);
 }
 
-.bench,
-.moves {
+.bench {
   display: flex;
   flex-direction: column;
 }
 
 .lineup {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
 }
@@ -159,8 +658,7 @@
   border-top: 1px solid var(--color-line);
 }
 
-.benchRow:first-child,
-.move:first-child {
+.benchRow:first-child {
   border-top: none;
 }
 
@@ -168,35 +666,23 @@
   text-align: right;
 }
 
-.move {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--color-line);
-}
+@media (max-width: 640px) {
+  .benchRow {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  }
 
-.movePlayers,
-.moveNumbers {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+  .benchRow .muted {
+    grid-column: 2 / -1;
+  }
 
-.moveNumbers {
-  align-items: flex-end;
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-  text-align: right;
-}
-
-.move .muted {
-  grid-column: 1 / -1;
-  margin: 0;
+  .benchRow .benchPoints {
+    grid-row: 1;
+    grid-column: 3;
+  }
 }
 
 .window {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
 }
@@ -213,13 +699,10 @@
   margin-top: 4px;
 }
 
-.windowScroll {
-  overflow-x: auto;
-}
-
+/* The window plan never scrolls sideways: fixed columns, and the names wrap in theirs. */
 .windowTable {
   width: 100%;
-  min-width: 560px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--step--1);
 }
@@ -230,9 +713,11 @@
   border-top: 1px solid var(--color-line);
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .windowTable thead th {
+  overflow-wrap: normal;
   border-top: none;
   color: var(--color-text-muted);
   font-size: var(--step--2);
@@ -243,49 +728,46 @@
   text-align: right;
 }
 
-@media (max-width: 640px) {
-  :global(html).memberPage {
-    scroll-padding-bottom: 45dvh;
-  }
-  .squadContext > section:first-child > header > h2 {
-    display: none;
-  }
-  .computeDock {
-    position: sticky;
-    bottom: 0;
-    max-height: 45dvh;
-    overflow-y: auto;
-    z-index: 1;
+.weekColumn {
+  width: 4.5rem;
+}
+
+.hitsColumn {
+  width: 5rem;
+}
+
+.chipColumn {
+  width: 7rem;
+}
+
+.pointsColumn {
+  width: 6rem;
+}
+
+@media (max-width: 599.98px) {
+  .windowTable {
+    font-size: var(--step--2);
   }
 
-  .head {
-    align-items: flex-start;
-    flex-direction: column;
+  .windowTable th,
+  .windowTable td {
+    padding: 6px 4px;
   }
 
-  .title {
-    font-size: var(--step-3);
+  .weekColumn {
+    width: 2.75rem;
   }
 
-  .benchRow {
-    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  .hitsColumn {
+    width: 4.25rem;
   }
 
-  .benchRow .muted {
-    grid-column: 2 / -1;
+  .chipColumn {
+    width: 3.75rem;
   }
 
-  .move {
-    grid-template-columns: 1fr;
-  }
-
-  .moveNumbers {
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .move .muted {
-    grid-column: 1;
+  .pointsColumn {
+    width: 4rem;
   }
 }
 

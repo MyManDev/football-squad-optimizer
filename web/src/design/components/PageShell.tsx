@@ -155,7 +155,8 @@ export function PageShell({
   useEffect(() => {
     if (!overlay) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeOverlays();
+      // A control inside that already answered Escape (a list it closed) keeps the overlay.
+      if (event.key === "Escape" && !event.defaultPrevented) closeOverlays();
     };
     document.addEventListener("keydown", onKey);
     const root = document.documentElement;

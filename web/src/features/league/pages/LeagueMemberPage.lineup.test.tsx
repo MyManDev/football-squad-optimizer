@@ -135,8 +135,8 @@ describe("the published Free Hit squad basis", () => {
  */
 describe("a squad basis the two documents disagree about", () => {
   const UNCONFIRMED = {
-    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen above against your own team before using the moves below.",
-    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Aşağıdaki hamleleri kullanmadan önce yukarıdaki on beş oyuncuyu kendi takımınla karşılaştır.",
+    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen on this page against your own team before using these moves.",
+    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
   } as const;
 
   it.each(["en", "tr"] as const)("says so, and names neither week, in %s", (language) => {

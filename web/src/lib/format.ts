@@ -43,6 +43,26 @@ export function signedPoints(value: number, digits = 1, locale = "en-GB"): strin
   return rounded > 0 ? `+${text}` : rounded < 0 ? `−${text}` : text;
 }
 
+/**
+ * A figure on the decision board, the gain strip and the player plates: at most two
+ * decimals and at least one, so '2,36', '3,6' and '8,0'. Two decimals let the board's
+ * figures add up to the plan's gain the way the producer's rows do (2,36 + 0,65 = 3,01),
+ * which one decimal cannot promise; the trailing zero goes, the first decimal stays.
+ */
+export function figure(value: number, locale = "en-GB"): string {
+  return value.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
+
+/**
+ * `figure` with its sign, taken after rounding to two decimals exactly as `signedPoints`
+ * does: a value that rounds to zero prints unsigned.
+ */
+export function signedFigure(value: number, locale = "en-GB"): string {
+  const rounded = Math.round(value * 100) / 100;
+  const text = figure(Math.abs(rounded), locale);
+  return rounded > 0 ? `+${text}` : rounded < 0 ? `−${text}` : text;
+}
+
 export function percent(probability: number, digits = 0, locale = "en-GB"): string {
   return new Intl.NumberFormat(locale, {
     style: "percent",

@@ -299,6 +299,69 @@ describe("member decision controls", () => {
     }
   });
 
+  it("renders the plan and the advanced part apart, and every input once without a part", () => {
+    const count = (container: HTMLElement, name: string) =>
+      container.querySelectorAll(`input[name="${name}"]`).length;
+    const whole = renderControls(`/league/members/${ENTRY}?mode=fark-yarat`);
+    for (const name of ["strategy", "window", "llm", "top100", "chip"]) {
+      expect(count(whole.container, name), name).toBeGreaterThan(0);
+    }
+    expect(screen.getAllByRole("combobox", { name: "Karşısında oynadığın üye" })).toHaveLength(1);
+    const every = Object.fromEntries(
+      ["strategy", "window", "llm", "top100", "chip"].map((name) => [
+        name,
+        count(whole.container, name),
+      ]),
+    );
+    whole.unmount();
+
+    const plan = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?mode=fark-yarat`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            part="plan"
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    expect(count(plan.container, "strategy")).toBe(every.strategy);
+    expect(count(plan.container, "window")).toBe(every.window);
+    expect(screen.getByRole("combobox", { name: "Karşısında oynadığın üye" })).toBeInTheDocument();
+    for (const name of ["llm", "top100", "chip"]) expect(count(plan.container, name)).toBe(0);
+    // The plan names the choice it shows, and the chosen strategy in one short line.
+    expect(screen.getByRole("heading", { name: "Plan" })).toBeInTheDocument();
+    expect(screen.getByText("şu an: Fark yarat · 1 hafta")).toBeInTheDocument();
+    expect(
+      screen.getByText(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].short),
+    ).toBeInTheDocument();
+    // The notes that explain the options wait behind a closed disclosure.
+    const notes = screen.getByText(MESSAGES.tr.leagueMembers.optionNotes).closest("details")!;
+    expect(notes).not.toHaveAttribute("open");
+    expect(notes).toHaveTextContent(MESSAGES.tr.leagueMembers.rivalNote);
+    plan.unmount();
+
+    const advanced = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?mode=fark-yarat`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            part="advanced"
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    for (const name of ["llm", "top100", "chip"]) {
+      expect(count(advanced.container, name)).toBe(every[name]);
+    }
+    for (const name of ["strategy", "window"]) expect(count(advanced.container, name)).toBe(0);
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
   it("phrases the rule as a band on the gap, never as a chance of catching up", () => {
     // Check the declared rule separately as well as the full rendered controls.
     //

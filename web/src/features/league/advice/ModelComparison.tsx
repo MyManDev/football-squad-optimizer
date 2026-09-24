@@ -22,8 +22,10 @@ export function ModelComparison({
   busy?: boolean;
   deadlinePassed?: boolean;
 }) {
-  const { language } = useLanguage();
+  const { language, messages } = useLanguage();
   const tr = language === "tr";
+  // The Top 100 setting is a weight on the selection, never a share of anything.
+  const weight = messages.leagueMembers.top100Weight(request.top100Weight ?? 0);
   const transport = useMemo(() => client ?? createAdviceClient(), [client]);
   const {
     leagueId,
@@ -92,8 +94,8 @@ export function ModelComparison({
     <Card title={tr ? "İki modelin karşılaştırması" : "Model comparison"}>
       <p>
         {tr
-          ? `Aynı kadro, bütçe, ${request.window} hafta ve %${request.top100Weight ?? 0} Top100 etkisi.`
-          : `Same squad, budget, ${request.window} weeks and ${request.top100Weight ?? 0}% Top100 influence.`}
+          ? `Aynı kadro, bütçe, ${request.window} hafta ve ${weight}.`
+          : `Same squad, budget, ${request.window} weeks and ${weight}.`}
       </p>
       <table style={{ width: "100%" }}>
         <thead>
