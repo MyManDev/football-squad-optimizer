@@ -1,6 +1,7 @@
 """Weekly service composition keeps provenance, preflight and preview semantics."""
 
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import replace
@@ -314,6 +315,10 @@ def test_rotation_export_is_capture_pinned_and_existing_pair_is_validated(
         export(None, repository_commit="b" * 40)
         calls.clear()
     checked = []
+    # The subject here is the reuse branch, so the premise is stated rather than built: an
+    # existing pair is a *readable* one. Whether a pair on disk can be read is the subject of
+    # its own tests, which write an unreadable one and require the export.
+    monkeypatch.setattr(weekly, "rotation_pair_is_readable", lambda *args: existing)
     monkeypatch.setattr(weekly, "export_rotation_evidence", export)
     monkeypatch.setattr(
         weekly, "read_rotation_evidence_artifact", lambda *args: checked.append(args)
@@ -382,6 +387,69 @@ def test_a_named_capture_reaches_the_export_from_the_stage_that_runs_it(
     assert calls[0].snapshot == operation.request.snapshot_id
     # And the artifact is named after the claims, so a fixture read cannot reuse this pair.
     assert result.value["table"] == str(table)
+
+
+def test_the_stage_re_exports_a_pair_it_cannot_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both halves on disk is not the same as a pair this project can read.
+
+    The file is named after the table's contract and the manifest declares the export's, so
+    moving the export contract alone leaves the previous version's pair under this version's
+    name. Asking existence takes the "already exported" branch and then raises at the read,
+    on a run that cannot be retried inside its own window.
+    """
+
+    operation = world(tmp_path)
+    operation.run.directory.mkdir(parents=True)
+    operation.values["capture"] = {
+        "snapshot_id": operation.request.snapshot_id,
+        "deadline_utc": "2026-08-28T17:30:00Z",
+    }
+    table, manifest = rotation_artifact(
+        operation.paths.rotation, "2026-27", 2, operation.request.snapshot_id or ""
+    )
+    table.parent.mkdir(parents=True, exist_ok=True)
+    table.write_text("contract_version\n", encoding="utf-8")
+    manifest.write_text("{}", encoding="utf-8")
+
+    calls = []
+
+    def export(request, *, repository_commit):
+        calls.append(request)
+        table.write_text("table")
+        manifest.write_text("manifest")
+        return {}
+
+    monkeypatch.setattr(weekly, "export_rotation_evidence", export)
+    monkeypatch.setattr(weekly, "read_rotation_evidence_artifact", lambda *args: None)
+    operation._rotation()
+
+    # The unreadable pair did not stand in for an export.
+    assert len(calls) == 1
+
+
+def test_the_preflight_looks_for_the_artifact_the_stage_will_open(tmp_path: Path) -> None:
+    """With --rotation-capture the artifact is named after the club-news capture.
+
+    A preflight that assumed the decision capture would check a file the stage never opens,
+    and the disagreement would not fail: it would pass, and the refusal would arrive later.
+    """
+
+    capture = "club-news-20260912T143000Z-abcdef123456"
+    base = world(tmp_path, rotation=True)
+    operation = weekly.WeeklyOperations(
+        replace(base.request, rotation_capture=capture),
+        base.paths,
+        run_id="synthetic",
+        repository_commit="b" * 40,
+        handoff=base.supplied_handoff,
+    )
+    operation.run.directory.mkdir(parents=True, exist_ok=True)
+    named, _ = rotation_artifact(operation.paths.rotation, "2026-27", 2, capture)
+
+    with pytest.raises(WeekError, match=re.escape(named.name)):
+        operation._preflight()
 
 
 def test_missing_reused_rotation_refuses_before_capture_or_export(tmp_path: Path) -> None:
