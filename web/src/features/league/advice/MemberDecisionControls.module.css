@@ -200,6 +200,11 @@
   cursor: not-allowed;
 }
 
+/* The window the link names stays readable on ink even where it cannot be computed. */
+.segment:has(input:checked:disabled) {
+  color: var(--color-board-muted);
+}
+
 .segment:has(input:focus-visible) {
   outline: 2px solid var(--color-focus);
   outline-offset: -4px;

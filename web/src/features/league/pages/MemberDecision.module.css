@@ -200,14 +200,17 @@
   line-height: 16px;
 }
 
-/* A board narrower than two columns of it: the phone's layout, the gain in the header. */
+/* A board narrower than two columns of it: the phone's layout, as D-Phone-Bu-Hafta draws
+   it. A 28 px strip holds DEĞİŞİKLİK and the gain, the two 52 px panels sit 4 px apart
+   inside a 4 px bezel, so a board is 140 px tall. */
 @container (max-width: 439px) {
   .board {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "head led"
       "panels panels";
-    row-gap: 6px;
+    gap: 0 var(--space-3);
+    padding: 0 4px 4px;
   }
 
   .led {
@@ -216,30 +219,38 @@
     gap: var(--space-2);
     min-width: 0;
     max-width: none;
+    padding-right: var(--space-2);
     text-align: right;
   }
 
   .ledValue {
     font-size: 22px;
-    line-height: 26px;
+    line-height: 28px;
   }
 
   .ledUnknown {
     max-width: 16ch;
+    padding: 4px 0;
   }
 
   .boardHead {
     align-self: center;
+    padding: 0 var(--space-2);
+    line-height: 28px;
+  }
+
+  .panels {
+    gap: 4px;
   }
 
   .panel {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 60px minmax(0, 1fr) auto;
     grid-template-areas:
       "word name meta"
       "word strip meta";
-    column-gap: var(--space-3);
+    column-gap: var(--space-2);
     min-height: 52px;
-    padding: 6px var(--space-2);
+    padding: 4px var(--space-3) 4px var(--space-2);
   }
 
   .word {
@@ -308,6 +319,12 @@
   cursor: pointer;
 }
 
+@media (max-width: 1179.98px) {
+  .retry {
+    min-height: 44px;
+  }
+}
+
 /* ---- Gain strip ---- */
 
 .gain {
@@ -334,16 +351,26 @@
 
 .gainFigure {
   flex: none;
-  color: var(--color-good);
+  color: var(--color-text);
   font-family: var(--font-display);
   font-size: 30px;
   font-weight: 800;
   line-height: 34px;
 }
 
+/* Green only for a gain; a plan that loses against holding is said in the loss colour. */
+.gainFigure[data-sign="up"] {
+  color: var(--color-good);
+}
+
+.gainFigure[data-sign="down"] {
+  color: var(--color-bad);
+}
+
 .gainCaption {
-  max-width: 34ch;
+  max-width: 40ch;
   color: var(--color-text-muted);
+  text-wrap: balance;
   font-size: var(--step--2);
   line-height: 16px;
 }
@@ -409,6 +436,11 @@
   font-family: var(--font-mono);
   font-size: var(--step--2);
   line-height: 16px;
+}
+
+/* A share and its player never part at a line break. */
+.gainItem {
+  white-space: nowrap;
 }
 
 @media (max-width: 599.98px) {
@@ -537,18 +569,39 @@
   font-size: var(--step--2);
   line-height: 16px;
   text-align: right;
+  text-wrap: pretty;
 }
 
+/* On a phone the decision reads as D-Phone-Bu-Hafta draws it: the boards, the captain
+   line, the gain strip, then the proof stamp and the sentences that qualify it. */
 @media (max-width: 599.98px) {
-  .stamp {
+  .grid {
+    gap: var(--space-2);
+  }
+
+  .captain {
     order: 1;
+    min-height: 44px;
+  }
+
+  .gain {
+    order: 2;
+  }
+
+  .stamp {
+    order: 3;
     align-items: flex-start;
     max-width: none;
   }
 
-  .captain,
   .states {
-    order: 2;
+    order: 4;
+  }
+
+  /* The vice-captain carries the name only, as the phone artboard draws it, so the
+     captain line stays on one line. */
+  .viceClub {
+    display: none;
   }
 
   .stampTags {

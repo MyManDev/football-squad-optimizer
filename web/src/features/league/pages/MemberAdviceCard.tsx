@@ -683,8 +683,12 @@ function GainStrip({
     Number.isSafeInteger(squad.free_transfers) &&
     squad.free_transfers >= 0;
   const facts = [
+    // Free transfers used of those held: a move beyond them is a hit, stated beside it.
     freeKnown && view.moves.length > 0
-      ? copy.freeTransfersUsed(view.moves.length, squad.free_transfers)
+      ? copy.freeTransfersUsed(
+          Math.min(view.moves.length, squad.free_transfers),
+          squad.free_transfers,
+        )
       : null,
     finiteNumber(hits) && view.moves.length > 0
       ? copy.hitPointsFact(hits.toLocaleString(locale, { maximumFractionDigits: 1 }))
@@ -706,7 +710,12 @@ function GainStrip({
       <div className={board.gainTop}>
         {finiteNumber(gain) ? (
           <p className={board.gainHead}>
-            <strong className={board.gainFigure}>{signedFigure(gain, locale)}</strong>{" "}
+            <strong
+              className={board.gainFigure}
+              data-sign={gain >= 0.005 ? "up" : gain <= -0.005 ? "down" : undefined}
+            >
+              {signedFigure(gain, locale)}
+            </strong>{" "}
             <span className={board.gainCaption}>{caption}</span>
           </p>
         ) : null}
@@ -753,11 +762,14 @@ function GainStrip({
         </div>
       ) : allShares && view.moves.length > 1 ? (
         <p className={board.gainList}>
-          {view.moves
-            .map(
-              (move) => `${shortName(move)} ${signedFigure(move.expected_points_delta!, locale)}`,
-            )
-            .join(" · ")}
+          {view.moves.map((move, index) => (
+            <span key={move.move_id}>
+              {index > 0 ? " · " : null}
+              <span className={board.gainItem}>
+                {shortName(move)} {signedFigure(move.expected_points_delta!, locale)}
+              </span>
+            </span>
+          ))}
         </p>
       ) : null}
     </div>
@@ -789,7 +801,9 @@ function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
           {copy.viceMark}
         </span>
         <strong className={board.armName}>{vice.short_name || vice.name}</strong>
-        <ClubMark team={vice.team} codes={codes} />
+        <span className={board.viceClub}>
+          <ClubMark team={vice.team} codes={codes} />
+        </span>
       </span>
     </p>
   );

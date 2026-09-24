@@ -39,12 +39,17 @@
     padding: var(--space-2) var(--space-5);
   }
 
+  /* Below 1180 px the bar is two lines (about 97 px): a jump lands under it, not behind. */
   :global(html):has(.topBar) {
-    scroll-padding-top: 80px;
+    scroll-padding-top: 112px;
   }
 }
 
 @media (min-width: 1180px) {
+  :global(html):has(.topBar) {
+    scroll-padding-top: 80px;
+  }
+
   .topBar {
     margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-6)) 0;
     padding: var(--space-2) var(--space-6);
@@ -159,22 +164,27 @@
   }
 }
 
-/* The phone's compact bar: the team, the week with the short deadline on one line, and
-   the score bug as label-and-figure pairs that wrap onto a second line. */
+/* The phone's compact strip, as D-Phone-Bu-Hafta draws it: a sidebar-green band right
+   under the phone bar. The team, the week and the short deadline share the first line
+   (a long team name pushes the week to the next), and the score bug follows as quiet
+   label-and-figure pairs in sentence case. Labels are ink2 on the band (6.1:1). */
 @media (max-width: 599.98px) {
   .topBar {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px var(--space-3);
     min-height: 0;
-    margin-top: calc(-1 * var(--space-2));
-    padding: 0 0 var(--space-3);
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+    padding: var(--space-2) var(--space-4) 10px;
+    border-bottom: 0;
+    background: var(--color-surface-2);
   }
 
   .teamName {
-    font-size: 20px;
-    line-height: 24px;
+    font-size: 18px;
+    line-height: 22px;
   }
 
   .topWeek {
@@ -183,7 +193,7 @@
   }
 
   .weekLabel {
-    font-size: 18px;
+    font-size: 16px;
     line-height: 22px;
   }
 
@@ -202,9 +212,10 @@
   }
 
   .scoreBug {
+    flex: 1 1 100%;
     flex-wrap: wrap;
-    gap: 2px var(--space-4);
-    margin-top: var(--space-1);
+    gap: 0 var(--space-3);
+    margin: 2px 0 0;
   }
 
   .scoreCell,
@@ -212,12 +223,19 @@
   .scoreCell:last-child {
     flex-direction: row;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1);
     padding: 0;
   }
 
   .scoreCell + .scoreCell {
     border-left: 0;
+  }
+
+  .scoreCell dt {
+    font-family: var(--font-body);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .scoreCell dd {
@@ -377,9 +395,18 @@ section.notice p {
   overflow-wrap: anywhere;
 }
 
-/* On a phone the proof stamp follows the gain strip, as the phone artboard draws it, and
-   the captain line and the plan's sentences follow the stamp. */
+/* On a phone the proof stamp leaves the heading row for its place after the gain strip,
+   as the phone artboard draws it (MemberDecision.module.css orders the parts), and the
+   rhythm tightens so the boards and the captain line come up first. */
 @media (max-width: 599.98px) {
+  .page {
+    gap: var(--space-4);
+  }
+
+  .decision {
+    gap: var(--space-3);
+  }
+
   .headingRow {
     display: contents;
   }

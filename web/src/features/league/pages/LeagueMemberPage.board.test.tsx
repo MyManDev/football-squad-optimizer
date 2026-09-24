@@ -348,7 +348,38 @@ describe("the gain strip and the captain line", () => {
       }),
     });
     expect(decision("en").querySelector('[class*="segments"]')).toBeNull();
-    expect(screen.getByText("Fernandes −0.4 · Brobbey +1.2")).toBeInTheDocument();
+    const list = screen.getByText("Fernandes −0.4").closest("p")!;
+    expect(list).toHaveTextContent("Fernandes −0.4 · Brobbey +1.2");
+    // A share never parts from its player at a line break.
+    for (const item of ["Fernandes −0.4", "Brobbey +1.2"]) {
+      expect(within(list).getByText(item).className).toMatch(/gainItem/);
+    }
+  });
+
+  it("colours the gain by its sign, and a loss against holding is never drawn green", () => {
+    show("en", {
+      advice: twoMoves({
+        moves: [move("gw-1", PALMER, FERNANDES, -2.0), move("gw-2", JESUS, BROBBEY, 1.2)],
+        expected_gain_vs_hold: -0.8,
+      }),
+    });
+    expect(screen.getByText("−0.8")).toHaveAttribute("data-sign", "down");
+    cleanup();
+    show("en");
+    const figure = screen.getAllByText("+3.01").find((element) => element.tagName === "STRONG");
+    expect(figure).toHaveAttribute("data-sign", "up");
+  });
+
+  it("counts the free transfers used as at most the ones held", () => {
+    const squad: LeagueViewEnvelope<EntrySquad> = structuredClone(SQUAD);
+    squad.payload.free_transfers_known = true;
+    squad.payload.free_transfers = 1;
+    show("tr", { squad, advice: twoMoves({ transfer_hit_points: 4 }) });
+    const copy = MESSAGES.tr.leagueMembers;
+    // Two moves on one free transfer: one is free and the other is the hit named beside it.
+    expect(screen.getByText(copy.freeTransfersUsed(1, 1))).toBeInTheDocument();
+    expect(screen.queryByText(copy.freeTransfersUsed(2, 1))).toBeNull();
+    expect(screen.getByText(copy.hitPointsFact("4"))).toBeInTheDocument();
   });
 
   it("names no free-transfer fact the squad does not publish", () => {
