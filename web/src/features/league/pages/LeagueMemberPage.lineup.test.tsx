@@ -1,10 +1,10 @@
 /**
  * The published decision is more than the moves: the card shows the armband, the chip,
  * the eleven and the bench order when the producer published them, and nothing invented
- * when it did not.
+ * when it did not. The pitch draws that week; its list view ('Liste') reads it out.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -14,6 +14,7 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
@@ -39,6 +40,13 @@ function renderAdvice(
   );
 }
 
+/** Switches the squad section from the pitch to its list, where the lineup is read out. */
+function openList(language: "tr" | "en" = "tr") {
+  const list = screen.getByRole("button", { name: MESSAGES[language].leagueMembers.viewList });
+  fireEvent.click(list);
+  expect(list).toHaveAttribute("aria-pressed", "true");
+}
+
 describe("the advice card carries the whole decision", () => {
   it("shows captain, vice-captain, chip, eleven and bench order from the payload", () => {
     const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
@@ -46,6 +54,9 @@ describe("the advice card carries the whole decision", () => {
     expect(payload.starting_xi).toHaveLength(11);
     expect(payload.bench).toHaveLength(4);
     renderAdvice(advice);
+    // The pitch is shown first; the list waits behind the toggle.
+    expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
+    openList();
 
     const lineup = screen.getByRole("region", { name: "Bu haftaki kadron" });
     expect(within(lineup).getByText("Kaptan")).toBeInTheDocument();
@@ -62,6 +73,7 @@ describe("the advice card carries the whole decision", () => {
   it("names the chip the plan plays", () => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     renderAdvice({ ...base, payload: { ...base.payload, chip: "3xc" } }, "en");
+    openList("en");
     const lineup = screen.getByRole("region", { name: "Your gameweek" });
     expect(within(lineup).getByText("Triple Captain")).toBeInTheDocument();
   });
@@ -78,7 +90,9 @@ describe("the advice card carries the whole decision", () => {
       chip: null,
     };
     renderAdvice({ ...base, payload: stripped });
-    expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Bu haftaki kadron", hidden: true })).toBeNull();
+    // With no published eleven there is no list to switch to.
+    expect(screen.queryByRole("button", { name: "Liste" })).toBeNull();
   });
 
   it("shows no lineup for a legacy document that never carried the fields", () => {
@@ -93,7 +107,8 @@ describe("the advice card carries the whole decision", () => {
       ...legacy
     } = base.payload;
     renderAdvice({ ...base, payload: legacy as EntryAdvice });
-    expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Bu haftaki kadron", hidden: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Liste" })).toBeNull();
   });
 });
 
@@ -181,6 +196,7 @@ describe("a squad basis the two documents disagree about", () => {
       renderAdvice({ ...base, payload }, language, squad);
       expect(screen.queryByText(UNCONFIRMED[language])).not.toBeInTheDocument();
       expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
+      openList(language);
       const lineup = language === "en" ? "Your gameweek" : "Bu haftaki kadron";
       expect(
         within(screen.getByRole("region", { name: lineup })).getByText("Wildcard"),

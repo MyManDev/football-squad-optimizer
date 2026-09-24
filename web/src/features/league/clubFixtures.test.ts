@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { FixturesPayload } from "../fixtures/types";
-import { clubWeeks, nextThree } from "./clubFixtures";
+import { clubWeeks, listedWeeks, meetings, nextThree } from "./clubFixtures";
 
 const published = (
   JSON.parse(readFileSync(join(__dirname, "../../../public/data/fixtures.json"), "utf-8")) as {
@@ -81,5 +81,62 @@ describe("a club's matches in a run of gameweeks", () => {
     expect(clubWeeks(CALENDAR, "2026-27", "Arsenal", [9])).toEqual([null]);
     expect(clubWeeks(CALENDAR, "2025-26", "Arsenal", [6])).toEqual([null]);
     expect(clubWeeks(null, "2026-27", "Arsenal", [6, 7])).toEqual([null, null]);
+  });
+});
+
+describe("the weeks the calendar lists", () => {
+  it("keeps the listed weeks in order and leaves out the rest", () => {
+    expect(listedWeeks(CALENDAR, "2026-27", nextThree(6))).toEqual([6, 7, 8]);
+    expect(listedWeeks(CALENDAR, "2026-27", nextThree(7))).toEqual([7, 8]);
+    expect(listedWeeks(CALENDAR, "2025-26", nextThree(6))).toEqual([]);
+    expect(listedWeeks(null, "2026-27", nextThree(6))).toEqual([]);
+  });
+});
+
+describe("players of one eleven who face each other", () => {
+  const eleven = [
+    { name: "Raya", team: "Arsenal" },
+    { name: "Saka", team: "Arsenal" },
+    { name: "Calvert-Lewin", team: "Leeds United" },
+    { name: "Palmer", team: "Chelsea" },
+  ];
+
+  it("pairs the two sides of a fixture, home first, from the calendar alone", () => {
+    expect(meetings(CALENDAR, "2026-27", 6, eleven)).toEqual([
+      {
+        home: "ARS",
+        away: "LEE",
+        homePlayers: [eleven[0], eleven[1]],
+        awayPlayers: [eleven[2]],
+      },
+    ]);
+    // Both of Arsenal's matches in the double week meet a side of the eleven.
+    expect(meetings(CALENDAR, "2026-27", 7, eleven).map((m) => `${m.home}-${m.away}`)).toEqual([
+      "LEE-ARS",
+      "ARS-CHE",
+    ]);
+  });
+
+  it("names no meeting where only one side is in the eleven, or without the week", () => {
+    expect(meetings(CALENDAR, "2026-27", 8, eleven.slice(0, 2))).toEqual([]);
+    expect(meetings(CALENDAR, "2026-27", 9, eleven)).toEqual([]);
+    expect(meetings(null, "2026-27", 6, eleven)).toEqual([]);
+  });
+
+  it("finds the real GW6 meetings of the published calendar", () => {
+    const week = published.current_gameweek!;
+    const first = published.gameweeks.find((item) => item.gameweek === week)!.fixtures[0]!;
+    const players = [
+      { name: "home", team: first.home.name },
+      { name: "away", team: first.away.name },
+    ];
+    expect(meetings(published, published.season, week, players)).toEqual([
+      {
+        home: first.home.short_name,
+        away: first.away.short_name,
+        homePlayers: [players[0]],
+        awayPlayers: [players[1]],
+      },
+    ]);
   });
 });

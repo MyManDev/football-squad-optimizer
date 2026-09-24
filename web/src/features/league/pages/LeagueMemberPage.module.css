@@ -1,11 +1,11 @@
 /*
  * The member page in direction D: a top bar pinned at the top of the main column, the
- * decision (heading row, boards, gain strip, captain line), the two honesty lines, and
- * the secondary tools as closed sections. The plan and Hesapla render in the sidebar.
+ * decision (heading row, boards, gain strip, captain line), the squad on the pitch, the
+ * two honesty lines, and the secondary tools as closed sections. The plan and Hesapla
+ * render in the sidebar; the fixture rail is a column of its own from 1180 px.
  */
 
 .page,
-.squadContext,
 .systemPage {
   display: flex;
   flex-direction: column;
@@ -14,6 +14,33 @@
 
 .page {
   gap: var(--space-5);
+  min-width: 0;
+}
+
+/* ---- The page and its fixture rail, 1180 px and wider ----
+   The rail stands flush with the window's right edge and as tall as the window, so the
+   main column gives up its right padding, its top and bottom padding (the page keeps
+   them) and its width cap while the member page is in it. */
+
+@media (min-width: 1180px) {
+  :global(#main):has(.layout[data-rail="column"]) {
+    max-width: none;
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+
+  .layout[data-rail="column"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    column-gap: var(--space-6);
+  }
+
+  .layout[data-rail="column"] > .page {
+    gap: var(--space-4);
+    padding: var(--space-5) 0 var(--space-7);
+  }
 }
 
 /* ---- Top bar ---- */
@@ -357,10 +384,37 @@ section.notice p {
   gap: var(--space-4);
 }
 
+/* The squad, and on a tablet the fixtures beside it where the column has room for both
+   (the rail's 320 or 340 px next to a pitch of at least 340), below it where it has not. */
+.squadArea {
+  container: squadarea / inline-size;
+}
+
+.squadGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+@container squadarea (min-width: 684px) {
+  .squadGrid:has(> aside) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    gap: var(--space-5);
+  }
+}
+
+@container squadarea (min-width: 880px) {
+  .squadGrid:has(> aside) {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
 .decision {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .headingRow {
@@ -410,6 +464,16 @@ section.notice p {
   .headingRow {
     display: contents;
   }
+
+  /* The phone reads the decision and then what to make of it, as D-Phone-Bu-Hafta draws
+     it; the squad ('Kadro' in the menu) follows. */
+  .adviceSection > .decision {
+    order: -2;
+  }
+
+  .adviceSection > .honestyBlock {
+    order: -1;
+  }
 }
 
 .echo {
@@ -428,15 +492,16 @@ section.notice p {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-2) var(--space-4);
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-line);
 }
 
+/* 12 px lines, as the artboards set them: quieter than the decision they qualify. */
 .honestyLines {
   flex: 1 1 320px;
   color: var(--color-text-muted);
-  font-size: var(--step--1);
-  line-height: 18px;
+  font-size: var(--step--2);
+  line-height: 16px;
 }
 
 .honestyLines p {
@@ -492,8 +557,9 @@ section.notice p {
 }
 
 .historyLink {
-  flex-basis: 100%;
+  flex: none;
   order: 4;
+  align-self: center;
   margin: 0;
   font-size: var(--step--1);
 }
@@ -563,34 +629,6 @@ section.notice p {
   }
 }
 
-/* ---- The held squad, until it moves under the pitch ---- */
-
-.contextDetails > summary {
-  padding: var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-s);
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.contextDetails > summary > h2 {
-  display: inline;
-  font: inherit;
-  margin: 0;
-}
-
-@media (min-width: 641px) {
-  .contextDetails > summary {
-    display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .squadContext > section:first-child > header > h2 {
-    display: none;
-  }
-}
-
 /* ---- Shared by the advice sections ---- */
 
 .assumptionList {
@@ -640,6 +678,11 @@ section.notice p {
   margin-top: var(--space-2);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
+}
+
+/* The week's lineup as the squad section's list view, right under its heading row. */
+.lineupList {
+  max-width: 720px;
 }
 
 .lineupTitle {
@@ -771,30 +814,80 @@ section.notice p {
   width: 6rem;
 }
 
+/* On a phone each week is a block of its own: the week and its expected points on the
+   first line, then who comes in and who goes out, then the hit points and the chip, each
+   under its column's name. The roles in the markup keep it a table for a screen reader;
+   the column names shown here are the stylesheet's and are not read twice. */
 @media (max-width: 599.98px) {
-  .windowTable {
+  .windowTable,
+  .windowTable tbody {
+    display: block;
+  }
+
+  .windowTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .windowTable tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "week points"
+      "in in"
+      "out out"
+      "hits chip";
+    gap: 2px var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .windowTable tbody th,
+  .windowTable tbody td {
+    display: block;
+    padding: 0;
+    border-top: 0;
     font-size: var(--step--2);
+    line-height: 16px;
   }
 
-  .windowTable th,
-  .windowTable td {
-    padding: 6px 4px;
+  .windowTable td[data-label]::before {
+    content: attr(data-label) / "";
+    margin-right: var(--space-2);
+    color: var(--color-text-muted);
+    font-weight: 400;
   }
 
-  .weekColumn {
-    width: 2.75rem;
+  .weekCell {
+    grid-area: week;
+    font-weight: 600;
   }
 
-  .hitsColumn {
-    width: 4.25rem;
+  .inCell {
+    grid-area: in;
   }
 
-  .chipColumn {
-    width: 3.75rem;
+  .outCell {
+    grid-area: out;
   }
 
-  .pointsColumn {
-    width: 4rem;
+  .windowTable .hitsCell {
+    grid-area: hits;
+    text-align: left;
+  }
+
+  .chipCell {
+    grid-area: chip;
+    text-align: right;
+  }
+
+  .windowTable .pointsCell {
+    grid-area: points;
+    font-weight: 600;
   }
 }
 

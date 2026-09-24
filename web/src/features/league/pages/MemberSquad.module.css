@@ -1,0 +1,226 @@
+/*
+ * The squad section: the heading row with the Saha | Liste toggle, the pitch and its
+ * bench, or the list; and the held squad as a compact list for its closed section.
+ */
+
+.squad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-height: 32px;
+}
+
+.heading {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.line {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* Saha | Liste: two real buttons drawn as one segmented control. */
+.toggle {
+  flex: none;
+  display: flex;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.face {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.option:first-child .face {
+  border-radius: var(--radius-s) 0 0 var(--radius-s);
+}
+
+.option:last-child .face {
+  border-left: 0;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+}
+
+.option[aria-pressed="true"] .face {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-primary-text);
+  font-weight: 600;
+}
+
+.option:hover:not([aria-pressed="true"]) .face {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* Touch screens: 44 px targets that draw a 32 px face. */
+@media (max-width: 1179.98px) {
+  .option {
+    height: 44px;
+  }
+
+  .face {
+    height: 32px;
+  }
+}
+
+.pitchView,
+.listView {
+  min-width: 0;
+}
+
+.pitchView[hidden],
+.listView[hidden] {
+  display: none;
+}
+
+.note {
+  margin: var(--space-2) 0 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* ---- The held squad, in its closed section ---- */
+
+.held {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 640px;
+}
+
+.heldTitle {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.heldList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heldRow {
+  display: grid;
+  grid-template-columns: 72px auto auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  padding: 6px 0;
+  border-top: 1px solid var(--color-line);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.heldRow:first-child {
+  border-top: 0;
+}
+
+.heldLead {
+  grid-column: 1;
+  color: var(--color-text-faint);
+}
+
+.heldName {
+  grid-column: 2;
+  font-size: var(--step--1);
+  white-space: nowrap;
+}
+
+.heldMark {
+  grid-column: 3;
+  display: inline-grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 16px;
+}
+
+.heldMeta {
+  grid-column: 4;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.heldXp {
+  grid-column: 5;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 599.98px) {
+  .heldRow {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .heldLead {
+    grid-column: 1 / -1;
+  }
+
+  .heldName {
+    grid-column: 1;
+  }
+
+  .heldMark {
+    grid-column: 2;
+  }
+
+  .heldMeta {
+    grid-column: 3;
+  }
+
+  .heldXp {
+    grid-column: 4;
+  }
+}

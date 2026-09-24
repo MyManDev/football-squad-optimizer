@@ -151,7 +151,7 @@ export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
           <p className={board.stampCaption}>{copy.stampOptimalCaption}</p>
         </>
       ) : view.solver_status === "FEASIBLE" ? (
-        <p className={board.stampTags}>
+        <p className={`${board.stampTags} ${board.stampUnproven}`}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>
         </p>
       ) : null}
@@ -361,8 +361,8 @@ export function AdviceDecision({
 
 /**
  * What a switch adds to the plan (rival players, the club's word, the Top 100 weight, the
- * chip), the week's lineup, what the plan assumes, and the window. Each renders only where
- * the document carries it.
+ * chip), what the plan assumes, and the window. Each renders only where the document
+ * carries it. The week's lineup is the squad section's list view (`PlanLineup`).
  */
 export function AdviceDetails({
   shown,
@@ -375,10 +375,8 @@ export function AdviceDetails({
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
   windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
 }) {
-  const { language } = useLanguage();
   const { envelope } = shown;
   const view = envelope.payload;
-  const { chipBasis } = adviceBasis(view, CHIP_COPY[language]);
   return (
     <div className={board.details}>
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
@@ -386,12 +384,18 @@ export function AdviceDetails({
       <Top100Section view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
-      <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
       <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
     </div>
   );
+}
+
+/** The week's lineup as a list, on the basis the chip scores it: the pitch's list view. */
+export function PlanLineup({ view }: { view: EntryAdvice }) {
+  const { language } = useLanguage();
+  const { chipBasis } = adviceBasis(view, CHIP_COPY[language]);
+  return <LineupSection view={view} chipBasis={chipBasis} />;
 }
 
 /** The decision and its details together, as one plan reads when shown on its own. */
@@ -888,7 +892,9 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
  * expected points). The moves and the lineup above are the first week's; the rest of the
  * window lives here. What the window assumes is stated above, beside every other plan's
  * assumptions. Rendered only when the producer published it, so a one-week document shows
- * nothing extra. The table never scrolls sideways: on a narrow screen its cells wrap.
+ * nothing extra. The table never scrolls sideways: on a phone each week is a block of its
+ * own, the week and its expected points on the first line, then who comes in, who goes
+ * out, the hit points and the chip, each under its column's name.
  */
 function WindowSection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
@@ -902,40 +908,64 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <table className={styles.windowTable}>
-        <thead>
-          <tr>
-            <th scope="col" className={styles.weekColumn}>
+      {/* The roles are stated because a phone lays each week out as a block, and a table
+          whose parts change their display must still read as a table. */}
+      <table className={styles.windowTable} role="table">
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader" className={styles.weekColumn}>
               {copy.windowWeek}
             </th>
-            <th scope="col">{copy.in}</th>
-            <th scope="col">{copy.out}</th>
-            <th scope="col" className={`${styles.right} ${styles.hitsColumn}`}>
+            <th scope="col" role="columnheader">
+              {copy.in}
+            </th>
+            <th scope="col" role="columnheader">
+              {copy.out}
+            </th>
+            <th scope="col" role="columnheader" className={`${styles.right} ${styles.hitsColumn}`}>
               {copy.windowHits}
             </th>
-            <th scope="col" className={styles.chipColumn}>
+            <th scope="col" role="columnheader" className={styles.chipColumn}>
               {copy.chipLabel}
             </th>
-            <th scope="col" className={`${styles.right} ${styles.pointsColumn}`}>
+            <th
+              scope="col"
+              role="columnheader"
+              className={`${styles.right} ${styles.pointsColumn}`}
+            >
               {copy.windowPoints}
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {weeks.map((week) => (
-            <tr key={week.gameweek}>
-              <th scope="row" className="num">
+            <tr key={week.gameweek} role="row">
+              <th scope="row" role="rowheader" className={`${styles.weekCell} num`}>
                 {copy.windowWeekOf(week.gameweek)}
               </th>
-              <td>{names(week.transfers_in)}</td>
-              <td>{names(week.transfers_out)}</td>
-              <td className={`${styles.right} num`}>
+              <td role="cell" className={styles.inCell} data-label={copy.in}>
+                {names(week.transfers_in)}
+              </td>
+              <td role="cell" className={styles.outCell} data-label={copy.out}>
+                {names(week.transfers_out)}
+              </td>
+              <td
+                role="cell"
+                className={`${styles.right} ${styles.hitsCell} num`}
+                data-label={copy.windowHits}
+              >
                 {points(week.transfer_hit_points, 0, locale)}
               </td>
-              <td>
+              <td role="cell" className={styles.chipCell} data-label={copy.chipLabel}>
                 {week.chip ? (copy.chipNames[week.chip] ?? week.chip) : copy.rivalPlayersNone}
               </td>
-              <td className={`${styles.right} num`}>{points(week.expected_points, 1, locale)}</td>
+              <td
+                role="cell"
+                className={`${styles.right} ${styles.pointsCell} num`}
+                data-label={copy.windowPoints}
+              >
+                {points(week.expected_points, 1, locale)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -1156,8 +1186,8 @@ function LineupSection({ view, chipBasis }: { view: EntryAdvice; chipBasis: stri
   const mark = (player: AdvicePlayer) =>
     player.player_id === captain.player_id ? "C" : player.player_id === vice.player_id ? "V" : null;
   return (
-    <section className={styles.lineup} aria-label={copy.lineupTitle}>
-      <h3 className={styles.lineupTitle}>{copy.lineupTitle}</h3>
+    <section className={styles.lineupList} aria-label={copy.lineupTitle}>
+      <h3 className="visually-hidden">{copy.lineupTitle}</h3>
       {finiteNumber(view.expected_own_points) ? (
         <p className={styles.planCost}>
           <strong className="num">

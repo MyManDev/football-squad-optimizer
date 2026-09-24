@@ -1,6 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -405,14 +406,16 @@ describe("the app shell on a phone", () => {
 
   it("links the phone bar's 'Fikstür' to the list, or opens the page's sheet when it has one", async () => {
     stubLayout("phone");
+    // A page renders its sheet outside main, as the member page does.
     function SheetPage() {
       const shell = useShell();
       const register = shell?.registerSheet;
       useEffect(() => register?.(), [register]);
-      return (
+      return createPortal(
         <div id={FIXTURE_SHEET_ID} data-testid="sheet" data-open={String(shell?.sheetOpen)}>
           sheet
-        </div>
+        </div>,
+        document.body,
       );
     }
     const plain = renderShell();
@@ -429,11 +432,15 @@ describe("the app shell on a phone", () => {
     await user.click(open);
     expect(open).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("sheet")).toHaveAttribute("data-open", "true");
+    // Everything behind the sheet is out of reach: the sidebar, the phone bar and the page.
     expect(document.getElementById("sidebar")).toHaveAttribute("inert");
+    expect(screen.getByRole("banner", { hidden: true })).toHaveAttribute("inert");
+    expect(screen.getByRole("main", { hidden: true })).toHaveAttribute("inert");
     expect(document.documentElement.style.overflow).toBe("hidden");
 
     await user.keyboard("{Escape}");
     expect(screen.getByTestId("sheet")).toHaveAttribute("data-open", "false");
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
     expect(open).toHaveFocus();
   });
 

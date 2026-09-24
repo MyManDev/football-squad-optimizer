@@ -218,6 +218,7 @@ const en = {
     settledRealized: (points: string) => `Settled: ${points} Realized`,
     pitchLabel: "Starting eleven by position",
     captainLabel: "captain",
+    viceCaptainLabel: "vice-captain",
   },
   moves: {
     loading: "Loading the proposed moves…",
@@ -793,11 +794,9 @@ const en = {
     publicDataBody:
       "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
-    memberSquad: "Member Squad",
+    memberSquad: "Your current squad",
     heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
-    starterCount: (count: number) => `${count} starters`,
     bench: "Bench",
-    benchCount: (count: number) => `${count} substitutes`,
     emptySquad: "No squad is available for this member.",
     emptySquadBody: "The published member record does not contain squad data.",
     honestyRule:
@@ -926,6 +925,30 @@ const en = {
     advancedSettings: "Advanced settings",
     decisionTools: "Decision tools",
     chipsAndTransfers: "Chips and free transfers",
+    // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
+    squadAfterTitle: "Squad after the transfers",
+    squadOwnPoints: (points: string) => `captain doubled: ${points} xP`,
+    attackDirection: "Direction of attack",
+    pitchHorizontal: "Goalkeeper on the left, attacking to the right.",
+    pitchVertical: "Goalkeeper at the bottom, attacking upwards.",
+    viewLabel: "View",
+    viewPitch: "Pitch",
+    viewList: "List",
+    railWeeks: (weeks: readonly number[]) =>
+      weeks.length === 1
+        ? `Gameweek ${weeks[0]}`
+        : `Gameweeks ${weeks.slice(0, -1).join(", ")} and ${weeks[weeks.length - 1]}`,
+    railTransfers: "Fixtures for the transfers",
+    railXi: "Starting XI",
+    railMeet: (gameweek: number) => `Facing each other in gameweek ${gameweek}`,
+    railMeetNone: "None of these starters face each other that week.",
+    railWeekHead: "GW",
+    railWeekColumn: (gameweek: number) => `Gameweek ${gameweek}`,
+    railPlayer: "Player",
+    railLegendVenue: "H: home · A: away.",
+    railLegendDifficulty: "Fixture difficulty is not shown.",
+    railNoCalendar: "The fixture calendar is not available, so no match is shown here.",
+    railNoWeeks: "The calendar lists none of these gameweeks.",
     chipStrategy: {
       title: "Chip strategy",
       autoThisWeek: "Automatic plan · this week",
@@ -1277,6 +1300,7 @@ const tr: MessageSchema<typeof en> = {
     settledRealized: (pointsValue) => `Sonuçlandı: ${pointsValue} Gerçekleşen`,
     pitchLabel: "Pozisyona göre ilk on bir",
     captainLabel: "kaptan",
+    viceCaptainLabel: "yedek kaptan",
   },
   moves: {
     loading: "Önerilen hamleler yükleniyor…",
@@ -1830,11 +1854,9 @@ const tr: MessageSchema<typeof en> = {
     publicDataBody:
       "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
-    memberSquad: "Üye kadrosu",
+    memberSquad: "Şu anki kadron",
     heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
-    starterCount: (count) => `${count} ilk 11 oyuncusu`,
     bench: "Yedekler",
-    benchCount: (count) => `${count} yedek`,
     emptySquad: "Bu üye için kadro bulunmuyor.",
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
     honestyRule:
@@ -1951,6 +1973,29 @@ const tr: MessageSchema<typeof en> = {
     advancedSettings: "Gelişmiş ayarlar",
     decisionTools: "Karar araçları",
     chipsAndTransfers: "Çipler ve transfer hakkı",
+    squadAfterTitle: "Kadro, transferlerden sonra",
+    squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} xP`,
+    attackDirection: "Hücum yönü",
+    pitchHorizontal: "Kaleci solda, hücum sağa doğru.",
+    pitchVertical: "Kaleci altta, hücum yukarı doğru.",
+    viewLabel: "Görünüm",
+    viewPitch: "Saha",
+    viewList: "Liste",
+    railWeeks: (weeks) =>
+      weeks.length === 1
+        ? `${weeks[0]}. hafta`
+        : `${weeks.slice(0, -1).join(", ")} ve ${weeks[weeks.length - 1]}. hafta`,
+    railTransfers: "Transferin fikstürü",
+    railXi: "İlk 11",
+    railMeet: (gameweek) => `${gameweek}. haftada karşı karşıya`,
+    railMeetNone: "Bu hafta ilk 11'den karşı karşıya gelen oyuncu yok.",
+    railWeekHead: "hafta",
+    railWeekColumn: (gameweek) => `${gameweek}. hafta`,
+    railPlayer: "Oyuncu",
+    railLegendVenue: "E: ev · D: deplasman.",
+    railLegendDifficulty: "Fikstür zorluk derecesi gösterilmez.",
+    railNoCalendar: "Fikstür takvimi okunamadı; bu yüzden burada maç gösterilmiyor.",
+    railNoWeeks: "Takvim bu haftaların hiçbirini listelemiyor.",
     chipStrategy: {
       title: "Çip stratejisi",
       autoThisWeek: "Otomatik plan · bu hafta",

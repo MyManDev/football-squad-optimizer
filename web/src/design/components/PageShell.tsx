@@ -383,7 +383,9 @@ export function PageShell({
             </div>
           </div>
         </aside>
-        <main id="main" className={styles.main} inert={drawerOpen}>
+        {/* A page's fixture sheet is rendered outside main, so main can be inert while
+            the sheet is open as well as while the drawer is. */}
+        <main id="main" className={styles.main} inert={overlay}>
           {children}
         </main>
         {overlay ? (

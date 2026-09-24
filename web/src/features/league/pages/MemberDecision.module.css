@@ -535,6 +535,36 @@
   max-width: 320px;
 }
 
+/* Where the heading row has the room, the stamp's caption is one line, and a tag (example
+   data, a computed plan) stands beside the stamp rather than on a line of its own. */
+@media (min-width: 600px) {
+  .stamp {
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "tags box"
+      "caption caption";
+    align-items: center;
+    justify-content: end;
+    justify-items: end;
+    gap: var(--space-1) var(--space-2);
+    max-width: 440px;
+  }
+
+  .stampTags {
+    grid-area: tags;
+  }
+
+  .stampBox,
+  .stampUnproven {
+    grid-area: box;
+  }
+
+  .stampCaption {
+    grid-area: caption;
+  }
+}
+
 .stampTags {
   display: flex;
   flex-wrap: wrap;
