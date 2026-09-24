@@ -185,11 +185,7 @@ function LeagueMemberContent({
         <details className={styles.contextDetails} open={contextExpanded}>
           <summary>{contextExpanded ? copy.memberSquad : <h2>{copy.memberSquad}</h2>}</summary>
           <div className={styles.squadContext}>
-            <Card
-              tone="pitch"
-              title={copy.memberSquad}
-              aside={copy.starterCount(view.starting_xi.length)}
-            >
+            <Card title={copy.memberSquad} aside={copy.starterCount(view.starting_xi.length)}>
               <Pitch starters={view.starting_xi} />
               <p className={styles.notice}>{copy.heldViceCaptainUnavailable}</p>
             </Card>

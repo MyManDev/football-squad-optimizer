@@ -71,6 +71,24 @@ test("language controls satisfy label-in-name and remain keyboard operable", asy
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
 
+test("language buttons are 44 px touch targets below 1180 px wide", async ({ page }) => {
+  // Desktop keeps D's compact 30 px control; every narrower width is treated as touch.
+  for (const [width, minHeight, minWidth] of [
+    [390, 44, 44],
+    [1179, 44, 44],
+    [1440, 28, 40],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    for (const name of [/^TR/, /^EN/]) {
+      const box = await page.getByRole("button", { name }).boundingBox();
+      expect(box, `${String(name)} at ${width}`).not.toBeNull();
+      expect(box!.height, `${String(name)} height at ${width}`).toBeGreaterThanOrEqual(minHeight);
+      expect(box!.width, `${String(name)} width at ${width}`).toBeGreaterThanOrEqual(minWidth);
+    }
+  }
+});
+
 test("skip link and primary navigation expose visible keyboard focus", async ({ page }) => {
   await page.goto("/");
   await page.keyboard.press("Tab");

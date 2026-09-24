@@ -42,7 +42,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--step-2);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .head {
@@ -70,7 +70,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--step-4);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.05;
 }
 
@@ -120,7 +120,7 @@
   margin: 0 0 var(--space-2);
   font-family: var(--font-display);
   font-size: var(--step-1);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .lineupSub {
@@ -128,8 +128,6 @@
   font-size: var(--step--1);
   font-weight: 600;
   color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .armband {
@@ -239,8 +237,6 @@
   color: var(--color-text-muted);
   font-size: var(--step--2);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .windowTable .right {

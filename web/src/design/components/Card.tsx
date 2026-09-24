@@ -4,9 +4,9 @@ import styles from "./Card.module.css";
 
 /**
  * One region of a page: an optional heading row and its content, separated from what
- * comes before it by a hairline and space rather than a box. `muted` reads quieter;
- * `pitch` marks a region whose content draws its own grass (the heading stays on the
- * page, never on the grass), so it looks like `surface`.
+ * comes before it by a hairline and space rather than a box. `muted` reads quieter. A
+ * region that holds a pitch is a plain region: the pitch draws its own grass, and the
+ * heading stays on the page, never on the grass.
  */
 export function Card({
   title,
@@ -17,7 +17,7 @@ export function Card({
   title?: string;
   aside?: ReactNode;
   children: ReactNode;
-  tone?: "surface" | "muted" | "pitch";
+  tone?: "surface" | "muted";
 }) {
   const className = tone === "muted" ? `${styles.card} ${styles.muted}` : styles.card;
   return (

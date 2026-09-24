@@ -121,6 +121,18 @@ th {
   font-weight: 600;
 }
 
+/* The browser's own `smaller` would put a note at about 11.7 px; 12 px is the floor. */
+small {
+  font-size: var(--step--2);
+}
+
+/* Codes read in Plex Mono like every other code and figure, not the system monospace. */
+code,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
 button,
 input,
 select,
