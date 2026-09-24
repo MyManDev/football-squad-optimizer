@@ -118,6 +118,36 @@ def test_a_stale_export_contract_makes_a_pair_on_disk_unreusable(
     assert not rotation_pair_is_readable(table, manifest)
 
 
+def test_the_provider_survives_the_artifact_and_an_older_one_stays_readable(
+    tmp_path: Path, clean_tree: None
+) -> None:
+    """Written into the manifest is only half of a record; a consumer has to be able to see it.
+
+    The fixture path names no adapter, so this artifact's silence is the true statement. An
+    artifact that does name one carries it through the reader, and one written before the
+    field existed is still read rather than refused.
+    """
+
+    code, _, output_dir = _run(tmp_path)
+    assert code == 0
+    table_path, manifest_path = _pair(output_dir)
+    assert read_rotation_evidence_artifact(table_path, manifest_path).attrs["provider"] is None
+
+    _rewrite_manifest(manifest_path, provider="gemini")
+    assert read_rotation_evidence_artifact(table_path, manifest_path).attrs["provider"] == "gemini"
+
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del document["provider"]
+    manifest_path.write_text(
+        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    assert read_rotation_evidence_artifact(table_path, manifest_path).attrs["provider"] is None
+
+    _rewrite_manifest(manifest_path, provider="   ")
+    with pytest.raises(DataValidationError, match="must be a non-empty string or absent"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
 def test_the_export_writes_a_readable_pair(tmp_path: Path, clean_tree: None) -> None:
     code, _, output_dir = _run(tmp_path)
     assert code == 0
