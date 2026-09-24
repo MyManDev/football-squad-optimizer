@@ -179,6 +179,12 @@ net columns beside it.
   id that `--rotation` then reads. It runs **before** the capture, for the reason above, and
   its roster comes from a capture already on disk so its only network reach is the club hosts
   the registry names.
+- **The club-news capture runs on the machine that publishes, not beside it.** `--rotation-capture`
+  is resolved against the run's own `data/snapshots`, so a capture written into a different
+  checkout is a capture the run cannot see. That machine is the one holding `data/entries`,
+  `data/ledger`, `data/handoffs` and `data/advice_records`, which the league and publish stages
+  read and which are gitignored and local; a clone without them can capture club news and export
+  rotation evidence, and can do nothing else in this list.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
