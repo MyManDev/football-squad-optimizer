@@ -13,6 +13,12 @@ two are not confused:
 - It refuses a URL that is not in the registry.
 - It reads the host's `robots.txt` through the same reader as the document and refuses a
   disallowed path, recording that club as **not covered** rather than reading it anyway.
+- It asks that question of the origin the registry names, so it **refuses a redirect that is
+  answered by a different origin** rather than following it. One host's `robots.txt` is not
+  the other's, and neither is the reading signed in the table below. The request has already
+  gone by the time the serving host is known, so what the refusal buys is that the bytes are
+  not read and the club is recorded as not covered; the fix is to register the origin that
+  answers and sign its reading, after which there is no redirect left.
 - It treats a `robots.txt` that cannot be read as an unanswered question, not as consent.
   "We could not ask" is not "they said yes".
 - It sends one identity (`squadopt/1.0`), reads only registered paths — a club may have more
