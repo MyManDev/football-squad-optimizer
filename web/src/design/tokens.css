@@ -170,11 +170,12 @@ a:hover {
   white-space: nowrap;
 }
 
+/* The focused skip link sits above the phone bar, the drawer and its scrim. */
 a.visually-hidden:focus-visible {
   position: fixed;
   top: var(--space-3);
   left: var(--space-3);
-  z-index: 10;
+  z-index: 60;
   width: auto;
   height: auto;
   padding: var(--space-2) var(--space-3);

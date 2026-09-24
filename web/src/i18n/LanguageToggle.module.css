@@ -35,6 +35,16 @@
   color: var(--color-text);
 }
 
+/* In the 72 px icon rail the two halves stack, TR over EN. */
+.vertical {
+  flex-direction: column;
+}
+
+.vertical button + button {
+  border-left: 0;
+  border-top: 1px solid var(--color-line);
+}
+
 /* Touch widths: every target is at least 44 px. */
 @media (max-width: 1179px) {
   .toggle button {

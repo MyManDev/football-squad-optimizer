@@ -26,7 +26,13 @@ test("visitor navigation reaches league entry without browser errors", async ({ 
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto("/");
-  await page.getByRole("link", { name: "Lig", exact: true }).click();
+  // 'Lig' is the member list; the league entry page stays reachable as 'Bu hafta' while no
+  // member is in context.
+  const navigation = page.getByRole("navigation");
+  await navigation.getByRole("link", { name: "Lig", exact: true }).click();
+  await expect(page).toHaveURL("/league/members");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Üyeleri");
+  await navigation.getByRole("link", { name: "Bu hafta", exact: true }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
 
@@ -51,7 +57,7 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       language === "tr" ? "Yönetim" : "Admin",
     );
-    await expect(page.locator('header a[href="/admin"], footer a[href="/admin"]')).toHaveCount(0);
+    await expect(page.locator('#sidebar a[href="/admin"], header a[href="/admin"]')).toHaveCount(0);
     await expect(page.locator('a[href="/league"]')).toHaveCount(0);
     expect(systemDataRequests).toEqual([]);
 
@@ -99,11 +105,12 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("link", { name: "Deniz Aral" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", language);
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+    // The sidebar's navigation and its operations link are the whole chrome.
     expect(
       await page
-        .locator("header nav a, footer a")
+        .locator("#sidebar a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/fixtures", "/contribute", "/status"]);
+    ).toEqual(["/", "/league/members", "/fixtures", "/contribute", "/status"]);
     await expect(
       page.locator(
         'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',

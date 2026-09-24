@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Component, lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
 import { PageShell } from "../design/components/PageShell";
+import { useViewerEntry } from "../features/league/identity/useViewerEntry";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 
@@ -50,28 +51,6 @@ const FixturesPage = lazy(() =>
 const ContributePage = lazy(() =>
   import("../features/contributions/ContributePage").then((m) => ({ default: m.ContributePage })),
 );
-const FixturePanels = lazy(() =>
-  import("../features/fixtures/FixturePanels").then((m) => ({ default: m.FixturePanels })),
-);
-
-/** The fixture rails are a convenience: if their chunk fails to load, the page stays whole. */
-class Optional extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
-}
-
-const rails = (
-  <Optional>
-    <Suspense fallback={null}>
-      <FixturePanels />
-    </Suspense>
-  </Optional>
-);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -87,10 +66,12 @@ export function App() {
 
 function LocalizedApp({ basename }: { basename: string }) {
   const { messages } = useLanguage();
+  // The member the visitor said they are, in memory only: 'Bu hafta' opens their page.
+  const { viewer } = useViewerEntry();
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
-        <PageShell rails={rails}>
+        <PageShell viewerEntryId={viewer?.entryId ?? null}>
           <Suspense fallback={<EmptyState title={messages.common.loading} />}>
             <Routes>
               <Route path="/" element={<LeagueEntryPage />} />
