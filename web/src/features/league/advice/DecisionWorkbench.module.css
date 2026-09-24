@@ -50,3 +50,17 @@
   max-width: 100%;
   min-height: 6rem;
 }
+
+/* Touch targets on the member page below 1180 px, where the page is used by finger. */
+@media (max-width: 1179.98px) {
+  .pin {
+    min-height: 44px;
+  }
+
+  /* Padding, not flex, so the summary keeps its disclosure marker. */
+  .summary {
+    padding-block: 12px;
+    line-height: 20px;
+    cursor: pointer;
+  }
+}

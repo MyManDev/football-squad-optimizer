@@ -74,3 +74,18 @@
   padding: 0.3rem 0.7rem;
   cursor: pointer;
 }
+
+/* Touch targets on the member page below 1180 px, where the page is used by finger. */
+@media (max-width: 1179.98px) {
+  .template,
+  .templateActive,
+  .nameInput,
+  .save {
+    min-height: 44px;
+  }
+
+  .remove {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

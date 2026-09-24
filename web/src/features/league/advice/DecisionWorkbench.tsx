@@ -63,6 +63,7 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
       </p>
       <button
         type="button"
+        className={styles.pin}
         disabled={!candidate || !!pinned || board.candidates.length >= 3}
         onClick={() =>
           candidate && change({ ...board, candidates: [...board.candidates, candidate] })
@@ -186,7 +187,9 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
               </p>
               {!!p.stated_limits?.length && (
                 <details>
-                  <summary>{tr ? "Planın varsayımları" : "Plan assumptions"}</summary>
+                  <summary className={styles.summary}>
+                    {tr ? "Planın varsayımları" : "Plan assumptions"}
+                  </summary>
                   <ul>
                     {p.stated_limits.map((limit, j) => (
                       <li key={j}>{messages.leagueMembers.statedLimits[limit] ?? limit}</li>
@@ -254,7 +257,9 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
           : "Net points subtract transfer hits. Higher scores from different models or different horizons do not prove a better plan. Missing measurements are shown as —."}
       </p>
       <details>
-        <summary>{tr ? "Karar vermeden önce" : "Before deciding"}</summary>
+        <summary className={styles.summary}>
+          {tr ? "Karar vermeden önce" : "Before deciding"}
+        </summary>
         <ul>
           <li>
             {tr
