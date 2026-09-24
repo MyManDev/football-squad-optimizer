@@ -198,6 +198,7 @@ def _provenance_from_capture(coded: Sequence[CodedClub]) -> ClubModelProvenance:
                 version=entry.response.model_version,
                 prompt_sha256=entry.prompt_sha256,
                 response_sha256=hashlib.sha256(entry.response.text.encode("utf-8")).hexdigest(),
+                provider=entry.provider,
             )
             for entry in coded
         }
@@ -227,6 +228,10 @@ def _inputs_from_fixture(fixture_path: Path) -> _ClubNewsInputs:
         # which is a stronger and falser statement than a placeholder that says so plainly.
         prompt_sha256=hashlib.sha256(b"fixture-provider-has-no-prompt").hexdigest(),
         response_sha256=hashlib.sha256(response.text.encode("utf-8")).hexdigest(),
+        # No adapter was asked, so no adapter is named. The same reasoning as the prompt
+        # digest above: a fixture week is not a week served by a provider, and the manifest
+        # saying nothing is the true statement.
+        provider=None,
     )
     # Every covered club maps to this one response, which is what actually happened: the
     # fixture answers once for all of them, and saying so is not the same as pretending
@@ -344,6 +349,7 @@ def _manifest(
         "clubs_partially_covered": list(attrs["clubs_partially_covered"]),
         "documents_read": attrs["documents_read"],
         "document_sha256s": list(attrs["document_sha256s"]),
+        "provider": attrs["provider"],
         "model_identifier": attrs["model_identifier"],
         "model_version": attrs["model_version"],
         "prompt_sha256": attrs["prompt_sha256"],

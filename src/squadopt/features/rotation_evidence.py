@@ -226,6 +226,7 @@ class ModelProvenance:
     version: str
     prompt_sha256: str
     response_sha256: str
+    provider: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("identifier", "version", "prompt_sha256", "response_sha256"):
@@ -234,6 +235,12 @@ class ModelProvenance:
                     f"Model provenance {name} must be non-empty; without it a claim cannot "
                     "be replayed."
                 )
+        if self.provider is not None and not self.provider.strip():
+            raise InvalidValueError(
+                "Model provenance provider must be a name or None. None says the source did "
+                "not record which adapter was asked, which a capture written before the field "
+                "and the fixture path both mean; an empty string would claim otherwise."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,7 +284,20 @@ class ClubModelProvenance:
                     "states one of each, so a week coded by more than one model, or under "
                     "more than one prompt, is refused rather than recorded as if it were one."
                 )
+        providers = {entry.provider for entry in self.by_club.values()}
+        if len(providers) > 1:
+            raise InvalidValueError(
+                "The clubs disagree about provider: "
+                f"{sorted(repr(value) for value in providers)}. A week half served by one "
+                "adapter and half by another is a mixture, and the manifest states one."
+            )
         object.__setattr__(self, "by_club", MappingProxyType(dict(self.by_club)))
+
+    @property
+    def provider(self) -> str | None:
+        """The adapter every club was asked through, or None where none was recorded."""
+
+        return next(iter(self.by_club.values())).provider
 
     @property
     def identifier(self) -> str:
@@ -777,6 +797,7 @@ def build_rotation_evidence_table(
             "players_with_unverifiable_citation": tuple(sorted(unverifiable)),
             "claims_ambiguous": unresolved.get("ambiguous", 0),
             "players_not_addressed": len(roster) - len(placed),
+            "provider": None if model is None else model.provider,
             "model_identifier": None if model is None else model.identifier,
             "model_version": None if model is None else model.version,
             "prompt_sha256": None if model is None else model.prompt_sha256,

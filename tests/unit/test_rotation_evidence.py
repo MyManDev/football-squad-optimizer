@@ -602,6 +602,49 @@ def test_a_week_asked_two_different_questions_is_refused() -> None:
         )
 
 
+def test_a_week_served_by_two_providers_is_refused() -> None:
+    """Two adapters are two instruments, whatever model identifier they report.
+
+    A model name does not pin the adapter: a fake can report any name, and one vendor's
+    identifier can be served through another's compatible endpoint. So a week half asked
+    through one adapter and half through another is a mixture the manifest cannot state.
+    """
+
+    through_one = ModelProvenance(
+        identifier="synthetic-stub",
+        version="fixture-1",
+        prompt_sha256=PROMPT_SHA256,
+        response_sha256=ARSENAL_RESPONSE_SHA256,
+        provider="anthropic",
+    )
+    through_another = ModelProvenance(
+        identifier="synthetic-stub",
+        version="fixture-1",
+        prompt_sha256=PROMPT_SHA256,
+        response_sha256=UNITED_RESPONSE_SHA256,
+        provider="gemini",
+    )
+
+    with pytest.raises(InvalidValueError, match="disagree about provider"):
+        ClubModelProvenance(by_club={"Arsenal": through_one, "Man Utd": through_another})
+
+
+def test_one_provider_across_the_week_is_stated_once() -> None:
+    """And where every club agrees, the week names it once, like its model and its prompt."""
+
+    named = ModelProvenance(
+        identifier="synthetic-stub",
+        version="fixture-1",
+        prompt_sha256=PROMPT_SHA256,
+        response_sha256=ARSENAL_RESPONSE_SHA256,
+        provider="gemini",
+    )
+    assert ClubModelProvenance(by_club={"Arsenal": named}).provider == "gemini"
+    # A week from a source that recorded no adapter says so, rather than guessing one.
+    unrecorded = ClubModelProvenance(by_club={"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256)})
+    assert unrecorded.provider is None
+
+
 def test_a_week_served_by_two_model_versions_is_refused() -> None:
     """A request naming an alias can be served by a snapshot, and two snapshots are a mixture."""
 

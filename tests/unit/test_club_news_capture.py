@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from squadopt.data.errors import DataSourceError
+from squadopt.data.errors import DataSourceError, InvalidValueError
 from squadopt.data.snapshots import (
     SnapshotExistsError,
     list_snapshot_ids,
@@ -206,6 +206,60 @@ def test_a_capture_written_before_the_field_reads_as_none_partly_read(tmp_path: 
     )
 
     assert read_captured_coverage(older)[2] == ()
+
+
+def test_the_provider_that_was_asked_survives_the_round_trip(tmp_path: Path) -> None:
+    """Which adapter answered is not recoverable from the model identifier.
+
+    A fake adapter can name any model it likes, and one vendor's identifier can be served
+    through another's compatible endpoint. The two are separate facts about a week and the
+    capture is where they are written down together.
+    """
+
+    covered = FixtureClubNewsProvider(FIXTURE)
+    coded = tuple(replace(entry, provider="gemini") for entry in _coded())
+    metadata = write_club_news_capture(
+        tmp_path,
+        documents=_documents(),
+        coded=coded,
+        clubs_declared=covered.clubs_declared(),
+        clubs_covered=covered.clubs_covered(),
+        captured_at_utc=CAPTURED_AT,
+    )
+
+    read_back = read_captured_responses(read_snapshot(tmp_path, metadata.snapshot_id))
+    assert read_back
+    assert {entry.provider for entry in read_back} == {"gemini"}
+
+
+def test_a_capture_written_before_the_field_names_no_provider(tmp_path: Path) -> None:
+    """An absent provider is None, not a refusal.
+
+    The weeks already on disk were captured before any adapter name was recorded, and a
+    week of club pages cannot be fetched again. Demanding the field would make those weeks
+    unreadable in order to say something they never claimed.
+    """
+
+    identifier = _write(tmp_path)
+    snapshot = read_snapshot(tmp_path, identifier)
+    index = json.loads(snapshot.payloads[INDEX_PAYLOAD].decode("utf-8"))
+    for entry in index["responses"]:
+        del entry["provider"]
+    older = replace(
+        snapshot,
+        payloads={**snapshot.payloads, INDEX_PAYLOAD: json.dumps(index).encode("utf-8")},
+    )
+
+    read_back = read_captured_responses(older)
+    assert read_back
+    assert {entry.provider for entry in read_back} == {None}
+
+
+def test_a_named_provider_must_be_a_name() -> None:
+    """None and the empty string are different statements, so only one of them is allowed."""
+
+    with pytest.raises(InvalidValueError, match="provider must be a name"):
+        replace(_coded()[0], provider="   ")
 
 
 def test_declared_and_covered_stay_apart(tmp_path: Path) -> None:

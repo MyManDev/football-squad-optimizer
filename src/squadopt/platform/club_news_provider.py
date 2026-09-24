@@ -267,6 +267,10 @@ def code_week_by_club(
                 response=response,
                 prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
                 prompt_sha256=prompt_sha256,
+                # Which adapter was asked, beside which model answered. The two are not
+                # recoverable from each other: a fake adapter can name any model, and one
+                # vendor's identifier can be served through another's compatible endpoint.
+                provider=config.provider,
             )
         )
     return tuple(coded), tuple(refused)
