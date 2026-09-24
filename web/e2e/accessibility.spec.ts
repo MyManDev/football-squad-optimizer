@@ -22,44 +22,40 @@ async function waitForPage(page: import("@playwright/test").Page) {
   await expect(page.locator("main")).not.toContainText(/Yükleniyor|Loading/);
 }
 
+// The site has one palette (direction D is light only), so every route is checked in it,
+// in both languages.
 for (const language of ["tr", "en"] as const) {
-  for (const theme of ["dark", "light"] as const) {
-    test(`axe has no critical or serious violations in ${language} ${theme}`, async ({ page }) => {
-      test.setTimeout(60_000);
-      await installLeagueMocks(page);
-      await page.addInitScript(
-        ({ selectedLanguage, selectedTheme }) => {
-          localStorage.setItem("squadopt.language", selectedLanguage);
-          localStorage.setItem("squadopt.theme", selectedTheme);
-        },
-        { selectedLanguage: language, selectedTheme: theme },
-      );
+  test(`axe has no critical or serious violations in ${language}`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await installLeagueMocks(page);
+    await page.addInitScript((selectedLanguage) => {
+      localStorage.setItem("squadopt.language", selectedLanguage);
+    }, language);
 
-      for (const route of ROUTES) {
-        await page.goto(route);
-        await waitForPage(page);
-        if (route.includes("mode=saf-puan&window=3")) {
-          await expect(page.locator('[aria-labelledby="entry-advice-title"]')).toBeVisible();
-          const plan = page.getByRole("region", {
-            name: MESSAGES[language].leagueMembers.windowTitle(3),
-          });
-          await expect(plan).toBeVisible();
-          await expect(plan.locator("tbody tr")).toHaveCount(3);
-        }
-        const results = await new AxeBuilder({ page }).analyze();
-        const blocking = results.violations.filter((violation) =>
-          BLOCKING_IMPACTS.has(violation.impact ?? ""),
-        );
-        const summary = blocking.map((violation) => ({
-          id: violation.id,
-          impact: violation.impact,
-          nodes: violation.nodes.length,
-          targets: violation.nodes.slice(0, 3).map((node) => node.target.join(" ")),
-        }));
-        expect(summary, `${language} ${theme} ${route}`).toEqual([]);
+    for (const route of ROUTES) {
+      await page.goto(route);
+      await waitForPage(page);
+      if (route.includes("mode=saf-puan&window=3")) {
+        await expect(page.locator('[aria-labelledby="entry-advice-title"]')).toBeVisible();
+        const plan = page.getByRole("region", {
+          name: MESSAGES[language].leagueMembers.windowTitle(3),
+        });
+        await expect(plan).toBeVisible();
+        await expect(plan.locator("tbody tr")).toHaveCount(3);
       }
-    });
-  }
+      const results = await new AxeBuilder({ page }).analyze();
+      const blocking = results.violations.filter((violation) =>
+        BLOCKING_IMPACTS.has(violation.impact ?? ""),
+      );
+      const summary = blocking.map((violation) => ({
+        id: violation.id,
+        impact: violation.impact,
+        nodes: violation.nodes.length,
+        targets: violation.nodes.slice(0, 3).map((node) => node.target.join(" ")),
+      }));
+      expect(summary, `${language} ${route}`).toEqual([]);
+    }
+  });
 }
 
 test("language controls satisfy label-in-name and remain keyboard operable", async ({ page }) => {

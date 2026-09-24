@@ -4,7 +4,6 @@ import { NavLink } from "react-router";
 import { LanguageToggle } from "../../i18n/LanguageToggle";
 import { useLanguage } from "../../i18n/context";
 import styles from "./PageShell.module.css";
-import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [{ to: "/", key: "league", end: true }] as const;
 
@@ -52,7 +51,6 @@ export function PageShell({ children, rails }: { children: ReactNode; rails?: Re
         </nav>
         <div className={styles.preferences}>
           <LanguageToggle />
-          <ThemeToggle />
         </div>
       </header>
       <div className={styles.body}>

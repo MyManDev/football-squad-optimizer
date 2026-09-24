@@ -7,7 +7,7 @@
 
 .plan {
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   padding: var(--space-3);
   min-width: 0;
   overflow-wrap: anywhere;

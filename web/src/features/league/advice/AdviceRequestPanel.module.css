@@ -21,8 +21,8 @@
 }
 
 .compute {
-  border: 1px solid var(--border, currentColor);
-  border-radius: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-s);
   background: transparent;
   color: inherit;
   font-weight: 600;

@@ -6,7 +6,7 @@
 .details > summary {
   padding: var(--space-3);
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-s);
   cursor: pointer;
   font-weight: 600;
 }

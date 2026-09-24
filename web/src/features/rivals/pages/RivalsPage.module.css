@@ -46,7 +46,7 @@
 .table thead th {
   border-top: none;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--step--2);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

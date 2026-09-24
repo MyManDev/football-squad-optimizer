@@ -54,7 +54,7 @@
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-s);
   text-decoration: none;
   color: var(--color-text-muted);
   font-weight: 600;

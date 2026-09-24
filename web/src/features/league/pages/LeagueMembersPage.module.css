@@ -58,7 +58,7 @@
 .table thead th {
   border-top: none;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--step--2);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -84,7 +84,7 @@
 .sub {
   display: block;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--step--2);
 }
 
 @media (max-width: 640px) {
@@ -100,17 +100,17 @@
 
 .viewerSelect {
   margin-left: 0.5rem;
-  border: 1px solid var(--border, currentColor);
-  border-radius: 999px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-s);
   background: transparent;
   color: inherit;
-  font-size: 0.75rem;
+  font-size: var(--step--2);
   padding: 0.05rem 0.55rem;
   cursor: pointer;
 }
 
 .viewerSelect:hover {
-  background: var(--surface-hover, rgba(127, 127, 127, 0.12));
+  background: var(--color-surface-2);
 }
 
 .viewerClear {

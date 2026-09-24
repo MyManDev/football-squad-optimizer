@@ -48,7 +48,7 @@
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -73,7 +73,7 @@
   gap: var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--step--1);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .filters select,
@@ -101,7 +101,6 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
   background: var(--color-surface);
-  box-shadow: var(--shadow-1);
 }
 
 .cardMeta {

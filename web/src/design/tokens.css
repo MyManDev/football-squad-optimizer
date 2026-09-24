@@ -1,21 +1,40 @@
-/* SquadOpt design tokens.
+/* SquadOpt design tokens: direction D, "Saha Kenarı".
 
-   Colour comes from direction A "Matchday" — pitch night, one gold accent — and the data
-   craft from direction B "Ledger": typographic tables, hairline rules, restrained charts.
-   Dark is the design's home; the light variant keeps the same roles with a warm off-white
-   ground and a darkened gold that clears 4.5:1 on white.
+   The page is pale green paper, and it has one palette. There is no dark theme and no
+   theme switch: the colours below sit on bare :root, and the operating system's colour
+   preference is not followed (color-scheme: light).
 
-   Gold is spent once per screen (the captain badge, the active nav pill, the realized line).
-   Semantic colours are separate from it, and every colour is defined on bare :root first so a
-   viewer with no explicit choice still gets a complete palette. */
+   Ink and the page greens carry the page. The only dark objects on the paper are the
+   substitution boards and the grass. Red and green belong to the boards and their
+   ÇIKAN / GİREN tags; lime is a small fill only (YENİ, the captain badge, the active nav
+   item, the viewer's own row, LED digits), always with ink text on it. The one shadow is
+   the drawer and sheet shadow. Radii are 4 px on controls, chips and tags, 6 px on
+   boards and panels; there are no pills.
+
+   Type: Barlow Semi Condensed for headings, IBM Plex Sans for text, IBM Plex Mono for
+   codes and figures. Body is 14 px and nothing is set under 12 px (--step--2). Plex Sans
+   is loaded at 400, 500 and 600 and Plex Mono at 500 and 600, so text never asks for 700.
+
+   Contrast, WCAG formula: ink (--color-text) 14.1:1 on the page, ink2 (--color-text-muted)
+   6.7:1, ink3 (--color-text-faint) 4.78:1 on the page and 5.17:1 on panels but only
+   4.36:1 on the sidebar (--color-surface-2), so ink3 is for labels and never sits on
+   --color-surface-2. --color-good is 4.33:1 on --color-surface-2 for the same reason, and
+   --color-warn is 4.77:1 there. Links (--color-accent) are 10.3:1 on the page. White is
+   5.6:1 on --color-out-panel and 5.3:1 on --color-in-panel; lime and --color-board-muted
+   are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on --color-seg2 and 13.5:1 on lime.
+   No small text sits directly on the grass (white 3.98:1, ink 4.02:1): it goes on the
+   white plates (--color-chip, ink2 on them 7.6:1). */
 
 :root {
-  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
-  --font-body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", Consolas, "SFMono-Regular", monospace;
+  color-scheme: light;
 
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, "SFMono-Regular", Menlo, monospace;
+
+  --step--2: 0.75rem;
   --step--1: 0.8125rem;
-  --step-0: 0.9375rem;
+  --step-0: 0.875rem;
   --step-1: 1.125rem;
   --step-2: 1.375rem;
   --step-3: 1.75rem;
@@ -29,78 +48,45 @@
   --space-6: 32px;
   --space-7: 48px;
 
-  --radius-s: 6px;
-  --radius-m: 10px;
-  --radius-pill: 999px;
+  --radius-s: 4px;
+  --radius-m: 6px;
 
-  /* Dark: the design's home. */
-  --color-bg: #0e1f18;
-  --color-surface: #15291f;
-  --color-surface-2: #1b3327;
-  --color-line: #27453a;
-  --color-text: #eef4ef;
-  --color-text-muted: #9fb5a8;
-  --color-text-faint: #9fb5a8;
-  --color-accent: #f2c14e;
-  --color-accent-text: #17210f;
-  --color-pitch: #123c2b;
-  --color-pitch-line: #1f5a41;
-  --color-chip: #e9f2ec;
-  --color-chip-text: #0f2419;
-  --color-chip-muted: #4b6a5b;
-  --color-good: #6fcf97;
-  --color-warn: #f2c14e;
-  --color-bad: #ef7a6d;
-  --color-focus: #f2c14e;
-
-  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
   --measure: 62ch;
-}
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --color-bg: #f4f6f2;
-    --color-surface: #ffffff;
-    --color-surface-2: #e9efe9;
-    --color-line: #d3dcd4;
-    --color-text: #12241c;
-    --color-text-muted: #546b5e;
-    --color-text-faint: #546b5e;
-    --color-accent: #8a6a12;
-    --color-accent-text: #ffffff;
-    --color-pitch: #dfeadf;
-    --color-pitch-line: #c2d4c6;
-    --color-chip: #ffffff;
-    --color-chip-text: #12241c;
-    --color-chip-muted: #5f7568;
-    --color-good: #1f7a4d;
-    --color-warn: #8a6a12;
-    --color-bad: #b42318;
-    --color-focus: #12241c;
-    --shadow-1: 0 1px 0 rgba(18, 36, 28, 0.1);
-  }
-}
-
-:root[data-theme="light"] {
-  --color-bg: #f4f6f2;
-  --color-surface: #ffffff;
-  --color-surface-2: #e9efe9;
-  --color-line: #d3dcd4;
-  --color-text: #12241c;
-  --color-text-muted: #546b5e;
-  --color-text-faint: #546b5e;
-  --color-accent: #8a6a12;
+  --color-bg: #ecf3e6;
+  --color-surface: #f7fbf3;
+  --color-surface-2: #ddebd4;
+  --color-line: #c3d8b8;
+  --color-text: #10261a;
+  --color-text-muted: #3d5a47;
+  --color-text-faint: #56705f;
+  --color-accent: #17402a;
   --color-accent-text: #ffffff;
-  --color-pitch: #dfeadf;
-  --color-pitch-line: #c2d4c6;
+  --color-primary: #17402a;
+  --color-primary-text: #ffffff;
+  --color-good: #1c7a3e;
+  --color-bad: #b3261e;
+  --color-warn: #8a5a00;
+  --color-focus: #10261a;
+
+  --color-pitch: #3f8f58;
+  --color-pitch-2: #48995f;
+  --color-pitch-line: rgba(255, 255, 255, 0.85);
   --color-chip: #ffffff;
-  --color-chip-text: #12241c;
-  --color-chip-muted: #5f7568;
-  --color-good: #1f7a4d;
-  --color-warn: #8a6a12;
-  --color-bad: #b42318;
-  --color-focus: #12241c;
-  --shadow-1: 0 1px 0 rgba(18, 36, 28, 0.1);
+  --color-chip-text: #10261a;
+  --color-chip-muted: #3d5a47;
+
+  --color-board: #10261a;
+  --color-board-muted: #cfe3d3;
+  --color-out-panel: #c62828;
+  --color-in-panel: #1e7b45;
+  --color-lime: #c6ff3d;
+  --color-seg2: #a8db45;
+
+  --color-scrim: rgba(16, 38, 26, 0.45);
+  --shadow-drawer: 0 12px 32px rgba(16, 38, 26, 0.28);
+
+  font-variant-numeric: tabular-nums;
 }
 
 *,
@@ -109,18 +95,37 @@
   box-sizing: border-box;
 }
 
-html {
-  color-scheme: dark light;
-}
-
 body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: var(--step-0);
-  line-height: 1.5;
+  line-height: 1.43;
   -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Emphasis in running text is Plex Sans 600, the heaviest weight the page loads for it. */
+b,
+strong,
+th {
+  font-weight: 600;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 a {
@@ -164,8 +169,9 @@ a.visually-hidden:focus-visible {
   overflow: visible;
   clip: auto;
   white-space: normal;
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
 }
 

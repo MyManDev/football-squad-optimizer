@@ -119,11 +119,12 @@ const en = {
     tr: "Türkçe",
     en: "English",
   },
-  theme: {
-    label: "Theme",
-    light: "Light",
-    dark: "Dark",
-    switchTo: (current: string, next: string) => `Theme: ${current}. Switch to ${next}.`,
+  /** The position word for a published position code, lower case to sit inside a line. */
+  positions: {
+    GK: "goalkeeper",
+    DEF: "defender",
+    MID: "midfielder",
+    FWD: "forward",
   },
   squad: {
     loading: "Loading the latest decision…",
@@ -1082,11 +1083,11 @@ const tr: MessageSchema<typeof en> = {
     decisions: "Karar kaydı (GitHub)",
   },
   language: { label: "Dil", tr: "Türkçe", en: "English" },
-  theme: {
-    label: "Tema",
-    light: "Açık",
-    dark: "Koyu",
-    switchTo: (current, next) => `Tema: ${current}. ${next} temaya geç.`,
+  positions: {
+    GK: "kaleci",
+    DEF: "defans",
+    MID: "orta saha",
+    FWD: "forvet",
   },
   squad: {
     loading: "Son karar yükleniyor…",

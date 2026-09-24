@@ -113,21 +113,40 @@ for (const language of ["tr", "en"] as const) {
   });
 }
 
-for (const theme of ["dark", "light"] as const) {
-  test(`${theme} theme applies its complete root palette`, async ({ page }) => {
-    await page.addInitScript((value) => localStorage.setItem("squadopt.theme", value), theme);
-    await page.goto("/");
+test("the page applies its one light palette", async ({ page }) => {
+  await page.goto("/");
 
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+  const palette = await page.locator("body").evaluate((body) => {
+    const style = getComputedStyle(body);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  // Page #ECF3E6, ink #10261A.
+  expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(
+    "light",
+  );
+});
+
+for (const scheme of ["dark", "light"] as const) {
+  test(`a stored theme and a ${scheme} system preference leave the light palette in place`, async ({
+    page,
+  }) => {
+    // An older visit may have stored a dark choice; the site has no dark theme any more.
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.addInitScript(() => localStorage.setItem("squadopt.theme", "dark"));
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
+
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme");
     const palette = await page.locator("body").evaluate((body) => {
       const style = getComputedStyle(body);
       return { background: style.backgroundColor, color: style.color };
     });
-    expect(palette).toEqual(
-      theme === "dark"
-        ? { background: "rgb(14, 31, 24)", color: "rgb(238, 244, 239)" }
-        : { background: "rgb(244, 246, 242)", color: "rgb(18, 36, 28)" },
-    );
+    expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
+    // The stale value is removed on load, so nothing reads it later, and no control
+    // offers a theme.
+    expect(await page.evaluate(() => localStorage.getItem("squadopt.theme"))).toBeNull();
+    await expect(page.getByRole("button", { name: /temaya geç|theme/i })).toHaveCount(0);
   });
 }
 
