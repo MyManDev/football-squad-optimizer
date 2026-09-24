@@ -43,14 +43,32 @@ def test_every_kind_has_a_distinct_tag() -> None:
     assert len(tags) == len(KINDS)
 
 
-def test_the_next_steps_name_the_tag_and_the_dispatch() -> None:
+def test_the_next_steps_name_the_release_recipe_and_never_a_squash() -> None:
     names = PublishNames(season="2026-27", gameweek=2, kind="decision")
     text = next_steps(names, "https://example.invalid/pr/1")
-    assert "site-2026-27-gw02-decision" in text
-    assert "Deploy Pages" in text
     assert "https://example.invalid/pr/1" in text
+    # The recipe is named rather than copied. `scripts/release/ship.sh` is what changes when
+    # the procedure changes, so a second copy in a print statement is a second thing to forget.
+    assert "sh scripts/release/ship.sh --dry-run" in text
+    assert "site-2026-27-gw02-decision" in text
+    assert "docs/deployment_runbook.md" in text
     # The outward half is printed, never performed: these are instructions, not calls.
-    assert "git tag -a" in text
+    assert "Drop --dry-run only when operating it" in text
+    # #575 and #638. A squash destroys the ancestry main and develop share, which is what made
+    # the release before #523 conflict, and `scripts/release/deploy.sh` refuses such a main.
+    assert "two-parent" in text
+    assert "Never squash the release to main" in text
+    assert "squash PR" not in text
+
+
+def test_the_dry_run_preview_carries_the_same_release_rule() -> None:
+    # `publish` prints these steps on the dry-run path too, before a pull request exists, and
+    # the weekly runbook has the operator run that preview first. The rule has to be there.
+    names = PublishNames(season="2026-27", gameweek=2, kind="decision")
+    text = next_steps(names, "")
+    assert "(open it above)" in text
+    assert "Never squash the release to main" in text
+    assert "squash PR" not in text
 
 
 def test_the_league_tree_is_built_from_a_live_capture_with_absolute_roots() -> None:

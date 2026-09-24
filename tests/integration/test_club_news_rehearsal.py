@@ -15,8 +15,9 @@ A claim like that is only worth anything if it can be walked, so this walks it:
 ``export_rotation_evidence`` with the capture id instead of running the whole weekly runner,
 because a weekly run needs a week's captures and a workspace lock. The step between -- that
 ``--rotation-capture`` reaches the export as ``club_news_snapshot`` and names the artifact --
-is pinned by its own unit tests in ``test_weekly_operations``. What is rehearsed here is the
-path those two meet on.
+is pinned by ``test_a_named_capture_reaches_the_export_from_the_stage_that_runs_it`` in
+``test_weekly_operations``, which drives the stage itself and reads back the request it built.
+What is rehearsed here is the path those two meet on.
 
 Nothing opens a socket, nothing reads a key, and every write is under ``tmp_path``.
 """
