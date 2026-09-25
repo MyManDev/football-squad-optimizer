@@ -102,13 +102,14 @@ export const CHIP_FORECAST_COPY = {
     reasons: {
       fixtures_unscheduled:
         "Bazı maçların haftası belli değil; sonraki haftaların maç sayıları eksik.",
-      calendar_missing: "Bu yakalamada maç takvimi yok.",
+      calendar_missing: "Bu veri çekiminde maç takvimi yok.",
       calendar_unreadable: "Maç takvimi okunamadı.",
       calendar_incomplete: "Takvim eksik veya bir maç ya da hafta yineleniyor.",
       club_roster_missing: "Tam kulüp listesi eksik.",
       club_roster_incomplete: "Kadro ve takvimdeki kulüpler tam kulüp listesiyle eşleşmiyor.",
-      capture_mismatch: "Bu okuma ekrandaki kadro ve yakalamayla eşleşmiyor.",
-      chip_history_unknown: "Çip geçmişin yakalanmadığı için elindeki çipler belirlenemiyor.",
+      capture_mismatch: "Bu okuma ekrandaki kadro ve veri çekimiyle eşleşmiyor.",
+      chip_history_unknown:
+        "Çip geçmişin veri çekiminde yer almadığı için elindeki çipler belirlenemiyor.",
       chip_window_unreadable: "Mevcut çip penceresi belirlenemedi.",
       squad_projection_missing: "Elindeki bazı oyuncuların bu hafta için hesabı yok.",
       forecast_inputs_unreadable: "Girdiler kullanılabilir bir çip okuması oluşturmuyor.",
