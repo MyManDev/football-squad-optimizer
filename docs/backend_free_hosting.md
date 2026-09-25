@@ -325,7 +325,9 @@ Cloudflare answers 502 and the site serves the static tree.
   hammering, not a quota. That Block is the only action a Free rule may take was not
   confirmed on the page; it is the action to choose.
 - **The application's own limit is the one that protects the solver.** 30 POSTs per 60 s per
-  client address and per (capture, entry), applied after a cache miss; at most one open
+  client address (an IPv6 client by its /64), charged on every cache miss, and 30 admitted
+  jobs per 60 s per (capture, entry), so joining an open job or being refused one spends
+  nothing of the member's budget; at most one open
   job per distinct request; a computed answer is served from the cache for ever after.
   Polls are not limited by the application, which is what the Cloudflare rule is for.
 - **What a Cloudflare block looks like to the site.** Cloudflare's 403 and 429 pages carry

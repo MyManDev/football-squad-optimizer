@@ -25,10 +25,17 @@ is the discipline around that one write:
   browser retry loop must not become a denial of service on the league's own worker.
   The budget is for work: a request the cache already answers costs one small read and
   spends no token, so opening a computed plan again never uses up a member's asks.
+  The two buckets are charged at different moments because they protect different
+  things. The address bucket is the client's own, spent on every miss it sends. The
+  entry bucket is shared by everyone who asks about that member, so it is spent only
+  when a new job is admitted: a request that joins an open job, or that its own address
+  may not open, starts no work, and charging it let one client use up a named member's
+  budget for everyone else.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import math
 import time
 from collections.abc import Callable, Iterator
@@ -84,9 +91,41 @@ class MalformedIdempotencyKeyError(ValueError):
 
 
 class RateLimiter(Protocol):
-    """Whether one more request in ``bucket`` is allowed right now."""
+    """A request budget per bucket: ask whether one is left, and spend one."""
 
-    def allow(self, bucket: str) -> bool: ...
+    def allow(self, bucket: str) -> bool:
+        """Spend one request in ``bucket`` if one is left; whether it was spent."""
+        ...
+
+    def has_room(self, bucket: str) -> bool:
+        """Whether ``allow`` would spend one now, spending nothing."""
+        ...
+
+
+_IPV6_CLIENT_PREFIX: Final = 64
+
+
+def client_address_bucket(host: str) -> str:
+    """The bucket one client address is counted in: IPv4 by address, IPv6 by its /64.
+
+    One IPv6 subscriber is normally handed a whole /64, and every address in it is theirs
+    to use, so counting each address apart gave one client as many budgets and open-job
+    slots as it cared to pick addresses. An IPv4 address written in IPv6 form is the IPv4
+    address. Anything that is not an address (a test client's name, ``unknown``) is its
+    own bucket, as before.
+    """
+
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    if isinstance(address, ipaddress.IPv4Address):
+        return str(address)
+    if address.ipv4_mapped is not None:
+        return str(address.ipv4_mapped)
+    shift = 128 - _IPV6_CLIENT_PREFIX
+    network = ipaddress.IPv6Network(((int(address) >> shift) << shift, _IPV6_CLIENT_PREFIX))
+    return str(network)
 
 
 class FixedWindowRateLimiter:
@@ -95,6 +134,10 @@ class FixedWindowRateLimiter:
     Replicas each carry their own window, so the effective limit scales with the
     replica count; the plan's scaling order says to read the cache hit rate before
     adding replicas, and this limiter is part of why that stays true.
+
+    A bucket whose window has ended counts exactly like one that was never seen, so it is
+    dropped. The sweep runs at most once a window, which keeps the table to the buckets
+    used in about the last two windows however many addresses and entries have asked.
     """
 
     def __init__(
@@ -108,14 +151,27 @@ class FixedWindowRateLimiter:
         self.window_seconds = self._window
         self._clock = clock
         self._counts: dict[str, tuple[float, int]] = {}
+        self._swept_at = clock()
+
+    def _current(self, bucket: str, now: float) -> tuple[float, int]:
+        if now - self._swept_at >= self._window:
+            self._counts = {
+                name: held for name, held in self._counts.items() if now - held[0] < self._window
+            }
+            self._swept_at = now
+        started, count = self._counts.get(bucket, (now, 0))
+        if now - started >= self._window:
+            return now, 0
+        return started, count
+
+    def has_room(self, bucket: str) -> bool:
+        _started, count = self._current(bucket, self._clock())
+        return count < self._limit
 
     def allow(self, bucket: str) -> bool:
         now = self._clock()
-        started, count = self._counts.get(bucket, (now, 0))
-        if now - started >= self._window:
-            started, count = now, 0
+        started, count = self._current(bucket, now)
         if count >= self._limit:
-            self._counts[bucket] = (started, count)
             return False
         self._counts[bucket] = (started, count + 1)
         return True
@@ -161,6 +217,12 @@ class AdviceSubmitService:
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
 
+    def _rate_limited(self) -> RateLimitedError:
+        return RateLimitedError(
+            "Too many advice requests; try again shortly.",
+            retry_after_seconds=math.ceil(float(getattr(self._limiter, "window_seconds", 60.0))),
+        )
+
     def public_job_view(self, job_id: str) -> dict[str, object] | None:
         """The job as the world may see it: progress and a coded reason, nothing else.
 
@@ -205,11 +267,13 @@ class AdviceSubmitService:
         token, and so does the cache read: a hit is one small file read that starts no
         work, and charging for it meant a member who opened an already computed plan a
         few times was refused the one request that needed a solve. Only a miss, which
-        is a request for work, consults the limiter. Deduplication scans open jobs by
-        fingerprint: at most one open job exists per normalized request, however many
-        keys or clients ask.
+        is a request for work, consults the limiter: the client's address bucket at once,
+        the member's entry bucket only once the job is admitted. Deduplication scans open
+        jobs by fingerprint: at most one open job exists per normalized request, however
+        many keys or clients ask.
         """
 
+        client_bucket = client_address_bucket(client_bucket)
         if self._store_ready is not None and not self._store_ready():
             # Refuse before validating: a queue write onto a store that has failed its
             # capability checks either errors, or lands on storage nothing will read
@@ -243,17 +307,10 @@ class AdviceSubmitService:
         cached = self._reader.cached(cache_key)
         if cached is not None:
             return SubmitOutcome(kind="hit", payload=cached)
-        if self._limiter is not None:
-            entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
-            if not self._limiter.allow(f"ip:{client_bucket}") or not self._limiter.allow(
-                entry_bucket
-            ):
-                raise RateLimitedError(
-                    "Too many advice requests; try again shortly.",
-                    retry_after_seconds=math.ceil(
-                        float(getattr(self._limiter, "window_seconds", 60.0))
-                    ),
-                )
+        limiter = self._limiter
+        entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
+        if limiter is not None and not limiter.allow(f"ip:{client_bucket}"):
+            raise self._rate_limited()
 
         command = ApiCommandRequest(
             operation="league.advise",
@@ -332,12 +389,18 @@ class AdviceSubmitService:
                 raise OpenJobLimitedError(
                     "This connection already has the allowed open computations."
                 )
+            # Looked at here and spent only once the job exists. This callback runs under
+            # the queue transaction, so nothing in this process can admit in between.
+            if limiter is not None and not limiter.has_room(entry_bucket):
+                raise self._rate_limited()
             self._client_jobs[record.job_id] = client_bucket
             try:
                 yield
             except BaseException:
                 self._client_jobs.pop(record.job_id, None)
                 raise
+            if limiter is not None:
+                limiter.allow(entry_bucket)
 
         def prepare() -> None:
             # Only new work reaches this callback: late cache hits and open-job

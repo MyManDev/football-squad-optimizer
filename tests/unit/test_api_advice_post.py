@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Barrier
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,10 +20,12 @@ from squadopt.platform.advice_read import (
     AdviceReadStore,
     AdviceRequestContext,
     FileLeagueDirectory,
+    PreferencePlayers,
 )
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
+    client_address_bucket,
 )
 from squadopt.platform.jobs_contract import AdviceJob, JobError
 
@@ -90,6 +93,8 @@ def _world(
     metrics: AdviceMetrics | None = None,
     submit_services: list[AdviceSubmitService] | None = None,
     utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
+    preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
+    | None = None,
     **app_kwargs: object,
 ):
     _publish_members(tmp_path / "site")
@@ -100,6 +105,7 @@ def _world(
         cache,
         _Context(),
         {"saf-puan": False, "fark-yarat": True},
+        preference_players=preference_players,
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     if submit_services is not None:
@@ -450,6 +456,207 @@ def test_a_cache_hit_spends_no_rate_limit_token(tmp_path: Path) -> None:
     assert refused.json()["error"]["code"] == "RATE_LIMITED"
     # Even with the budget spent, the computed plan still opens.
     assert client.post(ADVICE_URL, json=BODY).status_code == 200
+
+
+# --- the member's budget is spent on admitted work, and only on ids the capture has ------
+
+ENTRY_BUCKET = f"entry:{CONTEXT.capture_snapshot_id}:313686"
+SQUAD = frozenset(range(1, 16))
+ROSTER = frozenset(range(1, 701))
+
+
+def _players(context: AdviceRequestContext, league_id: int, entry_id: int) -> PreferencePlayers:
+    assert context == CONTEXT and league_id == LEAGUE_ID
+    return PreferencePlayers(squad=SQUAD, roster=ROSTER)
+
+
+def _outcome(response: Any) -> str:
+    return "JOB" if response.status_code == 202 else response.json()["error"]["code"]
+
+
+def test_forty_distinct_avoid_lists_leave_the_entry_budget_for_another_client(
+    tmp_path: Path,
+) -> None:
+    """The audit's run: one address, forty misses, and another client still computes.
+
+    Every avoid list is a different address, so each POST is a miss. Before the fix each
+    one charged the member's (capture, entry) bucket before deduplication and before the
+    open-job cap, so thirty of them emptied it and the next client was told to wait 60 s.
+    """
+
+    limiter = FixedWindowRateLimiter(limit=30, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter, preference_players=_players)
+
+    outcomes = [
+        _outcome(
+            client.post(ADVICE_URL, json={**BODY, "preferences": {"avoid_players": [100 + n]}})
+        )
+        for n in range(40)
+    ]
+
+    assert outcomes.count("JOB") == 4
+    assert outcomes.count("OPEN_JOB_LIMITED") == 26
+    assert outcomes.count("RATE_LIMITED") == 10  # the address's own budget, 30 misses
+    assert limiter._counts[ENTRY_BUCKET][1] == 4  # only the admitted jobs were charged
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        response = other.post(ADVICE_URL, json={**BODY, "window": 3})
+    assert response.status_code == 202, response.text
+    assert len(queue.jobs()) == 5
+
+
+def test_joining_an_open_job_spends_no_entry_token(tmp_path: Path) -> None:
+    limiter = FixedWindowRateLimiter(limit=2, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter)
+    first = client.post(ADVICE_URL, json=BODY)
+    assert first.status_code == 202
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        joined = other.post(ADVICE_URL, json=BODY)
+        assert joined.status_code == 202
+        assert joined.json()["job_id"] == first.json()["job_id"]
+        # The member's second token is still there for new work.
+        assert other.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    # And the entry bucket still holds: two admitted jobs were its whole budget.
+    with TestClient(client.app, client=("a-third-client", 123)) as third:
+        refused = third.post(ADVICE_URL, json={**BODY, "window": 5})
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "RATE_LIMITED"
+    assert refused.headers["Retry-After"] == "60"
+    assert len(queue.jobs()) == 2
+
+
+def test_an_open_job_refusal_spends_no_entry_token(tmp_path: Path) -> None:
+    services: list[AdviceSubmitService] = []
+    limiter = FixedWindowRateLimiter(limit=2, window_seconds=60.0)
+    client, _cache, queue = _world(
+        tmp_path, rate_limiter=limiter, max_open_jobs_per_client=1, submit_services=services
+    )
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    refused = client.post(ADVICE_URL, json={**BODY, "window": 3})
+    assert _outcome(refused) == "OPEN_JOB_LIMITED"
+    assert limiter._counts[ENTRY_BUCKET][1] == 1
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        assert other.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    assert len(queue.jobs()) == 2
+    assert sorted(services[0]._client_jobs.values()) == ["another-client", "testclient"]
+
+
+def test_new_work_refused_at_preparation_spends_no_entry_token(tmp_path: Path) -> None:
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    client, _cache, queue = _world(
+        tmp_path, rate_limiter=limiter, deadline_for=lambda context: "2026-08-27T11:00:00Z"
+    )
+    assert _outcome(client.post(ADVICE_URL, json=BODY)) == "DEADLINE_PASSED"
+    assert limiter.has_room(ENTRY_BUCKET)
+    assert queue.jobs() == ()
+
+
+def test_a_full_entry_bucket_refuses_with_no_job_and_no_reservation(tmp_path: Path) -> None:
+    services: list[AdviceSubmitService] = []
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter, submit_services=services)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        refused = other.post(ADVICE_URL, json={**BODY, "window": 3})
+    assert _outcome(refused) == "RATE_LIMITED"
+    assert len(queue.jobs()) == 1
+    assert list(services[0]._client_jobs.values()) == ["testclient"]
+
+
+@pytest.mark.parametrize(
+    ("host", "bucket"),
+    [
+        ("2001:db8:1:2:aaaa:bbbb:cccc:dddd", "2001:db8:1:2::/64"),
+        ("2001:db8:1:2::1", "2001:db8:1:2::/64"),
+        ("2001:DB8:1:2::1", "2001:db8:1:2::/64"),
+        ("fe80::1%eth0", "fe80::/64"),
+        ("::ffff:203.0.113.9", "203.0.113.9"),
+        ("203.0.113.9", "203.0.113.9"),
+        ("testclient", "testclient"),
+        ("unknown", "unknown"),
+    ],
+)
+def test_a_client_is_counted_by_its_ipv4_address_or_its_ipv6_64(host: str, bucket: str) -> None:
+    assert client_address_bucket(host) == bucket
+
+
+def test_addresses_in_one_ipv6_64_share_one_budget_and_one_open_job_cap(tmp_path: Path) -> None:
+    other_url = ADVICE_URL.replace("313686", "2199732")
+
+    def post(client: TestClient, host: str, url: str) -> str:
+        with TestClient(client.app, client=(host, 443)) as requester:
+            return _outcome(requester.post(url, json=BODY))
+
+    limited, _cache, _queue = _world(
+        tmp_path / "rate", rate_limiter=FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    )
+    assert post(limited, "2001:db8:1:2::1", ADVICE_URL) == "JOB"
+    assert post(limited, "2001:db8:1:2::ffff", other_url) == "RATE_LIMITED"
+    assert post(limited, "2001:db8:1:3::1", other_url) == "JOB"
+
+    capped, _cache, _queue = _world(tmp_path / "open", max_open_jobs_per_client=1)
+    assert post(capped, "2001:db8:1:2::1", ADVICE_URL) == "JOB"
+    assert post(capped, "2001:db8:1:2::2", other_url) == "OPEN_JOB_LIMITED"
+    assert post(capped, "2001:db8:1:3::1", other_url) == "JOB"
+
+
+def test_the_limiter_forgets_a_bucket_once_its_window_has_passed() -> None:
+    now = [0.0]
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0, clock=lambda: now[0])
+    for index in range(100):
+        assert limiter.allow(f"ip:client-{index}")
+    assert limiter.has_room("ip:unseen") and not limiter.has_room("ip:client-0")
+    assert not limiter.allow("ip:client-0")
+    assert len(limiter._counts) == 100  # looking spends nothing and stores nothing
+
+    now[0] = 60.0
+    assert limiter.allow("ip:late")
+    assert set(limiter._counts) == {"ip:late"}
+    assert limiter.allow("ip:client-0")  # a forgotten bucket starts a fresh window
+
+
+@pytest.mark.parametrize(
+    "preferences",
+    [
+        {"keep_players": [16]},
+        {"avoid_players": [701]},
+        {"keep_players": [1], "avoid_players": [2**53 - 1]},
+    ],
+    ids=["kept-not-held", "avoided-not-in-roster", "one-good-one-unknown"],
+)
+def test_players_the_capture_does_not_have_are_refused_before_any_work(
+    tmp_path: Path, preferences: dict[str, list[int]]
+) -> None:
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter, preference_players=_players)
+
+    posted = client.post(ADVICE_URL, json={**BODY, "preferences": preferences})
+    read = client.get(ADVICE_URL, params={**BODY, "preferences": json.dumps(preferences)})
+
+    for response in (posted, read):
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert queue.jobs() == ()
+    # The refusal spent nothing: the one token still admits a request the capture can hold.
+    accepted = {"keep_players": [1, 15], "avoid_players": [700]}
+    assert client.post(ADVICE_URL, json={**BODY, "preferences": accepted}).status_code == 202
+
+
+@pytest.mark.parametrize(
+    "players",
+    [None, lambda _context, _league, _entry: None],
+    ids=["no-squad-reader", "squad-unreadable"],
+)
+def test_named_players_are_refused_when_the_squad_cannot_be_read(
+    tmp_path: Path,
+    players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None] | None,
+) -> None:
+    client, _cache, queue = _world(tmp_path, preference_players=players)
+    refused = client.post(ADVICE_URL, json={**BODY, "preferences": {"avoid_players": [5]}})
+    assert _outcome(refused) == "UNSUPPORTED_ADVICE_REQUEST"
+    # The two flags name no player and need no squad.
+    flags = {"no_hits": True, "save_chips": True}
+    assert client.post(ADVICE_URL, json={**BODY, "preferences": flags}).status_code == 202
+    assert len(queue.jobs()) == 1
 
 
 def test_a_tree_from_another_week_is_not_ready_and_queues_nothing(tmp_path: Path) -> None:

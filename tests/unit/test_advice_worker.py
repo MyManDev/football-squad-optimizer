@@ -1443,6 +1443,14 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         route, json={**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
     )
     assert invalid.status_code == 422
+    # Ids the capture does not have for this member are refused before a job exists:
+    # 1002 is on the roster but not in the fifteen, 1025 is not on the roster at all.
+    jobs_before = backend.queue.jobs()
+    for unknown in ({"keep_players": [1002]}, {"avoid_players": [1025]}):
+        refused = client.post(route, json={**body, "preferences": unknown})
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert backend.queue.jobs() == jobs_before
     for malformed in (None, "", []):
         invalid = client.post(route, json={**body, "preferences": malformed})
         assert invalid.status_code == 422

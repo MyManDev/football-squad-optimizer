@@ -390,14 +390,14 @@ The advice routes add their own codes:
 | 413 | `PAYLOAD_TOO_LARGE` | The POST body is over 4096 bytes (`ADVICE_BODY_MAX_BYTES`); it is refused before it is parsed |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | The POST's `Content-Type` is not `application/json` (parameters such as `charset` are allowed). A cross-site form's `text/plain` POST needs no preflight, so this is what keeps it from filing a job |
 | 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token. The body's `strategy` must match the query's pattern, `^[a-z][a-z0-9._-]{0,63}$` |
-| 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival, chip or switch combination the menu does not offer |
+| 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival, chip or switch combination the menu does not offer, or a kept player the member does not hold in the capture, an avoided player outside the capture's roster, or named players for a member whose captured squad cannot be read. GET and POST refuse these alike, before a token is spent |
 | 422 | `DEADLINE_PASSED` | The resolved capture's gameweek has closed. New work is refused before the spec or job is written; cached answers and existing open-job replays remain available. `error.details.public_reason` carries English and Turkish sentences |
 | 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |
 | 422 | `MANAGERS_WORD_UNAVAILABLE` | The manager's word was asked for and the current capture has no coded club news |
 | 422 | `CHIP_HISTORY_UNKNOWN` | The capture cannot establish which chips the member holds |
 | 422 | `CHIP_NOT_HELD` | The member cannot play the requested chip this gameweek |
-| 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds. Only a request that needs work is charged: a POST the cache already answers spends no token |
-| 429 | `OPEN_JOB_LIMITED` | This client address already owns the allowed open jobs; wait for one to finish. `error.details.public_reason` carries English and Turkish sentences, with no estimated wait |
+| 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds. Only a request that needs work is charged: a POST the cache already answers spends no token. The client address's bucket (IPv4 by address, IPv6 by /64) is charged on every miss; the (capture, entry) bucket only when a new job is admitted, never for joining an open job or for an `OPEN_JOB_LIMITED` refusal |
+| 429 | `OPEN_JOB_LIMITED` | This client address (an IPv6 client by its /64) already owns the allowed open jobs; wait for one to finish. `error.details.public_reason` carries English and Turkish sentences, with no estimated wait |
 | 503 | `NOT_READY` | No capture context, the published league tree is for another week than the capture (the message names both), the store probe is failing, or the queue lock stayed busy (then with `Retry-After`) |
 | 503 | `QUEUE_UNAVAILABLE` | A queue write was refused; nothing was accepted, with `Retry-After` |
 | 503 | `QUEUE_INTEGRITY_ERROR` | A stored job record cannot be trusted |
@@ -415,8 +415,10 @@ Ownership lives only in this API process's memory and is forgotten on restart; n
 client address is written to a job, spec, log or metric. Completed, failed and missing
 owned jobs release their slots at the next admission, reading only owned job IDs.
 Failed preparation or publication removes the reservation immediately. Cache hits, idempotency replays and dedup
-do not consume slots or meet this cap. The existing request-rate limiter still charges
-cache misses before deduplication or a cap refusal. A household sharing one address, or a member quickly
+do not consume slots or meet this cap. The request-rate limiter charges the client address's
+bucket on every cache miss, before deduplication or a cap refusal; the member's (capture,
+entry) bucket is shared by every client, so it is charged only when a new job is admitted.
+Idle buckets are dropped once their window has passed. A household sharing one address, or a member quickly
 changing selections, can meet the cap; server-side cancellation is not provided.
 `advice_open_job_refused_total` starts at zero in the API role and counts these refusals.
 `advice_deadline_refused_total` also starts at zero in the API role; `scripts/backend_status.py` prints it as `Deadline refusals (API)` so refusals behind the page's deadline notice remain visible to the operator.

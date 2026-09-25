@@ -166,6 +166,20 @@ def held_member_chips(
     return menu.held if menu.known else None
 
 
+def held_member_squad(
+    request: AdviseEntryRequest,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+) -> tuple[int, ...]:
+    """The fifteen codes the member holds going into the deadline, read without solving.
+
+    The same picks, read the same way, that become the planner's held squad, so a kept
+    player accepted against this is one the solver accepts too.
+    """
+    return _requested_picks(request, request.entry_id, provider=provider, inputs=inputs).squad
+
+
 #: Where a document this computation depends on may already exist: handed the address,
 #: it returns that document's payload as computed from these same inputs, or ``None``.
 PrerequisiteLookup = Callable[[MenuRequest], Mapping[str, object] | None]
