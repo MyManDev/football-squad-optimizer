@@ -96,7 +96,7 @@ function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
       {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
         <span className={styles.xp}>
           {figure(player.expectedPoints, locale)}
-          <span className="visually-hidden"> xP</span>
+          <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
         </span>
       ) : null}
       {player.isNew ? <span className={styles.new}>{messages.leagueMembers.boardNew}</span> : null}
@@ -195,7 +195,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
                 className={styles.line}
                 data-line={line.position.toLowerCase()}
                 role="listitem"
-                aria-label={line.position}
+                aria-label={messages.positions[line.position]}
                 style={
                   {
                     "--n": line.players.length,
@@ -282,7 +282,10 @@ export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes:
                 {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
                   <span className={styles.benchXp}>
                     {figure(player.expectedPoints, locale)}
-                    <span className="visually-hidden"> xP</span>
+                    <span className="visually-hidden">
+                      {" "}
+                      {messages.leagueMembers.pointsUnitSpoken}
+                    </span>
                   </span>
                 ) : null}
               </li>

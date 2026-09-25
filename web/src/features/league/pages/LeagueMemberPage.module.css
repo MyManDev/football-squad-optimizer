@@ -506,14 +506,8 @@ section.notice p {
   }
 
   /* The phone reads the decision and then what to make of it, as D-Phone-Bu-Hafta draws
-     it; the squad ('Kadro' in the menu) follows. */
-  .adviceSection > .decision {
-    order: -2;
-  }
-
-  .adviceSection > .honestyBlock {
-    order: -1;
-  }
+     it; the squad ('Kadro' in the menu) follows. LeagueMemberView places the honesty block
+     there in the document itself, not with `order`, so the tab order matches the screen. */
 }
 
 .echo {
