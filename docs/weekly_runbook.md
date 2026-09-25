@@ -342,8 +342,9 @@ the ten per UTC day. A prior preview without `--publish` cannot acquire it on re
 use a new run ID, with the
 explicit capture/evidence reuse options above if appropriate. An actual resume repeats
 the original options unchanged. A used suffix refuses before the expensive stages.
-Rebuilding the captures dated 12, 15, 17 or 18 September 2026, already recorded by
-older code, requires `python -m scripts.build_league_site` with `--no-advice-record`;
+Rebuilding a capture already recorded by older code (those dated 12, 15, 17 or 18
+September 2026, and any whose record's `told.source` is not `page_default`) requires
+`python -m scripts.build_league_site` with `--no-advice-record`;
 the weekly runner has no skip-recording switch and otherwise refuses only at the end
 of the league stage.
 
