@@ -115,7 +115,7 @@ test("published league and member journey works without submitting a solve", asy
   await page
     .getByRole("row")
     .filter({ has: page.locator(`a[href="/league/members/${entryId}"]`) })
-    .getByRole("button", { name: MESSAGES.en.leagueMembers.viewerSelect, exact: true })
+    .getByRole("button", { name: MESSAGES.en.leagueMembers.viewerSelect })
     .click();
   await expect(page).toHaveURL(new RegExp(`/league/members/${entryId}$`));
   const plan = page.locator('[aria-labelledby="entry-advice-title"]');
