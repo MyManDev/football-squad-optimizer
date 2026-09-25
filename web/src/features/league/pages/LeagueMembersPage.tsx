@@ -10,7 +10,7 @@ import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type { ScoreboardState } from "../components/karne";
 import { DisclosureIcon } from "../components/memberIcons";
-import { SystemKarne } from "../components/SystemKarne";
+import { SystemKarne, SystemScoreboardDetails } from "../components/SystemKarne";
 import { ViewerChips } from "../components/ViewerChips";
 import { LeagueDataMissing, loadEntrySquad, loadLeagueMembers, loadScoreboard } from "../data";
 import { useViewerEntry } from "../identity/useViewerEntry";
@@ -331,6 +331,15 @@ export function LeagueMembersView({
               </p>
             ) : null}
           </div>
+        ) : null}
+
+        {/* The whole scoreboard is a wide table: closed, and across both columns. */}
+        {scoreboard ? (
+          <SystemScoreboardDetails
+            state={scoreboard}
+            leagueId={view.league_id}
+            className={styles.fullScoreboard}
+          />
         ) : null}
       </div>
     </div>

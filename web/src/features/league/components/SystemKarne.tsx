@@ -14,7 +14,8 @@ type Series = "ours" | "league" | "game";
  * the FPL average, as horizontal bars on one scale for the whole chart (3 px a point where
  * the column allows), so a longer bar is always more points. Its good weeks and bad weeks are both
  * shown. Everything else the scoreboard says (scoring basis, live or replay, provisional
- * weeks, Top 100, the error breakdown) is one click away in the closed full scoreboard.
+ * weeks, Top 100, the error breakdown) is one click away in the closed full scoreboard
+ * (SystemScoreboardDetails), which the page lays out at full width.
  */
 export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagueId: number }) {
   const { locale, messages } = useLanguage();
@@ -101,17 +102,40 @@ export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagu
             ))}
           </ol>
           <p className={styles.caption}>{copy.karneCaption}</p>
-          <details className={styles.full}>
-            <summary className={styles.fullSummary}>
-              <DisclosureIcon className={styles.fullIcon} />
-              <span>{copy.karneFull}</span>
-            </summary>
-            <div className={styles.fullBody}>
-              <ScoreboardCard envelope={state.envelope} />
-            </div>
-          </details>
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The whole scoreboard behind the record, closed until asked for: the scoring basis, live
+ * or replay, provisional weeks and the error breakdown. It is a wide table, so the page
+ * gives it the full width under the table and the record rather than the record's narrow
+ * column; it exists only where the record has weeks to show.
+ */
+export function SystemScoreboardDetails({
+  state,
+  leagueId,
+  className,
+}: {
+  state: ScoreboardState;
+  leagueId: number;
+  className?: string;
+}) {
+  const { messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  if (state.status !== "ready" || state.envelope.payload.league_id !== leagueId) return null;
+  if (karneWeeks(state.envelope.payload).length === 0) return null;
+  return (
+    <details className={className ? `${styles.full} ${className}` : styles.full}>
+      <summary className={styles.fullSummary}>
+        <DisclosureIcon className={styles.fullIcon} />
+        <span>{copy.karneFull}</span>
+      </summary>
+      <div className={styles.fullBody}>
+        <ScoreboardCard envelope={state.envelope} />
+      </div>
+    </details>
   );
 }

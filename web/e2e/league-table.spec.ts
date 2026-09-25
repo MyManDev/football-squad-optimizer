@@ -57,8 +57,24 @@ test("at 1440 the table, the system's record and the viewer's chips share one sc
   const karneBox = (await karne.boundingBox())!;
   expect(karneBox.x).toBeGreaterThanOrEqual(tableBox.x + tableBox.width);
   expect(karneBox.y).toBeLessThan(tableBox.y + tableBox.height);
-  await expect(karne.locator("details")).not.toHaveAttribute("open");
   await expect(karne.getByText(copy.karneCaption)).toBeVisible();
+  // The full scoreboard is a wide table: closed, and once opened it reads across both
+  // columns without scrolling sideways instead of squeezing into the record's column.
+  const full = page.locator("main details", { hasText: copy.karneFull });
+  await expect(full).toHaveCount(1);
+  await expect(full).not.toHaveAttribute("open");
+  await full.locator("summary").click();
+  const scoreboardTable = full.getByRole("table", {
+    name: MESSAGES.tr.leagueScoreboard.caption,
+  });
+  await expect(scoreboardTable).toBeVisible();
+  expect((await full.boundingBox())!.width).toBeGreaterThan(tableBox.width + karneBox.width);
+  const region = await scoreboardTable.evaluate((element) => ({
+    table: element.scrollWidth,
+    column: element.parentElement!.clientWidth,
+  }));
+  expect(region.table).toBeLessThanOrEqual(region.column);
+  await full.locator("summary").click();
 
   // The viewer's chips and the member right behind them.
   await expect(

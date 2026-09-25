@@ -409,6 +409,11 @@ td.total {
   font-weight: 600;
 }
 
+/* The whole scoreboard under both columns, where its table has room to read. */
+.fullScoreboard {
+  grid-column: 1 / -1;
+}
+
 /* ---- Touch: every control is at least 44 px under 1180 px ---- */
 
 @media (max-width: 1179.98px) {

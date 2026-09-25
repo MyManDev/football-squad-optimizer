@@ -148,10 +148,10 @@
   margin-top: var(--space-4);
 }
 
-/* ---- The whole scoreboard, closed until asked for ---- */
+/* ---- The whole scoreboard, closed until asked for; the page gives it the full width ---- */
 
 .full {
-  margin-top: var(--space-4);
+  min-width: 0;
   border-top: 1px solid var(--color-line);
 }
 

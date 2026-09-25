@@ -253,8 +253,9 @@ describe.each(["tr", "en"] as const)("the system's record beside the table in %s
 
   it("keeps the whole scoreboard, with its basis and modes, one click away and closed", () => {
     show({ scoreboard: board([week(1, 26, 54.3, 50)]) }, language);
-    const karne = screen.getByRole("region", { name: copy.karneTitle });
-    const full = within(karne).getByText(copy.karneFull).closest("details")!;
+    // A wide table: the page lays it out under both columns, not in the record's column.
+    const full = screen.getByText(copy.karneFull).closest("details")!;
+    expect(screen.getAllByText(copy.karneFull)).toHaveLength(1);
     expect(full.open).toBe(false);
     expect(within(full).getByRole("table", { name: scoreboard.caption })).toBeInTheDocument();
     expect(full).toHaveTextContent(MESSAGES[language].scoreboardComparisons.legacy);
@@ -270,10 +271,12 @@ describe.each(["tr", "en"] as const)("the system's record beside the table in %s
     const karne = screen.getByRole("region", { name: copy.karneTitle });
     expect(karne).toHaveTextContent(scoreboard[key]);
     expect(within(karne).queryAllByRole("img")).toHaveLength(0);
+    expect(screen.queryByText(copy.karneFull)).toBeNull();
   });
 
   it("shows nothing from another league's scoreboard", () => {
     show({ scoreboard: board([week(1, 26, 54.3, 50)], 1) }, language);
     expect(screen.queryByRole("region", { name: copy.karneTitle })).toBeNull();
+    expect(screen.queryByText(copy.karneFull)).toBeNull();
   });
 });
