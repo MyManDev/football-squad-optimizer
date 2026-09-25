@@ -21,8 +21,10 @@ compute, not their published advice.
 
 Each row is one `backend-down` issue, from the uptime check that opened it to the one that
 closed it. The check runs hours apart in practice (see
-[free hosting](../../backend_free_hosting.md#recommendation)), so these spans bound the outages
-from outside; they are not their exact lengths.
+[free hosting](../../backend_free_hosting.md#recommendation)), so a span is neither an
+outage's length nor a bound on it. An outage starts somewhere between the last passing check
+and the one that opened its issue, and ends somewhere between the last failing check and the
+one that closed it. #821 below shows the difference.
 
 | Issue | Opened (UTC) | Closed (UTC) | Span |
 | --- | --- | --- | --- |
@@ -31,19 +33,35 @@ from outside; they are not their exact lengths.
 | #795 | 2026-09-24 15:26 | 2026-09-25 11:14 | 19 h 48 min |
 | #821 | 2026-09-25 15:51 | 2026-09-25 19:50 | 3 h 59 min |
 
-**The logon watcher is now registered, and #821 happened after it.** Read on the PC on
-2026-09-25:
+**The logon watcher is registered, but it has not run from its shortcut yet.** Read on the PC
+on 2026-09-25:
 
-- The Startup folder holds `SquadOpt advice backend.lnk`, written at 10:37:55Z. It runs
-  `scripts/start_backend_at_logon.ps1 -Watch -Workers 6 -Port 8000` from the main checkout.
+- The Startup folder holds `SquadOpt advice backend.lnk`, written at 10:37:55Z. At logon it
+  runs `scripts/start_backend_at_logon.ps1 -Watch -Workers 6 -Port 8000` from the main
+  checkout. The logon session in use began on 2026-09-21 (the machine booted at 09:15:53Z and
+  its `explorer.exe` started at 09:16:23Z), so the shortcut has not run since it was written.
 - The api, the six worker interpreters and `cloudflared` were created at 10:38:09Z and
-  10:38:10Z. At 20:20Z they were still the same processes.
-- The public check failed at 15:51Z and recovered at 19:50Z. The System log shows the PC
-  asleep from 16:24:19Z to 18:23:26Z.
+  10:38:10Z, started (the api and workers through the launcher) by a `-Watch` run of the same
+  script that began at 10:38:05Z, not from the shortcut. Its log,
+  `data/runtime/backend/logs/startup-20260925T103805Z.log` in the main checkout, records both
+  starts, then both healthy one 60 s check later, at 10:39:18Z and 10:39:19Z. At 20:20Z, and
+  again at 21:38Z, they were still the same processes.
+- Between 21:38Z and 21:40Z no watcher was running. No process had
+  `start_backend_at_logon.ps1` on its command line, and the watcher's mutex,
+  `Global\SquadOpt-backend-8000-squadopt-logon`, did not exist. The 10:38:05Z watcher ended
+  at a time its log does not record (it writes only when a condition changes), and what it
+  had started kept running.
+- The public check failed at 15:51Z with HTTP 530 and recovered at 19:50Z. The System log
+  shows the PC entering sleep at 13:22:47Z, reason "Button or Lid". At 16:24:19Z the
+  hibernate-from-sleep timeout woke it only to hibernate ("Hibernate from Sleep - Fixed
+  Timeout"), and it resumed at 18:23:26Z.
 
-So the processes were alive through the whole of #821, and the watcher had nothing to restart.
-It covers a process that died. It does not cover a PC that sleeps, or one that is up but not
-reachable. What failed at 15:51Z, half an hour before the sleep began, was not established.
+So #821's failed check at 15:51Z fell inside a sleep that lasted from 13:22:47Z to 18:23:26Z,
+about five hours, longer than the issue's 3 h 59 min span. The processes survived the sleep,
+so a watcher, had one been running, would have had nothing to restart. A watcher covers a
+process that died. It does not cover a PC that sleeps. Nor would it notice a PC that is awake,
+with its processes alive, but not reachable from outside, because it checks only local health
+and the local process list. That mode has not been observed.
 
 ### What the backend needs, as measured
 
@@ -111,14 +129,21 @@ Azure and Hetzner use. The page each price came from is listed under
   recomputes, and pending jobs are recomputable requests.
 - **Tunnel and DNS.** No change.
 - **Migration steps.** None; this is the current state. What A still lacks is outside the
-  repository: the PC must not sleep while members may press Compute, and nothing restarts the
-  connector when the processes are alive but the machine or its network is not serving (#821).
-  A fix to how the watcher finds its repository is open as #813.
+  repository:
+  - The PC must not sleep while members may press Compute. #821 was a sleep started by the
+    lid or the power button, which the hibernate-from-sleep timeout later turned into
+    hibernation, so the idle sleep timeout alone does not cover it.
+  - A watcher must be running. The registered shortcut starts one at the next logon, and
+    none was running when this was read (see Context).
+  - Nothing restarts the connector when the processes are alive but the PC is not reachable
+    from outside. That mode has not been observed.
+
+  A fix to how the watcher finds its checkout under `powershell -File` has merged as #813.
 - **Rollback.** Not applicable. The fallback is the static site: let the backend stop, or
   delete the `ADVICE_API_ORIGIN` variable and release
   ([ADR 0006](0006-backend-hosting.md#rollback)).
 - **What stays unsolved.** Availability depends on the owner's sleep settings, network and
-  presence. Four outages in six days, the latest with the watcher running.
+  presence. Four outages in six days, the latest after the watcher was registered.
 
 ### B. An always-on small x86-64 VPS, with Docker Compose and cloudflared
 
@@ -153,14 +178,40 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
 - **Tunnel and DNS.** The same tunnel moves to the new host, and the DNS record (a CNAME to the
   tunnel) does not change. Cloudflare sends each request to the geographically closest
   connected replica, so two connectors in front of two different stores would split members
-  across two queues. The order is:
-  1. On the PC, run `start_backend_at_logon.ps1 -Unregister`, otherwise the watcher starts the
-     PC's connector again.
-  2. Stop the PC's connector.
-  3. Copy `config.yml` and the tunnel credentials JSON to the host, and install the connector
+  across two queues. Two things on the PC bring its connector back:
+  - A running watcher. It checks every 60 s and starts a connector labelled `squadopt-logon`
+    after three consecutive checks find none, so a stopped connector comes back a few minutes
+    later. `-Unregister` does not end a running watcher, and the script has no switch that
+    does, so a scripted move needs a step of its own for it.
+  - The Startup shortcut, which starts a new watcher at the next logon. `-Unregister` removes
+    only that shortcut.
+
+  The order is:
+  1. On the PC, end any running watcher. One started by the shortcut is the hidden
+     `powershell.exe` whose command line contains `start_backend_at_logon.ps1` and `-Watch`.
+     One started by hand in a PowerShell window ends when that window is closed. Every watcher
+     holds the mutex `Global\SquadOpt-backend-8000-squadopt-logon` while it runs, so none is
+     left when this prints `False`:
+
+     ```powershell
+     $m = $null
+     [System.Threading.Mutex]::TryOpenExisting('Global\SquadOpt-backend-8000-squadopt-logon', [ref]$m)
+     if ($m) { $m.Dispose() }
+     ```
+
+     Ending a watcher does not stop the api, the workers or the connector. The watcher starts
+     each as a separate process and on exit only releases its mutex, and the 10:38:05Z
+     watcher ended while what it had started kept running.
+  2. Run `start_backend_at_logon.ps1 -Unregister`, so the next logon does not start a watcher
+     again.
+  3. Stop the PC's connector, the `cloudflared` started with `--label squadopt-logon`.
+  4. Copy `config.yml` and the tunnel credentials JSON to the host, and install the connector
      as a service: `cloudflared service install`, then `systemctl start cloudflared`.
      `cloudflared` publishes `linux-amd64` and `linux-arm64` builds (release 2026.9.3).
-  4. Check that `cloudflared tunnel info squadopt-api` lists exactly one connector.
+  5. Wait at least five minutes after step 3, longer than a watcher missed in step 1 needs to
+     start the PC's connector again. Then check that `cloudflared tunnel info squadopt-api`
+     lists exactly one connector. If it lists two, a watcher is still running: go back to
+     step 1.
 
   The config's `service: http://127.0.0.1:8000` still matches, because Compose publishes the
   api on host loopback.
@@ -196,10 +247,12 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
   The `Dockerfile` does not change, and neither does the site build or the uptime workflow,
   because the public hostname stays the same.
 - **Rollback.** Stop the host's connector (`systemctl stop cloudflared`). On the PC, run
-  `start_backend_at_logon.ps1 -Register` and start it. Members reach the PC again once its
-  connector is up. Answers computed on the VPS are not copied back; they recompute. Jobs pending on
-  the VPS at the switch are lost, and members press Compute again. Delete the VM to stop the
-  charge.
+  `start_backend_at_logon.ps1 -Register`, then start a watcher now with
+  `start_backend_at_logon.ps1 -Watch` from the main checkout, in a window left open, or sign
+  out and in again. `-Register` alone only writes the shortcut, which runs at the next logon,
+  as the script itself prints. Members reach the PC again once its connector is up. Answers
+  computed on the VPS are not copied back; they recompute. Jobs pending on the VPS at the
+  switch are lost, and members press Compute again. Delete the VM to stop the charge.
 - **What stays unsolved.** A single machine, now one the owner does not sleep. Nobody has
   measured solve speed on shared vCPUs. The PC is still needed once per publish.
 
@@ -278,6 +331,9 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
     containers of one app share network resources, so the api's peer stays loopback and the
     existing forwarded-address trust holds. The api container plus a 0.25 vCPU / 0.5 GiB
     connector sums to 0.75 / 1.5, an allowed pair once the worker has moved to its own app.
+    Before that container starts, take the PC's connector out in B's order: end any running
+    watcher, run `-Unregister`, stop the PC's connector. Then check for exactly one connector
+    as in B's step 5.
   - **Drop the tunnel.** Use Container Apps ingress with `squadopt-api.mymandev.com` as a
     custom domain, which changes the DNS record. How the managed certificate and the ingress
     peer behave behind Cloudflare's proxy is UNVERIFIED.
@@ -293,9 +349,10 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
   4. Script the transport of inputs from the PC to an NFS share inside a VNet, which the
      runbook records as undecided.
   5. Write a release step that re-applies the YAML with the release digest.
-- **Rollback.** The runbook's own: re-apply the previous digest, or for hosting, stop the
-  cloud connector (or remove the custom domain) and re-register the PC watcher. Delete the
-  resource group to stop all charges.
+- **Rollback.** The runbook's own: re-apply the previous digest. For hosting, stop the cloud
+  connector (or remove the custom domain and point the DNS record at the tunnel again). Then,
+  on the PC, run `-Register` and start a watcher now, as in B's rollback. Delete the resource
+  group to stop all charges.
 - **What stays unsolved.** The widest cost range at six always-on workers, the highest at its
   upper end, and the most setup (VNet, storage account, registry, identity). The repository's Azure files are templates with
   placeholder subscription, registry and storage names, and none has been applied.
@@ -318,11 +375,14 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
 - **Tunnel and DNS.** Run `cloudflared` as a second container in the api task. Containers in
   one `awsvpc` task share its network namespace, a fact taken from ECS's documented model and
   not re-read today. The hostname and DNS stay as they are, and no load balancer is needed.
+  Before the task starts, take the PC's connector out in B's order: end any running watcher,
+  run `-Unregister`, stop the PC's connector. Then check for exactly one connector as in B's
+  step 5.
 - **Migration steps in this repository.** The same parity measurement and transport script as
   B and D. A task definition, which the repository does not have (only Compose and the Azure
   YAML exist). The same two switch inputs. A release step.
-- **Rollback.** As in D: stop the cloud connector, re-register the PC watcher, and delete the
-  service and the file system.
+- **Rollback.** As in D: stop the cloud connector, then on the PC run `-Register` and start a
+  watcher now, as in B's rollback. Delete the service and the file system.
 - **What stays unsolved.** A cost at six workers that falls inside D's range, a template that
   does not exist yet, and a filesystem whose hard-link behaviour is unproven here.
 
@@ -356,8 +416,11 @@ This is an order to consider the options in, with the reason for each place. It 
 recommendation, and every step can stop the sequence.
 
 1. **A, as it is now, with the owner-side gaps closed.** It costs nothing and is the only
-   option whose timings were measured. The latest outage coincided with a sleep window, so the
-   PC's sleep setting comes first.
+   option whose timings were measured. The latest outage was a sleep started by the lid or the
+   power button, which the hibernate-from-sleep timeout turned into hibernation about three
+   hours later. So the power settings come first, and more than the idle sleep timeout: the
+   lid-close action, the power-button action and the hibernate timeout too, in both the
+   plugged-in and the battery settings Windows keeps. A running watcher comes next.
 2. **Measure before moving anything.** The Linux x86-64 parity run and a timed window-5 solve
    are prerequisites for B, D and E. The cheapest way to run them is an hourly-billed VM
    (Hetzner lists CPX42 at €0.1122 an hour). This step answers the unknown every remote
@@ -388,9 +451,11 @@ own trigger).
 
 ## Sources, read on 2026-09-25
 
-All were read on 2026-09-25 between 20:03 and 20:25 UTC. The pricing pages that render prices
-in the browser (Hetzner, Oracle, Azure) were read after rendering; the API and price-list files
-were read as JSON.
+The web pages, the price API and the price-list files were read on 2026-09-25 between 20:03
+and 20:25 UTC. The pricing pages that render prices in the browser (Hetzner, Oracle, Azure)
+were read after rendering; the API and price-list files were read as JSON. The PC facts were
+read the same evening; the watcher, its mutex, its log and the sleep entries were re-read
+between 21:30Z and 21:40Z.
 
 | What | Where |
 | --- | --- |
@@ -418,4 +483,5 @@ were read as JSON.
 | cloudflared release assets (linux-amd64, linux-arm64) | <https://github.com/cloudflare/cloudflared/releases/tag/2026.9.3> |
 | ortools and the other compiled pins, wheel tags | `https://pypi.org/pypi/<name>/<version>/json` for every pin in `constraints.txt` |
 | Outage issues | #747, #787, #795, #821 |
-| PC facts: CPU, memory, Startup shortcut, process start times, sleep log, store and input sizes | read-only queries on the owner's PC; no process was touched |
+| PC facts: CPU, memory, Startup shortcut, boot and logon times, process start times, the watcher's log and mutex, sleep log, store and input sizes | read-only queries on the owner's PC; no process was touched |
+| The watcher's behaviour: `-Unregister`, the 60 s checks, three misses before a restart, the mutex | `scripts/start_backend_at_logon.ps1` |
