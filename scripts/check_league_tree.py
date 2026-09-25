@@ -3,8 +3,11 @@
 Each check expects what each member's advice index declares. An absence the index states
 in the producer's own shape, with a string reason (a menu this run left out, a window or
 rival pair that did not solve, a member with no advice this week), is reported and is not
-a finding; a document the index names that the tree lacks is, and so is an index the
-page's validator would refuse or an absence stated without its reason.
+a finding; a document the index names that the tree lacks is, and so is an index that
+fails the page's assertAdviceIndex (the envelope is not checked) or a Top 100 menu, an
+``unavailable`` row or a refused member stated without its reason. The manager's word and
+the chip menu are read as the producer writes them: their absences are not checked for a
+reason.
 """
 
 import argparse
