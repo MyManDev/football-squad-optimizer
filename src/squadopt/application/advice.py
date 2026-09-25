@@ -1334,6 +1334,12 @@ TOP100_SOLVE_ERRORS: tuple[type[Exception], ...] = (
     KeyError,
     ValueError,
 )
+#: What one member's own solve (the baseline, a rival pair, a window) may fail with and
+#: still be recorded against that member rather than raised through the batch. The same
+#: set as a Top 100 setting's: a window the wall clock cut short raises
+#: ``SolverExecutionError``, and one member's clock must not cost every other member
+#: their advice.
+MEMBER_SOLVE_ERRORS: tuple[type[Exception], ...] = TOP100_SOLVE_ERRORS
 
 
 @dataclass(frozen=True, slots=True)

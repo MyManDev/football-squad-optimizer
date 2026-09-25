@@ -1642,6 +1642,125 @@ def test_a_rival_that_cannot_be_priced_is_recorded_not_fatal(
     assert not (tmp_path / "gap" / "advice" / "101" / "fark-yarat").exists()
 
 
+#: What a clock-cut search says, in the words ``solve_window_plan`` uses.
+CLOCK_CUT = "was stopped by the 1800s wall-clock safety cap"
+
+
+@pytest.mark.parametrize("stage", ["window", "rival", "baseline"])
+def test_one_members_solver_error_stays_that_members(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    """The first member's solve raises ``SolverExecutionError`` (a window the wall clock
+    cut short, a rival pair, the baseline itself): that member records it where the
+    module records every other failure, and the second member still gets every document."""
+
+    import datetime
+
+    import squadopt.application.advice as advice_module
+    import squadopt.application.league_views as league_views_module
+    from squadopt.application.advice import member_horizon_builder
+    from squadopt.optimization import SolverExecutionError
+
+    def cut(entry_id: int, what: str) -> None:
+        if entry_id == 101:
+            raise SolverExecutionError(f"The {what} for entry 101 {CLOCK_CUT}.")
+
+    if stage == "window":
+        real_window = advice_module.build_window_payload
+
+        def window(picks: EntryPicks, *args: Any, window: int, **kwargs: Any) -> Any:
+            cut(picks.entry_id, f"{window}-week window")
+            return real_window(picks, *args, window=window, **kwargs)
+
+        monkeypatch.setattr(advice_module, "build_window_payload", window)
+    elif stage == "rival":
+        real_advise = league_views_module.advise_entry
+
+        def advise(request: Any, **kwargs: Any) -> Any:
+            if request.rival_entry_id is not None:
+                cut(request.entry_id, f"{request.strategy} pair")
+            return real_advise(request, **kwargs)
+
+        monkeypatch.setattr(league_views_module, "advise_entry", advise)
+    else:
+        real_control = league_views_module.solve_member_control
+
+        def control(picks: EntryPicks, *args: Any) -> Any:
+            cut(picks.entry_id, "one-week plan")
+            return real_control(picks, *args)
+
+        monkeypatch.setattr(league_views_module, "solve_member_control", control)
+
+    inputs, projection, rules = _world_context(world)
+    snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
+    handoff = read_projection_handoff(world_module._handoff(world))
+    report = build_league_views(
+        _Provider(
+            {
+                101: _member_picks(world, 101, _legal_squad(world)),
+                202: _member_picks(world, 202, _squad_b(world)),
+            }
+        ),
+        tuple(
+            EntryRegistration(entry_id, f"member-{entry_id}", "2026-08-23T00:00:00Z")
+            for entry_id in (101, 202)
+        ),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings=_standings(101, 202),
+        now=datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC),
+        horizon_builder=member_horizon_builder(snapshot, season=SEASON, in_season=handoff),
+    )
+    by_id = {member.entry_id: member for member in report.members}
+    files = set(report.files)
+    # The second member is untouched by the first member's error.
+    assert by_id[202].rendered
+    assert {"entries/202.json", "advice/202/saf-puan/1.json", "advice/202/index.json"} <= files
+    assert CLOCK_CUT not in by_id[202].reason
+    index = json.loads((tmp_path / "league/advice/101/index.json").read_text(encoding="utf-8"))[
+        "payload"
+    ]
+    if stage == "baseline":
+        # No plan at all: the member is refused, with the solver's words on their note.
+        assert not by_id[101].rendered and CLOCK_CUT in by_id[101].reason
+        assert "advice/101/saf-puan/1.json" not in files
+        assert index["computed"] == [] and not any(index["windows"].values())
+        return
+    assert by_id[101].rendered and "advice/101/saf-puan/1.json" in files
+    if stage == "window":
+        assert f"saf-puan 3 weeks not solved: The 3-week window for entry 101 {CLOCK_CUT}" in (
+            by_id[101].reason
+        )
+        assert index["windows"]["saf-puan"] == [1]
+        stated = [
+            (row["strategy"], row["rival_entry_id"], row["window"], row["reason"])
+            for row in index["unavailable"]
+            if "window" in row
+        ]
+        assert stated == [
+            ("saf-puan", None, 3, "not_solved_for_member"),
+            ("saf-puan", None, 5, "not_solved_for_member"),
+        ]
+    else:
+        assert f"ortak-koru vs 202 not solved: The ortak-koru pair for entry 101 {CLOCK_CUT}" in (
+            by_id[101].reason
+        )
+        assert index["computed"] == []
+        pairs = [
+            (row["strategy"], row["rival_entry_id"], row["reason"])
+            for row in index["unavailable"]
+            if "window" not in row
+        ]
+        assert pairs == [
+            ("ortak-koru", 202, "not_solved_for_member"),
+            ("fark-yarat", 202, "not_solved_for_member"),
+        ]
+
+
 def test_the_mapper_is_only_a_scheduler(world: dict[str, Any], tmp_path: Path) -> None:
     """A pool's map and the built-in map produce the same tree, byte for byte."""
 
