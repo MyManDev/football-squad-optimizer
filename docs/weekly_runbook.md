@@ -48,6 +48,14 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 Before publishing, run `python -m scripts.check_league_tree <preview>/data` against the
 candidate tree, or use the publication worktree's `web/public/data`. It runs the wider
 menu, Top 100 and manager's-word release checks and exits non-zero on any finding.
+It expects what each member's `advice/<id>/index.json` declares: an absence the index
+states in the producer's shape with a string reason (the menu a `--skip-top100` run leaves
+out, a window or rival pair listed in `unavailable`, a member with no advice this week) is
+printed as a stated absence and is not a finding, while a document the index names and the
+tree lacks is (the one-week `saf-puan/1.json` included), and so is an index that fails the
+page's `assertAdviceIndex` (the envelope is not checked) or a Top 100 menu, an `unavailable`
+row or a refused member stated without its reason. The manager's word and the chip menu are
+read as the producer writes them; their absences are not checked for a reason.
 Pass a site origin URL instead to check its published `/data/league/` documents. The URL
 form is narrower: its figure sweep covers only the word files it fetches, while the local
 check sweeps every word file under the supplied root. This command only reads the tree;
@@ -179,6 +187,12 @@ net columns beside it.
   id that `--rotation` then reads. It runs **before** the capture, for the reason above, and
   its roster comes from a capture already on disk so its only network reach is the club hosts
   the registry names.
+- **The club-news capture runs on the machine that publishes, not beside it.** `--rotation-capture`
+  is resolved against the run's own `data/snapshots`, so a capture written into a different
+  checkout is a capture the run cannot see. That machine is the one holding `data/entries`,
+  `data/ledger`, `data/handoffs` and `data/advice_records`, which the league and publish stages
+  read and which are gitignored and local; a clone without them can capture club news and export
+  rotation evidence, and can do nothing else in this list.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
@@ -325,8 +339,9 @@ the ten per UTC day. A prior preview without `--publish` cannot acquire it on re
 use a new run ID, with the
 explicit capture/evidence reuse options above if appropriate. An actual resume repeats
 the original options unchanged. A used suffix refuses before the expensive stages.
-Rebuilding the captures dated 12, 15, 17 or 18 September 2026, already recorded by
-older code, requires `python -m scripts.build_league_site` with `--no-advice-record`;
+Rebuilding a capture already recorded by older code (those dated 12, 15, 17 or 18
+September 2026, and any whose record's `told.source` is not `page_default`) requires
+`python -m scripts.build_league_site` with `--no-advice-record`;
 the weekly runner has no skip-recording switch and otherwise refuses only at the end
 of the league stage.
 
