@@ -1,11 +1,12 @@
 """The POST: a hit, one open job per request, idempotency, CORS, and rate limits."""
 
 import json
+import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Event, Lock, Thread
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,6 +24,7 @@ from squadopt.platform.advice_read import (
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
+    SubmitOutcome,
 )
 from squadopt.platform.jobs_contract import AdviceJob, JobError
 
@@ -944,3 +946,60 @@ def test_two_meanings_under_one_address_is_a_conflict(tmp_path: Path) -> None:
     response = client.post(ADVICE_URL, json=BODY)
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "REQUEST_CONFLICT"
+
+
+def test_a_slow_submit_does_not_hold_other_requests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    services: list[AdviceSubmitService] = []
+    client, _cache, queue = _world(tmp_path, submit_services=services)
+    submit = services[0].submit
+    entered, release = Event(), Event()
+
+    def slow_submit(**fields: object) -> SubmitOutcome:
+        entered.set()
+        # Sleeps until the test lets it go; the bound makes a regression fail, not hang.
+        release.wait(timeout=5)
+        return submit(**fields)
+
+    monkeypatch.setattr(services[0], "submit", slow_submit)
+    # One client is one event loop, shared by both requests as uvicorn's one loop is.
+    with TestClient(client.app) as shared, ThreadPoolExecutor(max_workers=1) as poster:
+        pending = poster.submit(shared.post, ADVICE_URL, json=BODY)
+        assert entered.wait(timeout=10)
+        health = shared.get("/health")
+        answered_while_submitting = not pending.done()
+        release.set()
+        accepted = pending.result(timeout=10)
+    assert health.status_code == 200
+    assert answered_while_submitting
+    assert accepted.status_code == 202
+    assert [job.job_id for job in queue.jobs()] == [accepted.json()["job_id"]]
+
+
+def test_the_rate_limiter_counts_every_thread() -> None:
+    limiter = FixedWindowRateLimiter(2000, 3600.0)
+    allowed: list[int] = []
+    tally = Lock()
+    start = Barrier(8)
+
+    def spend() -> None:
+        start.wait(timeout=10)
+        mine = sum(limiter.allow("ip:203.0.113.9") for _ in range(500))
+        with tally:
+            allowed.append(mine)
+
+    # A tiny switch interval makes the threads interleave inside allow; unlocked, the
+    # read and the write of one bucket's count raced and let far more than the limit in.
+    interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        threads = [Thread(target=spend) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+    finally:
+        sys.setswitchinterval(interval)
+    assert len(allowed) == 8
+    assert sum(allowed) == 2000

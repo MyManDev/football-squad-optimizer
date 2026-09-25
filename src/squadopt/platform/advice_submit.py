@@ -30,6 +30,7 @@ is the discipline around that one write:
 from __future__ import annotations
 
 import math
+import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -108,17 +109,21 @@ class FixedWindowRateLimiter:
         self.window_seconds = self._window
         self._clock = clock
         self._counts: dict[str, tuple[float, int]] = {}
+        # The api runs submissions in its thread pool, so two requests can count one
+        # bucket at once; without the lock both read the same count and one is lost.
+        self._lock = threading.Lock()
 
     def allow(self, bucket: str) -> bool:
-        now = self._clock()
-        started, count = self._counts.get(bucket, (now, 0))
-        if now - started >= self._window:
-            started, count = now, 0
-        if count >= self._limit:
-            self._counts[bucket] = (started, count)
-            return False
-        self._counts[bucket] = (started, count + 1)
-        return True
+        with self._lock:
+            now = self._clock()
+            started, count = self._counts.get(bucket, (now, 0))
+            if now - started >= self._window:
+                started, count = now, 0
+            if count >= self._limit:
+                self._counts[bucket] = (started, count)
+                return False
+            self._counts[bucket] = (started, count + 1)
+            return True
 
 
 @dataclass(frozen=True, slots=True)
