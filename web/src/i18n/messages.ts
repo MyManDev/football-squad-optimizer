@@ -948,9 +948,14 @@ const en = {
     // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
     squadAfterTitle: "Squad after the transfers",
     squadOwnPoints: (points: string) => `captain doubled: ${points} xP`,
-    /** The unit after a player's expected points where a row has room for one short word. */
+    /** The unit after a player's expected points in the held squad's rows. */
     pointsUnit: "xP",
-    /** The same unit as a screen reader hears it after a figure the plate prints alone. */
+    /**
+     * The printed unit where the line is tightest, the decision's captain line and the
+     * plan's list rows, in both languages: shown, but not read out.
+     */
+    pointsUnitAbbreviation: "xP",
+    /** The unit as a screen reader hears it after a figure: plates, bench, captain, rows. */
     pointsUnitSpoken: "xP",
     attackDirection: "Direction of attack",
     pitchHorizontal: "Goalkeeper on the left, attacking to the right.",
@@ -2040,7 +2045,7 @@ const tr: MessageSchema<typeof en> = {
     freshnessScored: (gameweek, published) => `Son puanlanan hafta: ${gameweek} · ${published}`,
     freshnessNoScored: "kayıt yok",
     freshnessNote:
-      "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri görüntüsü gerekir. Erken planlar son dakika kadro bilgisi içermez.",
+      "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri çekimi gerekir. Erken planlar son dakika kadro bilgisi içermez.",
     freshnessPlayed:
       "Bu karar haftası artık oynandı; sonuçlarla geriye dönük yeniden tahmin yapılmadı. Yeni haftanın karar verisi bekleniyor.",
     advancedSettings: "Gelişmiş ayarlar",
@@ -2049,6 +2054,7 @@ const tr: MessageSchema<typeof en> = {
     squadAfterTitle: "Kadro, transferlerden sonra",
     squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} beklenen puan`,
     pointsUnit: "puan",
+    pointsUnitAbbreviation: "xP",
     pointsUnitSpoken: "beklenen puan",
     attackDirection: "Hücum yönü",
     pitchHorizontal: "Kaleci solda, hücum sağa doğru.",

@@ -414,8 +414,15 @@ describe("the gain strip and the captain line", () => {
     const line = within(decision).getByText("Haaland").closest("p")!;
     expect(line).toHaveTextContent("Kaptan");
     expect(line).toHaveTextContent("MCI");
-    expect(line).toHaveTextContent(`8,0 ${MESSAGES.tr.leagueMembers.pointsUnit}`);
-    expect(line).not.toHaveTextContent("xP");
+    // The tight line prints the short unit and a screen reader hears it in words: the
+    // "xP" is hidden from assistive technology and "beklenen puan" is hidden from sight.
+    const copy = MESSAGES.tr.leagueMembers;
+    expect(line).toHaveTextContent(`8,0 ${copy.pointsUnitAbbreviation}`);
+    expect(within(line).getByText(copy.pointsUnitAbbreviation)).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(within(line).getByText(copy.pointsUnitSpoken)).toHaveClass("visually-hidden");
     expect(line).toHaveTextContent("Yedek kaptan");
     expect(within(line).getByText("Fernandes")).toBeInTheDocument();
   });

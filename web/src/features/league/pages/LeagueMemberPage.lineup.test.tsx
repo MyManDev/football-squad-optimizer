@@ -18,10 +18,24 @@ import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
-/** A row's figure and its Turkish unit, "8,0 puan": the list never prints the English "xP". */
-const UNIT = MESSAGES.tr.leagueMembers.pointsUnit;
-const FIGURE_IN_POINTS = new RegExp(`^-?\\d+(,\\d+)? ${UNIT}$`);
-const FIGURE_IN_POINTS_ANYWHERE = new RegExp(`\\d ${UNIT}|xP`);
+/**
+ * A row's figure and its unit: "8,0 xP" on screen, with "xP" hidden from a screen reader and
+ * "beklenen puan" read out in its place.
+ */
+const PRINTED = MESSAGES.tr.leagueMembers.pointsUnitAbbreviation;
+const SPOKEN = MESSAGES.tr.leagueMembers.pointsUnitSpoken;
+function figureCells(list: HTMLElement): HTMLElement[] {
+  const printed = within(list).queryAllByText(PRINTED);
+  const spoken = within(list).queryAllByText(SPOKEN);
+  expect(printed.every((unit) => unit.getAttribute("aria-hidden") === "true")).toBe(true);
+  expect(spoken.every((unit) => unit.classList.contains("visually-hidden"))).toBe(true);
+  expect(spoken.map((unit) => unit.parentElement)).toEqual(
+    printed.map((unit) => unit.parentElement),
+  );
+  const values = printed.map((unit) => unit.parentElement!);
+  for (const value of values) expect(value.textContent).toMatch(/^-?\d+(,\d+)? /);
+  return values;
+}
 
 afterEach(cleanup);
 
@@ -71,7 +85,7 @@ describe("the advice card carries the whole decision", () => {
     expect(within(lineup).getAllByText(payload.vice_captain!.name).length).toBeGreaterThan(0);
     // The bench is listed in the producer's order, goalkeeper first.
     expect(payload.bench![0]!.position).toBe("GK");
-    const rows = within(lineup).getAllByText(FIGURE_IN_POINTS);
+    const rows = figureCells(lineup);
     expect(rows).toHaveLength(15);
   });
 
@@ -124,9 +138,9 @@ describe("the advice card carries the whole decision", () => {
     }
     // The starter with no figure has neither a bar nor a number; the others have both.
     const silentRow = starters.find((row) => row.textContent!.includes(silent.name))!;
-    expect(silentRow.textContent).not.toMatch(FIGURE_IN_POINTS_ANYWHERE);
+    expect(silentRow.textContent).not.toMatch(new RegExp(`${PRINTED}|${SPOKEN}`));
     expect(silentRow.querySelector("[style]")).toBeNull();
-    expect(within(lineup).getAllByText(FIGURE_IN_POINTS)).toHaveLength(14);
+    expect(figureCells(lineup)).toHaveLength(14);
     const bars = lineup.querySelectorAll<HTMLElement>("li [style]");
     expect(bars).toHaveLength(14);
     // One scale for the whole list: at least eight points, and at least the biggest figure.

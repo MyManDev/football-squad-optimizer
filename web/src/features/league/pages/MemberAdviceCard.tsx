@@ -129,7 +129,7 @@ function adviceBasis(view: EntryAdvice, chipCopy: ChipCopy) {
 }
 
 /**
- * The proof stamp beside the decision heading. KANITLANDI · OPTIMAL only for a plan the
+ * The proof stamp beside the decision heading. KANITLANDI · OPTİMAL only for a plan the
  * solver proved (OPTIMAL); a plan it found without finishing the proof (FEASIBLE) keeps the
  * "proof incomplete" badge, and its gap sentence stands under the boards. Any other status
  * claims nothing.
@@ -796,6 +796,22 @@ function GainStrip({
   );
 }
 
+/**
+ * The unit after a figure where the line is tightest: the short "xP" on screen in both
+ * languages, and in Turkish the words "beklenen puan" for a screen reader, so neither the
+ * width nor the word "expected" is lost. Where the two agree it is plain text.
+ */
+function PointsUnit() {
+  const copy = useLanguage().messages.leagueMembers;
+  if (copy.pointsUnitAbbreviation === copy.pointsUnitSpoken) return <>{copy.pointsUnitSpoken}</>;
+  return (
+    <>
+      <span aria-hidden="true">{copy.pointsUnitAbbreviation}</span>
+      <span className="visually-hidden"> {copy.pointsUnitSpoken}</span>
+    </>
+  );
+}
+
 /** The armband: C, the captain, the club and the expected points; V and the vice-captain. */
 function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
   const { locale, messages } = useLanguage();
@@ -813,7 +829,7 @@ function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
         <ClubMark team={captain.team} codes={codes} />
         {finiteNumber(captain.expected_points) ? (
           <span className={board.armPoints}>
-            {figure(captain.expected_points, locale)} {copy.pointsUnit}
+            {figure(captain.expected_points, locale)} <PointsUnit />
           </span>
         ) : null}
       </span>
@@ -1379,7 +1395,11 @@ function LineupRow({
         <span />
       )}
       <span className={lineup.value}>
-        {xp !== null ? `${figure(xp, locale)} ${copy.pointsUnit}` : ""}
+        {xp !== null ? (
+          <>
+            {figure(xp, locale)} <PointsUnit />
+          </>
+        ) : null}
       </span>
     </li>
   );
