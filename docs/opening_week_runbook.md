@@ -122,7 +122,9 @@ week's scores are final. `bootstrap-static.json`'s event then carries `finished:
 is impossible by design, and a settle taken from provisional points would write a wrong
 outcome into a ledger that does not permit corrections.
 
-Then capture again (the later bootstrap carries realized `event_points`) and settle:
+Then capture again (the capture keeps the week's own `event-gw01-live.json`, which settle
+scores; the bootstrap's `event_points` are never read, because they follow whichever week is
+current) and settle:
 
 ```console
 squadopt gameweek settle --gameweek 1
@@ -227,7 +229,8 @@ is held (or when a decided gameweek needs a post-gameweek capture to settle, pol
 most every 12 h after a 48 h grace); **decide** when an in-window capture exists and the
 gameweek is undecided — GW1 from the capture alone, later gameweeks only if the
 producer's handoff `data/handoffs/<season>-gwNN.json` is present, otherwise it waits and
-names the path; **settle** when the latest capture marks a decided gameweek finished.
+names the path; **settle** when the latest capture marks a decided gameweek finished and
+checked.
 After a capture it re-plans once, so a deadline capture is decided in the same tick.
 Everything is idempotent — a second tick in the same state does nothing — and every
 step is the same code as the manual commands; the tick only chooses the moment. It

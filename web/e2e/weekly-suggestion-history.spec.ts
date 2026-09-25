@@ -8,7 +8,9 @@ import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
 test.beforeEach(async ({ page }) => {
-  // These acceptance tests are offline; a remote font must not hold document load open.
+  // Nothing here reaches past the local preview: the one test that opens a member page
+  // installs the league mocks, which refuse the advice API, and the remote font stylesheet
+  // is answered empty so it cannot hold document load open.
   await page.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ contentType: "text/css", body: "" }),
   );

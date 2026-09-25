@@ -573,6 +573,8 @@ const en = {
     viewerBody:
       "Pick your own row to get advice from your squad. Select again whenever you reopen or refresh the site. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
     viewerSelect: "This is me",
+    /** The button's accessible name: its visible words first, then whose row it is. */
+    viewerSelectFor: (manager: string, team: string) => `This is me: ${manager}, ${team}`,
     viewerYouBadge: "you",
     viewerPrompt: "Pick your row with “This is me”; the choice lasts for this visit only.",
     viewerSelected: (name: string) =>
@@ -946,6 +948,13 @@ const en = {
     // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
     squadAfterTitle: "Squad after the transfers",
     squadOwnPoints: (points: string) => `captain doubled: ${points} xP`,
+    /**
+     * The printed unit on the tight lines (the decision's captain line, the plan's list rows,
+     * the held squad's rows), in both languages: shown, but not read out.
+     */
+    pointsUnitAbbreviation: "xP",
+    /** The unit as a screen reader hears it after a figure: plates, bench, captain, rows. */
+    pointsUnitSpoken: "xP",
     attackDirection: "Direction of attack",
     pitchHorizontal: "Goalkeeper on the left, attacking to the right.",
     pitchVertical: "Goalkeeper at the bottom, attacking upwards.",
@@ -1024,9 +1033,9 @@ const en = {
   reasonCodes: {
     no_capture: () => "no capture is held; the calendar is unknown",
     settle_due: (p: ReasonParams) =>
-      `gameweek ${p.gameweek} is finished in the latest capture and its decision has no outcome`,
+      `gameweek ${p.gameweek} is finished and checked in the latest capture and its decision has no outcome`,
     recapture_for_outcome: (p: ReasonParams) =>
-      `gameweek ${p.gameweek} was decided but is not marked finished; the capture is ${p.capture_age_hours} h old`,
+      `gameweek ${p.gameweek} was decided but is not yet marked finished and checked; the capture is ${p.capture_age_hours} h old`,
     await_outcome: (p: ReasonParams) =>
       `gameweek ${p.gameweek} awaits its outcome; next look after ${p.recapture_hours} h`,
     deadline_missed: (p: ReasonParams) =>
@@ -1655,10 +1664,10 @@ const tr: MessageSchema<typeof en> = {
     unknown: "Bilinmiyor",
     chipsTitle: "Çipler",
     chipsMissing: "Çip bilgisi yok",
-    asOf: (week) => `GW${week} öncesi`,
+    asOf: (week) => `${week}. hafta öncesi`,
     halves: { first_half: "İlk yarı", second_half: "İkinci yarı" },
-    window: (start, stop) => `GW${start} ile GW${stop}`,
-    used: (week) => `GW${week}'te kullanıldı`,
+    window: (start, stop) => `${start}. ile ${stop}. hafta arası`,
+    used: (week) => `${week}. haftada kullanıldı`,
     noWindow: "Yayımlanmış pencere yok",
     states: {
       available: "Kullanılabilir",
@@ -1685,7 +1694,7 @@ const tr: MessageSchema<typeof en> = {
       "Hesapla saf puanı bir, üç ve beş haftada, rakip seçilmiş bir stratejiyi ise bir haftada destekler. Rakip stratejisi daha uzun pencerede hesaplanmaz.",
     computeProvenance: (capture: string, at: string) =>
       `Veri çekimi ${capture}, sonuç tarihi ${at}.`,
-    computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
+    computeStaticFallback: "Hesaplama servisine ulaşılamadı; bu, önceden yayınlanmış plan.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
     computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, okunabilir.",
     adviceComputedBadge: "Hesap sonucu",
@@ -1697,6 +1706,7 @@ const tr: MessageSchema<typeof en> = {
     viewerBody:
       "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Siteyi yeniden açtığında veya yenilediğinde tekrar seçim yapmalısın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
     viewerSelect: "Bu benim",
+    viewerSelectFor: (manager: string, team: string) => `Bu benim: ${manager}, ${team}`,
     viewerYouBadge: "sen",
     viewerPrompt: "Satırındaki “Bu benim” ile kendini seç; seçim yalnız bu ziyarette tutulur.",
     viewerSelected: (name: string) =>
@@ -1876,7 +1886,7 @@ const tr: MessageSchema<typeof en> = {
     adviceUnreadable: "Bu üyenin önerisi okunamadı.",
     adviceUnreadableBody:
       "Bu sayfadaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
-    freeHitSquadBasis: (week: number) => `Free Hit oynadın; bu öneri GW ${week} kadrona göre.`,
+    freeHitSquadBasis: (week: number) => `Free Hit oynadın; bu öneri ${week}. hafta kadrona göre.`,
     squadBasisUnconfirmed:
       "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
     entryNotAvailable: "Bu üyenin kadro belgesi yayımlanmamış.",
@@ -1904,7 +1914,7 @@ const tr: MessageSchema<typeof en> = {
     leaderMark: "lider",
     noPreviousRank: "Önceki sıra bilinmiyor",
     movementNote:
-      "Hareket, oyunun bu yakalamada bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
+      "Hareket, oyunun bu veri çekiminde bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
     unknown: "bilinmiyor",
     newMember: "yeni",
     movementLabel: (movement, places) =>
@@ -2020,7 +2030,7 @@ const tr: MessageSchema<typeof en> = {
     freeTransfersKeptUnderChip: (chip, free) =>
       `${chip}: eldeki ${free} ücretsiz transfer kullanılmaz`,
     hitPointsFact: (points) => `${points} ceza puanı`,
-    stampOptimal: "KANITLANDI · OPTIMAL",
+    stampOptimal: "KANITLANDI · OPTİMAL",
     stampOptimalCaption: "Kendi hedefine göre en iyi plan olduğu kanıtlandı.",
     captainMark: "C",
     viceMark: "V",
@@ -2033,14 +2043,16 @@ const tr: MessageSchema<typeof en> = {
     freshnessScored: (gameweek, published) => `Son puanlanan hafta: ${gameweek} · ${published}`,
     freshnessNoScored: "kayıt yok",
     freshnessNote:
-      "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri görüntüsü gerekir. Erken planlar son dakika kadro bilgisi içermez.",
+      "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri çekimi gerekir. Erken planlar son dakika kadro bilgisi içermez.",
     freshnessPlayed:
       "Bu karar haftası artık oynandı; sonuçlarla geriye dönük yeniden tahmin yapılmadı. Yeni haftanın karar verisi bekleniyor.",
     advancedSettings: "Gelişmiş ayarlar",
     decisionTools: "Karar araçları",
     chipsAndTransfers: "Çipler ve transfer hakkı",
     squadAfterTitle: "Kadro, transferlerden sonra",
-    squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} xP`,
+    squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} beklenen puan`,
+    pointsUnitAbbreviation: "xP",
+    pointsUnitSpoken: "beklenen puan",
     attackDirection: "Hücum yönü",
     pitchHorizontal: "Kaleci solda, hücum sağa doğru.",
     pitchVertical: "Kaleci altta, hücum yukarı doğru.",
@@ -2096,15 +2108,15 @@ const tr: MessageSchema<typeof en> = {
       ownThisWeek: "Senin seçimin · bu hafta",
       hold: "Sakla",
       autoHonesty:
-        "Saklama değerleri seçilen modelin bu yakalamadaki fırsatlarından hesaplanan bir yaklaşımdır. Sezon boyunca üstünlük veya tam stokastik MDP kanıtı değildir. Sonraki tarihler yeni veride yeniden planlanır.",
+        "Saklama değerleri, seçilen modelin bu veri çekimindeki gelecek fırsatlarından yaklaşık olarak hesaplanır. Sezon boyunca daha iyi sonuç verdiklerini kanıtlamaz; sezonun geri kalanını baştan sona çözen bir plan da değildir. Sonraki haftalar yeni veriyle yeniden planlanır.",
       autoFuture:
         "Gelecek fırsatlar sabit bir dağılım varsayar; sakatlıklar ve çipler arası rekabet bu değeri değiştirebilir. Wildcard'ın tahmin penceresi dışındaki uzun vadeli etkisi ölçülmüş değildir.",
       expiry: "son hafta",
       holdingValue: "saklama değeri",
       opportunities: "pencere sonrası fırsat",
       utilityNote: (weight) =>
-        `Top 100 ağırlığı ${weight}. Saklama değeri ve çözüm açığı seçim faydası birimindedir; maç puanı tahmini değildir.`,
-      solverGap: "Çözüm açığı",
+        `Top 100 ağırlığı ${weight}. Saklama değeri ve kanıtın açık bıraktığı fark, planlayıcının seçim yaparken kullandığı ölçektedir; maç puanı tahmini değildir.`,
+      solverGap: "Kanıtın açık bıraktığı fark",
       holdChips: "Çipleri sakla",
       automatic: "Otomatik strateji",
       switchesOff:
@@ -2117,9 +2129,9 @@ const tr: MessageSchema<typeof en> = {
   reasonCodes: {
     no_capture: () => "elde capture yok; takvim bilinmiyor",
     settle_due: (p: ReasonParams) =>
-      `oyun haftası ${p.gameweek} son capture'da bitmiş görünüyor ve kararının sonucu işlenmemiş`,
+      `oyun haftası ${p.gameweek} son veri çekiminde bitmiş ve kontrol edilmiş görünüyor, kararının sonucu henüz işlenmedi`,
     recapture_for_outcome: (p: ReasonParams) =>
-      `oyun haftası ${p.gameweek} karara bağlandı ama bitmiş işaretli değil; capture ${p.capture_age_hours} saatlik`,
+      `oyun haftası ${p.gameweek} karara bağlandı ama henüz bitmiş ve kontrol edilmiş olarak işaretli değil; veri çekimi ${p.capture_age_hours} saatlik`,
     await_outcome: (p: ReasonParams) =>
       `oyun haftası ${p.gameweek} sonucunu bekliyor; ${p.recapture_hours} saat sonra tekrar bakılacak`,
     deadline_missed: (p: ReasonParams) =>

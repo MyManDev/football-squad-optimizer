@@ -414,23 +414,33 @@ describe("the gain strip and the captain line", () => {
     const line = within(decision).getByText("Haaland").closest("p")!;
     expect(line).toHaveTextContent("Kaptan");
     expect(line).toHaveTextContent("MCI");
-    expect(line).toHaveTextContent("8,0 xP");
+    // The tight line prints the short unit and a screen reader hears it in words: the
+    // "xP" is hidden from assistive technology and "beklenen puan" is hidden from sight.
+    const copy = MESSAGES.tr.leagueMembers;
+    expect(line).toHaveTextContent(`8,0 ${copy.pointsUnitAbbreviation}`);
+    expect(within(line).getByText(copy.pointsUnitAbbreviation)).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(within(line).getByText(copy.pointsUnitSpoken)).toHaveClass("visually-hidden");
     expect(line).toHaveTextContent("Yedek kaptan");
     expect(within(line).getByText("Fernandes")).toBeInTheDocument();
   });
 });
 
 describe("the proof stamp", () => {
-  it("says KANITLANDI · OPTIMAL only for a proven plan", () => {
+  it("says KANITLANDI · OPTİMAL only for a proven plan", () => {
     show("tr");
-    expect(screen.getByText("KANITLANDI · OPTIMAL")).toBeInTheDocument();
+    // Turkish capitals: the dotted İ, never the English I.
+    expect(MESSAGES.tr.leagueMembers.stampOptimal).toBe("KANITLANDI · OPTİMAL");
+    expect(screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal)).toBeInTheDocument();
     expect(screen.getByText(MESSAGES.tr.leagueMembers.stampOptimalCaption)).toBeInTheDocument();
   });
 
   it("keeps the unproven badge and the gap sentence for a plan found without a proof", () => {
     show("tr", { advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }) });
     const copy = MESSAGES.tr.leagueMembers;
-    expect(screen.queryByText("KANITLANDI · OPTIMAL")).toBeNull();
+    expect(screen.queryByText(copy.stampOptimal)).toBeNull();
     expect(screen.getAllByText(copy.unprovenPlanBadge)).toHaveLength(1);
     expect(screen.getByText(copy.unprovenPlanBody("1,3"))).toBeInTheDocument();
   });
@@ -439,7 +449,7 @@ describe("the proof stamp", () => {
     const advice = twoMoves();
     delete (advice.payload as { solver_status?: string }).solver_status;
     show("en", { advice });
-    expect(screen.queryByText("PROVEN · OPTIMAL")).toBeNull();
+    expect(screen.queryByText(MESSAGES.en.leagueMembers.stampOptimal)).toBeNull();
     expect(screen.queryByText(MESSAGES.en.leagueMembers.unprovenPlanBadge)).toBeNull();
   });
 });
