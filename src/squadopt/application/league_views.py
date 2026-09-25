@@ -250,11 +250,12 @@ def render_member(
     seam. One rival that cannot be priced — a band the squad cannot satisfy, a rival
     with players the projection lacks — is recorded as unavailable with its reason and
     the rest of the menu renders; a window that cannot be solved — a calendar the
-    capture does not publish that far, no plan inside the budget, a search the wall
-    clock cut short — is recorded the same way, never dropped silently; a baseline that
-    fails takes the member out of the menu entirely, with the reason on the members row.
-    The baseline, rival and window solves catch ``MEMBER_SOLVE_ERRORS``, so a failure
-    there stays this member's and does not cost the other members their advice.
+    capture does not publish that far, no plan inside the budget — is recorded the same
+    way, never dropped silently; a baseline that fails takes the member out of the
+    menu entirely, with the reason on the members row. The baseline, rival and window
+    solves catch ``MEMBER_SOLVE_ERRORS`` (a window the wall clock cut short raises
+    ``SolverExecutionError``), so a failure there stays this member's and does not cost
+    the other members their advice.
     """
 
     try:
