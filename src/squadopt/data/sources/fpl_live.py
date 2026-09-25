@@ -1774,13 +1774,13 @@ def fpl_entry_history_points(history: bytes, *, entry_id: int) -> tuple[EntryGam
 def scored_gameweeks(bootstrap: bytes) -> frozenset[int]:
     """Return the gameweeks whose points are final: finished **and** checked.
 
-    ``finished`` alone is what ``live/ledger.py`` gates our own realized outcome on, and it
-    is not enough for a score published to a reader. Bonus is added per fixture, so a score
-    read before it lands is short by up to three points per player and short by *different*
-    amounts for different players — biased rather than noisy, and it does not average out
-    across a squad. Gameweek 1 was measured sitting at ``finished: false, data_checked:
-    false`` eight and a half hours after its last kick-off with every fixture at ninety
-    minutes, so the gap this guards against is hours wide rather than minutes.
+    ``finished`` alone is not enough for a score published to a reader, nor for the realized
+    outcome ``live/ledger.py`` records, which requires both flags as well. Bonus is added per
+    fixture, so a score read before it lands is short by up to three points per player and
+    short by *different* amounts for different players: biased rather than noisy, and it does
+    not average out across a squad. Gameweek 1 was measured sitting at ``finished: false,
+    data_checked: false`` eight and a half hours after its last kick-off with every fixture at
+    ninety minutes, so the gap this guards against is hours wide rather than minutes.
     """
 
     document = _document(bootstrap, "Bootstrap")
