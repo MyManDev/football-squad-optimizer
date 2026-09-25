@@ -411,11 +411,11 @@ class AdviceReadStore:
             "top100": {"available": top100, "weights": list(TOP100_WEIGHTS) if top100 else [0]},
             "managers_word": {"available": word},
             "preferences": {"available": True},
+            # No "strategy" entry: the automatic chip strategy is not offered. Its value
+            # for holding a chip comes from the window's own weeks, so it can never beat
+            # the window's best week and spends the chip there however much season is left
+            # (audit 2026-09-25, H3). ``validate_advice_selection`` refuses ``chip="auto"``.
             "chips": {
-                "strategy": {
-                    "version": "model_opportunity_reservation_v1",
-                    "windows": [1, 3, 5],
-                },
                 "held_by_entry": {
                     str(entry): list(held) for entry, held in chips.items() if held is not None
                 },

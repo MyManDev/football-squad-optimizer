@@ -94,10 +94,14 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     .filter({ has: page.locator(`a[href="/league/members/${context.entryId}"]`) })
     .getByRole("button", { name: "Bu benim", exact: true })
     .click();
-  expect(await (await capabilities).json()).toMatchObject({
+  const offered = await (await capabilities).json();
+  expect(offered).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
   });
+  // The automatic chip strategy is not offered (audit 2026-09-25, H3).
+  expect(offered.chips).toBeDefined();
+  expect(offered.chips).not.toHaveProperty("strategy");
   await expect(
     page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer"),
   ).toBeVisible();
@@ -194,17 +198,6 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
       payload: { mode: "ortak-koru", rival_entry_id: context.rivalId },
     },
     {
-      query: "chip=auto&top100=20",
-      body: {
-        strategy: "saf-puan",
-        window: 1,
-        rival_entry_id: null,
-        chip: "auto",
-        top100_weight: 20,
-      },
-      payload: { mode: "saf-puan", chip_strategy: { requested_chip: "auto", top100_weight: 20 } },
-    },
-    {
       query: "chip=bboost",
       body: { strategy: "saf-puan", window: 1, rival_entry_id: null, chip: "bboost" },
       payload: { mode: "saf-puan", chip_choice: { chip: "bboost" } },
@@ -237,18 +230,11 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     });
     await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
     await expect(advice).toBeVisible();
-    if (selection.body.chip === "auto") {
-      await expect(
-        page.getByRole("radio", { name: "Otomatik strateji", exact: true }),
-      ).toBeChecked();
-      await expect(page.getByTestId("chip-strategy")).toBeVisible();
-      await expect(page.getByTestId("chip-strategy")).toContainText("saklama değeri");
-    }
     for (const move of selectedAnswer.payload.moves) {
       if (move.player_in) await expect(advice).toContainText(move.player_in.name);
     }
   }
-  expect(jobs.size).toBe(5);
+  expect(jobs.size).toBe(4);
 
   // Last step only: restore the real published plan, then stop this fixture's API tree.
   const baseline = JSON.parse(await readFile(context.baselineCopy, "utf8"));

@@ -6,6 +6,21 @@ with the selected current/football forecast, 1/3/5-week windows and supported To
 weights. Named chips in longer windows remain instructions for **this week only**.
 Manager-word/rival variants do not acquire chip support implicitly.
 
+**Status since the 2026-09-25 audit (H3): the automatic strategy is not offered to
+members.** The capabilities no longer carry `chips.strategy`, and a request with
+`chip="auto"` is refused with `UNSUPPORTED_ADVICE_REQUEST` before a job exists. The
+reason is the tail below: V(n) never exceeds the largest sample, and the samples
+are the window's own weeks, so holding can never beat the window's best week. In
+the synthetic check in `tests/unit/test_chip_strategy.py`, a Triple Captain or Bench
+Boost right with eleven dates left after a three-week window is spent inside it.
+It returns when the tail values the captured season calendar (fixture counts,
+doubles) instead of the window's weeks. The planner stays in the code for research,
+and the same test file carries the expected failure that flips then.
+The member page reads `chips.strategy` as the switch for every chip choice beyond
+the one-week plan, so without it the page offers a named chip on the one-week plan
+without a Top100 setting only. The backend still computes named chips over 3 and 5
+weeks and with Top100.
+
 ## Decision model
 
 The existing CP-SAT transfer model jointly chooses transfers, squad, eleven,

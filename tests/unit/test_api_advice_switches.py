@@ -485,10 +485,8 @@ def test_capabilities_say_what_may_be_asked_right_now(tmp_path: Path) -> None:
         "top100": {"available": True, "weights": list(TOP100_WEIGHTS)},
         "managers_word": {"available": True},
         "preferences": {"available": True},
-        "chips": {
-            "held_by_entry": {},
-            "strategy": {"version": "model_opportunity_reservation_v1", "windows": [1, 3, 5]},
-        },
+        # No automatic chip strategy is offered (audit 2026-09-25, H3).
+        "chips": {"held_by_entry": {}},
     }
     jsonschema.validate(document, league_capabilities_schema())
 

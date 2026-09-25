@@ -332,3 +332,17 @@ it.each([1, 3, 5])("offers automatic chip timing with Top100 over %i weeks", (wi
     resolve(`chip=auto&window=${window}`, { ...caps, chipsByEntry: {} }).request.chip,
   ).not.toBe("auto");
 });
+
+it.each([1, 3, 5])(
+  "offers no automatic chip timing over %i weeks without its capability",
+  (window) => {
+    // Audit 2026-09-25, H3: the backend no longer advertises the chip strategy. The
+    // "Automatic strategy" radio renders only when computable.chipStrategy is true.
+    const caps: AdviceCapabilities = { ...WHOLE_MENU, chipsByEntry: { [ENTRY]: ["3xc"] } };
+    for (const link of [`chip=auto&window=${window}`, `chip=auto&window=${window}&top100=20`]) {
+      const selection = resolve(link, caps);
+      expect(selection.computable?.chipStrategy).toBe(false);
+      expect(selection.request.chip).not.toBe("auto");
+    }
+  },
+);
