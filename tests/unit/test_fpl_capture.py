@@ -2,7 +2,8 @@
 
 Nothing here touches a network: `fetch` is exercised against a fake opener and `capture`
 against a fake `fetch`. The sleeps are injected so the backoff is asserted rather than
-waited out.
+waited out. The one test whose claim is about what http.client itself does with a body
+cut off talks to a server on the loopback interface, in this process, instead.
 """
 
 import http.client
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.fixtures.loopback_http import DIRECT_OPENER, serving, status_head
 
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION
 from squadopt.data.errors import DataError, DataSourceError
@@ -203,6 +205,38 @@ def test_a_body_cut_short_inside_the_real_reader_is_a_data_error(
     with pytest.raises(DataSourceError, match="IncompleteRead"):
         fpl_capture.fetch(URL, attempts=2, sleeper=lambda _: None)
     assert opened == [URL, URL]
+
+
+#: The same two bytes of a payload, sent under each framing a body can have, and cut off.
+CUT_OFF_ANSWERS: dict[str, bytes] = {
+    "content-length": status_head(Content_Type="application/json", Content_Length="900") + b'{"',
+    "chunked": status_head(Content_Type="application/json", Transfer_Encoding="chunked")
+    + b'384\r\n{"',
+}
+
+
+@pytest.mark.parametrize("answer", CUT_OFF_ANSWERS.values(), ids=CUT_OFF_ANSWERS.keys())
+def test_a_body_cut_off_under_http_client_is_a_data_error(
+    answer: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Through http.client itself, on a loopback server.
+
+    `_read` reads with no amount, so a body sent with a Content-Length and cut off raises
+    `IncompleteRead` just as a chunked one does, and the capture needs no length check.
+    """
+
+    monkeypatch.setattr(urllib.request, "urlopen", DIRECT_OPENER.open)
+    slept: list[float] = []
+
+    with (
+        serving(answer) as server,
+        pytest.raises(DataSourceError, match="IncompleteRead") as raised,
+    ):
+        fpl_capture.fetch(f"{server.url}/api/bootstrap-static/", attempts=2, sleeper=slept.append)
+
+    assert server.url in str(raised.value)
+    assert len(server.answered) == 2
+    assert slept == [2.0]
 
 
 # --- registered endpoints -------------------------------------------------------------

@@ -3,6 +3,8 @@
 Every test here is offline. The opener is injected, so what the adapter would have sent and
 how it judges what came back are both asserted without a request leaving the machine --
 which is also the only way to test a 429 followed by a 200, or a host that disallows us.
+The few tests whose claim is about what http.client itself does with a body cut short talk
+to a server on the loopback interface, in this process, instead of to a fake.
 
 The refusals carry the weight. A fetch that fails loudly costs a club's coverage for one
 week, which this lane records honestly; a fetch that succeeds with the wrong bytes puts a
@@ -20,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.fixtures.loopback_http import DIRECT_OPENER, serving, status_head
 
 from squadopt.platform.club_news_fetch import (
     CLUB_NEWS_SOURCES_CONTRACT_VERSION,
@@ -335,15 +338,18 @@ def test_a_persistent_server_error_reports_every_attempt() -> None:
 
 # --- failures urllib does not wrap --------------------------------------------
 
-#: What urllib raises raw once the request is sent: a read that times out, a host that
-#: hangs up before answering, and a body shorter than its declared length. Built fresh for
-#: each raise. The short body's expected count is 404 on purpose (see the robots test).
+#: What reaches the reader raw once the request is sent: a read that times out, a host that
+#: hangs up before answering, and a body cut short. Built fresh for each raise. They are
+#: raised from the opener here, which tests what the reader does with each one and not
+#: where it comes from. The bounded read this reader makes raises `IncompleteRead` by itself
+#: only for a chunked body; for a body sent with a Content-Length it is `_read_once` that
+#: raises it (the `_Declared` tests below, and the loopback tests at the end of this section).
 TRANSPORT_FAILURES: dict[str, Callable[[], Exception]] = {
     "timeout": lambda: TimeoutError("timed out"),
     "hang-up": lambda: http.client.RemoteDisconnected(
         "Remote end closed connection without response"
     ),
-    "short body": lambda: http.client.IncompleteRead(b"<p>Saka", 404),
+    "short body": lambda: http.client.IncompleteRead(b"<p>Saka", 20),
 }
 
 
@@ -356,6 +362,27 @@ class _FailingRead(_Reply):
 
     def read(self, amount: int | None = None) -> bytes:
         raise self._failure
+
+
+class _Declared(_Reply):
+    """A response that declares a Content-Length and delivers only the bytes it is given.
+
+    `read(amount)` returns what arrived and raises nothing, which is what http.client's
+    bounded read does when a body sent with a Content-Length ends early: its own comment
+    there says it ought to raise `IncompleteRead` and does not, for compatibility.
+    """
+
+    def __init__(
+        self,
+        content: bytes,
+        *,
+        declared: int,
+        content_type: str = "text/html; charset=utf-8",
+        chunked: bool = False,
+    ) -> None:
+        super().__init__(content=content, content_type=content_type)
+        self.headers["Content-Length"] = str(declared)
+        self.chunked = chunked
 
 
 @pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
@@ -392,11 +419,11 @@ def test_a_transport_failure_on_every_attempt_names_the_url(
     assert delays == [2.0, 4.0, 8.0]
 
 
-def test_a_body_that_fails_while_it_is_read_is_retried() -> None:
-    """The headers arrived, so the open succeeded; the failure is in `read`."""
+def test_a_chunked_body_that_fails_while_it_is_read_is_retried() -> None:
+    """The headers arrived, so the open succeeded; http.client raises from `read` itself."""
 
     delays, sleeper = _slept()
-    cut_short = _FailingRead(http.client.IncompleteRead(b"<p>Saka", 20))
+    cut_short = _FailingRead(http.client.IncompleteRead(b"<p>Saka"))
     opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [cut_short, _Reply()]})
 
     document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
@@ -416,6 +443,70 @@ def test_a_body_that_times_out_on_every_read_names_the_url() -> None:
 
     assert PAGE in str(raised.value)
     assert delays == [2.0, 4.0, 8.0]
+
+
+def test_a_page_shorter_than_its_declared_length_is_retried() -> None:
+    """Returned short without an error, it would be hashed and coded as the whole page."""
+
+    whole = b"<p>Saka trained fully.</p>"
+    delays, sleeper = _slept()
+    cut_short = _Declared(whole[:7], declared=len(whole))
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [cut_short, _Reply(content=whole)]})
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    assert document.content == whole
+    assert opener.requested.count(PAGE) == 2
+    assert delays == [2.0]
+
+
+def test_a_page_shorter_than_its_declared_length_every_time_is_refused() -> None:
+    delays, sleeper = _slept()
+    opener = _Opener(
+        {ROBOTS: _allowing_robots(), PAGE: [_Declared(b"<p>Saka", declared=26) for _ in range(4)]}
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="IncompleteRead") as raised:
+        read_url(PAGE, opener=opener, sleeper=sleeper)
+
+    assert PAGE in str(raised.value)
+    assert opener.requested.count(PAGE) == 4
+    assert delays == [2.0, 4.0, 8.0]
+
+
+def test_a_page_as_long_as_its_declared_length_is_read_once() -> None:
+    """The check compares with the declared length and does not refuse a page that met it."""
+
+    whole = b"<p>Saka trained fully.</p>"
+    opener = _opener(_Declared(whole, declared=len(whole)))
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert document.content == whole
+    assert opener.requested.count(PAGE) == 1
+
+
+def test_a_declared_length_over_the_ceiling_is_still_too_large_and_not_retried() -> None:
+    """Only the ceiling plus one byte is read, so a longer declaration is not a short read."""
+
+    served = _Declared(b"x" * (MAXIMUM_DOCUMENT_BYTES + 1), declared=3 * MAXIMUM_DOCUMENT_BYTES)
+    opener = _opener(served)
+
+    with pytest.raises(ClubNewsFetchError, match="wrong URL rather than a long page"):
+        fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested.count(PAGE) == 1
+
+
+def test_a_chunked_body_is_not_judged_by_a_content_length_beside_it() -> None:
+    """http.client ignores that header when the body is chunked, and so does the reader."""
+
+    whole = b"<p>Saka trained fully.</p>"
+    opener = _opener(_Declared(whole, declared=len(whole) + 50, chunked=True))
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert document.content == whole
 
 
 def test_one_slow_host_does_not_cost_the_other_clubs_their_pages() -> None:
@@ -440,19 +531,86 @@ def test_one_slow_host_does_not_cost_the_other_clubs_their_pages() -> None:
     assert PAGE in refused[0][1]
 
 
-def test_a_robots_file_cut_short_is_not_consent() -> None:
-    """A short body counting 404 bytes is a failed read, not a host with no robots file.
+#: A robots file that disallows the registered page, and two ways of receiving less of it
+#: than its Content-Length declares.
+ROBOTS_DISALLOWING = b"User-agent: *\nDisallow: /team-news\n"
+ROBOTS_CUT_SHORT: dict[str, Callable[[], _Declared]] = {
+    # The cut falls before the Disallow line, so what arrived reads as "allow everything".
+    "cut before its Disallow line": lambda: _Declared(
+        b"User-agent: *\n", declared=len(ROBOTS_DISALLOWING), content_type="text/plain"
+    ),
+    # 404 bytes are missing, so the error's own text says "404 more expected", and
+    # `robots_allows` still reads "404" in a refusal's text as a host with no robots file.
+    "404 bytes missing": lambda: _Declared(
+        b"User-agent", declared=len(b"User-agent") + 404, content_type="text/plain"
+    ),
+}
 
-    `robots_allows` still reads "404" in a refusal's text as "no robots file", so the
-    refusal names the failure by its type and not by its text.
-    """
 
-    opener = _Opener({ROBOTS: [http.client.IncompleteRead(b"User-agent", 404)], PAGE: _Reply()})
+def test_the_whole_robots_file_disallows_the_page() -> None:
+    """The control for the test below: served whole, this file refuses the page."""
 
-    with pytest.raises(ClubNewsFetchError, match="preference is unknown"):
+    robots = _Declared(
+        ROBOTS_DISALLOWING, declared=len(ROBOTS_DISALLOWING), content_type="text/plain"
+    )
+
+    assert not robots_allows(SOURCE, opener=_opener(robots=robots), sleeper=lambda _: None)
+
+
+@pytest.mark.parametrize("robots", ROBOTS_CUT_SHORT.values(), ids=ROBOTS_CUT_SHORT.keys())
+def test_a_robots_file_cut_short_is_not_consent(robots: Callable[[], _Declared]) -> None:
+    """A robots file shorter than it said it was is an unanswered question, not a yes."""
+
+    opener = _Opener({ROBOTS: robots(), PAGE: _Reply()})
+
+    with pytest.raises(ClubNewsFetchError, match="preference is unknown") as raised:
         fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None)
 
+    assert "IncompleteRead" in str(raised.value)
     assert PAGE not in opener.requested
+
+
+def _direct(request: urllib.request.Request, timeout: float) -> Any:
+    return DIRECT_OPENER.open(request, timeout=timeout)
+
+
+#: The same 14 bytes of a robots file, sent under each framing a body can have, and cut off.
+CUT_OFF_ANSWERS: dict[str, bytes] = {
+    "content-length": status_head(Content_Type="text/plain", Content_Length="100")
+    + b"User-agent: *\n",
+    "chunked": status_head(Content_Type="text/plain", Transfer_Encoding="chunked")
+    + b"40\r\nUser-agent: *\n",
+}
+
+
+def test_the_loopback_server_serves_a_whole_body() -> None:
+    """The control for the test below: the server and the real reader agree on a whole body."""
+
+    body = b"User-agent: *\nDisallow: /team-news\n"
+    answer = status_head(Content_Type="text/plain", Content_Length=str(len(body))) + body
+
+    with serving(answer) as server:
+        read = read_url(f"{server.url}/robots.txt", opener=_direct, sleeper=lambda _: None)
+
+    assert (read.status, read.content) == (200, body)
+    assert len(server.answered) == 1
+
+
+@pytest.mark.parametrize("answer", CUT_OFF_ANSWERS.values(), ids=CUT_OFF_ANSWERS.keys())
+def test_a_body_cut_off_under_http_client_is_retried_and_refused(answer: bytes) -> None:
+    """Through http.client itself, which returns a short Content-Length body without error."""
+
+    delays, sleeper = _slept()
+
+    with (
+        serving(answer) as server,
+        pytest.raises(ClubNewsFetchError, match="IncompleteRead") as raised,
+    ):
+        read_url(f"{server.url}/robots.txt", opener=_direct, attempts=2, sleeper=sleeper)
+
+    assert "on 2 attempts" in str(raised.value)
+    assert len(server.answered) == 2
+    assert delays == [2.0]
 
 
 # --- one club failing does not fail the week --------------------------------
