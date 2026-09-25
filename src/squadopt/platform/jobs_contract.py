@@ -180,7 +180,7 @@ class AdviceJob:
         ``running -> queued`` is the disposable-worker edge: the attempt count
         increments so a crash-looping job is visible as one, and nothing else about
         the record changes — the retry recomputes rather than trusting a half-done
-        worker's leavings.
+        worker's leavings, unless the cache already holds the complete answer.
         """
 
         if (self.status, to) not in _TRANSITIONS:

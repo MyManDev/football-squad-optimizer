@@ -43,10 +43,20 @@ function memberSurface(
   );
 }
 
-function sectionFor(title: string): HTMLElement {
-  const section = screen.getByRole("heading", { level: 2, name: title }).closest("section");
-  if (!section) throw new Error(`No section for ${title}`);
-  return section;
+/** The bench under the pitch: a region named for it, one list item per player. */
+function benchItems(language: Language = "en"): HTMLElement[] {
+  const bench = screen.getByRole("region", { name: MESSAGES[language].leagueMembers.bench });
+  return within(bench).getAllByRole("listitem");
+}
+
+/** The closed section holding the squad the member holds before the plan's transfers. */
+function heldSection(language: Language): HTMLElement {
+  const summary = screen.getByText(MESSAGES[language].leagueMembers.memberSquad, {
+    selector: "summary span",
+  });
+  const details = summary.closest("details");
+  if (!details) throw new Error("No held squad section");
+  return details;
 }
 
 describe("the member's published squad", () => {
@@ -77,25 +87,32 @@ describe("the member's published squad", () => {
     const copy = MESSAGES[language];
     render(memberSurface(squad, language));
 
+    // With no plan shown, the pitch draws the squad the member holds.
+    expect(
+      screen.getByRole("heading", { level: 2, name: copy.leagueMembers.memberSquad }),
+    ).toBeInTheDocument();
     const pitch = screen.getByRole("list", { name: copy.squad.pitchLabel });
     expect(
       within(pitch)
         .getAllByRole("listitem")
         .map((row) => row.getAttribute("aria-label")),
-    ).toEqual(["GK", "DEF", "MID", "FWD"]);
+    ).toEqual((["GK", "DEF", "MID", "FWD"] as const).map((code) => copy.positions[code]));
     for (const player of squad.payload.starting_xi) {
       expect(within(pitch).getByTitle(player.name)).toHaveTextContent(player.short_name);
     }
-    expect(screen.getByText(copy.leagueMembers.starterCount(11))).toBeInTheDocument();
+    expect(pitch.querySelectorAll("[title]")).toHaveLength(11);
     const captain = squad.payload.starting_xi.find((player) => player.is_captain)!;
     const captainChip = within(pitch).getByLabelText(copy.squad.captainLabel).parentElement!;
     expect(within(captainChip).getByTitle(captain.name)).toBeInTheDocument();
     expect(within(pitch).getAllByLabelText(copy.squad.captainLabel)).toHaveLength(1);
-    const bench = sectionFor(copy.leagueMembers.bench);
-    expect(Array.from(bench.querySelectorAll("strong"), (player) => player.textContent)).toEqual(
-      squad.payload.bench.map((player) => player.name),
+    // The held squad names no vice-captain, so none is drawn.
+    expect(within(pitch).queryByLabelText(copy.squad.viceCaptainLabel)).toBeNull();
+    expect(screen.getByText(copy.leagueMembers.heldViceCaptainUnavailable)).toBeInTheDocument();
+    const bench = benchItems(language);
+    expect(bench).toHaveLength(4);
+    bench.forEach((item, index) =>
+      expect(item).toHaveTextContent(squad.payload.bench[index]!.name),
     );
-    expect(within(bench).getByText(copy.leagueMembers.benchCount(4))).toBeInTheDocument();
   });
 
   it("changes the held players when the displayed member changes", () => {
@@ -115,9 +132,10 @@ describe("the member's published squad", () => {
     for (const player of second.payload.starting_xi) {
       expect(within(pitch).getByTitle(player.name)).toBeInTheDocument();
     }
-    const bench = sectionFor(MESSAGES.en.leagueMembers.bench);
-    expect(Array.from(bench.querySelectorAll("strong"), (player) => player.textContent)).toEqual(
-      second.payload.bench.map((player) => player.name),
+    const bench = benchItems();
+    expect(bench).toHaveLength(second.payload.bench.length);
+    bench.forEach((item, index) =>
+      expect(item).toHaveTextContent(second.payload.bench[index]!.name),
     );
   });
 
@@ -134,20 +152,10 @@ describe("the member's published squad", () => {
     Object.freeze(squad.payload.bench);
     render(memberSurface(squad));
 
-    const bench = sectionFor(MESSAGES.en.leagueMembers.bench);
-    const names = Array.from(bench.querySelectorAll("strong"));
-    expect(names.map((player) => player.textContent)).toEqual([
-      original[0]!.name,
-      original[2]!.name,
-      original[3]!.name,
-      original[1]!.name,
-    ]);
-    expect(names.map((player) => player.parentElement!.firstElementChild!.textContent)).toEqual([
-      "1",
-      "3",
-      "4",
-      "—",
-    ]);
+    const bench = benchItems();
+    const expected = [original[0]!, original[2]!, original[3]!, original[1]!];
+    bench.forEach((item, index) => expect(item).toHaveTextContent(expected[index]!.name));
+    expect(bench.map((item) => item.firstElementChild!.textContent)).toEqual(["1", "3", "4", "-"]);
     expect(squad.payload.bench.map((player) => player.player_id)).toEqual(before);
   });
 
@@ -162,11 +170,46 @@ describe("the member's published squad", () => {
       proposedVice.short_name = "Proposed Vice Only";
       render(memberSurface(squad, language, advice));
 
-      const held = sectionFor(MESSAGES[language].leagueMembers.memberSquad);
+      // The pitch draws the plan, with its vice-captain; the held squad waits, closed.
+      const copy = MESSAGES[language];
+      const pitch = screen.getByRole("list", { name: copy.squad.pitchLabel });
+      const vice = within(pitch).getByLabelText(copy.squad.viceCaptainLabel).parentElement!;
+      const viceInEleven = advice.payload.starting_xi!.find(
+        (player) => player.player_id === proposedVice.player_id,
+      )!;
+      expect(within(vice).getByTitle(viceInEleven.name)).toBeInTheDocument();
+      const held = heldSection(language);
+      expect(held).not.toHaveAttribute("open");
       expect(
-        within(held).getByText(MESSAGES[language].leagueMembers.heldViceCaptainUnavailable),
+        within(held).getByText(copy.leagueMembers.heldViceCaptainUnavailable),
       ).toBeInTheDocument();
       expect(held).not.toHaveTextContent("Proposed Vice Only");
+      // It lists the fifteen the member holds, the eleven and the bench.
+      expect(within(held).getAllByRole("listitem")).toHaveLength(
+        squad.payload.starting_xi.length + squad.payload.bench.length,
+      );
+      for (const player of [...squad.payload.starting_xi, ...squad.payload.bench]) {
+        expect(held).toHaveTextContent(player.name);
+      }
+      // Each row's figure prints the short "xP", hidden from a screen reader; in Turkish
+      // "beklenen puan" is read out in its place, in English the "xP" itself.
+      const members = copy.leagueMembers;
+      const withFigure = [...squad.payload.starting_xi, ...squad.payload.bench].filter(
+        (player) => typeof player.expected_points === "number",
+      );
+      expect(withFigure.length).toBeGreaterThan(0);
+      if (language === "en") {
+        // One word both ways: plain text after the figure, as before.
+        expect(within(held).getAllByText(/^-?\d+(\.\d+)? xP$/)).toHaveLength(withFigure.length);
+      } else {
+        const printed = within(held).getAllByText(members.pointsUnitAbbreviation);
+        expect(printed).toHaveLength(withFigure.length);
+        for (const unit of printed) expect(unit).toHaveAttribute("aria-hidden", "true");
+        const spoken = within(held).getAllByText(members.pointsUnitSpoken);
+        expect(spoken).toHaveLength(withFigure.length);
+        for (const unit of spoken) expect(unit).toHaveClass("visually-hidden");
+        expect(held).not.toHaveTextContent(/\d puan/);
+      }
       expect(screen.getAllByText("Proposed Vice Only").length).toBeGreaterThan(0);
     },
   );
@@ -178,8 +221,7 @@ describe("the member's published squad", () => {
     expect(screen.getByText(copy.leagueMembers.emptySquad)).toBeInTheDocument();
     expect(screen.getByText(copy.leagueMembers.emptySquadBody)).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: copy.squad.pitchLabel })).not.toBeInTheDocument();
-    expect(screen.queryByText(copy.leagueMembers.starterCount(0))).not.toBeInTheDocument();
-    expect(screen.queryByText(copy.leagueMembers.benchCount(0))).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: copy.leagueMembers.bench })).toBeNull();
   });
 
   it.each(["tr", "en"] as const)(
@@ -204,8 +246,7 @@ describe("the member's published squad", () => {
 
       expect(await screen.findByText(copy.leagueMembers.entryNotAvailable)).toBeInTheDocument();
       expect(screen.queryByRole("list", { name: copy.squad.pitchLabel })).not.toBeInTheDocument();
-      expect(screen.queryByText(copy.leagueMembers.starterCount(0))).not.toBeInTheDocument();
-      expect(screen.queryByText(copy.leagueMembers.benchCount(0))).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: copy.leagueMembers.bench })).toBeNull();
       client.clear();
     },
   );

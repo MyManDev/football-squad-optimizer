@@ -1,55 +1,775 @@
+/*
+ * The member page in direction D: a top bar pinned at the top of the main column, the
+ * decision (heading row, boards, gain strip, captain line), the squad on the pitch, the
+ * two honesty lines, and the secondary tools as closed sections. The plan and Hesapla
+ * render in the sidebar; the fixture rail is a column of its own from 1180 px.
+ */
+
 .page,
-.adviceSection,
-.squadContext,
 .systemPage {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-.contextDetails > summary {
-  padding: var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md, 8px);
-  cursor: pointer;
+.page {
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* ---- The page and its fixture rail, 1180 px and wider ----
+   The rail stands flush with the window's right edge and as tall as the window, so the
+   main column gives up its right padding, its top and bottom padding (the page keeps
+   them) and its width cap while the member page is in it. */
+
+@media (min-width: 1180px) {
+  :global(#main):has(.layout[data-rail="column"]) {
+    max-width: none;
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+
+  .layout[data-rail="column"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    column-gap: var(--space-6);
+  }
+
+  .layout[data-rail="column"] > .page {
+    gap: var(--space-4);
+    padding: var(--space-5) 0 var(--space-7);
+  }
+}
+
+/* ---- Top bar ---- */
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  min-height: 64px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-bg);
+}
+
+/* Pinned at the top of the main column from 600 px up; on a phone only the phone bar is. */
+@media (min-width: 600px) {
+  .topBar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
+    padding: var(--space-2) var(--space-5);
+  }
+
+  /* The bar is two lines (about 97 px) wherever the team, the week and the score bug do not
+     share one, which includes 1280 to 1440 px desktops with the sidebar open: a jump (the
+     sidebar's 'Kadro') lands under it, not behind. */
+  :global(html):has(.topBar) {
+    scroll-padding-top: 112px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .topBar {
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-6)) 0;
+    padding: var(--space-2) var(--space-6);
+  }
+}
+
+.topIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.teamName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.topWeek {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.weekLabel {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 26px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.deadline {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.deadlineLabel {
+  color: var(--color-text-muted);
+}
+
+.deadlineLong,
+.deadlineShort {
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.deadlineShort {
+  display: none;
+}
+
+.scoreBug {
+  display: flex;
+  margin: 0 0 0 auto;
+}
+
+.scoreCell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 var(--space-3);
+}
+
+.scoreCell + .scoreCell {
+  border-left: 1px solid var(--color-line);
+}
+
+.scoreCell:last-child {
+  padding-right: 0;
+}
+
+.scoreCell dt {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.scoreCell dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+/* Below 1180 px the score bug takes its own line under the team and the week. */
+@media (max-width: 1179.98px) {
+  .scoreBug {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .scoreCell:first-child {
+    padding-left: 0;
+  }
+}
+
+/* The phone's compact strip, as D-Phone-Bu-Hafta draws it: a sidebar-green band right
+   under the phone bar. The team, the week and the short deadline share the first line,
+   always: the week and the deadline keep their width and a team name that does not fit in
+   what is left ends in an ellipsis (the sidebar's member block prints it whole). A 390 px
+   phone has under a pixel to spare for a 17-letter name, so a wrap here would depend on
+   how each system draws the fonts, and it cost 26 px of the first screen. The score bug
+   follows as one row of quiet cells, the label in sentence case over the figure, split by
+   hairlines as on a desktop. Labels are ink2 on the band (6.1:1). */
+@media (max-width: 599.98px) {
+  .topBar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    min-height: 0;
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 0;
+    background: var(--color-surface-2);
+  }
+
+  /* A zero basis keeps the name from pushing the week to a second line; it then grows into
+     the room the week leaves, up to its own width, so the week still follows it. */
+  .topIdentity {
+    flex: 1 1 0;
+    max-width: max-content;
+  }
+
+  .teamName {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 18px;
+    line-height: 22px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .topWeek {
+    flex: 0 0 auto;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .weekLabel {
+    font-size: 16px;
+    line-height: 22px;
+  }
+
+  .deadline {
+    flex-direction: row;
+    gap: 0 var(--space-1);
+    white-space: nowrap;
+  }
+
+  .deadlineLong {
+    display: none;
+  }
+
+  .deadlineShort {
+    display: inline;
+  }
+
+  /* One row, always: when a narrow phone or a wider font runs out of room, a long label
+     breaks inside its own cell (one extra 14 px line) instead of a whole cell falling to a
+     second row (a 25 px jump that pushed the week's gain below the first screen). */
+  .scoreBug {
+    flex: 1 1 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: auto;
+    justify-content: start;
+    margin: 0;
+  }
+
+  .scoreCell {
+    min-width: 0;
+    justify-content: flex-end;
+    padding: 0 var(--space-2);
+  }
+
+  .scoreCell:first-child {
+    padding-left: 0;
+  }
+
+  .scoreCell dt {
+    font-family: var(--font-body);
+    font-weight: 400;
+    line-height: 14px;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: normal;
+  }
+
+  .scoreCell dd {
+    font-size: 16px;
+    line-height: 18px;
+  }
+}
+
+/* ---- WHO block, in the sidebar (surface-2: labels are ink2, never ink3) ---- */
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 2px;
+}
+
+.whoLeague {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.whoLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-s);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.whoLink:hover {
+  background: var(--color-bg);
+}
+
+.whoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.whoTeam {
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.whoManager {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1179.98px) {
+  .whoLink {
+    min-height: 48px;
+  }
+}
+
+/* ---- Hesapla under the plan; pinned to the bottom of the phone and tablet drawer ---- */
+
+.computeDock {
+  margin-top: var(--space-2);
+}
+
+:global(#sidebar[data-mode="drawer"]) .computeDock {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  max-height: 45dvh;
+  overflow-y: auto;
+  margin: var(--space-3) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-3) var(--space-4) calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-2);
+}
+
+/* ---- Notices that change how the page reads ---- */
+
+.notice {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+}
+
+section.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--color-text);
+}
+
+section.notice p {
+  margin: 0;
+}
+
+.noticeTitle {
+  margin: 0;
+  font-size: var(--step-1);
+}
+
+.notice a {
+  color: var(--color-text);
+}
+
+/* ---- The decision ---- */
+
+.adviceSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* The squad, and on a tablet the fixtures beside it where the column has room for both
+   (the rail's 320 or 340 px next to a pitch of at least 340), below it where it has not. */
+.squadArea {
+  container: squadarea / inline-size;
+}
+
+.squadGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+@container squadarea (min-width: 684px) {
+  .squadGrid:has(> aside) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    gap: var(--space-5);
+  }
+}
+
+@container squadarea (min-width: 880px) {
+  .squadGrid:has(> aside) {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+/* A named container: the proof stamp reads its width (MemberDecision.module.css). */
+.decision {
+  container: decision / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.headingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* From 600 px the stamp keeps the right-hand column however long the heading's summary
+   is: the summary wraps under the heading rather than pushing the stamp to a line of its
+   own, where its right-aligned parts would stand out of line. */
+@media (min-width: 600px) {
+  .headingRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.headingText {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
+  min-width: 0;
+}
+
+.decisionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: 28px;
 }
 
 .selectionSummary {
   margin: 0;
-  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
   overflow-wrap: anywhere;
 }
-.contextDetails > summary > h2 {
-  display: inline;
-  font: inherit;
+
+/* On a phone the proof stamp leaves the heading row for its place after the gain strip,
+   as the phone artboard draws it (MemberDecision.module.css orders the parts), and the
+   rhythm tightens so the boards and the captain line come up first. */
+@media (max-width: 599.98px) {
+  .page {
+    gap: var(--space-4);
+  }
+
+  /* Two columns, so the proof stamp can stand beside the transfer facts; everything else
+     takes the whole row (MemberDecision.module.css places and orders the parts). */
+  .decision {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .decision > *,
+  .headingRow > * {
+    grid-column: 1 / -1;
+  }
+
+  .headingRow {
+    display: contents;
+  }
+
+  /* The phone reads the decision and then what to make of it, as D-Phone-Bu-Hafta draws
+     it; the squad ('Kadro' in the menu) follows. LeagueMemberView places the honesty block
+     there in the document itself, not with `order`, so the tab order matches the screen. */
+}
+
+.echo {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
+}
+
+/* ---- Honesty: two lines and the disclosure ---- */
+
+.honestyBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+}
+
+/* 12 px lines, as the artboards set them: quieter than the decision they qualify. */
+.honestyLines {
+  flex: 1 1 320px;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.honestyLines p {
   margin: 0;
 }
 
-@media (min-width: 641px) {
-  .contextDetails > summary {
-    display: none;
+.how {
+  flex: 0 1 auto;
+}
+
+.how[open] {
+  flex-basis: 100%;
+  order: 3;
+}
+
+.howSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-size: var(--step--1);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.howSummary::-webkit-details-marker {
+  display: none;
+}
+
+.howBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure);
+  padding-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.howBody p {
+  margin: 0;
+}
+
+.howTitle {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text);
+  font-size: var(--step-0);
+}
+
+.historyLink {
+  flex: none;
+  order: 4;
+  align-self: center;
+  margin: 0;
+  font-size: var(--step--1);
+}
+
+@media (max-width: 1179.98px) {
+  .howSummary {
+    min-height: 44px;
+  }
+
+  .historyLink a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
 }
+
+/* On a phone the disclosure reads as the artboard draws it, a quiet underlined line with
+   its icon rather than a box, so it and the history link share one row. */
+@media (max-width: 599.98px) {
+  .honestyBlock {
+    column-gap: var(--space-5);
+  }
+
+  .howSummary {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+/* ---- Secondary tools, each closed until asked for ---- */
+
+.tools {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool {
+  border-top: 1px solid var(--color-line);
+}
+
+.tool:last-child {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.toolSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.toolSummary::-webkit-details-marker {
+  display: none;
+}
+
+.toolIcon {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.tool[open] .toolIcon {
+  transform: rotate(90deg);
+}
+
+.toolBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-1) 0 var(--space-5);
+}
+
+/* The panels inside the tools keep some plain controls of their own. They wear the page's
+   look here: an outlined ink button as wide as its words (never the browser's grey slab
+   stretched across the column), and a table read from the left with hairline rows. */
+.toolBody button:not([class]) {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolBody button:not([class]):hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.toolBody button:not([class]):disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.toolBody table:not([class]) {
+  border-collapse: collapse;
+}
+
+.toolBody table:not([class]) th,
+.toolBody table:not([class]) td {
+  padding: 6px var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.toolBody table:not([class]) thead th {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 600;
+}
+
+/* A panel's own headings sit under the tool's name, so each level is smaller than it and
+   never larger than the level above (the browser's default h3 is larger than this h2). */
+.toolBody h2,
+.toolBody h3 {
+  font-size: var(--step-0);
+}
+
+/* A chip's name over its verdict: the name is the heading, never smaller than the line
+   under it. */
+.toolBody h4 {
+  font-size: var(--step-0);
+}
+
+/* A panel's paragraphs are spaced by the panel's own rhythm, not the browser's margins on
+   top of it, which left gaps of 40 px between two sentences, and read in lines a person
+   can follow (the column is wider than a line of prose should be). */
+.toolBody section > p {
+  margin-block: 0;
+}
+
+.toolBody p {
+  max-width: var(--measure);
+}
+
+/* One chip's reading: its name, the verdict and the figures as one block, 4 px apart,
+   with the space between two chips instead of between their lines. */
+.toolBody article:not([class]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.toolBody article:not([class]) > * {
+  margin: 0;
+}
+
+@media (max-width: 1179.98px) {
+  .toolSummary {
+    min-height: 48px;
+  }
+
+  .toolBody button:not([class]) {
+    min-height: 44px;
+  }
+}
+
+/* ---- Shared by the advice sections ---- */
 
 .assumptionList {
   margin: 0;
   padding-left: 1.2rem;
   color: var(--color-text-muted);
-}
-
-.comparison {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--step-2);
-  font-weight: 600;
-}
-
-.head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
 }
 
 .back {
@@ -59,36 +779,16 @@
   font-weight: 600;
 }
 
-.kicker,
 .muted,
 .diagnostic {
   color: var(--color-text-muted);
   font-size: var(--step--1);
 }
 
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--step-4);
-  font-weight: 600;
-  line-height: 1.05;
-}
-
-.lede,
 .notice,
 .honesty,
 .diagnostic {
-  margin: var(--space-2) 0 0;
   max-width: var(--measure);
-}
-
-.notice,
-.diagnostic {
-  color: var(--color-text-muted);
-}
-
-.notice a {
-  color: var(--color-text);
 }
 
 .honesty {
@@ -104,14 +804,8 @@
   color: var(--color-text-muted);
 }
 
-.bench,
-.moves {
-  display: flex;
-  flex-direction: column;
-}
-
 .lineup {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
 }
@@ -120,16 +814,7 @@
   margin: 0 0 var(--space-2);
   font-family: var(--font-display);
   font-size: var(--step-1);
-  font-weight: 600;
-}
-
-.lineupSub {
-  margin: var(--space-3) 0 var(--space-1);
-  font-size: var(--step--1);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 700;
 }
 
 .armband {
@@ -152,53 +837,8 @@
   margin: 2px 0 0;
 }
 
-.benchRow {
-  display: grid;
-  grid-template-columns: 2rem minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: 8px 0;
-  border-top: 1px solid var(--color-line);
-}
-
-.benchRow:first-child,
-.move:first-child {
-  border-top: none;
-}
-
-.benchPoints {
-  text-align: right;
-}
-
-.move {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--color-line);
-}
-
-.movePlayers,
-.moveNumbers {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.moveNumbers {
-  align-items: flex-end;
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-  text-align: right;
-}
-
-.move .muted {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
 .window {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
 }
@@ -215,13 +855,10 @@
   margin-top: 4px;
 }
 
-.windowScroll {
-  overflow-x: auto;
-}
-
+/* The window plan never scrolls sideways: fixed columns, and the names wrap in theirs. */
 .windowTable {
   width: 100%;
-  min-width: 560px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--step--1);
 }
@@ -232,64 +869,111 @@
   border-top: 1px solid var(--color-line);
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .windowTable thead th {
+  overflow-wrap: normal;
   border-top: none;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--step--2);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .windowTable .right {
   text-align: right;
 }
 
-@media (max-width: 640px) {
-  :global(html).memberPage {
-    scroll-padding-bottom: 45dvh;
-  }
-  .squadContext > section:first-child > header > h2 {
-    display: none;
-  }
-  .computeDock {
-    position: sticky;
-    bottom: 0;
-    max-height: 45dvh;
-    overflow-y: auto;
-    z-index: 1;
+.weekColumn {
+  width: 4.5rem;
+}
+
+.hitsColumn {
+  width: 5rem;
+}
+
+.chipColumn {
+  width: 7rem;
+}
+
+.pointsColumn {
+  width: 6rem;
+}
+
+/* On a phone each week is a block of its own: the week and its expected points on the
+   first line, then who comes in and who goes out, then the hit points and the chip, each
+   under its column's name. The roles in the markup keep it a table for a screen reader;
+   the column names shown here are the stylesheet's and are not read twice. */
+@media (max-width: 599.98px) {
+  .windowTable,
+  .windowTable tbody {
+    display: block;
   }
 
-  .head {
-    align-items: flex-start;
-    flex-direction: column;
+  .windowTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
-  .title {
-    font-size: var(--step-3);
+  .windowTable tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "week points"
+      "in in"
+      "out out"
+      "hits chip";
+    gap: 2px var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--color-line);
   }
 
-  .benchRow {
-    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  .windowTable tbody th,
+  .windowTable tbody td {
+    display: block;
+    padding: 0;
+    border-top: 0;
+    font-size: var(--step--2);
+    line-height: 16px;
   }
 
-  .benchRow .muted {
-    grid-column: 2 / -1;
+  .windowTable td[data-label]::before {
+    content: attr(data-label) / "";
+    margin-right: var(--space-2);
+    color: var(--color-text-muted);
+    font-weight: 400;
   }
 
-  .move {
-    grid-template-columns: 1fr;
+  .weekCell {
+    grid-area: week;
+    font-weight: 600;
   }
 
-  .moveNumbers {
-    align-items: flex-start;
+  .inCell {
+    grid-area: in;
+  }
+
+  .outCell {
+    grid-area: out;
+  }
+
+  .windowTable .hitsCell {
+    grid-area: hits;
     text-align: left;
   }
 
-  .move .muted {
-    grid-column: 1;
+  .chipCell {
+    grid-area: chip;
+    text-align: right;
+  }
+
+  .windowTable .pointsCell {
+    grid-area: points;
+    font-weight: 600;
   }
 }
 
@@ -301,4 +985,14 @@
   text-decoration: underline;
   cursor: pointer;
   padding: 0;
+}
+
+/* The viewer's change and clear controls are touch targets under 1180 px. */
+@media (max-width: 1179.98px) {
+  .viewerAction,
+  .viewerClear {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
 }

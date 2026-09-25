@@ -214,4 +214,16 @@ it("names the examined window even without a Free Hit row", () => {
   );
   expect(view.container.textContent).toContain(CHIP_FORECAST_COPY.en.calendarTrue);
   expect(view.container.textContent).not.toContain(CHIP_FORECAST_COPY.en.calendarFalse);
+  view.unmount();
+
+  // The Turkish page says the range in Turkish, not with the English 'to'.
+  const turkish = render(
+    <LanguageProvider initialLanguage="tr">
+      <ChipForecastCard published={envelope} squad={squad} />
+    </LanguageProvider>,
+  );
+  expect(turkish.container.textContent).toContain(
+    `${CHIP_FORECAST_COPY.tr.calendarFalse}: ${squad.gameweek + 1}. ile 19. hafta arası.`,
+  );
+  expect(turkish.container.textContent).not.toMatch(/\d to \d/);
 });

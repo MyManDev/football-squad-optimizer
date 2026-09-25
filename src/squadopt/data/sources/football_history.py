@@ -97,6 +97,16 @@ def archive_history(root: Path) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
+def captured_history_weeks(gameweek: int) -> range:
+    """The played gameweeks ``captured_history`` reads for a capture open for ``gameweek``.
+
+    Every one from gameweek 1, not a trailing window: the football model trains on the
+    whole season so far. The capture reads its live documents from this same range, so
+    the reader and the capture cannot disagree about which weeks a capture must hold.
+    """
+    return range(1, gameweek)
+
+
 def captured_history(snapshot: CapturedSnapshot, *, season: str, gameweek: int) -> pd.DataFrame:
     """Do not split aggregated DGW xG/actions into invented fixture observations.
 
@@ -109,7 +119,7 @@ def captured_history(snapshot: CapturedSnapshot, *, season: str, gameweek: int) 
     clubs = {t["id"]: t["code"] for t in boot["teams"]}
     cutoff = pd.Timestamp(snapshot.metadata.captured_at_utc)
     rows: list[dict[str, Any]] = []
-    for week in range(1, gameweek):
+    for week in captured_history_weeks(gameweek):
         payload = snapshot.payloads.get(f"event-gw{week:02d}-live.json")
         if payload is None:
             raise ValueError(f"Missing captured football history GW{week}.")

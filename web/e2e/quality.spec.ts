@@ -6,7 +6,7 @@ import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
 const PAGES = [
   { heading: "Ligini bul", path: "/" },
-  { heading: "Lig Üyeleri", path: "/league/members" },
+  { heading: "Lig tablosu", path: "/league/members" },
   { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
   { heading: "Önerilen Hamleler", path: "/moves" },
   { heading: "Rakip Analizi", path: "/rivals" },
@@ -26,7 +26,13 @@ test("visitor navigation reaches league entry without browser errors", async ({ 
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto("/");
-  await page.getByRole("link", { name: "Lig", exact: true }).click();
+  // 'Lig' is the member list; the league entry page stays reachable as 'Bu hafta' while no
+  // member is in context.
+  const navigation = page.getByRole("navigation");
+  await navigation.getByRole("link", { name: "Lig", exact: true }).click();
+  await expect(page).toHaveURL("/league/members");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig tablosu");
+  await navigation.getByRole("link", { name: "Bu hafta", exact: true }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
 
@@ -51,7 +57,7 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       language === "tr" ? "Yönetim" : "Admin",
     );
-    await expect(page.locator('header a[href="/admin"], footer a[href="/admin"]')).toHaveCount(0);
+    await expect(page.locator('#sidebar a[href="/admin"], header a[href="/admin"]')).toHaveCount(0);
     await expect(page.locator('a[href="/league"]')).toHaveCount(0);
     expect(systemDataRequests).toEqual([]);
 
@@ -94,16 +100,17 @@ for (const language of ["tr", "en"] as const) {
 
     await expect(page).toHaveURL("/league/members");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      language === "tr" ? "Lig Üyeleri" : "League Members",
+      language === "tr" ? "Lig tablosu" : "League table",
     );
     await expect(page.getByRole("link", { name: "Deniz Aral" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", language);
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+    // The sidebar's navigation and its operations link are the whole chrome.
     expect(
       await page
-        .locator("header nav a, footer a")
+        .locator("#sidebar a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/fixtures", "/contribute", "/status"]);
+    ).toEqual(["/", "/league/members", "/fixtures", "/contribute", "/status"]);
     await expect(
       page.locator(
         'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
@@ -113,21 +120,66 @@ for (const language of ["tr", "en"] as const) {
   });
 }
 
-for (const theme of ["dark", "light"] as const) {
-  test(`${theme} theme applies its complete root palette`, async ({ page }) => {
-    await page.addInitScript((value) => localStorage.setItem("squadopt.theme", value), theme);
-    await page.goto("/");
+test("a member page's sidebar adds only its member block to the chrome", async ({ page }) => {
+  await page.goto("/league/members/35249001");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
+  // The member block goes back to the member list; the rest is the navigation with this
+  // member's week and squad, and the operations link.
+  expect(
+    await page
+      .locator("#sidebar a")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+  ).toEqual([
+    "/league/members",
+    "/league/members/35249001",
+    "/league/members/35249001#kadro",
+    "/league/members",
+    "/fixtures",
+    "/contribute",
+    "/status",
+  ]);
+  await expect(
+    page.locator(
+      'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
+    ),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+});
 
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+test("the page applies its one light palette", async ({ page }) => {
+  await page.goto("/");
+
+  const palette = await page.locator("body").evaluate((body) => {
+    const style = getComputedStyle(body);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  // Page #ECF3E6, ink #10261A.
+  expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(
+    "light",
+  );
+});
+
+for (const scheme of ["dark", "light"] as const) {
+  test(`a stored theme and a ${scheme} system preference leave the light palette in place`, async ({
+    page,
+  }) => {
+    // An older visit may have stored a dark choice; the site has no dark theme any more.
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.addInitScript(() => localStorage.setItem("squadopt.theme", "dark"));
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
+
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme");
     const palette = await page.locator("body").evaluate((body) => {
       const style = getComputedStyle(body);
       return { background: style.backgroundColor, color: style.color };
     });
-    expect(palette).toEqual(
-      theme === "dark"
-        ? { background: "rgb(14, 31, 24)", color: "rgb(238, 244, 239)" }
-        : { background: "rgb(244, 246, 242)", color: "rgb(18, 36, 28)" },
-    );
+    expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
+    // The stale value is removed on load, so nothing reads it later, and no control
+    // offers a theme.
+    expect(await page.evaluate(() => localStorage.getItem("squadopt.theme"))).toBeNull();
+    await expect(page.getByRole("button", { name: /temaya geç|theme/i })).toHaveCount(0);
   });
 }
 
@@ -167,7 +219,7 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   }
 
   for (const destination of [
-    { heading: "Lig Üyeleri", path: "/league/members" },
+    { heading: "Lig tablosu", path: "/league/members" },
     { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
     // The virtual member shows the week the shipped index names.
     {

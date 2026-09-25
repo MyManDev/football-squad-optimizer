@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useMemo, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
+import { useShellLayout } from "../../../design/shell/layout";
+import { useShell } from "../../../design/shell/ShellContext";
+import { ShellPortal } from "../../../design/shell/ShellPortal";
 import { useLanguage } from "../../../i18n/context";
-import { points } from "../../../lib/format";
+import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
@@ -12,23 +16,30 @@ import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
+import type { AdviceJob } from "../advice/useAdviceJob";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
-import { Pitch } from "../../squad/components/Pitch";
 import { MemberResourceCards } from "../components/MemberResourceCards";
 import { ChipForecastCard } from "../components/ChipForecastCard";
-import { ExampleDataBadge } from "../components/ExampleDataBadge";
+import { MemberFixtureRail, type RailPlacement } from "../components/MemberFixtureRail";
+import { DisclosureIcon, InfoIcon } from "../components/memberIcons";
 import { isMemberStrategy } from "../types";
-import { AdviceCard, MissingAdviceCard } from "./MemberAdviceCard";
+import {
+  AdviceDecision,
+  AdviceDetails,
+  AdviceMethodNotes,
+  AdviceStamp,
+  MissingAdviceCard,
+  PlanLineup,
+} from "./MemberAdviceCard";
+import { HeldSquad, MemberSquad } from "./MemberSquad";
+import { hasLineup, squadOnPitch } from "./squadOnPitch";
+import { MemberTopBar, MemberWho } from "./MemberTopBar";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
-  useEffect(() => {
-    document.documentElement.classList.add(styles.memberPage);
-    return () => document.documentElement.classList.remove(styles.memberPage);
-  }, []);
   const { squad } = props;
   const contextKey = [
     squad.payload.league_id,
@@ -40,6 +51,47 @@ export function LeagueMemberView(props: LeagueMemberViewProps) {
   ].join(":");
   // A new published squad invalidates both an old result and its in-flight request.
   return <LeagueMemberContent key={contextKey} {...props} />;
+}
+
+type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
+
+/**
+ * The state of a request for this page's plan as one quiet line, for the decision heading:
+ * on a phone the plan and Hesapla live in the drawer, and this is what is left in view once
+ * the drawer closes. Nothing while no request was made.
+ */
+function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null {
+  const states = copy.computeEchoStates;
+  const word =
+    state.phase === "requesting"
+      ? states.requesting
+      : state.phase === "waiting"
+        ? state.status === "queued"
+          ? states.queued
+          : states.running
+        : state.phase === "done"
+          ? state.source === "api-cache"
+            ? states.done
+            : states.published
+          : state.phase === "failed"
+            ? states.failed
+            : state.phase === "unavailable"
+              ? states.unavailable
+              : null;
+  return word === null ? null : copy.computeEcho(word);
+}
+
+/** A closed section of the page's secondary tools, read one click away. */
+function Tool({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details className={styles.tool}>
+      <summary className={styles.toolSummary}>
+        <DisclosureIcon className={styles.toolIcon} />
+        <span>{title}</span>
+      </summary>
+      <div className={styles.toolBody}>{children}</div>
+    </details>
+  );
 }
 
 function LeagueMemberContent({
@@ -60,19 +112,14 @@ function LeagueMemberContent({
   rivalSquad = null,
   windowControl = null,
   deadlinePassed = null,
+  fixtures = null,
+  fixturesPending = false,
+  leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
-  const [contextExpanded, setContextExpanded] = useState(
-    () => window.matchMedia?.("(min-width: 641px)").matches ?? true,
-  );
-  useEffect(() => {
-    const media = window.matchMedia?.("(min-width: 641px)");
-    if (!media) return;
-    const update = () => setContextExpanded(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
   const copy = messages.leagueMembers;
+  const layout = useShellLayout();
+  const shell = useShell();
   const view = squad.payload;
   const [searchParams] = useSearchParams();
   const { viewer, clear } = useViewerEntry();
@@ -111,6 +158,8 @@ function LeagueMemberContent({
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );
+  const modelShown =
+    capabilities?.models?.includes("football") === true || selection.request.model === "football";
   const selectionSummary = [
     isMemberStrategy(selection.request.strategy)
       ? copy.strategies[selection.request.strategy].name
@@ -120,202 +169,150 @@ function LeagueMemberContent({
           "asiri-agresif": messages.decision.modes.extreme,
         }[selection.request.strategy],
     messages.decision.week(selection.request.window),
+    modelShown
+      ? copy.modelNames[selection.request.model === "football" ? "football" : "current"]
+      : null,
     selection.request.rivalEntryId !== null
       ? `${copy.rivalLabel}: ${selectedRival?.team_name ?? selectedRival?.manager_name ?? `#${selection.request.rivalEntryId}`}`
       : null,
-    selection.top100.weight !== 0 ? `Top 100 ${selection.top100.weight}` : null,
+    selection.top100.weight !== 0 ? copy.top100Weight(selection.top100.weight) : null,
     selection.evidence.on ? EVIDENCE_COPY[language].legend : null,
     selection.chip.chip ? copy.chipNames[selection.chip.chip] : null,
   ]
     .filter(Boolean)
-    .join(", ");
+    .join(" · ");
+  const echo = computeEcho(copy, job.state);
+  const dateTime = (iso: string) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
+      new Date(iso),
+    );
+  const played =
+    outcomeFreshness?.scoredGameweek != null && outcomeFreshness.scoredGameweek >= view.gameweek;
+  const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
+  const plan = !adviceLoading && shown ? shown.envelope.payload : null;
+  const onPitch = squadOnPitch(plan, view);
+  // One fixture rail: its own column from 1180 px (and on a page rendered without the
+  // shell), beside the squad on a tablet, and a sheet over the page on a phone.
+  const railPlacement: RailPlacement = !shell
+    ? "column"
+    : layout === "phone"
+      ? "sheet"
+      : layout === "tablet"
+        ? "flow"
+        : "column";
+  const rail = (
+    <MemberFixtureRail
+      placement={railPlacement}
+      fixtures={fixtures}
+      pending={fixturesPending}
+      season={view.season}
+      gameweek={view.gameweek}
+      moves={plan?.moves ?? []}
+      eleven={onPitch.eleven}
+      codes={codes}
+    />
+  );
+  // What to make of the decision: the two honesty lines, how it was worked out and the
+  // member's history. Placed after the decision on a phone and after the squad elsewhere.
+  const honesty = (
+    <div key="honesty" className={styles.honestyBlock} data-mark="honesty">
+      <div className={styles.honestyLines}>
+        <p>{copy.honestyModel}</p>
+        <p>{copy.honestyDecision}</p>
+      </div>
+      <details className={styles.how}>
+        <summary className={styles.howSummary}>
+          <InfoIcon />
+          <span>{copy.howComputed}</span>
+        </summary>
+        <div className={styles.howBody}>
+          <p>{copy.honestyRule}</p>
+          <p>{copy.independentAdviceRule}</p>
+          {!adviceLoading && shown ? <AdviceMethodNotes view={shown.envelope.payload} /> : null}
+          <p>{copy.diagnosticOnly}</p>
+          <h3 className={styles.howTitle}>{copy.freshnessTitle}</h3>
+          <p>{copy.freshnessDecision(view.gameweek, dateTime(squad.generated_at_utc))}</p>
+          {outcomeFreshness ? (
+            <p>
+              {copy.freshnessScored(
+                outcomeFreshness.scoredGameweek == null
+                  ? copy.freshnessNoScored
+                  : messages.common.gameweekShort(outcomeFreshness.scoredGameweek),
+                dateTime(outcomeFreshness.publishedAt),
+              )}
+            </p>
+          ) : null}
+          <p>{copy.freshnessNote}</p>
+        </div>
+      </details>
+      {view.league_id === 352490 ? (
+        <p className={styles.historyLink}>
+          <Link to={`/league/members/${entryId}/history`}>{messages.suggestionHistory.title}</Link>
+        </p>
+      ) : null}
+    </div>
+  );
+  const squadArea = (
+    <div key="squad" className={styles.squadArea}>
+      <div className={styles.squadGrid}>
+        <MemberSquad
+          onPitch={onPitch}
+          plan={plan}
+          codes={codes}
+          list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
+        />
+        {railPlacement === "flow" ? rail : null}
+      </div>
+    </div>
+  );
 
   return (
-    <div className={styles.page}>
-      <header className={styles.head}>
-        <div>
-          <Link className={styles.back} to="/league/members">
-            {copy.backToMembers}
-          </Link>
-          <div className={styles.kicker}>
-            {view.season} · {messages.common.gameweek(view.gameweek)} · #{view.entry.entry_id}
-          </div>
-          <h1 className={styles.title}>{view.entry.team_name ?? copy.unknownTeam}</h1>
-          <p className={styles.lede}>{view.entry.manager_name ?? copy.unknownMember}</p>
-          {view.league_id === 352490 && (
-            <p>
-              <Link to={`/league/members/${entryId}/history`}>
-                {messages.suggestionHistory.title}
-              </Link>
-            </p>
-          )}
-        </div>
-        <ExampleDataBadge sourceKind={squad.source_kind} />
-      </header>
+    <div className={styles.layout} data-rail={railPlacement}>
+      <div className={styles.page}>
+        <MemberTopBar
+          squad={squad}
+          members={members}
+          fixtures={fixtures}
+          deadlinePassed={deadlinePassed}
+        />
+        <ShellPortal slot="who">
+          <MemberWho squad={squad} leagueName={leagueName} />
+        </ShellPortal>
 
-      {viewer ? (
-        <Card tone="muted" title={copy.viewerTitle}>
-          <p className={styles.notice}>{copy.viewerBody}</p>
+        {deadlinePassed !== null ? (
+          <section className={styles.notice} aria-labelledby="deadline-passed-title">
+            <h2 className={styles.noticeTitle} id="deadline-passed-title">
+              {COMPUTE_COPY[language].deadlinePassedTitle}
+            </h2>
+            <p data-testid="deadline-passed">
+              {COMPUTE_COPY[language].deadlinePassedBody(view.gameweek, dateTime(deadlinePassed))}
+            </p>
+          </section>
+        ) : null}
+        {played ? (
+          <p className={styles.notice} role="status">
+            {copy.freshnessPlayed}
+          </p>
+        ) : null}
+        {membersIssue ? (
           <p className={styles.notice}>
             <strong>
-              {copy.viewerSelected(
-                viewer.entryId === entryId
-                  ? (view.entry.manager_name ?? `#${viewer.entryId}`)
-                  : `#${viewer.entryId}`,
-              )}
+              {membersIssue === "missing" ? copy.notAvailable : copy.membersUnreadable}
             </strong>{" "}
-            <Link to="/league/members">{copy.viewerChange}</Link>{" "}
-            <button
-              type="button"
-              className={styles.viewerClear}
-              onClick={() => {
-                clear();
-                navigate("/league/members", { replace: true });
-              }}
-            >
-              {copy.viewerClear}
-            </button>
+            {copy.membersAuxiliaryUnavailable}
           </p>
-        </Card>
-      ) : null}
-
-      <MemberResourceCards squad={view} expanded={contextExpanded} />
-
-      {view.starting_xi.length > 0 ? (
-        <details className={styles.contextDetails} open={contextExpanded}>
-          <summary>{contextExpanded ? copy.memberSquad : <h2>{copy.memberSquad}</h2>}</summary>
-          <div className={styles.squadContext}>
-            <Card
-              tone="pitch"
-              title={copy.memberSquad}
-              aside={copy.starterCount(view.starting_xi.length)}
-            >
-              <Pitch starters={view.starting_xi} />
-              <p className={styles.notice}>{copy.heldViceCaptainUnavailable}</p>
-            </Card>
-            <Card title={copy.bench} aside={copy.benchCount(view.bench.length)}>
-              <div className={styles.bench}>
-                {[...view.bench]
-                  .sort(
-                    (left, right) =>
-                      (left.bench_order ?? Number.MAX_SAFE_INTEGER) -
-                      (right.bench_order ?? Number.MAX_SAFE_INTEGER),
-                  )
-                  .map((player) => (
-                    <div className={styles.benchRow} key={player.player_id}>
-                      <span className="num">{player.bench_order ?? "—"}</span>
-                      <strong>{player.name}</strong>
-                      <span className={styles.muted}>
-                        {player.team} · {player.position}
-                      </span>
-                      <span className={`${styles.benchPoints} num`}>
-                        {points(player.expected_points, 1, locale)} xP
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </Card>
-          </div>
-        </details>
-      ) : (
-        <EmptyState title={copy.emptySquad}>{copy.emptySquadBody}</EmptyState>
-      )}
-
-      {membersIssue ? (
-        <Card
-          tone="muted"
-          title={membersIssue === "missing" ? copy.notAvailable : copy.membersUnreadable}
-        >
-          <p className={styles.notice}>{copy.membersAuxiliaryUnavailable}</p>
-        </Card>
-      ) : null}
-
-      <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
-        <h2 className="visually-hidden" id="entry-advice-title">
-          {copy.advice}
-        </h2>
-        {deadlinePassed !== null ? (
-          <Card tone="muted" title={COMPUTE_COPY[language].deadlinePassedTitle}>
-            <p className={styles.notice} data-testid="deadline-passed">
-              {COMPUTE_COPY[language].deadlinePassedBody(
-                view.gameweek,
-                new Intl.DateTimeFormat(locale, {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }).format(new Date(deadlinePassed)),
-              )}
-            </p>
-          </Card>
         ) : null}
-        {viewer !== null && viewer.entryId !== entryId ? (
-          <Card tone="muted" title={copy.notYourPageTitle}>
-            <p className={styles.notice}>
-              {copy.notYourPageBody}{" "}
-              <Link to={`/league/members/${viewer.entryId}`}>{copy.notYourPageLink}</Link>
-            </p>
-          </Card>
-        ) : null}
-        <Card
-          tone="muted"
-          title={language === "tr" ? "Karar ve sonuç verisi" : "Decision and outcome data"}
-        >
-          <p>
-            {language === "tr" ? "Karar haftası" : "Decision gameweek"}: GW{view.gameweek} ·{" "}
-            {language === "tr" ? "Kadro yayını" : "Squad published"}:{" "}
-            {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
-              new Date(squad.generated_at_utc),
-            )}
-          </p>
-          {outcomeFreshness && (
-            <p>
-              {language === "tr" ? "Son puanlanan hafta" : "Latest scored gameweek"}:{" "}
-              {outcomeFreshness.scoredGameweek == null
-                ? "—"
-                : `GW${outcomeFreshness.scoredGameweek}`}{" "}
-              ·{" "}
-              {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
-                new Date(outcomeFreshness.publishedAt),
-              )}
-            </p>
-          )}
-          <p>
-            {language === "tr"
-              ? "Fikstür veya sonuçların güncellenmesi tahmini yenilemez. Bu plan yalnız seçili karar verisini kullanır; sonraki haberler ve transferler için yeni veri görüntüsü gerekir. Erken planlar son dakika kadro bilgisi içermez."
-              : "Refreshing fixtures or outcomes does not refresh forecasts. This plan uses the selected decision capture; later news and transfers require a new capture. Early plans do not include deadline-day team news."}
-          </p>
-          {outcomeFreshness?.scoredGameweek != null &&
-            outcomeFreshness.scoredGameweek >= view.gameweek && (
-              <p role="status">
-                {language === "tr"
-                  ? "Bu karar haftası artık oynandı; sonuçlarla geriye dönük yeniden tahmin yapılmadı. Yeni haftanın karar verisi bekleniyor."
-                  : "This decision week has been played. Forecasts were not rewritten using outcomes; the next decision capture is pending."}
-              </p>
-            )}
-        </Card>
-        <ChipForecastCard
-          published={indexReadable ? index?.chip_forecast : undefined}
-          computed={computedForecast}
-          squad={view}
-        />
-        <TemplatePicker
-          canApply={(params) => {
-            const offered = resolve(params);
-            return (
-              !adviceLoading &&
-              indexReadable &&
-              (offered.status === "ready" || offered.computable?.selection === true)
-            );
-          }}
-        />
-        <MemberDecisionControls
-          entryId={entryId}
-          members={members}
-          index={selection.status === "index-error" ? null : index}
-          capabilities={capabilities}
-        />
-        <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-        <div className={styles.computeDock} data-compute-dock>
+
+        <ShellPortal slot="plan">
+          <MemberDecisionControls
+            entryId={entryId}
+            members={members}
+            index={selection.status === "index-error" ? null : index}
+            capabilities={capabilities}
+            part="plan"
+          />
           <AdviceRequestPanel
+            dockClassName={styles.computeDock}
             request={request}
             job={job}
             selectionAvailable={
@@ -349,66 +346,171 @@ function LeagueMemberContent({
             chipChosen={selection.chip.chip !== null}
             deadlinePassed={deadlinePassed !== null}
           />
-        </div>
-        <p className={styles.selectionSummary} data-testid="member-selection-summary">
-          {selectionSummary}
-        </p>
-        {capabilities?.models?.includes("football") && computeAvailable && (
-          <ModelComparison
-            request={request}
-            selected={shown?.envelope ?? null}
-            snapshot={view.source_snapshot_id}
-            client={client}
-            deadlinePassed={deadlinePassed !== null}
-            busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
-          />
-        )}
-        {adviceLoading ? (
-          <EmptyState title={copy.loadingAdvice} />
-        ) : shown ? (
-          <AdviceCard
-            shown={shown}
+          <MemberDecisionControls
+            entryId={entryId}
             members={members}
-            squad={squad}
-            rivalSquad={rivalSquad}
-            windowControl={windowControl}
+            index={selection.status === "index-error" ? null : index}
+            capabilities={capabilities}
+            part="notes"
           />
-        ) : computeOnly && !rejectedContext ? null : (
-          <MissingAdviceCard
-            issue={
-              rejectedContext
-                ? "context-mismatch"
-                : rejectedUnreadable
-                  ? "unavailable"
-                  : (adviceIssue ??
-                    (selection.status !== "ready" ? selection.status : "not-computed"))
-            }
-            reason={selection.reason}
-            onRetry={
-              adviceIssue === "index-error"
-                ? onRetryIndex
-                : rejectedContext ||
-                    rejectedUnreadable ||
-                    adviceIssue === "published-missing" ||
-                    adviceIssue === "unavailable"
-                  ? onRetryAdvice
-                  : undefined
-            }
-            canCompute={computeAvailable}
-          />
-        )}
-        <DecisionWorkbench
-          request={{
-            ...request,
-            top100Weight: selection.top100.weight,
-            managersWord: selection.evidence.on,
-            chip: selection.chip.chip,
-          }}
-          selected={shown?.envelope ?? null}
-          squad={squad}
-          loading={adviceLoading}
-        />
-      </section>
+        </ShellPortal>
+
+        <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
+          <div className={styles.decision} data-mark="decision">
+            <div className={styles.headingRow}>
+              <div className={styles.headingText}>
+                <h2 className={styles.decisionTitle} id="entry-advice-title">
+                  {copy.decisionTitle}
+                </h2>
+                <p className={styles.selectionSummary} data-testid="member-selection-summary">
+                  {selectionSummary}
+                </p>
+                <p className={styles.echo} aria-live="polite">
+                  {echo}
+                </p>
+              </div>
+              {!adviceLoading && shown ? <AdviceStamp shown={shown} /> : null}
+            </div>
+            {adviceLoading ? (
+              <EmptyState title={copy.loadingAdvice} />
+            ) : shown ? (
+              <AdviceDecision shown={shown} members={members} squad={squad} fixtures={fixtures} />
+            ) : computeOnly && !rejectedContext ? null : (
+              <MissingAdviceCard
+                issue={
+                  rejectedContext
+                    ? "context-mismatch"
+                    : rejectedUnreadable
+                      ? "unavailable"
+                      : (adviceIssue ??
+                        (selection.status !== "ready" ? selection.status : "not-computed"))
+                }
+                reason={selection.reason}
+                onRetry={
+                  adviceIssue === "index-error"
+                    ? onRetryIndex
+                    : rejectedContext ||
+                        rejectedUnreadable ||
+                        adviceIssue === "published-missing" ||
+                        adviceIssue === "unavailable"
+                      ? onRetryAdvice
+                      : undefined
+                }
+                canCompute={computeAvailable}
+              />
+            )}
+          </div>
+          {/* A phone reads the decision, then what to make of it, then the squad (as
+              D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed
+              in the document where they are seen, so the tab order follows the screen, and
+              they are keyed siblings, so crossing 600 px moves the existing elements rather
+              than making new ones: an open "Nasıl hesaplandı?" stays open. */}
+          {layout === "phone" ? [honesty, squadArea] : [squadArea, honesty]}
+          {!adviceLoading && shown ? (
+            <AdviceDetails
+              shown={shown}
+              squad={squad}
+              rivalSquad={rivalSquad}
+              windowControl={windowControl}
+            />
+          ) : null}
+        </section>
+
+        {viewer ? (
+          <Card tone="muted" title={copy.viewerTitle}>
+            <p className={styles.notice}>{copy.viewerBody}</p>
+            <p className={styles.notice}>
+              <strong>
+                {copy.viewerSelected(
+                  viewer.entryId === entryId
+                    ? (view.entry.manager_name ?? `#${viewer.entryId}`)
+                    : `#${viewer.entryId}`,
+                )}
+              </strong>{" "}
+              <Link className={styles.viewerAction} to="/league/members">
+                {copy.viewerChange}
+              </Link>{" "}
+              <button
+                type="button"
+                className={styles.viewerClear}
+                onClick={() => {
+                  clear();
+                  navigate("/league/members", { replace: true });
+                }}
+              >
+                {copy.viewerClear}
+              </button>
+            </p>
+            {viewer.entryId !== entryId ? (
+              <p className={styles.notice}>
+                <strong>{copy.notYourPageTitle}</strong> {copy.notYourPageBody}{" "}
+                <Link to={`/league/members/${viewer.entryId}`}>{copy.notYourPageLink}</Link>
+              </p>
+            ) : null}
+          </Card>
+        ) : null}
+
+        <div className={styles.tools}>
+          {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
+            <Tool title={copy.memberSquad}>
+              <HeldSquad squad={view} codes={codes} />
+            </Tool>
+          ) : null}
+          <Tool title={copy.advancedSettings}>
+            <MemberDecisionControls
+              entryId={entryId}
+              members={members}
+              index={selection.status === "index-error" ? null : index}
+              capabilities={capabilities}
+              part="advanced"
+            />
+            <TemplatePicker
+              canApply={(params) => {
+                const offered = resolve(params);
+                return (
+                  !adviceLoading &&
+                  indexReadable &&
+                  (offered.status === "ready" || offered.computable?.selection === true)
+                );
+              }}
+            />
+          </Tool>
+          <Tool title={copy.decisionTools}>
+            <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
+            <DecisionWorkbench
+              request={{
+                ...request,
+                top100Weight: selection.top100.weight,
+                managersWord: selection.evidence.on,
+                chip: selection.chip.chip,
+              }}
+              selected={shown?.envelope ?? null}
+              squad={squad}
+              loading={adviceLoading}
+            />
+            {capabilities?.models?.includes("football") && computeAvailable ? (
+              <ModelComparison
+                request={request}
+                selected={shown?.envelope ?? null}
+                snapshot={view.source_snapshot_id}
+                client={client}
+                deadlinePassed={deadlinePassed !== null}
+                busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
+              />
+            ) : null}
+          </Tool>
+          <Tool title={copy.chipsAndTransfers}>
+            <MemberResourceCards squad={view} />
+            <ChipForecastCard
+              published={indexReadable ? index?.chip_forecast : undefined}
+              computed={computedForecast}
+              squad={view}
+            />
+          </Tool>
+        </div>
+      </div>
+      {railPlacement === "column" ? rail : null}
+      {railPlacement === "sheet" ? createPortal(rail, document.body) : null}
     </div>
   );
 }

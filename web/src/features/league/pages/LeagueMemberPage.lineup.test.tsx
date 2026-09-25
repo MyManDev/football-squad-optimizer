@@ -1,10 +1,10 @@
 /**
  * The published decision is more than the moves: the card shows the armband, the chip,
  * the eleven and the bench order when the producer published them, and nothing invented
- * when it did not.
+ * when it did not. The pitch draws that week; its list view ('Liste') reads it out.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -14,8 +14,28 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+
+/**
+ * A row's figure and its unit: "8,0 xP" on screen, with "xP" hidden from a screen reader and
+ * "beklenen puan" read out in its place.
+ */
+const PRINTED = MESSAGES.tr.leagueMembers.pointsUnitAbbreviation;
+const SPOKEN = MESSAGES.tr.leagueMembers.pointsUnitSpoken;
+function figureCells(list: HTMLElement): HTMLElement[] {
+  const printed = within(list).queryAllByText(PRINTED);
+  const spoken = within(list).queryAllByText(SPOKEN);
+  expect(printed.every((unit) => unit.getAttribute("aria-hidden") === "true")).toBe(true);
+  expect(spoken.every((unit) => unit.classList.contains("visually-hidden"))).toBe(true);
+  expect(spoken.map((unit) => unit.parentElement)).toEqual(
+    printed.map((unit) => unit.parentElement),
+  );
+  const values = printed.map((unit) => unit.parentElement!);
+  for (const value of values) expect(value.textContent).toMatch(/^-?\d+(,\d+)? /);
+  return values;
+}
 
 afterEach(cleanup);
 
@@ -39,6 +59,13 @@ function renderAdvice(
   );
 }
 
+/** Switches the squad section from the pitch to its list, where the lineup is read out. */
+function openList(language: "tr" | "en" = "tr") {
+  const list = screen.getByRole("button", { name: MESSAGES[language].leagueMembers.viewList });
+  fireEvent.click(list);
+  expect(list).toHaveAttribute("aria-pressed", "true");
+}
+
 describe("the advice card carries the whole decision", () => {
   it("shows captain, vice-captain, chip, eleven and bench order from the payload", () => {
     const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
@@ -46,6 +73,9 @@ describe("the advice card carries the whole decision", () => {
     expect(payload.starting_xi).toHaveLength(11);
     expect(payload.bench).toHaveLength(4);
     renderAdvice(advice);
+    // The pitch is shown first; the list waits behind the toggle.
+    expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
+    openList();
 
     const lineup = screen.getByRole("region", { name: "Bu haftaki kadron" });
     expect(within(lineup).getByText("Kaptan")).toBeInTheDocument();
@@ -55,13 +85,76 @@ describe("the advice card carries the whole decision", () => {
     expect(within(lineup).getAllByText(payload.vice_captain!.name).length).toBeGreaterThan(0);
     // The bench is listed in the producer's order, goalkeeper first.
     expect(payload.bench![0]!.position).toBe("GK");
-    const rows = within(lineup).getAllByText(/xP$/);
+    const rows = figureCells(lineup);
     expect(rows).toHaveLength(15);
+  });
+
+  it("reads the week out one row a player, with the pitch's marks and a bar per figure", () => {
+    const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const payload = base.payload;
+    const eleven = payload.starting_xi!;
+    // One starter with no published figure: no bar, no figure, never a 0.
+    const silent = eleven[1]!;
+    const withSilent: EntryAdvice = {
+      ...payload,
+      starting_xi: eleven.map((player) => {
+        if (player.player_id !== silent.player_id) return player;
+        const { expected_points: _unstated, ...rest } = player;
+        return rest;
+      }),
+    };
+    renderAdvice({ ...base, payload: withSilent });
+    openList();
+    const lineup = screen.getByRole("region", { name: "Bu haftaki kadron" });
+    const [first, second] = within(lineup).getAllByRole("list");
+    const starters = within(first!).getAllByRole("listitem");
+    const bench = within(second!).getAllByRole("listitem");
+    expect(starters).toHaveLength(11);
+    expect(bench).toHaveLength(4);
+    const codes = MESSAGES.tr.positionCodes;
+    // The eleven lead with the position code, the bench with its published place.
+    starters.forEach((row, index) =>
+      expect(row.firstElementChild).toHaveTextContent(
+        codes[eleven[index]!.position as keyof typeof codes],
+      ),
+    );
+    expect(bench.map((row) => row.firstElementChild!.textContent)).toEqual(["1", "2", "3", "4"]);
+    // The bench adds the position word after the club, as the held list does.
+    expect(bench[0]).toHaveTextContent(MESSAGES.tr.positions.GK);
+    // The captain and vice-captain carry the pitch's marks, each on one row only.
+    const captain = within(lineup).getAllByRole("img", { name: MESSAGES.tr.squad.captainLabel });
+    expect(captain).toHaveLength(1);
+    expect(captain[0]!.closest("li")).toHaveTextContent(payload.captain!.name);
+    const vice = within(lineup).getAllByRole("img", { name: MESSAGES.tr.squad.viceCaptainLabel });
+    expect(vice).toHaveLength(1);
+    expect(vice[0]!.closest("li")).toHaveTextContent(payload.vice_captain!.name);
+    // Every player a move brings in is marked new, and nobody else.
+    const incoming = new Set(payload.moves.map((move) => move.player_in?.name));
+    for (const row of starters) {
+      const name = eleven.find((player) => row.textContent!.includes(player.name))!.name;
+      expect(within(row).queryByText(MESSAGES.tr.leagueMembers.boardNew) !== null).toBe(
+        incoming.has(name),
+      );
+    }
+    // The starter with no figure has neither a bar nor a number; the others have both.
+    const silentRow = starters.find((row) => row.textContent!.includes(silent.name))!;
+    expect(silentRow.textContent).not.toMatch(new RegExp(`${PRINTED}|${SPOKEN}`));
+    expect(silentRow.querySelector("[style]")).toBeNull();
+    expect(figureCells(lineup)).toHaveLength(14);
+    const bars = lineup.querySelectorAll<HTMLElement>("li [style]");
+    expect(bars).toHaveLength(14);
+    // One scale for the whole list: at least eight points, and at least the biggest figure.
+    const scale = Number(lineup.style.getPropertyValue("--scale"));
+    const figures = [...withSilent.starting_xi!, ...payload.bench!]
+      .map((player) => player.expected_points)
+      .filter((value): value is number => typeof value === "number");
+    expect(scale).toBeGreaterThanOrEqual(Math.max(8, ...figures));
   });
 
   it("names the chip the plan plays", () => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     renderAdvice({ ...base, payload: { ...base.payload, chip: "3xc" } }, "en");
+    openList("en");
     const lineup = screen.getByRole("region", { name: "Your gameweek" });
     expect(within(lineup).getByText("Triple Captain")).toBeInTheDocument();
   });
@@ -78,7 +171,9 @@ describe("the advice card carries the whole decision", () => {
       chip: null,
     };
     renderAdvice({ ...base, payload: stripped });
-    expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Bu haftaki kadron", hidden: true })).toBeNull();
+    // With no published eleven there is no list to switch to.
+    expect(screen.queryByRole("button", { name: "Liste" })).toBeNull();
   });
 
   it("shows no lineup for a legacy document that never carried the fields", () => {
@@ -93,13 +188,14 @@ describe("the advice card carries the whole decision", () => {
       ...legacy
     } = base.payload;
     renderAdvice({ ...base, payload: legacy as EntryAdvice });
-    expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Bu haftaki kadron", hidden: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Liste" })).toBeNull();
   });
 });
 
 describe("the published Free Hit squad basis", () => {
   it.each([
-    ["tr", "Free Hit oynadın; bu öneri GW 2 kadrona göre."],
+    ["tr", "Free Hit oynadın; bu öneri 2. hafta kadrona göre."],
     ["en", "Free Hit played; this advice stands on your GW 2 squad."],
   ] as const)("names the prior squad in %s", (language, expected) => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
@@ -135,8 +231,8 @@ describe("the published Free Hit squad basis", () => {
  */
 describe("a squad basis the two documents disagree about", () => {
   const UNCONFIRMED = {
-    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen above against your own team before using the moves below.",
-    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Aşağıdaki hamleleri kullanmadan önce yukarıdaki on beş oyuncuyu kendi takımınla karşılaştır.",
+    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen on this page against your own team before using these moves.",
+    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
   } as const;
 
   it.each(["en", "tr"] as const)("says so, and names neither week, in %s", (language) => {
@@ -181,6 +277,7 @@ describe("a squad basis the two documents disagree about", () => {
       renderAdvice({ ...base, payload }, language, squad);
       expect(screen.queryByText(UNCONFIRMED[language])).not.toBeInTheDocument();
       expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
+      openList(language);
       const lineup = language === "en" ? "Your gameweek" : "Bu haftaki kadron";
       expect(
         within(screen.getByRole("region", { name: lineup })).getByText("Wildcard"),

@@ -18,6 +18,7 @@ import pytest
 from squadopt.data.sources.club_news import ClubNewsError
 from squadopt.data.sources.club_news_coding import locate_quote
 from squadopt.data.sources.club_news_readable import (
+    FEED_MEDIA_TYPES,
     MARKUP_MEDIA_TYPES,
     PLAIN_MEDIA_TYPES,
     READABLE_TEXT_CONTRACT_VERSION,
@@ -147,9 +148,99 @@ def test_block_elements_separate_sentences_that_were_never_adjacent() -> None:
         locate_quote(readable, "He is fit Saka is out", "The claim")
 
 
+@pytest.mark.parametrize(
+    "page",
+    [
+        pytest.param(
+            b'<!DOCTYPE html><html><head><title>Team news</title><link rel="stylesheet" '
+            b'href="/site.css"></head><body><p>Smith is fit.</p><p>Jones is out.</p></body></html>',
+            id="unclosed-link-in-head",
+        ),
+        pytest.param(
+            b'<html><body><p>Smith is fit.</p><link rel="preload" href="/app.js">'
+            b"<p>Jones is out.</p></body></html>",
+            id="unclosed-link-between-paragraphs",
+        ),
+        pytest.param(
+            b'<!DOCTYPE html><meta charset="utf-8"><link rel="icon" href="/favicon.ico">'
+            b"<p>Smith is fit.</p><p>Jones is out.</p>",
+            id="unclosed-link-with-no-head-element",
+        ),
+        pytest.param(
+            b'<html><head><link rel="stylesheet" href="/site.css"/></head><body>'
+            b"<p>Smith is fit.</p><p>Jones is out.</p></body></html>",
+            id="self-closed-link-in-head",
+        ),
+    ],
+)
+def test_an_html_link_tag_does_not_silence_the_rest_of_the_page(page: bytes) -> None:
+    """In HTML ``<link>`` is a void element: it has no content and no end tag.
+
+    Counted as a silent region, an unclosed one opened a region nothing ever closed, and every
+    word after it was dropped. In ``head`` that refused the whole page; between paragraphs it
+    kept the first and lost the second, so a player written about below the tag read as a
+    player his club said nothing about.
+    """
+
+    readable = extract_readable_text(page, "text/html")
+
+    assert readable == b"Smith is fit.\nJones is out.\n"
+    assert locate_quote(readable, "Jones is out.", "The claim") == (14, 27)
+
+
+FEED = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Club news</title>
+<item><title>Smith back in training</title>
+<description><![CDATA[<p>The manager said <strong>Smith</strong> is fit for Saturday&rsquo;s \
+game.</p>]]></description>
+<link>https://club.example/news/1</link></item>
+<item><title>Jones a doubt</title>
+<description>Jones missed Friday &amp; is rated doubtful.</description></item>
+</channel></rss>"""
+
+
+def test_a_feed_item_body_is_read_and_its_sentence_can_be_quoted() -> None:
+    """A feed keeps an item's own markup inside ``CDATA``, and that is where the words are.
+
+    Dropped, the only sentence in this document a claim could cite disappears and the feed
+    reads as a list of headlines. The same rules do the work as on a page: the markup goes,
+    the entities resolve into the characters a person sees, and the locator finds the span.
+    """
+
+    readable = extract_readable_text(FEED, "application/rss+xml")
+    quote = "The manager said Smith is fit for Saturday\u2019s game."
+
+    assert quote.encode("utf-8") in readable
+    assert locate_quote(readable, quote, "The claim") == (33, 85)
+
+
+def test_a_feeds_structure_keeps_one_item_out_of_the_next() -> None:
+    """Two items are two sources, and a quote spanning the join was never on one page."""
+
+    readable = extract_readable_text(FEED, "application/rss+xml").decode("utf-8")
+
+    assert readable.splitlines() == [
+        "Club news",
+        "Smith back in training",
+        "The manager said Smith is fit for Saturday\u2019s game.",
+        "Jones a doubt",
+        "Jones missed Friday & is rated doubtful.",
+    ]
+    # The item's URL is not a sentence anybody said, and it is not offered as one.
+    assert "https://club.example/news/1" not in readable
+
+
+def test_a_feed_with_no_readable_text_is_refused_like_a_page() -> None:
+    """An empty feed is a read that did not work, not a club that published nothing."""
+
+    with pytest.raises(ReadableTextError, match="no readable text"):
+        extract_readable_text(b"<rss><channel></channel></rss>", "application/rss+xml")
+
+
 def test_the_extraction_declares_a_version() -> None:
     """Offsets written under one extractor do not mean the same thing under another."""
 
-    assert READABLE_TEXT_CONTRACT_VERSION == "readable_text_v1"
+    assert READABLE_TEXT_CONTRACT_VERSION == "readable_text_v3"
     assert "text/html" in MARKUP_MEDIA_TYPES
     assert "text/plain" in PLAIN_MEDIA_TYPES
+    assert "application/rss+xml" in FEED_MEDIA_TYPES
