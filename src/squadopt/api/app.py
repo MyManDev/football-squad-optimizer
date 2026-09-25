@@ -15,6 +15,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi import Path as ApiPath
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHttpException
 
 from squadopt.api.views import (
@@ -548,7 +549,11 @@ def create_app(
         if current.tzinfo is None or current.utcoffset() is None:
             raise ValueError("utc_now must return a timezone-aware datetime.")
 
-        outcome = advice_submit.submit(
+        # submit reads the cache and writes the queue on disk. Called directly from this
+        # async route it ran on the event loop and held every other request, /health
+        # included, until it returned; the plain-def routes already run in the thread pool.
+        outcome = await run_in_threadpool(
+            advice_submit.submit,
             league_id=league_id,
             entry_id=entry_id,
             strategy=strategy,
