@@ -50,6 +50,7 @@ reported.
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 from typing import NamedTuple
@@ -153,7 +154,8 @@ COMMAND_DOCUMENTS = (
 
 #: `python -m scripts.<name>`: the whole dotted name must be a module.
 COMMAND = re.compile(r"python3?(?:\.exe)?\s+-m\s+scripts\.([\w.<>{}*]+)")
-#: A backticked `scripts.<name>`: a module, or a name defined in one.
+#: A backticked `scripts.<name>`: a module, or a name a module binds at its top level (read
+#: from the module's source, see `_names_bound_at_top_level`).
 MODULE_NAME = re.compile(r"`scripts\.([\w.<>{}*]+)")
 #: `scripts/<name>.py`, backticked or not, and not the tail of a longer path.
 SCRIPT_PATH = re.compile(r"(?<![\w./-])scripts/([\w./<>{}*-]+?)\.py\b")
@@ -194,6 +196,65 @@ def _is_a_module(dotted: str) -> bool:
     return location.with_suffix(".py").is_file() or (location / "__main__.py").is_file()
 
 
+def _names_assigned(target: ast.expr) -> list[str]:
+    """The names an assignment target binds: `a`, and each name unpacked from a tuple or list.
+
+    An attribute or a subscript target binds no name of the module's own.
+    """
+
+    if isinstance(target, ast.Name):
+        return [target.id]
+    if isinstance(target, ast.Starred):
+        return _names_assigned(target.value)
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return [name for element in target.elts for name in _names_assigned(element)]
+    return []
+
+
+def _names_bound_at_top_level(source: str) -> frozenset[str]:
+    """The names a module binds by definition, assignment or import at its top level.
+
+    A statement nested in a top-level ``if`` or ``try`` counts too, since it also runs on
+    import. A name bound inside a function or a class does not, and neither does a ``for``,
+    ``with`` or ``:=`` target: a document citing one of those is reported, and should cite the
+    module instead.
+    """
+
+    bound: set[str] = set()
+    pending: list[ast.stmt] = list(ast.parse(source).body)
+    while pending:
+        statement = pending.pop()
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            bound.add(statement.name)
+        elif isinstance(statement, (ast.Import, ast.ImportFrom)):
+            bound.update(
+                (alias.asname or alias.name).partition(".")[0] for alias in statement.names
+            )
+        elif isinstance(statement, ast.Assign):
+            bound.update(name for target in statement.targets for name in _names_assigned(target))
+        elif isinstance(statement, ast.AnnAssign):
+            bound.update(_names_assigned(statement.target))
+        elif isinstance(statement, ast.If):
+            pending += [*statement.body, *statement.orelse]
+        elif isinstance(statement, (ast.Try, ast.TryStar)):
+            pending += [*statement.body, *statement.orelse, *statement.finalbody]
+            pending += [inner for handler in statement.handlers for inner in handler.body]
+    return frozenset(bound)
+
+
+def _is_bound_in_a_module(dotted: str) -> bool:
+    """Whether `<module>.<name>` names a module under scripts/ and a name it binds."""
+
+    module, _, name = dotted.rpartition(".")
+    if not module:
+        return False
+    location = SCRIPTS.joinpath(*module.split("."))
+    for source in (location.with_suffix(".py"), location / "__init__.py"):
+        if source.is_file():
+            return name in _names_bound_at_top_level(source.read_text(encoding="utf-8"))
+    return False
+
+
 def _removal_note_lines(lines: list[str]) -> frozenset[int]:
     """The line numbers, from 1, of every paragraph that says something has been removed."""
 
@@ -225,8 +286,7 @@ def _scripts_cited_in(document: Path, text: str) -> list[Citation]:
         for name in (raw.rstrip(".") for raw in COMMAND.findall(line)):
             cited.append((name, _is_a_module(name)))
         for name in (raw.rstrip(".") for raw in MODULE_NAME.findall(line)):
-            parent = name.rpartition(".")[0]
-            cited.append((name, _is_a_module(name) or (bool(parent) and _is_a_module(parent))))
+            cited.append((name, _is_a_module(name) or _is_bound_in_a_module(name)))
         for name in SCRIPT_PATH.findall(line):
             cited.append((name.replace("/", "."), (SCRIPTS / f"{name}.py").is_file()))
         found.extend(
@@ -268,8 +328,9 @@ def test_every_scripts_command_a_document_cites_exists() -> None:
     ]
     assert not missing, "\n".join(
         [
-            "these name no module under scripts/; a removed command's replacement is in "
-            "the 'Retired compatibility commands' table of scripts/README.md:",
+            "these name no module under scripts/, or a name their module does not bind; a "
+            "removed command's replacement is in the 'Retired compatibility commands' table of "
+            "scripts/README.md:",
             *missing,
         ]
     )
@@ -313,6 +374,77 @@ def test_a_removal_note_excuses_its_names_only_inside_the_note() -> None:
         (1, "gone_module"),
         (4, "run_season_tick"),
     ]
+
+
+def test_a_name_cited_in_a_module_is_one_the_module_binds() -> None:
+    """`scripts.<module>.<name>` claims the name as well as the file, so both are checked."""
+
+    text = "\n".join(
+        [
+            "See `scripts.run_frozen_holdout.main` here.",
+            "See `scripts.run_frozen_holdout.no_such_name` here.",
+            "See `scripts.no_such_module.main` here.",
+        ]
+    )
+    cited = _scripts_cited_in(REPOSITORY_ROOT / "README.md", text)
+
+    assert [(c.name, c.resolves) for c in cited] == [
+        ("run_frozen_holdout.main", True),
+        ("run_frozen_holdout.no_such_name", False),
+        ("no_such_module.main", False),
+    ]
+
+
+def test_a_module_binds_its_top_level_names_and_no_others() -> None:
+    """The source is parsed, not run, so a name that only appears in a target is a probe."""
+
+    source = "\n".join(
+        [
+            "import os.path",
+            "from json import dumps as to_json",
+            "LIMIT: int = 3",
+            "first, (second, [third, *rest]) = 1, (2, [3, 4])",
+            "TABLE = {}",
+            "TABLE[only_an_index] = 1",
+            "only_an_owner.attribute = 1",
+            "for loop_variable in range(1):",
+            "    FROM_A_LOOP = 1",
+            "class Runner:",
+            "    inside_the_class = 1",
+            "async def fetch() -> None: ...",
+            "def main() -> None:",
+            "    inside_the_function = 1",
+            "if True:",
+            "    FROM_AN_IF = 1",
+            "else:",
+            "    FROM_AN_ELSE = 1",
+            "try:",
+            "    import tomllib",
+            "except ImportError:",
+            "    FROM_A_HANDLER = None",
+            "finally:",
+            "    FROM_A_FINALLY = 1",
+        ]
+    )
+
+    assert _names_bound_at_top_level(source) == {
+        "os",
+        "to_json",
+        "LIMIT",
+        "first",
+        "second",
+        "third",
+        "rest",
+        "TABLE",
+        "Runner",
+        "fetch",
+        "main",
+        "FROM_AN_IF",
+        "FROM_AN_ELSE",
+        "tomllib",
+        "FROM_A_HANDLER",
+        "FROM_A_FINALLY",
+    }
 
 
 def test_the_protocol_allowance_covers_a_runner_and_nothing_else() -> None:
