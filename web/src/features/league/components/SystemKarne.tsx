@@ -13,8 +13,9 @@ type Series = "ours" | "league" | "game";
  * "Sistemin karnesi": SquadOpt's own paper squad week by week beside the league mean and
  * the FPL average, as horizontal bars on one scale for the whole chart (3 px a point where
  * the column allows), so a longer bar is always more points. Its good weeks and bad weeks are both
- * shown. Everything else the scoreboard says (scoring basis, live or replay, provisional
- * weeks, Top 100, the error breakdown) is one click away in the closed full scoreboard
+ * shown. A replay week is marked and the basis of the system's net is stated under the
+ * chart; everything else the scoreboard says (provisional weeks, Top 100, the error
+ * breakdown) is one click away in the closed full scoreboard
  * (SystemScoreboardDetails), which the page lays out at full width.
  */
 export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagueId: number }) {
@@ -39,7 +40,9 @@ export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagu
     game: copy.karneGame,
   };
   const describe = (week: KarneWeek) =>
-    `${copy.weekLabel(week.gameweek)}: ${(["ours", "league", "game"] as const)
+    `${copy.weekLabel(week.gameweek)}${week.replay ? ` (${copy.karneReplay})` : ""}: ${(
+      ["ours", "league", "game"] as const
+    )
       .map((series) => {
         const value = week[series];
         return `${names[series]} ${value === null ? copy.karneNone : format(series, value)}`;
@@ -77,6 +80,9 @@ export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagu
                   {week.provisional ? (
                     <span className={styles.provisional}>{board.provisional}</span>
                   ) : null}
+                  {week.replay && week.ours !== null ? (
+                    <span className={styles.provisional}>{copy.karneReplay}</span>
+                  ) : null}
                 </span>
                 <div className={styles.bars} role="img" aria-label={describe(week)}>
                   {(["ours", "league", "game"] as const).map((series) => {
@@ -102,6 +108,12 @@ export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagu
             ))}
           </ol>
           <p className={styles.caption}>{copy.karneCaption}</p>
+          {weeks.some((week) => week.ours !== null && week.namedEleven) ? (
+            <p className={styles.caption}>{copy.karneNamedEleven}</p>
+          ) : null}
+          {weeks.some((week) => week.ours !== null && week.replay) ? (
+            <p className={styles.caption}>{copy.karneReplayNote}</p>
+          ) : null}
         </>
       )}
     </section>

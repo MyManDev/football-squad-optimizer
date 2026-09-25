@@ -456,6 +456,13 @@ describe("the fixture rail", () => {
     expect(within(aside).queryByRole("table")).toBeNull();
   });
 
+  it("says the calendar is being read, not that it failed, while it loads", () => {
+    show("tr", { fixtures: null, fixturesPending: true });
+    const aside = rail();
+    expect(aside).toHaveTextContent(MESSAGES.tr.leagueMembers.railLoading);
+    expect(aside).not.toHaveTextContent(MESSAGES.tr.leagueMembers.railNoCalendar);
+  });
+
   it("leaves out the weeks the calendar does not list", () => {
     show("en", {
       fixtures: { ...CALENDAR, gameweeks: CALENDAR.gameweeks.slice(0, 2) },

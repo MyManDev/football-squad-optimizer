@@ -98,16 +98,18 @@ export function local(iso: string, locale = "en-GB"): string {
   });
 }
 
-/** The zone the league keeps its deadlines in, whatever zone the reader's device is set to. */
-export const DEADLINE_TIME_ZONE = "Europe/Istanbul";
-
 type DeadlineStyle = "long" | "short";
 
-function deadlineParts(iso: string, locale: string, style: DeadlineStyle) {
+function deadlineParts(
+  iso: string,
+  locale: string,
+  style: DeadlineStyle,
+  timeZone: string | undefined,
+) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   const parts = new Intl.DateTimeFormat(locale, {
-    timeZone: DEADLINE_TIME_ZONE,
+    timeZone,
     weekday: style,
     day: "numeric",
     month: style,
@@ -126,11 +128,13 @@ function deadlineParts(iso: string, locale: string, style: DeadlineStyle) {
 }
 
 /**
- * A deadline in Istanbul time, written out: '10 Ekim Cumartesi · 13:00' in Turkish,
- * 'Saturday 10 October · 13:00' in English. An unreadable timestamp is returned as given.
+ * A deadline in the reader's own time, as every other time on the site is, written out:
+ * '10 Ekim Cumartesi · 13:00' in Turkish, 'Saturday 10 October · 13:00' in English (the
+ * GW6 deadline on a device set to Istanbul). `timeZone` is for tests. An unreadable
+ * timestamp is returned as given.
  */
-export function deadlineLong(iso: string, locale = "en-GB"): string {
-  const parts = deadlineParts(iso, locale, "long");
+export function deadlineLong(iso: string, locale = "en-GB", timeZone?: string): string {
+  const parts = deadlineParts(iso, locale, "long", timeZone);
   if (parts === null) return iso;
   const date = isTurkish(locale)
     ? `${parts.day} ${parts.month} ${parts.weekday}`
@@ -142,8 +146,8 @@ export function deadlineLong(iso: string, locale = "en-GB"): string {
  * The same deadline for a narrow line: '10 Eki Cmt 13:00' in Turkish, 'Sat 10 Oct 13:00'
  * in English.
  */
-export function deadlineShort(iso: string, locale = "en-GB"): string {
-  const parts = deadlineParts(iso, locale, "short");
+export function deadlineShort(iso: string, locale = "en-GB", timeZone?: string): string {
+  const parts = deadlineParts(iso, locale, "short", timeZone);
   if (parts === null) return iso;
   return isTurkish(locale)
     ? `${parts.day} ${parts.month} ${parts.weekday} ${parts.time}`

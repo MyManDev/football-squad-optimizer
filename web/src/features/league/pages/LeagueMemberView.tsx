@@ -113,6 +113,7 @@ function LeagueMemberContent({
   windowControl = null,
   deadlinePassed = null,
   fixtures = null,
+  fixturesPending = false,
   leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
@@ -203,6 +204,7 @@ function LeagueMemberContent({
     <MemberFixtureRail
       placement={railPlacement}
       fixtures={fixtures}
+      pending={fixturesPending}
       season={view.season}
       gameweek={view.gameweek}
       moves={plan?.moves ?? []}

@@ -693,13 +693,22 @@ function GainStrip({
     squad.free_transfers_known === true &&
     Number.isSafeInteger(squad.free_transfers) &&
     squad.free_transfers >= 0;
+  // A Wildcard or Free Hit week makes its moves without spending a free transfer (the
+  // planner pins the ones used to zero and keeps those held), so it says that instead.
+  const weekChip = view.chip ?? view.chip_choice?.chip ?? null;
+  const unlimited = weekChip === "wildcard" || weekChip === "freehit";
   const facts = [
     // Free transfers used of those held: a move beyond them is a hit, stated beside it.
     freeKnown && view.moves.length > 0
-      ? copy.freeTransfersUsed(
-          Math.min(view.moves.length, squad.free_transfers),
-          squad.free_transfers,
-        )
+      ? unlimited
+        ? copy.freeTransfersKeptUnderChip(
+            copy.chipNames[weekChip] ?? weekChip,
+            squad.free_transfers,
+          )
+        : copy.freeTransfersUsed(
+            Math.min(view.moves.length, squad.free_transfers),
+            squad.free_transfers,
+          )
       : null,
     finiteNumber(hits) && view.moves.length > 0
       ? copy.hitPointsFact(hits.toLocaleString(locale, { maximumFractionDigits: 1 }))

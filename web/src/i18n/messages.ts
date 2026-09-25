@@ -92,6 +92,10 @@ const en = {
     dayShort: "d",
     none: "None.",
     rawJson: "Raw JSON",
+    pageFailed: "This page could not be drawn.",
+    pageFailedBody:
+      "The site may have been updated since this tab opened. Reloading fetches the current version.",
+    reload: "Reload",
   },
   shell: {
     skip: "Skip to content",
@@ -916,6 +920,8 @@ const en = {
     gainCaptionBeforeCost: (cost: string) =>
       `expected points against keeping the squad you hold, for the eleven with the captain doubled, before this week's transfer cost of ${cost}`,
     freeTransfersUsed: (used: number, free: number) => `${used}/${free} free transfers`,
+    freeTransfersKeptUnderChip: (chip: string, free: number) =>
+      `${chip}: none of the ${free} free transfers held is used`,
     hitPointsFact: (points: string) => `${points} hit points`,
     stampOptimal: "PROVEN · OPTIMAL",
     stampOptimalCaption: "Proved the best plan for its own objective.",
@@ -960,6 +966,7 @@ const en = {
     railLegendVenue: "H: home · A: away.",
     railLegendDifficulty: "Fixture difficulty is not shown.",
     railNoCalendar: "The fixture calendar is not available, so no match is shown here.",
+    railLoading: "Reading the fixture calendar.",
     railNoWeeks: "The calendar lists none of these gameweeks.",
     // Direction D's league table page: the system's record, the viewer's chips and chaser.
     karneTitle: "The system's record",
@@ -973,6 +980,11 @@ const en = {
     karneNone: "no record",
     karneCaption:
       "This is SquadOpt's own paper squad, not yours. Its good weeks and its bad weeks are both here.",
+    karneReplay: "replay",
+    karneNamedEleven:
+      "Its score counts the eleven it named, with no autosubs or vice-captain step, so it is not directly comparable with the members' official scores.",
+    karneReplayNote:
+      "A week marked replay was recorded after its deadline, so it was not a live decision.",
     karneFull: "The full scoreboard",
     chipsHalfNote: "Second-half chips are not open yet.",
     chipLine: {
@@ -1215,6 +1227,10 @@ const tr: MessageSchema<typeof en> = {
     dayShort: "g",
     none: "Yok.",
     rawJson: "Ham JSON",
+    pageFailed: "Bu sayfa çizilemedi.",
+    pageFailedBody:
+      "Site bu sekme açıldıktan sonra güncellenmiş olabilir. Yeniden yüklemek güncel sürümü getirir.",
+    reload: "Yeniden yükle",
   },
   shell: {
     skip: "İçeriğe geç",
@@ -2001,6 +2017,8 @@ const tr: MessageSchema<typeof en> = {
     gainCaptionBeforeCost: (cost) =>
       `beklenen puan, mevcut kadronu korumaya göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
     freeTransfersUsed: (used, free) => `${used}/${free} ücretsiz transfer`,
+    freeTransfersKeptUnderChip: (chip, free) =>
+      `${chip}: eldeki ${free} ücretsiz transfer kullanılmaz`,
     hitPointsFact: (points) => `${points} ceza puanı`,
     stampOptimal: "KANITLANDI · OPTIMAL",
     stampOptimalCaption: "Kendi hedefine göre en iyi plan olduğu kanıtlandı.",
@@ -2043,6 +2061,7 @@ const tr: MessageSchema<typeof en> = {
     railLegendVenue: "E: ev · D: deplasman.",
     railLegendDifficulty: "Fikstür zorluk derecesi gösterilmez.",
     railNoCalendar: "Fikstür takvimi okunamadı; bu yüzden burada maç gösterilmiyor.",
+    railLoading: "Fikstür takvimi okunuyor.",
     railNoWeeks: "Takvim bu haftaların hiçbirini listelemiyor.",
     karneTitle: "Sistemin karnesi",
     karneLede:
@@ -2054,6 +2073,11 @@ const tr: MessageSchema<typeof en> = {
     karneNone: "kayıt yok",
     karneCaption:
       "Bu, SquadOpt'un kendi kâğıt kadrosu; senin kadron değil. İyi haftası da kötü haftası da burada.",
+    karneReplay: "sonradan kayıt",
+    karneNamedEleven:
+      "Puanı belirlediği ilk on birin puanıdır; otomatik yedek ve yedek kaptan devreye girmez, bu yüzden üyelerin resmi puanlarıyla birebir karşılaştırılamaz.",
+    karneReplayNote:
+      "“Sonradan kayıt” yazan hafta son karardan sonra kaydedildi; canlı bir karar değildi.",
     karneFull: "Tüm skor tablosu",
     chipsHalfNote: "İkinci yarı çipleri henüz açılmadı.",
     chipLine: {

@@ -114,6 +114,7 @@ export function LeagueMemberPage() {
       computePending={computePending}
       deadlinePassed={deadlinePassed}
       fixtures={fixtures.data ?? null}
+      fixturesPending={fixtures.isPending}
       leagueName={membersQuery.data?.payload.league_name}
     />
   );

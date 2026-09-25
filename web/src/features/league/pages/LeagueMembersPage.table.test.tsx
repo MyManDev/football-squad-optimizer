@@ -259,6 +259,22 @@ describe.each(["tr", "en"] as const)("the system's record beside the table in %s
     // A provisional week says so beside its name.
     expect(karne).toHaveTextContent(scoreboard.provisional);
     expect(karne.textContent).not.toMatch(AS_A_CHANCE);
+    // The system's net is on the named-eleven basis, and the record says so.
+    expect(karne).toHaveTextContent(copy.karneNamedEleven);
+    // No week here was recorded after its deadline, so nothing is marked replay.
+    expect(karne).not.toHaveTextContent(copy.karneReplayNote);
+  });
+
+  it("marks a week the system recorded after its deadline as replay", () => {
+    const replay = week(2, 68, 79.7, 70);
+    replay.ours!.mode = "replay";
+    show({ scoreboard: board([week(1, 26, 54.3, 50), replay]) }, language);
+    const karne = screen.getByRole("region", { name: copy.karneTitle });
+    const weeks = within(karne).getAllByRole("img");
+    expect(weeks[1]).toHaveAccessibleName(new RegExp(`\\(${copy.karneReplay}\\)`));
+    expect(weeks[0]).not.toHaveAccessibleName(new RegExp(copy.karneReplay));
+    expect(within(karne).getAllByText(copy.karneReplay)).toHaveLength(1);
+    expect(karne).toHaveTextContent(copy.karneReplayNote);
   });
 
   it("keeps the whole scoreboard, with its basis and modes, one click away and closed", () => {

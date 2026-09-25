@@ -93,7 +93,8 @@ function WeekHead({ weeks }: { weeks: readonly number[] }) {
  * Everything is read from the published fixture calendar and joined to the players by
  * club. A home match is a filled cell and an away match an outlined one, and that is the
  * only encoding: no difficulty is rated or coloured. A week the calendar does not list is
- * left out; a blank week says so; with no calendar the rail says that and nothing else.
+ * left out; a blank week says so; with no calendar the rail says that and nothing else,
+ * and while the calendar is still being read it says only that.
  *
  * On a phone it is a sheet over the page, opened from the phone bar through the shell: it
  * is a modal dialog while open, takes focus to its close button, and the shell locks and
@@ -102,6 +103,7 @@ function WeekHead({ weeks }: { weeks: readonly number[] }) {
 export function MemberFixtureRail({
   placement,
   fixtures,
+  pending = false,
   season,
   gameweek,
   moves,
@@ -110,6 +112,7 @@ export function MemberFixtureRail({
 }: {
   placement: RailPlacement;
   fixtures: FixturesPayload | null;
+  pending?: boolean;
   season: string;
   gameweek: number;
   moves: readonly AdviceMove[];
@@ -179,7 +182,7 @@ export function MemberFixtureRail({
       </div>
       <div className={styles.body}>
         {!fixtures ? (
-          <p className={styles.quiet}>{copy.railNoCalendar}</p>
+          <p className={styles.quiet}>{pending ? copy.railLoading : copy.railNoCalendar}</p>
         ) : weeks.length === 0 ? (
           <p className={styles.quiet}>{copy.railNoWeeks}</p>
         ) : (

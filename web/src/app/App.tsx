@@ -7,6 +7,7 @@ import { PageShell } from "../design/components/PageShell";
 import { useViewerEntry } from "../features/league/identity/useViewerEntry";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
+import { RouteErrorBoundary } from "./RouteErrorBoundary";
 
 const SquadPage = lazy(() =>
   import("../features/squad/pages/SquadPage").then((m) => ({ default: m.SquadPage })),
@@ -72,28 +73,30 @@ function LocalizedApp({ basename }: { basename: string }) {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
         <PageShell viewerEntryId={viewer?.entryId ?? null}>
-          <Suspense fallback={<EmptyState title={messages.common.loading} />}>
-            <Routes>
-              <Route path="/" element={<LeagueEntryPage />} />
-              <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
-              <Route path="/moves" element={<MovesPage />} />
-              <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
-              <Route path="/rivals" element={<RivalsPage />} />
-              <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
-              <Route path="/league" element={<LeaguePage />} />
-              <Route path="/league/members" element={<LeagueMembersPage />} />
-              <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
-              <Route
-                path="/league/members/:entryId/history"
-                element={<LeagueMemberHistoryPage />}
-              />
-              <Route path="/fixtures" element={<FixturesPage />} />
-              <Route path="/contribute" element={<ContributePage />} />
-              <Route path="/status" element={<StatusPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />
-            </Routes>
-          </Suspense>
+          <RouteErrorBoundary>
+            <Suspense fallback={<EmptyState title={messages.common.loading} />}>
+              <Routes>
+                <Route path="/" element={<LeagueEntryPage />} />
+                <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
+                <Route path="/moves" element={<MovesPage />} />
+                <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
+                <Route path="/rivals" element={<RivalsPage />} />
+                <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
+                <Route path="/league" element={<LeaguePage />} />
+                <Route path="/league/members" element={<LeagueMembersPage />} />
+                <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
+                <Route
+                  path="/league/members/:entryId/history"
+                  element={<LeagueMemberHistoryPage />}
+                />
+                <Route path="/fixtures" element={<FixturesPage />} />
+                <Route path="/contribute" element={<ContributePage />} />
+                <Route path="/status" element={<StatusPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />
+              </Routes>
+            </Suspense>
+          </RouteErrorBoundary>
         </PageShell>
       </BrowserRouter>
     </QueryClientProvider>

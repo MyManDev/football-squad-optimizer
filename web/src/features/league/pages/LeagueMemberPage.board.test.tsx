@@ -17,6 +17,7 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { deadlineLong } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
 import { HttpAdviceClient } from "../advice/adviceClient";
 import { writeViewerEntry } from "../identity/useViewerEntry";
@@ -189,9 +190,9 @@ describe("the top bar", () => {
     expect(headings).toHaveLength(1);
     expect(headings[0]).toHaveTextContent(SQUAD.payload.entry.team_name!);
     expect(screen.getByText(`${GW}. hafta`)).toBeInTheDocument();
-    // The calendar's deadline, in Istanbul time: 10:00 UTC is 13:00 there.
+    // The calendar's deadline in the reader's own time (13:00 on a device set to Istanbul).
     expect(screen.getByText("Son karar")).toBeInTheDocument();
-    expect(screen.getByText("10 Ekim Cumartesi · 13:00")).toBeInTheDocument();
+    expect(screen.getByText(deadlineLong("2026-10-10T10:00:00Z", "tr-TR"))).toBeInTheDocument();
   });
 
   it("shows the published standing in the score bug", () => {
@@ -380,6 +381,25 @@ describe("the gain strip and the captain line", () => {
     expect(screen.getByText(copy.freeTransfersUsed(1, 1))).toBeInTheDocument();
     expect(screen.queryByText(copy.freeTransfersUsed(2, 1))).toBeNull();
     expect(screen.getByText(copy.hitPointsFact("4"))).toBeInTheDocument();
+  });
+
+  it("says a Wildcard or Free Hit week spends none of the free transfers held", () => {
+    const squad: LeagueViewEnvelope<EntrySquad> = structuredClone(SQUAD);
+    squad.payload.free_transfers_known = true;
+    squad.payload.free_transfers = 5;
+    const copy = MESSAGES.tr.leagueMembers;
+    for (const chip of ["wildcard", "freehit"] as const) {
+      show("tr", { squad, advice: twoMoves({ chip, transfer_hit_points: 0 }) });
+      expect(
+        screen.getByText(copy.freeTransfersKeptUnderChip(copy.chipNames[chip]!, 5)),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(copy.freeTransfersUsed(2, 5))).toBeNull();
+      expect(screen.getByText(copy.hitPointsFact("0"))).toBeInTheDocument();
+      cleanup();
+    }
+    // A Bench Boost week still counts its moves against the free transfers.
+    show("tr", { squad, advice: twoMoves({ chip: "bboost" }) });
+    expect(screen.getByText(copy.freeTransfersUsed(2, 5))).toBeInTheDocument();
   });
 
   it("names no free-transfer fact the squad does not publish", () => {
