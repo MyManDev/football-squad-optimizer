@@ -248,7 +248,10 @@ capture without one refuses the switch with `TOP100_INPUTS_UNAVAILABLE` or
 
 An explicit
 `Idempotency-Key` is supported; the advice submission service also handles its absence.
-Reusing an explicit key with a different request conflicts. Equivalent open work is deduplicated,
+Reusing an explicit key with a different request conflicts. One API process serializes that key
+check with the enqueue, so it holds for two requests sent at the same moment; two API processes
+over one store do not share that lock, and at the same moment each can accept the key for a
+different request. Equivalent open work is deduplicated,
 and configured request buckets can reject excess submissions. The in-memory limiter is per API
 process; replicas do not share it automatically.
 

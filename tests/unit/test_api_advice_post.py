@@ -4,9 +4,10 @@ import json
 import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
-from threading import Barrier, Event, Lock, Thread
+from threading import Barrier, BrokenBarrierError, Event, Lock, Thread
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1003,3 +1004,42 @@ def test_the_rate_limiter_counts_every_thread() -> None:
         sys.setswitchinterval(interval)
     assert len(allowed) == 8
     assert sum(allowed) == 2000
+
+
+def test_one_key_sent_for_two_requests_at_once_is_still_a_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _cache, queue = _world(tmp_path)
+    scan = queue.jobs
+    both_read = Barrier(2)
+
+    def history() -> tuple[AdviceJob, ...]:
+        # Holds each submission after its history read until the other has read too, so
+        # an unserialized check lets both see an empty history and both enqueue. Serialized,
+        # the second can never arrive while the first waits, and the timeout lets it go.
+        found = scan()
+        with suppress(BrokenBarrierError):
+            both_read.wait(timeout=2)
+        return found
+
+    monkeypatch.setattr(queue, "jobs", history)
+    key = {"Idempotency-Key": "client:shared:1"}
+    requests = (BODY, {**BODY, "window": 3})
+    # One client is one event loop, shared by both requests as uvicorn's one loop is.
+    with TestClient(client.app) as shared, ThreadPoolExecutor(max_workers=2) as posters:
+        answers = list(
+            posters.map(lambda body: shared.post(ADVICE_URL, json=body, headers=key), requests)
+        )
+    monkeypatch.setattr(queue, "jobs", scan)
+
+    assert sorted(answer.status_code for answer in answers) == [202, 409]
+    accepted, refused = sorted(answers, key=lambda answer: answer.status_code)
+    assert refused.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert [
+        job.job_id for job in queue.jobs() if job.idempotency_key == key["Idempotency-Key"]
+    ] == [accepted.json()["job_id"]]
+    # The accepted request keeps its key: replayed, it is the same job, not a conflict.
+    body = requests[answers.index(accepted)]
+    replay = client.post(ADVICE_URL, json=body, headers=key)
+    assert replay.status_code == 202
+    assert replay.json()["job_id"] == accepted.json()["job_id"]
