@@ -457,6 +457,29 @@ def test_a_record_with_no_rule_pick_says_so_rather_than_leaving_the_key_out(
     assert record["told"]["source"] == "page_default"
 
 
+def test_an_older_told_block_is_refused_rather_than_rewritten_into_the_new_one(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A capture recorded before ``page_default`` keeps its record; rebuilding it is refused.
+
+    The fix applies to records written from now on. An older record of the same capture
+    differs in ``told.source`` and lacks ``suggested_strategy``, and both are named.
+    """
+
+    fresh = tmp_path / "fresh"
+    _build(world, tmp_path / "first", record_root=fresh)
+    older: dict[str, Any] = load_member_advice_record(fresh, SEASON, 2, 101, world["gw2_id"])
+    del older["suggested_strategy"]
+    older["told"]["source"] = "baseline"
+    records = tmp_path / "records"
+    record_member_advice(records, older)
+    with pytest.raises(AdviceRecordConflictError) as refusal:
+        _build(world, tmp_path / "second", record_root=records)
+    assert "told.source: recorded 'baseline', now 'page_default'" in str(refusal.value)
+    assert "suggested_strategy: recorded absent, now" in str(refusal.value)
+    assert load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"]) == older
+
+
 def test_writing_the_record_does_not_move_a_single_published_byte(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
