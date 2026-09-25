@@ -38,6 +38,8 @@ export interface Top100Copy {
   honesty: string;
   unchanged: string;
   changed: string;
+  /** The same, where no price is printed above to point at. */
+  changedNoPrice: string;
   cost: (points: string) => string;
   costAtMost: (points: string) => string;
   combinedCost: (points: string) => string;
@@ -96,6 +98,7 @@ const en: Top100Copy = {
     "This is the price of a preference; no points gain from this setting has been measured. The points on the card are the base model's, without the setting.",
   unchanged: "This setting did not change your plan this week.",
   changed: "This setting changed your plan; the price is stated above.",
+  changedNoPrice: "This setting changed your plan.",
   cost: (points) =>
     `This setting gives up ~${points} expected points in the base model against the pure-points plan at 0, hits included.`,
   costAtMost: (points) =>
@@ -156,6 +159,7 @@ const tr: Top100Copy = {
     "Bu bir tercihin bedelidir; bu ayarın puan kazandırdığı ölçülmedi. Karttaki puanlar ayarsız temel modelin puanlarıdır.",
   unchanged: "Bu ayar bu hafta planını değiştirmedi.",
   changed: "Bu ayar planını değiştirdi; bedeli yukarıda yazılı.",
+  changedNoPrice: "Bu ayar planını değiştirdi.",
   cost: (points) =>
     `Bu ayar, 0 ayarlı saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
   costAtMost: (points) =>
