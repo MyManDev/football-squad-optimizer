@@ -23,7 +23,11 @@ from scripts.export_decided_appearance import (
     settled_weeks,
 )
 
-from squadopt.live.recommendation import InSeasonProjection, write_projection_handoff
+from squadopt.live.recommendation import (
+    InSeasonProjection,
+    read_projection_handoff,
+    write_projection_handoff,
+)
 
 SEASON = "2026-27"
 CAPTURE = "fpl-live-20260918T122516Z-cd5c04029774"
@@ -75,7 +79,9 @@ def _never(_: InSeasonProjection) -> tuple[pd.DataFrame, dict[str, object]]:
 def _data_root(tmp_path: Path, decided: InSeasonProjection, *others: InSeasonProjection) -> Path:
     root = tmp_path / "data"
     kept = root / "handoffs" / "by-capture" / CAPTURE
-    for index, handoff in enumerate((*others, decided)):
+    # The decided handoff is written second when there are others, so it sorts neither
+    # first nor last and neither end of the kept list can stand in for the ledger's choice.
+    for index, handoff in enumerate((*others[:1], decided, *others[1:])):
         write_projection_handoff(kept / f"{index:02d}.json", handoff)
     ledger = root / "ledger" / SEASON / "gw05"
     ledger.mkdir(parents=True)
@@ -93,9 +99,22 @@ WEEK = SettledWeek(season=SEASON, gameweek=5, decision_capture=CAPTURE)
 
 
 def test_the_handoff_read_is_the_one_the_ledger_decided_from(tmp_path: Path) -> None:
+    """Three handoffs kept for the capture and the decided one between the other two.
+
+    With the decided handoff first or last, "take the first kept" or "take the last kept"
+    would pass for the ledger's choice; in the middle only the fingerprint finds it.
+    """
+
     decided = _handoff({1: 2.0, 2: 1.0})
     replay = _handoff({1: 2.5, 2: 1.0})
-    root = _data_root(tmp_path, decided, replay)
+    elite = _handoff({1: 2.6, 2: 1.0})
+    root = _data_root(tmp_path, decided, replay, elite)
+    kept = sorted((root / "handoffs" / "by-capture" / CAPTURE).glob("*.json"))
+    assert [read_projection_handoff(path).fingerprint for path in kept] == [
+        replay.fingerprint,
+        decided.fingerprint,
+        elite.fingerprint,
+    ]
 
     assert decided_handoff(root, WEEK).fingerprint == decided.fingerprint
 
