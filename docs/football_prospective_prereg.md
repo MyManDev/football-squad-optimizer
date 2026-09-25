@@ -47,25 +47,49 @@ deadlines in the bootstrap of the newest capture:
 | 5 | 2026-09-18T17:30:00Z | one, for `fpl-live-20260918T122516Z-cd5c04029774`, file written 2026-09-21T16:48Z, after the deadline | `phase_c_control_components_v1` | settled, and already read (above) |
 | 6 | 2026-10-10T10:00:00Z | two, for `fpl-live-20260922T195839Z-3b81864cd038` and `fpl-live-20260922T214539Z-364991a4f832`, both written on 2026-09-22 | `phase_c_control_components_v1` for both | not played |
 
+Each capture named in the table has its row's gameweek as its own target (defined in the next
+section).
+
 The member option was released on 2026-09-21 (#763, #764), after the gameweek 5 deadline.
 Gameweek 6 is therefore the first week in which a member could choose it before entries
 locked.
 
 ## Which capture a gameweek is scored from
 
-The scored capture is the last `fpl-live` capture whose capture instant precedes the
-gameweek's deadline. When entries lock, that is the capture the backend answers from
-(`latest_snapshot_id` in `src/squadopt/platform/capture_context.py`). Both arms are read for
-that capture and no other. If it has no usable football artifact, the football option was not
-on offer when entries locked, and the week is missing (see below). An earlier capture's
-artifact is never used in its place.
+The scored capture is the last `fpl-live` capture, by capture instant, whose own target is the
+gameweek. A capture's own target is
+`read_inputs(snapshot, season=..., gameweek=None).deadline.gameweek`
+(`src/squadopt/live/recommendation.py`): the earliest deadline that the capture's own
+bootstrap shows still open at its capture instant. A capture that targets the gameweek was
+therefore taken before the gameweek's deadline and, since deadlines rise with the gameweek,
+not before the previous gameweek's deadline.
+
+Being taken before the deadline is not enough. A capture taken before the previous
+gameweek's deadline also precedes this one's, but its own target is an earlier gameweek.
+Its football artifact is that gameweek's forecast (`read_football_forecast` refuses an
+artifact whose `gameweek` is not the capture's own target), and its handoff is that
+gameweek's (`load_capture_identity` pairs a capture with the handoff for its own target).
+Nobody could have had this gameweek's advice from it either: `advise_entry`
+(`src/squadopt/application/advice.py`) refuses a request for any gameweek other than the
+capture's own, and the backend takes no new advice work from a capture once that capture's
+own deadline has passed (`DeadlinePassedError` in `src/squadopt/platform/advice_submit.py`).
+
+The scored capture is the newest capture the backend could have answered this gameweek from.
+The backend serves the newest live capture (`latest_snapshot_id` in
+`src/squadopt/platform/capture_context.py`) unless the published league pages name another
+capture that has a matching handoff (`src/squadopt/platform/backend_runtime.py`). Both arms
+are read for the scored capture and no other. If it has no usable football artifact, the week
+is missing (see below). No other capture's artifact is used in its place: not an earlier
+capture of the same gameweek, and never a capture whose own target is another gameweek.
 
 ## The two arms
 
 - **Football.** The `football_team_share_v1` artifact for the scored capture, as
   `scripts/build_football_forecast.py` writes it without `--contextual`. It is read by
-  `read_football_forecast` (`src/squadopt/live/football_artifact.py`), which applies the
-  capture's availability. The first week of that forecast is the decided forecast. Top 100
+  `read_football_forecast` (`src/squadopt/live/football_artifact.py`) with the capture's
+  inputs read for its own target, as the backend reads them, and the reader applies the
+  capture's availability. The reader requires the artifact's first week to be that target,
+  so the first week is the scored gameweek, and it is the decided forecast. Top 100
   weight is zero and the manager's word is off. The arm includes v1's known limit: its goal and
   assist shares are split before availability is applied, so what availability removes from an
   absent player is not passed to his teammates (#829 states this in `live-football-model.md`).
@@ -160,7 +184,11 @@ difference comes from.
 Every gameweek from the first scored one to the reading's last appears in the record. A gameweek is
 missing when any of the following holds, and the record lists it with its reason:
 
-- no `fpl-live` capture precedes its deadline;
+- no `fpl-live` capture targets it, because none was taken between the previous gameweek's
+  deadline and its own. The last capture before its deadline then targets an earlier
+  gameweek, and the week is not scored from it: that capture's artifact and handoff are the
+  earlier gameweek's, and the backend took no new advice work from it once that gameweek's
+  deadline had passed (`DeadlinePassedError` in `src/squadopt/platform/advice_submit.py`);
 - the scored capture has no `football_team_share_v1` artifact, or the artifact file was written
   at or after the deadline, or it names another model version;
 - the backend cannot pair the scored capture with exactly one handoff;
@@ -198,7 +226,10 @@ Expectations:
 ## When it is read
 
 - **Between the dates below, no outcome is read.** At any time, the runner may check inputs
-  (which weeks have both arms, and which are missing and why) without reading an outcome.
+  without reading an outcome. The check reports, for each week, the scored capture and its own
+  target (for a week no capture targets, the last capture before its deadline and the
+  gameweek that capture targets), which weeks have both arms, and which are missing and why.
+  A week whose capture targets another gameweek shows up there, before any outcome is read.
 - **Interim**, after gameweek 20 settles: all three readings over the scored weeks up to
   gameweek 20. Only the harm clause below may be applied.
 - **Final**, after gameweek 38 settles: all three readings over every scored week. The verdict
@@ -258,11 +289,11 @@ The record follows ADR 0003 (`architecture/decisions/0003-measurement-artifacts.
 
 - **Record, committed.** `football_prospective_gw20.json` and `football_prospective_gw38.json`
   in `docs/`, each with its markdown twin and a row in `measurements_index.md`. Each holds, per
-  gameweek: the scored capture, the artifact fingerprint and write time, the handoff
-  fingerprint and model version, both arms' realized squad scores and solver statuses,
-  reading two's counts and means, reading three's summaries, and the pooled statistics with
-  the verdict or the reason there is none. The second reading is a new record and leaves the
-  first as it was.
+  gameweek: the scored capture and its own target, the artifact fingerprint and write time,
+  the handoff fingerprint and model version, both arms' realized squad scores and solver
+  statuses, reading two's counts and means, reading three's summaries, and the pooled
+  statistics with the verdict or the reason there is none. The second reading is a new record
+  and leaves the first as it was.
 - **Evidence, not committed.** The per-player forecast and outcome rows, and the per-member
   plans, go under `artifacts/`. They are expansions of licence-restricted captures.
 - **Operational state, read only.** Captures, handoffs and artifacts are read through their
