@@ -5,6 +5,8 @@ meaning, so exercising it needs no live source and no network.
 """
 
 import json
+import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -96,6 +98,51 @@ def test_metadata_serialization_is_byte_identical_for_identical_captures(tmp_pat
     assert (tmp_path / "a" / first / METADATA_FILENAME).read_bytes() == (
         tmp_path / "b" / second / METADATA_FILENAME
     ).read_bytes()
+
+
+def test_metadata_is_written_with_lf_line_endings_on_every_platform(tmp_path: Path) -> None:
+    """A real Windows capture's metadata carried 62 CRLF endings; the bytes now match Linux's."""
+
+    identifier = _write(tmp_path)
+    raw = (tmp_path / identifier / METADATA_FILENAME).read_bytes()
+
+    assert b"\r" not in raw
+    assert raw == (json.dumps(json.loads(raw), indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def test_metadata_leaves_no_staging_file_beside_it(tmp_path: Path) -> None:
+    identifier = _write(tmp_path)
+
+    assert sorted(entry.name for entry in (tmp_path / identifier).iterdir()) == [
+        METADATA_FILENAME,
+        PAYLOAD_DIRECTORY,
+    ]
+
+
+def test_a_metadata_write_that_dies_part_way_leaves_no_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bytes are staged in a sibling, so a writer that dies leaves an interrupted capture.
+
+    The write dies after the metadata bytes are written and before they are published. What
+    it leaves must be a directory with no metadata, which no listing counts as a capture,
+    and not a half-written file that would be listed as the newest one.
+    """
+
+    earlier = _write(tmp_path, captured_at="2026-08-21T15:00:00Z")
+
+    def die(descriptor: int) -> None:
+        raise OSError("the writer was stopped")
+
+    monkeypatch.setattr(os, "fsync", die)
+    with pytest.raises(OSError, match="the writer was stopped"):
+        _write(tmp_path)
+    monkeypatch.undo()
+
+    interrupted = [entry for entry in tmp_path.iterdir() if entry.name != earlier]
+    assert len(interrupted) == 1
+    assert sorted(entry.name for entry in interrupted[0].iterdir()) == [PAYLOAD_DIRECTORY]
+    assert list_snapshot_ids(tmp_path, source=SOURCE) == (earlier,)
 
 
 def test_a_later_capture_of_the_same_bytes_is_a_different_snapshot(tmp_path: Path) -> None:
@@ -339,6 +386,52 @@ def test_a_directory_without_metadata_is_not_listed_as_a_snapshot(tmp_path: Path
     (tmp_path / "fpl-live-20260821T170000Z-abcabcabcabc" / PAYLOAD_DIRECTORY).mkdir(parents=True)
 
     assert list_snapshot_ids(tmp_path) == (identifier,)
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        (b'{\n  "captured_at_utc": "2026-08-21T17:0', "cannot be read as JSON"),
+        (b"", "cannot be read as JSON"),
+        (b"\xff\xfe\x00not text", "cannot be read as JSON"),
+        (b"[]\n", "is not a JSON object"),
+    ],
+    ids=["truncated", "empty", "not text", "not an object"],
+)
+def test_a_capture_whose_metadata_does_not_parse_is_skipped_and_logged(
+    content: bytes, reason: str, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Consumers take the last listed capture, so an unreadable newest one must not be listed.
+
+    The earlier capture stays the newest, and the skipped directory is named in the log so
+    an operator can see why the listing ended where it did.
+    """
+
+    earlier = _write(tmp_path, captured_at="2026-08-21T16:00:00Z")
+    broken = _write(tmp_path, captured_at="2026-08-21T17:00:00Z")
+    (tmp_path / broken / METADATA_FILENAME).write_bytes(content)
+
+    with caplog.at_level(logging.WARNING, logger="squadopt.data.snapshots"):
+        assert list_snapshot_ids(tmp_path, source=SOURCE) == (earlier,)
+        assert list_snapshot_ids(tmp_path) == (earlier,)
+
+    assert any(broken in record.getMessage() for record in caplog.records)
+    assert all(reason in record.getMessage() for record in caplog.records)
+
+
+def test_another_sources_broken_metadata_is_not_opened_for_a_filtered_listing(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The filter comes first, so asking for one source does not log another's damage."""
+
+    live = _write(tmp_path)
+    cohort = _write(tmp_path, source="fpl-top100")
+    (tmp_path / cohort / METADATA_FILENAME).write_bytes(b"{")
+
+    with caplog.at_level(logging.WARNING, logger="squadopt.data.snapshots"):
+        assert list_snapshot_ids(tmp_path, source=SOURCE) == (live,)
+
+    assert caplog.records == []
 
 
 def test_listing_an_absent_root_is_empty_rather_than_an_error(tmp_path: Path) -> None:
