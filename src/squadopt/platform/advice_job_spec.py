@@ -34,6 +34,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Protocol
 
+from squadopt.platform._damaged_entry import (
+    PUBLISH_ATTEMPTS,
+    is_damaged,
+    quarantine,
+    read_entry,
+)
 from squadopt.platform.advice_read import AdviceRequestContext
 
 __all__ = [
@@ -199,9 +205,8 @@ class FileAdviceJobSpecStore:
         return self._root / key[:2] / f"{key}.json"
 
     def get(self, key: str) -> AdviceJobSpec | None:
-        try:
-            raw = self._path(key).read_bytes()
-        except FileNotFoundError:
+        raw = read_entry(self._path(key))
+        if raw is None:
             return None
         try:
             document = json.loads(raw)
@@ -212,11 +217,20 @@ class FileAdviceJobSpecStore:
         return AdviceJobSpec.from_payload(document)
 
     def put(self, key: str, spec: AdviceJobSpec) -> None:
-        """Write once. The same meaning again is a no-op; a different one is a defect."""
+        """Write once. The same meaning again is a no-op; a different one is a defect.
+
+        A spec that is not JSON at all is neither: it is what a crash left before this store
+        fsynced its writes. It is moved aside and the address written again, where it used
+        to answer every later request for the same answer with 409 ``REQUEST_CONFLICT``.
+        The bytes are fsynced before the link, so this write cannot leave one behind.
+        """
 
         payload = _serialize(spec)
         path = self._path(key)
         existing = self._read(path)
+        if existing is not None and is_damaged(existing):
+            quarantine(path, existing, component="specs")
+            existing = None
         if existing is not None:
             _require_identical(key, existing, payload)
             return
@@ -225,25 +239,27 @@ class FileAdviceJobSpecStore:
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 handle.write(payload)
-            try:
-                os.link(temporary, path)  # atomic create; fails if the key exists
-            except FileExistsError:
-                winner = self._read(path)
-                if winner is None:
-                    raise AdviceJobSpecError(
-                        f"Spec {key[:12]}… exists but cannot be read back."
-                    ) from None
-                _require_identical(key, winner, payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            for _attempt in range(PUBLISH_ATTEMPTS):
+                try:
+                    os.link(temporary, path)  # atomic create; fails if the key exists
+                    return
+                except FileExistsError:
+                    winner = self._read(path)
+                if winner is not None:
+                    _require_identical(key, winner, payload)
+                    return
+                # Gone before it could be read: another request that read the damage
+                # before this spec was written moved it aside, and is linking it back.
+            raise AdviceJobSpecError(f"Spec {key[:12]}… exists but cannot be read back.")
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
 
     @staticmethod
     def _read(path: Path) -> bytes | None:
-        try:
-            return path.read_bytes()
-        except FileNotFoundError:
-            return None
+        return read_entry(path)
 
 
 def _serialize(spec: AdviceJobSpec) -> bytes:
