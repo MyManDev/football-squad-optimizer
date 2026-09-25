@@ -48,3 +48,16 @@ export function isEntryChips(value: unknown, gameweek: number): value is EntryCh
     });
   });
 }
+
+/**
+ * The half of the season the member's chips are read in: the first half while the week the
+ * chips were read for is inside any first-half window, the second half after that.
+ */
+export function currentChipHalf(chips: EntryChipAvailability): (typeof CHIP_HALVES)[number] {
+  const firstStops = Object.values(chips.states)
+    .map((halves) => halves.first_half?.stop_event)
+    .filter((stop): stop is number => typeof stop === "number");
+  return firstStops.length === 0 || chips.gameweek <= Math.max(...firstStops)
+    ? "first_half"
+    : "second_half";
+}

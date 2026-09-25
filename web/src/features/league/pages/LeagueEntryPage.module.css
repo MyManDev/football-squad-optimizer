@@ -33,7 +33,18 @@
   font: inherit;
 }
 
+.form label {
+  font-weight: 600;
+}
+
+/* The page's one action: the primary button, sized to its word. */
 .form button {
+  justify-self: start;
+  padding-inline: var(--space-5);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 600;
   cursor: pointer;
 }
 .form :disabled {

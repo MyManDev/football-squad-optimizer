@@ -229,17 +229,26 @@ def test_a_reused_capture_refuses_when_its_rotation_export_is_not_on_disk(
         )
 
 
-def test_a_reused_capture_with_its_rotation_export_already_on_disk_is_allowed(
+def test_a_reused_capture_whose_rotation_export_cannot_be_read_is_refused(
     tmp_path: Path,
 ) -> None:
+    """Both halves on disk is not the same as a pair this project can read.
+
+    A file named after the table's contract can carry a manifest declaring a different export
+    contract, which is what an export-contract bump leaves behind. Accepting it here takes the
+    "already exported" branch and raises at the read instead, hours in and on a run that cannot
+    be retried inside its own window.
+    """
+
     snapshot_id = "fpl-live-20260911T100000Z-abc123def456"
     table, manifest = rotation_artifact(tmp_path, "2026-27", 4, snapshot_id)
     table.write_text("contract_version\n", encoding="utf-8")
     manifest.write_text("{}", encoding="utf-8")
 
-    check_rotation_for_reused_capture(
-        tmp_path, season="2026-27", gameweek=4, snapshot_id=snapshot_id
-    )
+    with pytest.raises(WeekError, match="cannot be read back"):
+        check_rotation_for_reused_capture(
+            tmp_path, season="2026-27", gameweek=4, snapshot_id=snapshot_id
+        )
 
 
 def test_a_half_written_rotation_export_does_not_count_as_reusable(tmp_path: Path) -> None:

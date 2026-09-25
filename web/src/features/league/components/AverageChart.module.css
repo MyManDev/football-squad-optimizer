@@ -24,7 +24,7 @@
 .tick {
   fill: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--step--2);
 }
 
 .barAhead {

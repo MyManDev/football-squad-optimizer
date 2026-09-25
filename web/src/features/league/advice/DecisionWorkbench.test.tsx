@@ -126,6 +126,11 @@ it("pins alternatives, records a human preference, restores it and resets on cha
   view.rerender(card(five, answer(5)));
   fireEvent.click(screen.getByRole("button", { name: "Bu planı karşılaştırmaya ekle" }));
   fireEvent.click(screen.getByRole("radio", { name: "Tercihim: Plan A" }));
+  // A pinned plan names its Top 100 setting as the weight it is, never as a share.
+  expect(
+    within(screen.getByRole("region", { name: "Plan A" })).getByText(/Top 100 ağırlığı 0/),
+  ).toBeInTheDocument();
+  expect(view.container.textContent).not.toContain("%");
   fireEvent.change(screen.getByLabelText("Bu planı neden tercih ettim?"), {
     target: { value: "Hoca haberini bekliyorum" },
   });

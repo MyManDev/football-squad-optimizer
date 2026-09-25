@@ -15,8 +15,9 @@ A claim like that is only worth anything if it can be walked, so this walks it:
 ``export_rotation_evidence`` with the capture id instead of running the whole weekly runner,
 because a weekly run needs a week's captures and a workspace lock. The step between -- that
 ``--rotation-capture`` reaches the export as ``club_news_snapshot`` and names the artifact --
-is pinned by its own unit tests in ``test_weekly_operations``. What is rehearsed here is the
-path those two meet on.
+is pinned by ``test_a_named_capture_reaches_the_export_from_the_stage_that_runs_it`` in
+``test_weekly_operations``, which drives the stage itself and reads back the request it built.
+What is rehearsed here is the path those two meet on.
 
 Nothing opens a socket, nothing reads a key, and every write is under ``tmp_path``.
 """
@@ -51,6 +52,7 @@ from squadopt.data.sources.club_news import (
 )
 from squadopt.data.sources.club_news_coding import CodingFixture
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.platform.club_news_acquire import main as acquire
 from squadopt.platform.club_news_provider import (
     KEY_ENVIRONMENT_VARIABLE,
@@ -258,6 +260,17 @@ def test_a_week_is_acquired_and_exported_without_a_key(
     assert len(table) == manifest["roster_size"]
     # The record names what answered, which is the whole reason genericity is about wiring.
     assert manifest["model_identifier"] == REHEARSAL_MODEL
+    # And which adapter was asked. It is not recoverable from the model identifier: this fake
+    # names a model no vendor serves, and a real vendor's identifier can be served through
+    # another's compatible endpoint. #551's fourth rehearsal item is this line.
+    assert manifest["provider"] == REHEARSAL_PROVIDER
+    # And a consumer reading the artifact back sees it, which is what makes the field a record
+    # rather than a line in a file nobody opens.
+    read_back = read_rotation_evidence_artifact(
+        output / "table.csv", output / "table.manifest.json"
+    )
+    assert read_back.attrs["provider"] == REHEARSAL_PROVIDER
+    assert read_back.attrs["model_identifier"] == REHEARSAL_MODEL
     assert manifest["clubs_covered"], manifest
     assert set(manifest["clubs_covered"]) <= set(manifest["clubs_declared"])
 

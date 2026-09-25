@@ -1,43 +1,39 @@
+/* A region, not a box: a hairline above it, space around it, a sentence-case heading. */
 .card {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-m);
-  padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
 }
 
-.surface {
-  background: var(--color-surface);
-}
-
+/* A quieter region: notes and provenance read in ink2 under an ink heading. */
 .muted {
-  background: var(--color-surface-2);
-}
-
-.pitch {
-  background: var(--color-pitch);
-  border-color: var(--color-pitch-line);
+  color: var(--color-text-muted);
 }
 
 .header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
 }
 
 .title {
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--step-1);
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
   text-wrap: balance;
 }
 
 .aside {
-  font-size: var(--step--1);
+  font-size: var(--step--2);
+  line-height: 16px;
   color: var(--color-text-muted);
   text-align: right;
 }

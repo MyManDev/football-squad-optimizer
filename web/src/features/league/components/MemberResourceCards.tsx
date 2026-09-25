@@ -4,13 +4,12 @@ import { CHIP_HALVES, CHIP_NAMES, isEntryChips } from "../chipShape";
 import type { EntrySquad } from "../types";
 import styles from "./MemberResourceCards.module.css";
 
-export function MemberResourceCards({
-  squad,
-  expanded = true,
-}: {
-  squad: EntrySquad;
-  expanded?: boolean;
-}) {
+/**
+ * What the member can still use: the free transfers held before the deadline and every
+ * chip by half. The member page shows both under its closed "Chips and free transfers"
+ * section, so the cards themselves never collapse.
+ */
+export function MemberResourceCards({ squad }: { squad: EntrySquad }) {
   const { messages, locale } = useLanguage();
   const copy = messages.memberResources;
   const chips = isEntryChips(squad.chips, squad.gameweek) ? squad.chips : undefined;
@@ -27,46 +26,43 @@ export function MemberResourceCards({
             : copy.unknown}
         </p>
       </Card>
-      <details className={styles.details} open={expanded}>
-        <summary>{expanded ? copy.chipsTitle : <h2>{copy.chipsTitle}</h2>}</summary>
-        <Card title={copy.chipsTitle} aside={copy.asOf(squad.gameweek)}>
-          {!chips?.known ? (
-            <p>{copy.chipsMissing}</p>
-          ) : (
-            <div className={styles.chips}>
-              {CHIP_NAMES.map((chip) => (
-                <section key={chip}>
-                  <h3 className={styles.name}>{messages.leagueMembers.chipNames[chip]}</h3>
-                  <dl className={styles.windows}>
-                    {CHIP_HALVES.map((half) => {
-                      const window = chips.states[chip]![half];
-                      return (
-                        <div key={half}>
-                          <dt>{copy.halves[half]}</dt>
-                          <dd>
-                            {window ? (
-                              <>
-                                <strong>
-                                  {window.state === "used"
-                                    ? copy.used(window.gameweek!)
-                                    : copy.states[window.state]}
-                                </strong>
-                                <span>{copy.window(window.start_event, window.stop_event)}</span>
-                              </>
-                            ) : (
-                              copy.noWindow
-                            )}
-                          </dd>
-                        </div>
-                      );
-                    })}
-                  </dl>
-                </section>
-              ))}
-            </div>
-          )}
-        </Card>
-      </details>
+      <Card title={copy.chipsTitle} aside={copy.asOf(squad.gameweek)}>
+        {!chips?.known ? (
+          <p>{copy.chipsMissing}</p>
+        ) : (
+          <div className={styles.chips}>
+            {CHIP_NAMES.map((chip) => (
+              <section key={chip}>
+                <h3 className={styles.name}>{messages.leagueMembers.chipNames[chip]}</h3>
+                <dl className={styles.windows}>
+                  {CHIP_HALVES.map((half) => {
+                    const window = chips.states[chip]![half];
+                    return (
+                      <div key={half}>
+                        <dt>{copy.halves[half]}</dt>
+                        <dd>
+                          {window ? (
+                            <>
+                              <strong>
+                                {window.state === "used"
+                                  ? copy.used(window.gameweek!)
+                                  : copy.states[window.state]}
+                              </strong>
+                              <span>{copy.window(window.start_event, window.stop_event)}</span>
+                            </>
+                          ) : (
+                            copy.noWindow
+                          )}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </section>
+            ))}
+          </div>
+        )}
+      </Card>
     </>
   );
 }

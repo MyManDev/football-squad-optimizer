@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
+import { figure } from "../../../lib/format";
 import { createAdviceClient, type AdviceClient, type AdviceRequest } from "./adviceClient";
 import { sameAdviceRequest, useAdviceJob } from "./useAdviceJob";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
@@ -22,8 +23,10 @@ export function ModelComparison({
   busy?: boolean;
   deadlinePassed?: boolean;
 }) {
-  const { language } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const tr = language === "tr";
+  // The Top 100 setting is a weight on the selection, never a share of anything.
+  const weight = messages.leagueMembers.top100Weight(request.top100Weight ?? 0);
   const transport = useMemo(() => client ?? createAdviceClient(), [client]);
   const {
     leagueId,
@@ -87,13 +90,14 @@ export function ModelComparison({
   }
   const current = request.model === "football" ? counterpart : selectedPayload;
   const football = request.model === "football" ? selectedPayload : counterpart;
-  const display = (value: unknown) => (typeof value === "number" ? value.toFixed(2) : "—");
+  // Written the way the rest of the page writes a figure: '56,11' on the Turkish page.
+  const display = (value: unknown) => (typeof value === "number" ? figure(value, locale) : "—");
   return (
     <Card title={tr ? "İki modelin karşılaştırması" : "Model comparison"}>
       <p>
         {tr
-          ? `Aynı kadro, bütçe, ${request.window} hafta ve %${request.top100Weight ?? 0} Top100 etkisi.`
-          : `Same squad, budget, ${request.window} weeks and ${request.top100Weight ?? 0}% Top100 influence.`}
+          ? `Aynı kadro, bütçe, ${request.window} hafta ve ${weight}.`
+          : `Same squad, budget, ${request.window} weeks and ${weight}.`}
       </p>
       <table style={{ width: "100%" }}>
         <thead>

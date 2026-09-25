@@ -1,0 +1,64 @@
+/* The viewer's chips beside the league table: a 2 x 2 list, name over state, no boxes. */
+
+.chips {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.half,
+.note,
+.state {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* As wide as D-Lig's record column at most, so the pairs stay pairs where the list runs
+   the page's full width (under the table on a tablet). */
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 440px;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.name {
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* A chip already played is spent: its name reads quieter than the ones still in hand. */
+.chip[data-state="used"] .name,
+.chip[data-state="expired"] .name {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.note {
+  margin: var(--space-2) 0 0;
+}

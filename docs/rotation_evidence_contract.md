@@ -146,6 +146,12 @@ is where club-level facts live. A capture written before the field carries no
 `clubs_partially_covered`, and an absent list reads as empty rather than as a refusal — those
 weeks allowed one page per club, so no club could be partly read.
 
+The contract moved again, to `rotation_evidence_export_v3`, when the manifest gained
+`provider`. The table's version did not move for the same reason, and the capture layout's
+version did not move either: `provider` joined the response index as an optional key that an
+older capture reads as `None`, so a week captured before the field stays readable and says
+the true thing about itself rather than a guessed one.
+
 ### `rotation_disposition`, in full
 
 `not_addressed`, `no_statement`, `stated_expected_to_start`, `stated_expected_absent`,
@@ -202,6 +208,14 @@ makes the table checkable and one with a hole in it checks less than it claims.
 `document_sha256s`, `model_identifier`,
 `model_version`, `prompt_sha256`, `response_sha256s`, `claims_coded`, `claims_ambiguous`,
 `players_not_addressed`.
+
+`provider` is written beside them and is the one field not required on read, though it is read: an artifact that names an adapter carries it into the table's attributes, and one written before the field existed reads as `null` rather than being refused. It names the
+adapter the week was asked through, which `model_identifier` does not pin: a fake adapter can
+report any model name, and one vendor's identifier can be served through another's compatible
+endpoint. It is `null` where nothing recorded it, which is what a fixture week and a capture
+written before the field both are, and demanding it would refuse weeks already on disk that a
+club-page fetch cannot produce again. Where clubs disagree about it the week is refused, for
+the same reason two models or two prompts are: the manifest states one instrument.
 
 **One check is weaker than Phase B's, and named rather than hidden.** `source_snapshot_ids`
 varies by row here: a player nobody wrote about was read from the decision capture alone.

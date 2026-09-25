@@ -4,6 +4,7 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
+import { useFixtures } from "../../fixtures/data";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { LeagueDataMissing } from "../data";
 import { useDeadlinePassed } from "../advice/deadline";
@@ -41,6 +42,8 @@ export function LeagueMemberPage() {
     squad.data?.payload.season,
     squad.data?.payload.gameweek,
   );
+  // The same calendar the deadline is read from; the query is shared, so nothing more is read.
+  const fixtures = useFixtures();
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
@@ -110,6 +113,9 @@ export function LeagueMemberPage() {
       computeService={computeService}
       computePending={computePending}
       deadlinePassed={deadlinePassed}
+      fixtures={fixtures.data ?? null}
+      fixturesPending={fixtures.isPending}
+      leagueName={membersQuery.data?.payload.league_name}
     />
   );
 }
