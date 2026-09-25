@@ -363,10 +363,10 @@ and nothing else on the list would notice.
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and `/data/league/members.json`.
 
-**The eleventh is the opposite check, and reading it as a 200 inverts it.**
+**The tenth is the opposite check, and reading it as a 200 inverts it.**
 `/data/league/entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is eight route 200s, two JSON 200s, and one 404.
+rather than the application shell. A green smoke is seven route 200s, two JSON 200s, and one 404.
 
 Transient edge and propagation failures are retried for roughly one minute.
 
