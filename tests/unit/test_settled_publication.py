@@ -11,12 +11,17 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from tests.unit.test_check_league_tree import _tree as clean_league_tree
 from tests.unit.test_scoreboard_diagnostics import decision_inputs
 from tests.unit.test_weekly_suggestion_eval import recorded
 
-from squadopt.application import league_publication, scoreboard
+from squadopt.application import league_publication, scoreboard, site
 from squadopt.application import settled_publication as publication
 from squadopt.application.advice_record import record_member_advice
+from squadopt.application.contract import ui_view_schema
+from squadopt.application.fixtures_view import fixtures_schema
+from squadopt.application.live_score import live_score_schema
+from squadopt.application.views import SiteIndex, ViewEnvelope
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.live.ledger import write_manifest
@@ -24,11 +29,48 @@ from squadopt.live.ledger import write_manifest
 SEASON = "2026-27"
 STAMP = "2026-09-22T09:00:00Z"
 IDS = tuple(range(101, 116))
+#: What the accepted decision publish's root index names: the files the candidate carries
+#: once the season builder has run, as ``build_site`` lists them (status is not listed).
+FROZEN_FILES = (
+    f"{SEASON}/gw05/live.json",
+    f"{SEASON}/gw05/pool.json",
+    f"{SEASON}/gw05/recommendation.json",
+    f"{SEASON}/league.json",
+    f"{SEASON}/ledger.json",
+    "fixtures.json",
+    "schema/fixtures_v1.schema.json",
+    "schema/live_score_v1.schema.json",
+    "schema/ui_view_v1.schema.json",
+)
 
 
 def write(path: Path, document: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def frozen_index(
+    files: tuple[str, ...] = FROZEN_FILES,
+    weeks: tuple[int, ...] = (5,),
+    latest: int | None = 5,
+) -> dict[str, Any]:
+    index = SiteIndex(
+        generated_at_utc="2026-09-18T12:00:00Z",
+        seasons=(SEASON,),
+        gameweeks={SEASON: weeks},
+        latest=(
+            None
+            if latest is None
+            else {
+                "season": SEASON,
+                "gameweek": latest,
+                "path": f"{SEASON}/gw{latest:02d}/recommendation.json",
+            }
+        ),
+        schema_path="schema/ui_view_v1.schema.json",
+        files=files,
+    )
+    return ViewEnvelope(payload=index.to_dict(), generated_at_utc="2026-09-18T12:00:00Z").to_dict()
 
 
 def inventory(root: Path) -> dict[str, bytes]:
@@ -186,8 +228,15 @@ def world(
             },
         },
     )
-    for name in ("index.json", "fixtures.json", "schema/ui_view_v1.schema.json"):
-        write(accepted / "data" / name, {"accepted": name})
+    # The schemas the accepted tree froze, and a root index naming what it served.
+    for name, schema in (
+        ("ui_view_v1", ui_view_schema()),
+        ("live_score_v1", live_score_schema()),
+        ("fixtures_v1", fixtures_schema()),
+    ):
+        write(accepted / f"data/schema/{name}.schema.json", schema)
+    write(accepted / "data/index.json", frozen_index())
+    write(accepted / "data/fixtures.json", {"accepted": "fixtures.json"})
     write(accepted / f"data/{SEASON}/status.json", {"payload": {"next_gameweek": 5}})
     write(accepted / "data/league/series-horizon.json", {"old": "superseded history keys"})
     write(
@@ -605,50 +654,91 @@ def test_system_gw6_recommendation_also_refuses_before_work(
     assert_early_refusal(request, monkeypatch, "gw06/recommendation")
 
 
+def cli_arguments(request: publication.SettledPublicationRequest) -> list[str]:
+    return [
+        "--accepted-dir",
+        str(request.accepted_dir),
+        "--snapshot-root",
+        str(request.snapshot_root),
+        "--snapshot-id",
+        request.snapshot_id,
+        "--registry",
+        str(request.registry_path),
+        "--record-root",
+        str(request.record_root),
+        "--ledger-root",
+        str(request.ledger_root),
+        "--out",
+        str(request.out_dir),
+        "--season",
+        SEASON,
+        "--gameweek",
+        "5",
+    ]
+
+
 def test_cli_reports_the_actual_candidate_file_list(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from scripts.build_settled_site import main
+    import scripts.build_settled_site as cli
 
     request = world(tmp_path)
-    assert (
-        main(
-            [
-                "--accepted-dir",
-                str(request.accepted_dir),
-                "--snapshot-root",
-                str(request.snapshot_root),
-                "--snapshot-id",
-                request.snapshot_id,
-                "--registry",
-                str(request.registry_path),
-                "--record-root",
-                str(request.record_root),
-                "--ledger-root",
-                str(request.ledger_root),
-                "--out",
-                str(request.out_dir),
-                "--season",
-                SEASON,
-                "--gameweek",
-                "5",
-            ]
-        )
-        == 0
-    )
+    # The synthetic advice here is not a publishable menu; the tree check's own wiring
+    # is held to a real league tree below.
+    checked: list[Path] = []
+    monkeypatch.setattr(cli, "run_checks", lambda tree: checked.append(Path(tree.root)) or [])
+    assert cli.main(cli_arguments(request)) == 0
     output = capsys.readouterr().out
     assert STAMP in output and "data/league/members.json" in output
     assert "data/league/series-horizon.json" in output
     assert "data/league/entries/101.json" not in output
-    assert f'python -m scripts.check_league_tree "{request.out_dir / "data"}"' in output
-    assert "report its result in #632" in output
-    assert (
-        "Frozen season-schema and root-index consistency still need separate verification."
-        in output
-    )
+    # The candidate was checked where it was generated, before it was written.
+    assert len(checked) == 1 and checked[0].name == "data"
+    assert checked[0].parents[2] == request.out_dir.parent
+    assert checked[0].parent != request.out_dir
+    # Every check it ran is printed, and no check is left for the operator to run.
+    rebuilt = len(list((request.out_dir / "data" / SEASON).rglob("*.json"))) + 1
+    assert "Checked before the candidate was written:" in output
+    assert f"  {rebuilt} rebuilt documents match the frozen schemas" in output
+    assert f"  data/fixtures.json comes from {request.snapshot_id}" in output
+    assert "  the frozen data/index.json names the candidate's" in output
+    assert "  the league tree check found nothing" in output
+    assert "python -m scripts.check_league_tree" not in output
     changed = output.split("Changed files (post this list before a site PR):\n")[1].splitlines()
     season_count = sum(name.startswith(f"data/{SEASON}/") for name in changed)
     assert f"Changed file count: {len(changed)} ({season_count} season documents)" in output
+
+
+def test_cli_refuses_a_candidate_the_league_tree_check_finds_fault_with(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.build_settled_site as cli
+
+    request = world(tmp_path)
+    monkeypatch.setattr(
+        cli, "run_checks", lambda tree: ["101: advice/101/saf-puan/3.json not published"]
+    )
+    assert cli.main(cli_arguments(request)) == 1
+    error = capsys.readouterr().err
+    assert "Settled publication refused: The candidate fails the league tree check" in error
+    assert "101: advice/101/saf-puan/3.json not published" in error
+    assert not request.out_dir.exists()
+    assert not list(request.out_dir.parent.glob("settled-*"))
+
+
+def test_cli_tree_check_is_the_release_checker_on_the_candidate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from scripts.build_settled_site import league_tree_findings
+
+    data = tmp_path / "data"
+    clean_league_tree(data)
+    assert league_tree_findings(data) == []
+    (data / "league/advice/1/saf-puan/3.json").unlink()
+    assert league_tree_findings(data) == ["1: advice/1/saf-puan/3.json not published"]
+    assert f"League tree check on the candidate before it is written ({data})" in (
+        capsys.readouterr().out
+    )
 
 
 def test_missing_past_week_with_only_ordinary_cells_refuses(tmp_path: Path) -> None:
@@ -724,3 +814,140 @@ def test_accepted_tree_change_during_generation_refuses(
         publication.publish_settled(request)
     assert not request.out_dir.exists()
     assert not list(request.out_dir.parent.glob("settled-*"))
+
+
+def assert_refused_before_writing(request: publication.SettledPublicationRequest) -> None:
+    assert not request.out_dir.exists()
+    assert not list(request.out_dir.parent.glob("settled-*"))
+
+
+def test_every_rebuilt_document_is_checked_against_the_frozen_schemas(tmp_path: Path) -> None:
+    request = world(tmp_path)
+    result = publication.publish_settled(request)
+    season_documents = list((request.out_dir / "data" / SEASON).rglob("*.json"))
+    # Three week views, the ledger, the league comparison and the status; the fixture
+    # list makes seven.
+    assert len(season_documents) == 6
+    assert result.checks == (
+        "7 rebuilt documents match the frozen schemas",
+        f"data/fixtures.json comes from {request.snapshot_id}",
+        f"the frozen data/index.json names the candidate's {len(FROZEN_FILES)} files and weeks",
+    )
+
+
+def test_a_rebuilt_view_whose_shape_moved_since_the_accepted_publish_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = world(tmp_path)
+    original = publication.build_site
+
+    def moved(**kwargs: Any) -> Any:
+        result = original(**kwargs)
+        path = kwargs["out_dir"] / f"data/{SEASON}/gw05/recommendation.json"
+        document = json.loads(path.read_bytes())
+        document["payload"]["field_the_frozen_schema_never_had"] = 1
+        write(path, document)
+        return result
+
+    monkeypatch.setattr(publication, "build_site", moved)
+    with pytest.raises(
+        DataError,
+        match=rf"data/{SEASON}/gw05/recommendation\.json does not match the frozen "
+        r"data/schema/ui_view_v1\.schema\.json",
+    ):
+        publication.publish_settled(request)
+    assert_refused_before_writing(request)
+
+
+def test_a_rebuilt_document_with_no_frozen_schema_refuses(tmp_path: Path) -> None:
+    request = world(tmp_path)
+    (request.accepted_dir / "data/schema/live_score_v1.schema.json").unlink()
+    with pytest.raises(
+        DataError,
+        match=r"live_score_v1, and the accepted tree froze no "
+        r"data/schema/live_score_v1\.schema\.json",
+    ):
+        publication.publish_settled(request)
+    assert_refused_before_writing(request)
+
+
+def test_a_fixture_list_the_outcome_capture_did_not_refresh_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = world(tmp_path)
+    # The accepted tree serves the decision capture's fixture list, and this capture's
+    # list cannot be read: the season builder prints a line and writes none.
+    publication.publish_settled(replace(request, out_dir=tmp_path / "reference"))
+    fixtures = json.loads((tmp_path / "reference/data/fixtures.json").read_bytes())
+    fixtures["payload"]["source_snapshot_id"] = "fpl-live-20260918T120000Z-decision"
+    write(request.accepted_dir / "data/fixtures.json", fixtures)
+    monkeypatch.setattr(site, "fixtures_view", Mock(side_effect=DataError("unreadable list")))
+    with pytest.raises(
+        DataError,
+        match=r"data/fixtures\.json comes from 'fpl-live-20260918T120000Z-decision', not the "
+        r"outcome capture",
+    ):
+        publication.publish_settled(request)
+    assert_refused_before_writing(request)
+
+
+@pytest.mark.parametrize(
+    ("index", "match"),
+    [
+        (
+            frozen_index(files=(*FROZEN_FILES, f"{SEASON}/gw04/recommendation.json")),
+            r"names 1 file\(s\) the candidate lacks: \['2026-27/gw04/recommendation\.json'\]",
+        ),
+        (
+            frozen_index(files=tuple(f for f in FROZEN_FILES if not f.endswith("pool.json"))),
+            r"1 gameweek view\(s\) the frozen data/index\.json does not name: "
+            r"\['2026-27/gw05/pool\.json'\]",
+        ),
+        (
+            frozen_index(weeks=(4, 5)),
+            r"lists 2026-27 gameweeks \[4, 5\], and the candidate's "
+            r"data/2026-27/ledger\.json holds \[5\]",
+        ),
+        (frozen_index(latest=None), r"names None as the latest view"),
+        (frozen_index(files=(*FROZEN_FILES, "../outside.json")), r"outside data/"),
+    ],
+    ids=["names-a-missing-file", "omits-a-view", "other-weeks", "no-latest", "outside"],
+)
+def test_a_frozen_root_index_that_disagrees_with_the_candidate_refuses(
+    tmp_path: Path, index: dict[str, Any], match: str
+) -> None:
+    request = world(tmp_path)
+    write(request.accepted_dir / "data/index.json", index)
+    with pytest.raises(DataError, match=match):
+        publication.publish_settled(request)
+    assert_refused_before_writing(request)
+
+
+def test_the_league_tree_check_reads_the_settled_candidate_not_the_accepted_tree(
+    tmp_path: Path,
+) -> None:
+    request = world(tmp_path)
+    seen: list[dict[str, Any]] = []
+
+    def check(data: Path) -> list[str]:
+        seen.append(json.loads((data / "league/members.json").read_bytes())["payload"])
+        assert not data.is_relative_to(request.accepted_dir)
+        return []
+
+    result = publication.publish_settled(request, league_tree_check=check)
+    assert [payload["scored_gameweek"] for payload in seen] == [5]
+    assert result.checks[-1] == "the league tree check found nothing"
+
+
+def test_a_league_tree_check_finding_refuses_and_writes_nothing(tmp_path: Path) -> None:
+    request = world(tmp_path)
+    before = inventory(request.accepted_dir)
+    with pytest.raises(
+        DataError,
+        match=r"fails the league tree check with 2 finding\(s\); the first: 101: index",
+    ):
+        publication.publish_settled(
+            request, league_tree_check=lambda data: ["101: index", "102: index"]
+        )
+    assert_refused_before_writing(request)
+    assert inventory(request.accepted_dir) == before
