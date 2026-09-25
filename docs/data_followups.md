@@ -134,25 +134,35 @@ current-value fixture table is not sufficient for backtesting.
 any of them in the same way.**
 
 *Calendar-derived features are in use.* `attach_fixture_features` produces `fixture_count`
-and `home_fixture_count` (the latter derived from `is_home`), and these places read them:
-the expected-minutes stage scales by fixture count and caps at that many full matches; the
-Phase C component base, the live default since #351, takes both as pre-match features
-(`PRE_MATCH_FEATURE_COLUMNS` in `prediction/component_dataset.py`); the two-stage
-production model in `backtest/production.py` (`two-stage-appearance-calendar-v1`) consumes
-both; and the Issue #43 learned-rate candidate names both among its declared rate inputs.
-The versioning requirement above is met by `fixture_snapshot_v1`, which keys on the
-persistent team code and records the snapshot each row came from.
+and `home_fixture_count` (the latter derived from `is_home`). Two places read both: the
+Phase C component base, the live default since #351, takes them as pre-match features
+(`PRE_MATCH_FEATURE_COLUMNS` in `prediction/component_dataset.py`), and the Issue #43
+learned-rate candidate names them among its declared rate inputs (`CALENDAR_INPUT_COLUMNS`
+in `prediction/learned_rate.py`). The two-stage model in `backtest/production.py` (feature
+contract `two-stage-appearance-calendar-v1`, which no longer decides live squads) reads only
+`fixture_count`: its expected-minutes stage scales by it and caps at that many full matches
+(`prediction/minutes.py`), and `production_component_prediction` bounds its component split
+by it (`prediction/production.py`). It attaches `home_fixture_count` too, and no stage of it
+reads that column. The versioning requirement above is met by `fixture_snapshot_v1`, which
+keys on the persistent team code and records the snapshot each row came from.
 
 *The source's own difficulty rating is still unused, and now the reason is written down
 rather than pending.* **No model reads `mean_fixture_difficulty` or
-`minimum_fixture_difficulty`.** Since #152 `attach_fixture_features` attaches them only when
-every fixture row carries a capture instant, which no archive row does, so on the
-development folds they are not computed at all, and every caller passes
-`unproven_difficulty="omit"` (the ruling is under "Cross-owner coordination" below).
+`minimum_fixture_difficulty`.** `attach_fixture_features` computes both on every call
+(`aggregate_team_gameweek` in `src/squadopt/data/fixtures.py`), and since #152 it attaches
+them only when every fixture row carries a capture instant. Every caller passes
+`unproven_difficulty="omit"` (the ruling is under "Cross-owner coordination" below). No
+archive row carries a capture instant, so on the development folds the two columns are
+computed and then left off the frame. Every row of a live capture does carry one, so the live
+scoring frame (`build_component_scoring_frame`, reached from `build_projection_handoff`)
+has both columns attached, and the component models do not read them.
 [`features/strength.py`](../src/squadopt/features/strength.py) explains why the rating was not
 worth settling as a feature: it is opaque, so nobody here can say what it measures, and its
 stability within a season is unverified. A strength estimate computed from results already
-held is reproducible and its timing is ours to control, which is the better trade.
+held is reproducible and its timing is ours to control, which is the better trade. Whether to
+keep computing two columns nothing consumes (dropped on the development folds, attached and
+unread on the live path) is an open question for both owners (three until 2026-09-25), since
+`attach_fixture_features` is shared.
 
 *The opponent-strength proposal: closed.* A fitted opponent rating applied at the decision
 lost 0.91 realized points a fold ([`opponent_projection_note.md`](opponent_projection_note.md)),
@@ -250,24 +260,36 @@ columns the archive adapter produces, or 0.007 s per thousand rows, scaling line
 the six seasons. That is **26.6 %** of a `build_panel` call, which sounds material until you
 ask how often the call happens.
 
-**Once per run.** Every caller loads the panel at the top and then iterates folds over the
-frame in memory: the `measure_*` and `export_*` scripts, `build_projection_handoff`,
+**Once per run, or once per process.** Every caller loads the panel at the top and then
+iterates folds over the frame in memory: the `measure_*` and `export_*` scripts,
 `recommend_current_squad`, the four `experiments/` studies, and `fpl_capture`'s identity
-check. The member-publication workers (`platform/publication_workers.py`) are the one
-repeated caller: each worker process builds the panel once in its initializer, beside the
-parent's own build (`league_publication.py`), so a league stage run with N workers cleans
-the archive N + 1 times, the workers in parallel. That is still about a second of cleaning
-per process, against a league stage measured in hours, so the answer below does not
-change. The other entry point, `build_canonical_dataset`, is reached only by the tests
-(`tests/integration/test_end_to_end.py`), over the committed synthetic sample.
+check. `build_projection_handoff` builds it twice, once for the carried rates and the opening
+fallback, and once more in `_component_table` for the component model's four training
+seasons. Two callers build it in a process pool's initializer, once per worker process:
 
-So a perfect vectorization has a **ceiling of about one second per run**, against walk-forward
-benchmarks measured in hours. Against that, the change would edit the one module whose own
-docstring exists to justify being the single place types change — "so a coercion bug has
-exactly one home" — and would trade an actionable per-record message for a column-wide one
-on the path that reports bad source data. Paying real risk in the coercion layer to save a
-second once is the wrong trade in the opposite direction from the one this item worried
-about.
+- the member-publication workers (`platform/publication_workers.py`), beside the parent's
+  own build (`application/league_publication.py`). A league stage run with N workers above
+  one cleans the archive at most N + 1 times, the workers in parallel (the spawned pool
+  starts a worker only while members are waiting, so a league with fewer members than
+  workers starts fewer). With one worker there is no pool, and the parent cleans it once.
+- the season workers of `scripts/run_chip_bayesopt.py` (`_init_worker`, four by default),
+  which clean it at most once each and nowhere else; with one worker the script runs the
+  same initializer in its own process, once.
+
+That is still about a second of cleaning per build, against a league stage the runbook
+measured at about thirty-six minutes for fifteen members with eight workers (GW4 rehearsal,
+[`weekly_runbook.md`](weekly_runbook.md)) and plans in hours once the Top-100 menu is on, so
+the answer below does not change. The other entry point, `build_canonical_dataset`, is
+reached only by the tests (`tests/integration/test_end_to_end.py`), over the committed
+synthetic sample.
+
+So a perfect vectorization has a **ceiling of about one second per panel build**, against
+walk-forward benchmarks measured in hours. Against that, the change would edit the one module
+whose own docstring exists to justify being the single place types change ("so a coercion
+bug has exactly one home"), and would trade an actionable per-record message for a
+column-wide one on the path that reports bad source data. Paying real risk in the coercion
+layer to save a second once is the wrong trade in the opposite direction from the one this
+item worried about.
 
 **What would change the answer**, so this does not need re-measuring from scratch: cleaning
 moving onto a per-fold or per-request path rather than a once-per-run one, or a source
