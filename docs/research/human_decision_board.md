@@ -22,9 +22,10 @@ No new model coefficient or automatic transfer policy is inferred from the artic
 
 ## Implemented scope
 
-The member page now has a bilingual, mobile decision board below the main advice. Users
-pin up to three completed plans generated using the existing model, 1/3/5-week horizon,
-Top100, manager-news, rival and chip controls. Unsupported combinations remain governed by
+The member page now has a bilingual, mobile decision board below the main advice, in its
+closed "Karar araçları" (decision tools) section. Users pin up to three completed plans
+generated using the existing model, 1/3/5-week horizon, Top100, manager-news, rival and chip
+controls. Unsupported combinations remain governed by
 the existing capability checks. The board does not start jobs, submit FPL transfers or
 activate chips. Opening a saved plan restores its URL settings; computation still requires
 the existing explicit action and deadline checks.

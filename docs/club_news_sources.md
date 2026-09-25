@@ -13,6 +13,12 @@ two are not confused:
 - It refuses a URL that is not in the registry.
 - It reads the host's `robots.txt` through the same reader as the document and refuses a
   disallowed path, recording that club as **not covered** rather than reading it anyway.
+- It asks that question of the origin the registry names, so it **refuses a redirect that is
+  answered by a different origin** rather than following it. One host's `robots.txt` is not
+  the other's, and neither is the reading signed in the table below. The request has already
+  gone by the time the serving host is known, so what the refusal buys is that the bytes are
+  not read and the club is recorded as not covered; the fix is to register the origin that
+  answers and sign its reading, after which there is no redirect left.
 - It treats a `robots.txt` that cannot be read as an unanswered question, not as consent.
   "We could not ask" is not "they said yes".
 - It sends one identity (`squadopt/1.0`), reads only registered paths — a club may have more
@@ -58,15 +64,38 @@ takes and signs, which is what the name and date in the row are for, and it can 
 in two ways a later reading would catch: a governing document may exist somewhere neither
 search reached, and a club can publish one tomorrow. That is why a row ages.
 
-**Seventeen clubs are not here, and for three different reasons.** Seven publish terms
+**Seventeen clubs are not here, and for three different reasons.** Eight publish terms
 that restrict this directly, and they are not registered: Spurs (2.6.3 forbids extracting,
 scraping and crawling; 2.6.4 forbids use to generate prompts) and Bournemouth (no "robot,
 spider, or other automatic device") forbid the read itself; Leeds (6.5) forbids mass,
-automated or systematic extraction; Arsenal, Brighton, Man City and Man Utd grant a
-licence limited to personal, non-commercial use. Nine could not be read at all: Aston
-Villa, Coventry, Everton, Nott'm Forest, Sunderland, Brentford, Fulham, Ipswich and
+automated or systematic extraction; Arsenal, Brighton, Brentford, Man City and Man Utd
+grant a licence limited to personal, non-commercial use. Eight could not be read at all:
+Aston Villa, Coventry, Everton, Nott'm Forest, Sunderland, Fulham, Ipswich and
 Chelsea serve their terms or policy pages client-side or publish none this reader could
-locate, and **unread is not silent**. Hull City's host did not resolve.
+locate, and **unread is not silent**. Hull City serves nothing this reader can reach.
+
+**Brentford and Hull City were the two the survey left open, and both are now closed.**
+Read 2026-09-24, with our own reader and our own identity.
+
+Brentford moved from the second group to the first. Its `robots.txt` allows `/news` for
+`squadopt/1.0`, and `/news` redirects within the same origin to `/en/news`, so the lane
+would have been able to ask. The document the earlier survey could not locate is at
+[`/en/terms-of-use`](https://www.brentfordfc.com/en/terms-of-use), and clause 8.2 settles
+it before readability is reached:
+
+> Permission is granted to You to view the Site Materials on a single personal computer or
+> other device and to print a single hard copy of such Site Materials solely for personal,
+> non-commercial use. [...] Any other use of materials on this Site [...]
+
+That is the same licence Arsenal, Brighton, Man City and Man Utd grant, and it is the
+reason those four are not registered either. Separately, and not the operative reason: its
+news page yields 223 words and all of them are navigation, so it is a Crystal Palace case
+underneath a Man City case.
+
+Hull City is unreadable rather than absent, which is a different sentence from the one
+this file used to carry. `hullcity.co.uk` does not resolve, which is what the earlier
+survey met. Two hosts that do resolve do not answer: `www.hulltigers.com` returns HTTP 530
+and `www.hullcityafc.com` times out. **We could not ask**, and that is not consent.
 
 **Crystal Palace was read, considered and rejected on a different ground.** Its
 `robots.txt` allows our path, it publishes an RSS feed, and no terms document could be

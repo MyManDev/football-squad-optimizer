@@ -1,0 +1,710 @@
+/*
+ * The marked pitch and the bench under it.
+ *
+ * Two drawings of one list, chosen by the width the pitch has (a container query, not the
+ * window): upright under 640 px, own goal at the bottom; across from 640 px, own goal on
+ * the left. In both the midfield's centre sits on the halfway line, the defence and the
+ * attack stand at mirrored distances from it, and the keeper stands at the own goal.
+ * Every plate is centred on its point, so a line is symmetric about the pitch's axis.
+ *
+ * Nothing small is written on the grass: names, codes, figures and the direction of
+ * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The stripes are the one
+ * pattern the page allows, and they are only on the grass.
+ */
+
+.wrap {
+  container: pitch / inline-size;
+}
+
+.field {
+  container: field / inline-size;
+  position: relative;
+  max-width: 540px;
+  height: clamp(420px, 112cqw, 604px);
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  background: repeating-linear-gradient(
+    180deg,
+    var(--color-pitch) 0 9.0909%,
+    var(--color-pitch-2) 9.0909% 18.1818%
+  );
+}
+
+.descAcross {
+  display: none;
+}
+
+/* ---- Markings: upright by default ---- */
+
+.markings,
+.markings span {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.markings {
+  inset: 0;
+}
+
+.boundary {
+  inset: 10px;
+  border: 2px solid var(--color-pitch-line);
+}
+
+.halfway {
+  left: 10px;
+  right: 10px;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: var(--color-pitch-line);
+}
+
+.circle {
+  left: 50%;
+  top: 50%;
+  width: clamp(56px, 19cqw, 104px);
+  aspect-ratio: 1;
+  border: 2px solid var(--color-pitch-line);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.centreSpot,
+.penaltySpot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-pitch-line);
+  transform: translate(-50%, -50%);
+}
+
+.centreSpot {
+  left: 50%;
+  top: 50%;
+}
+
+.own,
+.far {
+  inset: 0;
+}
+
+.box,
+.goalArea,
+.goal {
+  left: 50%;
+  border: 2px solid var(--color-pitch-line);
+  transform: translateX(-50%);
+}
+
+.box {
+  width: 55cqw;
+  height: 17cqw;
+}
+
+.goalArea {
+  width: 26cqw;
+  height: 6.5cqw;
+}
+
+.penaltySpot {
+  left: 50%;
+}
+
+/* The arc outside the penalty area: a circle round the spot, cut at the area's edge. */
+.arc {
+  left: 50%;
+  width: 18cqw;
+  height: 18cqw;
+  border: 2px solid var(--color-pitch-line);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.goal {
+  width: 12cqw;
+  height: 7px;
+}
+
+.own .box,
+.own .goalArea {
+  bottom: 10px;
+  border-bottom: 0;
+}
+
+.own .penaltySpot {
+  bottom: calc(10px + 12cqw);
+  transform: translate(-50%, 50%);
+}
+
+.own .arc {
+  bottom: calc(10px + 3cqw);
+  clip-path: inset(0 0 14cqw 0);
+}
+
+.own .goal {
+  bottom: 3px;
+  border-top: 0;
+}
+
+.far .box,
+.far .goalArea {
+  top: 10px;
+  border-top: 0;
+}
+
+.far .penaltySpot {
+  top: calc(10px + 12cqw);
+}
+
+.far .arc {
+  top: calc(10px + 3cqw);
+  clip-path: inset(14cqw 0 0 0);
+}
+
+.far .goal {
+  top: 3px;
+  border-bottom: 0;
+}
+
+/* ---- The players: upright by default ---- */
+
+.lines {
+  position: absolute;
+  inset: 0;
+}
+
+.token {
+  --vw: min(124px, calc((100cqw - 16px - (var(--n) - 1) * 6px) / var(--n)));
+  position: absolute;
+  width: var(--vw);
+  left: calc(50% + (var(--i) - (var(--n) - 1) / 2) * (var(--vw) + 6px));
+  transform: translate(-50%, -50%);
+}
+
+.line[data-line="gk"] .token {
+  top: calc(100% - 40px);
+}
+
+.line[data-line="def"] .token {
+  top: calc(75% - 19px);
+}
+
+.line[data-line="mid"] .token {
+  top: 50%;
+}
+
+.line[data-line="fwd"] .token {
+  top: calc(25% + 19px);
+}
+
+/* Upright, as the tablet artboards draw it: the name, the club and the figure on three
+   centred lines, so a narrow plate in a line of five still prints its club code whole. */
+.plate {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "name"
+    "code"
+    "xp";
+  height: 52px;
+  padding: 3px 4px;
+  border-radius: var(--radius-s);
+  background: var(--color-chip);
+  color: var(--color-chip-text);
+  font-size: var(--step--2);
+  line-height: 16px;
+  text-align: center;
+}
+
+.name {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.nameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  outline: 1px solid var(--color-board);
+  outline-offset: -1px;
+}
+
+.swatchAcross {
+  display: none;
+}
+
+.code {
+  grid-area: code;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-chip-muted);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+/* A club with no code is printed by its name, cut short with an ellipsis if it must be. */
+.codeText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.xp {
+  grid-area: xp;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
+   narrow plate keeps its name and a tag never reads as the next plate's. Where a plate
+   carries both, they stand side by side about its centre. */
+.new,
+.mark {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  height: 16px;
+  border-radius: var(--radius-s);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.new {
+  padding: 0 4px;
+  background: var(--color-lime);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mark {
+  width: 16px;
+  background: var(--color-lime);
+}
+
+.plate:has(.mark) .new {
+  transform: translateX(calc(-100% - 2px));
+}
+
+.plate:has(.new) .mark {
+  transform: translateX(2px);
+}
+
+.vice {
+  border: 1.5px solid var(--color-text);
+  background: var(--color-chip);
+  line-height: 13px;
+}
+
+/* The direction of attack: under the first defender's plate, left-aligned with it. */
+.attack {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-s);
+  background: var(--color-chip);
+  color: var(--color-chip-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.arrow {
+  flex: none;
+  transform: rotate(-90deg);
+}
+
+.attack[data-at="last"] {
+  display: none;
+}
+
+/* ---- Across: 640 px and wider ---- */
+
+@container pitch (min-width: 640px) {
+  .field {
+    max-width: none;
+    height: var(--hh, 256px);
+    background: repeating-linear-gradient(
+      90deg,
+      var(--color-pitch) 0 9.0909%,
+      var(--color-pitch-2) 9.0909% 18.1818%
+    );
+  }
+
+  .descAcross {
+    display: inline;
+  }
+
+  .descUpright {
+    display: none;
+  }
+
+  .boundary {
+    inset: 12px;
+  }
+
+  .halfway {
+    left: calc(50% - 1px);
+    right: auto;
+    top: 12px;
+    bottom: 12px;
+    width: 2px;
+    height: auto;
+  }
+
+  .circle {
+    width: 60px;
+  }
+
+  .box,
+  .goalArea,
+  .goal {
+    left: auto;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .box {
+    width: 88px;
+    height: 136px;
+  }
+
+  .goalArea {
+    width: 28px;
+    height: 62px;
+  }
+
+  .arc {
+    left: auto;
+    top: calc(50% - 30px);
+    width: 60px;
+    height: 60px;
+    transform: none;
+  }
+
+  .goal {
+    width: 7px;
+    height: 28px;
+  }
+
+  .penaltySpot {
+    top: 50%;
+    bottom: auto;
+  }
+
+  .own .box,
+  .own .goalArea {
+    left: 12px;
+    bottom: auto;
+    border: 2px solid var(--color-pitch-line);
+    border-left: 0;
+  }
+
+  .own .penaltySpot {
+    left: 76px;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+  }
+
+  .own .arc {
+    left: 46px;
+    bottom: auto;
+    clip-path: inset(0 0 0 54px);
+  }
+
+  .own .goal {
+    left: 5px;
+    bottom: auto;
+    border: 2px solid var(--color-pitch-line);
+    border-right: 0;
+  }
+
+  .far .box,
+  .far .goalArea {
+    top: 50%;
+    right: 12px;
+    border: 2px solid var(--color-pitch-line);
+    border-right: 0;
+  }
+
+  .far .penaltySpot {
+    top: 50%;
+    left: auto;
+    right: 76px;
+    transform: translate(50%, -50%);
+  }
+
+  .far .arc {
+    top: calc(50% - 30px);
+    right: 46px;
+    clip-path: inset(0 54px 0 0);
+  }
+
+  .far .goal {
+    top: 50%;
+    right: 5px;
+    border: 2px solid var(--color-pitch-line);
+    border-left: 0;
+  }
+
+  /* Plates 136 px wide where the pitch has room, narrower where it has not, so the keeper,
+     the defence and the midfield never touch. */
+  .token {
+    --pw: min(136px, calc((100cqw - 64px) / 5));
+    width: var(--pw);
+    top: calc(50% + (var(--i) - (var(--n) - 1) / 2) * var(--step));
+  }
+
+  .line[data-line="gk"] .token {
+    top: 50%;
+    left: calc(16px + var(--pw) / 2);
+  }
+
+  .line[data-line="def"] .token {
+    top: calc(50% + (var(--i) - (var(--n) - 1) / 2) * var(--step));
+    left: calc((16px + var(--pw) / 2 + 50%) / 2);
+  }
+
+  .line[data-line="mid"] .token {
+    top: calc(50% + (var(--i) - (var(--n) - 1) / 2) * var(--step));
+    left: 50%;
+  }
+
+  .line[data-line="fwd"] .token {
+    top: calc(50% + (var(--i) - (var(--n) - 1) / 2) * var(--step));
+    left: calc(100% - (16px + var(--pw) / 2 + 50%) / 2);
+  }
+
+  .swatchAcross {
+    display: block;
+  }
+
+  .swatchUpright {
+    display: none;
+  }
+
+  /* Across, two lines: the name, then the club, YENİ and the figure. */
+  .plate {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name name name name"
+      "code new . xp";
+    column-gap: 4px;
+    height: 40px;
+    padding: 4px 8px;
+    text-align: left;
+  }
+
+  .name,
+  .code {
+    justify-content: flex-start;
+  }
+
+  .code {
+    line-height: 16px;
+  }
+
+  .name {
+    font-size: var(--step--1);
+  }
+
+  .xp {
+    font-size: var(--step--1);
+  }
+
+  /* The name has the whole first row; an armband takes its right end. */
+  .plate:has(.mark) .name {
+    padding-right: 20px;
+  }
+
+  .new {
+    position: static;
+    grid-area: new;
+    align-self: center;
+  }
+
+  .mark {
+    top: 4px;
+    right: 8px;
+    bottom: auto;
+    left: auto;
+  }
+
+  .new,
+  .mark,
+  .plate:has(.mark) .new,
+  .plate:has(.new) .mark {
+    transform: none;
+  }
+
+  .attack {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .arrow {
+    transform: none;
+  }
+
+  .wrap[data-def-crowded] .attack[data-at="first"] {
+    display: none;
+  }
+
+  .wrap[data-def-crowded] .attack[data-at="last"] {
+    display: inline-flex;
+  }
+}
+
+/* ---- The bench, in the published order ---- */
+
+.bench {
+  container: bench / inline-size;
+  margin-top: var(--space-2);
+}
+
+.benchTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.benchList {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.benchItem {
+  display: grid;
+  grid-template-columns: 12px auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-height: 28px;
+  padding: 4px 0;
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.benchOrder {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.benchName {
+  font-size: var(--step--1);
+  white-space: nowrap;
+}
+
+.benchMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.benchCode {
+  font-family: var(--font-mono);
+}
+
+.benchXp {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  font-weight: 600;
+  text-align: right;
+}
+
+@container bench (min-width: 360px) {
+  .benchList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Across a wide column the bench is one row under the pitch, as the desktop draws it:
+   the heading at the left, the four players side by side, each on two lines. */
+@container bench (min-width: 640px) {
+  .benchInner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .benchTitle {
+    flex: none;
+    width: 72px;
+    margin: 0;
+    padding-top: 4px;
+  }
+
+  .benchList {
+    flex: 1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: var(--space-4);
+  }
+
+  .benchItem {
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "order name xp"
+      ". meta meta";
+    align-items: baseline;
+    padding: 4px 0 0;
+  }
+
+  .benchOrder {
+    grid-area: order;
+  }
+
+  .benchName {
+    grid-area: name;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .benchMeta {
+    grid-area: meta;
+  }
+
+  .benchXp {
+    grid-area: xp;
+  }
+}

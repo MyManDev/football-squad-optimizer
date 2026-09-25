@@ -347,13 +347,19 @@ def next_steps(names: PublishNames, pr_url: str) -> str:
             "",
             "Deliberate steps left to a person, in order:",
             f"  1. Merge the PR once CI is green: {pr_url or '(open it above)'}",
-            "  2. Release develop to main (squash PR titled 'release: ...'); wait for the",
-            "     green main-push CI.",
-            f'  3. git tag -a {names.site_tag} <main-sha> -m "{names.site_tag}"',
-            f"     git push origin {names.site_tag}",
-            '  4. Dispatch the trusted workflow: gh workflow run "Deploy Pages" --ref develop '
-            f"-f release_tag={names.site_tag}",
-            "  5. Watch the run summary: budget, upload, identity, smoke — 7/7 or investigate.",
+            "  2. Release with the recipe. It cuts the two-parent release whose tree equals",
+            "     develop, verifies both properties, merges the release PR, tags, dispatches",
+            "     and verifies the live site:",
+            f"       sh scripts/release/ship.sh --dry-run <site-PR> {names.site_tag} \\",
+            "         <release-branch> <accepted-generated-at-ISO> '<summary sentence>'",
+            "     Drop --dry-run only when operating it; a settled tag takes its gameweek",
+            "     as a sixth argument.",
+            "  3. Never squash the release to main. A squash destroys the ancestry main and",
+            "     develop share, which is what made the release before #523 conflict in every",
+            "     file both had touched, and scripts/release/deploy.sh refuses a main that is",
+            "     not a two-parent merge whose tree equals develop.",
+            '  4. docs/deployment_runbook.md, "Release in one command", carries the arguments,',
+            "     the waits, and the recovery path once the window is already open.",
         ]
     )
 

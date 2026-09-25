@@ -286,6 +286,12 @@ that names the weeks each figure covers. A member's net is their gross week minu
 transfer cost, read from their own history, and the Top-100 mean is netted the same way
 when the week's picks capture covers the cohort.
 
+The league table at `/league/members` reads the same document. Beside the members it
+draws, per finished gameweek, our paper squad's net, the members' mean net and the game's
+average as bars on one scale ("Sistemin karnesi"), says "kayıt yok" where our row is
+missing rather than drawing a zero, and keeps the whole scoreboard, with its bases, modes
+and provisional weeks, behind a closed "Tüm skor tablosu" under the table.
+
 Our own figure is not FPL's net and the card says so in both languages: it is the eleven
 the decision named, scored as named. The game's automatic substitutions are not applied,
 and the frozen decision names no vice-captain, so a captain who did not play is not

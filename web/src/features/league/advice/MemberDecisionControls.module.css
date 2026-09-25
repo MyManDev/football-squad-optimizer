@@ -1,24 +1,309 @@
-.intro,
-.note,
-.honesty {
+/*
+ * The plan part sits in the sidebar (surface-2): labels are ink2, never ink3, which is
+ * 4.36:1 there. Rows are 28 px on a desktop, so Hesapla stays above a small laptop's fold
+ * with every strategy and both models listed, and 44 px targets below 1180 px, where the
+ * sidebar is a drawer over the page. The inputs are real radios, drawn to D's look.
+ */
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* The heading with the plan now in force at its right, as D-Bu-Hafta draws it; a plan too
+   long for that (a long strategy name) moves under the heading as a whole line of its own
+   and reads from the left, instead of leaving a word behind at the right. */
+.planHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--space-2);
+}
+
+.planTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.planNow {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  text-wrap: pretty;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field > legend,
+.label {
+  padding: 0;
+  margin-bottom: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  font-size: var(--step-0);
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.row:has(input:disabled) {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.row:has(input:checked) .rowName {
+  font-weight: 600;
+}
+
+.radio {
+  flex: none;
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--color-surface);
+  cursor: inherit;
+}
+
+.radio::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text);
+  transform: scale(0);
+}
+
+.radio:checked::before {
+  transform: scale(1);
+}
+
+.radio:disabled {
+  border-color: var(--color-text-muted);
+  background: transparent;
+}
+
+.rowName {
+  min-width: 0;
+}
+
+/* A state tag inside the option's name: outlined, 12 px, never a pill. */
+.tag {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-s);
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.line {
   margin: 0;
   color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.rivalField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 24rem;
+}
+
+.rivalField select {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: var(--step--1);
+}
+
+/* The window: three real radios drawn as one segmented control. */
+.segments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  font-size: var(--step-0);
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segment + .segment {
+  border-left: 1px solid var(--color-line);
+}
+
+.segment input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.segment:has(input:checked) {
+  background: var(--color-text);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.segment:has(input:disabled) {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+/* The window the link names stays readable on ink even where it cannot be computed. */
+.segment:has(input:checked:disabled) {
+  color: var(--color-board-muted);
+}
+
+.segment:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -4px;
+}
+
+.segment:has(input:checked:focus-visible) {
+  outline-color: var(--color-lime);
+}
+
+/* Under Hesapla in the sidebar, a step apart from the button's own lines. */
+.notes {
+  margin-top: var(--space-2);
+}
+
+.notes > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 28px;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.notes > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notesIcon {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.notes[open] .notesIcon {
+  transform: rotate(90deg);
+}
+
+.notesBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.notesBody p {
+  margin: 0;
+}
+
+.descriptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.descriptions dt {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.descriptions dd {
+  margin: 0;
+}
+
+@media (max-width: 1179.98px) {
+  .row,
+  .notes > summary {
+    min-height: 44px;
+  }
+
+  .segment,
+  .rivalField select {
+    min-height: 44px;
+  }
+}
+
+/* ---- The advanced part: the page's own column, under 'Gelişmiş ayarlar' ---- */
+
+.note {
+  margin: var(--space-2) 0 0;
   max-width: var(--measure);
-}
-
-.intro {
-  margin-bottom: var(--space-3);
-}
-
-.honesty {
-  margin-top: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
 }
 
 .controls {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .fieldset {
@@ -34,80 +319,36 @@
   font-size: var(--step--1);
   font-weight: 600;
   color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: var(--space-2);
-}
-
-.option {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md, 8px);
-  cursor: pointer;
-}
-
-.option:has(input:checked) {
-  border-color: var(--color-accent, currentColor);
-}
-
-.option input {
-  margin-top: 4px;
-}
-
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.description {
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
-.rivalField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  max-width: 24rem;
-}
-
-.rivalField select {
-  font: inherit;
-  padding: 6px 8px;
 }
 
 .windows {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
 }
 
 .windowOption {
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
+  min-height: 28px;
 }
 
 .windowOption:has(input:disabled) {
   color: var(--color-text-muted);
 }
 
-.note {
-  margin-top: var(--space-2);
+/* A checkbox row in the preferences panel, which borrows these field styles. */
+.option {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 28px;
+}
+
+@media (max-width: 1179.98px) {
+  .windowOption,
+  .option {
+    min-height: 44px;
+  }
 }

@@ -33,10 +33,9 @@ export interface ChipCopy {
   freeHit: string;
   basis: Record<MemberChip, string>;
   expectedOwnPoints: (points: string, basis: string) => string;
-  projectedGain: (points: string, basis: string) => string;
   moveRowsBasis: (basis: string) => string;
-  planGainVsHold: (points: string, basis: string) => string;
-  planGainVsHoldBeforeCost: (points: string, cost: string, basis: string) => string;
+  gainCaption: (basis: string) => string;
+  gainCaptionBeforeCost: (cost: string, basis: string) => string;
   limits: Record<string, string>;
 }
 
@@ -90,13 +89,12 @@ const en: ChipCopy = {
     bboost: "all fifteen players with the captain doubled",
   },
   expectedOwnPoints: (points, basis) => `${points} expected points for ${basis}`,
-  projectedGain: (points, basis) => `${points} for ${basis}`,
   moveRowsBasis: (basis) =>
-    `Each row is what the total for ${basis} moves by once that swap is added to the rows above it, so the rows add up to the whole plan's gain below. Keeping your squad is counted with the same chip played.`,
-  planGainVsHold: (points, basis) =>
-    `${points} expected points against keeping the squad you hold and playing the same chip, for ${basis}.`,
-  planGainVsHoldBeforeCost: (points, cost, basis) =>
-    `${points} expected points against keeping the squad you hold and playing the same chip, for ${basis}, before this week's transfer cost of ${cost}.`,
+    `Each change is what the total for ${basis} moves by once that swap is added to the changes before it, so the changes add up to the whole plan's gain. Keeping your squad is counted with the same chip played.`,
+  gainCaption: (basis) =>
+    `expected points against keeping the squad you hold and playing the same chip, for ${basis}`,
+  gainCaptionBeforeCost: (cost, basis) =>
+    `expected points against keeping the squad you hold and playing the same chip, for ${basis}, before this week's transfer cost of ${cost}`,
   limits: {
     [CHIP_CHOICE_LIMIT]:
       "The chip is in this plan because you chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.",
@@ -147,13 +145,12 @@ const tr: ChipCopy = {
     bboost: "on beş oyuncunun tamamı, kaptan iki kat",
   },
   expectedOwnPoints: (points, basis) => `${points} beklenen puan (${basis})`,
-  projectedGain: (points, basis) => `${points} (${basis})`,
   moveRowsBasis: (basis) =>
-    `Her satır, o takas kendisinden önceki satırlara eklendiğinde toplamın (${basis}) ne kadar değiştiğini gösterir; bu yüzden satırlar aşağıdaki toplam kazancı verir. Mevcut kadroyu korumak da aynı çip oynanmış sayılarak hesaplanır.`,
-  planGainVsHold: (points, basis) =>
-    `Mevcut kadronu koruyup aynı çipi oynamaya göre ${points} beklenen puan (${basis}).`,
-  planGainVsHoldBeforeCost: (points, cost, basis) =>
-    `Mevcut kadronu koruyup aynı çipi oynamaya göre ${points} beklenen puan (${basis}); bu haftanın ${cost} transfer maliyeti düşülmeden önce.`,
+    `Her değişiklik, kendinden önceki değişikliklere eklendiğinde toplamın (${basis}) ne kadar değiştiğini gösterir; bu yüzden değişiklikler planın toplam kazancını verir. Mevcut kadroyu korumak da aynı çip oynanmış sayılarak hesaplanır.`,
+  gainCaption: (basis) =>
+    `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis})`,
+  gainCaptionBeforeCost: (cost, basis) =>
+    `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis}); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
   limits: {
     [CHIP_CHOICE_LIMIT]:
       "Çip bu planda, çünkü sen seçtin; planlayıcı çipi tartmadı. Yazan kazanç yalnız bu haftanındır: çipin sonraki bir haftada kaç puan getireceği ölçülmedi, bu yüzden bu, çipi şimdi oyna tavsiyesi değildir.",

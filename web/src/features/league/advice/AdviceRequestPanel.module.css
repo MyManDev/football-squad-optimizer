@@ -1,41 +1,66 @@
-.hint {
-  margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  opacity: 0.85;
-}
-@media (max-width: 640px) {
-  :global([data-compute-dock]) .hint {
-    display: none;
-  }
-  :global([data-compute-dock]):has(.state) .durationNote {
-    display: none;
-  }
+/*
+ * Hesapla, compact: the primary button (40 px on a desktop, 48 px below 1180 px where the
+ * sidebar is a drawer) with the request's state under it, then quiet 12 px notes. The page
+ * pins the first block to the bottom of the phone drawer; the notes stay in its flow.
+ */
+
+.panel,
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
+.notes {
+  margin-top: var(--space-2);
 }
 
 .compute {
-  border: 1px solid var(--border, currentColor);
-  border-radius: 0.5rem;
-  background: transparent;
-  color: inherit;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-size: var(--step-0);
   font-weight: 600;
-  padding: 0.4rem 1rem;
+  line-height: 20px;
   cursor: pointer;
 }
 
+.compute:hover:not(:disabled) {
+  background: var(--color-text);
+}
+
+.compute:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Disabled reads as a quiet outline, not as a faded primary that still looks pressable. */
 .compute:disabled {
-  opacity: 0.6;
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 
+.state,
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
 .state {
-  margin: 0.5rem 0 0;
-  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+@media (max-width: 1179.98px) {
+  .compute {
+    min-height: 48px;
+  }
 }

@@ -117,7 +117,7 @@ def _elements(*, played: dict[int, tuple[int, int]] | None = None) -> list[dict[
 
 
 def _bootstrap(elements: list[dict[str, Any]] | None = None) -> bytes:
-    finished = [dict(EVENTS[0], finished=True), *EVENTS[1:]]
+    finished = [dict(EVENTS[0], finished=True, data_checked=True), *EVENTS[1:]]
     document = {
         "events": finished,
         "teams": TEAMS,
@@ -892,3 +892,86 @@ def test_a_projection_without_the_column_states_nothing_rather_than_nothing_at_a
     frame = pd.DataFrame({"player_id": [1, 2], "expected_points": [4.0, 3.0]})
 
     assert producer._appearance(frame) is None
+
+
+# --- the in-season sample is a payload fact, not a calendar one --------------
+
+
+def _capture_with(
+    world: dict[str, Any],
+    events: list[dict[str, Any]],
+    captured_at: str = "2026-08-28T15:31:00Z",
+) -> Any:
+    """One capture whose bootstrap carries exactly the settlement flags given.
+
+    ``captured_at`` chooses the target, because the target is the first deadline the capture
+    instant has not reached. A test that needs more than one gameweek before the target has
+    to move the instant rather than the calendar.
+    """
+
+    document = {"events": events, "teams": TEAMS, "elements": _elements()}
+    return write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc=captured_at,
+        payloads={
+            BOOTSTRAP_PAYLOAD: json.dumps(document).encode("utf-8"),
+            FIXTURES_PAYLOAD: _fixtures(),
+        },
+    )
+
+
+def test_a_settled_predecessor_is_accepted(world: dict[str, Any]) -> None:
+    """The ordinary case, and the one the refusal must stay silent on.
+
+    Gameweek 2 is the open target and gameweek 1 is finished and checked, so the calendar's
+    count and the payload's own answer agree and nothing is raised.
+    """
+
+    settled = [dict(EVENTS[0], finished=True, data_checked=True), *EVENTS[1:]]
+    snapshot = _capture_with(world, settled)
+
+    projection, _, _ = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+
+    assert projection.gameweek == 2
+
+
+@pytest.mark.parametrize(
+    ("flags", "why"),
+    [
+        ({"finished": False, "data_checked": False}, "still being played"),
+        # Finished is the last kick-off; checked is bonus landing, and bonus is short by
+        # different amounts for different players, so the gap between them is not noise.
+        ({"finished": True, "data_checked": False}, "finished but bonus not yet added"),
+    ],
+)
+def test_an_unsettled_predecessor_is_refused(
+    world: dict[str, Any], flags: dict[str, bool], why: str
+) -> None:
+    """A mid-gameweek capture looks complete to the calendar and is not (#224)."""
+
+    snapshot = _capture_with(world, [dict(EVENTS[0], **flags), *EVENTS[1:]])
+
+    with pytest.raises(SystemExit, match=r"\[1\] are not finished and checked"):
+        _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+
+
+def test_the_refusal_reads_the_set_and_not_the_count(world: dict[str, Any]) -> None:
+    """A gap in the middle is the same defect, and counting would not see it.
+
+    The target is gameweek 3, so two weeks precede it. Gameweek 1 is settled, gameweek 2 is
+    not, and gameweek 3 itself is marked settled. So the count a naive rule would compare,
+    `target - 1 = 2` against two settled weeks, **agrees**, while the set does not: the
+    settled weeks are {1, 3} and the ones that had to be are {1, 2}.
+    """
+
+    events = [
+        dict(EVENTS[0], finished=True, data_checked=True),
+        dict(EVENTS[1], finished=False, data_checked=False),
+        dict(EVENTS[2], finished=True, data_checked=True),
+    ]
+    # After gameweek 2's deadline, so the target is 3 and two weeks precede it.
+    snapshot = _capture_with(world, events, captured_at="2026-09-01T09:00:00Z")
+
+    with pytest.raises(SystemExit, match=r"\[2\] are not finished and checked"):
+        _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)

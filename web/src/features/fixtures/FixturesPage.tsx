@@ -8,7 +8,11 @@ import { GameweekFixtures } from "./GameweekFixtures";
 import type { FixtureGameweek } from "./types";
 import styles from "./Fixtures.module.css";
 
-/** This week and next at the top, then every played gameweek, newest first. */
+/**
+ * This week and next at the top, then every played gameweek, newest first. The weeks stand
+ * side by side where the column has room for more than one, so a wide screen reads the
+ * schedule like a fixture board instead of one narrow list down the page.
+ */
 export function FixturesPage() {
   const { language, locale, messages } = useLanguage();
   const copy = FIXTURES_COPY[language];
@@ -27,9 +31,7 @@ export function FixturesPage() {
       }
       aside={copy.deadline(local(entry.deadline_utc, locale))}
     >
-      <div className={styles.pageWeek}>
-        <GameweekFixtures week={entry} locale={locale} copy={copy} />
-      </div>
+      <GameweekFixtures week={entry} locale={locale} copy={copy} />
     </Card>
   );
 
@@ -40,13 +42,17 @@ export function FixturesPage() {
         <h1 className={styles.pageTitle}>{copy.pageTitle}</h1>
         <p className={styles.lede}>{copy.pageLede}</p>
       </header>
-      {current ? week(current, copy.thisWeek) : null}
-      {next ? week(next, copy.nextWeek) : null}
+      {current || next ? (
+        <div className={styles.weeks}>
+          {current ? week(current, copy.thisWeek) : null}
+          {next ? week(next, copy.nextWeek) : null}
+        </div>
+      ) : null}
       <h2 className={styles.pastTitle}>{copy.pastTitle}</h2>
       {past.length === 0 ? (
         <p className={styles.lede}>{copy.noPast}</p>
       ) : (
-        past.map((entry) => week(entry))
+        <div className={styles.weeks}>{past.map((entry) => week(entry))}</div>
       )}
       <p className={styles.lede}>
         {copy.capturedAt(local(data.captured_at_utc, locale))}
