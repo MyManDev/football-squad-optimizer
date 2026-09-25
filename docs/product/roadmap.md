@@ -7,29 +7,117 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 
 ## Current position
 
-- **Phase A — Engineering complete; prospective evidence accumulating.**
-- **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
-  handoff is produced and verified.
-- **Phase C — Engineering merged; prospective evidence still required.** The component model,
-  decision-level evaluation and default handoff integration landed on `develop` through
-  #348, #350 and #351. This integration does not establish a production deployment.
-- **Phase D — Sampler, scoring, readout and binding runner merged.** The preregistered
-  component scenario path and single-run calibration command are implemented. Calibration
-  claims require the separate binding evidence; merging the code does not establish them.
-- **Phase E — Initial candidate-selection engineering merged; promotion gated.** Candidate
-  generation, selection, E2/E3 measurement commands and the explicit live shadow seam landed
-  through #358–#366. The production selector pin remains empty and normal decisions do not
-  enable the shadow hook. Measurement results are separate from this engineering milestone.
-- **Phases F–H — Planned.** Multi-gameweek and later product claims require their own
-  implementation and evaluation gates.
+Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026. Each
+line names the code or the record it can be checked against. The phase sections below keep
+their goals; this section is what exists today.
 
-The backend and frontend are at different integration stages. Published pages use static
-views; the member page can request and display advice through the optional HTTP/job client,
-with pure-points computation for one, three or five weeks, and one-week member strategies
-against a named rival. The worker loop, capture-context provider and shared-store composition
-exist in `squadopt.platform`. Browser acceptance is recorded separately from remote host and
-storage acceptance, which remains unverified. See the
-[backend boundary](../architecture/backend.md).
+### What a member gets
+
+League `352490` only. The site is the direction D design (#798: light green page, a left
+sidebar, transfers drawn as substitution boards, the squad on a pitch, fixtures beside the
+decision), released to `main` in #805 and deployed as `site-2026-27-gw06-fix1` on
+2026-09-25.
+
+**Published with the week**, for every member, in the static tree
+(`web/public/data/league/advice/<entry>/index.json`; the GW6 decision was built from
+capture `fpl-live-20260922T214539Z-364991a4f832`):
+
+- The pure-points plan (`saf-puan`) at one, three and five weeks. Window plans are solved
+  at CP-SAT linearization level 2, which proves them far more often (#655,
+  `docs/member_window_proofs.md`), and are searched against a hold-the-squad control: when
+  that control is proved, the plan is never worse than holding on the solver's own objective
+  (#783, `docs/decision_preferences.md`).
+- A plan for each chip the member can still play this gameweek, with what the chip week adds
+  over the member's own no-chip plan for that gameweek (#603, #612,
+  `application/advice_chips.py`).
+- The chip forecast: for each held chip, play now or hold, and the gameweek a hold points
+  at (#685, #728, `application/chip_forecast.py`). It uses the decaying threshold without
+  the reservation. Over four development seasons each threshold rule beat never playing a
+  chip, and none separated from another (`docs/chip_forecast_rule.md`).
+
+**Computed on request** through the advice backend, which offers the whole member menu
+(`menu_capabilities` in `application/advice_capabilities.py`) and publishes what the current
+capture can answer (the capabilities document in `platform/advice_read.py`):
+
+- The rival strategies against a named rival, at one, three or five weeks (#604):
+  `ortak-koru` (an overlap floor with the rival, declared at nine players) and `fark-yarat`
+  (an overlap ceiling, declared at five), each priced in expected points against the
+  member's own plan. The declared rule `gap_and_weeks_strategy_rule_v1` suggests one. Gate 1
+  of the strategy bench fails at every horizon, so none is `gated_pass` and none may be
+  called safer (`docs/strategy_bench.md`).
+- The Top 100 influence: a weight the member chooses (0, 5, 10, 20, 30, 40 or 50) on how
+  many Top 100 teams started each player last week, at every window and on the rival
+  strategies (#594, #599). The plan is chosen on the weighted points and every number shown
+  is on the base model (`application/top100_weight.py`). It is offered only when that
+  capture's Top 100 export passed its gate.
+- The manager's word: model-coded club news entered as a constraint the member switches on,
+  with its price, on the one-week pure-points plan (#581, `application/manager_words.py`).
+  Two real clubs are registered, Liverpool and Newcastle
+  (`data/sources/club_news_sources.json`). It is offered only when a rotation table with the
+  club news exists for that capture.
+- A chip the member names, forced into the plan at one, three or five weeks (#646, #769,
+  `application/advice_chip_strategy.py`). The automatic chip choice is refused until it can
+  value holding a chip past the window (#802).
+- The football model: `model=football` selects the experimental per-fixture
+  `football_team_share_v1` when a validated forecast exists for the backend's exact capture
+  (#763, `docs/live-football-model.md`). The default stays `current`. Its gains are
+  development evidence; it has not yet been compared with `current` on settled weeks.
+- Preferences: keep, avoid, no-hit and save-chip constraints on the pure-points plan, at any
+  window and with either model (#783, `docs/decision_preferences.md`). They are refused with
+  a rival strategy or the manager's word.
+
+What a strategy may publish is a closed list with no probability and no spread in it
+(`PUBLISHABLE_FIELDS` in `application/strategies/catalog.py`).
+
+### How it runs
+
+- **Weekly publication.** The operator's weekly runner (`platform/weekly_operations.py`,
+  [weekly runbook](../weekly_runbook.md)) captures, builds the projection handoff, solves
+  every member and publishes a static tree through a release pull request and an immutable
+  `site-*` tag ([deployment runbook](../deployment_runbook.md)). Cloudflare Pages serves it at
+  `squadopt.mymandev.com`.
+- **The advice backend runs on the owner's Windows PC** (an API and its workers, six by
+  default) behind the `squadopt-api` Cloudflare Tunnel (#602, route (a) in
+  [backend free hosting](../backend_free_hosting.md)). It serves only while that PC is on,
+  awake and logged on; with it off, members still get the published plans.
+- **The logon watcher.** `scripts/start_backend_at_logon.ps1 -Register` puts a Startup
+  shortcut that runs the script with `-Watch` at logon: it starts what is not running, then
+  checks every 60 seconds and starts a component after three failed checks in a row (#623,
+  #658). The owner runs `-Register` on the machine; the repository cannot show whether that
+  has been done. `scripts/release/restart_backend.ps1` restarts the recorded backend on a new
+  release (#663).
+- **The uptime check.** The `Backend uptime` workflow opens a `backend-down` issue when
+  `/health` fails and closes it on recovery (#676). Its schedule fires hours apart, not every
+  fifteen minutes (measured in the hosting document). The last outage issue, #795, was open
+  from 2026-09-24T15:26Z to 2026-09-25T11:14Z.
+
+### Where the evidence stands
+
+- **Phase A: engineering complete, three weeks settled.** The published ledger
+  (`web/public/data/2026-27/ledger.json`) holds GW1 and GW5 decided live and GW4 as a replay.
+  GW2 and GW3 were rolled with no decision (`docs/season_ledger_2026-27.md`). The exit asks
+  for eight prospective gameweeks: if every week from GW6 on is decided live before its
+  deadline, GW11 is the eighth. The GW3 Top-100 cohort was lost before it could be settled
+  (see Phase A below).
+- **Phase B: complete.**
+- **Phase C: the component base is the live default and is published bare.** The GW4 and GW5
+  decisions name `phase_c_control_components_v1` (`gw04/recommendation.json` and
+  `gw05/recommendation.json` under `web/public/data/2026-27/`); the Top 100 reaches a
+  member's plan only as the weight above. The elite family's instrument, the Top 100
+  effect reader, is fixed to read after GW12 and after GW20 (`docs/top100_effect_prereg.md`).
+- **Phase D: calibration failed.** S1 passes and S2 fails on the 137 frozen folds, so
+  `PHASE_E_CALIBRATED_VERSIONS` stays empty (`application/phase_e.py`) and no scenario
+  claim reaches a member.
+- **Phase E: nothing promoted.** The member strategies are priced constraints from the
+  strategy catalogue, not Phase E risk modes.
+- **Phase F: partly with members.** Members get three- and five-week plans. No horizon has
+  beaten the rolling one-week control; the capped rolling three-week planner is level with
+  it (`docs/transfer_discipline_note.md`).
+- **Phase G: searched, nothing promoted.** The 2025-26 holdout is spent (see Phase G).
+- **Phase H: one item started.** The manager's word is the first model-read evidence in the
+  product, entered as a priced constraint.
+
+See the [backend boundary](../architecture/backend.md) for the API and worker contracts.
 
 ## Phase A — Measurement correctness
 
@@ -52,7 +140,12 @@ Recorded result:
 - Paired gap change: **-1.925 points per gameweek**.
 - The result is season-dependent and descriptive because historical ownership timing is not
   verified.
-- The GW3 Overall Top-100 cohort is frozen; its outcome remains pending settlement.
+- The GW3 Overall Top-100 cohort (`fpl-top100-20260901T040725Z-5813e06fe096`, 100/100
+  members) was frozen before its deadline and then **lost**: the capture was among those
+  emptied from `data/snapshots` on 2026-09-10, before its gameweek was settled, and the
+  source serves only today's rankings. It can never be scored, so no Top-100 performance
+  claim will come from it. `benchmark_v2.md` still prints its status as
+  `pending_settlement`, which was true when that record was written.
 
 Exit state: engineering work is complete. Prospective evidence continues to accumulate for at
 least eight gameweeks, with twelve or more preferred for a stable-season interpretation.
@@ -120,15 +213,21 @@ history use the existing in-season estimate row by row. Old captures without the
 payloads fall back to the legacy model with a recorded reason; `--control-only` is the explicit
 rollback. See [`docs/phase_c_operational_component.md`](../phase_c_operational_component.md).
 
-The Top-100 five-per-cent uplift is applied **on top of** that component base whenever the
-producer is given both evidence artifact paths, which on an ordinary mid-season capture is the
-default weekly path. This paragraph used to say the uplift was not combined with the component
-base; that stopped being true when #395 shipped, and it is corrected here rather than quietly.
-The composition is its own promoted model version, `phase-c-component-elite-top100-v1`, and
-`--control-only` on the producer or `--projection component-only` on the weekly runner leaves
-it out. It has never been measured as a candidate on that base: on 8 September 2026 the owner
-amended the promotion boundary to admit a bounded, fitted-nothing uplift without one, under
-stated conditions. The frozen rule is in
+**The published decisions carry the bare component base, not the Top-100 uplift.** The
+five-per-cent uplift still exists as its own model version,
+`phase-c-component-elite-top100-v1` (#395): the producer multiplies it on top of the component
+base when it is given both evidence artifact paths, and the weekly runner's default
+`--projection component` builds that handoff. It is not what members are published. A week
+that offers the Top 100 menu runs with `--projection component-only`, because a member's own
+weight must not stack on the frozen uplift ([weekly runbook](../weekly_runbook.md)), and the
+GW4 and GW5 decisions both name `phase_c_control_components_v1`. The Top 100 now reaches a
+plan only as the weight a member chooses, priced on base points
+(`application/top100_weight.py`, #594). This paragraph said until 25 September 2026 that the
+uplift was the default weekly path; it is corrected here rather than quietly.
+
+The uplift was never measured as a candidate on the component base: on 8 September 2026 the
+owner amended the promotion boundary to admit a bounded, fitted-nothing uplift without one,
+under stated conditions. The frozen rule is in
 [`docs/phase_c_operational_elite_policy.md`](../phase_c_operational_elite_policy.md); the
 amendment is in
 [`docs/phase_c_operational_component.md`](../phase_c_operational_component.md).
@@ -213,7 +312,10 @@ Goal: choose one legal squad decision using calibrated uncertainty rather than o
 - Value the bench through appearance-driven autosub contribution.
 - Price captain risk explicitly.
 - Support rival-gap utility without mixing rival identity into the player model.
-- Give Saf Puan, Garantici and aggressive modes measured mathematical meanings.
+- Offer member strategies as declared constraints priced in expected points (the strategy
+  catalogue, `application/strategies/catalog.py`), and name none of them safer or more
+  aggressive before its bench gates pass. Of the earlier named modes only `saf-puan`, the
+  unconstrained plan, is still offered.
 
 Current delivery state:
 
@@ -239,20 +341,21 @@ Current delivery state:
 - E4 requires calibrated Phase D evidence, eligible E3 evidence and a valid new prospective
   capture. The ordinary decision command does not install the shadow hook, and the production
   selector pin remains empty. The explicit seam evaluates full-pool squad decisions; it does
-  not establish a transfer-policy improvement or implement the public strategy modes.
-- Rival-gap utility, the mode meanings above and E5 default promotion remain later work with
+  not establish a transfer-policy improvement or implement the member strategies, which the
+  strategy catalogue declares separately.
+- Rival-gap utility inside the selector and E5 default promotion remain later work with
   their own preregistrations. The existing E2/E3 instruments do not satisfy these broader
   exit criteria by their mere presence.
 
 Exit criteria:
 
-- Every mode has a frozen objective and reproducible price.
-- No mode is named safer or more aggressive without passing its declared evidence gates.
+- Every strategy has a frozen objective and reproducible price.
+- No strategy is named safer or more aggressive without passing its declared evidence gates.
 - The risk-neutral arm remains a reproducible control.
 
 ## Phase F — Multi-gameweek rolling horizon
 
-**Status: planned.**
+**Status: partly delivered to members; no horizon has beaten the weekly control.**
 
 Goal: plan transfers over three to five gameweeks while re-optimizing at every deadline.
 
@@ -263,6 +366,19 @@ Goal: plan transfers over three to five gameweeks while re-optimizing at every d
 - Separate the live one-gameweek control from longer research horizons.
 - Re-plan after every new capture instead of treating one plan as permanently optimal.
 
+Current delivery state:
+
+- Members get three- and five-week plans for `saf-puan` (#402) and for the rival strategies
+  (#604), starting from each member's captured squad, bank, free transfers and chips.
+- A window's later weeks repeat the first week's projection, rescaled by fixture counts, and
+  prices are held at the captured values; the payload states this beside the plan
+  (`WINDOW_STATED_LIMITS` in `application/advice.py`). The optional football model forecasts
+  each later fixture instead. There is no scenario tree and no measured terminal value.
+- No horizon has beaten the rolling one-week control under calendar scaling
+  (`docs/planner_horizon_rolling.md`); with a one-transfer cap the rolling three-week planner
+  is level with it (`docs/transfer_discipline_note.md`). The member windows are offered as
+  plans, not as evidence that a longer horizon scores more.
+
 Exit criteria:
 
 - One-week output reproduces the single-gameweek control.
@@ -271,17 +387,19 @@ Exit criteria:
 
 ## Phase G — Design of Experiments and Bayesian Optimization
 
-**Status: planned after the model and objectives stabilize.**
+**Status: instruments built and run on development seasons; nothing promoted.**
 
-Goal: search expensive policy and model choices without tuning against noise or the locked
-holdout.
+Goal: search expensive policy and model choices without tuning against noise or against the
+data a promotion is judged on.
 
 - Use DoE to identify important factors and interactions.
 - Freeze candidate spaces and evaluation budgets before optimization.
 - Use Bayesian Optimization only for the reduced, versioned search space.
 - Track evaluation noise and optimizer regret against tractable grid references.
 - Evaluate multiple objectives through explicit trade-offs or Pareto frontiers.
-- Reserve the locked holdout for one declared promotion decision.
+- Declare an untouched evaluation set before a promotion decision. The 2025-26 holdout was
+  spent once as a final test (`fw10_holdout`) and has since been walked as development data,
+  so no locked holdout remains (`docs/measurements_index.md`, opening section).
 
 Exit criteria:
 
@@ -292,7 +410,8 @@ Exit criteria:
 
 ## Phase H — Advanced methods and product scaling
 
-**Status: future.**
+**Status: future, with one item started.** Model-read club news reaches members as the
+manager's word, a priced constraint the member switches on (see Current position).
 
 Goal: introduce more complex methods only when simpler calibrated baselines leave a measured
 gap.
@@ -309,5 +428,6 @@ gap.
 Exit criteria:
 
 - Every advanced method must beat a simpler baseline on a frozen evaluation contract.
-- LLM evidence must retain source, capture time, confidence and provenance.
+- LLM evidence must retain source, capture time and provenance, with the model's reading as
+  a category, never as a confidence score.
 - Product scaling must not weaken reproducibility, privacy or probability-publication gates.

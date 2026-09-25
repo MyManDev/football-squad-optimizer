@@ -102,8 +102,9 @@ lost on 2026-09-10.
 
 The member flow accepts league `352490`, then a selected member. Other leagues are currently
 rejected. Published advice and a newly computed response are separate states; pure-points
-requests support one, three or five weeks, while rival strategies require a named member and
-one week. Published capabilities control what the page offers.
+requests and rival strategies support one, three or five weeks, and a rival strategy needs a
+named member. Published capabilities control what the page offers; the
+[roadmap](docs/product/roadmap.md#current-position) lists what a member gets today.
 
 Use the [weekly runbook](docs/weekly_runbook.md) for publication, the
 [backend runbook](docs/backend_runbook.md) for API/worker acceptance, and the
