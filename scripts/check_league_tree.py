@@ -1,7 +1,18 @@
-"""Check a published league tree using the three release checks from the tooling seed."""
+"""Check a published league tree using the three release checks from the tooling seed.
+
+Each check expects what each member's advice index declares. An absence the index states
+in the producer's own shape, with a string reason (a menu this run left out, a window or
+rival pair that did not solve, a member with no advice this week), is reported and is not
+a finding; a document the index names that the tree lacks is, and so is an index that
+fails the page's assertAdviceIndex (the envelope is not checked) or a Top 100 menu, an
+``unavailable`` row or a refused member stated without its reason. The manager's word and
+the chip menu are read as the producer writes them: their absences are not checked for a
+reason.
+"""
 
 import argparse
 import json
+import math
 import re
 import urllib.error
 import urllib.request
@@ -22,6 +33,31 @@ QUOTE_FORBIDDEN = re.compile(
     r"|\b50\s*[-/]\s*50\b|fifty[\s-]fifty",
     re.IGNORECASE,
 )
+#: The pure-points strategy, whose longer windows need no rival.
+PURE = "saf-puan"
+#: The Top 100 weights beyond the published plan (``TOP100_WEIGHTS`` without zero). The
+#: page offers each of them wherever the index names its file, whatever else it lists.
+MENU_WEIGHTS = (5, 10, 20, 30, 40, 50)
+#: The keys of the index the producer writes for a member it could not advise
+#: (``_refused_member_index`` in ``squadopt.application.league_views``), and no others.
+REFUSED_INDEX_KEYS = frozenset(
+    {
+        "league_id",
+        "season",
+        "gameweek",
+        "entry_id",
+        "window",
+        "windows",
+        "strategies",
+        "rival_entry_ids",
+        "default_rival_entry_id",
+        "suggested_strategy",
+        "computed",
+        "unavailable",
+    }
+)
+#: ``Number.MAX_SAFE_INTEGER``, the page's bound on an id.
+MAX_SAFE_INTEGER = 2**53 - 1
 
 
 class Tree:
@@ -71,40 +107,316 @@ def walk(node: object, where: str, problems: list[str]) -> None:
         problems.append(f"{where}: forbidden text {node[:80]!r}")
 
 
+def _number(value: object) -> bool:
+    """A JSON number: ``typeof value === "number"`` on the page."""
+
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _positive(value: object) -> bool:
+    """``Number.isSafeInteger(value) && value > 0``, as the page reads an id.
+
+    An integer is compared as it is, never through ``float``, so a number too large for a
+    float is refused like any other id past the safe range rather than raising.
+    """
+
+    if not _number(value) or (isinstance(value, float) and not value.is_integer()):
+        return False
+    assert isinstance(value, (int, float))
+    return 0 < value <= MAX_SAFE_INTEGER
+
+
+def _window(value: object) -> bool:
+    return _number(value) and value in (1, 3, 5)
+
+
+def _finite(value: object) -> bool:
+    """``Number.isFinite(value)``: an integer too large for a float reads as Infinity on the
+    page, so it is not finite here either."""
+
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def page_refusal(index: object, entry: int) -> str | None:
+    """What the page's ``assertAdviceIndex`` refuses in this index, or None when it would not.
+
+    A port of ``web/src/features/league/publicationShape.ts``: an index the page throws on
+    is a member page that shows an error, so the checker must not pass it either.
+    """
+
+    if not isinstance(index, dict):
+        return "not an object"
+    strategies = index.get("strategies")
+    rivals = index.get("rival_entry_ids")
+    computed = index.get("computed")
+    unavailable = index.get("unavailable")
+    windows = index.get("windows", {})
+    checks = (
+        ("entry_id", _number(index.get("entry_id")) and index.get("entry_id") == entry),
+        ("league_id", _positive(index.get("league_id"))),
+        ("gameweek", _positive(index.get("gameweek"))),
+        ("season", isinstance(index.get("season"), str)),
+        ("window", _window(index.get("window"))),
+        (
+            "strategies",
+            isinstance(strategies, list) and all(isinstance(s, str) for s in strategies),
+        ),
+        ("rival_entry_ids", isinstance(rivals, list) and all(_positive(r) for r in rivals)),
+        (
+            "default_rival_entry_id",
+            "default_rival_entry_id" in index
+            and (
+                index["default_rival_entry_id"] is None
+                or _positive(index["default_rival_entry_id"])
+            ),
+        ),
+        (
+            "computed",
+            isinstance(computed, list)
+            and all(
+                isinstance(row, dict)
+                and isinstance(row.get("strategy"), str)
+                and _positive(row.get("rival_entry_id"))
+                and ("window" not in row or _window(row["window"]))
+                and row.get("path")
+                == (
+                    f"advice/{entry}/{row['strategy']}/{int(row.get('window', 1))}"
+                    f"/vs-{int(row['rival_entry_id'])}.json"
+                )
+                for row in computed
+            ),
+        ),
+        (
+            "unavailable",
+            isinstance(unavailable, list)
+            and all(
+                isinstance(row, dict)
+                and isinstance(row.get("strategy"), str)
+                and isinstance(row.get("reason"), str)
+                and "rival_entry_id" in row
+                and (row["rival_entry_id"] is None or _positive(row["rival_entry_id"]))
+                and ("window" not in row or _window(row["window"]))
+                for row in unavailable
+            ),
+        ),
+        (
+            "windows",
+            isinstance(windows, dict)
+            and all(
+                isinstance(items, list) and all(_window(w) for w in items)
+                for items in windows.values()
+            ),
+        ),
+    )
+    for field, ok in checks:
+        if not ok:
+            return field
+    suggestion = index.get("suggested_strategy")
+    if suggestion is not None and not (
+        isinstance(suggestion, dict)
+        and suggestion.get("strategy") in ("saf-puan", "ortak-koru", "fark-yarat")
+        and isinstance(suggestion.get("rule_id"), str)
+        and suggestion.get("band") in ("behind", "level", "ahead")
+        and _positive(suggestion.get("rival_entry_id"))
+        and _finite(suggestion.get("points_ahead_of_rival"))
+        and _positive(suggestion.get("scored_gameweek"))
+        and _finite(suggestion.get("gameweeks_remaining"))
+        and _finite(suggestion.get("band_edge_points"))
+    ):
+        return "suggested_strategy"
+    return None
+
+
+def member_index(read: Callable[[str], Any], entry: int) -> tuple[dict[str, Any] | None, str]:
+    """A member's advice index, or the finding that keeps every check from reading it."""
+
+    envelope = read(f"advice/{entry}/index.json")
+    if envelope is None:
+        return None, f"{entry}: no index"
+    index = envelope.get("payload") if isinstance(envelope, dict) else None
+    refused_field = page_refusal(index, entry)
+    if refused_field is not None:
+        return None, f"{entry}: index the page refuses ({refused_field})"
+    assert isinstance(index, dict)
+    return index, ""
+
+
+def refusal(index: dict[str, Any]) -> str | None:
+    """The reason a refused member's index states, or None when it is not one.
+
+    Recognised only in the exact shape the producer writes for a member it could not
+    advise (``_refused_member_index``): its keys and no others, the pure-points strategy
+    first, no window named for any strategy, nothing computed, no suggestion, and one
+    ``unavailable`` row per strategy with no rival and the same string reason.
+    """
+
+    strategies = index.get("strategies")
+    rows = index.get("unavailable")
+    if (
+        set(index) != REFUSED_INDEX_KEYS
+        or not isinstance(strategies, list)
+        or not strategies
+        or strategies[0] != PURE
+        or len(set(strategies)) != len(strategies)
+        or not isinstance(rows, list)
+        or not rows
+        or not isinstance(rows[0], dict)
+    ):
+        return None
+    reason = rows[0].get("reason")
+    if (
+        not isinstance(reason, str)
+        or index["window"] != 1
+        or index["windows"] != {strategy: [] for strategy in strategies}
+        or index["computed"] != []
+        or index["suggested_strategy"] is not None
+        or rows
+        != [
+            {"strategy": strategy, "rival_entry_id": None, "reason": reason}
+            for strategy in strategies
+        ]
+    ):
+        return None
+    return reason
+
+
+def stated_unavailable(index: dict[str, Any]) -> dict[tuple[str, int, int | None], str]:
+    """Every (strategy, window, rival) the index says did not solve, with its reason.
+
+    A row without a window is the one-week pair, as the producer writes it and the page
+    reads it. ``page_refusal`` has already refused any row without a string strategy and
+    reason, so every row here states its reason.
+    """
+
+    return {
+        (row["strategy"], row.get("window", 1), row["rival_entry_id"]): row["reason"]
+        for row in index["unavailable"]
+    }
+
+
+def menu_absence(menu: object) -> str | None:
+    """The reason a Top 100 menu the index states absent gives, or None when it is not so
+    stated: ``available`` false and a string reason, the producer's shape and nothing else.
+    """
+
+    if isinstance(menu, dict) and menu.get("available") is False:
+        reason = menu.get("reason")
+        if isinstance(reason, str):
+            return reason
+    return None
+
+
+def print_absences(absences: list[tuple[int, str]]) -> None:
+    """Name what the indexes say is absent, one line per statement; none of it is a finding."""
+
+    grouped: defaultdict[str, list[int]] = defaultdict(list)
+    for entry, statement in absences:
+        grouped[statement].append(entry)
+    for statement, entries in sorted(grouped.items()):
+        members = ", ".join(str(entry) for entry in entries)
+        print(f"  stated absence, {len(entries)} member(s): {statement} ({members})")
+
+
 def check_variants(read: Callable[[str], Any]) -> list[str]:
     problems: list[str] = []
+    absences: list[tuple[int, str]] = []
     kinds: Counter[tuple[str, int, bool]] = Counter()
     statuses: Counter[tuple[int, str | None]] = Counter()
     ceilings: dict[int, list[float]] = {}
     members = read("members.json")["payload"]["members"]
     humans = [m["entry_id"] for m in members if m.get("member_kind") == "human"]
     for entry in humans:
-        index = read(f"advice/{entry}/index.json")["payload"]
+        index, finding = member_index(read, entry)
+        if index is None:
+            problems.append(finding)
+            continue
+        refused = refusal(index)
+        if refused is not None:
+            absences.append((entry, f"no advice this week: {refused}"))
+            continue
         rival = index["default_rival_entry_id"]
-        menu = index.get("top100") or {}
-        documents = menu.get("documents") or []
-        expected = {("saf-puan", w, None, s) for w in (3, 5) for s in (5, 10, 20, 30, 40, 50)}
-        if rival is not None:
+        windows = index.get("windows") or {}
+        stated = stated_unavailable(index)
+        for (strategy, window, rival_id), reason in stated.items():
+            against = f" vs {rival_id}" if rival_id is not None else ""
+            absences.append((entry, f"{strategy} window {window}{against} not solved: {reason}"))
+        # Every pure-points window the index names has its file, the one-week plan every
+        # member is shown included, whatever the menu and the word say; a member with
+        # advice always has that one.
+        pure_windows = windows.get(PURE, [])
+        if 1 not in pure_windows:
+            problems.append(f"{entry}: index names no one-week {PURE} window")
+        for window in pure_windows:
+            if read(f"advice/{entry}/{PURE}/{window}.json") is None:
+                problems.append(f"{entry}: advice/{entry}/{PURE}/{window}.json not published")
+        # Every chip the menu names has its file, at the one path the page builds for it
+        # (``chipPath`` in chipChoice.ts); a menu that is not available names none.
+        chips = index.get("chips")
+        if isinstance(chips, dict) and chips.get("available") is True:
+            chip_paths = chips.get("paths")
+            if not isinstance(chip_paths, dict) or not chip_paths:
+                problems.append(f"{entry}: chips available with no paths {chip_paths!r}")
+                chip_paths = {}
+            for chip, chip_path in sorted(chip_paths.items()):
+                expected_path = f"advice/{entry}/{PURE}/1/chip-{chip}.json"
+                if chip_path != expected_path:
+                    problems.append(f"{entry}: chip {chip} path {chip_path!r}")
+                elif read(chip_path) is None:
+                    problems.append(f"{entry}: {chip_path} not published")
+        # The longer pure-points windows, and, against the default rival, every rival
+        # strategy's windows: the menu is built from these and nothing else.
+        longer = [window for window in pure_windows if window != 1]
+        strategies = [s for s in index["strategies"] if s != PURE] if rival is not None else []
+        rival_windows = {
+            strategy: [1, *(w for w in windows.get(strategy, []) if w != 1)]
+            for strategy in strategies
+        }
+        for strategy in strategies:
+            for window in longer:
+                if (
+                    window not in rival_windows[strategy]
+                    and (strategy, window, rival) not in stated
+                ):
+                    problems.append(
+                        f"{entry}: {strategy} window {window} neither published nor stated "
+                        f"unavailable (windows {windows.get(strategy)})"
+                    )
+        menu = index.get("top100")
+        documents: list[dict[str, Any]] = []
+        expected: set[tuple[str, int, int | None, int]] = set()
+        if isinstance(menu, dict) and menu.get("available") is True:
+            documents = menu.get("documents") or []
+            expected |= {(PURE, w, None, s) for w in longer for s in MENU_WEIGHTS}
             expected |= {
-                (st, w, rival, s)
-                for st in ("ortak-koru", "fark-yarat")
-                for w in (1, 3, 5)
-                for s in (5, 10, 20, 30, 40, 50)
+                (strategy, window, rival, s)
+                for strategy, strategy_windows in rival_windows.items()
+                for window in strategy_windows
+                if (strategy, window, rival) not in stated
+                for s in MENU_WEIGHTS
             }
+        elif (absent := menu_absence(menu)) is not None:
+            absences.append((entry, f"Top 100 menu not published: {absent}"))
+        elif menu is None:
+            problems.append(f"{entry}: index has no top100 entry")
+        else:
+            problems.append(f"{entry}: top100 entry malformed {menu!r}")
         got = {(d["strategy"], d["window"], d["rival_entry_id"], d["weight"]) for d in documents}
         for missing in sorted(expected - got, key=str):
             problems.append(f"{entry}: no document for {missing}")
-        for strategy in ("ortak-koru", "fark-yarat"):
-            if rival is not None and index["windows"].get(strategy) != [1, 3, 5]:
-                problems.append(f"{entry}: {strategy} windows {index['windows'].get(strategy)}")
         targets = [
             (d["path"], d["strategy"], d["window"], d["rival_entry_id"], d["weight"])
             for d in documents
         ]
+        # Every rival document ``computed`` names, the one-week rows included: the producer
+        # writes those without a window, and the page reads them as window 1.
         targets += [
-            (row["path"], row["strategy"], row["window"], row["rival_entry_id"], 0)
+            (row["path"], row["strategy"], row.get("window", 1), row["rival_entry_id"], 0)
             for row in index["computed"]
-            if row.get("window") in (3, 5)
         ]
         for path, strategy, window, rival_id, weight in targets:
             document = read(path)
@@ -148,6 +460,7 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
             f"  window {window}: ceiling mean {sum(values) / len(values):.2f}, "
             f"max {max(values):.2f}"
         )
+    print_absences(absences)
     print(f"\n{'ALL GOOD' if not problems else str(len(problems)) + ' PROBLEM(S)'}")
     for problem in problems[:40]:
         print("  " + problem)
@@ -157,6 +470,7 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
 
 def check_top100(read: Callable[[str], Any]) -> list[str]:
     problems: list[str] = []
+    absences: list[tuple[int, str]] = []
     changed: defaultdict[int, int] = defaultdict(int)
     costs: defaultdict[int, list[float]] = defaultdict(list)
     statuses: defaultdict[str, defaultdict[str | None, int]] = defaultdict(lambda: defaultdict(int))
@@ -165,31 +479,58 @@ def check_top100(read: Callable[[str], Any]) -> list[str]:
     members = read("members.json")["payload"]["members"]
     humans = [m["entry_id"] for m in members if m.get("member_kind") == "human"]
     for entry in humans:
-        index = read(f"advice/{entry}/index.json")
+        index, finding = member_index(read, entry)
         if index is None:
-            problems.append(f"{entry}: no index")
+            problems.append(finding)
             continue
-        menu = index["payload"].get("top100")
-        if not menu or not menu.get("available"):
-            problems.append(f"{entry}: menu unavailable {menu}")
+        refused = refusal(index)
+        if refused is not None:
+            absences.append((entry, f"no advice this week: {refused}"))
             continue
+        menu = index.get("top100")
+        if menu is None:
+            problems.append(f"{entry}: index has no top100 entry")
+            continue
+        if not isinstance(menu, dict) or menu.get("available") is not True:
+            absent = menu_absence(menu)
+            if absent is None:
+                problems.append(f"{entry}: top100 entry malformed {menu!r}")
+            else:
+                absences.append((entry, f"Top 100 menu not published: {absent}"))
+            continue
+        # A weight the menu says did not solve, with or without the word: stated only in
+        # the producer's shape, with a string reason.
+        stated: dict[tuple[int, bool], str] = {}
+        for row in menu.get("unavailable") or []:
+            if (
+                isinstance(row, dict)
+                and row.get("weight") in MENU_WEIGHTS
+                and isinstance(row.get("word"), bool)
+                and isinstance(row.get("reason"), str)
+            ):
+                stated[(row["weight"], row["word"])] = row["reason"]
+            else:
+                problems.append(f"{entry}: top100 unavailable row malformed {row!r}")
         base = read(f"advice/{entry}/saf-puan/1.json")
         if base is None or "top100" in base["payload"]:
             problems.append(f"{entry}: baseline missing or carries top100")
-        word_on = index["payload"].get("evidence", {}).get("available") is True
+        word_on = (index.get("evidence") or {}).get("available") is True
         for label, paths, word in (
             ("plain", menu["paths"], False),
             ("word", menu["word_paths"], True),
         ):
             if word and not word_on and paths:
                 problems.append(f"{entry}: word paths without the word")
-            for weight in ("5", "10", "20", "30", "40", "50"):
+            for weight in (str(value) for value in MENU_WEIGHTS):
                 path = paths.get(weight)
                 expected = (
                     f"advice/{entry}/saf-puan/1/top100-{weight}{'-hoca-sozu' if word else ''}.json"
                 )
                 if path is None:
-                    if word_on or not word:
+                    reason = stated.get((int(weight), word))
+                    if reason is not None:
+                        absences.append((entry, f"Top 100 {label} {weight} not solved: {reason}"))
+                    elif word_on or not word:
                         problems.append(f"{entry}: {label} {weight} missing")
                     continue
                 if path != expected:
@@ -237,6 +578,7 @@ def check_top100(read: Callable[[str], Any]) -> list[str]:
         )
     print(f"  solver status {dict((k, dict(v)) for k, v in statuses.items())}")
     print(f"  move reasons {dict(reasons)}")
+    print_absences(absences)
     print(f"\n{'ALL GOOD' if not problems else str(len(problems)) + ' PROBLEM(S)'}")
     for problem in problems[:40]:
         print("  " + problem)
@@ -263,9 +605,13 @@ def check_word(tree: Tree) -> list[str]:
     for member in humans:
         entry = member["entry_id"]
         advice_dir = f"advice/{entry}"
-        index = read(f"{advice_dir}/index.json")["payload"]
-        evidence = index.get("evidence")
-        if not isinstance(evidence, dict):
+        index, finding = member_index(read, entry)
+        if index is None:
+            check(False, finding)
+            continue
+        refused = refusal(index)
+        evidence: Any = index.get("evidence")
+        if refused is None and not isinstance(evidence, dict):
             check(False, f"{entry}: index has no evidence entry")
             continue
         word_file = f"{advice_dir}/saf-puan/1/hoca-sozu.json"
@@ -274,6 +620,9 @@ def check_word(tree: Tree) -> list[str]:
             if tree.live
             else (Path(tree.root) / "league" / word_file).is_file()
         )
+        if refused is not None:
+            check(not word_exists, f"{entry}: no advice this week ({refused}) and no file")
+            continue
         if not evidence.get("available"):
             check(
                 not word_exists,
