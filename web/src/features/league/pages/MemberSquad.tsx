@@ -109,9 +109,10 @@ function ShortName({ name, shortName }: { name: string; shortName: string }) {
 }
 
 /**
- * The squad the member holds before the plan's transfers, as a compact list: the eleven
- * with the captain the game records, the bench in its published order, and the note that
- * the published squad names no vice-captain (none is inferred).
+ * The squad the member holds before the plan's transfers, as a compact list, one line per
+ * player: the eleven led by the position word with the captain the game records, the bench
+ * led by its published order with the position after the club, and the note that the
+ * published squad names no vice-captain (none is inferred).
  */
 export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCodes }) {
   const { locale, messages } = useLanguage();
@@ -120,7 +121,7 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
     Object.hasOwn(messages.positions, code)
       ? messages.positions[code as keyof typeof messages.positions]
       : code;
-  const row = (player: EntrySquadPlayer, lead: ReactNode) => (
+  const row = (player: EntrySquadPlayer, lead: ReactNode, onBench: boolean) => (
     <li key={player.player_id} className={styles.heldRow}>
       <span className={styles.heldLead}>{lead}</span>
       <strong className={styles.heldName}>
@@ -135,7 +136,8 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
         </>
       ) : null}
       <span className={styles.heldMeta}>
-        <ClubMark team={player.team} codes={codes} /> · {position(player.position)}
+        <ClubMark team={player.team} codes={codes} />
+        {onBench ? ` · ${position(player.position)}` : null}
       </span>
       {finite(player.expected_points) ? (
         <span className={styles.heldXp}>{figure(player.expected_points, locale)} xP</span>
@@ -146,13 +148,13 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
     <div className={styles.held}>
       <h3 className={styles.heldTitle}>{copy.startingXiLabel}</h3>
       <ol className={styles.heldList}>
-        {squad.starting_xi.map((player) => row(player, position(player.position)))}
+        {squad.starting_xi.map((player) => row(player, position(player.position), false))}
       </ol>
       {squad.bench.length > 0 ? (
         <>
           <h3 className={styles.heldTitle}>{copy.bench}</h3>
           <ol className={styles.heldList}>
-            {heldBench(squad.bench).map((player) => row(player, player.bench_order ?? "—"))}
+            {heldBench(squad.bench).map((player) => row(player, player.bench_order ?? "-", true))}
           </ol>
         </>
       ) : null}

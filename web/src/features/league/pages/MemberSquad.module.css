@@ -161,7 +161,10 @@
 
 .heldLead {
   grid-column: 1;
+  overflow: hidden;
   color: var(--color-text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .heldName {
@@ -199,28 +202,9 @@
   white-space: nowrap;
 }
 
+/* A phone keeps one line per player, as a desktop does; the club is what gives way. */
 @media (max-width: 599.98px) {
   .heldRow {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-  }
-
-  .heldLead {
-    grid-column: 1 / -1;
-  }
-
-  .heldName {
-    grid-column: 1;
-  }
-
-  .heldMark {
-    grid-column: 2;
-  }
-
-  .heldMeta {
-    grid-column: 3;
-  }
-
-  .heldXp {
-    grid-column: 4;
+    gap: 0 6px;
   }
 }

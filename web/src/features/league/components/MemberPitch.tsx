@@ -233,7 +233,7 @@ export interface BenchPlayer {
   position: string;
   team: string;
   expectedPoints: number | null;
-  /** The published order, or null where none is published (shown as a dash, last). */
+  /** The published order, or null where none is published (shown as a hyphen, last). */
   order: number | null;
 }
 
@@ -256,7 +256,7 @@ export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes:
             const shortName = player.shortName.trim() || player.name;
             return (
               <li key={player.playerId} className={styles.benchItem}>
-                <span className={styles.benchOrder}>{player.order ?? "—"}</span>
+                <span className={styles.benchOrder}>{player.order ?? "-"}</span>
                 <strong className={styles.benchName}>
                   <span aria-hidden={shortName !== player.name || undefined}>{shortName}</span>
                   {shortName !== player.name ? (

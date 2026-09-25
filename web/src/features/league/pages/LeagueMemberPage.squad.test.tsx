@@ -155,7 +155,7 @@ describe("the member's published squad", () => {
     const bench = benchItems();
     const expected = [original[0]!, original[2]!, original[3]!, original[1]!];
     bench.forEach((item, index) => expect(item).toHaveTextContent(expected[index]!.name));
-    expect(bench.map((item) => item.firstElementChild!.textContent)).toEqual(["1", "3", "4", "—"]);
+    expect(bench.map((item) => item.firstElementChild!.textContent)).toEqual(["1", "3", "4", "-"]);
     expect(squad.payload.bench.map((player) => player.player_id)).toEqual(before);
   });
 
