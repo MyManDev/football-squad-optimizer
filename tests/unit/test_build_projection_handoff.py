@@ -14,6 +14,7 @@ which the capture's season phase cannot be established.
 
 import hashlib
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -30,10 +31,11 @@ from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import CONTROL_MODEL_NAME, handoff_path_for, read_projection_handoff
 from squadopt.platform.projection_retention import publish_retained_handoff
 from squadopt.prediction.component_dataset import (
-    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+    COMPONENT_HISTORY_WINDOW,
+    component_feature_columns,
 )
 from squadopt.prediction.component_dataset import (
-    component_feature_columns,
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.elite_evidence import (
@@ -541,6 +543,63 @@ def test_component_model_is_the_default_when_the_capture_has_settled_history(
     assert projection.feature_contract_version == COMPONENT_FEATURE_CONTRACT_VERSION
     assert report["projection_selection"] == "phase_c_component_default"
     assert report["version_is_promoted"] is True
+
+
+def test_the_component_model_reads_only_its_own_window_from_every_played_week(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A capture keeps every played week because the football history reads GW1 onward.
+
+    The component model's inputs must not move with it: from a GW7 capture holding GW1 to
+    GW6 it still reads only the ``COMPONENT_HISTORY_WINDOW`` weeks before the target.
+    """
+
+    opening = datetime(2026, 8, 21, 17, 30, tzinfo=UTC)
+    events = [
+        {
+            "id": week,
+            "deadline_time": (opening + timedelta(weeks=week - 1))
+            .isoformat()
+            .replace("+00:00", "Z"),
+            "finished": week < 7,
+            "data_checked": week < 7,
+        }
+        for week in range(1, 9)
+    ]
+    bootstrap = json.loads(_bootstrap())
+    bootstrap["events"] = events
+    snapshot = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-29T12:00:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode("utf-8"),
+            FIXTURES_PAYLOAD: _fixtures(),
+            **{
+                f"event-gw{week:02d}-live.json": b"unused by the injected component builder"
+                for week in range(1, 7)
+            },
+        },
+    )
+    read: list[list[int]] = []
+
+    def fake_component(
+        *_args: object,
+        fallback: pd.DataFrame,
+        event_payloads: dict[int, bytes],
+        **_kwargs: object,
+    ) -> object:
+        read.append(sorted(event_payloads))
+        table = fallback.loc[:, ["player_id", "expected_points"]].copy(deep=True)
+        return table, {"component_fingerprint": "a" * 64}
+
+    monkeypatch.setattr(producer, "_component_table", fake_component)
+
+    _, _, report = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+
+    assert COMPONENT_HISTORY_WINDOW == 5
+    assert read == [[2, 3, 4, 5, 6]]
+    assert report["projection_selection"] == "phase_c_component_default"
 
 
 def _evidence_for(

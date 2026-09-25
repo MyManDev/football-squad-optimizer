@@ -1029,7 +1029,7 @@ const en = {
         "Chip strategy cannot be combined with the manager's word. Choose Hold chips to use that input. The Top 100 weight remains available with chip strategy.",
       blocked:
         "Switch the manager's word off to choose a chip strategy. You can keep the Top 100 weight.",
-      note: "Automatic plans chip timing and transfers together. A named chip forces this week; hold preserves all chips throughout the window.",
+      note: "A named chip forces this week; hold preserves all chips throughout the window.",
     },
   },
   reasonCodes: {
@@ -2126,7 +2126,7 @@ const tr: MessageSchema<typeof en> = {
         "Çip stratejisi teknik direktör yorumuyla birleştirilmez. Yorumu kullanmak için Çipleri sakla seçeneğine geç. Top 100 ağırlığı çip stratejisiyle kullanılabilir.",
       blocked:
         "Çip stratejisini seçmek için teknik direktör yorumunu kapat. Top 100 ağırlığını koruyabilirsin.",
-      note: "Otomatik: çipleri kullanma veya saklama zamanını transferlerle birlikte planlar. Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz.",
+      note: "Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz.",
     },
   },
   reasonCodes: {

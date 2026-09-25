@@ -24,6 +24,15 @@ MEMBER_WINDOWS: tuple[int, ...] = (1, 3, 5)
 #: owns the rule and re-exports this tuple, so the transport and the producer read one list.
 TOP100_WEIGHTS: tuple[int, ...] = (0, 5, 10, 20, 30, 40, 50)
 
+#: The automatic chip strategy's request value. It is a known, well-formed choice that the
+#: member menu refuses: its value for holding a chip is built from the window's own weeks,
+#: so it spends a chip inside the window however many weeks the right has left (audit
+#: 2026-09-25, H3). ``planning/chip_strategy.py`` keeps the planner for research. The
+#: capabilities still carry ``chips.strategy``: it opens a named chip over 3 and 5 weeks and
+#: a chip with a Top 100 setting, which force the named chip and carry no holding value.
+#: The page never offers ``auto`` (``AUTOMATIC_CHIP_OFFERED`` in ``web/.../chipChoice.ts``).
+AUTOMATIC_CHIP = "auto"
+
 
 @dataclass(frozen=True, slots=True)
 class AdviceCapability:
@@ -114,8 +123,13 @@ def validate_advice_selection(
     if managers_word and window not in capability.managers_word_windows:
         raise EntryError("The manager's word applies to the one-week pure-points plan only.")
     if chip is not None:
-        if chip not in (*CHIP_NAMES, "auto"):
+        if chip not in (*CHIP_NAMES, AUTOMATIC_CHIP):
             raise EntryError("Unknown chip choice.")
+        if chip == AUTOMATIC_CHIP:
+            raise EntryError(
+                "The automatic chip strategy is not offered: it cannot yet value holding a "
+                "chip past the window. Name a chip, or ask for none."
+            )
         if window not in capability.chip_windows or managers_word:
             raise EntryError(
                 "A chip requires a supported pure-points window with the manager's word off."
