@@ -1,9 +1,10 @@
 # Chip timing in member advice
 
-The member can hold every chip, force one held chip this week, or ask the joint
-transfer planner to choose a chip schedule. Automatic strategy is opt-in. It works
-with the selected current/football forecast, 1/3/5-week windows and supported Top100
-weights. Named chips in longer windows remain instructions for **this week only**.
+The member can hold every chip or force one held chip this week, with the selected
+current/football forecast, 1/3/5-week windows and supported Top100 weights. The joint
+planner can also choose a chip schedule by itself (the automatic strategy), but that
+is not offered to members; see the status below. Named chips in longer windows remain
+instructions for **this week only**.
 Manager-word/rival variants do not acquire chip support implicitly.
 
 **Status since the 2026-09-25 audit (H3): the automatic strategy is not offered to
