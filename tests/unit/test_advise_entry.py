@@ -18,13 +18,15 @@ from tests.unit.test_league_views import (
 from squadopt.application import advice as advice_service
 from squadopt.application.advice import (
     AdviseEntryRequest,
+    MemberControl,
     advise_entry,
     advise_with_managers_word,
 )
 from squadopt.application.entries import EntryError, EntryRegistration
 from squadopt.application.league_views import build_league_views
 from squadopt.application.manager_words import ManagerWord, ManagerWords
-from squadopt.optimization import SolverStatus
+from squadopt.live.transfers import MEMBER_PLANNING_POLICY
+from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import FirstWeekExclusion
 
 world = league_views_tests.world  # re-register the fixture in this module
@@ -822,19 +824,19 @@ def _unproven_margin_split_payload(
     )
 
 
-def test_an_unproven_price_tag_is_published_as_a_ceiling(
+def test_a_price_against_an_unproven_control_publishes_no_ceiling(
     world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A price measured against a plan nobody proved is published as the most it can cost.
+    """A price measured against a plan nobody proved carries no ceiling at all.
 
-    Write C* for the best plan with no band and S* for the best plan inside it. The true
-    cost is C* - S*. The solver returned a value for each and a distance to its own
-    bound, so C* is somewhere between the anchor and the anchor plus that distance, and
-    S* is at least the band plan's value; the cost is therefore at most the anchor's
-    bound minus the band plan's value. That is the number published, and the only end of
-    the range that can be stated: the other end is max(0, tag - the band plan's own
-    distance), which is zero whenever the band plan is the unproven one, and a floor
-    printed beside a ceiling reads as an interval around an estimate.
+    The solver's gap is in planner-objective units, which count a tenth of the bench, and
+    a price is in net points. The rival's anchor is solved at the game's charge, so the
+    bench is the whole difference here, and it is enough: an anchor scoring 50 with a
+    bench of 10 has objective 51, and with a gap of 0.5 a plan scoring 51.4 with a bench
+    of 0 (objective 51.4) is inside the bound and nets 1.4 above the anchor, where the
+    old ceiling allowed 0.5. So the tag is published as measured, the control's status
+    and gap beside it, and no ceiling, on the plan and on the alternative alike; the page
+    then prints no price.
     """
 
     payload = _unproven_margin_split_payload(
@@ -843,49 +845,39 @@ def test_an_unproven_price_tag_is_published_as_a_ceiling(
 
     assert payload["control_solver_status"] == "FEASIBLE"
     assert payload["control_optimality_gap"] == 3.0
-    cost = float(str(payload["expected_points_cost"]))
-    ceiling = float(str(payload["expected_points_cost_ceiling"]))
-    # The whole of the control's unfinished proof stands above the tag, and no more.
-    assert ceiling == pytest.approx(cost + 3.0)
+    assert float(str(payload["expected_points_cost"])) >= 0.0
+    assert "expected_points_cost_ceiling" not in payload
     alternative = payload["alternative_plan"]
     assert isinstance(alternative, dict)
-    assert float(str(alternative["expected_points_cost_ceiling"])) == pytest.approx(
-        float(str(alternative["expected_points_cost"])) + 3.0
-    )
+    assert float(str(alternative["expected_points_cost"])) >= 0.0
+    assert "expected_points_cost_ceiling" not in alternative
 
 
-def test_the_ceiling_covers_an_anchor_the_search_left_below_the_band_plan(
+def test_an_anchor_the_search_left_below_the_band_plan_publishes_no_ceiling(
     world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The case that makes the difference of two returned values negative.
 
     A cut-off search hands back a real plan worth less than the band's. The difference
-    the tag is built from is then negative — a strategy reading as a gift — and the
-    anchor is floored at the best plan solved here so the tag stays a price. That floor
-    alone would publish a flat zero as the cost, which is a number nobody measured: the
-    control's own bound still stands above it. The ceiling carries that bound, so the
-    tag is bracketed by something measured on both sides.
+    the tag is built from is then negative (a strategy reading as a gift), and the anchor
+    is floored at the best plan solved here so the tag stays a price. That floor is a
+    flat zero nobody measured as a cost, and with the anchor unproven nothing bounds the
+    cost from above either, so no ceiling is published and nothing is printed as one.
     """
 
     payload = _unproven_margin_split_payload(
         world, monkeypatch, control_gap=3.0, worse_control=True
     )
 
-    cost = float(str(payload["expected_points_cost"]))
-    ceiling = float(str(payload["expected_points_cost_ceiling"]))
-    assert cost == 0.0  # the anchor came back worth less than the band plan
-    # The anchor's own bound stands 1.0 above the band plan here: 44 + 3 against 46.
-    assert ceiling == pytest.approx(1.0)
-    assert ceiling > cost
+    assert float(str(payload["expected_points_cost"])) == 0.0  # the anchor came back lower
+    assert "expected_points_cost_ceiling" not in payload
 
 
 def test_a_proven_price_tag_and_its_ceiling_are_the_same_number(world: dict[str, Any]) -> None:
     """Nothing a proven plan publishes moves: the ceiling meets the tag exactly.
 
-    A proof means the solver's bound and the plan it returned are the same value, so the
-    ceiling arithmetic adds nothing and the member reads today's sentence and today's
-    figure. This is what makes the ceiling safe to publish on every rival document
-    rather than only on the unproven ones.
+    Under the control's proof the tag is measured against the right plan, so the most the
+    band can cost is the tag, and the member reads today's sentence and today's figure.
     """
 
     payload = _margin_split_payload(world)
@@ -901,11 +893,11 @@ def test_a_proven_price_tag_and_its_ceiling_are_the_same_number(world: dict[str,
 def test_no_published_ceiling_can_be_a_giveaway(
     world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A ceiling is never below zero and never below the tag it bounds.
+    """A ceiling is never below zero, never apart from the tag, and never unproven.
 
-    A band only removes plans, so the true cost cannot be negative, and the ceiling is
-    the tag plus a distance the solver measured as non-negative. Both properties hold
-    proven and unproven, on the published plan and on the alternative beside it, so no
+    A band only removes plans, so the true cost cannot be negative. Where a ceiling is
+    published it is the tag under a proven control; where the control is unproven there
+    is none. Both hold on the published plan and on the alternative beside it, so no
     reader of either number is ever told a constrained plan hands them points.
     """
 
@@ -915,26 +907,27 @@ def test_no_published_ceiling_can_be_a_giveaway(
         _unproven_margin_split_payload(world, monkeypatch, control_gap=3.0, worse_control=True),
     ]
     for payload in payloads:
-        cost = float(str(payload["expected_points_cost"]))
-        ceiling = float(str(payload["expected_points_cost_ceiling"]))
-        assert 0.0 <= cost <= ceiling
+        proven = payload["control_solver_status"] == "OPTIMAL"
         alternative = payload["alternative_plan"]
-        if isinstance(alternative, dict):
-            other_cost = float(str(alternative["expected_points_cost"]))
-            other_ceiling = float(str(alternative["expected_points_cost_ceiling"]))
-            assert 0.0 <= other_cost <= other_ceiling
+        documents = [payload, *([alternative] if isinstance(alternative, dict) else [])]
+        for document in documents:
+            cost = float(str(document["expected_points_cost"]))
+            assert cost >= 0.0
+            if proven:
+                assert document["expected_points_cost_ceiling"] == cost
+            else:
+                assert "expected_points_cost_ceiling" not in document
 
 
-def test_an_unproven_plan_without_a_measured_bound_is_refused_not_read_as_zero(
+def test_an_unproven_control_without_a_measured_bound_publishes_no_ceiling(
     world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An unproven plan with no measured bound is refused, never read as zero.
+    """An unproven control with no measured bound leaves its gap and the ceiling absent.
 
-    "The proof did not finish" and "the proof finished at zero" are different facts.
-
-    The planner records the distance to its bound beside every plan it could not prove,
-    so this shape does not arise from it; if it ever did, a ceiling read off a missing
-    measurement would be a claim nobody made.
+    "The proof did not finish" and "the proof finished at zero" are different facts. The
+    planner records the distance to its bound beside every plan it could not prove, so
+    this shape does not arise from it; if it ever did, nothing is read off the missing
+    measurement: the gap is published as null and no ceiling is published, never zero.
     """
 
     inputs, projection, rules = _margin_split_context(world)
@@ -958,14 +951,17 @@ def test_an_unproven_plan_without_a_measured_bound_is_refused_not_read_as_zero(
         )
 
     monkeypatch.setattr(advice_service, "plan_transfers", gapless_control)
-    with pytest.raises(EntryError, match="may not be read as zero"):
-        advise_entry(
-            _request(strategy="ortak-koru", rival_entry_id=202),
-            provider=provider,
-            inputs=inputs,
-            projection=projection,
-            rules=rules,
-        )
+    payload = advise_entry(
+        _request(strategy="ortak-koru", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["control_solver_status"] == "FEASIBLE"
+    assert payload["control_optimality_gap"] is None
+    assert "expected_points_cost_ceiling" not in payload
 
 
 def test_the_price_ceiling_travels_through_the_declared_envelope(world: dict[str, Any]) -> None:
@@ -1485,9 +1481,94 @@ def test_a_binding_word_is_priced_against_the_control_under_one_policy(
 
     assert payload["evidence"]["binding"] is True  # type: ignore[index]
     cost = float(str(payload["expected_points_cost"]))
-    ceiling = float(str(payload["expected_points_cost_ceiling"]))
-    assert cost >= 0.0 and ceiling >= cost
+    assert cost >= 0.0
+    # This world's control is proven, so the ceiling is the price itself.
+    assert control.plan.solver_status is SolverStatus.OPTIMAL
+    assert payload["expected_points_cost_ceiling"] == cost
     assert payload["control_solver_status"] == control.plan.solver_status.name
+
+
+def _unproven(control: MemberControl, gap: float) -> MemberControl:
+    """``control`` as a search that stopped before its proof would hand it back."""
+
+    plan = dataclasses.replace(
+        control.plan,
+        solver_status=SolverStatus.FEASIBLE,
+        diagnostics={**dict(control.plan.diagnostics), "absolute_optimality_gap": gap},
+    )
+    return dataclasses.replace(control, plan=plan)
+
+
+def test_an_objective_gap_is_not_a_bound_on_the_price() -> None:
+    """Why no ceiling is built from an unproven control's gap.
+
+    The gap is on the planner's objective: the eleven with the captain doubled, plus the
+    bench at the bench weight, less each paid transfer at the planning charge. A price is
+    in net points, hits at the game's charge. With the member policy's own numbers, a
+    plan the search did not reach sits inside the control's bound and still nets far
+    more than the control plus the gap, because it carries a thinner bench and pays two
+    hits the planning charge prices at twice what the game takes.
+    """
+
+    bench_weight = OptimizationConfig().bench_weight
+    margin = float(str(MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]))
+    charge = float(str(MEMBER_PLANNING_POLICY["hit_points_charged"]))
+
+    def objective(score: float, bench: float, paid: int) -> float:
+        return score + bench_weight * bench - margin * paid
+
+    def net(score: float, paid: int) -> float:
+        return score - charge * paid
+
+    control, gap = (50.0, 10.0, 0), 2.0
+    missed = (68.0, 1.0, 2)
+    assert objective(*control) < objective(*missed) <= objective(*control) + gap
+    assert net(missed[0], missed[2]) - net(control[0], control[2]) > gap
+    # The excess is the bench term plus (margin - charge) per extra paid transfer, which
+    # nothing but the squad size bounds on an uncapped week.
+    assert net(missed[0], missed[2]) - net(control[0], control[2]) - gap <= (
+        bench_weight * control[1] + (margin - charge) * (missed[2] - control[2]) + 1e-9
+    )
+
+
+@pytest.mark.parametrize("binding", [True, False])
+def test_a_word_priced_against_an_unproven_control_publishes_no_ceiling(
+    world: dict[str, Any], binding: bool
+) -> None:
+    """Binding or not, the word's price has no ceiling when its control is unproven.
+
+    Not binding, the document is the control's own plan at a price of zero, and zero is
+    exact only under the control's proof: a plan the search did not reach could break the
+    rule and cost it. Binding, the tag is measured against a plan nobody proved. Either
+    way the gap is on the objective and bounds no price, so the key is absent (never 0)
+    and the page prints no price.
+    """
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    provider = _Provider({101: picks})
+    proven = advice_service.solve_member_control(picks, inputs, projection, rules)
+    player = (
+        int(str(proven.plan.weeks[0].captain["player_id"]))
+        if binding
+        else 999_999  # nobody in the pool
+    )
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(player, "stated_expected_absent"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=_unproven(proven, 2.0),
+    )
+
+    assert payload["evidence"]["binding"] is binding  # type: ignore[index]
+    assert float(str(payload["expected_points_cost"])) >= 0.0
+    assert "expected_points_cost_ceiling" not in payload
+    status = payload["control_solver_status"] if binding else payload["solver_status"]
+    assert status == "FEASIBLE"
 
 
 def test_the_one_week_plan_says_whether_the_clock_stopped_its_search(

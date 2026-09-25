@@ -81,21 +81,25 @@ const STATES: Array<[string, LeagueViewEnvelope<EntryAdvice>]> = [
   // A price published as a ceiling is the one number on this page that states a bound
   // rather than a reading, so it gets its own state here: "the most it can cost" is a
   // deterministic fact about a search that stopped, and it must never drift into
-  // reading as a spread, an interval or a chance of anything.
+  // reading as a spread, an interval or a chance of anything. The producer's shape: the
+  // pure-points plan was proved, the strategy's own plan was not.
   [
     "rival strategy priced as a ceiling",
     {
       ...mockEntryAdviceEnvelope(35249001, "ortak-koru", 1),
       payload: {
         ...mockEntryAdviceEnvelope(35249001, "ortak-koru", 1).payload,
-        control_solver_status: "FEASIBLE",
-        control_optimality_gap: 1.5,
+        solver_status: "FEASIBLE",
+        optimality_gap: 1.5,
+        control_solver_status: "OPTIMAL",
+        control_optimality_gap: 0,
+        expected_points_cost: 2.3,
         expected_points_cost_ceiling: 2.3,
         alternative_plan: {
           kind: "with_hits" as const,
           overlap_applied: 9,
           transfer_hit_points: 8,
-          expected_points_cost: 6.4,
+          expected_points_cost: 7.9,
           expected_points_cost_ceiling: 7.9,
         },
       },
