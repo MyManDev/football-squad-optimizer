@@ -49,9 +49,11 @@ Before publishing, run `python -m scripts.check_league_tree <preview>/data` agai
 candidate tree, or use the publication worktree's `web/public/data`. It runs the wider
 menu, Top 100 and manager's-word release checks and exits non-zero on any finding.
 It expects what each member's `advice/<id>/index.json` declares: an absence the index
-states with its reason (the menu a `--skip-top100` run leaves out, a window or rival pair
-listed in `unavailable`, a member with no advice this week) is printed as a stated absence
-and is not a finding, while a document the index names and the tree lacks is.
+states in the producer's shape with a string reason (the menu a `--skip-top100` run leaves
+out, a window or rival pair listed in `unavailable`, a member with no advice this week) is
+printed as a stated absence and is not a finding, while a document the index names and the
+tree lacks is (the one-week `saf-puan/1.json` included), and so is an index the page's
+validator would refuse or an absence stated without its reason.
 Pass a site origin URL instead to check its published `/data/league/` documents. The URL
 form is narrower: its figure sweep covers only the word files it fetches, while the local
 check sweeps every word file under the supplied root. This command only reads the tree;
