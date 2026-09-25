@@ -411,7 +411,9 @@ function LeagueMemberContent({
                     : `#${viewer.entryId}`,
                 )}
               </strong>{" "}
-              <Link to="/league/members">{copy.viewerChange}</Link>{" "}
+              <Link className={styles.viewerAction} to="/league/members">
+                {copy.viewerChange}
+              </Link>{" "}
               <button
                 type="button"
                 className={styles.viewerClear}

@@ -45,8 +45,6 @@
   border-top: none;
   color: var(--color-text-muted);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   font-size: var(--step--2);
 }
 

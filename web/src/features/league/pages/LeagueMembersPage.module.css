@@ -1,124 +1,475 @@
+/*
+ * The league table in direction D (D-Lig): the top bar, then the table as the page's one
+ * focal point with the system's record, the viewer's chips and their chaser in a quieter
+ * column beside it where the page is wide enough, under it where it is not. The table
+ * never scrolls sideways: on a phone the gap to the leader goes and the rest narrows.
+ */
+
+/* The page uses the whole main column from 1180 px, as D-Lig does. */
+@media (min-width: 1180px) {
+  :global(#main):has(.page) {
+    max-width: none;
+  }
+}
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
+  min-width: 0;
+  container: league-page / inline-size;
 }
 
-.head {
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@container league-page (min-width: 940px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 50cqw - 180px, 440px);
+    column-gap: var(--space-7);
+  }
+}
+
+.tableColumn {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.kicker,
-.sub {
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
+/* ---- Heading row ---- */
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
 }
 
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--step-4);
+  font-size: 22px;
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 28px;
 }
 
-.lede,
-.notice {
-  margin: var(--space-2) 0 0;
-  max-width: var(--measure);
-  color: var(--color-text-muted);
-}
-
-.notice {
+.context {
   margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
 }
 
-.tableWrap {
-  overflow-x: auto;
+.context span + span::before {
+  content: " · ";
 }
+
+/* ---- Who the visitor is, one quiet line ---- */
+
+.viewer {
+  min-width: 0;
+}
+
+.viewerLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-3);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  line-height: 20px;
+}
+
+.viewerLine strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.viewerAction,
+.viewerClear {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  font-size: var(--step--1);
+}
+
+.viewerClear {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- The table ---- */
 
 .table {
   width: 100%;
-  min-width: 680px;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: var(--step--1);
 }
 
 .table th,
 .table td {
-  padding: 10px 8px;
-  border-top: 1px solid var(--color-line);
+  padding: 0 var(--space-2);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: var(--space-3);
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: var(--space-3);
 }
 
 .table thead th {
-  border-top: none;
-  color: var(--color-text-muted);
+  height: 32px;
+  border-bottom: 1px solid var(--color-text-muted);
+  color: var(--color-text-faint);
   font-size: var(--step--2);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 400;
+  line-height: 16px;
 }
 
-.systemRow {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+.table tbody tr {
+  border-bottom: 1px solid var(--color-line);
 }
 
-.systemRow td:first-child {
-  border-left: 3px solid var(--color-accent);
+.table tbody td {
+  height: 40px;
+  padding-block: 2px;
 }
 
-.right {
+/* Column widths include the cells' own padding (8 px a side, 12 at the table's edges). */
+th.rank {
+  width: 52px;
+}
+
+th.move {
+  width: 56px;
+}
+
+th.week {
+  width: 88px;
+}
+
+th.total {
+  width: 80px;
+}
+
+th.gap {
+  width: 108px;
+}
+
+.week,
+.total,
+.gap {
   text-align: right !important;
 }
 
-.memberLink {
-  display: block;
+td.rank {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+td.move {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.moveMark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+td.week,
+td.gap {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+td.total {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+/* Name over manager, and 'Bu benim' at the end of the cell (on a phone, at the end of the
+   manager's line). The whole cell opens the member's page: the manager's link is
+   stretched over it, and the button sits above the stretch. */
+.teamCell {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name select"
+    "manager select";
+  align-items: center;
+  column-gap: var(--space-2);
+  min-width: 0;
+}
+
+.teamName {
+  grid-area: name;
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.manager {
+  grid-area: manager;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.leader {
+  font-family: var(--font-body);
+  font-size: var(--step--2);
   font-weight: 600;
 }
 
-.sub {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--step--2);
+.memberLink {
+  color: inherit;
+  text-decoration: none;
 }
 
-@media (max-width: 640px) {
-  .head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+.memberLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
 
-  .title {
-    font-size: var(--step-3);
-  }
+.teamCell:hover .teamName,
+.memberLink:hover {
+  text-decoration: underline;
 }
 
 .viewerSelect {
-  margin-left: 0.5rem;
-  border: 1px solid currentColor;
+  grid-area: select;
+  position: relative;
+  z-index: 1;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
-  background: transparent;
-  color: inherit;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
   font-size: var(--step--2);
-  padding: 0.05rem 0.55rem;
+  line-height: 16px;
   cursor: pointer;
 }
 
 .viewerSelect:hover {
-  background: var(--color-surface-2);
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
-.viewerClear {
-  border: none;
-  background: transparent;
-  color: inherit;
-  text-decoration: underline;
-  font-size: 0.85rem;
+/* Once the visitor has said who they are, the other rows' 'Bu benim' waits for the pointer
+   (or the keyboard) on a desktop, so the table reads as D-Lig draws it. Touch screens
+   always show it. */
+@media (hover: hover) and (pointer: fine) and (min-width: 1180px) {
+  .table[data-viewer] .teamCell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "name"
+      "manager";
+  }
+
+  /* Out of the flow while it waits, so the names keep the whole cell. */
+  .table[data-viewer] .viewerSelect {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+
+  .table[data-viewer] tr:hover .viewerSelect,
+  .table[data-viewer] tr:focus-within .viewerSelect {
+    opacity: 1;
+  }
+}
+
+/* The viewer's own row: a lime fill with ink on it (13.5:1), nothing else changes. */
+.viewerRow td {
+  background: var(--color-lime);
+  color: var(--color-text);
+}
+
+.viewerRow td:first-child {
+  border-radius: var(--radius-s) 0 0 var(--radius-s);
+}
+
+.viewerRow td:last-child {
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+}
+
+.viewerRow td.move,
+.viewerRow .manager,
+.viewerRow td.week,
+.viewerRow td.gap {
+  color: var(--color-text);
+}
+
+.note {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+/* ---- About the table, closed ---- */
+
+.about {
+  border-top: 1px solid var(--color-line);
+}
+
+.aboutSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  font-size: var(--step--1);
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
+  list-style: none;
+}
+
+.aboutSummary::-webkit-details-marker {
+  display: none;
+}
+
+.aboutIcon {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.about[open] .aboutIcon {
+  transform: rotate(90deg);
+}
+
+.aboutBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure);
+  padding-bottom: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.aboutBody p {
+  margin: 0;
+}
+
+.aboutTitle {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text);
+  font-size: var(--step-0);
+}
+
+/* ---- Beside the table ---- */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.chaser {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 20px;
+}
+
+.chaser strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* ---- Touch: every control is at least 44 px under 1180 px ---- */
+
+@media (max-width: 1179.98px) {
+  .viewerSelect,
+  .viewerClear,
+  .viewerAction,
+  .aboutSummary {
+    min-height: 44px;
+  }
+
+  .viewerSelect {
+    padding: 0 var(--space-3);
+  }
+
+  .table tbody td {
+    height: 52px;
+  }
+}
+
+/* ---- Phone: the gap to the leader goes, the rest narrows ---- */
+
+@container league-page (max-width: 559.98px) {
+  th.rank {
+    width: 32px;
+  }
+
+  th.move {
+    width: 40px;
+  }
+
+  .viewerSelect {
+    padding: 0 var(--space-2);
+  }
+
+  th.week,
+  th.total {
+    width: 56px;
+  }
+
+  .table th:first-child,
+  .table td:first-child {
+    padding-left: var(--space-2);
+  }
+
+  .table th:nth-last-child(2),
+  .table td:nth-last-child(2) {
+    padding-right: var(--space-2);
+  }
+
+  .table .gap {
+    display: none;
+  }
+
+  .teamCell {
+    grid-template-areas:
+      "name name"
+      "manager select";
+  }
+
+  .table thead th {
+    height: auto;
+    padding-block: var(--space-1);
+  }
 }

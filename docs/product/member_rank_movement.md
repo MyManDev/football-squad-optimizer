@@ -5,11 +5,16 @@ document. It publishes the existing `movement` and `movement_places` fields. Nei
 the member's points nor the registry order is used to reconstruct a previous rank.
 
 - Positive previous and current ranks: subtract current from previous. Positive means
-  `up`, negative means `down`; publish the absolute number of places.
-- Equal positive ranks: `same` and `0`, displayed as “unchanged” / “yerinde kaldı”.
-- Missing, null or zero previous rank: `unknown` and `null`, displayed as “Previous
-  rank unavailable” / “Önceki sıra bilinmiyor”. Zero is not a position and does not
-  prove that the member just joined. A missing current rank also prevents movement.
+  `up`, negative means `down`; publish the absolute number of places. The table shows an
+  arrow and the places, and names them in words (“up 2 places” / “2 sıra yükseldi”).
+- Equal positive ranks: `same` and `0`, shown as “=” and named “unchanged” / “yerinde
+  kaldı”.
+- Missing, null or zero previous rank: `unknown` and `null`, shown as a dash and named
+  “Previous rank unavailable” / “Önceki sıra bilinmiyor”. Zero is not a position and does
+  not prove that the member just joined. A missing current rank also prevents movement.
+
+Movement is the table's second column, after the rank. The words are each cell's
+accessible name, so a screen reader hears them rather than the glyphs.
 - Negative, boolean, fractional or text previous ranks fail parsing instead of being
   coerced into a plausible movement. Both standings parsers use the same rule.
 

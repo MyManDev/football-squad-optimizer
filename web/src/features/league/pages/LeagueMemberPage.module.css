@@ -898,3 +898,13 @@ section.notice p {
   cursor: pointer;
   padding: 0;
 }
+
+/* The viewer's change and clear controls are touch targets under 1180 px. */
+@media (max-width: 1179.98px) {
+  .viewerAction,
+  .viewerClear {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

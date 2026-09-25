@@ -1,13 +1,13 @@
 import { Link } from "react-router";
 
 import { useLanguage } from "../../../i18n/context";
-import { deadlineLong, deadlineShort, money } from "../../../lib/format";
+import { deadlineLong, deadlineShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline } from "../advice/deadline";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { SwitchIcon } from "../components/memberIcons";
-import { netWeekPoints } from "../standing";
 import type { EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
+import { scoreBugCells, type ScoreCell } from "./scoreBug";
 import styles from "./LeagueMemberPage.module.css";
 
 /**
@@ -38,61 +38,62 @@ export function MemberTopBar({
   const entry = view.entry;
   const deadline = deadlinePassed ?? gameweekDeadline(fixtures, view.season, view.gameweek);
   const humans = members.filter((member) => member.member_kind === "human").length;
-  const count = (value: number) => new Intl.NumberFormat(locale).format(value);
-  const net = netWeekPoints(entry);
-  const cells = [
-    Number.isSafeInteger(entry.rank) && entry.rank > 0
-      ? {
-          key: "rank",
-          label: copy.rankLabel,
-          value: humans >= entry.rank ? `${entry.rank}/${humans}` : String(entry.rank),
-        }
-      : null,
-    typeof entry.total_points === "number" && Number.isFinite(entry.total_points)
-      ? { key: "points", label: copy.pointsLabel, value: count(entry.total_points) }
-      : null,
-    net !== null && Number.isFinite(net)
-      ? { key: "week", label: copy.lastWeekLabel, value: count(net) }
-      : null,
-    Number.isFinite(view.bank_tenths)
-      ? { key: "bank", label: copy.bankLabel, value: money(view.bank_tenths, locale) }
-      : null,
-    view.free_transfers_known === true &&
-    Number.isSafeInteger(view.free_transfers) &&
-    view.free_transfers >= 0
-      ? { key: "free", label: copy.freeTransfersLabel, value: count(view.free_transfers) }
-      : null,
-  ].filter((cell) => cell !== null);
+  const cells = scoreBugCells(entry, humans, view, locale, copy);
   return (
     <header className={styles.topBar}>
       <div className={styles.topIdentity}>
         <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
         <ExampleDataBadge sourceKind={squad.source_kind} />
       </div>
-      <div className={styles.topWeek}>
-        <p className={styles.weekLabel}>{copy.weekLabel(view.gameweek)}</p>
-        {deadline ? (
-          <p className={styles.deadline}>
-            <span className={styles.deadlineLabel}>
-              {deadlinePassed ? copy.deadlinePassedLabel : copy.deadlineLabel}
-            </span>{" "}
-            <span className={styles.deadlineLong}>{deadlineLong(deadline, locale)}</span>
-            <span className={styles.deadlineShort}>{deadlineShort(deadline, locale)}</span>
-          </p>
-        ) : null}
-      </div>
-      {cells.length > 0 ? (
-        <dl className={styles.scoreBug}>
-          {cells.map((cell) => (
-            <div key={cell.key} className={styles.scoreCell}>
-              <dt>{cell.label}</dt>
-              <dd>{cell.value}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
+      <TopWeek gameweek={view.gameweek} deadline={deadline} passed={deadlinePassed !== null} />
+      <ScoreBug cells={cells} />
     </header>
   );
+}
+
+/**
+ * The gameweek in broadcast capitals and its deadline, long on wide screens and short on a
+ * phone; with no stated deadline, the week alone.
+ */
+export function TopWeek({
+  gameweek,
+  deadline,
+  passed,
+}: {
+  gameweek: number;
+  deadline: string | null;
+  passed: boolean;
+}) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  return (
+    <div className={styles.topWeek}>
+      <p className={styles.weekLabel}>{copy.weekLabel(gameweek)}</p>
+      {deadline ? (
+        <p className={styles.deadline}>
+          <span className={styles.deadlineLabel}>
+            {passed ? copy.deadlinePassedLabel : copy.deadlineLabel}
+          </span>{" "}
+          <span className={styles.deadlineLong}>{deadlineLong(deadline, locale)}</span>
+          <span className={styles.deadlineShort}>{deadlineShort(deadline, locale)}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The score bug itself: label over figure, the labels in broadcast capitals. */
+export function ScoreBug({ cells }: { cells: ScoreCell[] }) {
+  return cells.length > 0 ? (
+    <dl className={styles.scoreBug}>
+      {cells.map((cell) => (
+        <div key={cell.key} className={styles.scoreCell}>
+          <dt>{cell.label}</dt>
+          <dd>{cell.value}</dd>
+        </div>
+      ))}
+    </dl>
+  ) : null;
 }
 
 /**

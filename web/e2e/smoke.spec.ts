@@ -77,7 +77,7 @@ test("language selection switches the full frame and persists across routes", as
 
   // 'League' is the member list; the league entry page is 'This week' with no member.
   await page.getByRole("link", { name: "League", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("League Members");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("League table");
   await page.reload();
   await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
     "href",

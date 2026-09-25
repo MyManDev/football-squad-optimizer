@@ -140,37 +140,16 @@
   color: var(--color-text-muted);
 }
 
-.diagnostic {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  max-width: var(--measure);
-  padding: var(--space-3);
-  border-left: 3px solid var(--color-warn);
-  border-radius: var(--radius-s);
-  background: color-mix(in srgb, var(--color-warn) 8%, var(--color-surface-2));
-  font-size: var(--step--1);
-}
-
+/* A state statement is a line with its tag, not a tinted card with a coloured stripe: the
+   tag (Badge) carries the tone. */
+.diagnostic,
 .horizonStatus {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
   max-width: var(--measure);
-  padding: var(--space-3);
-  border-left: 3px solid;
-  border-radius: var(--radius-s);
+  padding-block: var(--space-2);
   font-size: var(--step--1);
-}
-
-.horizonControl {
-  border-color: var(--color-good);
-  background: color-mix(in srgb, var(--color-good) 8%, var(--color-surface-2));
-}
-
-.horizonShadow {
-  border-color: var(--color-warn);
-  background: color-mix(in srgb, var(--color-warn) 8%, var(--color-surface-2));
 }
 
 .sourceNote code {

@@ -1,0 +1,117 @@
+import type { CSSProperties } from "react";
+
+import { useLanguage } from "../../../i18n/context";
+import { points } from "../../../lib/format";
+import { karneWeeks, type KarneWeek, type ScoreboardState } from "./karne";
+import { DisclosureIcon } from "./memberIcons";
+import { ScoreboardCard } from "./ScoreboardCard";
+import styles from "./SystemKarne.module.css";
+
+type Series = "ours" | "league" | "game";
+
+/**
+ * "Sistemin karnesi": SquadOpt's own paper squad week by week beside the league mean and
+ * the FPL average, as horizontal bars on one scale for the whole chart (3 px a point where
+ * the column allows), so a longer bar is always more points. Its good weeks and bad weeks are both
+ * shown. Everything else the scoreboard says (scoring basis, live or replay, provisional
+ * weeks, Top 100, the error breakdown) is one click away in the closed full scoreboard.
+ */
+export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagueId: number }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const board = messages.leagueScoreboard;
+  // Another league's scoreboard is not this table's record.
+  if (state.status === "ready" && state.envelope.payload.league_id !== leagueId) return null;
+  const weeks = state.status === "ready" ? karneWeeks(state.envelope.payload) : [];
+  // One scale for the whole chart: the longest bar is the largest figure in it.
+  const max = Math.max(
+    1,
+    ...weeks
+      .flatMap((week) => [week.ours, week.league, week.game])
+      .filter((value): value is number => value !== null),
+  );
+  const format = (series: Series, value: number) =>
+    points(value, series === "league" || !Number.isInteger(value) ? 1 : 0, locale);
+  const names: Record<Series, string> = {
+    ours: copy.karneOurs,
+    league: copy.karneLeague,
+    game: copy.karneGame,
+  };
+  const describe = (week: KarneWeek) =>
+    `${copy.weekLabel(week.gameweek)}: ${(["ours", "league", "game"] as const)
+      .map((series) => {
+        const value = week[series];
+        return `${names[series]} ${value === null ? copy.karneNone : format(series, value)}`;
+      })
+      .join(", ")}`;
+  return (
+    <section className={styles.karne} aria-labelledby="karne-title" data-mark="karne">
+      <h2 className={styles.title} id="karne-title">
+        {copy.karneTitle}
+      </h2>
+      <p className={styles.lede}>{copy.karneLede}</p>
+      {state.status === "pending" ? (
+        <p className={styles.state}>{board.loading}</p>
+      ) : state.status === "missing" ? (
+        <p className={styles.state}>{board.notPublished}</p>
+      ) : state.status === "error" ? (
+        <p className={styles.state}>{board.notAvailable}</p>
+      ) : weeks.length === 0 ? (
+        <p className={styles.state}>{board.noGameweek}</p>
+      ) : (
+        <>
+          <ul className={styles.legend} aria-hidden="true">
+            {(["ours", "league", "game"] as const).map((series) => (
+              <li key={series}>
+                <span className={`${styles.swatch} ${styles[series]}`} />
+                {names[series]}
+              </li>
+            ))}
+          </ul>
+          <ol className={styles.weeks} style={{ "--max": max } as CSSProperties}>
+            {weeks.map((week) => (
+              <li key={week.gameweek} className={styles.week}>
+                <span className={styles.weekName}>
+                  {copy.weekLabel(week.gameweek)}
+                  {week.provisional ? (
+                    <span className={styles.provisional}>{board.provisional}</span>
+                  ) : null}
+                </span>
+                <div className={styles.bars} role="img" aria-label={describe(week)}>
+                  {(["ours", "league", "game"] as const).map((series) => {
+                    const value = week[series];
+                    return (
+                      <span key={series} className={styles.bar} data-series={series}>
+                        {value === null ? (
+                          <span className={styles.none}>{copy.karneNone}</span>
+                        ) : (
+                          <>
+                            <span
+                              className={`${styles.fill} ${styles[series]}`}
+                              style={{ "--points": Math.max(0, value) } as CSSProperties}
+                            />
+                            <span className={styles.value}>{format(series, value)}</span>
+                          </>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className={styles.caption}>{copy.karneCaption}</p>
+          <details className={styles.full}>
+            <summary className={styles.fullSummary}>
+              <DisclosureIcon className={styles.fullIcon} />
+              <span>{copy.karneFull}</span>
+            </summary>
+            <div className={styles.fullBody}>
+              <ScoreboardCard envelope={state.envelope} />
+            </div>
+          </details>
+        </>
+      )}
+    </section>
+  );
+}

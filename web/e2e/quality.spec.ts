@@ -6,7 +6,7 @@ import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
 const PAGES = [
   { heading: "Ligini bul", path: "/" },
-  { heading: "Lig Üyeleri", path: "/league/members" },
+  { heading: "Lig tablosu", path: "/league/members" },
   { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
   { heading: "Önerilen Hamleler", path: "/moves" },
   { heading: "Rakip Analizi", path: "/rivals" },
@@ -31,7 +31,7 @@ test("visitor navigation reaches league entry without browser errors", async ({ 
   const navigation = page.getByRole("navigation");
   await navigation.getByRole("link", { name: "Lig", exact: true }).click();
   await expect(page).toHaveURL("/league/members");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Üyeleri");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig tablosu");
   await navigation.getByRole("link", { name: "Bu hafta", exact: true }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
@@ -100,7 +100,7 @@ for (const language of ["tr", "en"] as const) {
 
     await expect(page).toHaveURL("/league/members");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      language === "tr" ? "Lig Üyeleri" : "League Members",
+      language === "tr" ? "Lig tablosu" : "League table",
     );
     await expect(page.getByRole("link", { name: "Deniz Aral" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", language);
@@ -219,7 +219,7 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   }
 
   for (const destination of [
-    { heading: "Lig Üyeleri", path: "/league/members" },
+    { heading: "Lig tablosu", path: "/league/members" },
     { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
     // The virtual member shows the week the shipped index names.
     {

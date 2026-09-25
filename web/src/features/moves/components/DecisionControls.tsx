@@ -148,13 +148,7 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
         </form>
       </div>
 
-      <div
-        className={`${styles.horizonStatus} ${
-          liveControl ? styles.horizonControl : styles.horizonShadow
-        }`}
-        role="note"
-        aria-live="polite"
-      >
+      <div className={styles.horizonStatus} role="note" aria-live="polite">
         <Badge tone={liveControl ? "good" : "warn"}>
           {liveControl ? copy.liveControl : copy.researchShadow}
         </Badge>
