@@ -85,6 +85,28 @@ def _tree(root: Path) -> None:
                         "path": rival_path,
                     }
                 )
+    # The rival strategies against the default rival at every window, as the producer
+    # names them in ``computed``: the one-week rows carry no window.
+    computed = []
+    for strategy in ("ortak-koru", "fark-yarat"):
+        for window in (1, 3, 5):
+            rival_path = f"advice/1/{strategy}/{window}/vs-2.json"
+            _write(
+                root,
+                rival_path,
+                {
+                    "mode": strategy,
+                    "window": window,
+                    "rival_entry_id": 2,
+                    "expected_points_cost": 0,
+                    "expected_points_cost_ceiling": 0,
+                    "plan_weeks": [{}] * window,
+                },
+            )
+            row = {"strategy": strategy, "rival_entry_id": 2, "path": rival_path}
+            computed.append(row if window == 1 else {**row, "window": window})
+    chip_path = "advice/1/saf-puan/1/chip-wildcard.json"
+    _write(root, chip_path, {"mode": "saf-puan", "window": 1})
     _write(
         root,
         "advice/1/index.json",
@@ -99,8 +121,14 @@ def _tree(root: Path) -> None:
             "suggested_strategy": None,
             "strategies": ["saf-puan", "ortak-koru", "fark-yarat"],
             "windows": {"saf-puan": [1, 3, 5], "ortak-koru": [1, 3, 5], "fark-yarat": [1, 3, 5]},
-            "computed": [],
+            "computed": computed,
             "unavailable": [],
+            "chips": {
+                "available": True,
+                "paths": {"wildcard": chip_path},
+                "unavailable": [],
+                "held": ["wildcard"],
+            },
             "evidence": {
                 "available": True,
                 "binding": False,
@@ -141,6 +169,7 @@ def _gw6_shape(root: Path) -> None:
     index["windows"] = {"saf-puan": [1, 3, 5]}
     index["rival_entry_ids"] = []
     index["default_rival_entry_id"] = None
+    index["computed"] = []
     _write(root, "advice/1/index.json", index)
     (root / "league/advice/1/saf-puan/1/hoca-sozu.json").unlink()
 
@@ -218,6 +247,12 @@ def test_a_skip_top100_tree_with_a_refused_member_passes_and_names_both_absences
         # nothing but the index's own windows names it.
         ("gw6", "advice/1/saf-puan/1.json"),
         ("gw6", "advice/1/saf-puan/3.json"),
+        # A one-week rival document ``computed`` names without a window, a longer one it
+        # names with its window, and a chip the chip menu names.
+        ("full", "advice/1/ortak-koru/1/vs-2.json"),
+        ("full", "advice/1/fark-yarat/5/vs-2.json"),
+        ("full", "advice/1/saf-puan/1/chip-wildcard.json"),
+        ("gw6", "advice/1/saf-puan/1/chip-wildcard.json"),
     ],
 )
 def test_a_document_the_index_lists_and_the_tree_lacks_is_still_a_finding(
@@ -376,8 +411,17 @@ def test_what_the_index_states_unavailable_is_satisfied_and_what_it_omits_is_not
         or (document["strategy"] == "ortak-koru" and document["window"] == 1)
     ]
     menu["documents"] = [document for document in menu["documents"] if document not in gone]
+    # Nor did the rival strategies reach window 5, or the ortak-koru pair its one week.
+    unsolved = [
+        row
+        for row in index["computed"]
+        if row.get("window", 1) == 5
+        or (row["strategy"] == "ortak-koru" and row.get("window", 1) == 1)
+    ]
+    index["computed"] = [row for row in index["computed"] if row not in unsolved]
     removed = [
         *(document["path"] for document in gone),
+        *(row["path"] for row in unsolved),
         menu["paths"].pop("20"),
         menu["word_paths"].pop("20"),
         "advice/1/saf-puan/5.json",
@@ -455,3 +499,53 @@ def test_local_word_figure_hit_is_reported_once(tmp_path, capsys):
     path.write_text(json.dumps(document))
     assert main([str(tmp_path)]) == 1
     assert capsys.readouterr().out.count("league/advice/1/saf-puan/1/hoca-sozu.json") == 1
+
+
+def test_a_rival_document_or_chip_file_that_is_not_the_named_one_is_a_finding(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A one-week rival document is read and its identity checked like a longer one, and a
+    chip path must be the one the page builds, or the page never offers that chip."""
+
+    _tree(tmp_path)
+    path = tmp_path / "league/advice/1/ortak-koru/1/vs-2.json"
+    document = json.loads(path.read_bytes())
+    document["payload"]["mode"] = "fark-yarat"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    index = _read(tmp_path, "advice/1/index.json")
+    index["chips"]["paths"]["freehit"] = "advice/1/saf-puan/1/chip-wildcard.json"
+    _write(tmp_path, "advice/1/index.json", index)
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert "1: advice/1/ortak-koru/1/vs-2.json identity mismatch" in output
+    assert "1: chip freehit path 'advice/1/saf-puan/1/chip-wildcard.json'" in output
+
+
+@pytest.mark.parametrize("field", ["league_id", "points_ahead_of_rival"])
+def test_a_number_too_large_for_a_float_is_a_finding_not_a_crash(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], field: str
+) -> None:
+    """The page reads such a number as Infinity and refuses the index; so does the checker,
+    without a traceback and without stopping the other checks."""
+
+    _tree(tmp_path)
+    index = _read(tmp_path, "advice/1/index.json")
+    if field == "league_id":
+        index["league_id"] = 10**400
+    else:
+        index["suggested_strategy"] = {
+            "strategy": "ortak-koru",
+            "rule_id": "rule",
+            "band": "level",
+            "rival_entry_id": 2,
+            "points_ahead_of_rival": 10**400,
+            "scored_gameweek": 5,
+            "gameweeks_remaining": 33,
+            "band_edge_points": 10,
+        }
+    _write(tmp_path, "advice/1/index.json", index)
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    expected = "league_id" if field == "league_id" else "suggested_strategy"
+    assert output.count(f"1: index the page refuses ({expected})") == 3
+    assert "unreadable tree" not in output

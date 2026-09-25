@@ -111,14 +111,16 @@ def _number(value: object) -> bool:
 
 
 def _positive(value: object) -> bool:
-    """``Number.isSafeInteger(value) && value > 0``, as the page reads an id."""
+    """``Number.isSafeInteger(value) && value > 0``, as the page reads an id.
 
-    return (
-        isinstance(value, (int, float))
-        and not isinstance(value, bool)
-        and float(value).is_integer()
-        and 0 < value <= MAX_SAFE_INTEGER
-    )
+    An integer is compared as it is, never through ``float``, so a number too large for a
+    float is refused like any other id past the safe range rather than raising.
+    """
+
+    if not _number(value) or (isinstance(value, float) and not value.is_integer()):
+        return False
+    assert isinstance(value, (int, float))
+    return 0 < value <= MAX_SAFE_INTEGER
 
 
 def _window(value: object) -> bool:
@@ -126,7 +128,15 @@ def _window(value: object) -> bool:
 
 
 def _finite(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    """``Number.isFinite(value)``: an integer too large for a float reads as Infinity on the
+    page, so it is not finite here either."""
+
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def page_refusal(index: object, entry: int) -> str | None:
@@ -341,6 +351,20 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
         for window in pure_windows:
             if read(f"advice/{entry}/{PURE}/{window}.json") is None:
                 problems.append(f"{entry}: advice/{entry}/{PURE}/{window}.json not published")
+        # Every chip the menu names has its file, at the one path the page builds for it
+        # (``chipPath`` in chipChoice.ts); a menu that is not available names none.
+        chips = index.get("chips")
+        if isinstance(chips, dict) and chips.get("available") is True:
+            chip_paths = chips.get("paths")
+            if not isinstance(chip_paths, dict) or not chip_paths:
+                problems.append(f"{entry}: chips available with no paths {chip_paths!r}")
+                chip_paths = {}
+            for chip, chip_path in sorted(chip_paths.items()):
+                expected_path = f"advice/{entry}/{PURE}/1/chip-{chip}.json"
+                if chip_path != expected_path:
+                    problems.append(f"{entry}: chip {chip} path {chip_path!r}")
+                elif read(chip_path) is None:
+                    problems.append(f"{entry}: {chip_path} not published")
         # The longer pure-points windows, and, against the default rival, every rival
         # strategy's windows: the menu is built from these and nothing else.
         longer = [window for window in pure_windows if window != 1]
@@ -385,10 +409,11 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
             (d["path"], d["strategy"], d["window"], d["rival_entry_id"], d["weight"])
             for d in documents
         ]
+        # Every rival document ``computed`` names, the one-week rows included: the producer
+        # writes those without a window, and the page reads them as window 1.
         targets += [
-            (row["path"], row["strategy"], row["window"], row["rival_entry_id"], 0)
+            (row["path"], row["strategy"], row.get("window", 1), row["rival_entry_id"], 0)
             for row in index["computed"]
-            if row.get("window") in (3, 5)
         ]
         for path, strategy, window, rival_id, weight in targets:
             document = read(path)
