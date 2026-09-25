@@ -173,6 +173,31 @@ describe("the manager's word on the advice card", () => {
     }
   });
 
+  it("does not point at a price it does not print when the word changed the plan", () => {
+    // A binding word priced against a pure-points plan found without a proof carries no
+    // ceiling, so no price is printed above, and the section may not say one is.
+    const advice = switchedOn([item()], {
+      control_solver_status: "FEASIBLE",
+      control_optimality_gap: 2.5,
+      expected_points_cost: 1.5,
+    });
+    delete advice.payload.expected_points_cost_ceiling;
+    for (const [language, price, gap] of [
+      ["en", "1.5", "2.5"],
+      ["tr", "1,5", "2,5"],
+    ] as const) {
+      const { container, unmount } = renderPage(language, advice);
+      const section = sectionText(container);
+      const text = container.textContent ?? "";
+      expect(section).toContain(EVIDENCE_COPY[language].changedNoPrice);
+      expect(section).not.toContain(EVIDENCE_COPY[language].changed);
+      expect(text).not.toContain(EVIDENCE_COPY[language].cost(price));
+      expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(price));
+      expect(text).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+      unmount();
+    }
+  });
+
   it("withholds a quote the producer withheld, and says why", () => {
     const withheld = item({ words: null, words_status: "withheld_figure", role: "not_captain" });
     const { container } = renderPage("tr", switchedOn([withheld]));

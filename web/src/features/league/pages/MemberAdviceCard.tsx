@@ -161,6 +161,42 @@ export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
 }
 
 /**
+ * Whether the plan a document's price is measured against (the anchor: the member's own
+ * pure-points plan) was found without a proof. A document without a control of its own
+ * (the manager's word that binds nobody is the control's plan) is its own anchor.
+ */
+function anchorIsUnproven(view: EntryAdvice): boolean {
+  return (view.control_solver_status ?? view.solver_status) === "FEASIBLE";
+}
+
+/**
+ * The price this page prints for a document, or undefined when it prints none.
+ *
+ * A price tag is a difference between two solved plans: the anchor and the priced one. It
+ * is the cost itself only where both proofs finished. Where only the priced plan's proof is
+ * missing, the producer publishes `expected_points_cost_ceiling` and this page states that
+ * (the most the strategy can cost) instead of a figure it cannot stand behind. Where the
+ * anchor's proof is missing, the solver's bound is on its objective and bounds no price, so
+ * the producer publishes no ceiling and this page prints no price, even for an older
+ * document that carries one. A document that is unproven and carries no ceiling has no
+ * honest figure to print, so it prints none; and a price below zero is a giveaway no
+ * constrained plan can hand out, so no producer's number is rendered as one.
+ */
+function shownPrice(view: EntryAdvice): number | undefined {
+  if (anchorIsUnproven(view)) return undefined;
+  return publishedPrice({
+    strategy: view.mode,
+    // The pure-points plan has no price of its own; switched on, the manager's word does,
+    // and a Top 100 weight is priced the same way.
+    word: view.mode === "saf-puan" && view.evidence !== undefined,
+    top100: view.top100 !== undefined,
+    unproven: view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE",
+    expected_points_cost: view.expected_points_cost,
+    expected_points_cost_ceiling: view.expected_points_cost_ceiling,
+  });
+}
+
+/**
  * The decision itself: one substitution board per move, the gain strip, the captain line,
  * and the sentences that change how the plan may be read (the proof, the price, the rival
  * bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
@@ -188,20 +224,10 @@ export function AdviceDecision({
           (member) => member.member_kind === "human" && member.entry_id === view.rival_entry_id,
         ) ?? null);
   const rivalName = rival ? (rival.team_name ?? rival.manager_name ?? null) : null;
-  // A price tag is a difference between two solved plans: the member's pure-points plan
-  // it is measured against (the anchor) and the priced one. It is the cost itself only
-  // where both proofs finished. Where only the priced plan's proof is missing, the
-  // producer publishes `expected_points_cost_ceiling` and this page states that (the most
-  // the strategy can cost) instead of a figure it cannot stand behind. Where the anchor's
-  // proof is missing, the solver's bound is on its objective and bounds no price, so the
-  // producer publishes no ceiling and this page prints no price, even for an older
-  // document that carries one. A document that is unproven and carries no ceiling has no
-  // honest figure to print, so it prints none; and a price below zero is a giveaway no
-  // constrained plan can hand out, so no producer's number is rendered as one.
+  // What a price may be printed as is `shownPrice`'s rule; these name its parts for the
+  // sentences around it.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
-  // A document without a control of its own (the manager's word that binds nobody is the
-  // control's plan) is its own anchor.
-  const anchorUnproven = (view.control_solver_status ?? view.solver_status) === "FEASIBLE";
+  const anchorUnproven = anchorIsUnproven(view);
   const explainedUnproven =
     view.solver_status === "FEASIBLE" ||
     (view.control_solver_status === "FEASIBLE" && !view.chip_choice);
@@ -212,16 +238,7 @@ export function AdviceDecision({
   // with the word on as well, the one number is the pair's.
   const top100Priced = view.top100 !== undefined;
   const strategyPriced = top100Priced && view.mode !== "saf-puan";
-  const price = anchorUnproven
-    ? undefined
-    : publishedPrice({
-        strategy: view.mode,
-        word: wordPriced,
-        top100: top100Priced,
-        unproven,
-        expected_points_cost: view.expected_points_cost,
-        expected_points_cost_ceiling: view.expected_points_cost_ceiling,
-      });
+  const price = shownPrice(view);
   const evidenceCopy = EVIDENCE_COPY[language];
   const top100Copy = TOP100_COPY[language];
   const alternative = view.alternative_plan;
@@ -388,11 +405,13 @@ export function AdviceDetails({
 }) {
   const { envelope } = shown;
   const view = envelope.payload;
+  // The "changed" sentences point at the price above; where none is printed they do not.
+  const priced = shownPrice(view) !== undefined;
   return (
     <div className={board.details}>
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
-      <EvidenceSection view={view} />
-      <Top100Section view={view} />
+      <EvidenceSection view={view} priced={priced} />
+      <Top100Section view={view} priced={priced} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
       <StatedLimits view={view} />
@@ -1026,7 +1045,7 @@ function dateline(iso: string | null, precision: string | null, locale: string):
  * cut from the captured bytes; the category is the model's; the role is the declared
  * rule's. Example data says so on the section itself, not only in a badge elsewhere.
  */
-function EvidenceSection({ view }: { view: EntryAdvice }) {
+function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean }) {
   const { language, locale, messages } = useLanguage();
   const copy = EVIDENCE_COPY[language];
   const evidence = view.evidence;
@@ -1044,7 +1063,9 @@ function EvidenceSection({ view }: { view: EntryAdvice }) {
       )}
       <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
       {evidence.binding === undefined ? null : (
-        <p className={styles.muted}>{evidence.binding ? copy.changed : copy.unchanged}</p>
+        <p className={styles.muted}>
+          {evidence.binding ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
+        </p>
       )}
       {evidence.applied.length > 0 ? (
         <ul className={styles.assumptionList}>
@@ -1095,7 +1116,7 @@ function EvidenceSection({ view }: { view: EntryAdvice }) {
  * A Top 100 weighted plan: the setting the member chose, whether it moved their plan, and
  * what it is and is not. Rendered only on a weighted document.
  */
-function Top100Section({ view }: { view: EntryAdvice }) {
+function Top100Section({ view, priced }: { view: EntryAdvice; priced: boolean }) {
   const { language } = useLanguage();
   const copy = TOP100_COPY[language];
   const top100 = view.top100;
@@ -1104,7 +1125,8 @@ function Top100Section({ view }: { view: EntryAdvice }) {
     <section className={styles.adviceSection} data-testid="top100-influence">
       <h3 className={styles.lineupTitle}>{copy.title}</h3>
       <p className={styles.muted}>
-        {copy.weightLine(top100.weight)} {top100.changed ? copy.changed : copy.unchanged}
+        {copy.weightLine(top100.weight)}{" "}
+        {top100.changed ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
       </p>
       <p className={styles.honesty}>{copy.honesty}</p>
       <p className={styles.muted}>{copy.notStart}</p>

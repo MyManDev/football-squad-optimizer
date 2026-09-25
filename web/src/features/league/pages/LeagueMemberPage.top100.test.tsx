@@ -163,6 +163,30 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(page).toContain(MESSAGES.en.leagueMembers.controlUnprovenBody("2.5"));
   });
 
+  it.each([
+    ["en", "0.2", "2.5"],
+    ["tr", "0,2", "2,5"],
+  ] as const)(
+    "does not point at a price it does not print when the setting changed the plan, in %s",
+    (language, price, gap) => {
+      const advice = weighted(30, false, {
+        control_solver_status: "FEASIBLE",
+        control_optimality_gap: 2.5,
+        expected_points_cost: 0.2,
+        top100: { ...weighted(30).payload.top100!, changed: true },
+      });
+      delete advice.payload.expected_points_cost_ceiling;
+      const { container } = renderPage(language, advice, "mode=saf-puan&window=1&top100=30");
+      const text = section(container);
+      expect(text).toContain(TOP100_COPY[language].changedNoPrice);
+      expect(text).not.toContain(TOP100_COPY[language].changed);
+      const page = container.textContent ?? "";
+      expect(page).not.toContain(TOP100_COPY[language].cost(price));
+      expect(page).not.toContain(TOP100_COPY[language].costAtMost(price));
+      expect(page).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+    },
+  );
+
   it("prices the word and the setting together when both are on", () => {
     const { container } = renderPage(
       "tr",
