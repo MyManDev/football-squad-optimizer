@@ -130,9 +130,11 @@ def _bucket_reading(frame: pd.DataFrame) -> dict[str, object]:
         reading["read"] = False
         reading["reason"] = f"fewer than {MINIMUM_BUCKET_ROWS} rows"
         return reading
-    fitted = float(frame["fitted_appearance_probability"].mean())
+    per_player_fitted = frame["fitted_appearance_probability"].astype("float64")
+    per_player_multiplier = frame["pre_deadline_availability_multiplier"].astype("float64")
+    fitted = float(per_player_fitted.mean())
     realised = float(frame["appearance"].astype("float64").mean())
-    multiplier = float(frame["pre_deadline_availability_multiplier"].mean())
+    multiplier = float(per_player_multiplier.mean())
     reading.update(
         {
             "read": True,
@@ -142,9 +144,18 @@ def _bucket_reading(frame: pd.DataFrame) -> dict[str, object]:
             # is the condition under which the multiplier is a second cut of one risk.
             "calibration_gap": fitted - realised,
             "availability_multiplier": multiplier,
-            # What the multiplier removes on top, in probability units. It is double counting
-            # to the extent the gap above is zero.
-            "further_reduction": fitted * (1.0 - multiplier),
+            # What the multiplier removes on top, in probability units, averaged over the
+            # players: each player's fitted probability times one minus his own multiplier.
+            # Not the bucket's mean fitted times one minus its mean multiplier, because the
+            # two covary (the players the capture cuts hardest are not a random draw), and
+            # the product of the means then misstates what happened to these players. It is
+            # double counting to the extent the gap above is zero.
+            "further_reduction": float((per_player_fitted * (1.0 - per_player_multiplier)).mean()),
+            # What is left after both cuts, per player and averaged, so it can be read beside
+            # the realised appearance rate.
+            "after_multiplier_appearance_probability": float(
+                (per_player_fitted * per_player_multiplier).mean()
+            ),
         }
     )
     return reading
@@ -281,24 +292,32 @@ def _summary(record: Mapping[str, object]) -> str:
     lines += [
         "",
         "| Recent weeks missed | Rows | Fitted P(appearance) | Realised rate | Gap "
-        "| Multiplier | Further reduction |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Multiplier | Further reduction | Left after the multiplier |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     buckets = record["by_recent_weeks_missed"]
     assert isinstance(buckets, dict)
     for name, value in buckets.items():
         assert isinstance(value, dict)
         if not value.get("read"):
-            lines.append(f"| {name} | {value['rows']} | not read: {value['reason']} | | | | |")
+            lines.append(f"| {name} | {value['rows']} | not read: {value['reason']} | | | | | |")
             continue
         lines.append(
             f"| {name} | {value['rows']} | {float(value['fitted_appearance_probability']):.4f} | "
             f"{float(value['realised_appearance_rate']):.4f} | "
             f"{float(value['calibration_gap']):+.4f} | "
             f"{float(value['availability_multiplier']):.4f} | "
-            f"{float(value['further_reduction']):.4f} |"
+            f"{float(value['further_reduction']):.4f} | "
+            f"{float(value['after_multiplier_appearance_probability']):.4f} |"
         )
     lines += [
+        "",
+        "Fitted, realised, gap and multiplier are bucket means. Further reduction is the mean "
+        "over the bucket's players of each one's fitted probability times one minus his own "
+        "multiplier, and the last column is the mean of fitted times multiplier: what the "
+        "projection carried after both cuts, to read beside the realised rate. Neither is the "
+        "product of the bucket means, because the players the capture cuts hardest do not "
+        "carry the bucket's average fitted probability.",
         "",
         "A gap near zero means the fitted probability has already absorbed the absence, and "
         "whatever the multiplier removes on top of it is removed twice. A gap that is large "
