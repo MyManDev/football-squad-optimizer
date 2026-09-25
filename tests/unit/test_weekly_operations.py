@@ -7,6 +7,7 @@ import subprocess
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from tests.unit.test_publication_services import publication_world
@@ -723,6 +724,203 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
     assert [w["gameweek"] for w in json.loads(history.read_bytes())["payload"]["weeks"]] == [2]
 
 
+def _stored_record(root: Path, snapshot: str, entry_id: int, commit: object) -> Path:
+    """One member's record of one capture as the store holds it: a document and its manifest.
+
+    Only the provenance is written, because the commit is all the preflight reads; the
+    manifest is real, so the record is read through the same digest check as any other.
+    """
+
+    from squadopt.application.advice_record import (
+        MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+        RECORD_FILE,
+    )
+    from squadopt.live.ledger import write_manifest
+
+    directory = root / "2026-27/gw02" / f"entry-{entry_id}" / snapshot
+    directory.mkdir(parents=True)
+    (directory / RECORD_FILE).write_text(
+        json.dumps({"provenance": {"repository_commit": commit}}), encoding="utf-8"
+    )
+    write_manifest(directory, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
+    return directory
+
+
+@pytest.mark.parametrize(
+    ("recorded", "record_advice", "refused"),
+    [
+        ("a" * 40, True, True),
+        # The same commit rebuilds the same capture as a replay, not a conflict.
+        ("b" * 40, True, False),
+        # The record writer matches an unknown commit against a known one.
+        (None, True, False),
+        # A preview writes no record, so there is nothing for it to conflict with.
+        ("a" * 40, False, False),
+    ],
+)
+def test_the_preflight_compares_a_reused_captures_records_with_this_runs_commit(
+    tmp_path: Path, recorded: object, record_advice: bool, refused: bool
+) -> None:
+    base = world(tmp_path)
+    capture = base.request.snapshot_id or ""
+    _stored_record(base.paths.records, capture, 101, recorded)
+    _stored_record(base.paths.records, "fpl-live-20260820T120000Z-another", 102, "c" * 40)
+    operation = weekly.WeeklyOperations(
+        base.request,
+        base.paths,
+        run_id="recording",
+        repository_commit="b" * 40,
+        handoff=base.supplied_handoff,
+        record_advice=record_advice,
+    )
+    operation.run.directory.mkdir(parents=True)
+
+    if not refused:
+        operation._preflight()
+        return
+    with pytest.raises(WeekError) as refusal:
+        operation._preflight()
+    message = str(refusal.value)
+    # The capture, the commit that recorded it and this run's commit, by name. A record of
+    # another capture from yet another commit is not this run's business and is not named.
+    assert capture in message and "a" * 40 + " (entry 101)" in message and "b" * 40 in message
+    assert "c" * 40 not in message
+    assert "--no-advice-record" in message and "drop --snapshot-id" in message
+
+
+def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The Friday run records a capture; develop moves; the publish reuses that capture.
+
+    The league stage would refuse to record the capture again from the new commit, and only
+    after solving every member, so the preflight refuses first: no capture, no solve, and the
+    record stays as it was. ``--no-advice-record`` is then the escape, and it publishes.
+    """
+
+    from squadopt.application import league_views
+    from squadopt.application.league_publication import (
+        LeaguePublicationRequest,
+        LeaguePublicationResult,
+        publish_league,
+    )
+
+    tmp_path = tmp_path_factory.mktemp("m7")
+    checkout, paths, args = _git_checkout(tmp_path)
+    # Git runs for real against a bare origin; gh is answered here, so no run in this test
+    # can reach a real host even if the refusal under test were missing.
+    _fake_gh(monkeypatch, "https://example.invalid/pr/7")
+    snapshot = args[args.index("--snapshot-id") + 1]
+    recorded = _git(checkout, "rev-parse", "HEAD")
+    # The league stage stamps the commit of the package it runs from, which in a test is
+    # not the synthetic checkout, so each run's stamp is stated as the commit it runs on.
+    monkeypatch.setattr(league_views, "repository_commit", lambda: recorded)
+    assert weekly.main([*args, "--record-advice", "--run-id", "recorded"]) == 0
+    record = paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json"
+    kept = record.read_bytes()
+    assert json.loads(kept)["provenance"]["repository_commit"] == recorded
+
+    (checkout / "source.py").write_text("merged after the recording run")
+    _git(checkout, "commit", "-qam", "develop moved")
+    current = _git(checkout, "rev-parse", "HEAD")
+    _origin_develop_at_head(checkout)
+    monkeypatch.setattr(league_views, "repository_commit", lambda: current)
+
+    solved: list[LeaguePublicationRequest] = []
+
+    def spy(request: LeaguePublicationRequest, **kwargs: Any) -> LeaguePublicationResult:
+        solved.append(request)
+        return publish_league(request, **kwargs)
+
+    monkeypatch.setattr(weekly, "publish_league", spy)
+    assert weekly.main([*args, "--publish", "--run-id", "reused"]) == 1
+    # Nothing was solved: without the preflight this run reaches the league stage, solves
+    # every member, and only then meets the record it cannot write.
+    assert solved == []
+
+    stderr = capsys.readouterr().err
+    assert "run_week stopped: Capture " + snapshot in stderr
+    assert f"written by commit {recorded} (entry 101)" in stderr
+    assert f"this run's source revision is {current}" in stderr
+    assert "--no-advice-record" in stderr
+    doc = json.loads((paths.journal / "reused/run.json").read_bytes())
+    assert doc["stages"][0]["name"] == "preflight" and doc["stages"][0]["status"] == "failed"
+    assert all(stage["status"] == "pending" for stage in doc["stages"][1:])
+    assert not (checkout / ".codex-tmp").exists()
+    assert record.read_bytes() == kept
+
+    assert weekly.main([*args, "--publish", "--no-advice-record", "--run-id", "escaped"]) == 0
+    assert len(solved) == 1 and solved[0].record_root is None
+    assert record.read_bytes() == kept
+    member_week = record.parent.parent
+    assert [path.name for path in member_week.iterdir() if not path.name.startswith(".")] == [
+        snapshot
+    ]
+    doc = json.loads((paths.journal / "escaped/run.json").read_bytes())
+    stages = {stage["name"]: stage for stage in doc["stages"]}
+    assert stages["league"]["value"]["advice_recorded"] is False
+    assert stages["publish"]["value"]["status"] == "pr_open"
+
+
+def test_no_advice_record_publishes_and_says_it_recorded_nothing(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tmp_path = tmp_path_factory.mktemp("off")
+    checkout, paths, args = _git_checkout(tmp_path)
+    _origin_develop_at_head(checkout)
+    _fake_gh(monkeypatch, "https://example.invalid/pr/2")
+
+    assert weekly.main([*args, "--publish", "--no-advice-record", "--run-id", "unrecorded"]) == 0
+
+    # Published, and nothing recorded: not this capture, not any other.
+    assert not paths.records.exists()
+    doc = json.loads((paths.journal / "unrecorded/run.json").read_bytes())
+    assert doc["request"]["publication_options"]["no_advice_record"] is True
+    stages = {stage["name"]: stage for stage in doc["stages"]}
+    assert stages["league"]["value"]["advice_recorded"] is False
+    assert stages["publish"]["value"]["status"] == "pr_open"
+    events = _recent_events(paths.log_root, "season_tick", 200)
+    skipped = [event for event in events if event.message == "tick.week.advice_record.skipped"]
+    assert len(skipped) == 1 and skipped[0].fields["reason"] == "--no-advice-record"
+    # A resume repeats the original options, so it cannot quietly start recording.
+    assert weekly.main([*args, "--publish", "--run-id", "unrecorded", "--resume"]) == 1
+
+
+@pytest.mark.parametrize(
+    ("options", "said"),
+    [
+        (["--no-advice-record"], "--no-advice-record requires --publish"),
+        (
+            ["--publish", "--record-advice", "--no-advice-record"],
+            "--no-advice-record and --record-advice contradict each other",
+        ),
+    ],
+)
+def test_the_switch_is_refused_where_it_would_mean_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], options: list[str], said: str
+) -> None:
+    arguments = ["--workspace", str(tmp_path), "--season", "2026-27", "--gameweek", "5"]
+    with pytest.raises(SystemExit) as error:
+        weekly.main([*arguments, "--league", "352490", "--dry-run", *options])
+    assert error.value.code == 2
+    assert said in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_dry_run_says_a_publication_will_not_be_recorded(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = ["--workspace", str(tmp_path), "--season", "2026-27", "--gameweek", "5"]
+    assert (
+        weekly.main([*arguments, "--league", "1", "--dry-run", "--publish", "--no-advice-record"])
+        == 0
+    )
+    assert "Record advice: False (--no-advice-record)" in capsys.readouterr().out
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.parametrize(
     "options",
     [
@@ -730,6 +928,7 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
         ["--decide", "--chip", "bboost", "--rotation", "--publish"],
         ["--rotation", "--rotation-capture", "club-news-abc123456789"],
         ["--snapshot-id", "capture", "--skip-top100", "--projection", "component-only"],
+        ["--publish", "--no-advice-record"],
     ],
 )
 def test_legacy_and_installed_dry_run_flags_match_without_writing(

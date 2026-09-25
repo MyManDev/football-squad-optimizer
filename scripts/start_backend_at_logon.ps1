@@ -28,7 +28,9 @@ Windows PowerShell 5.1 compatible on purpose (no &&, no ternary, ASCII only).
 #>
 [CmdletBinding()]
 param(
-    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
+    # Defaults to the checkout this script lives in, resolved below: Windows PowerShell 5.1
+    # leaves $PSScriptRoot empty while it binds these defaults under -File.
+    [string]$RepoRoot = "",
     [int]$Workers = 6,
     [int]$Port = 8000,
     [string]$TunnelName = "squadopt-api",
@@ -42,6 +44,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $RepoRoot) {
+    $scriptDirectory = $PSScriptRoot
+    if (-not $scriptDirectory) { $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path }
+    $RepoRoot = Split-Path -Parent $scriptDirectory
+}
 $ShortcutName = "SquadOpt advice backend.lnk"
 if ($DryRun -and ($Register -or $Unregister)) {
     throw "-DryRun cannot be combined with -Register or -Unregister."
