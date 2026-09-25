@@ -52,6 +52,7 @@ from squadopt.data.sources.club_news import (
 )
 from squadopt.data.sources.club_news_coding import CodingFixture
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.platform.club_news_acquire import main as acquire
 from squadopt.platform.club_news_provider import (
     KEY_ENVIRONMENT_VARIABLE,
@@ -263,6 +264,13 @@ def test_a_week_is_acquired_and_exported_without_a_key(
     # names a model no vendor serves, and a real vendor's identifier can be served through
     # another's compatible endpoint. #551's fourth rehearsal item is this line.
     assert manifest["provider"] == REHEARSAL_PROVIDER
+    # And a consumer reading the artifact back sees it, which is what makes the field a record
+    # rather than a line in a file nobody opens.
+    read_back = read_rotation_evidence_artifact(
+        output / "table.csv", output / "table.manifest.json"
+    )
+    assert read_back.attrs["provider"] == REHEARSAL_PROVIDER
+    assert read_back.attrs["model_identifier"] == REHEARSAL_MODEL
     assert manifest["clubs_covered"], manifest
     assert set(manifest["clubs_covered"]) <= set(manifest["clubs_declared"])
 

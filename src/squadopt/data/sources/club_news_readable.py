@@ -50,7 +50,7 @@ class ReadableTextError(DataSourceError):
 
 #: The extraction, versioned like the prompt. Bumped whenever a rule below changes, because
 #: offsets written under one version do not mean the same thing under another.
-READABLE_TEXT_CONTRACT_VERSION: Final = "readable_text_v1"
+READABLE_TEXT_CONTRACT_VERSION: Final = "readable_text_v2"
 
 #: Served bytes that are already what a person reads.
 PLAIN_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/plain",)
@@ -58,16 +58,28 @@ PLAIN_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/plain",)
 #: Served bytes that carry markup this module removes.
 MARKUP_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/html", "application/xhtml+xml")
 
+#: A syndication feed, read through the same parser and the same rules. A club that serves a
+#: news page a person reads but a reader cannot is not a club this lane can cover, and a feed
+#: is often the same words without the application shell around them. It is not a second
+#: extractor: the only thing a feed needs that a page does not is ``CDATA``, which is where a
+#: feed keeps the markup of its own item bodies.
+FEED_MEDIA_TYPES: Final[tuple[str, ...]] = ("application/rss+xml", "application/atom+xml")
+
 #: Elements whose content is instructions to a browser rather than words to a reader. Their
 #: text is dropped entirely: a quote located inside a script would be a citation into code.
 SILENT_ELEMENTS: Final[frozenset[str]] = frozenset(
-    {"script", "style", "template", "noscript", "head", "svg"}
+    # ``link`` is here for feeds. In HTML it is a void element inside ``head``, which is
+    # already silent, so nothing a page ever extracted moves; in a feed it holds the item's
+    # URL, and a bare URL run into the next item's sentence is noise a quote could land in.
+    {"script", "style", "template", "noscript", "head", "svg", "link"}
 )
 
 #: Elements that end a line. A club's page separates its sentences with markup rather than
 #: newlines, so without this every paragraph would run into the next and a quote spanning the
 #: join would match text that was never adjacent on the page.
 BREAKING_ELEMENTS: Final[frozenset[str]] = frozenset(
+    # A feed's structure, so one item's words do not run into the next one's. ``title`` is the
+    # only one of these HTML also has, and there it lives inside the silent ``head``.
     {
         "address",
         "article",
@@ -97,12 +109,16 @@ BREAKING_ELEMENTS: Final[frozenset[str]] = frozenset(
         "p",
         "pre",
         "section",
+        "description",
+        "entry",
+        "item",
         "table",
         "tbody",
         "td",
         "tfoot",
         "th",
         "thead",
+        "title",
         "tr",
         "ul",
     }
@@ -144,6 +160,25 @@ class _Reader(html.parser.HTMLParser):
             return
         self._current.append(data)
 
+    def unknown_decl(self, data: str) -> None:
+        """Read a ``CDATA`` section, which is where a feed keeps an item's own markup.
+
+        Dropped, the sentence a claim would quote disappears: a feed item's body is almost
+        always ``<![CDATA[<p>...</p>]]>``, and the words inside it are the club's. It is run
+        through a second reader rather than fed back into this one, because a parser being
+        driven from inside its own callback is a different kind of bug.
+        """
+
+        if self._silent or not data.startswith("CDATA["):
+            return
+        nested = _Reader()
+        nested.feed(data[len("CDATA[") :].removesuffix("]"))
+        nested.close()
+        inner = nested.text()
+        if inner:
+            self._break()
+            self._lines.extend(inner.split("\n"))
+
     def _break(self) -> None:
         line = " ".join("".join(self._current).split())
         if line:
@@ -175,11 +210,12 @@ def extract_readable_text(content: bytes, content_type: str) -> bytes:
                 "that published nothing; it is a read that did not work."
             )
         return content
-    if media_type not in MARKUP_MEDIA_TYPES:
+    if media_type not in MARKUP_MEDIA_TYPES and media_type not in FEED_MEDIA_TYPES:
         raise ReadableTextError(
             f"{media_type!r} is not a document type this project reads. Readable text is "
-            f"extracted from {list(MARKUP_MEDIA_TYPES)!r} and passed through for "
-            f"{list(PLAIN_MEDIA_TYPES)!r}; anything else has no text a span could index."
+            f"extracted from {list(MARKUP_MEDIA_TYPES + FEED_MEDIA_TYPES)!r} and passed "
+            f"through for {list(PLAIN_MEDIA_TYPES)!r}; anything else has no text a span "
+            "could index."
         )
 
     try:
@@ -205,6 +241,7 @@ def extract_readable_text(content: bytes, content_type: str) -> bytes:
 
 
 __all__ = [
+    "FEED_MEDIA_TYPES",
     "MARKUP_MEDIA_TYPES",
     "PLAIN_MEDIA_TYPES",
     "READABLE_TEXT_CONTRACT_VERSION",

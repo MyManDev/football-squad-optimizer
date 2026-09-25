@@ -39,6 +39,7 @@ from squadopt.application.weekly_plan import (
     new_snapshot,
     prepare_week,
     rotation_artifact,
+    rotation_pair_is_readable,
     rotation_source_capture,
 )
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
@@ -428,7 +429,11 @@ class WeeklyOperations:
         table, manifest = rotation_artifact(
             self.paths.rotation, self.request.season, self.request.gameweek, distinguishing
         )
-        if not (table.is_file() and manifest.is_file()):
+        # Readability, not existence. A pair this reader cannot open is a pair this stage does
+        # not have, and exporting over it is the recovery. The alternative is the branch that
+        # skips the export and then raises at the read below, on a run that cannot be retried
+        # inside its own window.
+        if not rotation_pair_is_readable(table, manifest):
             export_rotation_evidence(
                 # Keyword arguments, deliberately. Positionally the eighth field is never
                 # reached, which is why this stage could not name a capture at all: the field

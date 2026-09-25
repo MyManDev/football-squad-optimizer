@@ -209,7 +209,7 @@ makes the table checkable and one with a hole in it checks less than it claims.
 `model_version`, `prompt_sha256`, `response_sha256s`, `claims_coded`, `claims_ambiguous`,
 `players_not_addressed`.
 
-`provider` is written beside them and is the one field not required on read. It names the
+`provider` is written beside them and is the one field not required on read, though it is read: an artifact that names an adapter carries it into the table's attributes, and one written before the field existed reads as `null` rather than being refused. It names the
 adapter the week was asked through, which `model_identifier` does not pin: a fake adapter can
 report any model name, and one vendor's identifier can be served through another's compatible
 endpoint. It is `null` where nothing recorded it, which is what a fixture week and a capture
