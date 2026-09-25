@@ -8,7 +8,8 @@ waited out.
 import json
 import re
 import urllib.error
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ import pytest
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import read_snapshot
+from squadopt.data.sources.football_history import captured_history
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.platform import fpl_capture
 
@@ -185,27 +187,45 @@ def test_an_empty_registry_reads_nothing_extra(tmp_path: Path) -> None:
     assert endpoints == {}
 
 
-def test_component_history_is_bounded_to_the_five_weeks_before_the_target() -> None:
-    events = [
-        {
-            "id": gameweek,
-            "deadline_time": f"2026-09-{gameweek + 1:02d}T17:30:00Z",
-            "finished": gameweek < 7,
-        }
-        for gameweek in range(1, 9)
+def _deadline(week: int) -> str:
+    """A weekly calendar from the opening deadline, the shape of a real season."""
+
+    opening = datetime(2026, 8, 21, 17, 30, tzinfo=UTC)
+    return (opening + timedelta(weeks=week - 1)).isoformat().replace("+00:00", "Z")
+
+
+def _season_events(open_week: int, *, weeks: int = 38) -> list[dict[str, Any]]:
+    return [
+        {"id": week, "deadline_time": _deadline(week), "finished": week < open_week}
+        for week in range(1, weeks + 1)
     ]
-    bootstrap = json.dumps({"events": events}).encode("utf-8")
-
-    endpoints = fpl_capture.component_history_endpoints(bootstrap, as_of_utc="2026-09-08T12:00:00Z")
-
-    assert tuple(endpoints) == tuple(f"event-gw{week:02d}-live.json" for week in range(2, 7))
 
 
-def test_component_history_reads_nothing_before_the_opening_deadline() -> None:
-    assert (
-        fpl_capture.component_history_endpoints(_bootstrap(), as_of_utc="2026-08-20T09:00:00Z")
-        == {}
+def test_a_gw7_capture_reads_every_played_week_not_only_the_last_five() -> None:
+    """The football history reads GW1 onward, so the GW7 capture must hold GW1 too."""
+
+    bootstrap = json.dumps({"events": _season_events(7)}).encode("utf-8")
+
+    endpoints = fpl_capture.live_history_endpoints(bootstrap, as_of_utc="2026-09-29T12:00:00Z")
+
+    assert tuple(endpoints) == tuple(f"event-gw{week:02d}-live.json" for week in range(1, 7))
+    assert endpoints["event-gw01-live.json"] == (
+        "https://fantasy.premierleague.com/api/event/1/live/"
     )
+
+
+def test_the_last_capture_of_a_season_reads_37_live_documents() -> None:
+    """The cost the wider history adds is bounded: the GW38 capture is the largest."""
+
+    bootstrap = json.dumps({"events": _season_events(38)}).encode("utf-8")
+
+    endpoints = fpl_capture.live_history_endpoints(bootstrap, as_of_utc=_deadline(37))
+
+    assert tuple(endpoints) == tuple(f"event-gw{week:02d}-live.json" for week in range(1, 38))
+
+
+def test_live_history_reads_nothing_before_the_opening_deadline() -> None:
+    assert fpl_capture.live_history_endpoints(_bootstrap(), as_of_utc="2026-08-20T09:00:00Z") == {}
 
 
 # --- capture end to end ---------------------------------------------------------------
@@ -246,7 +266,7 @@ def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     )
 
 
-def test_a_capture_without_a_registry_adds_only_the_bounded_component_history(
+def test_a_capture_without_a_registry_adds_only_the_live_history(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The injected capture operation calls this with one argument; it must not grow one."""
@@ -267,6 +287,119 @@ def test_a_capture_without_a_registry_adds_only_the_bounded_component_history(
         FIXTURES_PAYLOAD,
         "event-gw01-live.json",
     }
+
+
+def _gw7_world() -> dict[str, bytes]:
+    """A season six weeks in: one settled fixture a week between two clubs.
+
+    Each club fields one player, so every week yields two player-fixture rows. The
+    documents carry the fields the football history reads and nothing it does not.
+    """
+
+    teams = [
+        {"id": 1, "code": 3, "name": "Arsenal", "short_name": "ARS"},
+        {"id": 2, "code": 7, "name": "Aston Villa", "short_name": "AVL"},
+    ]
+    elements = [
+        {
+            "id": identifier,
+            "code": 100 + identifier,
+            "first_name": "A",
+            "second_name": f"Player {identifier}",
+            "team": identifier,
+            "element_type": element_type,
+            "now_cost": 55,
+            "status": "a",
+            "chance_of_playing_next_round": 100,
+            "news": "",
+        }
+        for identifier, element_type in ((1, 3), (2, 2))
+    ]
+    bootstrap = {"events": _season_events(7), "teams": teams, "elements": elements}
+    fixtures = [
+        {
+            "id": week,
+            "event": week,
+            "team_h": 1,
+            "team_a": 2,
+            "kickoff_time": (
+                datetime.fromisoformat(_deadline(week).replace("Z", "+00:00")) + timedelta(hours=2)
+            )
+            .isoformat()
+            .replace("+00:00", "Z"),
+            "team_h_score": 1,
+            "team_a_score": 0,
+            "finished": True,
+        }
+        for week in range(1, 7)
+    ]
+    stats = {
+        1: {"minutes": 90, "goals_scored": 1, "assists": 0, "clean_sheets": 1, "total_points": 9},
+        2: {"minutes": 90, "goals_scored": 0, "assists": 0, "clean_sheets": 0, "total_points": 1},
+    }
+    documents = {
+        "bootstrap-static/": json.dumps(bootstrap).encode("utf-8"),
+        "fixtures/": json.dumps(fixtures).encode("utf-8"),
+    }
+    for week in range(1, 7):
+        live = {
+            "elements": [
+                {
+                    "id": identifier,
+                    "stats": {
+                        **line,
+                        "expected_goals": "0.40",
+                        "expected_assists": "0.10",
+                        "starts": 1,
+                        "defensive_contribution": 11,
+                    },
+                    "explain": [{"fixture": week}],
+                }
+                for identifier, line in stats.items()
+            ]
+        }
+        documents[f"event/{week}/live/"] = json.dumps(live).encode("utf-8")
+    return documents
+
+
+def test_a_gw7_capture_builds_the_football_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reader walks GW1 to GW6 and refuses a gap, so the capture must hold all six.
+
+    A capture that kept only the component model's five weeks (GW2 to GW6) held no GW1,
+    and the football forecast could not be built from any capture after the GW6 deadline.
+    """
+
+    documents = _gw7_world()
+    requested: list[str] = []
+
+    def fake_fetch(url: str, **_: Any) -> bytes:
+        requested.append(url)
+        return documents[url.removeprefix(f"{fpl_capture.BASE_URL}/")]
+
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-09-29T12:00:00Z")
+    monkeypatch.setattr(fpl_capture, "fetch", fake_fetch)
+    written = fpl_capture.capture(tmp_path / "snapshots")
+    assert written is not None
+
+    live = [url for url in requested if url.endswith("/live/")]
+    assert live == [f"{fpl_capture.BASE_URL}/event/{week}/live/" for week in range(1, 7)]
+    snapshot = read_snapshot(tmp_path / "snapshots", written.snapshot_id)
+    history = captured_history(snapshot, season="2026-27", gameweek=7)
+    assert sorted(set(history["GW"])) == [1, 2, 3, 4, 5, 6]
+    assert len(history) == 12
+
+    without_gw01 = replace(
+        snapshot,
+        payloads={
+            name: content
+            for name, content in snapshot.payloads.items()
+            if name != "event-gw01-live.json"
+        },
+    )
+    with pytest.raises(ValueError, match="Missing captured football history GW1"):
+        captured_history(without_gw01, season="2026-27", gameweek=7)
 
 
 def test_a_dry_run_with_entries_writes_nothing(
