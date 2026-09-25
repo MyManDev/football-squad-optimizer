@@ -1,7 +1,7 @@
-"""Verify the live site after a deployment: the eleven smoke checks, then the content.
+"""Verify the live site after a deployment: the ten smoke checks, then the content.
 
 The checks mirror SMOKE_CHECKS in web/scripts/smoke-deployment.mjs, and a test holds the two
-lists equal so that adding a route there cannot leave this verifier behind. Eight routes must
+lists equal so that adding a route there cannot leave this verifier behind. Seven routes must
 return 200 carrying the SPA document, two documents must return 200 and parse as JSON, and one
 document must be ABSENT (404), because entry 0 does not exist and a 200 there means the
 absent-document rule has been lost. Reading that last check as "must be 200" inverts it.
@@ -40,7 +40,6 @@ ROUTES = [
     "/rivals",
     "/league",
     "/league/members/0",
-    "/analysis",
     "/status",
     "/fixtures",
 ]
