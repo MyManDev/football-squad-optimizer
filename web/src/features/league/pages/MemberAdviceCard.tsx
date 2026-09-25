@@ -12,6 +12,7 @@ import { publishedPrice } from "../advice/publishedPrice";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
+import { PointsUnit } from "../components/PointsUnit";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { BoardArrow, CheckIcon } from "../components/memberIcons";
 import type {
@@ -793,22 +794,6 @@ function GainStrip({
         </p>
       ) : null}
     </div>
-  );
-}
-
-/**
- * The unit after a figure where the line is tightest: the short "xP" on screen in both
- * languages, and in Turkish the words "beklenen puan" for a screen reader, so neither the
- * width nor the word "expected" is lost. Where the two agree it is plain text.
- */
-function PointsUnit() {
-  const copy = useLanguage().messages.leagueMembers;
-  if (copy.pointsUnitAbbreviation === copy.pointsUnitSpoken) return <>{copy.pointsUnitSpoken}</>;
-  return (
-    <>
-      <span aria-hidden="true">{copy.pointsUnitAbbreviation}</span>
-      <span className="visually-hidden"> {copy.pointsUnitSpoken}</span>
-    </>
   );
 }
 

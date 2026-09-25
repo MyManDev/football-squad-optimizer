@@ -6,6 +6,7 @@ import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
+import { PointsUnit } from "../components/PointsUnit";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
 import styles from "./MemberSquad.module.css";
@@ -143,7 +144,7 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
       </span>
       {finite(player.expected_points) ? (
         <span className={styles.heldXp}>
-          {figure(player.expected_points, locale)} {copy.pointsUnit}
+          {figure(player.expected_points, locale)} <PointsUnit />
         </span>
       ) : null}
     </li>

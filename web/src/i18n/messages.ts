@@ -948,11 +948,9 @@ const en = {
     // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
     squadAfterTitle: "Squad after the transfers",
     squadOwnPoints: (points: string) => `captain doubled: ${points} xP`,
-    /** The unit after a player's expected points in the held squad's rows. */
-    pointsUnit: "xP",
     /**
-     * The printed unit where the line is tightest, the decision's captain line and the
-     * plan's list rows, in both languages: shown, but not read out.
+     * The printed unit on the tight lines (the decision's captain line, the plan's list rows,
+     * the held squad's rows), in both languages: shown, but not read out.
      */
     pointsUnitAbbreviation: "xP",
     /** The unit as a screen reader hears it after a figure: plates, bench, captain, rows. */
@@ -2053,7 +2051,6 @@ const tr: MessageSchema<typeof en> = {
     chipsAndTransfers: "Çipler ve transfer hakkı",
     squadAfterTitle: "Kadro, transferlerden sonra",
     squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} beklenen puan`,
-    pointsUnit: "puan",
     pointsUnitAbbreviation: "xP",
     pointsUnitSpoken: "beklenen puan",
     attackDirection: "Hücum yönü",
