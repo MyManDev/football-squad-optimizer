@@ -193,6 +193,28 @@ net columns beside it.
   `data/ledger`, `data/handoffs` and `data/advice_records`, which the league and publish stages
   read and which are gitignored and local; a clone without them can capture club news and export
   rotation evidence, and can do nothing else in this list.
+- **Which model codes the club news is three environment variables, and they are checked
+  before anything is fetched.** For the free adapter, in the shell that runs
+  `capture_club_news`:
+
+  ```powershell
+  $env:SQUADOPT_LLM_PROVIDER = "gemini"
+  $env:SQUADOPT_LLM_API_KEY = "<the key>"      # or GEMINI_API_KEY; never committed or echoed
+  $env:SQUADOPT_LLM_MODEL = "gemini-3.6-flash" # optional: this is the default
+  ```
+
+  With `SQUADOPT_LLM_PROVIDER` unset the command asks the `anthropic` adapter, whose key is
+  `ANTHROPIC_API_KEY`. With `SQUADOPT_LLM_MODEL` unset the `gemini` adapter asks
+  `gemini-3.6-flash`, the model the first real run (#621, 22 September) was answered by. The
+  earlier default, `gemini-2.5-flash`, answers a new key with a 404: the provider now limits the
+  2.5 models to keys that used them before. A name outside the adapter's list
+  (`DOCUMENTED_MODELS` in `src/squadopt/platform/club_news_gemini.py`, read from the provider's
+  models page on 25 September 2026) stops the command with `Refused:` before a single page is
+  read, and the refusal lists the names it accepts. `gemini-3.8-flash` and
+  `gemini-3.5-flash-lite` are on that list and are the two the provider points new projects to,
+  but neither has answered this adapter yet, so a switch to one of them is something to try on
+  a quiet evening rather than on the deadline day. The capture records the model and the prompt
+  digest, so a week coded by one model stays distinguishable from a week coded by another.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
