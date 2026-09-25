@@ -9,11 +9,13 @@ Do the fitted appearance probability and the availability multiplier reduce the 
 | 2026-27 GW04 | 659 | 178 | 4 | 0 | `decided_appearance.csv` |
 | 2026-27 GW05 | 667 | 191 | 4 | 1 | `decided_appearance.csv` |
 
-| Recent weeks missed | Rows | Fitted P(appearance) | Realised rate | Gap | Multiplier | Further reduction |
-| --- | --- | --- | --- | --- | --- | --- |
-| 0 | 13 | not read: fewer than 30 rows | | | | |
-| 1 | 178 | 0.1218 | 0.0281 | +0.0937 | 0.0421 | 0.1167 |
-| no_prior_weeks | 178 | not read: the record holds no settled week before this one | | | | |
+| Recent weeks missed | Rows | Fitted P(appearance) | Realised rate | Gap | Multiplier | Further reduction | Left after the multiplier |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 13 | not read: fewer than 30 rows | | | | | |
+| 1 | 178 | 0.1218 | 0.0281 | +0.0937 | 0.0421 | 0.1081 | 0.0137 |
+| no_prior_weeks | 178 | not read: the record holds no settled week before this one | | | | | |
+
+Fitted, realised, gap and multiplier are bucket means. Further reduction is the mean over the bucket's players of each one's fitted probability times one minus his own multiplier, and the last column is the mean of fitted times multiplier: what the projection carried after both cuts, to read beside the realised rate. Neither is the product of the bucket means, because the players the capture cuts hardest do not carry the bucket's average fitted probability.
 
 A gap near zero means the fitted probability has already absorbed the absence, and whatever the multiplier removes on top of it is removed twice. A gap that is large and positive means the fitted probability had not seen the news and the multiplier is the correction it is meant to be.
 

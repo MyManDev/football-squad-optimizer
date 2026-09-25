@@ -7,10 +7,11 @@
       "rows": 13
     },
     "1": {
+      "after_multiplier_appearance_probability": 0.01374166356947297,
       "availability_multiplier": 0.042134831460674156,
       "calibration_gap": 0.09373729365773179,
       "fitted_appearance_probability": 0.12182718129818122,
-      "further_reduction": 0.11669401354685335,
+      "further_reduction": 0.10808551772870824,
       "read": true,
       "realised_appearance_rate": 0.028089887640449437,
       "rows": 178
@@ -27,7 +28,7 @@
   "population_rows": 369,
   "promotes": null,
   "provenance": {
-    "repository_commit": "4ea174809a6b8eeff9f9415a8603f04e6cf0a8d5",
+    "repository_commit": "6f4e2142944b2448e373947728a91a079f06276a",
     "working_tree_dirty": false
   },
   "question": "Do the fitted appearance probability and the availability multiplier reduce the same risk twice?",
