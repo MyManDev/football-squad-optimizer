@@ -10,11 +10,14 @@ from tests.fixtures.backend_app import app_for_capture
 from tests.unit.test_advice_worker import ENTRY_ID, LEAGUE_ID, _deployment, world_module
 from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_football_development import football_fixture  # noqa: F401
+from tests.unit.test_member_windows import _web_literal
 
 from squadopt.application.football_live import causal_training
+from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
 from squadopt.data.sources.football_history import normalize_history
 from squadopt.live.football_artifact import (
     ARTIFACT_CONTRACT,
+    SHARES_BEFORE_AVAILABILITY_LIMIT,
     football_artifact_path,
     forecast_digest,
     read_football_forecast,
@@ -115,6 +118,11 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     )
     if contextual:
         assert football.horizon.table.appearance_probability.eq(0.8).all()
+    # v1 splits goal and assist shares before availability and says so on every answer it
+    # decides, one week or a window; v3 applies availability first and must not say it.
+    assert result["stated_limits"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == (
+        0 if contextual else 1
+    )
     assert result["window"] == window
     assert result.get("top100", {}).get("weight", 0) == weight
     if window > 1:
@@ -122,6 +130,17 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
         assert not any("stays at zero" in s for s in result["stated_limits"])
     other = client.get(route, params={**body, "model": "current"})
     assert other.status_code == 404  # football must not fill current model's address
+
+
+def test_the_site_holds_the_share_limit_verbatim_and_it_passes_the_honesty_guard() -> None:
+    """The page translates a limit by exact lookup, so the producer and the site must agree.
+
+    The sentence states a mechanism and no number: no committed measurement sizes the loss.
+    """
+
+    assert _web_literal("FOOTBALL_SHARE_STATED_LIMIT") == SHARES_BEFORE_AVAILABILITY_LIMIT
+    assert not FORBIDDEN_TEXT_PATTERN.search(SHARES_BEFORE_AVAILABILITY_LIMIT)
+    assert not any(character.isdigit() for character in SHARES_BEFORE_AVAILABILITY_LIMIT)
 
 
 def test_football_missing_and_unknown_refused_before_queue(tmp_path, monkeypatch):

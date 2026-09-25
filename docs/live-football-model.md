@@ -53,3 +53,38 @@ Its score is first-week expected points under each model, not measured performan
   explicit limitations. This is not a calibrated injury model or full stochastic MDP.
 - Compare realized outcomes on future untouched captures before changing the
   default or claiming a live accuracy improvement.
+
+## Known limit: goal and assist shares are split before availability
+
+`football_team_share_v1` divides each club-fixture's forecast goals among all of that
+club's players by expected-goal rate times expected minutes, and its assists the same
+way by expected-assist rate (`FixtureFootballModel.predict` in
+`src/squadopt/prediction/football.py`). Availability is not an input to that split, so
+the shares of one club-fixture sum to one across every player, including those the
+capture marks as injured, suspended or doubtful. The capture's availability is applied
+afterwards: `read_football_forecast` (`src/squadopt/live/football_artifact.py`) scales
+each player's weekly expected points with `apply_availability`. What that scaling removes
+from a player is not handed to his teammates.
+
+What follows from it:
+
+- At a club with absentees, its players together are credited with fewer goals and
+  assists than the model forecasts for the club, and each available player at that
+  club is credited with less of the club's attack than a split among the available
+  players would give him.
+- Only goals and assists are split. Appearance, clean-sheet, DEFCON and residual
+  points are forecast per player and are not affected by this.
+- The contextual candidate, `football_contextual_v3`, applies availability before the
+  split (`availability_application: before_team_shares_v1`) and does not have this
+  limit.
+- No committed measurement records how large the loss is on a live capture, so this
+  document states the mechanism and no size.
+
+Members are told. Every answer the `football_team_share_v1` forecast decided, one week
+or a window, carries `SHARES_BEFORE_AVAILABILITY_LIMIT` in its `stated_limits`, and the
+member page shows it in English and in Turkish. An answer decided by
+`football_contextual_v3` does not carry it.
+
+Removing the limit means applying availability to the share weights before the split,
+as the contextual candidate does. That changes the forecast, so it is a new model
+version with its own measurement, and `football_team_share_v1` is left as it is here.

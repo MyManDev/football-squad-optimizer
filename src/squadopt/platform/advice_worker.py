@@ -54,6 +54,7 @@ from squadopt.application.advice_menu import (
 )
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
@@ -86,6 +87,7 @@ from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
 from squadopt.platform.queue_contracts import QueueLockTimeout
 from squadopt.platform.worker_metrics import serve_worker_metrics
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 
 __all__ = [
     "DEFAULT_HEARTBEAT_SECONDS",
@@ -338,6 +340,12 @@ def build_advice_compute(
             advice["stated_limits"] = [
                 *(existing_limits if isinstance(existing_limits, list) else []),
                 "Experimental football model; independent predictive superiority is unverified.",
+                # Only the version that splits attacking shares before availability.
+                *(
+                    [SHARES_BEFORE_AVAILABILITY_LIMIT]
+                    if football.horizon.model_version == FOOTBALL_MODEL_VERSION
+                    else []
+                ),
             ]
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
