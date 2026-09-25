@@ -60,6 +60,11 @@ from squadopt.live import (
 )
 from squadopt.platform.publication_workers import league_mapper
 
+#: The precision a handoff's fingerprint keeps. A rebuild on another run of the same code
+#: differs from the published file by floating-point noise far below it, and that is not
+#: a change this measurement is about.
+NOISE = 1e-9
+
 
 def _solve(
     arguments: argparse.Namespace, handoff: Path, out_root: Path
@@ -281,7 +286,7 @@ def _players(
         ranks = frame.groupby("position")[arm].rank(ascending=False, method="min")
         frame[f"{arm}_rank"] = ranks.astype("int64")
     frame["position_size"] = frame.groupby("position")["player_id"].transform("size")
-    changed = frame.loc[frame["delta"].ne(0.0)].sort_values(
+    changed = frame.loc[frame["delta"].abs().gt(NOISE)].sort_values(
         ["delta", "player_id"], ascending=[False, True]
     )
     rows: list[dict[str, Any]] = [
@@ -317,7 +322,9 @@ def _players(
             "top_20_order_unchanged": first["control"] == first["candidate"],
             "best_candidate_rank_of_a_changed_player": int(moved.min()) if len(moved) else None,
         }
-    unchanged = frame.loc[frame["delta"].eq(0.0)]
+    unchanged = frame.loc[frame["delta"].abs().le(NOISE)]
+    control_chance = control.appearance_probability or {}
+    candidate_chance = candidate.appearance_probability or {}
     return {
         "gameweeks_played": played,
         "roster": len(frame),
@@ -325,11 +332,11 @@ def _players(
         "players_listed_in_no_gameweek": int(frame["listed"].eq(0).sum()),
         "players_changed": len(changed),
         "every_changed_player_listed_in_fewer_gameweeks": bool(changed["listed"].lt(played).all()),
-        "unchanged_players_bit_identical": bool(
-            unchanged["control"].equals(unchanged["candidate"])
-        ),
-        "appearance_probability_identical": (
-            control.appearance_probability == candidate.appearance_probability
+        "largest_change_among_the_rest": float(unchanged["delta"].abs().max()),
+        "appearance_probability_same_players": set(control_chance) == set(candidate_chance),
+        "largest_appearance_probability_change": max(
+            (abs(control_chance[code] - candidate_chance[code]) for code in control_chance),
+            default=0.0,
         ),
         "change_mean": round(fmean(float(value) for value in changed["delta"]), 6),
         "change_min": round(float(changed["delta"].min()), 6),
