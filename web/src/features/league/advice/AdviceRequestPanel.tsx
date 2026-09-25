@@ -25,6 +25,7 @@
 
 import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
+import { local } from "../../../lib/format";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
@@ -74,7 +75,7 @@ export function AdviceRequestPanel({
   /** The page's class for the button's block, which it may pin in a drawer. */
   dockClassName?: string;
 }) {
-  const { language, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
   const { viewer } = useViewerEntry();
@@ -121,7 +122,7 @@ export function AdviceRequestPanel({
             </Badge>{" "}
             {copy.computeProvenance(
               String(state.envelope.payload.source_snapshot_id ?? "—"),
-              state.envelope.generated_at_utc,
+              local(state.envelope.generated_at_utc, locale),
             )}
             {state.source === "static-fallback" ? <> {copy.computeStaticFallback}</> : null}
           </p>

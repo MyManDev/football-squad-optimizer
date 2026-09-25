@@ -201,7 +201,7 @@ describe("league member advice flow", () => {
     expect(screen.getByText("Hesap sonucu")).toBeInTheDocument();
     expect(screen.getByText("Plan hazır")).toBeInTheDocument();
     expect(screen.queryByText("Şimdi hesaplandı")).toBeNull();
-    expect(screen.getByText(/Capture fpl-live-computed/)).toBeInTheDocument();
+    expect(screen.getByText(/Veri çekimi fpl-live-computed/)).toBeInTheDocument();
     expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
   });
 

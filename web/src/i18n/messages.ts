@@ -554,7 +554,7 @@ const en = {
     computePublished: "Published plan",
     computeUnsupportedSelection:
       "Compute supports pure points at one, three or five weeks, and a one-week strategy with a rival chosen. A rival strategy is not computed over a longer window.",
-    computeProvenance: (capture: string, at: string) => `Capture ${capture}, result dated ${at}.`,
+    computeProvenance: (capture: string, at: string) => `Snapshot ${capture}, result dated ${at}.`,
     computeStaticFallback: "The backend was unreachable; this is the published static answer.",
     computeUnavailable:
       "Only the published site is available right now; this combination was not published.",
@@ -1288,7 +1288,7 @@ const tr: MessageSchema<typeof en> = {
     liveFixtures: "Tamamlanan maç",
     liveBonusConfirmed: "Kaynakta bonus onaylandı",
     liveBonusPending: "Bonus henüz onaylanmadı; puan değişebilir",
-    liveCaptured: "Capture zamanı",
+    liveCaptured: "Veri çekimi",
     liveSnapshotNote:
       "Son bilinen capture gösterilir; kesintisiz canlı akış değildir. Bu sayı otomatik değişiklik sonrası resmi FPL toplamı değildir.",
     settledAside: "Sonuçlandı",
@@ -1667,7 +1667,8 @@ const tr: MessageSchema<typeof en> = {
     computePublished: "Yayınlanmış plan",
     computeUnsupportedSelection:
       "Hesapla saf puanı bir, üç ve beş haftada, rakip seçilmiş bir stratejiyi ise bir haftada destekler. Rakip stratejisi daha uzun pencerede hesaplanmaz.",
-    computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
+    computeProvenance: (capture: string, at: string) =>
+      `Veri çekimi ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
     computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, okunabilir.",

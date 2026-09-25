@@ -34,7 +34,7 @@ export const CHIP_FORECAST_COPY = {
     squad:
       "The present fifteen and bench are held unchanged. Future transfers, injuries and rotation are not included. Players without a fixture this week are left out of later estimates.",
     evidence:
-      "Development-season evidence: threshold_only minus off was +2.74 points a gameweek [+1.18, +4.26]. This is not decaying minus off, and it is not a measured gain for your team.",
+      "Development-season evidence: playing each chip when this rule's threshold was met, against never playing it, was worth +2.74 points a gameweek [+1.18, +4.26]. That is not the figure for the rule whose threshold loosens over the season, and it is not a measured gain for your team.",
     limits:
       "The system's own squad used this season's two chip windows over older seasons. Those managers had one set, so ownership and prices still describe that world.",
     action:
@@ -93,7 +93,7 @@ export const CHIP_FORECAST_COPY = {
     squad:
       "Mevcut on beşli ve yedekler değişmeden tutulur. Gelecek transferler, sakatlıklar ve rotasyon hesaba katılmaz. Bu hafta maçı olmayan oyuncular sonraki hafta hesaplarına alınmaz.",
     evidence:
-      "Geliştirme sezonlarındaki ölçüm: threshold_only eksi off, hafta başına +2,74 puan [+1,18, +4,26]. Bu, decaying eksi off değildir; senin takımın için ölçülmüş bir katkı da değildir.",
+      "Geliştirme sezonlarındaki ölçüm: çipi bu kuralın eşiği geçildiğinde oynamak, hiç oynamamaya göre hafta başına +2,74 puan getirdi [+1,18, +4,26]. Bu, eşiği sezon içinde gevşeyen kuralın sonucu değildir; senin takımın için ölçülmüş bir katkı da değildir.",
     limits:
       "Sistemin kendi kadrosu eski sezonlarda bu sezonun iki çip penceresiyle oynatıldı. O sezonların menajerlerinde tek set vardı; sahiplik ve fiyatlar o düzeni yansıtıyor.",
     action:
