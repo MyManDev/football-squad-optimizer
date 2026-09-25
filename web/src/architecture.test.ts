@@ -9,9 +9,10 @@
  *
  * 1. The lower zones (`design/`, `lib/`, `i18n/`, `data/`) import nothing from `features/`
  *    or `app/`, not even a type.
- * 2. A runtime validator never imports the loader that invokes it
- *    (docs/architecture/member_page_boundaries.md, "Runtime validators import only the
- *    shared errors and types").
+ * 2. No runtime validator named in `isValidator` imports a loader other than as a type.
+ *    The rule is docs/architecture/member_page_boundaries.md, "Runtime validators import
+ *    only the shared errors and types, never the loader that invokes them"; the set it is
+ *    held for is the list below, not every module that checks a document.
  * 3. No two production modules import each other's values, directly or around a longer
  *    loop.
  *
@@ -111,9 +112,18 @@ const show = (edge: Edge): string => `${edge.from}:${edge.line} -> ${edge.to} ($
 const LOWER_ZONES = ["design/", "lib/", "i18n/", "data/"];
 const UPPER_ZONES = ["features/", "app/"];
 
-/** Runtime validators: every `*Shape.ts` check, and `adviceResponse.ts` (`checkedAdvice`). */
+/**
+ * Runtime validators this rule names: every `*Shape.ts` check, `adviceResponse.ts`
+ * (`checkedAdvice`) and `adviceCapabilities.ts` (`checkedCapabilities`). A validator with
+ * another file name is covered only once it is added here.
+ */
+const NAMED_VALIDATORS = new Set([
+  "features/league/advice/adviceResponse.ts",
+  "features/league/advice/adviceCapabilities.ts",
+]);
+
 const isValidator = (path: string): boolean =>
-  /(^|\/)[^/]+Shape\.ts$/.test(path) || path === "features/league/advice/adviceResponse.ts";
+  /(^|\/)[^/]+Shape\.ts$/.test(path) || NAMED_VALIDATORS.has(path);
 
 /** Loaders fetch the published documents: each feature's `data.ts`, and the site client. */
 const isLoader = (path: string): boolean =>
@@ -168,6 +178,7 @@ describe("web architecture", () => {
     );
     expect(PRODUCTION.filter(isValidator)).toEqual(
       expect.arrayContaining([
+        "features/league/advice/adviceCapabilities.ts",
         "features/league/advice/adviceResponse.ts",
         "features/league/advice/adviceShape.ts",
         "features/league/publicationShape.ts",
@@ -185,7 +196,7 @@ describe("web architecture", () => {
     expect(upward.map(show)).toEqual([]);
   });
 
-  it("keeps runtime validators from importing a loader", () => {
+  it("keeps the named runtime validators from importing a loader", () => {
     const back = EDGES.filter(
       ({ from, to, kind }) => kind !== "type" && isValidator(from) && isLoader(to),
     );
