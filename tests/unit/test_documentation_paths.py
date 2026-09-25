@@ -43,14 +43,16 @@ runbooks kept telling an operator to run it, because the check above reads only 
 rooted `.py` paths and a runbook writes `python -m scripts.<name>`. The second check reads that
 form, a backticked `scripts.<name>`, and any `scripts/<name>.py`, in every document under
 `docs/` and in both READMEs. A dated record keeps the command that was run on its day, so the
-records are excused by name, and a living document may name a removed module only in the note
-that says it was removed.
+records are excused by name, and a living document may name a removed module only in the
+paragraph that says it was removed: the same name on any other line of that document is
+reported.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import NamedTuple
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCS = REPOSITORY_ROOT / "docs"
@@ -165,12 +167,26 @@ RECORDS: dict[str, str] = {
 }
 
 #: A living document may name a removed module in the note that says it was removed. Only
-#: these names are excused there; every other citation in the document is checked.
+#: these names are excused, and only on the lines of that note: the same name on any other
+#: line of the document is checked like every other citation.
 REMOVAL_NOTES: dict[str, frozenset[str]] = {
     "docs/architecture/platform_runtime.md": frozenset(
         {"run_gameweek_ops", "run_season_tick", "capture_deadline_snapshot"}
     ),
 }
+
+#: What makes a paragraph (a run of non-blank lines) a removal note. It is looked for in the
+#: paragraph's lines joined by spaces, so a line break inside the phrase does not hide it, and
+#: no line number is recorded, so an edit that moves the note does not break the allowance.
+REMOVED = "been removed"
+
+
+class Citation(NamedTuple):
+    document: str
+    line: int
+    name: str
+    resolves: bool
+    excused: bool
 
 
 def _is_a_module(dotted: str) -> bool:
@@ -178,37 +194,64 @@ def _is_a_module(dotted: str) -> bool:
     return location.with_suffix(".py").is_file() or (location / "__main__.py").is_file()
 
 
-def _cited_scripts() -> list[tuple[str, int, str, bool]]:
-    """Every scripts citation as (document, line, name, resolves).
+def _removal_note_lines(lines: list[str]) -> frozenset[int]:
+    """The line numbers, from 1, of every paragraph that says something has been removed."""
+
+    note: set[int] = set()
+    paragraph: list[int] = []
+    for number, line in enumerate([*lines, ""], 1):
+        if line.strip():
+            paragraph.append(number)
+            continue
+        if REMOVED in " ".join(lines[held - 1].strip() for held in paragraph):
+            note.update(paragraph)
+        paragraph = []
+    return frozenset(note)
+
+
+def _scripts_cited_in(document: Path, text: str) -> list[Citation]:
+    """Every scripts citation in one document's text.
 
     Placeholders are left out, and so is the runner a protocol names, by the allowance above.
     """
 
-    found: list[tuple[str, int, str, bool]] = []
-    for document in COMMAND_DOCUMENTS:
-        relative = document.relative_to(REPOSITORY_ROOT).as_posix()
-        for number, line in enumerate(document.read_text(encoding="utf-8").splitlines(), 1):
-            cited: list[tuple[str, bool]] = []
-            for name in (raw.rstrip(".") for raw in COMMAND.findall(line)):
-                cited.append((name, _is_a_module(name)))
-            for name in (raw.rstrip(".") for raw in MODULE_NAME.findall(line)):
-                parent = name.rpartition(".")[0]
-                cited.append((name, _is_a_module(name) or (bool(parent) and _is_a_module(parent))))
-            for name in SCRIPT_PATH.findall(line):
-                cited.append((name.replace("/", "."), (SCRIPTS / f"{name}.py").is_file()))
-            found.extend(
-                (relative, number, name, resolves)
-                for name, resolves in cited
-                if not PLACEHOLDER.search(name)
-                and not _is_a_runner_a_protocol_has_not_had_written_yet(
-                    document, "scripts/" + name.replace(".", "/") + ".py"
-                )
+    relative = document.relative_to(REPOSITORY_ROOT).as_posix()
+    lines = text.splitlines()
+    removed_here = REMOVAL_NOTES.get(relative, frozenset())
+    note = _removal_note_lines(lines) if removed_here else frozenset()
+    found: list[Citation] = []
+    for number, line in enumerate(lines, 1):
+        cited: list[tuple[str, bool]] = []
+        for name in (raw.rstrip(".") for raw in COMMAND.findall(line)):
+            cited.append((name, _is_a_module(name)))
+        for name in (raw.rstrip(".") for raw in MODULE_NAME.findall(line)):
+            parent = name.rpartition(".")[0]
+            cited.append((name, _is_a_module(name) or (bool(parent) and _is_a_module(parent))))
+        for name in SCRIPT_PATH.findall(line):
+            cited.append((name.replace("/", "."), (SCRIPTS / f"{name}.py").is_file()))
+        found.extend(
+            Citation(
+                relative,
+                number,
+                name,
+                resolves,
+                excused=relative in RECORDS or (number in note and name in removed_here),
             )
+            for name, resolves in cited
+            if not PLACEHOLDER.search(name)
+            and not _is_a_runner_a_protocol_has_not_had_written_yet(
+                document, "scripts/" + name.replace(".", "/") + ".py"
+            )
+        )
     return found
 
 
-def _is_excused(document: str, name: str) -> bool:
-    return document in RECORDS or name in REMOVAL_NOTES.get(document, frozenset())
+def _cited_scripts() -> list[Citation]:
+    return [
+        citation
+        for document in COMMAND_DOCUMENTS
+        for citation in _scripts_cited_in(document, document.read_text(encoding="utf-8"))
+    ]
 
 
 def test_every_scripts_command_a_document_cites_exists() -> None:
@@ -219,9 +262,9 @@ def test_every_scripts_command_a_document_cites_exists() -> None:
     assert len(cited) >= 100, f"expected the documents to cite scripts; found {len(cited)}"
 
     missing = [
-        f"{document}:{number} cites scripts.{name}"
-        for document, number, name, resolves in cited
-        if not resolves and not _is_excused(document, name)
+        f"{citation.document}:{citation.line} cites scripts.{citation.name}"
+        for citation in cited
+        if not citation.resolves and not citation.excused
     ]
     assert not missing, "\n".join(
         [
@@ -233,20 +276,43 @@ def test_every_scripts_command_a_document_cites_exists() -> None:
 
 
 def test_every_command_allowance_still_excuses_a_citation() -> None:
-    """A record that no longer cites a removed command, or a note whose name came back, is a
-    stale allowance; delete the entry so the list shrinks by itself."""
+    """A record that no longer cites a removed command, or a note whose name came back or that
+    no longer names it, is a stale allowance; delete the entry so the list shrinks by itself."""
 
-    unresolved = {
-        (document, name) for document, _, name, resolves in _cited_scripts() if not resolves
-    }
-    stale = [document for document in RECORDS if document not in {d for d, _ in unresolved}]
+    unresolved = [citation for citation in _cited_scripts() if not citation.resolves]
+    stale = [document for document in RECORDS if document not in {c.document for c in unresolved}]
+    in_a_note = {(c.document, c.name) for c in unresolved if c.excused}
     stale += [
         f"{document} {name}"
         for document, names in REMOVAL_NOTES.items()
         for name in sorted(names)
-        if (document, name) not in unresolved
+        if (document, name) not in in_a_note
     ]
     assert not stale, "these allowances excuse nothing; delete them: " + ", ".join(stale)
+
+
+def test_a_removal_note_excuses_its_names_only_inside_the_note() -> None:
+    """The note says the module is gone. A later line of the same document telling an operator
+    to run it is the stale instruction this check exists to catch, so it is reported."""
+
+    document = DOCS / "architecture" / "platform_runtime.md"
+    text = "\n".join(
+        [
+            "The old `scripts.run_season_tick` and `scripts.gone_module` have been",
+            "removed with 1.0.0.",
+            "",
+            "Run `python -m scripts.run_season_tick --execute` every fifteen minutes.",
+        ]
+    )
+    cited = _scripts_cited_in(document, text)
+
+    # Inside the note: the listed name is excused, a name the allowance does not list is not.
+    assert [(c.line, c.name) for c in cited if c.excused] == [(1, "run_season_tick")]
+    # Outside the note the listed name is reported like any other.
+    assert [(c.line, c.name) for c in cited if not c.resolves and not c.excused] == [
+        (1, "gone_module"),
+        (4, "run_season_tick"),
+    ]
 
 
 def test_the_protocol_allowance_covers_a_runner_and_nothing_else() -> None:
