@@ -53,8 +53,8 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
     <Card title={tr ? "Karar masam" : "My decision board"}>
       <p>
         {tr
-          ? "Bir planı ekle, yukarıdaki model, hafta, Top100 veya çip seçimini değiştir; yeni sonucu yanına ekle. En fazla üç planı karşılaştırıp kendi tercihini işaretle."
-          : "Pin a plan, change the model, horizon, Top100 or chip settings above, then pin the new result. Compare up to three plans and mark your own preference."}
+          ? "Bir planı ekle, model, hafta, Top 100 ağırlığı veya çip seçimini değiştir; yeni sonucu yanına ekle. En fazla üç planı karşılaştırıp kendi tercihini işaretle."
+          : "Pin a plan, change the model, horizon, Top 100 weight or chip, then pin the new result. Compare up to three plans and mark your own preference."}
       </p>
       <p>
         {tr
@@ -63,6 +63,7 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
       </p>
       <button
         type="button"
+        className={styles.pin}
         disabled={!candidate || !!pinned || board.candidates.length >= 3}
         onClick={() =>
           candidate && change({ ...board, candidates: [...board.candidates, candidate] })
@@ -114,7 +115,8 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                 · {p.window} {tr ? "hafta" : "weeks"} · {strategy}
               </p>
               <p>
-                Top100 %{c.request.top100Weight} · {tr ? "Hoca yorumu" : "Manager's word"}:{" "}
+                {messages.leagueMembers.top100Weight(c.request.top100Weight ?? 0)} ·{" "}
+                {tr ? "Hoca yorumu" : "Manager's word"}:{" "}
                 {c.request.managersWord ? (tr ? "Açık" : "On") : tr ? "Kapalı" : "Off"} ·{" "}
                 {tr ? "Çip tercihi" : "Chip preference"}: {chipName(c.request.chip)}
               </p>
@@ -185,7 +187,9 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
               </p>
               {!!p.stated_limits?.length && (
                 <details>
-                  <summary>{tr ? "Planın varsayımları" : "Plan assumptions"}</summary>
+                  <summary className={styles.summary}>
+                    {tr ? "Planın varsayımları" : "Plan assumptions"}
+                  </summary>
                   <ul>
                     {p.stated_limits.map((limit, j) => (
                       <li key={j}>{messages.leagueMembers.statedLimits[limit] ?? limit}</li>
@@ -253,7 +257,9 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
           : "Net points subtract transfer hits. Higher scores from different models or different horizons do not prove a better plan. Missing measurements are shown as —."}
       </p>
       <details>
-        <summary>{tr ? "Karar vermeden önce" : "Before deciding"}</summary>
+        <summary className={styles.summary}>
+          {tr ? "Karar vermeden önce" : "Before deciding"}
+        </summary>
         <ul>
           <li>
             {tr

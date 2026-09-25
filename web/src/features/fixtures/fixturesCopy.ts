@@ -1,9 +1,9 @@
 import type { Language } from "../../i18n/messages";
 
 /**
- * The fixture panels' copy, in both languages.
+ * The fixtures page's copy, in both languages.
  *
- * It lives beside the components that read it, so it loads with the panels' own chunk and
+ * It lives beside the components that read it, so it loads with the page's own chunk and
  * not with every first visit. The honesty sweep (`i18n/messagesNoProbability.test.ts`)
  * walks it entry by entry, functions called.
  *
@@ -17,8 +17,6 @@ export interface FixturesCopy {
   versus: string;
   unscheduled: string;
   noFixtures: string;
-  pastLink: string;
-  summary: string;
   pageTitle: string;
   pageLede: string;
   pastTitle: string;
@@ -35,8 +33,6 @@ const en: FixturesCopy = {
   versus: "v",
   unscheduled: "TBC",
   noFixtures: "No fixtures in this gameweek.",
-  pastLink: "Past gameweeks",
-  summary: "Fixtures: this week and next",
   pageTitle: "Fixtures",
   pageLede: "The schedule and the results, as the game published them. Times are your local time.",
   pastTitle: "Past gameweeks",
@@ -56,8 +52,6 @@ const tr: FixturesCopy = {
   versus: "-",
   unscheduled: "Belli değil",
   noFixtures: "Bu oyun haftasında maç yok.",
-  pastLink: "Geçmiş haftalar",
-  summary: "Fikstür: bu hafta ve gelecek hafta",
   pageTitle: "Fikstür",
   pageLede: "Oyunun yayımladığı maç programı ve sonuçlar. Saatler bulunduğunuz yerin saatidir.",
   pastTitle: "Geçmiş haftalar",

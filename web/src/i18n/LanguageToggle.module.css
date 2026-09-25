@@ -1,26 +1,54 @@
+/* TR | EN as one outlined segmented control: the pressed half is ink with white text. */
 .toggle {
   display: inline-flex;
-  padding: 2px;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-2);
+  border-radius: var(--radius-s);
+  background: transparent;
 }
 
 .toggle button {
-  min-width: 38px;
-  min-height: 38px;
+  min-width: 40px;
+  min-height: 30px;
   padding: 0 var(--space-2);
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: 3px;
   background: transparent;
   color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--step--1);
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
   cursor: pointer;
+}
+
+.toggle button + button {
+  border-left: 1px solid var(--color-line);
 }
 
 .toggle button[aria-pressed="true"] {
   background: var(--color-text);
-  color: var(--color-bg);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.toggle button:hover:not([aria-pressed="true"]) {
+  color: var(--color-text);
+}
+
+/* In the 72 px icon rail the two halves stack, TR over EN. */
+.vertical {
+  flex-direction: column;
+}
+
+.vertical button + button {
+  border-left: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+/* Touch widths, the phone and tablet layouts under 1180 px: every target is at least 44 px. */
+@media (max-width: 1179.98px) {
+  .toggle button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
