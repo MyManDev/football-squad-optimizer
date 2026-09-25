@@ -49,7 +49,7 @@ def test_worker_samples_time_after_waiting_for_the_transition_lock(
     def compute(job: AdviceJob) -> bytes:
         claims.append(job)
         clock[0] = FINISHED
-        return b"answer"
+        return b'"answer"'
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         # A distinct adapter owns the actual OS lock, just as another API/worker does.
@@ -84,7 +84,7 @@ def test_worker_samples_time_after_waiting_for_the_transition_lock(
     terminal = owner_queue.load("job-later")
     assert terminal is not None and terminal.status == "completed"
     assert terminal.updated_at_utc == "2026-09-01T10:02:00Z"
-    assert cache.get(terminal.cache_key) == b"answer"
+    assert cache.get(terminal.cache_key) == b'"answer"'
 
 
 @pytest.mark.parametrize("use_clock", [False, True])
