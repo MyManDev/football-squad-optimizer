@@ -240,10 +240,20 @@ pull request reviewed, with no gate anywhere catching it. Recover with the secon
 
 ```
 sh scripts/release/deploy.sh <tag>
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]
 ```
 
-and, once the tag has been pushed, with a re-dispatch instead, which needs neither script and
-can be repeated:
+Run the second line only when the first has exited 0, and wait about 45 seconds between
+them. `deploy.sh` reports the workflow run, not the site, so the recovery is not done until
+`verify_live.py` prints `ALL GOOD`: it is the step `ship.sh` runs after `deploy.sh`, and
+without it the recovery path had no check of what the site serves. If it fails in the first
+minutes, run it once more a minute later, as `ship.sh` does. `deploy.sh` watches
+only a dispatch run created after its own dispatch (with a minute of slack for clock skew) and
+refuses a run whose production job names another tag, so it cannot report the previous
+release's finished run as this one.
+
+Once the tag has been pushed, recover with a re-dispatch instead, which needs neither script
+and can be repeated, and then run the same `verify_live.py` command once that run has finished:
 
 ```
 gh workflow run deploy-pages.yml --ref develop -f release_tag=<tag>

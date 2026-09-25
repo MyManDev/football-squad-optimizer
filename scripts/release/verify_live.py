@@ -11,13 +11,20 @@ the publication must be the one just deployed rather than the previous one, and 
 of the gameweek the release is for. The second is what ``--settled`` states. Without it the
 verifier printed the settled weeks and returned ALL GOOD whatever they were, so a release
 that published an unsettled week, or last week's, passed.
+
+A request that gets no answer at all (a refused or reset connection, a DNS failure, a
+timeout) is a failed check with status 0, not a traceback, and a content document that cannot
+be read is a counted failure, so the run always ends with its failure count.
 """
 
 import argparse
+import http.client
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
+from typing import Any
 
 BASE = "https://squadopt.mymandev.com"
 UA = {"User-Agent": "squadopt-verify/1.0"}
@@ -36,6 +43,7 @@ ROUTES = [
 ]
 DOCUMENTS = ["/data/index.json", "/data/league/members.json"]
 ABSENT = "/data/league/entries/0.json"
+SEASON = re.compile(r"^\d{4}-\d{2}$")
 
 
 def fetch(path: str) -> tuple[int, bytes]:
@@ -45,6 +53,27 @@ def fetch(path: str) -> tuple[int, bytes]:
             return response.status, response.read()
     except urllib.error.HTTPError as error:
         return error.code, b""
+    except (urllib.error.URLError, http.client.HTTPException, OSError) as error:
+        # URLError covers refused connections and DNS, OSError timeouts and resets during the
+        # read, and HTTPException a response cut short.
+        print(f"  network error on {path}: {error}")
+        return 0, b""
+
+
+def _document(path: str) -> dict[str, Any] | None:
+    """The JSON object at ``path``, or None after printing why it could not be read."""
+
+    status, body = fetch(path)
+    document: object = None
+    if status == 200:
+        try:
+            document = json.loads(body)
+        except ValueError:
+            document = None
+    if not isinstance(document, dict):
+        print(f"  BAD {status} could not read {path}")
+        return None
+    return document
 
 
 def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int:
@@ -72,8 +101,9 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     print(f"  {'ok ' if ok else 'BAD'} {status} absent {ABSENT}  (must be 404, not the shell)")
 
     print("\n== content ==")
-    _, body = fetch("/data/league/members.json")
-    members = json.loads(body)
+    document = _document("/data/league/members.json")
+    failures += document is None
+    members = document or {}
     generated = members.get("generated_at_utc", "")
     payload = members.get("payload", {})
     matches = generated == accepted_generated_at
@@ -91,16 +121,29 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
         movement[member.get("movement")] = movement.get(member.get("movement"), 0) + 1
     print(f"  movement={movement}")
 
-    _, body = fetch("/data/league/scoreboard.json")
-    score = json.loads(body).get("payload", {})
+    document = _document("/data/league/scoreboard.json")
+    failures += document is None
+    score = (document or {}).get("payload", {})
     weeks = score.get("gameweeks", [])
     settled = [w.get("gameweek") for w in weeks if w.get("finished") and w.get("data_checked")]
     print(f"  scoreboard gameweeks={len(weeks)} settled={settled}")
 
-    _, body = fetch("/data/2026-27/status.json")
-    status_doc = json.loads(body).get("payload", {})
+    # The season is the one the site index names as latest, so the status document is found
+    # again when the season turns over instead of being read from last season's path.
+    index = _document("/data/index.json")
+    failures += index is None
+    latest = (index or {}).get("payload", {}).get("latest") or {}
+    season = latest.get("season")
+    status_doc: dict[str, Any] = {}
+    if isinstance(season, str) and SEASON.match(season):
+        document = _document(f"/data/{season}/status.json")
+        failures += document is None
+        status_doc = (document or {}).get("payload", {})
+    elif index is not None:
+        failures += 1
+        print(f"  BAD index.json names no latest season ({season!r})")
     print(
-        f"  status next_gameweek={status_doc.get('next_gameweek')}"
+        f"  status season={season} next_gameweek={status_doc.get('next_gameweek')}"
         f" deadline={status_doc.get('next_deadline_utc')}"
     )
 
