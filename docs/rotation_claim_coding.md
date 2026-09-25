@@ -38,7 +38,7 @@ Neither outcome is a citation. A model shown HTML either quotes the markup — a
 then shown `Bukayo <strong>is</strong> fit` as the club's own words — or quotes what it read
 and the span cannot be found.
 
-So a document carries two payloads. `readable_text_v1` turns served bytes into the text a
+So a document carries two payloads. `readable_text_v3` turns served bytes into the text a
 person reads, and **that** is what the model is shown and what the offsets index. The served
 bytes stay beside it: they are what the host actually sent and what makes the extraction
 auditable, and dropping them to save a payload would discard the only evidence that this step
