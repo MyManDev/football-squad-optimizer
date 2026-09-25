@@ -390,6 +390,83 @@ def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path:
     assert choose(tmp_path) == early
 
 
+def test_old_and_new_told_blocks_are_read_as_the_same_pure_points_advice(
+    tmp_path: Path,
+) -> None:
+    """Which document ``told`` names never decides what the settled review reads.
+
+    An older record named the rule's pick as told (``source`` ``suggested_strategy``) and
+    carried no ``suggested_strategy`` key; a newer one names the page's pure-points plan
+    (``source`` ``page_default``) and keeps the pick in that key. The rule's pick here is
+    ``ortak-koru``, whose recorded plan pays a larger hit under another digest, so a reader
+    that followed ``told`` would score a different week. Selection, the settled score and the
+    history rows all read the pure-points document by its address, so both shapes read
+    exactly as a record without the block does, and neither record is rewritten.
+    """
+
+    pick = {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 202,
+        "points_ahead_of_rival": 300,
+        "scored_gameweek": 3,
+        "gameweeks_remaining": 35,
+        "band_edge_points": 125.4,
+    }
+    shapes: dict[str, dict[str, Any]] = {
+        "none": {},
+        "old": {
+            "told": {
+                "strategy": "ortak-koru",
+                "window": 1,
+                "rival_entry_id": 202,
+                "published_path": "advice/101/ortak-koru/1.json",
+                "source": "suggested_strategy",
+            }
+        },
+        "new": {
+            "told": {
+                "strategy": "saf-puan",
+                "window": 1,
+                "rival_entry_id": None,
+                "published_path": "advice/101/saf-puan/1.json",
+                "source": "page_default",
+            },
+            "suggested_strategy": {**pick, "published_path": "advice/101/ortak-koru/1.json"},
+        },
+    }
+    capture = snapshot(tmp_path / "snapshots")
+    reviews: dict[str, review.WeekReview] = {}
+    rows: dict[str, dict[str, Any]] = {}
+    for shape, blocks in shapes.items():
+        record = recorded()
+        baseline = record["advice"][0]
+        baseline.update(published_path="advice/101/saf-puan/1.json", expected_points_cost=0)
+        record["advice"].append(
+            {
+                **baseline,
+                "strategy": "ortak-koru",
+                "rival_entry_id": 202,
+                "published_path": "advice/101/ortak-koru/1.json",
+                "transfer_hit_points": 8,
+                "advice_sha256": "b" * 64,
+            }
+        )
+        record.update(blocks)
+        root = tmp_path / shape
+        record_member_advice(root, record)
+        chosen = choose(root)
+        assert chosen == record  # read back as written: an older told is never rewritten
+        assert review._advice(chosen) == baseline
+        reviews[shape] = evaluate(root, [capture])
+        rows[shape] = review._history_week(reviews[shape], chosen)
+    assert reviews["old"] == reviews["new"] == reviews["none"]
+    assert reviews["new"].advice_sha256 == "a" * 64
+    assert reviews["new"].suggested == review.SuggestedScore(24, 4, 20, 2, 0, None)
+    assert rows["old"] == rows["new"] == rows["none"]
+
+
 def publish_for(
     root: Path,
     *,
