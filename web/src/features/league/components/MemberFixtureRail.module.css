@@ -1,0 +1,336 @@
+/*
+ * The member's fixture rail: a 340 px column of its own from 1180 px (panel background,
+ * left hairline, scrolling inside itself), a region beside the squad on a tablet, and a
+ * sheet from the right on a phone. Three blocks with sentence-case headings, then the
+ * legend. Home is a filled cell, away an outlined one; nothing else is encoded.
+ *
+ * Contrast: ink3 labels are 5.17:1 on the panel and 4.78:1 on the page; ink2 on a filled
+ * home cell (--color-surface-2) is 6.1:1; the ÇIKAN and GİREN tags are 6.2:1 and 5.0:1 on
+ * the panel.
+ */
+
+.rail {
+  min-width: 0;
+}
+
+.rail:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.weeks {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.quiet {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.blockTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+/* ---- The week grids ---- */
+
+.grid {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.grid th,
+.grid td {
+  padding: 2px 0 2px 4px;
+  text-align: left;
+  vertical-align: middle;
+  font-weight: inherit;
+}
+
+.grid th[scope="row"] {
+  padding-left: 0;
+}
+
+.grid .weekLabel {
+  padding-right: 4px;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
+.grid .weekNumber {
+  width: 50px;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-align: center;
+}
+
+.pair + .pair tr:first-child th,
+.pair + .pair tr:first-child td {
+  padding-top: 8px;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.club {
+  flex: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 20px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tag[data-kind="out"] {
+  color: var(--color-bad);
+}
+
+.tag[data-kind="in"] {
+  color: var(--color-good);
+}
+
+.captain {
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 16px;
+}
+
+.fixture {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.fixture + .fixture {
+  margin-top: 2px;
+}
+
+.fixture[data-venue="home"] {
+  border-color: var(--color-surface-2);
+  background: var(--color-surface-2);
+}
+
+.fixture[data-venue="none"] {
+  height: auto;
+  min-height: 24px;
+  border-color: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  line-height: 14px;
+  text-align: center;
+  white-space: normal;
+}
+
+.opponent {
+  font-weight: 600;
+}
+
+.venue {
+  color: var(--color-text-muted);
+}
+
+/* ---- Who meets whom ---- */
+
+.meetings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.meetings li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  padding: 4px 0;
+}
+
+.match {
+  flex: none;
+  min-width: 76px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.who {
+  color: var(--color-text-muted);
+}
+
+.legend {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* ---- A column of its own, 1180 px and wider ---- */
+
+.rail[data-placement="column"] {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.rail[data-placement="column"] .head {
+  height: 56px;
+  padding: 0 var(--space-4);
+}
+
+.rail[data-placement="column"] .body {
+  gap: var(--space-6);
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+/* ---- Beside the squad on a tablet ---- */
+
+.rail[data-placement="flow"] .body {
+  gap: var(--space-4);
+}
+
+/* ---- A sheet from the right on a phone ---- */
+
+.rail[data-placement="sheet"] {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(350px, calc(100vw - 40px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-surface);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 200ms ease,
+    visibility 0s linear 200ms;
+}
+
+.rail[data-placement="sheet"][data-open] {
+  transform: none;
+  visibility: visible;
+  box-shadow: var(--shadow-drawer);
+  transition:
+    transform 200ms ease,
+    visibility 0s;
+}
+
+/* The header with the close button stays put while the sheet scrolls under it. */
+.rail[data-placement="sheet"] .head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 56px;
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.rail[data-placement="sheet"] .body {
+  padding: var(--space-4) var(--space-4) calc(36px + env(safe-area-inset-bottom));
+}
+
+.rail[data-placement="sheet"] .grid .weekNumber {
+  width: 52px;
+}

@@ -59,7 +59,7 @@ const en: ComputeCopy = {
   serviceUnreachable:
     "The compute service could not be reached. The published plan for this selection could not be confirmed. Retry reading the published plan or try again when the service is available.",
   serviceUnreachablePublished:
-    "The compute service could not be reached. You can read the published plan for this selection below. Try computing again when the service is available.",
+    "The compute service could not be reached. The published plan for this selection is on the page. Try computing again when the service is available.",
   serviceUnreachableAbsent:
     "The compute service could not be reached. No plan has been published for this selection. Choose another published option or try again when the service is available.",
   otherCapture:
@@ -68,8 +68,7 @@ const en: ComputeCopy = {
   deadlinePassedBody: (gameweek, when) =>
     `The deadline of gameweek ${gameweek} passed on ${when}. The plan below was made for that deadline and can no longer be applied. The next gameweek's plan appears here when it is published.`,
   deadlinePassedCompute: "Nothing is computed for a gameweek whose deadline has passed.",
-  controlsNote:
-    "A selection that was not published can still be chosen; Compute below works it out now.",
+  controlsNote: "A selection that was not published can still be chosen; Compute works it out now.",
   wordComputable: "Not solved in this publish. Switch it on and Compute works it out now.",
   top100Computable: "A setting with no published plan is worked out now with Compute.",
   rivalComputable: "Any member can be chosen; a pair that was not published is computed now.",
@@ -150,7 +149,7 @@ const tr: ComputeCopy = {
   serviceUnreachable:
     "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan doğrulanamadı. Yayımlanmış planı okumayı veya servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
   serviceUnreachablePublished:
-    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış planı aşağıda okuyabilirsin. Servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
+    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan sayfada okunabilir. Servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
   serviceUnreachableAbsent:
     "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan yok. Yayımlanmış başka bir seçeneği seç veya servis erişilebilir olduğunda yeniden dene.",
   otherCapture:
@@ -159,7 +158,7 @@ const tr: ComputeCopy = {
   deadlinePassedBody: (gameweek, when) =>
     `Oyun haftası ${gameweek} için son tarih ${when} itibarıyla geçti. Aşağıdaki plan o son tarih için hazırlanmıştı ve artık uygulanamaz. Sıradaki haftanın planı yayınlandığında burada görünür.`,
   deadlinePassedCompute: "Son tarihi geçmiş bir oyun haftası için hesap yapılmaz.",
-  controlsNote: "Yayınlanmamış bir seçimi de seçebilirsin; aşağıdaki Hesapla onu şimdi hesaplar.",
+  controlsNote: "Yayınlanmamış bir seçimi de seçebilirsin; Hesapla onu şimdi hesaplar.",
   wordComputable: "Bu yayında çözülmedi. Açarsan Hesapla onu şimdi hesaplar.",
   top100Computable: "Yayınlanmış planı olmayan bir ayarı Hesapla şimdi hesaplar.",
   rivalComputable: "Her üye seçilebilir; yayınlanmamış bir eşleşme şimdi hesaplanır.",

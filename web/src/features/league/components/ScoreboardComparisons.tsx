@@ -14,8 +14,10 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
       : signed
         ? signedPoints(value, 1, locale)
         : points(value, 1, locale);
+  // One landmark for the table: the scrolling region below carries the name, so the block
+  // around it is a plain group under its heading rather than a second region of that name.
   return (
-    <section aria-label={copy.title}>
+    <div>
       <h3>{copy.title}</h3>
       <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.title}>
         <table className={styles.table}>
@@ -91,6 +93,6 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
   );
 }

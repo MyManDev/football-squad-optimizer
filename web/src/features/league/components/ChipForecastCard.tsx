@@ -39,7 +39,11 @@ export function ChipForecastCard({
                 {value.calendarRange ? (
                   <>
                     {value.calendarHasStructure ? copy.calendarTrue : copy.calendarFalse}:{" "}
-                    {value.calendarRange.first_gameweek} to {value.calendarRange.last_gameweek}.
+                    {copy.range(
+                      value.calendarRange.first_gameweek,
+                      value.calendarRange.last_gameweek,
+                    )}
+                    .
                   </>
                 ) : (
                   copy.calendarEmpty

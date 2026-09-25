@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
+import { MESSAGES } from "../src/i18n/messages";
 
 for (const language of ["tr", "en"] as const) {
   test(`human chooses and revisits plans on mobile (${language})`, async ({ page }, testInfo) => {
@@ -24,13 +25,23 @@ for (const language of ["tr", "en"] as const) {
       if (r.method() === "POST") posts.push(r.url());
     });
     await page.goto("/league/members/35249001?window=3");
+    // The decision board is one of the page's tools, closed until it is asked for.
+    const tools = page.locator("main details").filter({
+      has: page.locator("summary", { hasText: MESSAGES[language].leagueMembers.decisionTools }),
+    });
+    await expect(tools).not.toHaveAttribute("open");
+    await tools.locator(":scope > summary").click();
     const pin = page.getByRole("button", {
       name: tr ? "Bu planı karşılaştırmaya ekle" : "Pin this plan",
     });
     await expect(pin).toBeEnabled();
     await pin.click();
+    // On a phone the plan's window is in the drawer.
+    await page.getByRole("button", { name: MESSAGES[language].shell.openMenu }).click();
     await page.getByRole("radio", { name: /^5 / }).click();
     await expect(page).toHaveURL(/window=5/);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(pin).toBeEnabled();
     await pin.click();
     const first = page.getByRole("region", { name: "Plan A", exact: true });
@@ -40,6 +51,7 @@ for (const language of ["tr", "en"] as const) {
     });
     await note.fill("Wait for the press conference; keep a transfer.");
     await page.reload();
+    await tools.locator(":scope > summary").click();
     await expect(first.getByRole("radio")).toBeChecked();
     await expect(note).toHaveValue("Wait for the press conference; keep a transfer.");
     await expect(page.getByRole("region", { name: "Plan B", exact: true })).toBeVisible();

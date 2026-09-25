@@ -181,7 +181,7 @@ describe("league member advice flow", () => {
 
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeInTheDocument();
     expect(screen.getByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeInTheDocument();
-    expect(screen.getByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
+    expect(screen.getByText("Plandaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
   });
 
   it("shows the computed moves in the advice card with their origin", async () => {
@@ -201,7 +201,7 @@ describe("league member advice flow", () => {
     expect(screen.getByText("Hesap sonucu")).toBeInTheDocument();
     expect(screen.getByText("Plan hazır")).toBeInTheDocument();
     expect(screen.queryByText("Şimdi hesaplandı")).toBeNull();
-    expect(screen.getByText(/Capture fpl-live-computed/)).toBeInTheDocument();
+    expect(screen.getByText(/Veri çekimi fpl-live-computed/)).toBeInTheDocument();
     expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
   });
 
@@ -298,7 +298,7 @@ describe("league member advice flow", () => {
 
     expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
-    expect(screen.getByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
+    expect(screen.getByText("Plandaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
     await compute();
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ strategy: "saf-puan", window, rivalEntryId: null });
