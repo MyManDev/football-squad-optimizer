@@ -927,8 +927,8 @@ def test_two_concurrent_contexts_get_two_job_ids_rather_than_a_collision(
         def __getattr__(self, name: str) -> Any:
             return getattr(self._inner, name)
 
-        def jobs(self) -> Any:
-            history = self._inner.jobs()
+        def history(self, **kwargs: Any) -> Any:
+            history = self._inner.history(**kwargs)
             barrier.wait(timeout=10.0)
             return history
 

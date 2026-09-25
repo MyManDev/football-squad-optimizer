@@ -182,7 +182,8 @@ class AdviceMetrics:
             lines.append(f"advice_queue_depth {queue_depth}")
         if jobs_by_status is not None:
             lines.append(
-                "# HELP advice_jobs Jobs held in the store by status, not all-time totals."
+                "# HELP advice_jobs Jobs in the queue by status (a finished one until it is "
+                "archived), not all-time totals."
             )
             lines.append("# TYPE advice_jobs gauge")
             for status, count in sorted(jobs_by_status.items()):

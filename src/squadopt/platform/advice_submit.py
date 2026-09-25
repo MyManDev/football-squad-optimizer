@@ -276,7 +276,7 @@ class AdviceSubmitService:
         )
         fingerprint = command.request_fingerprint
 
-        history = self._queue.jobs()
+        history = self._queue.history(idempotency_key=idempotency_key, cache_key=cache_key)
         if idempotency_key is not None:
             # Idempotency history survives terminal state: a key reused for a
             # different request is a conflict whether or not the first job finished.
