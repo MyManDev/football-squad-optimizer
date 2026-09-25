@@ -41,6 +41,7 @@ that matter are pinned by name.
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCS = REPOSITORY_ROOT / "docs"
@@ -348,3 +349,88 @@ def test_every_artifact_that_flags_a_holdout_read_is_named_in_the_header() -> No
         f"does not name them: {unnamed!r}. The header states how many reads there have been, "
         "so it has to name every artifact that says it made one."
     )
+
+
+# --- a row must not quote a pool its protocol forbids without saying so -------
+
+PROJECTION_AUDIT = DOCS / "live_projection_audit.json"
+PROJECTION_AUDIT_PREREG = DOCS / "live_projection_audit_prereg.md"
+NEVER_MIXED = "never mixed with a live one"
+
+
+def _row_of(stem: str) -> str:
+    rows = [
+        line
+        for line in INDEX.read_text(encoding="utf-8").splitlines()
+        if line.startswith(f"| `{stem}`")
+    ]
+    assert len(rows) == 1, f"expected one index row for `{stem}`, found {len(rows)}"
+    return " ".join(rows[0].split())
+
+
+def _replays_pooled_beside_a_live_week(record: dict[str, Any]) -> list[str]:
+    """Fingerprints of the replay handoffs a projection audit's pool stacks beside another week.
+
+    Each pooled gameweek enters with the handoff the runner's rule picks, which the record
+    states as ``primary_projection_rule``: the one the ledger names, or the last kept one when
+    the ledger names none. A pool of replays alone mixes nothing, so it returns no fingerprint.
+    """
+
+    chosen = []
+    for gameweek in record["pooled"]["gameweeks"]:
+        projections = record["gameweeks"][str(gameweek)]["projections"]
+        held = [projection for projection in projections if projection.get("in_ledger")]
+        chosen.append(held[0] if held else projections[-1])
+    replays = [
+        str(projection["handoff_fingerprint"])
+        for projection in chosen
+        if projection.get("ledger_mode") == "replay"
+    ]
+    return replays if len(replays) < len(chosen) else []
+
+
+def test_the_projection_audit_row_says_when_its_pool_mixes_a_replay_with_a_live_week() -> None:
+    """The protocol says a replay "is never mixed with a live one"; the runner pools whichever
+    handoff the ledger names, and for GW4 that is a control replay written after the deadline.
+
+    Numbers from such a pool are not the protocol's pooled reading, and the record's own pooled
+    table does not say a replay is in it. So the index row that quotes them has to name the
+    replay handoff and the clause the pool breaks. When the runner keeps replays out of the pool,
+    the check has nothing to hold the row to and passes.
+    """
+
+    prereg = " ".join(PROJECTION_AUDIT_PREREG.read_text(encoding="utf-8").split())
+    assert NEVER_MIXED in prereg, "The clause this check holds the row to has left the protocol."
+
+    record = json.loads(PROJECTION_AUDIT.read_text(encoding="utf-8"))
+    replays = _replays_pooled_beside_a_live_week(record)
+    row = _row_of("live_projection_audit")
+    unnamed = [fingerprint[:8] for fingerprint in replays if fingerprint[:8] not in row]
+
+    assert not unnamed, (
+        "docs/live_projection_audit.json pools these replay handoffs beside a live week and the "
+        f"index row does not name them: {unnamed!r}. Name each one where the row quotes the pool."
+    )
+    assert not replays or NEVER_MIXED in row, (
+        "The committed pool mixes a replay with a live week, which the protocol forbids "
+        f'("{NEVER_MIXED}"). The row has to quote that clause and say the pooled numbers are '
+        "not the protocol's pooled reading."
+    )
+
+
+def test_the_mix_check_tells_a_mixed_pool_from_a_clean_one() -> None:
+    """A guard that cannot fail guards nothing, so prove it separates the cases."""
+
+    replay = {"handoff_fingerprint": "e7abac4d", "in_ledger": True, "ledger_mode": "replay"}
+    elite = {"handoff_fingerprint": "48f9e1ea", "in_ledger": False, "ledger_mode": None}
+    live = {"handoff_fingerprint": "a8984200", "in_ledger": True, "ledger_mode": "live"}
+    pooled = {"gameweeks": [4, 5]}
+
+    def record(week_four: list[dict[str, Any]], week_five: list[dict[str, Any]]) -> dict[str, Any]:
+        weeks = {"4": {"projections": week_four}, "5": {"projections": week_five}}
+        return {"gameweeks": weeks, "pooled": pooled}
+
+    assert _replays_pooled_beside_a_live_week(record([replay, elite], [live])) == ["e7abac4d"]
+    assert _replays_pooled_beside_a_live_week(record([elite, replay], [live])) == ["e7abac4d"]
+    assert _replays_pooled_beside_a_live_week(record([elite], [live])) == []
+    assert _replays_pooled_beside_a_live_week(record([replay], [replay])) == []
