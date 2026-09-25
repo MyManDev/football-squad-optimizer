@@ -237,14 +237,21 @@
     display: inline;
   }
 
+  /* One row, always: when a narrow phone or a wider font runs out of room, a long label
+     breaks inside its own cell (one extra 14 px line) instead of a whole cell falling to a
+     second row (a 25 px jump that pushed the week's gain below the first screen). */
   .scoreBug {
     flex: 1 1 100%;
-    flex-wrap: wrap;
-    row-gap: var(--space-1);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: auto;
+    justify-content: start;
     margin: 0;
   }
 
   .scoreCell {
+    min-width: 0;
+    justify-content: flex-end;
     padding: 0 var(--space-2);
   }
 
@@ -258,6 +265,7 @@
     line-height: 14px;
     letter-spacing: 0;
     text-transform: none;
+    white-space: normal;
   }
 
   .scoreCell dd {
