@@ -135,6 +135,8 @@ write-once store is right to refuse them.
 not the clock's. These bytes live at a content-addressed key whose immutability is checked on
 every write, so a wall-clock field would make an honest recomputation — after a recovered
 claim, say — indistinguishable from a determinism defect.
+A recovered claim recomputes unless its answer is already cached; a first attempt always
+computes and compares.
 
 ### The loop
 
@@ -149,8 +151,10 @@ One computation at a time per worker: CP-SAT runs a single search worker by desi
 replica scales by replication (ADR 0006). An empty queue waits rather than spins. SIGTERM and
 SIGINT are honoured *after* the job in hand finishes, so a container stop costs nobody their
 solve. Abandoned claims are walked back periodically through the contract's own
-`running -> queued` edge, which increments `attempt`; past `--max-attempts` (default 3) the
-job is failed with `TOO_MANY_ATTEMPTS` rather than crash-looping. The claim's lease is 300
+`running -> queued` edge, which increments `attempt`. A retried attempt whose answer is
+already in the cache (an earlier attempt finished it and lost only the job record) completes
+from the cache at any attempt, without computing; otherwise, past `--max-attempts` (default 3)
+the job is failed with `TOO_MANY_ATTEMPTS` rather than crash-looping. The claim's lease is 300
 seconds against a measured 3.0–29.6 s *single* solve, and one member's plan is several
 solves, so the claim is kept alive while the computation runs: `run_advice_worker_once`
 refreshes it through `queue.heartbeat` on a background thread every `heartbeat_seconds`,
@@ -387,7 +391,9 @@ The advice routes add their own codes:
 | 404 | `LEAGUE_NOT_CONNECTED`, `UNKNOWN_ENTRY`, `UNKNOWN_STRATEGY`, `NOT_COMPUTED` | The league, member or strategy is not served here, or nothing is cached at the address |
 | 409 | `IDEMPOTENCY_CONFLICT` | One `Idempotency-Key` reused for a different request |
 | 409 | `REQUEST_CONFLICT` | The address already records a different request; a defect, logged |
-| 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token |
+| 413 | `PAYLOAD_TOO_LARGE` | The POST body is over 4096 bytes (`ADVICE_BODY_MAX_BYTES`); it is refused before it is parsed |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | The POST's `Content-Type` is not `application/json` (parameters such as `charset` are allowed). A cross-site form's `text/plain` POST needs no preflight, so this is what keeps it from filing a job |
+| 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token. The body's `strategy` must match the query's pattern, `^[a-z][a-z0-9._-]{0,63}$` |
 | 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival, chip or switch combination the menu does not offer |
 | 422 | `DEADLINE_PASSED` | The resolved capture's gameweek has closed. New work is refused before the spec or job is written; cached answers and existing open-job replays remain available. `error.details.public_reason` carries English and Turkish sentences |
 | 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |
