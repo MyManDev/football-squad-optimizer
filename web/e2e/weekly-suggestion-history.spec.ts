@@ -7,15 +7,6 @@ import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
-test.beforeEach(async ({ page }) => {
-  // Nothing here reaches past the local preview: the one test that opens a member page
-  // installs the league mocks, which refuse the advice API, and the remote font stylesheet
-  // is answered empty so it cannot hold document load open.
-  await page.route("https://fonts.googleapis.com/**", (route) =>
-    route.fulfill({ contentType: "text/css", body: "" }),
-  );
-});
-
 for (const language of ["tr", "en"] as const) {
   test(`recorded settings expand without inventing settled scores in ${language}`, async ({
     page,
