@@ -1,7 +1,10 @@
 """The queue and the worker loop: claims are exclusive, failures become records."""
 
+import functools
 import json
 import logging
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -15,6 +18,7 @@ from squadopt.platform.advice_queue import (
     run_advice_worker_once,
 )
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.queue_contracts import QueueLockTimeout
 
 FINGERPRINT = "a" * 64
 CACHE_KEY = "b" * 64
@@ -301,3 +305,118 @@ def test_a_crash_is_logged_with_its_type_and_text(
     events = [json.loads(record.getMessage()) for record in caplog.records]
     crashed = next(event for event in events if event["event"] == "advice_job_failed")
     assert crashed["error_type"] == "RuntimeError" and "stale" in crashed["detail"]
+
+
+# The worker's queue waits LOCK_TIMEOUT for the metadata lock rather than five seconds, so
+# holding the real file lock past that timeout keeps these tests short.
+LOCK_TIMEOUT = 0.3
+
+
+def _worker_queue(root: Path, monkeypatch: pytest.MonkeyPatch) -> FileJobQueue:
+    from squadopt.platform import file_advice_queue
+    from squadopt.platform._queue_lock import QueueFileLock
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            file_advice_queue,
+            "QueueFileLock",
+            functools.partial(QueueFileLock, timeout_seconds=LOCK_TIMEOUT),
+        )
+        return FileJobQueue(root)
+
+
+def _hold_the_lock(root: Path, seconds: float) -> threading.Thread:
+    """Another process's transaction, as the OS sees it: the same lock file, held."""
+
+    from squadopt.platform._queue_lock import QueueFileLock
+
+    taken = threading.Event()
+
+    def hold() -> None:
+        with QueueFileLock(root / ".queue.lock").hold():
+            taken.set()
+            time.sleep(seconds)
+
+    holder = threading.Thread(target=hold)
+    holder.start()
+    assert taken.wait(timeout=5)
+    return holder
+
+
+def test_a_busy_lock_at_completion_is_waited_out_and_the_solve_completes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "jobs"
+    queue = _worker_queue(root, monkeypatch)
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    holders: list[threading.Thread] = []
+    attempts: list[str] = []
+    original_complete = queue.complete
+
+    def counted_complete(job: AdviceJob, **kwargs: object) -> AdviceJob:
+        attempts.append(job.job_id)
+        return original_complete(job, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(queue, "complete", counted_complete)
+
+    def compute(job: AdviceJob) -> bytes:
+        holders.append(_hold_the_lock(root, LOCK_TIMEOUT * 3))
+        return b'{"advice": 1}'
+
+    done = run_advice_worker_once(
+        queue, cache, compute, at_utc="2026-08-27T12:00:30Z", complete_retry_seconds=5.0
+    )
+    holders[0].join(timeout=5)
+
+    assert len(attempts) >= 2  # the first completion timed out on the held lock
+    assert done is not None and done.status == "completed" and done.error is None
+    assert cache.get(CACHE_KEY) == b'{"advice": 1}'
+    assert queue.load("job-0001") == done
+
+
+def test_a_lock_busy_past_the_budget_keeps_the_answer_and_leaves_the_job_to_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    root = tmp_path / "jobs"
+    queue = _worker_queue(root, monkeypatch)
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    holders: list[threading.Thread] = []
+
+    def compute(job: AdviceJob) -> bytes:
+        holders.append(_hold_the_lock(root, LOCK_TIMEOUT * 3))
+        return b'{"advice": 1}'
+
+    logger = logging.getLogger("test.advice.deferred")
+    with (
+        caplog.at_level(logging.INFO, logger=logger.name),
+        pytest.raises(QueueLockTimeout),
+    ):
+        run_advice_worker_once(
+            queue,
+            cache,
+            compute,
+            at_utc="2026-08-27T12:00:30Z",
+            complete_retry_seconds=0.0,
+            log=AdviceLog("worker", logger),
+        )
+    holders[0].join(timeout=5)
+
+    # Contention is not a failed computation: the job is still open and the answer kept.
+    still = queue.load("job-0001")
+    assert still is not None and still.status == "running" and still.error is None
+    assert cache.get(CACHE_KEY) == b'{"advice": 1}'
+    events = [json.loads(record.getMessage())["event"] for record in caplog.records]
+    assert "advice_job_completion_deferred" in events
+    assert "advice_job_failed" not in events
+
+    recovered = queue.recover(at_utc="2026-08-27T12:10:00Z", lease_seconds=0.0)
+    assert len(recovered) == 1 and recovered[0].attempt == 2
+
+    def must_not_solve_again(job: AdviceJob) -> bytes:
+        raise AssertionError("the retry must be served from the cache")
+
+    done = run_advice_worker_once(queue, cache, must_not_solve_again, at_utc="2026-08-27T12:10:30Z")
+    assert done is not None and done.status == "completed" and done.result_ref == CACHE_KEY
+    assert cache.get(CACHE_KEY) == b'{"advice": 1}'
