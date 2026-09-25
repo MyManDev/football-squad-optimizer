@@ -37,5 +37,8 @@ describe("the league table's derived columns", () => {
     expect(follower(rows, rows[2]!)).toBeNull();
     const unknown = [row(1, 371), row(2, null)];
     expect(follower(unknown, unknown[0]!)).toEqual({ member: unknown[1], behind: null });
+    // A next row with more points is not "behind": no distance rather than a negative one.
+    const unordered = [row(1, 300), row(2, 310)];
+    expect(follower(unordered, unordered[0]!)).toEqual({ member: unordered[1], behind: null });
   });
 });

@@ -210,6 +210,16 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
     );
   });
 
+  it("names the chaser without a distance, and without a stray comma, when a total is unknown", () => {
+    writeViewerEntry(leader.entry_id);
+    const envelope = structuredClone(mockLeagueMembersEnvelope);
+    envelope.payload.members.find((member) => member.entry_id === second.entry_id)!.total_points =
+      null;
+    show({ envelope }, language);
+    const chaser = screen.getByText(copy.followerLabel, { exact: false });
+    expect(chaser.textContent).toBe(`${copy.followerLabel} ${second.manager_name}.`);
+  });
+
   it("ignores a squad document that belongs to someone else", () => {
     writeViewerEntry(leader.entry_id);
     show({ viewerSquad: mockEntrySquadEnvelopes[second.entry_id!]! }, language);

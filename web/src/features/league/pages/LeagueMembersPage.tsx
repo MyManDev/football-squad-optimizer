@@ -322,12 +322,17 @@ export function LeagueMembersView({
                     chaser.member.team_name ??
                     `#${chaser.member.entry_id}`}
                 </strong>
-                ,{" "}
-                {chaser.behind === null
-                  ? null
-                  : chaser.behind === 0
-                    ? copy.followerLevel
-                    : copy.followerBehind(count(chaser.behind))}
+                {/* Without both totals there is no distance to state, only the name. */}
+                {chaser.behind === null ? (
+                  "."
+                ) : (
+                  <>
+                    ,{" "}
+                    {chaser.behind === 0
+                      ? copy.followerLevel
+                      : copy.followerBehind(count(chaser.behind))}
+                  </>
+                )}
               </p>
             ) : null}
           </div>

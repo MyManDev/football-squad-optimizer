@@ -49,7 +49,8 @@ export function gapToLeader(lead: number | null, row: Ranked): number | null {
 
 /**
  * The member right behind `viewer` in the published order, and how many points behind:
- * null for the last row, and `behind` null when either total is unknown.
+ * null for the last row, and `behind` null when either total is unknown or when the next
+ * row has more points (a table not ordered by these totals is not a distance to state).
  */
 export function follower<T extends Ranked>(
   rows: readonly T[],
@@ -58,11 +59,9 @@ export function follower<T extends Ranked>(
   const index = rows.indexOf(viewer);
   const next = index < 0 ? undefined : rows[index + 1];
   if (!next) return null;
-  return {
-    member: next,
-    behind:
-      known(viewer.total_points) && known(next.total_points)
-        ? viewer.total_points - next.total_points
-        : null,
-  };
+  const behind =
+    known(viewer.total_points) && known(next.total_points)
+      ? viewer.total_points - next.total_points
+      : null;
+  return { member: next, behind: behind !== null && behind >= 0 ? behind : null };
 }
