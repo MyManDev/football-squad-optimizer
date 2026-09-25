@@ -212,6 +212,59 @@ function LeagueMemberContent({
       codes={codes}
     />
   );
+  // What to make of the decision: the two honesty lines, how it was worked out and the
+  // member's history. Placed after the decision on a phone and after the squad elsewhere.
+  const honesty = (
+    <div key="honesty" className={styles.honestyBlock} data-mark="honesty">
+      <div className={styles.honestyLines}>
+        <p>{copy.honestyModel}</p>
+        <p>{copy.honestyDecision}</p>
+      </div>
+      <details className={styles.how}>
+        <summary className={styles.howSummary}>
+          <InfoIcon />
+          <span>{copy.howComputed}</span>
+        </summary>
+        <div className={styles.howBody}>
+          <p>{copy.honestyRule}</p>
+          <p>{copy.independentAdviceRule}</p>
+          {!adviceLoading && shown ? <AdviceMethodNotes view={shown.envelope.payload} /> : null}
+          <p>{copy.diagnosticOnly}</p>
+          <h3 className={styles.howTitle}>{copy.freshnessTitle}</h3>
+          <p>{copy.freshnessDecision(view.gameweek, dateTime(squad.generated_at_utc))}</p>
+          {outcomeFreshness ? (
+            <p>
+              {copy.freshnessScored(
+                outcomeFreshness.scoredGameweek == null
+                  ? copy.freshnessNoScored
+                  : messages.common.gameweekShort(outcomeFreshness.scoredGameweek),
+                dateTime(outcomeFreshness.publishedAt),
+              )}
+            </p>
+          ) : null}
+          <p>{copy.freshnessNote}</p>
+        </div>
+      </details>
+      {view.league_id === 352490 ? (
+        <p className={styles.historyLink}>
+          <Link to={`/league/members/${entryId}/history`}>{messages.suggestionHistory.title}</Link>
+        </p>
+      ) : null}
+    </div>
+  );
+  const squadArea = (
+    <div key="squad" className={styles.squadArea}>
+      <div className={styles.squadGrid}>
+        <MemberSquad
+          onPitch={onPitch}
+          plan={plan}
+          codes={codes}
+          list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
+        />
+        {railPlacement === "flow" ? rail : null}
+      </div>
+    </div>
+  );
 
   return (
     <div className={styles.layout} data-rail={railPlacement}>
@@ -347,57 +400,12 @@ function LeagueMemberContent({
               />
             )}
           </div>
-          <div className={styles.squadArea}>
-            <div className={styles.squadGrid}>
-              <MemberSquad
-                onPitch={onPitch}
-                plan={plan}
-                codes={codes}
-                list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
-              />
-              {railPlacement === "flow" ? rail : null}
-            </div>
-          </div>
-          <div className={styles.honestyBlock} data-mark="honesty">
-            <div className={styles.honestyLines}>
-              <p>{copy.honestyModel}</p>
-              <p>{copy.honestyDecision}</p>
-            </div>
-            <details className={styles.how}>
-              <summary className={styles.howSummary}>
-                <InfoIcon />
-                <span>{copy.howComputed}</span>
-              </summary>
-              <div className={styles.howBody}>
-                <p>{copy.honestyRule}</p>
-                <p>{copy.independentAdviceRule}</p>
-                {!adviceLoading && shown ? (
-                  <AdviceMethodNotes view={shown.envelope.payload} />
-                ) : null}
-                <p>{copy.diagnosticOnly}</p>
-                <h3 className={styles.howTitle}>{copy.freshnessTitle}</h3>
-                <p>{copy.freshnessDecision(view.gameweek, dateTime(squad.generated_at_utc))}</p>
-                {outcomeFreshness ? (
-                  <p>
-                    {copy.freshnessScored(
-                      outcomeFreshness.scoredGameweek == null
-                        ? copy.freshnessNoScored
-                        : messages.common.gameweekShort(outcomeFreshness.scoredGameweek),
-                      dateTime(outcomeFreshness.publishedAt),
-                    )}
-                  </p>
-                ) : null}
-                <p>{copy.freshnessNote}</p>
-              </div>
-            </details>
-            {view.league_id === 352490 ? (
-              <p className={styles.historyLink}>
-                <Link to={`/league/members/${entryId}/history`}>
-                  {messages.suggestionHistory.title}
-                </Link>
-              </p>
-            ) : null}
-          </div>
+          {/* A phone reads the decision, then what to make of it, then the squad (as
+              D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed
+              in the document where they are seen, so the tab order follows the screen, and
+              they are keyed siblings, so crossing 600 px moves the existing elements rather
+              than making new ones: an open "Nasıl hesaplandı?" stays open. */}
+          {layout === "phone" ? [honesty, squadArea] : [squadArea, honesty]}
           {!adviceLoading && shown ? (
             <AdviceDetails
               shown={shown}

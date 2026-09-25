@@ -264,6 +264,12 @@ export function LeagueMembersView({
                           <button
                             type="button"
                             className={styles.viewerSelect}
+                            // Fifteen rows carry this button: its name says whose row it is,
+                            // starting with the words it shows.
+                            aria-label={copy.viewerSelectFor(
+                              member.manager_name ?? copy.unknownMember,
+                              member.team_name ?? copy.unknownTeam,
+                            )}
                             onClick={() => {
                               select(member.entry_id);
                               navigate(`/league/members/${member.entry_id}`);

@@ -12,6 +12,7 @@ import { publishedPrice } from "../advice/publishedPrice";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
+import { PointsUnit } from "../components/PointsUnit";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { BoardArrow, CheckIcon } from "../components/memberIcons";
 import type {
@@ -129,7 +130,7 @@ function adviceBasis(view: EntryAdvice, chipCopy: ChipCopy) {
 }
 
 /**
- * The proof stamp beside the decision heading. KANITLANDI · OPTIMAL only for a plan the
+ * The proof stamp beside the decision heading. KANITLANDI · OPTİMAL only for a plan the
  * solver proved (OPTIMAL); a plan it found without finishing the proof (FEASIBLE) keeps the
  * "proof incomplete" badge, and its gap sentence stands under the boards. Any other status
  * claims nothing.
@@ -812,7 +813,9 @@ function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
         <strong className={board.armName}>{captain.short_name || captain.name}</strong>
         <ClubMark team={captain.team} codes={codes} />
         {finiteNumber(captain.expected_points) ? (
-          <span className={board.armPoints}>{figure(captain.expected_points, locale)} xP</span>
+          <span className={board.armPoints}>
+            {figure(captain.expected_points, locale)} <PointsUnit />
+          </span>
         ) : null}
       </span>
       <span className={board.armband}>
@@ -1376,7 +1379,13 @@ function LineupRow({
       ) : (
         <span />
       )}
-      <span className={lineup.value}>{xp !== null ? `${figure(xp, locale)} xP` : ""}</span>
+      <span className={lineup.value}>
+        {xp !== null ? (
+          <>
+            {figure(xp, locale)} <PointsUnit />
+          </>
+        ) : null}
+      </span>
     </li>
   );
 }

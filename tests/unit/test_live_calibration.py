@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 
 from squadopt.data.snapshots import read_snapshot, write_snapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.live import (
     LIVE_CALIBRATION_CONTRACT_VERSION,
     LiveCalibrationError,
@@ -134,7 +134,16 @@ def _settled_world(tmp_path: Path) -> dict[str, Any]:
         captured_at_utc=CAPTURED_AT,
         payloads={BOOTSTRAP_PAYLOAD: _bootstrap(), FIXTURES_PAYLOAD: b"[]"},
     )
-    finished = [dict(EVENTS[0], finished=True), EVENTS[1]]
+    finished = [dict(EVENTS[0], finished=True, data_checked=True), EVENTS[1]]
+    live = {
+        "elements": [
+            {
+                "id": element["id"],
+                "stats": {"minutes": 90, "starts": 1, "total_points": EVENT_POINTS},
+            }
+            for element in _elements()
+        ]
+    }
     settle_meta = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -144,6 +153,7 @@ def _settled_world(tmp_path: Path) -> dict[str, Any]:
                 events=finished, elements=_elements(event_points=EVENT_POINTS)
             ),
             FIXTURES_PAYLOAD: b"[]",
+            live_payload(1): json.dumps(live).encode("utf-8"),
         },
     )
     snapshot = read_snapshot(snapshot_root, decide_meta.snapshot_id)
