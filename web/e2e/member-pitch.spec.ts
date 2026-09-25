@@ -251,6 +251,31 @@ test("a line of five on the smallest phone keeps every club code whole and every
   await pitch.screenshot({ path: testInfo.outputPath("pitch-375-five.png") });
 });
 
+for (const [width, height] of [
+  [1280, 720],
+  [820, 1180],
+] as const) {
+  test(`the sidebar's 'Kadro' lands the squad's heading and toggle below the pinned top bar at ${width}x${height}`, async ({
+    page,
+  }) => {
+    await open(page, width, height, twoMoves());
+    const squadLink = page.locator("#sidebar nav").getByRole("link", { name: copy.shell.squad });
+    await squadLink.click();
+    await expect(page).toHaveURL(/#kadro$/);
+    const heading = page.getByRole("heading", { name: copy.leagueMembers.squadAfterTitle });
+    const toggle = page.getByRole("group", { name: copy.leagueMembers.viewLabel });
+    const bar = page.locator("main header").first();
+    await expect
+      .poll(async () => {
+        const [top, title, buttons] = await Promise.all(
+          [bar, heading, toggle].map(async (locator) => (await locator.boundingBox())!),
+        );
+        return Math.min(title!.y, buttons!.y) >= top!.y + top!.height && title!.y < height;
+      })
+      .toBe(true);
+  });
+}
+
 test("a two-move week fits the owner's laptop: the decision above 640, the pitch, bench and honesty above 900", async ({
   page,
 }, testInfo) => {

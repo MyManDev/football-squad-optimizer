@@ -66,17 +66,15 @@
     padding: var(--space-2) var(--space-5);
   }
 
-  /* Below 1180 px the bar is two lines (about 97 px): a jump lands under it, not behind. */
+  /* The bar is two lines (about 97 px) wherever the team, the week and the score bug do not
+     share one, which includes 1280 to 1440 px desktops with the sidebar open: a jump (the
+     sidebar's 'Kadro') lands under it, not behind. */
   :global(html):has(.topBar) {
     scroll-padding-top: 112px;
   }
 }
 
 @media (min-width: 1180px) {
-  :global(html):has(.topBar) {
-    scroll-padding-top: 80px;
-  }
-
   .topBar {
     margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-6)) 0;
     padding: var(--space-2) var(--space-6);
