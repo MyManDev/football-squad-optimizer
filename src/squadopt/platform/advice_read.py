@@ -129,6 +129,19 @@ class SwitchInputsProvider(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class PreferencePlayers:
+    """The player codes one member's preferences may name in one capture.
+
+    ``squad`` is the fifteen the member holds going into the deadline, the only players a
+    request may keep; ``roster`` is every player the capture offers, the only ones it may
+    avoid. Both are the ids the solver checks the same preferences against.
+    """
+
+    squad: frozenset[int]
+    roster: frozenset[int]
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedAdviceRequest:
     """One validated request: its address, the context, and the switched-on identity."""
 
@@ -301,6 +314,9 @@ class AdviceReadStore:
     windows each switch may be asked at); left out, it is derived from ``strategies`` as
     it always was, with no switch offered. ``switches`` is where the current context's
     switch inputs come from; without one every switched-on request is refused by name.
+    ``preference_players`` reads the member's captured squad and the capture's roster;
+    without one, and for a member whose squad it cannot read, a request that keeps or
+    avoids a player is refused, because its ids cannot be checked.
     """
 
     def __init__(
@@ -315,6 +331,8 @@ class AdviceReadStore:
         chip_availability: Callable[
             [AdviceRequestContext, int, tuple[int, ...]], Mapping[int, tuple[str, ...] | None]
         ]
+        | None = None,
+        preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
         | None = None,
     ) -> None:
         self._directory = directory
@@ -333,6 +351,43 @@ class AdviceReadStore:
         )
         self._switches = switches
         self._chip_availability = chip_availability
+        self._preference_players = preference_players
+
+    def _check_preference_players(
+        self,
+        context: AdviceRequestContext,
+        league_id: int,
+        entry_id: int,
+        preferences: DecisionPreferences,
+    ) -> None:
+        """Refuse a kept or avoided player the capture does not have for this member.
+
+        The contract accepts any positive id, and every distinct set is a distinct
+        address, so ids nobody holds used to reach the queue as new work and fail only in
+        the worker. The same two sets the solver checks are checked here, before a token
+        is spent or a job exists.
+        """
+
+        if not (preferences.keep_players or preferences.avoid_players):
+            return
+        players = (
+            None
+            if self._preference_players is None
+            else self._preference_players(context, league_id, entry_id)
+        )
+        if players is None:
+            raise UnsupportedAdviceRequestError(
+                "This member's captured squad cannot be read, so kept or avoided players "
+                "cannot be checked."
+            )
+        if not set(preferences.keep_players) <= players.squad:
+            raise UnsupportedAdviceRequestError(
+                "Only a player the member holds in this capture can be kept."
+            )
+        if not set(preferences.avoid_players) <= players.roster:
+            raise UnsupportedAdviceRequestError(
+                "An avoided player is not in this capture's roster."
+            )
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""
@@ -496,6 +551,7 @@ class AdviceReadStore:
                 raise ChipUnavailableError(
                     "CHIP_HISTORY_UNKNOWN" if held is None else "CHIP_NOT_HELD"
                 )
+        self._check_preference_players(context, league_id, entry_id, preferences)
         if (
             top100_weight
             or managers_word
