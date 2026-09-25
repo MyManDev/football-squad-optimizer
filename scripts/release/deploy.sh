@@ -68,8 +68,10 @@ log "deploy run $DRUN, watching"
 RC=$?
 CONC=$("$GH" run view "$DRUN" --json conclusion,jobs --jq '"\(.conclusion) jobs=[\([.jobs[] | "\(.name):\(.conclusion)"] | join(", "))]"' 2>/dev/null)
 log "deploy run $DRUN finished: $CONC"
-# The production job is named after the tag it deployed, so a run that deployed another tag
-# (a second dispatch in the same minute) is not reported as this release.
+# The production job is named after the tag it deployed, so a successful run that deployed
+# another tag (a second dispatch in the same minute) is not reported as this release. A failed
+# run is reported as failed whatever it names: a failed source check resolves no tag, so the
+# name cannot tell this release's own failure from another run's.
 if [ "$RC" -eq 0 ] && ! "$GH" run view "$DRUN" --json jobs --jq '.jobs[].name' 2>/dev/null | grep -qxF "production $TAG"; then
   log "deploy run $DRUN has no job 'production $TAG'; it is not this release's run"; exit 1
 fi

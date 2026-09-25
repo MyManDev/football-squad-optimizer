@@ -247,10 +247,15 @@ Run the second line only when the first has exited 0, and wait about 45 seconds 
 them. `deploy.sh` reports the workflow run, not the site, so the recovery is not done until
 `verify_live.py` prints `ALL GOOD`: it is the step `ship.sh` runs after `deploy.sh`, and
 without it the recovery path had no check of what the site serves. If it fails in the first
-minutes, run it once more a minute later, as `ship.sh` does. `deploy.sh` watches
-only a dispatch run created after its own dispatch (with a minute of slack for clock skew) and
-refuses a run whose production job names another tag, so it cannot report the previous
-release's finished run as this one.
+minutes, run it once more a minute later, as `ship.sh` does. `deploy.sh` watches the
+earliest dispatch run created since a minute before its own dispatch (the minute is slack for
+clock skew), so an older release's finished run is not picked while this machine's clock is
+within a minute of GitHub's. It refuses a successful run whose production job does not name
+this tag. A failed run is reported as failed whatever tag it names: the production job takes
+its name from the tag the source check resolves, and a failed source check resolves none, so
+the name cannot tell this release's own failure from another run's. If another dispatch was
+made shortly before this one, check with `gh run list --workflow deploy-pages.yml` that the
+failed run is this release's before dispatching again.
 
 Once the tag has been pushed, recover with a re-dispatch instead, which needs neither script
 and can be repeated, and then run the same `verify_live.py` command once that run has finished:

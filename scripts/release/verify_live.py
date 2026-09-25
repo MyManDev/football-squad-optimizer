@@ -13,8 +13,11 @@ verifier printed the settled weeks and returned ALL GOOD whatever they were, so 
 that published an unsettled week, or last week's, passed.
 
 A request that gets no answer at all (a refused or reset connection, a DNS failure, a
-timeout) is a failed check with status 0, not a traceback, and a content document that cannot
-be read is a counted failure, so the run always ends with its failure count.
+timeout) is a failed check with status 0, not a traceback. A content document is one counted
+failure when it does not come back with status 200, does not parse as a JSON object, or has a
+payload that is not an object, and so is a members or gameweeks list holding anything but
+objects. An index whose latest entry is not an object names no season, which is also counted.
+Each of these ends the run with its failure count rather than a traceback.
 """
 
 import argparse
@@ -68,12 +71,47 @@ def _document(path: str) -> dict[str, Any] | None:
     if status == 200:
         try:
             document = json.loads(body)
-        except ValueError:
+        except (ValueError, RecursionError):
+            # RecursionError is what the parser raises for nesting deeper than it recurses.
             document = None
     if not isinstance(document, dict):
         print(f"  BAD {status} could not read {path}")
         return None
     return document
+
+
+def _payload(document: dict[str, Any] | None, path: str) -> dict[str, Any] | None:
+    """The payload object of ``document``, or None after printing why it could not be read.
+
+    ``_document`` has already reported a document it could not read, so only a readable
+    document whose payload is missing or is not an object is reported here. Either way the
+    caller counts one failure for the document.
+    """
+
+    if document is None:
+        return None
+    payload = document.get("payload")
+    if not isinstance(payload, dict):
+        print(f"  BAD could not read the payload of {path}")
+        return None
+    return payload
+
+
+def _objects(payload: dict[str, Any] | None, key: str, path: str) -> list[dict[str, Any]] | None:
+    """The objects listed at ``payload[key]`` (none when the key is absent), or None.
+
+    A payload that could not be read has been reported already and gives None silently, so
+    the caller counts one failure for the document whichever read failed. A value that is
+    not a list of objects is reported here.
+    """
+
+    if payload is None:
+        return None
+    value = payload.get(key, [])
+    if isinstance(value, list) and all(isinstance(item, dict) for item in value):
+        return value
+    print(f"  BAD {key} of {path} is not a list of objects")
+    return None
 
 
 def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int:
@@ -101,11 +139,15 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     print(f"  {'ok ' if ok else 'BAD'} {status} absent {ABSENT}  (must be 404, not the shell)")
 
     print("\n== content ==")
-    document = _document("/data/league/members.json")
-    failures += document is None
-    members = document or {}
-    generated = members.get("generated_at_utc", "")
-    payload = members.get("payload", {})
+    # Every nested read below is type-checked: a document of the wrong shape inside is a
+    # counted failure, where it used to end the run in an AttributeError.
+    path = "/data/league/members.json"
+    document = _document(path)
+    read = _payload(document, path)
+    members = _objects(read, "members", path)
+    failures += members is None
+    payload = read or {}
+    generated = (document or {}).get("generated_at_utc", "")
     matches = generated == accepted_generated_at
     failures += not matches
     print(
@@ -114,34 +156,42 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     )
     print(
         f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
-        f" members={len(payload.get('members', []))}"
+        f" members={None if members is None else len(members)}"
     )
     movement: dict[str, int] = {}
-    for member in payload.get("members", []):
-        movement[member.get("movement")] = movement.get(member.get("movement"), 0) + 1
+    for member in members or []:
+        value = member.get("movement")
+        # A value that is not text is shown as written, and cannot fail as a dictionary key.
+        key = value if isinstance(value, str) else repr(value)
+        movement[key] = movement.get(key, 0) + 1
     print(f"  movement={movement}")
 
-    document = _document("/data/league/scoreboard.json")
-    failures += document is None
-    score = (document or {}).get("payload", {})
-    weeks = score.get("gameweeks", [])
-    settled = [w.get("gameweek") for w in weeks if w.get("finished") and w.get("data_checked")]
-    print(f"  scoreboard gameweeks={len(weeks)} settled={settled}")
+    path = "/data/league/scoreboard.json"
+    weeks = _objects(_payload(_document(path), path), "gameweeks", path)
+    failures += weeks is None
+    settled = [
+        week.get("gameweek")
+        for week in weeks or []
+        if week.get("finished") and week.get("data_checked")
+    ]
+    print(f"  scoreboard gameweeks={None if weeks is None else len(weeks)} settled={settled}")
 
     # The season is the one the site index names as latest, so the status document is found
     # again when the season turns over instead of being read from last season's path.
-    index = _document("/data/index.json")
+    path = "/data/index.json"
+    index = _payload(_document(path), path)
     failures += index is None
-    latest = (index or {}).get("payload", {}).get("latest") or {}
-    season = latest.get("season")
+    latest = (index or {}).get("latest")
+    season = latest.get("season") if isinstance(latest, dict) else None
     status_doc: dict[str, Any] = {}
     if isinstance(season, str) and SEASON.match(season):
-        document = _document(f"/data/{season}/status.json")
-        failures += document is None
-        status_doc = (document or {}).get("payload", {})
+        path = f"/data/{season}/status.json"
+        read = _payload(_document(path), path)
+        failures += read is None
+        status_doc = read or {}
     elif index is not None:
         failures += 1
-        print(f"  BAD index.json names no latest season ({season!r})")
+        print(f"  BAD index.json names no latest season (latest={latest!r})")
     print(
         f"  status season={season} next_gameweek={status_doc.get('next_gameweek')}"
         f" deadline={status_doc.get('next_deadline_utc')}"

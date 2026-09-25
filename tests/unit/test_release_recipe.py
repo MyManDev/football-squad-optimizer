@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
@@ -435,7 +436,7 @@ def test_a_request_with_no_answer_is_a_failed_check_not_a_traceback(
     def urlopen(*_args: object, **_kwargs: object) -> object:
         raise error
 
-    monkeypatch.setattr(verify_live.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
     assert verify_live.fetch("/league") == (0, b"")
     assert "network error on /league" in capsys.readouterr().out
     assert verify_live.main("2026-09-18T18:00:00Z", 5) == 1
@@ -469,6 +470,143 @@ def test_one_unreadable_content_document_is_a_counted_failure(
     output = capsys.readouterr().out
     assert f"BAD 0 could not read {unreadable}" in output
     assert "FAILURE(S)" in output
+
+
+_STAMP = "2026-09-18T18:00:00Z"
+_MEMBERS = "/data/league/members.json"
+_SCOREBOARD = "/data/league/scoreboard.json"
+_INDEX = "/data/index.json"
+_STATUS = "/data/2026-27/status.json"
+
+
+def _members(payload: object) -> bytes:
+    return json.dumps({"generated_at_utc": _STAMP, "payload": payload}).encode()
+
+
+@pytest.mark.parametrize(
+    ("path", "body", "reported", "failures"),
+    [
+        pytest.param(
+            _MEMBERS,
+            _members(None),
+            f"BAD could not read the payload of {_MEMBERS}",
+            1,
+            id="members-payload-null",
+        ),
+        pytest.param(
+            _MEMBERS,
+            _members([]),
+            f"BAD could not read the payload of {_MEMBERS}",
+            1,
+            id="members-payload-list",
+        ),
+        pytest.param(
+            _MEMBERS,
+            _members({"members": [None]}),
+            f"BAD members of {_MEMBERS} is not a list of objects",
+            1,
+            id="members-entry-null",
+        ),
+        pytest.param(
+            _MEMBERS,
+            _members({"members": "ab"}),
+            f"BAD members of {_MEMBERS} is not a list of objects",
+            1,
+            id="members-not-a-list",
+        ),
+        # The smoke check parses this and passes; the content read counts it, and the stamp
+        # it does not carry is a second failure.
+        pytest.param(_MEMBERS, b"[]", f"BAD 200 could not read {_MEMBERS}", 2, id="top-level-list"),
+        # Deeper than the parser recurses: the smoke check, the content read and the missing
+        # stamp each fail.
+        pytest.param(
+            _MEMBERS, b"[" * 100_000, f"BAD 200 could not read {_MEMBERS}", 3, id="nested-too-deep"
+        ),
+        pytest.param(
+            _SCOREBOARD,
+            b'{"payload": null}',
+            f"BAD could not read the payload of {_SCOREBOARD}",
+            1,
+            id="scoreboard-payload-null",
+        ),
+        pytest.param(
+            _SCOREBOARD,
+            b'{"payload": {"gameweeks": [null]}}',
+            f"BAD gameweeks of {_SCOREBOARD} is not a list of objects",
+            1,
+            id="scoreboard-entry-null",
+        ),
+        pytest.param(
+            _SCOREBOARD,
+            b'{"payload": {"gameweeks": {"5": {}}}}',
+            f"BAD gameweeks of {_SCOREBOARD} is not a list of objects",
+            1,
+            id="scoreboard-not-a-list",
+        ),
+        pytest.param(
+            _INDEX,
+            b'{"payload": null}',
+            f"BAD could not read the payload of {_INDEX}",
+            1,
+            id="index-payload-null",
+        ),
+        pytest.param(
+            _INDEX,
+            b'{"payload": {"latest": "2026-27"}}',
+            "BAD index.json names no latest season (latest='2026-27')",
+            1,
+            id="index-latest-not-an-object",
+        ),
+        pytest.param(
+            _STATUS,
+            b'{"payload": null}',
+            f"BAD could not read the payload of {_STATUS}",
+            1,
+            id="status-payload-null",
+        ),
+    ],
+)
+def test_a_document_of_the_wrong_shape_inside_is_a_counted_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    path: str,
+    body: bytes,
+    reported: str,
+    failures: int,
+) -> None:
+    """Only the top level was type-checked, so a null payload, a null entry or a latest entry
+    that is not an object ended the run in a traceback instead of its failure count."""
+
+    served = _live(5, 5, 6)
+
+    def fetch(asked: str) -> tuple[int, bytes]:
+        return (200, body) if asked == path else served(asked)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    assert verify_live.main(_STAMP) == 1
+    output = capsys.readouterr().out
+    assert reported in output
+    assert output.rstrip().endswith(f"\n{failures} FAILURE(S)")
+
+
+def test_a_movement_that_is_not_text_is_printed_not_raised(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The movement value was a dictionary key as served, so a list there raised TypeError."""
+
+    served = _live(5, 5, 6)
+    body = _members(
+        {"scored_gameweek": 5, "members": [{"movement": ["up"]}, {"movement": "up"}, {}]}
+    )
+
+    def fetch(asked: str) -> tuple[int, bytes]:
+        return (200, body) if asked == _MEMBERS else served(asked)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    assert verify_live.main(_STAMP, 5) == 0
+    output = capsys.readouterr().out
+    assert "movement={\"['up']\": 1, 'up': 1, 'None': 1}" in output
+    assert "members=3" in output
 
 
 _DEPLOY_TAG = "site-2026-27-gw06-fix1"
@@ -505,19 +643,26 @@ _DEPLOY_GH = """case "$*" in
     elif [ "$OLD_CREATED" -ge "$since" ]; then echo 100
     elif [ -n "$new" ] && [ "$new" -ge "$since" ]; then echo 200
     fi;;
-  "run watch "*) :;;
-  "run view "*"--json conclusion,jobs"*) echo "success jobs=[]";;
+  "run watch "*) [ "$SCENARIO" != failed ];;
+  "run view "*"--json conclusion,jobs"*)
+    if [ "$SCENARIO" = failed ]; then echo "failure jobs=[verify production source:failure]"
+    else echo "success jobs=[]"; fi;;
   "run view 200 --json jobs"*)
     echo "verify production source"
-    if [ "$SCENARIO" = other-tag ]; then echo "production site-2026-27-gw06-fix2"
-    else echo "production $TAG"; fi;;
+    case "$SCENARIO" in
+      other-tag) echo "production site-2026-27-gw06-fix2";;
+      failed) echo "production ";;
+      *) echo "production $TAG";;
+    esac;;
   "run view 100 --json jobs"*) echo "production site-2026-27-gw06-decision";;
   *) exit 99;;
 esac
 """
 
 
-@pytest.mark.parametrize("scenario", ["own-run", "existing-tag", "unregistered", "other-tag"])
+@pytest.mark.parametrize(
+    "scenario", ["own-run", "existing-tag", "unregistered", "other-tag", "failed"]
+)
 def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str) -> None:
     """The newest dispatch run was taken as this one, so a run GitHub had not registered yet
     left the script watching the previous release's finished run and reporting its result."""
@@ -582,6 +727,14 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
         assert result.returncode == 1
         assert "could not find a dispatch run created since the dispatch" in result.stdout
         assert "run watch" not in log
-    else:
+    elif scenario == "other-tag":
         assert result.returncode == 1
         assert f"has no job 'production {_DEPLOY_TAG}'" in result.stdout
+    else:
+        # A failed run is reported as the failure it is. Its source check resolved no tag, so
+        # its production job names none, and checking the name there would call this
+        # release's own failure another run's.
+        assert result.returncode == 1
+        assert "run watch 200 --exit-status" in log
+        assert "deploy run 200 finished: failure" in result.stdout
+        assert "not this release's run" not in result.stdout
