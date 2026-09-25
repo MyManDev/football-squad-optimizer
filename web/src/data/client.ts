@@ -15,20 +15,17 @@ import type {
   SiteIndex,
   StatusView,
 } from "./schema";
+import { ContractMismatchError, type Loaded, type ViewEnvelope } from "./envelope";
 import { readLiveScore, type LiveScoreView } from "./liveScore";
 
+// Compatibility re-export, 2026-09-26: the envelope types and `ContractMismatchError` moved
+// to `./envelope` so the live score reader stops importing this client (a value import
+// cycle). Kept for one release (docs/architecture/dependency_rules.md, rule 2); remove in
+// the release after the one that ships this move.
+export { ContractMismatchError } from "./envelope";
+export type { Loaded, ViewEnvelope } from "./envelope";
+
 export const UI_VIEW_CONTRACT_VERSION = "ui_view_v1";
-
-export interface ViewEnvelope<T> {
-  contract_version: string;
-  generated_at_utc: string;
-  payload: T;
-}
-
-export interface Loaded<T> {
-  payload: T;
-  generatedAtUtc: string;
-}
 
 export interface DataClient {
   getLiveScore?(season: string, gameweek: number): Promise<Loaded<LiveScoreView>>;
@@ -38,17 +35,6 @@ export interface DataClient {
   getLedger(season: string): Promise<Loaded<LedgerView>>;
   getLeague(season: string): Promise<Loaded<LeagueView>>;
   getStatus(season: string): Promise<Loaded<StatusView>>;
-}
-
-export class ContractMismatchError extends Error {
-  readonly found: string;
-  readonly expected: string;
-  constructor(found: string, expected: string) {
-    super(`This page was built for ${expected}; the data says ${found}.`);
-    this.name = "ContractMismatchError";
-    this.found = found;
-    this.expected = expected;
-  }
 }
 
 export class NotFoundError extends Error {
