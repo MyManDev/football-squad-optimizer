@@ -143,7 +143,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
-| `_experiment_cli.py` | helper | imported by 74 runners: provenance metadata, `write_json`, `write_text` | 2026-09-09 |
+| `_experiment_cli.py` | helper | imported by every runner that `git grep -l "from scripts._experiment_cli import" -- 'scripts/*.py' \| wc -l` counts: provenance metadata, `write_json`, `write_text` | 2026-09-09 |
 | `_phase_e_checkpoints.py` | helper | imported by `probe_phase_e_runtime` | 2026-09-07 |
 | `_phase_e_development.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_evaluation` | 2026-09-07 |
 | `_phase_e_evaluation.py` | helper | imported by `run_phase_e_shadow` | 2026-09-07 |

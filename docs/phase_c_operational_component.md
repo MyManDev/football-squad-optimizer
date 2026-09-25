@@ -244,7 +244,8 @@ python -m scripts.build_projection_handoff --control-only
 The ordinary command attempts the component model:
 
 ```console
-python -m scripts.capture_deadline_snapshot
+squadopt season tick --dry-run    # shows whether a capture is due; the tick can also decide and settle
+squadopt season tick              # prints "captured <fresh-snapshot-id>"
 python -m scripts.build_projection_handoff --snapshot-id <fresh-snapshot-id>
 ```
 

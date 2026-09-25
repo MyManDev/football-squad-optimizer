@@ -37,6 +37,14 @@ checked in full.
 The allowance is confined to the two directories a runner lives in. A protocol citing
 `data/snapshots.py` is the ambiguity above, nothing about being a protocol makes it less wrong,
 and a protocol's author has less to check a path against than anyone, not more.
+
+A command is a citation too. When the manual capture shell was removed with 1.0.0 the live
+runbooks kept telling an operator to run it, because the check above reads only backticked
+rooted `.py` paths and a runbook writes `python -m scripts.<name>`. The second check reads that
+form, a backticked `scripts.<name>`, and any `scripts/<name>.py`, in every document under
+`docs/` and in both READMEs. A dated record keeps the command that was run on its day, so the
+records are excused by name, and a living document may name a removed module only in the note
+that says it was removed.
 """
 
 from __future__ import annotations
@@ -130,6 +138,115 @@ def test_a_proposed_path_is_listed_only_while_it_does_not_exist() -> None:
     assert not created, (
         "these are listed as proposed and now exist; delete their entries: " + ", ".join(created)
     )
+
+
+SCRIPTS = REPOSITORY_ROOT / "scripts"
+
+#: Every document a reader follows to run something.
+COMMAND_DOCUMENTS = (
+    *sorted(DOCS.rglob("*.md")),
+    REPOSITORY_ROOT / "README.md",
+    SCRIPTS / "README.md",
+)
+
+#: `python -m scripts.<name>`: the whole dotted name must be a module.
+COMMAND = re.compile(r"python3?(?:\.exe)?\s+-m\s+scripts\.([\w.<>{}*]+)")
+#: A backticked `scripts.<name>`: a module, or a name defined in one.
+MODULE_NAME = re.compile(r"`scripts\.([\w.<>{}*]+)")
+#: `scripts/<name>.py`, backticked or not, and not the tail of a longer path.
+SCRIPT_PATH = re.compile(r"(?<![\w./-])scripts/([\w./<>{}*-]+?)\.py\b")
+
+#: Dated records. Each keeps the commands of its day, and a command removed since is still
+#: what was run then, so the whole document is excused.
+RECORDS: dict[str, str] = {
+    "docs/gw1_run_sheet.md": "the order of commands for Friday 2026-08-21",
+    "docs/gw2_run_sheet.md": "the order of commands for Friday 2026-08-28",
+    "docs/handover_2026-08-23.md": "the data and prediction handover of 2026-08-22",
+}
+
+#: A living document may name a removed module in the note that says it was removed. Only
+#: these names are excused there; every other citation in the document is checked.
+REMOVAL_NOTES: dict[str, frozenset[str]] = {
+    "docs/architecture/platform_runtime.md": frozenset(
+        {"run_gameweek_ops", "run_season_tick", "capture_deadline_snapshot"}
+    ),
+}
+
+
+def _is_a_module(dotted: str) -> bool:
+    location = SCRIPTS.joinpath(*dotted.split("."))
+    return location.with_suffix(".py").is_file() or (location / "__main__.py").is_file()
+
+
+def _cited_scripts() -> list[tuple[str, int, str, bool]]:
+    """Every scripts citation as (document, line, name, resolves).
+
+    Placeholders are left out, and so is the runner a protocol names, by the allowance above.
+    """
+
+    found: list[tuple[str, int, str, bool]] = []
+    for document in COMMAND_DOCUMENTS:
+        relative = document.relative_to(REPOSITORY_ROOT).as_posix()
+        for number, line in enumerate(document.read_text(encoding="utf-8").splitlines(), 1):
+            cited: list[tuple[str, bool]] = []
+            for name in (raw.rstrip(".") for raw in COMMAND.findall(line)):
+                cited.append((name, _is_a_module(name)))
+            for name in (raw.rstrip(".") for raw in MODULE_NAME.findall(line)):
+                parent = name.rpartition(".")[0]
+                cited.append((name, _is_a_module(name) or (bool(parent) and _is_a_module(parent))))
+            for name in SCRIPT_PATH.findall(line):
+                cited.append((name.replace("/", "."), (SCRIPTS / f"{name}.py").is_file()))
+            found.extend(
+                (relative, number, name, resolves)
+                for name, resolves in cited
+                if not PLACEHOLDER.search(name)
+                and not _is_a_runner_a_protocol_has_not_had_written_yet(
+                    document, "scripts/" + name.replace(".", "/") + ".py"
+                )
+            )
+    return found
+
+
+def _is_excused(document: str, name: str) -> bool:
+    return document in RECORDS or name in REMOVAL_NOTES.get(document, frozenset())
+
+
+def test_every_scripts_command_a_document_cites_exists() -> None:
+    """A runbook step that names a removed script sends the operator to an error at a deadline."""
+
+    cited = _cited_scripts()
+    # If this ever falls near zero the patterns have stopped matching and the test is asleep.
+    assert len(cited) >= 100, f"expected the documents to cite scripts; found {len(cited)}"
+
+    missing = [
+        f"{document}:{number} cites scripts.{name}"
+        for document, number, name, resolves in cited
+        if not resolves and not _is_excused(document, name)
+    ]
+    assert not missing, "\n".join(
+        [
+            "these name no module under scripts/; a removed command's replacement is in "
+            "the 'Retired compatibility commands' table of scripts/README.md:",
+            *missing,
+        ]
+    )
+
+
+def test_every_command_allowance_still_excuses_a_citation() -> None:
+    """A record that no longer cites a removed command, or a note whose name came back, is a
+    stale allowance; delete the entry so the list shrinks by itself."""
+
+    unresolved = {
+        (document, name) for document, _, name, resolves in _cited_scripts() if not resolves
+    }
+    stale = [document for document in RECORDS if document not in {d for d, _ in unresolved}]
+    stale += [
+        f"{document} {name}"
+        for document, names in REMOVAL_NOTES.items()
+        for name in sorted(names)
+        if (document, name) not in unresolved
+    ]
+    assert not stale, "these allowances excuse nothing; delete them: " + ", ".join(stale)
 
 
 def test_the_protocol_allowance_covers_a_runner_and_nothing_else() -> None:

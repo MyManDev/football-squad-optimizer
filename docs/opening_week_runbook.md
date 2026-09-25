@@ -26,14 +26,17 @@ control is `form_window=5, bench_weight=0.1, risk_aversion=0`).
 
 The installed weekly runner (`python -m squadopt.platform.weekly_operations`, see the
 [weekly runbook](weekly_runbook.md)) captures in-process as its `capture` stage, and the
-scheduled path is `squadopt season tick`. For a standalone manual capture, the deprecated
-shell over the same `platform.fpl_capture.capture` adapter still works:
+scheduled path is `squadopt season tick`. The manual capture shell was removed when its window
+ended with 1.0.0 ([platform runtime](architecture/platform_runtime.md)), so a manual capture is
+a tick. It captures when the next deadline is inside its capture window (3 hours by default)
+and can also decide and settle what is due, so look at what is due first:
 
 ```console
-python -m scripts.capture_deadline_snapshot
+squadopt season tick --dry-run
+squadopt season tick
 ```
 
-- The capture is immutable and checksummed; note the printed `snapshot_id`.
+- The capture is immutable and checksummed; note the `captured <snapshot_id>` line.
 - Capture early enough to leave time for a re-capture if the source hiccups; a later
   capture simply supersedes the earlier one (both are retained).
 
@@ -149,7 +152,7 @@ python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 2 --le
 Step by step, the same work is:
 
 ```console
-python -m scripts.capture_deadline_snapshot         # deprecated manual shell; the runner captures in-process
+squadopt season tick                                # captures in the window; decides only with a handoff
 python -m scripts.build_projection_handoff          # writes the path decide reads
 squadopt gameweek decide --gameweek 2 \
     --in-season-projection data/handoffs/2026-27-gw02.json
