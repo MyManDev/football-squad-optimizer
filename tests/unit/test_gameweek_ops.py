@@ -15,7 +15,7 @@ import pytest
 
 import squadopt.application as ops
 from squadopt.data.snapshots import read_snapshot, write_snapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.live import (
     HeldSquad,
     Projection,
@@ -66,6 +66,22 @@ def _elements(event_points: int | None = None) -> list[dict[str, Any]]:
                 record["event_points"] = event_points
             records.append(record)
     return records
+
+
+def _live(points: int) -> bytes:
+    """One week's live document, every element scoring ``points``: what a settle reads."""
+
+    return json.dumps(
+        {
+            "elements": [
+                {
+                    "id": element["id"],
+                    "stats": {"minutes": 90, "starts": 1, "total_points": points},
+                }
+                for element in _elements()
+            ]
+        }
+    ).encode("utf-8")
 
 
 def _game_config() -> dict[str, Any]:
@@ -152,7 +168,7 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         captured_at_utc=CAPTURED_AT,
         payloads={BOOTSTRAP_PAYLOAD: _bootstrap(), FIXTURES_PAYLOAD: b"[]"},
     )
-    finished = [dict(EVENTS[0], finished=True), EVENTS[1]]
+    finished = [dict(EVENTS[0], finished=True, data_checked=True), EVENTS[1]]
     settle_meta = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -160,6 +176,7 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         payloads={
             BOOTSTRAP_PAYLOAD: _bootstrap(events=finished, elements=_elements(event_points=3)),
             FIXTURES_PAYLOAD: b"[]",
+            live_payload(1): _live(3),
         },
     )
     return {

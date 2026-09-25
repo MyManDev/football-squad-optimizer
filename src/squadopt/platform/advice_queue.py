@@ -5,6 +5,8 @@ adapter lives in ``file_advice_queue``. API, worker and publication remain indep
 process responsibilities. A worker computes outside the metadata lock, then the queue
 checks attempt ownership before publishing immutable cache bytes and terminal state.
 Conflicting bytes remain a determinism defect; lost ownership never mutates a newer job.
+A finished answer that cannot get the metadata lock within its budget is written to the
+cache alone and its job is left to recovery: contention never becomes a failed job.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import re
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Final
@@ -41,6 +44,20 @@ from squadopt.platform.queue_contracts import (
 from squadopt.platform.queue_contracts import (
     JobQueue as JobQueue,
 )
+from squadopt.platform.queue_contracts import (
+    QueueLockTimeout,
+)
+
+#: How long a finished answer keeps asking for the queue's lock to record its completion.
+#: A tenth of the lease. The heartbeat needs the same lock, so it cannot refresh the claim
+#: while the lock is busy; the margin keeps it instead. An attempt that starts before the
+#: deadline still waits the lock's own 5 s (10 s when the heartbeat holds the in-process
+#: lock), so the whole wait stays under 40 s; 31.3 s was measured with the default
+#: heartbeat and 36.0 s with one every 0.5 s. A claim last refreshed at most one heartbeat
+#: interval (100 s) earlier stays inside the 300 s lease. If recovery walks a claim back
+#: first anyway, ``complete`` finds the lease lost and publishes nothing.
+DEFAULT_COMPLETE_RETRY_SECONDS: Final = DEFAULT_LEASE_SECONDS / 10.0
+_COMPLETE_RETRY_PAUSE_SECONDS: Final = 0.25
 
 _SANITIZE_PATTERNS: Final = (
     re.compile(r"[A-Za-z]:[\\/][^\s'\"]*"),  # windows paths
@@ -83,6 +100,45 @@ def _utc_stamp() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _complete_within_budget(
+    queue: JobQueue,
+    job: AdviceJob,
+    *,
+    cache: AdviceCacheRepository,
+    payload: bytes,
+    terminal_at_utc: Callable[[], str],
+    budget_seconds: float,
+    log: AdviceLog | None,
+) -> AdviceJob:
+    """Record a finished answer, waiting out a busy queue lock for a bounded time.
+
+    A busy lock is contention, not a failed computation. ``complete`` writes nothing
+    before it holds the lock, so asking again is safe. When the budget runs out the answer
+    is still written to the cache (write-once and keyed by its whole identity, so it needs
+    no metadata lock) and the timeout propagates: the job stays running, recovery walks it
+    back after its lease, and the retry is served from the cache instead of solved again.
+    """
+
+    deadline = time.monotonic() + budget_seconds
+    while True:
+        try:
+            return queue.complete(job, cache=cache, payload=payload, at_utc=terminal_at_utc())
+        except QueueLockTimeout:
+            remaining = deadline - time.monotonic()
+            if remaining > 0.0:
+                time.sleep(min(_COMPLETE_RETRY_PAUSE_SECONDS, remaining))
+                continue
+            cache.put(job.cache_key, payload)
+            if log is not None:
+                log.event(
+                    "advice_job_completion_deferred",
+                    job_id=job.job_id,
+                    cache_key=job.cache_key,
+                    attempt=job.attempt,
+                )
+            raise
+
+
 def _run_advice_worker_once(
     queue: JobQueue,
     cache: AdviceCacheRepository,
@@ -92,6 +148,7 @@ def _run_advice_worker_once(
     claim_at_utc: Callable[[], str] | None = None,
     terminal_at_utc: Callable[[], str] = _utc_stamp,
     heartbeat_seconds: float | None = None,
+    complete_retry_seconds: float = DEFAULT_COMPLETE_RETRY_SECONDS,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
     job_log_fields: dict[str, object] | None = None,
@@ -116,6 +173,13 @@ def _run_advice_worker_once(
     single-solve measurement the lease was compared against. Without a heartbeat a
     long-running claim goes stale under a live worker and a second worker recovers work
     that was never abandoned; two solves then race for one immutable key.
+
+    ``complete_retry_seconds`` bounds how long a finished answer waits for a busy queue
+    lock (``_complete_within_budget``). A lock that stays busy raises ``QueueLockTimeout``
+    to the caller with the answer already cached; it is never stored as a failure. A retried
+    attempt whose key the cache already holds takes that answer rather than computing it
+    again. A first attempt still computes and compares, which is how a determinism defect
+    under an existing key is caught.
     """
 
     from time import perf_counter
@@ -153,10 +217,23 @@ def _run_advice_worker_once(
         beating = threading.Thread(target=beat, name=f"advice-heartbeat-{job.job_id}", daemon=True)
         beating.start()
     try:
-        payload = compute(job)
+        # An earlier attempt of this job may have finished its answer and lost only the
+        # record (a lock that stayed busy, or a crash between the two writes).
+        held = cache.get(job.cache_key) if job.attempt > 1 else None
+        if held is not None and log is not None:
+            log.event("advice_job_answer_reused", job_id=job.job_id, attempt=job.attempt)
+        payload = held if held is not None else compute(job)
         if not isinstance(payload, bytes) or not payload:
             raise AdviceQueueError("compute must return non-empty bytes.")
-        completed = queue.complete(job, cache=cache, payload=payload, at_utc=terminal_at_utc())
+        completed = _complete_within_budget(
+            queue,
+            job,
+            cache=cache,
+            payload=payload,
+            terminal_at_utc=terminal_at_utc,
+            budget_seconds=complete_retry_seconds,
+            log=log,
+        )
     except AdviceCacheError as error:
         # Different bytes under a complete key: a determinism defect, recorded as
         # exactly that — never retried, never papered over.
@@ -177,7 +254,9 @@ def _run_advice_worker_once(
                 **(job_log_fields or {}),
             )
         return failed
-    except (BackendJobsContractError, AdviceLeaseLostError):
+    except (BackendJobsContractError, AdviceLeaseLostError, QueueLockTimeout):
+        # A busy lock is contention, not a computation that failed: the job stays open
+        # for recovery and the caller backs off.
         raise
     except AdviceComputeRefused as refusal:
         failed = job.transition(
@@ -264,6 +343,7 @@ def run_advice_worker_once(
     claim_at_utc: Callable[[], str] | None = None,
     terminal_at_utc: Callable[[], str] = _utc_stamp,
     heartbeat_seconds: float | None = None,
+    complete_retry_seconds: float = DEFAULT_COMPLETE_RETRY_SECONDS,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
     job_log_fields: dict[str, object] | None = None,
@@ -278,6 +358,7 @@ def run_advice_worker_once(
             claim_at_utc=claim_at_utc,
             terminal_at_utc=terminal_at_utc,
             heartbeat_seconds=heartbeat_seconds,
+            complete_retry_seconds=complete_retry_seconds,
             metrics=metrics,
             log=log,
             job_log_fields=job_log_fields,

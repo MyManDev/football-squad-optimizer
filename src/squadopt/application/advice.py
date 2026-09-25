@@ -1334,6 +1334,19 @@ TOP100_SOLVE_ERRORS: tuple[type[Exception], ...] = (
     KeyError,
     ValueError,
 )
+#: What one member's own solve (the baseline, a rival pair, a window) may fail with and
+#: still be recorded against that member rather than raised through the batch: the
+#: member's data, the planner refusing, or a window the wall clock cut short
+#: (``SolverExecutionError``), so one member's clock does not cost every other member their
+#: advice. Unlike a Top 100 setting's set it leaves out ``KeyError`` and ``ValueError``: a
+#: programming error would hit every member alike, and it should stop the run rather than
+#: publish a league in which every member is quietly refused.
+MEMBER_SOLVE_ERRORS: tuple[type[Exception], ...] = (
+    EntryError,
+    DataError,
+    SolverExecutionError,
+    TransferPlanningError,
+)
 
 
 @dataclass(frozen=True, slots=True)
