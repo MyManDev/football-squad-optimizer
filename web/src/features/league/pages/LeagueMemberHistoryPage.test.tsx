@@ -166,20 +166,20 @@ it("switches only between recorded weeks and hides unsettled scores", async () =
 
 it("opens all recorded weeks by default, shows totals, and returns from a selected week", async () => {
   show(mockSuggestionOverview());
-  const overview = screen.getByRole("region", { name: "Genel Bakış" });
+  const overview = screen.getByRole("region", { name: "Genel bakış" });
   expect(within(overview).getAllByRole("row")).toHaveLength(13);
   expect(
     within(within(overview).getByRole("row", { name: /^Toplam/ }))
       .getAllByRole("cell")
       .map((cell) => cell.textContent),
   ).toEqual(["624,0", "610,0", "+14,0", "+14,0"]);
-  expect(screen.getByText("Karşılaştırılan Hafta: 9/11")).toBeInTheDocument();
-  await userEvent.click(within(overview).getByRole("button", { name: "Oyun Haftası 5" }));
+  expect(screen.getByText("Karşılaştırılan hafta: 9/11")).toBeInTheDocument();
+  await userEvent.click(within(overview).getByRole("button", { name: "Oyun haftası 5" }));
   expect(screen.getByRole("combobox")).toHaveValue("5");
-  expect(screen.queryByRole("region", { name: "Genel Bakış" })).not.toBeInTheDocument();
-  expect(screen.getByText("Önerinin Neti − Üyenin Neti:")).toHaveTextContent("+6,0");
+  expect(screen.queryByRole("region", { name: "Genel bakış" })).not.toBeInTheDocument();
+  expect(screen.getByText("Önerinin neti − üyenin neti:")).toHaveTextContent("+6,0");
   await userEvent.selectOptions(screen.getByRole("combobox"), "overview");
-  expect(screen.getByRole("region", { name: "Genel Bakış" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Genel bakış" })).toBeInTheDocument();
 });
 
 it("shows no-record state without creating any historical weeks", () => {

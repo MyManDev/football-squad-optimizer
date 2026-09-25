@@ -1,99 +1,4 @@
-/*
- * The rails live in the margins beside the shell's 1080px column and never narrow it.
- * At 1280px the column contracts to fit two rails of at least 200px; the shell's
- * grid (PageShell.module.css) switches at the same width, so keep the two in step.
- */
-.rail {
-  display: none;
-}
-
-.stacked {
-  width: 100%;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 0 var(--space-4) var(--space-4);
-}
-
-.stackedSummary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-  font-weight: 600;
-}
-
-.stackedBody {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  gap: var(--space-5);
-  padding-top: var(--space-3);
-}
-
-.stackedBody > section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.stackedBody > p {
-  grid-column: 1 / -1;
-}
-
-@media (min-width: 1280px) {
-  .rail {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    grid-row: 1;
-    /* A little air at the screen edge when the margin is only just wide enough. */
-    width: min(100% - var(--space-2), 16rem);
-    margin-top: var(--space-4);
-    padding: var(--space-3);
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-m);
-    background: var(--color-surface);
-    position: sticky;
-    /* Under the sticky header. */
-    top: calc(70px + var(--space-4));
-    max-height: calc(100dvh - 70px - 2 * var(--space-4));
-    overflow-y: auto;
-  }
-
-  .railLeft {
-    grid-column: 1;
-    justify-self: end;
-  }
-
-  .railRight {
-    grid-column: 3;
-    justify-self: start;
-  }
-
-  .stacked {
-    display: none;
-  }
-}
-
-.panelHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.panelTitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--step-0);
-  font-weight: 600;
-}
-
-.panelWeek,
-.deadline,
+/* The fixture lists on /fixtures: the schedule and the results, nothing else. */
 .day,
 .empty,
 .kicker,
@@ -102,7 +7,6 @@
   font-size: var(--step--1);
 }
 
-.deadline,
 .empty,
 .lede {
   margin: 0;
@@ -155,11 +59,6 @@
   white-space: nowrap;
 }
 
-.pastLink {
-  font-size: var(--step--1);
-  font-weight: 600;
-}
-
 .page {
   display: flex;
   flex-direction: column;
@@ -170,16 +69,33 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--step-3);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .pastTitle {
   margin: var(--space-3) 0 0;
   font-family: var(--font-display);
   font-size: var(--step-2);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.pageWeek {
-  max-width: 24rem;
+/* Weeks side by side where the column holds two or three of them, one under the other on a
+   phone. Each list keeps a readable width, so a result never stretches across the page. */
+.weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  align-items: start;
+  gap: var(--space-5) var(--space-6);
+}
+
+/* Every week states its deadline the same way, under its heading, whatever its title's
+   length: side by side in one card and stacked in the next would read as two styles. */
+.weeks header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.weeks header > div {
+  text-align: left;
 }

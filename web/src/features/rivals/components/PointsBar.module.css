@@ -1,6 +1,6 @@
 .pointsTrack {
   height: 6px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-s);
   background: var(--color-surface-2);
   overflow: hidden;
 }

@@ -1,7 +1,7 @@
 .hint {
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  opacity: 0.85;
+  font-size: var(--step--1);
+  color: var(--color-text-muted);
 }
 
 .list {
@@ -19,8 +19,8 @@
 
 .template,
 .templateActive {
-  border: 1px solid var(--border, currentColor);
-  border-radius: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-s);
   background: transparent;
   color: inherit;
   padding: 0.35rem 0.6rem;
@@ -37,8 +37,8 @@
 }
 
 .meta {
-  font-size: 0.7rem;
-  opacity: 0.7;
+  font-size: var(--step--2);
+  color: var(--color-text-muted);
 }
 
 .remove {
@@ -59,18 +59,33 @@
 .nameInput {
   flex: 1;
   min-width: 8rem;
-  border: 1px solid var(--border, currentColor);
-  border-radius: 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-s);
   background: transparent;
   color: inherit;
   padding: 0.3rem 0.5rem;
 }
 
 .save {
-  border: 1px solid var(--border, currentColor);
-  border-radius: 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-s);
   background: transparent;
   color: inherit;
   padding: 0.3rem 0.7rem;
   cursor: pointer;
+}
+
+/* Touch targets on the member page below 1180 px, where the page is used by finger. */
+@media (max-width: 1179.98px) {
+  .template,
+  .templateActive,
+  .nameInput,
+  .save {
+    min-height: 44px;
+  }
+
+  .remove {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
