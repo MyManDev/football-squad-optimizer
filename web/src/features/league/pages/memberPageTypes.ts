@@ -1,3 +1,4 @@
+import type { FixturesPayload } from "../../fixtures/types";
 import type { ComputeService } from "../advice/AdviceRequestPanel";
 import type { AdviceCapabilities } from "../advice/adviceCapabilities";
 import type { AdviceClient, AdviceSource } from "../advice/adviceClient";
@@ -50,4 +51,14 @@ export interface LeagueMemberViewProps {
    */
   deadlinePassed?: string | null;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
+  /**
+   * The published fixture calendar the page already reads for the deadline: the open
+   * deadline in the top bar and the clubs' next three gameweeks on the boards come from it.
+   * Absent or null, the page says nothing about either.
+   */
+  fixtures?: FixturesPayload | null;
+  /** Whether the calendar is still being read, so its absence is not yet a failure. */
+  fixturesPending?: boolean;
+  /** The league's published name for the sidebar; absent while the member list is not read. */
+  leagueName?: string;
 }

@@ -101,6 +101,37 @@ def test_chip_cannot_combine_with_other_switches(
     assert not state["queue"].jobs()
 
 
+def test_the_automatic_chip_strategy_is_refused_before_queueing(
+    chip_http: dict[str, Any],
+) -> None:
+    """Audit 2026-09-25, H3: its holding value cannot beat the window's best week.
+
+    The capability stays: it is what opens a named chip over 3 and 5 weeks and a chip
+    with a Top 100 setting, which force the named chip and carry no holding value.
+    """
+
+    state = chip_http["build"](CHIP_NAMES)
+    client = state["client"]
+    caps = client.get(f"/api/v1/leagues/{LEAGUE}/capabilities").json()
+    assert caps["chips"]["strategy"]["windows"] == [1, 3, 5]
+    assert caps["chips"]["held_by_entry"]["313686"] == list(CHIP_NAMES)
+    for window in (1, 3, 5):
+        body = {**chip_http["body"], "window": window, "chip": "auto"}
+        for response in (
+            client.post(chip_http["url"], json=body),
+            client.get(chip_http["url"], params=body),
+        ):
+            assert response.status_code == 422, response.text
+            error = response.json()["error"]
+            assert error["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+            assert "automatic chip strategy is not offered" in error["message"]
+    assert not state["queue"].jobs()
+    # A named chip over a longer window is still accepted.
+    named = client.post(chip_http["url"], json={**chip_http["body"], "window": 3, "chip": "3xc"})
+    assert named.status_code == 202, named.text
+    assert len(state["queue"].jobs()) == 1
+
+
 def test_three_members_match_every_published_chip_file(
     chip_publication: dict[str, Any], tmp_path: Path
 ) -> None:

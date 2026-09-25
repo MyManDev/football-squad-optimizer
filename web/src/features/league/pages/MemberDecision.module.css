@@ -1,0 +1,732 @@
+/*
+ * The decision: the fourth official's substitution boards (the one dark object on the
+ * page besides the grass), the gain strip, the captain line and the proof stamp.
+ *
+ * Contrast on the board (WCAG formula): white is 5.6:1 on the red panel and 5.3:1 on the
+ * green one; lime and board-muted are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on the
+ * second bar segment and white 5.4:1 on the first. Uppercase and letter-spacing are used
+ * here only because these are broadcast elements: the board words, DEĞİŞİKLİK and the stamp.
+ */
+
+/* ---- Substitution boards ---- */
+
+.boards {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+/* Two boards to a row where the column is wide enough, one otherwise. */
+@container (min-width: 660px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cell {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head head"
+    "panels led";
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-2);
+  border-radius: var(--radius-m);
+  background: var(--color-board);
+  color: #ffffff;
+}
+
+.boardHead {
+  grid-area: head;
+  margin: 0;
+  padding: 2px var(--space-1) 0;
+  color: var(--color-lime);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panels {
+  grid-area: panels;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-areas:
+    "word name"
+    "word meta"
+    "word strip";
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 62px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  border-radius: var(--radius-s);
+  color: #ffffff;
+}
+
+.out {
+  background: var(--color-out-panel);
+}
+
+.in {
+  background: var(--color-in-panel);
+}
+
+.word {
+  grid-area: word;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.name {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 30px;
+}
+
+.new {
+  flex: none;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.meta :global(*) {
+  color: inherit;
+}
+
+.position {
+  white-space: nowrap;
+}
+
+/* The club's next three gameweeks: below 1180 px, where the fixture rail is not beside it. */
+.strip {
+  grid-area: strip;
+  display: none;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 1179.98px) {
+  .strip {
+    display: block;
+  }
+}
+
+.led {
+  grid-area: led;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 96px;
+  max-width: 132px;
+  margin: 0;
+  text-align: center;
+}
+
+.ledValue {
+  color: var(--color-lime);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
+.ledLabel,
+.ledUnknown {
+  color: var(--color-board-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* A board narrower than two columns of it: the phone's layout, as D-Phone-Bu-Hafta draws
+   it. A 28 px strip holds DEĞİŞİKLİK and the gain, the two 48 px panels sit 4 px apart
+   inside a 4 px bezel, so a board is 132 px tall. */
+@container (max-width: 439px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head led"
+      "panels panels";
+    gap: 0 var(--space-3);
+    padding: 0 4px 4px;
+  }
+
+  .led {
+    flex-direction: row-reverse;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: none;
+    padding-right: var(--space-2);
+    text-align: right;
+  }
+
+  .ledValue {
+    font-size: 22px;
+    line-height: 28px;
+  }
+
+  .ledUnknown {
+    max-width: 16ch;
+    padding: 4px 0;
+  }
+
+  .boardHead {
+    align-self: center;
+    padding: 0 var(--space-2);
+    line-height: 28px;
+  }
+
+  .panels {
+    gap: 4px;
+  }
+
+  .panel {
+    grid-template-columns: 60px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "word name meta"
+      "word strip meta";
+    column-gap: var(--space-2);
+    min-height: 48px;
+    padding: 4px var(--space-3) 4px var(--space-2);
+  }
+
+  .word {
+    flex-direction: row;
+    gap: 4px;
+    align-self: start;
+    padding-top: 6px;
+  }
+
+  .name {
+    font-size: 22px;
+    line-height: 24px;
+  }
+
+  .meta {
+    display: grid;
+    justify-items: end;
+    align-self: start;
+    padding-top: 4px;
+    text-align: right;
+  }
+
+  .sep {
+    display: none;
+  }
+}
+
+.reason {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  max-width: var(--measure);
+}
+
+.noMove {
+  margin: 0;
+  max-width: var(--measure);
+  font-size: var(--step-1);
+  font-weight: 500;
+}
+
+.missing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure);
+}
+
+.missing p {
+  margin: 0;
+}
+
+.missingTitle {
+  font-size: var(--step-1);
+}
+
+.retry {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 1179.98px) {
+  .retry {
+    min-height: 44px;
+  }
+}
+
+/* ---- Gain strip ---- */
+
+.gain {
+  --ppp: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.gainTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2) var(--space-5);
+}
+
+.gainHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.gainFigure {
+  flex: none;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 34px;
+}
+
+/* Green only for a gain; a plan that loses against holding is said in the loss colour. */
+.gainFigure[data-sign="up"] {
+  color: var(--color-good);
+}
+
+.gainFigure[data-sign="down"] {
+  color: var(--color-bad);
+}
+
+.gainCaption {
+  max-width: 40ch;
+  color: var(--color-text-muted);
+  text-wrap: balance;
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  list-style: none;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Sized at the fixed scale, and shrunk as a whole (every share by the same factor) only
+   where the column is narrower than the gain drawn at that scale. */
+.segments {
+  flex: 0 1 calc(var(--total) * var(--ppp));
+  display: flex;
+  min-width: 0;
+  height: 22px;
+}
+
+.segment {
+  flex: 0 1 calc(var(--share) * var(--ppp));
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  background: var(--color-good);
+  color: #ffffff;
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.alt {
+  background: var(--color-seg2);
+  color: var(--color-text);
+}
+
+.tick {
+  flex: none;
+  padding-left: 6px;
+  border-left: 1px solid var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.gainList {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* A share and its player never part at a line break. */
+.gainItem {
+  white-space: nowrap;
+}
+
+@media (max-width: 599.98px) {
+  .gain {
+    --ppp: 80px;
+  }
+}
+
+/* ---- Captain line ---- */
+
+.captain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+
+@media (min-width: 600px) {
+  .captain {
+    justify-content: flex-start;
+  }
+}
+
+.armband {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.armLabel {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+@media (max-width: 599.98px) {
+  .armLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.markCaptain,
+.markVice {
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.markCaptain {
+  background: var(--color-lime);
+  color: var(--color-text);
+}
+
+.markVice {
+  border: 1.5px solid var(--color-text);
+  color: var(--color-text);
+}
+
+.armName {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.armPoints {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ---- Proof stamp, beside the decision heading ---- */
+
+.stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  max-width: 320px;
+}
+
+/* Where the heading row has the room, the stamp's caption is one line, and a tag (example
+   data, a computed plan) stands beside the stamp rather than on a line of its own. */
+@media (min-width: 600px) {
+  .stamp {
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "tags box"
+      "caption caption";
+    align-items: center;
+    justify-content: end;
+    justify-items: end;
+    gap: var(--space-1) var(--space-2);
+    max-width: 440px;
+  }
+
+  .stampTags {
+    grid-area: tags;
+  }
+
+  .stampBox,
+  .stampUnproven {
+    grid-area: box;
+  }
+
+  .stampCaption {
+    grid-area: caption;
+  }
+}
+
+.stampTags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.stampTags:empty {
+  display: none;
+}
+
+.stampBox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 5px var(--space-3);
+  border: 2px solid var(--color-text);
+  border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.stampCaption {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  text-align: right;
+  text-wrap: pretty;
+}
+
+/* Where the decision column is narrower (a tablet, a desktop with the sidebar open under
+   1440 px), the stamp's sentence takes two balanced lines so the stamp keeps its place at
+   the right of the heading instead of dropping under it. */
+@container decision (max-width: 759.98px) {
+  .stampCaption {
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+}
+
+/* On a phone the decision reads as D-Phone-Bu-Hafta draws it: the boards, the captain
+   line, the gain figure and its bar, the proof stamp beside the week's transfer facts with
+   its sentence under both, then the boards' shared reason and the sentences that qualify
+   the plan. LeagueMemberPage.module.css makes the decision a two-column grid there; the
+   boards' wrapper, the gain strip and the stamp step aside (display: contents) so each of
+   their parts takes its own place in that grid, in the order below. */
+@media (max-width: 599.98px) {
+  .boards,
+  .gain,
+  .gainTop,
+  .stamp {
+    display: contents;
+  }
+
+  .grid,
+  .reason,
+  .noMove,
+  .missing,
+  .captain,
+  .gainHead,
+  .bar,
+  .gainList,
+  .facts,
+  .stampTags,
+  .stampCaption,
+  .states {
+    grid-column: 1 / -1;
+  }
+
+  .grid {
+    gap: var(--space-2);
+  }
+
+  .captain {
+    order: 1;
+    min-height: 36px;
+  }
+
+  .gainHead {
+    order: 2;
+    margin-top: var(--space-1);
+  }
+
+  .bar,
+  .gainList {
+    order: 3;
+  }
+
+  .stampTags {
+    order: 4;
+    justify-content: flex-start;
+  }
+
+  /* The stamp (or the unproven badge) stands in the first column, the transfer facts
+     beside it; with no stamp the facts take the whole row. */
+  .stampBox,
+  .stampUnproven {
+    order: 5;
+    grid-column: 1;
+    justify-self: start;
+    align-self: center;
+  }
+
+  .facts {
+    order: 6;
+    align-self: center;
+  }
+
+  :global([data-mark="decision"]):has([data-stamp]) .facts {
+    grid-column: 2;
+  }
+
+  .stampCaption {
+    order: 7;
+    max-width: none;
+    text-align: left;
+    text-wrap: wrap;
+  }
+
+  /* The reason shared by every board follows the stamp, with the plan's other sentences;
+     a board with a reason of its own keeps it under that board. */
+  .reason {
+    order: 8;
+  }
+
+  .states {
+    order: 9;
+  }
+
+  /* The vice-captain carries the name only, as the phone artboard draws it, so the
+     captain line stays on one line. */
+  .viceClub {
+    display: none;
+  }
+}
+
+/* ---- The sentences that change how the plan reads, and the sections after it ---- */
+
+.states {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.states:empty {
+  display: none;
+}
+
+.states > p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

@@ -69,12 +69,14 @@ their existing policy. No new analytics are added.
 
 ## Fixtures and release acceptance
 
-At widths of at least 1280px the two side rails show the first gameweek with an open deadline
-or an unfinished future kickoff, and its numbered successor from the published calendar.
-Closing the FPL deadline does not hide remaining weekend fixtures. They include the capture date; this is not
-a real-time scores service. Between 1280 and 1500px the central column fits between the rails;
-wider screens retain 1080px. Phones have a prominent Fixtures navigation link and collapsible
-lists below the page. Advancing the clock selects later weeks but never invents a score,
+The fixtures page shows the first gameweek with an open deadline or an unfinished future
+kickoff, and its numbered successor from the published calendar, above every earlier week.
+Closing the FPL deadline does not hide remaining weekend fixtures. The list includes the
+capture date; this is not a real-time scores service. The sidebar links it on every screen
+(a 264px column from 1180px, a 72px icon rail from 600px, a drawer below that), and phones
+also have a 'Fikstür' button in the sticky phone bar: it links to this page, except on a
+member page, where it opens that member's own fixture sheet. The shell carries no
+league-wide fixture rail. Advancing the clock selects later weeks but never invents a score,
 reschedules a fixture, edits the publication or runs a capture.
 
 Verify browser submission, the pending/public separation, approval, reload, retraction,

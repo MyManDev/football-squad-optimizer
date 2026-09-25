@@ -19,7 +19,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--step-4);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.05;
 }
 
@@ -45,9 +45,7 @@
   border-top: none;
   color: var(--color-text-muted);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 11px;
+  font-size: var(--step--2);
 }
 
 .right {

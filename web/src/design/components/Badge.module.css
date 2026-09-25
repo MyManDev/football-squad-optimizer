@@ -1,14 +1,18 @@
+/* A state tag: 4 px corners, 12 px text, the tone in its text and outline. */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: var(--step--1);
-  font-weight: 600;
-  line-height: 1.4;
+  min-height: 20px;
+  padding: 1px 6px;
   border: 1px solid var(--color-line);
-  color: var(--color-text-muted);
+  border-radius: var(--radius-s);
   background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  vertical-align: baseline;
 }
 
 .neutral {
@@ -33,4 +37,11 @@
 .accent {
   color: var(--color-accent);
   border-color: currentColor;
+}
+
+/* Lime is a fill, never a text colour, and always carries ink. */
+.lime {
+  border-color: var(--color-lime);
+  background: var(--color-lime);
+  color: var(--color-text);
 }

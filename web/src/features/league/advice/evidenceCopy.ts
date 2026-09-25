@@ -44,7 +44,7 @@ const en: EvidenceCopy = {
   },
   onlyBaseline: "One-week pure-points plan only.",
   sourceExample: "Example data: not a real club page.",
-  sourceCapture: "Read from registered club pages before this capture.",
+  sourceCapture: "Read from registered club pages before this data snapshot.",
   title: "What the club's page said",
   intro: (clubs: number) =>
     `Declared rule, not measured: a stated absence keeps a player out of the eleven, a stated doubt off the armband. Clubs read: ${clubs}.`,
@@ -81,7 +81,7 @@ const tr: EvidenceCopy = {
   },
   onlyBaseline: "Yalnız bir haftalık saf puan planında.",
   sourceExample: "Örnek veri: gerçek bir kulüp sayfası değil.",
-  sourceCapture: "Capture öncesi kayıtlı kulüp sayfalarından okundu.",
+  sourceCapture: "Bu veri çekiminden önce kayıtlı kulüp sayfalarından okundu.",
   title: "Kulübün sayfası ne dedi",
   intro: (clubs) =>
     `Beyan edilmiş kural, ölçülmemiş: söylenmiş yokluk on birin, söylenmiş şüphe kaptanlığın dışında tutar. Okunan kulüp: ${clubs}.`,
