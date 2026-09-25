@@ -478,6 +478,33 @@ def test_a_spec_that_parses_but_differs_is_still_a_conflict(
     assert events == []
 
 
+def test_a_spec_moved_aside_for_a_moment_is_linked_over_not_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "c" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    payload = json.dumps(_spec().as_payload(), sort_keys=True, separators=(",", ":")).encode()
+    read = FileAdviceJobSpecStore._read
+    calls: list[Path] = []
+
+    def racing_read(inner: Path) -> bytes | None:
+        calls.append(inner)
+        if len(calls) == 1:  # this request's miss; another request files the spec right after
+            missed = read(inner)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+            return missed
+        if len(calls) == 2:  # a request that read damage earlier moves the spec aside
+            os.replace(path, path.with_name(f"{path.name}.damaged-other"))
+        return read(inner)
+
+    monkeypatch.setattr(store, "_read", racing_read)
+    store.put(key, _spec())  # used to raise "exists but cannot be read back"
+    assert path.read_bytes() == payload
+    assert len(calls) == 2
+
+
 def test_a_missing_spec_is_a_named_refusal_not_a_crash(tmp_path: Path) -> None:
     store_root = tmp_path / "store"
     store_root.mkdir()
