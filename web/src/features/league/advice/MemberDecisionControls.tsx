@@ -62,7 +62,7 @@ import { CHIP_NAMES } from "../chipShape";
 import { DisclosureIcon } from "../components/memberIcons";
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
-import { CHIP_PARAMETER } from "./chipChoice";
+import { AUTOMATIC_CHIP_OFFERED, CHIP_PARAMETER } from "./chipChoice";
 import { CHIP_COPY, chipReason, chipsUnavailable } from "./chipCopy";
 import { COMPUTE_COPY } from "./computeCopy";
 import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
@@ -509,7 +509,8 @@ export function MemberDecisionControls({
             />
             <span>{chipStrategy ? strategyCopy.holdChips : chipCopy.none}</span>
           </label>
-          {chipStrategy && (
+          {/* Off until the holding value comes from the season calendar (audit H3). */}
+          {AUTOMATIC_CHIP_OFFERED && chipStrategy && (
             <label className={styles.windowOption}>
               <input
                 type="radio"

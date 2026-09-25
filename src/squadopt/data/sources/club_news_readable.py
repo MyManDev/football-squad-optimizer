@@ -50,7 +50,7 @@ class ReadableTextError(DataSourceError):
 
 #: The extraction, versioned like the prompt. Bumped whenever a rule below changes, because
 #: offsets written under one version do not mean the same thing under another.
-READABLE_TEXT_CONTRACT_VERSION: Final = "readable_text_v2"
+READABLE_TEXT_CONTRACT_VERSION: Final = "readable_text_v3"
 
 #: Served bytes that are already what a person reads.
 PLAIN_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/plain",)
@@ -68,11 +68,15 @@ FEED_MEDIA_TYPES: Final[tuple[str, ...]] = ("application/rss+xml", "application/
 #: Elements whose content is instructions to a browser rather than words to a reader. Their
 #: text is dropped entirely: a quote located inside a script would be a citation into code.
 SILENT_ELEMENTS: Final[frozenset[str]] = frozenset(
-    # ``link`` is here for feeds. In HTML it is a void element inside ``head``, which is
-    # already silent, so nothing a page ever extracted moves; in a feed it holds the item's
-    # URL, and a bare URL run into the next item's sentence is noise a quote could land in.
-    {"script", "style", "template", "noscript", "head", "svg", "link"}
+    {"script", "style", "template", "noscript", "head", "svg"}
 )
+
+#: A feed's silent elements: a page's, plus ``link``. In a feed ``<link>`` holds the item's URL
+#: as text, and a bare URL run into the next item's sentence is noise a quote could land in. It
+#: is silent only in a feed, because in HTML ``<link>`` is a void element with no end tag: the
+#: parser never reports one closing, so counted as silent there it opened a region nothing
+#: closed and every word after it on the page was dropped.
+FEED_SILENT_ELEMENTS: Final[frozenset[str]] = SILENT_ELEMENTS | {"link"}
 
 #: Elements that end a line. A club's page separates its sentences with markup rather than
 #: newlines, so without this every paragraph would run into the next and a quote spanning the
@@ -135,21 +139,22 @@ class _Reader(html.parser.HTMLParser):
     exists for.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, silent_elements: frozenset[str] = SILENT_ELEMENTS) -> None:
         super().__init__(convert_charrefs=True)
+        self._silent_elements = silent_elements
         self._lines: list[str] = []
         self._current: list[str] = []
         self._silent = 0
 
     def handle_starttag(self, tag: str, attrs: object) -> None:
-        if tag in SILENT_ELEMENTS:
+        if tag in self._silent_elements:
             self._silent += 1
             return
         if tag in BREAKING_ELEMENTS:
             self._break()
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in SILENT_ELEMENTS:
+        if tag in self._silent_elements:
             self._silent = max(0, self._silent - 1)
             return
         if tag in BREAKING_ELEMENTS:
@@ -171,6 +176,7 @@ class _Reader(html.parser.HTMLParser):
 
         if self._silent or not data.startswith("CDATA["):
             return
+        # An item body is HTML, so it is read under a page's rules and not the feed's.
         nested = _Reader()
         nested.feed(data[len("CDATA[") :].removesuffix("]"))
         nested.close()
@@ -227,7 +233,7 @@ def extract_readable_text(content: bytes, content_type: str) -> bytes:
             "found in the bytes it has to be matched against."
         ) from error
 
-    reader = _Reader()
+    reader = _Reader(FEED_SILENT_ELEMENTS if media_type in FEED_MEDIA_TYPES else SILENT_ELEMENTS)
     reader.feed(markup)
     reader.close()
     text = reader.text()

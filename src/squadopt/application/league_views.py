@@ -38,6 +38,7 @@ import pandas as pd
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
+    MEMBER_SOLVE_ERRORS,
     MEMBER_WINDOWS,
     TOP100_SOLVE_ERRORS,
     AdviseEntryRequest,
@@ -227,6 +228,12 @@ class MemberRender:
     chip_unavailable: tuple[tuple[str, str, str], ...] = ()
     chip_notes: tuple[str, ...] = ()
     chip_forecast: dict[str, Any] | None = None
+    #: What the member's public index says when the baseline failed for a reason that is
+    #: the operator's to read (the planner or the solver refused): the code the page
+    #: translates, while ``reason`` keeps the error's own text for the member's note.
+    #: Empty when the error's text is about the member's own data, which the index carries
+    #: as it always has.
+    public_refusal: str = ""
 
 
 def render_member(
@@ -251,7 +258,10 @@ def render_member(
     the rest of the menu renders; a window that cannot be solved — a calendar the
     capture does not publish that far, no plan inside the budget — is recorded the same
     way, never dropped silently; a baseline that fails takes the member out of the
-    menu entirely, with the reason on the members row.
+    menu entirely, with the reason on the members row. The baseline, rival and window
+    solves catch ``MEMBER_SOLVE_ERRORS`` (a window the wall clock cut short raises
+    ``SolverExecutionError``), so a failure there stays this member's and does not cost
+    the other members their advice.
     """
 
     try:
@@ -270,8 +280,18 @@ def render_member(
             rules=rules,
             control=control,
         )
-    except (EntryError, DataError) as error:
-        return MemberRender(task.entry_id, None, str(error), (), ())
+    except MEMBER_SOLVE_ERRORS as error:
+        detail = str(error)
+        return MemberRender(
+            task.entry_id,
+            None,
+            detail,
+            (),
+            (),
+            public_refusal=(
+                "" if isinstance(error, (EntryError, DataError)) else public_reason(detail)
+            ),
+        )
     payloads: list[tuple[str, int, dict[str, object]]] = []
     unavailable: list[tuple[str, int, str]] = []
     # The rival price tag's anchor depends on the member alone, so it is solved once for
@@ -313,7 +333,7 @@ def render_member(
                     control=control,
                     pricing=pricing,
                 )
-            except (EntryError, DataError) as error:
+            except MEMBER_SOLVE_ERRORS as error:
                 unavailable.append((strategy, rival_id, str(error)))
                 continue
             payloads.append((strategy, rival_id, payload))
@@ -335,7 +355,7 @@ def render_member(
                 rules=rules,
                 horizon_builder=horizon_builder,
             )
-        except (EntryError, DataError) as error:
+        except MEMBER_SOLVE_ERRORS as error:
             window_unavailable.append((window, str(error)))
             continue
         window_payloads.append((window, payload))
@@ -1448,9 +1468,18 @@ def build_league_views(
         return text.encode("utf-8")
 
     # Per rendered member: the picks the advice was computed from, the transfer-planning
-    # digest it was solved under, and every advice document with the bytes that landed.
-    # Records are written from this after the whole tree is on disk.
-    publications: list[tuple[EntryPicks, str, list[PublishedAdvice], dict[str, object]]] = []
+    # digest it was solved under, every advice document with the bytes that landed, the
+    # document the page shows and the rule's pick. Records are written from this after
+    # the whole tree is on disk.
+    publications: list[
+        tuple[
+            EntryPicks,
+            str,
+            list[PublishedAdvice],
+            dict[str, object],
+            dict[str, object] | None,
+        ]
+    ] = []
     published_indexes: dict[int, tuple[str, bytes]] = {}
     #: Members with no advice this week, whose index names why.
     refused: set[int] = set()
@@ -1474,8 +1503,13 @@ def build_league_views(
             member_rows.append(_row(entry_id, labels[entry_id], "empty"))
             # The page reads this member's index for the reason; without one it can only
             # say "unavailable". The row keeps ``data_quality`` "empty" — no advice exists.
+            # A planner's or solver's text stays on the note above; the public index
+            # carries the code the page translates instead.
             refused.add(entry_id)
-            _write(f"advice/{entry_id}/index.json", _refused_member_index(task, reason=reason))
+            _write(
+                f"advice/{entry_id}/index.json",
+                _refused_member_index(task, reason=render.public_refusal or reason),
+            )
             continue
         picks = picks_or_error
         advice = render.baseline
@@ -1897,41 +1931,30 @@ def build_league_views(
                 # carry — a data gap for this member, not a reason the league fails.
                 mode_note = f"competitive modes unavailable: {error}"
 
-        # Which of the member's documents is the one we told them. The page points at the
-        # declared rule's pick when there is one and its file was actually written; when
-        # the rule could not be stated, or its file did not solve, the page shows the
-        # pure-points baseline, and the record says which of the two it was rather than
-        # leaving a later reader to re-apply a rule from inputs that have since moved.
+        # Which of the member's documents is the one we told them. The page opens on the
+        # one-week pure-points plan whatever the rule says: the rule's pick is a label on
+        # an option, never a preselection (the web MemberDecisionControls and its test pin
+        # that), so the record names that document and says why. The rule's pick is kept
+        # beside it, as the index published it and with the address of its one-week file
+        # when that file was written, so a later reader can tell what the page showed from
+        # what it marked.
         emitted.extend(switches)
         emitted_paths = {item.relative_path for item in emitted}
-        suggested_slug = str(suggested["strategy"]) if suggested is not None else None
-        suggested_path = (
-            f"advice/{entry_id}/{suggested_slug}/{COMPUTED_WINDOW}.json"
-            if suggested_slug is not None
-            else None
-        )
-        told: dict[str, object] = (
-            {
-                "strategy": suggested_slug,
-                "window": COMPUTED_WINDOW,
-                # The rival of the document pointed at, not the rival the rule compared
-                # against: the pure-points file is rival-free whoever suggested it.
-                "rival_entry_id": (
-                    None if suggested_slug == COMPUTED_MODE else task.default_rival_id
-                ),
-                "published_path": suggested_path,
-                "source": "suggested_strategy",
+        told: dict[str, object] = {
+            "strategy": COMPUTED_MODE,
+            "window": COMPUTED_WINDOW,
+            "rival_entry_id": None,
+            "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
+            "source": "page_default",
+        }
+        suggestion: dict[str, object] | None = None
+        if suggested is not None:
+            suggested_path = f"advice/{entry_id}/{suggested['strategy']}/{COMPUTED_WINDOW}.json"
+            suggestion = {
+                **suggested,
+                "published_path": suggested_path if suggested_path in emitted_paths else None,
             }
-            if suggested_path is not None and suggested_path in emitted_paths
-            else {
-                "strategy": COMPUTED_MODE,
-                "window": COMPUTED_WINDOW,
-                "rival_entry_id": None,
-                "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
-                "source": "baseline",
-            }
-        )
-        publications.append((picks, render.transfer_config_fingerprint, emitted, told))
+        publications.append((picks, render.transfer_config_fingerprint, emitted, told, suggestion))
 
         # What was changed about this member's own name before it was published travels
         # on their row of the report, so the operator running the publish sees it. A name
@@ -2019,7 +2042,7 @@ def build_league_views(
     # into is last week's. Removed after members.json rather than before the renders, so a
     # run that dies mid-batch leaves the old tree whole rather than half-deleted.
     removed = _prune_unpublished_members(
-        out, {picks.entry_id for picks, _, _, _ in publications}, refused=refused
+        out, {picks.entry_id for picks, *_ in publications}, refused=refused
     )
 
     # The record comes last, after every published file is on disk: a refusal here must
@@ -2038,7 +2061,7 @@ def build_league_views(
         # every member after it went unrecorded as well. Both are collected now, and every
         # member is still attempted.
         unlanded: list[str] = []
-        for picks, fingerprint, emitted, told in publications:
+        for picks, fingerprint, emitted, told, suggestion in publications:
             record = build_member_advice_record(
                 picks,
                 projection,
@@ -2048,6 +2071,7 @@ def build_league_views(
                 generated_at_utc=generated,
                 league_view_contract_version=LEAGUE_VIEW_CONTRACT_VERSION,
                 told=told,
+                suggested_strategy=suggestion,
                 transfer_config_fingerprint=fingerprint or None,
                 commit=commit,
                 published_index=published_indexes.get(picks.entry_id),

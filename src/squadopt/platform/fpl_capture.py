@@ -17,6 +17,7 @@ from squadopt.application.entries import EntryRegistry
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.identity import reconcile_player_identity
 from squadopt.data.snapshots import SnapshotMetadata, write_snapshot
+from squadopt.data.sources.football_history import captured_history_weeks
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -154,13 +155,21 @@ def registered_endpoints(
     return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
 
 
-def component_history_endpoints(bootstrap: bytes, *, as_of_utc: str) -> Mapping[str, str]:
-    """Return the bounded, already-played live endpoints needed by Phase C features."""
+def live_history_endpoints(bootstrap: bytes, *, as_of_utc: str) -> Mapping[str, str]:
+    """Return the already-played live endpoints this capture's readers need.
+
+    Two readers take these documents, and each keeps its own window. The Phase C component
+    model reads the ``COMPONENT_HISTORY_WINDOW`` weeks before the target and selects them
+    by name itself, so a longer history changes nothing it computes. The football history
+    reads every played week from gameweek 1 and refuses a capture that lacks one. The
+    capture keeps the union of the two, which is every played week: one request per week,
+    37 at most in a 38-week season.
+    """
 
     target = next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=as_of_utc).gameweek
-    first = max(1, target - COMPONENT_HISTORY_WINDOW)
+    component = range(max(1, target - COMPONENT_HISTORY_WINDOW), target)
     paths: dict[str, str] = {}
-    for gameweek in range(first, target):
+    for gameweek in sorted({*component, *captured_history_weeks(target)}):
         paths.update(live_endpoint_path(gameweek))
     return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
 
@@ -233,11 +242,12 @@ def capture(
 ) -> SnapshotMetadata | None:
     """Fetch, describe and optionally persist one immutable snapshot.
 
-    The two season endpoints and up to five already-played live-score documents are always
-    read. The bounded history supplies the exact shifted minutes and points used by the
-    operational Phase C component model. Passing ``entry_registry`` adds the three
-    documents each registered entry publishes, and ``league_id`` adds the league standings
-    page, so a capture can record who was in the league when a recommendation was made.
+    The two season endpoints and every already-played live-score document are always read.
+    The last five supply the exact shifted minutes and points used by the operational
+    Phase C component model; the football history needs all of them. Passing
+    ``entry_registry`` adds the three documents each registered entry publishes, and
+    ``league_id`` adds the league standings page, so a capture can record who was in the
+    league when a recommendation was made.
 
     ``captured_at`` is stamped **after every read**, so no payload in the snapshot was fetched
     later than the instant the snapshot claims. Stamping it earlier would have been wrong in a
@@ -253,12 +263,12 @@ def capture(
         print(f"  read     {name}  ({len(content):,} bytes)")
 
     resolution_at = _utc_now()
-    history = component_history_endpoints(
+    history = live_history_endpoints(
         payloads[BOOTSTRAP_PAYLOAD],
         as_of_utc=resolution_at,
     )
     if history:
-        print(f"Reading {len(history)} component-history endpoint(s)")
+        print(f"Reading {len(history)} live-history endpoint(s)")
         for name, url in history.items():
             payloads[name] = fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")

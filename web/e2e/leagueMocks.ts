@@ -55,7 +55,17 @@ export function openCalendar() {
   };
 }
 
+/**
+ * The published league, served from the fixtures, with the advice API refused.
+ *
+ * CI builds the site with the production API origin (`VITE_ADVICE_API_ORIGIN`), so a member
+ * page asks that backend for its capabilities as soon as it opens. No spec may reach it:
+ * every `/api/v1/` request is aborted as a refused connection, which the page reads as a
+ * backend that is down. The abort is registered first, and Playwright tries the most
+ * recently registered route first, so a spec that needs the API routes it after this call.
+ */
 export async function installLeagueMocks(page: Page) {
+  await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.route("**/data/fixtures.json", (route) => fulfill(route, openCalendar()));
   await page.route("**/data/league/members.json", (route) =>
     fulfill(route, mockLeagueMembersEnvelope),

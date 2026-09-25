@@ -8,6 +8,7 @@ presses a button for.
 
 import json
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -45,7 +46,11 @@ from squadopt.platform.advice_job_spec import (
     AdviceJobSpecConflictError,
     FileAdviceJobSpecStore,
 )
-from squadopt.platform.advice_observability import AdviceLog
+from squadopt.platform.advice_observability import (
+    WORKER_COUNTER_FAMILIES,
+    AdviceLog,
+    AdviceMetrics,
+)
 from squadopt.platform.advice_queue import (
     AdviceComputeRefused,
     FileJobQueue,
@@ -406,6 +411,100 @@ def test_one_address_may_only_ever_mean_one_question(tmp_path: Path) -> None:
         store.put(key, _spec(entry_id=ENTRY_ID + 1))
 
 
+def test_a_spec_is_fsynced_whole_before_it_is_linked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, int]] = []
+    fsync, link = os.fsync, os.link
+
+    def spy_fsync(descriptor: int) -> None:
+        calls.append(("fsync", os.fstat(descriptor).st_size))
+        fsync(descriptor)
+
+    def spy_link(source: str, destination: str) -> None:
+        calls.append(("link", Path(source).stat().st_size))
+        link(source, destination)
+
+    monkeypatch.setattr(os, "fsync", spy_fsync)
+    monkeypatch.setattr(os, "link", spy_link)
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    store.put("e" * 64, _spec())
+    size = len(json.dumps(_spec().as_payload(), sort_keys=True, separators=(",", ":")))
+    assert calls == [("fsync", size), ("link", size)]
+
+
+def test_a_torn_spec_is_moved_aside_and_the_address_written_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        AdviceLog, "event", lambda _self, name, **fields: events.append((name, fields))
+    )
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "d" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    path.parent.mkdir(parents=True)
+    torn = b'{"contract_version":"advice_job_'  # what a crash can leave of a spec
+    path.write_bytes(torn)
+
+    store.put(key, _spec())  # used to raise AdviceJobSpecConflictError, for good
+    assert store.get(key) == _spec()
+    [aside] = [p for p in path.parent.iterdir() if p != path]
+    assert aside.name.startswith(f"{path.name}.damaged-")
+    assert aside.read_bytes() == torn
+    assert [(name, fields["source"]) for name, fields in events] == [
+        ("advice_damaged_entry_quarantined", path.name)
+    ]
+
+
+def test_a_spec_that_parses_but_differs_is_still_a_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        AdviceLog, "event", lambda _self, name, **fields: events.append((name, fields))
+    )
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "f" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    path.parent.mkdir(parents=True)
+    other = b'{"contract_version":"advice_job_spec_v1","league_id":1}'
+    path.write_bytes(other)
+
+    with pytest.raises(AdviceJobSpecConflictError):
+        store.put(key, _spec())
+    assert path.read_bytes() == other
+    assert [p.name for p in path.parent.iterdir()] == [path.name]
+    assert events == []
+
+
+def test_a_spec_moved_aside_for_a_moment_is_linked_over_not_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "c" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    payload = json.dumps(_spec().as_payload(), sort_keys=True, separators=(",", ":")).encode()
+    read = FileAdviceJobSpecStore._read
+    calls: list[Path] = []
+
+    def racing_read(inner: Path) -> bytes | None:
+        calls.append(inner)
+        if len(calls) == 1:  # this request's miss; another request files the spec right after
+            missed = read(inner)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+            return missed
+        if len(calls) == 2:  # a request that read damage earlier moves the spec aside
+            os.replace(path, path.with_name(f"{path.name}.damaged-other"))
+        return read(inner)
+
+    monkeypatch.setattr(store, "_read", racing_read)
+    store.put(key, _spec())  # used to raise "exists but cannot be read back"
+    assert path.read_bytes() == payload
+    assert len(calls) == 2
+
+
 def test_a_missing_spec_is_a_named_refusal_not_a_crash(tmp_path: Path) -> None:
     store_root = tmp_path / "store"
     store_root.mkdir()
@@ -468,7 +567,7 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
-@pytest.mark.parametrize("chip", [None, "bboost", "auto"])
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
     chip: str | None,
@@ -482,7 +581,7 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     if chip is not None:
         body["chip"] = chip
         capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
-        assert chip == "auto" or chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
+        assert chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
@@ -518,9 +617,7 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["window"] == COMPUTED_WINDOW
     assert isinstance(payload["moves"], list)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
-    if chip == "auto":
-        assert payload["chip_strategy"]["requested_chip"] == chip
-    elif chip is not None:
+    if chip is not None:
         assert payload["chip_choice"]["chip"] == chip
 
     # A second ask is answered from the cache and starts no second solve.
@@ -1083,6 +1180,199 @@ def test_a_busy_queue_lock_does_not_end_the_worker(running: dict[str, Any]) -> N
     assert "advice_worker_queue_busy_total 2" in backend.metrics.render(queue_depth=0)
 
 
+# --- the worker survives an unexpected error in a round ----------------------------------
+
+
+class _Flaky:
+    """A queue whose named operation raises the queued errors first; ``None`` lets one through."""
+
+    def __init__(self, queue: FileJobQueue, operation: str, errors: list[Exception | None]) -> None:
+        self._queue = queue
+        self._operation = operation
+        self._errors = errors
+        self.raised: list[str] = []
+
+    def __getattr__(self, name: str) -> Any:
+        real = getattr(self._queue, name)
+        if name != self._operation:
+            return real
+
+        def flaky(*args: Any, **kwargs: Any) -> Any:
+            error = self._errors.pop(0) if self._errors else None
+            if error is not None:
+                self.raised.append(type(error).__name__)
+                raise error
+            return real(*args, **kwargs)
+
+        return flaky
+
+
+def _queued(
+    job_id: str = "advice-0123456789abcdef-1", at: str = "2026-09-01T10:00:00Z"
+) -> AdviceJob:
+    return replace(
+        _job("a" * 64), job_id=job_id, status="queued", created_at_utc=at, updated_at_utc=at
+    )
+
+
+def test_an_error_from_claim_does_not_end_the_worker(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_queued())
+    flaky = _Flaky(queue, "claim", [PermissionError(13, "Access is denied")])
+    metrics = AdviceMetrics(zero_counters=WORKER_COUNTER_FAMILIES)
+    waits: list[float] = []
+    caplog.set_level(logging.INFO, logger="advice.worker")
+
+    processed = run_advice_worker(
+        flaky,
+        FileAdviceCache(tmp_path / "cache"),
+        lambda _job: b'{"computed":true}',
+        should_stop=_stop_after(20),
+        sleep=waits.append,
+        idle_seconds=0.5,
+        poll_seconds=0.5,
+        max_jobs=1,
+        heartbeat_seconds=None,
+        metrics=metrics,
+        log=AdviceLog("worker"),
+    )
+
+    # The claim that raised was logged and waited out, and the same process then took the
+    # next job and finished it.
+    assert flaky.raised == ["PermissionError"]
+    assert processed == 1
+    done = queue.load(_queued().job_id)
+    assert done is not None and done.status == "completed"
+    assert waits == [0.5]
+    events = [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == "advice.worker"
+    ]
+    failed = [event for event in events if event["event"] == "advice_worker_round_failed"]
+    assert len(failed) == 1
+    assert failed[0]["error_type"] == "PermissionError"
+    assert failed[0]["consecutive"] == 1 and failed[0]["backoff_seconds"] == 0.5
+    assert "Traceback" in failed[0]["trace"]
+    assert "advice_worker_round_failed_total 1" in metrics.render()
+
+
+def test_rounds_that_keep_failing_back_off_up_to_a_cap_and_a_good_round_resets_it(
+    tmp_path: Path,
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_queued("advice-0123456789abcdef-1", "2026-09-01T10:00:00Z"))
+    queue.submit(_queued("advice-0123456789abcdef-2", "2026-09-01T10:00:01Z"))
+    errors: list[Exception | None] = [OSError("store gone") for _ in range(3)]
+    flaky = _Flaky(queue, "claim", [*errors, None, OSError("store gone"), None])
+    waits: list[float] = []
+
+    processed = run_advice_worker(
+        flaky,
+        FileAdviceCache(tmp_path / "cache"),
+        lambda _job: b'{"computed":true}',
+        should_stop=_stop_after(40),
+        sleep=waits.append,
+        idle_seconds=0.5,
+        poll_seconds=10.0,
+        max_backoff_seconds=1.5,
+        max_jobs=2,
+        heartbeat_seconds=None,
+    )
+
+    assert processed == 2
+    # Doubling from one idle, held at the cap, and back to one idle after a good round.
+    assert waits == [0.5, 1.0, 1.5, 0.5]
+
+
+def test_a_failure_record_that_cannot_be_written_leaves_the_job_to_recovery(
+    tmp_path: Path,
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_queued())
+    flaky = _Flaky(queue, "store", [PermissionError(13, "Access is denied")])
+    attempts: list[int] = []
+
+    def compute(job: AdviceJob) -> bytes:
+        attempts.append(job.attempt)
+        if job.attempt == 1:
+            raise RuntimeError("the first attempt fails")
+        return b'{"computed":true}'
+
+    processed = run_advice_worker(
+        flaky,
+        FileAdviceCache(tmp_path / "cache"),
+        compute,
+        should_stop=_stop_after(20),
+        sleep=lambda _seconds: None,
+        idle_seconds=0.5,
+        poll_seconds=0.5,
+        recover_every_seconds=0.0,
+        lease_seconds=0.0,
+        max_jobs=1,
+        heartbeat_seconds=None,
+    )
+
+    assert flaky.raised == ["PermissionError"]
+    assert processed == 1 and attempts == [1, 2]
+    done = queue.load(_queued().job_id)
+    assert done is not None and done.status == "completed" and done.attempt == 2
+
+
+def test_a_clock_behind_a_jobs_stamp_is_waited_out_rather_than_fatal(tmp_path: Path) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_queued(at="2026-09-01T10:05:00Z"))
+    clock = [datetime(2026, 9, 1, 10, 0, tzinfo=UTC)]  # five minutes behind the job
+    waits: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        waits.append(seconds)
+        clock[0] = datetime(2026, 9, 1, 10, 6, tzinfo=UTC)  # the clock catches up
+
+    processed = run_advice_worker(
+        queue,
+        FileAdviceCache(tmp_path / "cache"),
+        lambda _job: b'{"computed":true}',
+        should_stop=_stop_after(20),
+        now=lambda: clock[0],
+        sleep=sleep,
+        idle_seconds=0.5,
+        poll_seconds=0.5,
+        max_jobs=1,
+        heartbeat_seconds=None,
+    )
+
+    assert processed == 1 and waits == [0.5]
+    done = queue.load(_queued().job_id)
+    assert done is not None and done.status == "completed"
+
+
+@pytest.mark.parametrize("stop", [KeyboardInterrupt, SystemExit])
+def test_an_interrupt_still_ends_the_worker(tmp_path: Path, stop: type[BaseException]) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_queued())
+
+    class _Interrupted:
+        def __getattr__(self, name: str) -> Any:
+            return getattr(queue, name)
+
+        def claim(self, **_kwargs: Any) -> Any:
+            raise stop()
+
+    with pytest.raises(stop):
+        run_advice_worker(
+            _Interrupted(),
+            FileAdviceCache(tmp_path / "cache"),
+            lambda _job: b'{"computed":true}',
+            should_stop=_stop_after(20),
+            sleep=lambda _seconds: None,
+            idle_seconds=0.5,
+            heartbeat_seconds=None,
+        )
+
+
 def test_an_unreadable_spec_is_a_request_unreadable_refusal(running: dict[str, Any]) -> None:
     backend = running["backend"]
     compute = build_advice_compute(backend.contexts, backend.job_specs)
@@ -1248,6 +1538,14 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         route, json={**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
     )
     assert invalid.status_code == 422
+    # Ids the capture does not have for this member are refused before a job exists:
+    # 1002 is on the roster but not in the fifteen, 1025 is not on the roster at all.
+    jobs_before = backend.queue.jobs()
+    for unknown in ({"keep_players": [1002]}, {"avoid_players": [1025]}):
+        refused = client.post(route, json={**body, "preferences": unknown})
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert backend.queue.jobs() == jobs_before
     for malformed in (None, "", []):
         invalid = client.post(route, json={**body, "preferences": malformed})
         assert invalid.status_code == 422

@@ -58,8 +58,12 @@ Histories and archives written before the settings were recorded have no such fi
 Missing settings or prices are not reconstructed, labelled off or shown as zero.
 Each optional row comes from the exact capture already selected for that week, under
 the same pre-deadline publication rule, reusing the verified selected record.
-Plain pure-points and chip rows have no displayed price. A priced setting shows its
-recorded ceiling when present, otherwise its cost, and never a negative value.
+Plain pure-points and chip rows have no displayed price. A mode priced by the scenario
+menu (garantici, agresif, asiri-agresif) shows its recorded cost, which never carries a
+ceiling. Any other priced row shows its recorded cost only when the record carries a
+ceiling equal to it, the only shape a price measured against a proven pure-points plan
+produces. A priced row with no ceiling, or with a ceiling that differs from its cost
+(written before that rule), shows no price. A negative value is never shown.
 The published path identifies a row but is not displayed.
 
 The additive schema is `docs/contracts/weekly_suggestion_history_v1.schema.json`.
