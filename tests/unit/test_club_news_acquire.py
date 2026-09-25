@@ -11,7 +11,7 @@ was refused is indistinguishable from a club that only ever registered one.
 import json
 import urllib.error
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +29,7 @@ from squadopt.data.sources.club_news_capture import read_captured_coverage
 from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.platform.club_news_acquire import acquire_week, main
-from squadopt.platform.club_news_fetch import ClubSource
+from squadopt.platform.club_news_fetch import CLUB_NEWS_SOURCES_CONTRACT_VERSION, ClubSource
 from squadopt.platform.club_news_provider import (
     DEFAULT_PROVIDER,
     KEY_ENVIRONMENT_VARIABLE,
@@ -40,6 +40,7 @@ from squadopt.platform.club_news_provider import (
 )
 
 FETCHED_AT = datetime(2026, 9, 12, 14, 0, tzinfo=UTC)
+READ_ON = date(2026, 9, 1)
 CONFIG = CodingProviderConfig(
     provider=DEFAULT_PROVIDER, model_identifier=CODING_MODEL_IDENTIFIER, api_key="k"
 )
@@ -50,9 +51,9 @@ UNITED_INJURIES = "https://club.example/united/injuries"
 ARSENAL = "https://club.example/arsenal/team-news"
 
 SOURCES = (
-    ClubSource(club="Arsenal", url=ARSENAL),
-    ClubSource(club="Man Utd", url=UNITED_PRESS),
-    ClubSource(club="Man Utd", url=UNITED_INJURIES),
+    ClubSource(club="Arsenal", url=ARSENAL, terms_read_on=READ_ON),
+    ClubSource(club="Man Utd", url=UNITED_PRESS, terms_read_on=READ_ON),
+    ClubSource(club="Man Utd", url=UNITED_INJURIES, terms_read_on=READ_ON),
 )
 
 
@@ -194,6 +195,42 @@ def test_partly_covered_never_names_a_club_that_is_not_covered() -> None:
     assert set(week.clubs_partially_covered) <= set(week.clubs_covered)
 
 
+def test_articles_are_coded_with_their_club_and_a_missing_one_narrows_nothing() -> None:
+    """A followed article is a document of the registered page's club, not a registered page.
+
+    So it reaches the club's one call beside the index, and when one cannot be read the club
+    stays fully covered: partial coverage is about the pages the registry declared, and the
+    articles an index links to are a capped sample, never a list the week declared.
+    """
+
+    read = f"{ARSENAL}/saka-fit"
+    lost = f"{ARSENAL}/removed"
+    index = f"<a href='{read}'>Saka fit</a><a href='{lost}'>Removed</a>".encode()
+    base = _opener(missing=frozenset({lost}))
+    coded: list[list[str]] = []
+
+    def _open(request: Any, timeout: float) -> _Reply:
+        if request.full_url == ARSENAL:
+            return _Reply(ARSENAL, index)
+        return base(request, timeout)  # type: ignore[no-any-return]
+
+    class _Recording(_Provider):
+        def code(
+            self, documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]
+        ) -> ClaimResponse:
+            coded.append([document.requested_url for document in documents])
+            return super().code(documents, roster)
+
+    week = _acquire(sources=SOURCES[:1], opener=_open, provider=_Recording())
+
+    assert [document.requested_url for document in week.documents] == [ARSENAL, read]
+    assert coded == [[ARSENAL, read]]
+    assert week.clubs_covered == ("Arsenal",)
+    assert week.clubs_partially_covered == ()
+    assert [club for club, _reason in week.refused_pages] == ["Arsenal"]
+    assert week.refused_pages[0][1].startswith(f"An article linked from {ARSENAL}")
+
+
 # --- the command ------------------------------------------------------------
 
 
@@ -201,12 +238,13 @@ def _registry(path: Path, sources: Sequence[ClubSource]) -> Path:
     path.write_text(
         json.dumps(
             {
-                "contract_version": "club_news_sources_v1",
+                "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
                 "sources": [
                     {
                         "club": source.club,
                         "url": source.url,
                         "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON.isoformat(),
                     }
                     for source in sources
                 ],

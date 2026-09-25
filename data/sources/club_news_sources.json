@@ -1,21 +1,24 @@
 {
-  "contract_version": "club_news_sources_v1",
-  "note": "Which club pages this project may read, and where the terms reading for each host is recorded. No club's bytes are redistributed here. A real host is added only after its terms of use and robots.txt have been read and the reading written into docs/club_news_sources.md, which is why terms_record is required rather than optional. A club may appear on more than one line -- team news and an injury table are often separate pages -- because a claim cites a document by digest and byte span rather than citing a club. One url may appear only once: the same page registered twice is read twice and coded twice, which would enter one sentence in the evidence table as two claims. The Example FC line stays: it is served offline by the fixture, no request is ever made for it, and it is what exercises the reader when no real host is reachable.",
+  "contract_version": "club_news_sources_v2",
+  "note": "Which club pages this project may read, and where the terms reading for each host is recorded. No club's bytes are redistributed here. A real host is added only after its terms of use and robots.txt have been read and the reading written into docs/club_news_sources.md, which is why terms_record is required rather than optional. terms_read_on is the date in that reading's row, copied here so the reader can judge its age: a host whose reading is older than the declared interval is not contacted, and a test holds the two dates equal. A club may appear on more than one line -- team news and an injury table are often separate pages -- because a claim cites a document by digest and byte span rather than citing a club. One url may appear only once: the same page registered twice is read twice and coded twice, which would enter one sentence in the evidence table as two claims. The Example FC line stays: it is served offline by the fixture, no request is ever made for it, and it is what exercises the reader when no real host is reachable. Its terms_read_on is null because nobody read it, and the reader refuses it for that reason before any request.",
   "sources": [
     {
       "club": "Liverpool",
       "url": "https://www.liverpoolfc.com/news",
-      "terms_record": "docs/club_news_sources.md"
+      "terms_record": "docs/club_news_sources.md",
+      "terms_read_on": "2026-09-22"
     },
     {
       "club": "Newcastle",
       "url": "https://www.newcastleunited.com/en/news",
-      "terms_record": "docs/club_news_sources.md"
+      "terms_record": "docs/club_news_sources.md",
+      "terms_read_on": "2026-09-23"
     },
     {
       "club": "Example FC",
       "url": "https://club.example/team-news",
-      "terms_record": "docs/club_news_sources.md"
+      "terms_record": "docs/club_news_sources.md",
+      "terms_read_on": null
     }
   ]
 }

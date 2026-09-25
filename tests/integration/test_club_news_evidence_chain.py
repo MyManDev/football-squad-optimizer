@@ -57,6 +57,7 @@ from squadopt.data.sources.club_news_coding import (
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.platform.club_news_fetch import (
+    CLUB_NEWS_SOURCES_CONTRACT_VERSION,
     ClubNewsFetchError,
     fetch_registered_documents,
     load_club_sources,
@@ -70,6 +71,9 @@ CODING_FIXTURE = SAMPLE / "club_news_coding_v1.fixture.json"
 COMMIT = "0" * 40
 #: Before the decision capture (2026-09-12T15:00:00Z), as a week's documents must be.
 FETCHED_AT = datetime(2026, 9, 12, 14, 0, tzinfo=UTC)
+#: The terms reading the test registries are dated with, inside the interval at every clock
+#: these tests pin.
+READ_ON = "2026-09-01"
 NEWS_CAPTURED_AT = "2026-09-12T14:30:00Z"
 
 #: Declared but never served: the registry sets out to read three clubs and the third 404s,
@@ -208,11 +212,12 @@ def _registry(path: Path, *, clubs: tuple[str, ...] | None = None) -> Path:
             "club": club,
             "url": first.get(club, f"https://club.example/{club.lower()}/absent"),
             "terms_record": "docs/club_news_sources.md",
+            "terms_read_on": READ_ON,
         }
         for club in declared
     ]
     path.write_text(
-        json.dumps({"contract_version": "club_news_sources_v1", "sources": sources}),
+        json.dumps({"contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION, "sources": sources}),
         encoding="utf-8",
     )
     return path
@@ -467,7 +472,7 @@ def test_an_empty_registry_is_refused_rather_than_read_as_a_quiet_week(
 
     path = tmp_path / "club_news_sources.json"
     path.write_text(
-        json.dumps({"contract_version": "club_news_sources_v1", "sources": []}),
+        json.dumps({"contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION, "sources": []}),
         encoding="utf-8",
     )
 
@@ -497,17 +502,19 @@ def test_a_club_whose_news_is_split_across_two_pages_is_read_in_full(
     path.write_text(
         json.dumps(
             {
-                "contract_version": "club_news_sources_v1",
+                "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
                 "sources": [
                     {
                         "club": "Man Utd",
                         "url": "https://club.example/united/press-conference-gw4",
                         "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON,
                     },
                     {
                         "club": "Man Utd",
                         "url": "https://club.example/united/squad-update",
                         "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON,
                     },
                 ],
             }

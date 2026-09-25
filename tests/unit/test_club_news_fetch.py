@@ -12,9 +12,10 @@ happening quietly.
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -22,10 +23,13 @@ import pytest
 
 from squadopt.platform.club_news_fetch import (
     CLUB_NEWS_SOURCES_CONTRACT_VERSION,
+    MAXIMUM_ARTICLES_PER_HOST,
     MAXIMUM_DOCUMENT_BYTES,
     PER_ORIGIN_DELAY_SECONDS,
+    TERMS_READING_VALID_DAYS,
     ClubNewsFetchError,
     ClubSource,
+    article_links,
     fetch_club_document,
     fetch_registered_documents,
     load_club_sources,
@@ -37,7 +41,10 @@ REGISTRY = Path(__file__).resolve().parents[2] / "data" / "sources" / "club_news
 
 PAGE = "https://club.example/team-news"
 ROBOTS = "https://club.example/robots.txt"
-SOURCE = ClubSource(club="Example FC", url=PAGE)
+#: A reading eleven days before the pinned clock, so every test below is inside the interval
+#: unless it says otherwise.
+READ_ON = date(2026, 9, 1)
+SOURCE = ClubSource(club="Example FC", url=PAGE, terms_read_on=READ_ON)
 FIXED_NOW = datetime(2026, 9, 12, 14, 5, 0, tzinfo=UTC)
 
 
@@ -284,7 +291,7 @@ def test_a_plain_http_source_is_refused_on_construction() -> None:
     """A citation into bytes an intermediary could have rewritten is not a citation."""
 
     with pytest.raises(ClubNewsFetchError, match="https"):
-        ClubSource(club="Example FC", url="http://club.example/team-news")
+        ClubSource(club="Example FC", url="http://club.example/team-news", terms_read_on=READ_ON)
 
 
 # --- the retry rule ---------------------------------------------------------
@@ -338,7 +345,7 @@ def test_a_persistent_server_error_reports_every_attempt() -> None:
 def test_a_refused_club_is_returned_beside_the_read_ones() -> None:
     """Declared and covered are different columns because this happens."""
 
-    other = ClubSource(club="Other FC", url="https://other.example/news")
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
     opener = _Opener(
         {
             ROBOTS: _allowing_robots(),
@@ -370,7 +377,7 @@ def _three_pages_on_one_host() -> tuple[tuple[ClubSource, ...], _Opener]:
     """One club publishing on three paths, which the registry now permits."""
 
     sources = tuple(
-        ClubSource(club="Example FC", url=f"https://club.example/{path}")
+        ClubSource(club="Example FC", url=f"https://club.example/{path}", terms_read_on=READ_ON)
         for path in ("team-news", "injuries", "press-conference")
     )
     replies: dict[str, Any] = {ROBOTS: _allowing_robots()}
@@ -412,7 +419,7 @@ def test_a_second_request_to_one_host_waits() -> None:
 def test_two_hosts_do_not_wait_for_each_other() -> None:
     """The debt is owed per host, so a slow neighbour does not slow an unrelated club."""
 
-    other = ClubSource(club="Other FC", url="https://other.example/news")
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
     opener = _Opener(
         {
             ROBOTS: _allowing_robots(),
@@ -584,7 +591,7 @@ def test_every_registered_source_points_at_a_terms_reading(tmp_path: Path) -> No
         load_club_sources(path)
 
 
-def _registry(tmp_path: Path, *entries: dict[str, str]) -> Path:
+def _registry(tmp_path: Path, *entries: dict[str, str | None]) -> Path:
     """A registry file carrying exactly ``entries``, each with its terms pointer."""
 
     path = tmp_path / "sources.json"
@@ -593,7 +600,12 @@ def _registry(tmp_path: Path, *entries: dict[str, str]) -> Path:
             {
                 "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
                 "sources": [
-                    {"terms_record": "docs/club_news_sources.md", **entry} for entry in entries
+                    {
+                        "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON.isoformat(),
+                        **entry,
+                    }
+                    for entry in entries
                 ],
             }
         ),
@@ -684,7 +696,7 @@ def test_a_registry_under_another_contract_is_refused(tmp_path: Path) -> None:
 
     path = tmp_path / "sources.json"
     path.write_text(
-        json.dumps({"contract_version": "club_news_sources_v2", "sources": []}),
+        json.dumps({"contract_version": "club_news_sources_v1", "sources": []}),
         encoding="utf-8",
     )
 
@@ -716,6 +728,7 @@ def test_registered_sources_are_read_in_the_declared_order(tmp_path: Path) -> No
                         "club": club,
                         "url": f"https://club.example/{index}",
                         "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON.isoformat(),
                     }
                     for index, club in enumerate(clubs)
                 ],
@@ -725,3 +738,434 @@ def test_registered_sources_are_read_in_the_declared_order(tmp_path: Path) -> No
     )
 
     assert [source.club for source in load_club_sources(path)] == list(clubs)
+
+
+# --- a registered page, followed to its articles ------------------------------
+
+ARTICLE_ONE = "https://club.example/team-news/saka-fit"
+ARTICLE_TWO = "https://club.example/team-news/press-conference"
+DEEPER = "https://club.example/team-news/deeper"
+PRIVATE = "https://club.example/team-news/private/injury-list"
+OFF_HOST = "https://other.example/team-news/rumour"
+
+#: An index written the way a club writes one: navigation, a list of headlines, and links
+#: that must not be followed sitting between the ones that must.
+INDEX = (
+    "<html><head><title>News</title></head><body>"
+    "<nav><a href='/tickets'>Tickets</a> <a href='/team-news'>News</a></nav>"
+    "<ul>"
+    "<li><a href='/team-news/saka-fit'>Saka fit for Saturday</a></li>"
+    "<li><a href='https://club.example/team-news/press-conference#video'>Press</a></li>"
+    "<li><a href='/team-news/saka-fit#comments'>Comments</a></li>"
+    "<li><a href='https://other.example/team-news/rumour'>Elsewhere</a></li>"
+    "<li><a href='//other.example/team-news/rumour'>Elsewhere, relative</a></li>"
+    "<li><a href='https://club.example.other.example/team-news/x'>Look-alike</a></li>"
+    "<li><a href='https://club.example:8443/team-news/x'>Another port</a></li>"
+    "<li><a href='http://club.example/team-news/insecure'>Plain http</a></li>"
+    "<li><a href='/team-news/private/injury-list'>Private</a></li>"
+    "<li><a href='/team-news/../tickets'>Climbing out</a></li>"
+    "<li><a href='/team-news/café'>Not ASCII</a></li>"
+    "<li><a href='mailto:press@club.example'>Mail</a></li>"
+    "</ul></body></html>"
+).encode()
+
+ARTICLE_ONE_BODY = (
+    b"<article><h1>Saka fit</h1><p>Saka trained fully on Thursday.</p>"
+    b"<a href='/team-news/deeper'>Read more</a></article>"
+)
+ARTICLE_TWO_BODY = b"<article><h1>Press conference</h1><p>Rice is rested for the cup.</p></article>"
+
+
+def _robots_keeping_private() -> _Reply:
+    return _allowing_robots(b"User-agent: *\nDisallow: /team-news/private\n")
+
+
+def _news_host(**overrides: Any) -> _Opener:
+    """The index above, its two articles, and every link that must stay unrequested served too.
+
+    Serving the off-host and deeper pages is deliberate: a test that only proved they were
+    not served could pass while the reader asked for them anyway.
+    """
+
+    replies: dict[str, Any] = {
+        ROBOTS: _robots_keeping_private(),
+        PAGE: _Reply(INDEX),
+        ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+        ARTICLE_TWO: _Reply(ARTICLE_TWO_BODY, final_url=ARTICLE_TWO),
+        DEEPER: _Reply(b"<p>Deeper.</p>", final_url=DEEPER),
+        PRIVATE: _Reply(b"<p>Private.</p>", final_url=PRIVATE),
+        OFF_HOST: _Reply(b"<p>Rumour.</p>", final_url=OFF_HOST),
+        "https://other.example/robots.txt": _allowing_robots(),
+    }
+    replies.update(overrides)
+    return _Opener(replies)
+
+
+def _read_news_host(opener: _Opener) -> tuple[Any, Any]:
+    return fetch_registered_documents(
+        (SOURCE,), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+
+def test_a_registered_page_is_followed_to_its_articles_on_the_same_host() -> None:
+    """I67: an index carries headlines, and the words a claim quotes are on the article.
+
+    Each article is its own document, in the order the index lists it, carrying the index's
+    club and its own readable text, so a claim cites the article and not the headline.
+    """
+
+    documents, _refused = _read_news_host(_news_host())
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE, ARTICLE_TWO]
+    assert {document.club for document in documents} == {"Example FC"}
+    one, two = documents[1], documents[2]
+    assert b"Saka trained fully on Thursday." in one.readable
+    assert b"Rice is rested" not in one.readable
+    assert b"Rice is rested for the cup." in two.readable
+    assert one.content == ARTICLE_ONE_BODY
+
+
+def test_no_link_off_the_registered_origin_is_ever_requested() -> None:
+    """Another host, a look-alike host, another port or plain http: none is registered."""
+
+    opener = _news_host()
+
+    _read_news_host(opener)
+
+    assert sorted(set(opener.requested)) == sorted({ROBOTS, PAGE, ARTICLE_ONE, ARTICLE_TWO})
+    assert not any("other.example" in url or url.startswith("http:") for url in opener.requested)
+
+
+def test_an_articles_own_links_are_not_followed() -> None:
+    """One step from a registered page and no further; this is not a crawler."""
+
+    opener = _news_host()
+
+    _read_news_host(opener)
+
+    assert DEEPER not in opener.requested
+
+
+def test_an_article_robots_disallows_is_not_requested_and_is_named() -> None:
+    """The host's stated preference decides each article path, as it decides the index."""
+
+    opener = _news_host()
+
+    documents, refused = _read_news_host(opener)
+
+    assert PRIVATE not in opener.requested
+    assert PRIVATE not in [document.requested_url for document in documents]
+    assert len(refused) == 1
+    club, reason = refused[0]
+    assert club == "Example FC"
+    assert f"An article linked from {PAGE}" in reason
+    assert "disallows" in reason
+    assert PRIVATE in reason
+
+
+def test_robots_is_asked_once_for_the_index_and_its_articles() -> None:
+    """The articles are paths of a host this run has already asked."""
+
+    opener = _news_host()
+
+    _read_news_host(opener)
+
+    assert opener.requested.count(ROBOTS) == 1
+
+
+def test_every_article_request_waits_like_any_second_request() -> None:
+    """Robots, the index and two articles: the first contact is free, the other three wait."""
+
+    delays, sleeper = _slept()
+
+    fetch_registered_documents(
+        (SOURCE,), opener=_news_host(), now=lambda: FIXED_NOW, sleeper=sleeper
+    )
+
+    assert delays == [PER_ORIGIN_DELAY_SECONDS] * 3
+
+
+def test_the_link_rule_keeps_same_origin_links_under_the_page_in_page_order() -> None:
+    """The rule itself, before robots: the private path is a link and robots judges it later."""
+
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(INDEX)})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert article_links(SOURCE, index) == (ARTICLE_ONE, ARTICLE_TWO, PRIVATE)
+
+
+def test_a_failed_article_costs_the_article_and_not_the_club() -> None:
+    """The registered page was read, so the club is read; the article is named as missing."""
+
+    missing = urllib.error.HTTPError(ARTICLE_TWO, 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+    documents, refused = _read_news_host(_news_host(**{ARTICLE_TWO: missing}))
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    reasons = [reason for _club, reason in refused]
+    assert any(ARTICLE_TWO in reason and "404" in reason for reason in reasons), reasons
+    assert all(reason.startswith("An article linked from") for reason in reasons)
+
+
+def test_an_article_answered_by_a_page_already_read_is_not_stored_twice() -> None:
+    """A removed article that redirects to the index would give one URL two sets of bytes."""
+
+    back_to_index = _Reply(INDEX, final_url=PAGE)
+
+    documents, refused = _read_news_host(_news_host(**{ARTICLE_ONE: back_to_index}))
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_TWO]
+    assert any("not stored a second time" in reason for _club, reason in refused)
+
+
+def test_a_registered_page_linked_from_another_is_read_once_as_itself() -> None:
+    """A link to a registered page is left for that page's own entry, so it is read once."""
+
+    injuries = "https://club.example/team-news/injuries"
+    index = b"<a href='/team-news/injuries'>Injuries</a><a href='/team-news/saka-fit'>Saka</a>"
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(index),
+            injuries: _Reply(b"<p>Nobody is injured.</p>", final_url=injuries),
+            ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+        }
+    )
+    registered = (SOURCE, ClubSource(club="Example FC", url=injuries, terms_read_on=READ_ON))
+
+    documents, refused = fetch_registered_documents(
+        registered, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert opener.requested.count(injuries) == 1
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE, injuries]
+
+
+def test_articles_are_capped_per_host_across_every_registered_page_it_serves() -> None:
+    """One server, one budget: two indexes on one host share the cap, in registry order."""
+
+    injuries = "https://club.example/injuries"
+    replies: dict[str, Any] = {ROBOTS: _allowing_robots()}
+    linked: dict[str, list[str]] = {PAGE: [], injuries: []}
+    for page, path in ((PAGE, "/team-news"), (injuries, "/injuries")):
+        for number in range(MAXIMUM_ARTICLES_PER_HOST):
+            url = f"https://club.example{path}/item-{number}"
+            linked[page].append(url)
+            replies[url] = _Reply(f"<p>Item {number}.</p>".encode(), final_url=url)
+        body = "".join(f"<a href='{url}'>{url}</a>" for url in linked[page])
+        replies[page] = _Reply(body.encode(), final_url=page)
+    registered = (SOURCE, ClubSource(club="Example FC", url=injuries, terms_read_on=READ_ON))
+    opener = _Opener(replies)
+
+    documents, refused = fetch_registered_documents(
+        registered, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    read = [document.requested_url for document in documents]
+    articles = [url for url in read if url not in (PAGE, injuries)]
+    assert refused == ()
+    assert read.count(injuries) == 1
+    assert articles == linked[PAGE][:MAXIMUM_ARTICLES_PER_HOST]
+    assert not any(url in opener.requested for url in linked[injuries])
+
+
+def test_a_feed_is_read_but_its_item_links_are_not_followed() -> None:
+    """A feed already carries its items' words, so following them would read them twice."""
+
+    feed = (
+        b"<rss><channel><item><title>Saka fit</title>"
+        b"<link>https://club.example/team-news/saka-fit</link>"
+        b"<description>Saka trained fully.</description></item></channel></rss>"
+    )
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(feed, content_type="application/rss+xml"),
+            ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+        }
+    )
+
+    documents, _refused = fetch_registered_documents(
+        (SOURCE,), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert [document.requested_url for document in documents] == [PAGE]
+    assert ARTICLE_ONE not in opener.requested
+
+
+def test_a_page_registered_at_the_root_of_its_host_follows_nothing() -> None:
+    """With no path to be under, every link on the site would count, so none does."""
+
+    root = ClubSource(club="Example FC", url="https://club.example/", terms_read_on=READ_ON)
+    opener = _Opener({ROBOTS: _allowing_robots(), root.url: _Reply(INDEX, final_url=root.url)})
+    index = fetch_club_document(root, opener=opener, now=lambda: FIXED_NOW)
+
+    assert article_links(root, index) == ()
+
+
+# --- a reading ages -----------------------------------------------------------
+
+
+def _dated(read_on: date | None) -> ClubSource:
+    return ClubSource(club="Example FC", url=PAGE, terms_read_on=read_on)
+
+
+def test_a_host_whose_reading_has_aged_is_not_contacted_at_all() -> None:
+    """F26: not the page and not its robots.txt. A stale reading is refused before a request."""
+
+    opener = _opener()
+    stale = FIXED_NOW.date() - timedelta(days=TERMS_READING_VALID_DAYS + 1)
+
+    with pytest.raises(ClubNewsFetchError, match="days old") as refusal:
+        fetch_club_document(_dated(stale), opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested == []
+    assert stale.isoformat() in str(refusal.value)
+    assert "docs/club_news_sources.md" in str(refusal.value)
+
+
+def test_a_reading_is_relied_on_through_its_last_day() -> None:
+    """The boundary, pinned: exactly the interval old is still inside it."""
+
+    last_day = FIXED_NOW.date() - timedelta(days=TERMS_READING_VALID_DAYS)
+
+    document = fetch_club_document(_dated(last_day), opener=_opener(), now=lambda: FIXED_NOW)
+
+    assert document.club == "Example FC"
+
+
+def test_an_undated_host_is_not_contacted_at_all() -> None:
+    """Nobody read it, which is the placeholder's case, and unread is not fine."""
+
+    opener = _opener()
+
+    with pytest.raises(ClubNewsFetchError, match="Nobody has dated"):
+        fetch_club_document(_dated(None), opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested == []
+
+
+def test_a_reading_dated_after_the_fetch_is_refused() -> None:
+    """A typo in the year would otherwise stretch a permission by a year."""
+
+    opener = _opener()
+    future = FIXED_NOW.date() + timedelta(days=2)
+
+    with pytest.raises(ClubNewsFetchError, match="after this fetch"):
+        fetch_club_document(_dated(future), opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested == []
+
+
+def test_a_reading_signed_a_day_ahead_of_utc_is_read() -> None:
+    """A reader east of UTC can sign on a date UTC has not reached yet."""
+
+    tomorrow = FIXED_NOW.date() + timedelta(days=1)
+
+    document = fetch_club_document(_dated(tomorrow), opener=_opener(), now=lambda: FIXED_NOW)
+
+    assert document.club == "Example FC"
+
+
+def test_a_stale_host_costs_its_club_and_not_the_week() -> None:
+    """The refusal arrives in the per-club currency, beside the clubs that were read."""
+
+    stale = _dated(FIXED_NOW.date() - timedelta(days=TERMS_READING_VALID_DAYS + 30))
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(),
+            "https://other.example/robots.txt": _allowing_robots(),
+            other.url: _Reply(final_url=other.url),
+        }
+    )
+
+    documents, refused = fetch_registered_documents(
+        (stale, other), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert [document.club for document in documents] == ["Other FC"]
+    assert [club for club, _reason in refused] == ["Example FC"]
+    assert not any(url.startswith("https://club.example") for url in opener.requested)
+
+
+def test_an_entry_with_no_reading_date_is_refused(tmp_path: Path) -> None:
+    """The key is required even where the answer is null: silence is not a date."""
+
+    path = tmp_path / "sources.json"
+    entry = {"club": "Example FC", "url": PAGE, "terms_record": "docs/club_news_sources.md"}
+    path.write_text(
+        json.dumps({"contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION, "sources": [entry]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="no 'terms_read_on'"):
+        load_club_sources(path)
+
+
+def test_a_reading_date_the_rule_cannot_read_is_refused(tmp_path: Path) -> None:
+    """A date written the local way is a reading the age rule cannot judge."""
+
+    path = _registry(tmp_path, {"club": "Example FC", "url": PAGE, "terms_read_on": "22/09/2026"})
+
+    with pytest.raises(ClubNewsFetchError, match="not a YYYY-MM-DD"):
+        load_club_sources(path)
+
+
+def test_a_null_reading_date_loads_and_is_carried_as_absent(tmp_path: Path) -> None:
+    """The placeholder's honest value reads; it is the fetch that refuses it."""
+
+    path = _registry(tmp_path, {"club": "Example FC", "url": PAGE, "terms_read_on": None})
+
+    (source,) = load_club_sources(path)
+
+    assert source.terms_read_on is None
+
+
+def test_one_host_dated_twice_is_refused(tmp_path: Path) -> None:
+    """A reading is of a host, so two of its pages cannot disagree about when it was read."""
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": PAGE, "terms_read_on": "2026-09-01"},
+        {
+            "club": "Example FC",
+            "url": "https://Club.Example/injuries",
+            "terms_read_on": "2026-09-02",
+        },
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="every page of one host"):
+        load_club_sources(path)
+
+
+def test_the_committed_registry_dates_match_the_signed_rows() -> None:
+    """The registry's date is copied from the table, and the two may not drift apart.
+
+    A row re-signed without the registry moving would keep refusing a host somebody just
+    read, and a registry date moved without the row would be a permission nobody signed.
+    """
+
+    rows = _reading_rows()
+
+    for source in load_club_sources(REGISTRY):
+        host = urllib.parse.urlsplit(source.url).netloc
+        _reader, signed = rows[host]
+        if source.terms_read_on is None:
+            assert signed == "—", host
+        else:
+            assert signed == source.terms_read_on.isoformat(), host
+
+
+def test_the_documented_interval_and_expiry_dates_are_the_codes() -> None:
+    """Prose that states a number is checked against the number it states."""
+
+    document = (REGISTRY.parents[2] / "docs" / "club_news_sources.md").read_text(encoding="utf-8")
+
+    assert f"{TERMS_READING_VALID_DAYS} days" in document
+    for source in load_club_sources(REGISTRY):
+        if source.terms_read_on is not None:
+            last_day = source.terms_read_on + timedelta(days=TERMS_READING_VALID_DAYS)
+            assert f"through {last_day.isoformat()}" in document, source.url
