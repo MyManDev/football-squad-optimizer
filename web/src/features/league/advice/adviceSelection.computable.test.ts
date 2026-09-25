@@ -311,38 +311,37 @@ describe("the resolver with the service's capabilities", () => {
   });
 });
 
-it.each([1, 3, 5])("offers automatic chip timing with Top100 over %i weeks", (window) => {
+it.each([1, 3, 5])("offers a named chip with Top100 over %i weeks", (window) => {
   const caps: AdviceCapabilities = {
     ...WHOLE_MENU,
     chipStrategyWindows: [1, 3, 5],
     chipsByEntry: { [ENTRY]: ["3xc"] },
   };
-  for (const chip of ["auto", "3xc"]) {
-    expect(resolve(`chip=${chip}&window=${window}&top100=20`, caps)).toMatchObject({
-      status: "not-listed",
-      path: null,
-      request: { chip, top100Weight: 20 },
-      computable: { selection: true, chipStrategy: true },
-    });
-  }
-  expect(
-    resolve(`chip=auto&window=${window}`, { ...caps, chipsByEntry: { [ENTRY]: [] } }).request.chip,
-  ).toBe("auto");
-  expect(
-    resolve(`chip=auto&window=${window}`, { ...caps, chipsByEntry: {} }).request.chip,
-  ).not.toBe("auto");
+  expect(resolve(`chip=3xc&window=${window}&top100=20`, caps)).toMatchObject({
+    status: "not-listed",
+    path: null,
+    request: { chip: "3xc", top100Weight: 20 },
+    computable: { selection: true, chipStrategy: true },
+  });
 });
 
 it.each([1, 3, 5])(
-  "offers no automatic chip timing over %i weeks without its capability",
+  "never asks for automatic chip timing over %i weeks, even with the chip strategy capability",
   (window) => {
-    // Audit 2026-09-25, H3: the backend no longer advertises the chip strategy. The
-    // "Automatic strategy" radio renders only when computable.chipStrategy is true.
-    const caps: AdviceCapabilities = { ...WHOLE_MENU, chipsByEntry: { [ENTRY]: ["3xc"] } };
-    for (const link of [`chip=auto&window=${window}`, `chip=auto&window=${window}&top100=20`]) {
-      const selection = resolve(link, caps);
-      expect(selection.computable?.chipStrategy).toBe(false);
-      expect(selection.request.chip).not.toBe("auto");
+    // Audit 2026-09-25, H3: the capability still opens named chips over longer windows
+    // and with Top100, but a link naming chip=auto falls back like a chip the page does
+    // not offer, and asks for the plan without a chip.
+    const caps: AdviceCapabilities = {
+      ...WHOLE_MENU,
+      chipStrategyWindows: [1, 3, 5],
+      chipsByEntry: { [ENTRY]: ["3xc"] },
+    };
+    for (const rest of [`window=${window}`, `window=${window}&top100=20`]) {
+      const selection = resolve(`chip=auto&${rest}`, caps);
+      expect(selection.computable?.chipStrategy).toBe(true);
+      expect(selection.chip.notOffered).toBe(true);
+      expect(selection.request.chip).toBeNull();
+      expect(selection.request).toStrictEqual(resolve(rest, caps).request);
     }
   },
 );

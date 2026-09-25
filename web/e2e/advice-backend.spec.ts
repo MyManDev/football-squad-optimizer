@@ -94,14 +94,21 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     .filter({ has: page.locator(`a[href="/league/members/${context.entryId}"]`) })
     .getByRole("button", { name: "Bu benim", exact: true })
     .click();
-  const offered = await (await capabilities).json();
-  expect(offered).toMatchObject({
+  expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
+    chips: { strategy: { windows: [1, 3, 5] } },
   });
-  // The automatic chip strategy is not offered (audit 2026-09-25, H3).
-  expect(offered.chips).toBeDefined();
-  expect(offered.chips).not.toHaveProperty("strategy");
+  // The automatic chip strategy is refused before any cache read or job (audit
+  // 2026-09-25, H3), while the capability above keeps the named chips over 3 and 5 weeks.
+  const automatic = { strategy: "saf-puan", window: 3, chip: "auto" };
+  for (const refused of [
+    await page.request.post(route, { data: automatic }),
+    await page.request.get(route, { params: automatic }),
+  ]) {
+    expect(refused.status()).toBe(422);
+    expect((await refused.json()).error.code).toBe("UNSUPPORTED_ADVICE_REQUEST");
+  }
   await expect(
     page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer"),
   ).toBeVisible();

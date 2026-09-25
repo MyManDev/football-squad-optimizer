@@ -27,7 +27,10 @@ TOP100_WEIGHTS: tuple[int, ...] = (0, 5, 10, 20, 30, 40, 50)
 #: The automatic chip strategy's request value. It is a known, well-formed choice that the
 #: member menu refuses: its value for holding a chip is built from the window's own weeks,
 #: so it spends a chip inside the window however many weeks the right has left (audit
-#: 2026-09-25, H3). ``planning/chip_strategy.py`` keeps the planner for research.
+#: 2026-09-25, H3). ``planning/chip_strategy.py`` keeps the planner for research. The
+#: capabilities still carry ``chips.strategy``: it opens a named chip over 3 and 5 weeks and
+#: a chip with a Top 100 setting, which force the named chip and carry no holding value.
+#: The page never offers ``auto`` (``AUTOMATIC_CHIP_OFFERED`` in ``web/.../chipChoice.ts``).
 AUTOMATIC_CHIP = "auto"
 
 
