@@ -190,10 +190,13 @@
 }
 
 /* The phone's compact strip, as D-Phone-Bu-Hafta draws it: a sidebar-green band right
-   under the phone bar. The team, the week and the short deadline share the first line
-   (a long team name pushes the week to the next), and the score bug follows as one row of
-   quiet cells, the label in sentence case over the figure, split by hairlines as on a
-   desktop. Labels are ink2 on the band (6.1:1). */
+   under the phone bar. The team, the week and the short deadline share the first line,
+   always: the week and the deadline keep their width and a team name that does not fit in
+   what is left ends in an ellipsis (the sidebar's member block prints it whole). A 390 px
+   phone has under a pixel to spare for a 17-letter name, so a wrap here would depend on
+   how each system draws the fonts, and it cost 26 px of the first screen. The score bug
+   follows as one row of quiet cells, the label in sentence case over the figure, split by
+   hairlines as on a desktop. Labels are ink2 on the band (6.1:1). */
 @media (max-width: 599.98px) {
   .topBar {
     display: flex;
@@ -208,12 +211,25 @@
     background: var(--color-surface-2);
   }
 
+  /* A zero basis keeps the name from pushing the week to a second line; it then grows into
+     the room the week leaves, up to its own width, so the week still follows it. */
+  .topIdentity {
+    flex: 1 1 0;
+    max-width: max-content;
+  }
+
   .teamName {
+    min-width: 0;
+    overflow: hidden;
     font-size: 18px;
     line-height: 22px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-wrap: normal;
   }
 
   .topWeek {
+    flex: 0 0 auto;
     align-items: baseline;
     gap: var(--space-2);
   }
@@ -225,8 +241,8 @@
 
   .deadline {
     flex-direction: row;
-    flex-wrap: wrap;
     gap: 0 var(--space-1);
+    white-space: nowrap;
   }
 
   .deadlineLong {
