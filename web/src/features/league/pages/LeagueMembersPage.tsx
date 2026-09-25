@@ -166,21 +166,26 @@ export function LeagueMembersView({
               </p>
             ) : (
               <p className={styles.viewerLine}>
-                {viewerRow ? (
-                  <>
+                {/* The claim on its own line, then its actions together on the next. */}
+                <span className={styles.viewerState}>
+                  {viewerRow ? (
                     <strong>
                       {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
-                    </strong>{" "}
+                    </strong>
+                  ) : (
+                    copy.viewerMissing
+                  )}
+                </span>{" "}
+                {viewerRow ? (
+                  <>
                     <Link
                       className={styles.viewerAction}
                       to={`/league/members/${viewerRow.entry_id}`}
                     >
                       {copy.viewerOpenMine}
-                    </Link>
+                    </Link>{" "}
                   </>
-                ) : (
-                  <>{copy.viewerMissing}</>
-                )}{" "}
+                ) : null}
                 <a className={styles.viewerAction} href="#league-member-list">
                   {copy.viewerChange}
                 </a>{" "}

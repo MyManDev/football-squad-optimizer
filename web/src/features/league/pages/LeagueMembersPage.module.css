@@ -91,6 +91,10 @@
   font-weight: 600;
 }
 
+.viewerState {
+  flex-basis: 100%;
+}
+
 .viewerAction,
 .viewerClear {
   display: inline-flex;
@@ -265,24 +269,30 @@ td.total {
   text-decoration: underline;
 }
 
+/* A quiet text action, not a box on every row: fifteen bordered buttons would outweigh
+   the names and figures the table is for. */
 .viewerSelect {
   grid-area: select;
   position: relative;
   z-index: 1;
   min-height: 28px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-line);
+  padding: 0 var(--space-1);
+  border: 0;
   border-radius: var(--radius-s);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
+  background: transparent;
+  color: var(--color-accent);
   font-size: var(--step--2);
+  font-weight: 500;
   line-height: 16px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .viewerSelect:hover {
-  border-color: var(--color-text-muted);
   color: var(--color-text);
+  text-decoration-thickness: 2px;
 }
 
 /* Once the visitor has said who they are, the other rows' 'Bu benim' waits for the pointer
@@ -425,7 +435,7 @@ td.total {
   }
 
   .viewerSelect {
-    padding: 0 var(--space-3);
+    padding: 0 var(--space-2);
   }
 
   .table tbody td {
@@ -445,7 +455,7 @@ td.total {
   }
 
   .viewerSelect {
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-1);
   }
 
   th.week,
