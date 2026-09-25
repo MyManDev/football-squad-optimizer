@@ -83,6 +83,32 @@ it.each<Language>(["tr", "en"])(
     ).not.toBeInTheDocument();
   },
 );
+it.each<Language>(["tr", "en"])(
+  "prints a scenario-menu mode's recorded price, which never has a ceiling, in %s",
+  async (language) => {
+    // The scenario menu prices a mode as a difference between two scenario means, not
+    // against a solved plan, and publishes no ceiling for it.
+    const value = history();
+    Object.assign(value.payload.weeks[0], {
+      recorded_plans: [
+        {
+          ...planRows[0],
+          published_path: "advice/101/garantici/1.json",
+          strategy: "garantici",
+          expected_points_cost: 3,
+        },
+      ],
+    });
+    show(value, language);
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    await userEvent.click(screen.getByText(MESSAGES[language].suggestionHistory.recordedPlans));
+    expect(
+      screen.getByText(
+        MESSAGES[language].leagueMembers.planCost(language === "tr" ? "3,0" : "3.0"),
+      ),
+    ).toBeVisible();
+  },
+);
 it("does not display negative archived prices", async () => {
   const value = history();
   Object.assign(value.payload.weeks[0], {

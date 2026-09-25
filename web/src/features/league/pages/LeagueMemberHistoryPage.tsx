@@ -20,6 +20,9 @@ import { publishedPrice } from "../advice/publishedPrice";
 import { loadLeagueMembers } from "../data";
 import type { EntryView } from "../types";
 
+/** The modes the scenario menu prices (`build_league_site.py --mode-residuals`). */
+const SCENARIO_MODES: ReadonlySet<string> = new Set(["garantici", "agresif", "asiri-agresif"]);
+
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
   const copy = messages.suggestionHistory;
@@ -391,14 +394,18 @@ function RecordedPlans({ week, members }: { week: WeekReview; members: EntryView
       <p>{copy.recordedPlansNote}</p>
       <ul>
         {week.recorded_plans.map((plan) => {
-          // A record keeps the price and its ceiling, not the proofs behind them. A ceiling
-          // is published only where the plan the price is measured against was proven, and
-          // it is then the price itself. A record with no ceiling, or (from before that
-          // rule) one that differs from its price, was measured against a plan nobody
-          // proved, and its figure bounds nothing, so no price is printed for it.
+          // A scenario-menu mode is priced as the difference between two scenario means,
+          // not against a solved plan, and never carries a ceiling; its recorded cost is
+          // printed as it was. Every other record keeps the price and its ceiling, not the
+          // proofs behind them. A ceiling is published only where the plan the price is
+          // measured against was proven, and it is then the price itself. Such a record
+          // with no ceiling, or (from before that rule) one that differs from its price,
+          // does not show that its price was measured against a proven plan, so no price
+          // is printed for it.
           const price =
-            plan.expected_points_cost_ceiling !== undefined &&
-            plan.expected_points_cost_ceiling === plan.expected_points_cost
+            SCENARIO_MODES.has(plan.strategy) ||
+            (plan.expected_points_cost_ceiling !== undefined &&
+              plan.expected_points_cost_ceiling === plan.expected_points_cost)
               ? publishedPrice({
                   ...plan,
                   word: plan.managers_word === true,
