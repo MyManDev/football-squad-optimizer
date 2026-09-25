@@ -429,7 +429,12 @@ def test_documents_read_after_the_decision_capture_refuse_the_week(tmp_path: Pat
 
 
 def test_an_unregistered_page_is_never_requested(tmp_path: Path) -> None:
-    """The registry is the permission, so a URL outside it produces no request at all."""
+    """The registry is the permission, so a page it does not name is not requested.
+
+    Man Utd's pages share Arsenal's host, but here they are not registered and do not sit under
+    the registered page's path, so they produce no request at all. (A page the registered one
+    links to under its own path is an article and is read; the unit tests hold that rule.)
+    """
 
     host = _Host()
     registry = _registry(tmp_path / "club_news_sources.json", clubs=("Arsenal",))

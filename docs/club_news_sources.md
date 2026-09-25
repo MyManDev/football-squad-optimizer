@@ -10,29 +10,36 @@ This is a judgement, not a computation. The reading below is a person's, dated a
 and nothing in the code decides it. What the code does is narrower and worth stating so the
 two are not confused:
 
-- It refuses a URL that is not in the registry.
+- It never contacts a host that is not in the registry, by a link or by a redirect. On a
+  registered host it requests the host's `robots.txt`, the registered pages, the article
+  links described below and the same-origin addresses those redirect to, and nothing else.
 - It refuses a host whose reading below is more than 90 days old, or undated, before any
   request to it, `robots.txt` included. See [When a reading ages](#when-a-reading-ages).
 - It reads the host's `robots.txt` through the same reader as the document and refuses a
   disallowed path, recording that club as **not covered** rather than reading it anyway.
-- It asks that question of the origin the registry names, so it **refuses a redirect that is
-  answered by a different origin** rather than following it. One host's `robots.txt` is not
-  the other's, and neither is the reading signed in the table below. The request has already
-  gone by the time the serving host is known, so what the refusal buys is that the bytes are
-  not read and the club is recorded as not covered; the fix is to register the origin that
-  answers and sign its reading, after which there is no redirect left.
+- It asks that question of the origin the registry names, so it **refuses a redirect to a
+  different origin before following it**: the other host is sent no request, and the page is
+  recorded as not read (for a registered page, its club as not covered). One host's
+  `robots.txt` is not the other's, and neither is the reading signed in the table below. A
+  redirect within the same scheme, host and port is followed. A `robots.txt` that redirects to
+  another origin counts as one that could not be read, so that host is refused. The fix is to
+  register the origin that answers and sign its reading, after which there is no redirect left.
 - It treats a `robots.txt` that cannot be read as an unanswered question, not as consent.
   "We could not ask" is not "they said yes".
 - It sends one identity (`squadopt/1.0`) and reads registered paths, in the order the
   registry declares them; a club may have more than one.
 - From a registered HTML page it follows **article links, and no others**: a link on the same
   origin, under the registered page's own path (`/news` leads to `/news/...`), in the order
-  the page lists them, at most ten per host per run. Each article is asked of the same
-  `robots.txt`, waits the same interval and meets the same refusals as a registered page,
-  and is stored as its own document with its own readable text. A link to another host is
-  never requested, an article's own links are not followed, and a feed's item links are not
-  followed because the feed already carries the items' words. An article that fails costs
-  that article: the club's coverage rests on its registered page.
+  the page lists them, at most ten per host per run. The path is the registered one even when
+  a same-origin redirect served the page somewhere else, so a page that is served at another
+  path should be registered where it is served. A link whose printed or resolved path has a
+  `.` or `..` segment, written out or percent-encoded, is skipped rather than resolved. Each
+  article is asked of the same `robots.txt`, waits the same interval and meets the same
+  refusals as a registered page, and is stored as its own document with its own readable
+  text. A link to another host is never requested, an article's own links are not followed,
+  and a feed's item links are not followed because the feed already carries the items'
+  words. An article that fails costs that article: the club's coverage rests on its
+  registered page.
 - It asks a host for its `robots.txt` **once per run**, however many registered paths that
   host serves, and decides each path against the one file it read. One club with three pages
   is one question, not three.

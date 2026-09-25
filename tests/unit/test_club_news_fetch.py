@@ -2,7 +2,9 @@
 
 Every test here is offline. The opener is injected, so what the adapter would have sent and
 how it judges what came back are both asserted without a request leaving the machine --
-which is also the only way to test a 429 followed by a 200, or a host that disallows us.
+which is also the only way to test a 429 followed by a 200, or a host that disallows us. The
+few tests about how the real opener handles a redirect keep that promise another way: they
+answer from a server on the loopback, or from a table put in place of urllib's https socket.
 
 The refusals carry the weight. A fetch that fails loudly costs a club's coverage for one
 week, which this lane records honestly; a fetch that succeeds with the wrong bytes puts a
@@ -10,12 +12,18 @@ citation in front of a member. So the tests below are mostly about the second ne
 happening quietly.
 """
 
+import http.client
+import io
 import json
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Sequence
+import urllib.response
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +37,9 @@ from squadopt.platform.club_news_fetch import (
     TERMS_READING_VALID_DAYS,
     ClubNewsFetchError,
     ClubSource,
+    SameOriginRedirects,
     article_links,
+    default_opener,
     fetch_club_document,
     fetch_registered_documents,
     load_club_sources,
@@ -183,6 +193,234 @@ def test_the_origin_refusal_follows_the_robots_switch() -> None:
     )
 
     assert document.final_url == "https://cdn.other.example/team-news"
+
+
+# --- a redirect is followed only within the origin that was asked --------------
+
+
+@contextmanager
+def _loopback_host(
+    routes: dict[str, tuple[int, dict[str, str], bytes]],
+) -> Iterator[tuple[str, list[str]]]:
+    """A real HTTP server on the loopback, answering ``routes`` by path and recording each GET.
+
+    The fake opener above cannot show what this section is about: it hands back a prepared
+    ``final_url`` and never makes the request a redirect would make. Only a real transport
+    shows whether a redirect's target was sent a request, so these tests use one.
+    """
+
+    requested: list[str] = []
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            requested.append(self.path)
+            status, headers, body = routes.get(self.path, (404, {}, b""))
+            self.send_response(status)
+            for name, value in headers.items():
+                self.send_header(name, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}", requested
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def _no_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep a machine's proxy settings from carrying loopback requests anywhere else."""
+
+    monkeypatch.setenv("no_proxy", "*")
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_a_redirect_to_another_origin_is_never_requested_from_it() -> None:
+    """The other host is sent nothing, rather than sent a request whose answer is discarded.
+
+    The origin check in ``fetch_club_document`` reads the final URL, which exists only after
+    the request to it has gone. An article link is printed by a club's page and nobody checked
+    where it redirects, so the transport itself must stop at the redirect: the second server
+    here stands for a host with no reading and no ``robots.txt`` asked, and it is never called.
+    """
+
+    registered_routes: dict[str, tuple[int, dict[str, str], bytes]] = {}
+    elsewhere_routes = {"/elsewhere": (200, {"Content-Type": "text/html"}, b"<p>Other.</p>")}
+    with (
+        _loopback_host(elsewhere_routes) as (elsewhere, elsewhere_requested),
+        _loopback_host(registered_routes) as (origin, requested),
+    ):
+        registered_routes["/news/article"] = (302, {"Location": f"{elsewhere}/elsewhere"}, b"")
+
+        with pytest.raises(ClubNewsFetchError, match="HTTP 302") as refusal:
+            read_url(f"{origin}/news/article", opener=default_opener, sleeper=lambda _: None)
+
+    assert requested == ["/news/article"]
+    assert elsewhere_requested == []
+    assert "another origin" in str(refusal.value)
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_a_redirect_within_the_origin_is_still_followed() -> None:
+    """A page that moved on its own host is read where it moved to, as before."""
+
+    routes = {
+        "/news/old": (301, {"Location": "/news/new"}, b""),
+        "/news/new": (200, {"Content-Type": "text/html"}, b"<p>Moved.</p>"),
+    }
+    with _loopback_host(routes) as (origin, requested):
+        read = read_url(f"{origin}/news/old", opener=default_opener, sleeper=lambda _: None)
+
+    assert requested == ["/news/old", "/news/new"]
+    assert read.final_url == f"{origin}/news/new"
+    assert read.content == b"<p>Moved.</p>"
+
+
+def test_the_redirect_rule_compares_origins_before_anything_is_sent() -> None:
+    """Driven directly: a new request is built only for the same scheme, host and port.
+
+    The host is compared without case, as host names are; another port or plain http is
+    another origin, as it is for the registry.
+    """
+
+    handler = SameOriginRedirects()
+    request = urllib.request.Request(ARTICLE_ONE)
+    headers = http.client.HTTPMessage()
+
+    followed = handler.redirect_request(
+        request, io.BytesIO(), 302, "Found", headers, "https://Club.Example/team-news/b"
+    )
+
+    assert followed is not None
+    assert followed.full_url == "https://Club.Example/team-news/b"
+    for elsewhere in (
+        "https://other.example/team-news/b",
+        "https://club.example:8443/team-news/b",
+        "http://club.example/team-news/b",
+    ):
+        with pytest.raises(urllib.error.HTTPError, match="another origin"):
+            handler.redirect_request(request, io.BytesIO(), 302, "Found", headers, elsewhere)
+
+
+class _HttpsTable:
+    """urllib's https socket replaced by a table, with every request it is handed recorded.
+
+    Only the socket goes. ``default_opener`` still builds its own opener, the redirect handler
+    still decides whether a 30x is followed, and a followed one still arrives here as a new
+    request, so what is recorded is what a real run would have sent. That lets the whole
+    reader, with its https-only sources, run through the real transport offline.
+    """
+
+    def __init__(self, routes: dict[str, tuple[int, dict[str, str], bytes]]) -> None:
+        self.routes = routes
+        self.requested: list[str] = []
+
+    def answer(self, request: urllib.request.Request) -> urllib.response.addinfourl:
+        self.requested.append(request.full_url)
+        status, headers, body = self.routes.get(request.full_url, (404, {}, b""))
+        message = http.client.HTTPMessage()
+        for name, value in headers.items():
+            message[name] = value
+        response = urllib.response.addinfourl(io.BytesIO(body), message, request.full_url, status)
+        # What `http.client` sets and urllib's error processor reads as the reason phrase.
+        response.msg = http.client.responses.get(status, "")  # type: ignore[attr-defined]
+        return response
+
+
+def _answer_https_from(monkeypatch: pytest.MonkeyPatch, routes: Any) -> _HttpsTable:
+    table = _HttpsTable(routes)
+    monkeypatch.setattr(
+        urllib.request.HTTPSHandler,
+        "https_open",
+        lambda _handler, request: table.answer(request),
+    )
+    return table
+
+
+_ALLOW_ALL = (200, {"Content-Type": "text/plain"}, b"User-agent: *\nAllow: /\n")
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_an_article_that_redirects_off_the_host_sends_that_host_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The path article links opened, read the way a real run reads it.
+
+    A registered address is one somebody checked. An article link is printed by the club's
+    page, and nobody checked where it redirects. Here one redirects to a host with no reading:
+    that host receives no request, the article is named as not read, and the club's other
+    article and its registered page are read as before.
+    """
+
+    moved = f"{PAGE}/moved"
+    elsewhere = "https://other.example/team-news/moved"
+    page = b"<a href='/team-news/moved'>Moved</a><a href='/team-news/saka-fit'>Saka</a>"
+    table = _answer_https_from(
+        monkeypatch,
+        {
+            ROBOTS: _ALLOW_ALL,
+            PAGE: (200, {"Content-Type": "text/html"}, page),
+            moved: (302, {"Location": elsewhere}, b""),
+            "https://other.example/robots.txt": _ALLOW_ALL,
+            elsewhere: (200, {"Content-Type": "text/html"}, b"<p>Elsewhere.</p>"),
+            ARTICLE_ONE: (200, {"Content-Type": "text/html"}, ARTICLE_ONE_BODY),
+        },
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE,), now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert table.requested == [ROBOTS, PAGE, moved, ARTICLE_ONE]
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    assert len(refused) == 1
+    club, reason = refused[0]
+    assert club == "Example FC"
+    assert f"An article linked from {PAGE}" in reason
+    assert "HTTP 302" in reason
+    assert "another origin" in reason
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_a_robots_file_that_redirects_off_the_host_is_one_that_could_not_be_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Another host's ``robots.txt`` does not answer for this one, so the host is refused.
+
+    Following the redirect used to parse the other host's file as this host's preference.
+    Now the other host is sent nothing, the preference is unknown, and the club is recorded
+    as not covered, which is what an unreadable ``robots.txt`` has always cost.
+    """
+
+    table = _answer_https_from(
+        monkeypatch,
+        {
+            ROBOTS: (301, {"Location": "https://other.example/robots.txt"}, b""),
+            "https://other.example/robots.txt": _ALLOW_ALL,
+            PAGE: (200, {"Content-Type": "text/html"}, b"<p>News.</p>"),
+        },
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE,), now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert table.requested == [ROBOTS]
+    assert documents == ()
+    assert len(refused) == 1
+    club, reason = refused[0]
+    assert club == "Example FC"
+    assert "could not be read" in reason
+    assert "HTTP 301" in reason
 
 
 def test_the_fetch_instant_comes_from_the_clock_and_not_the_response() -> None:
@@ -747,6 +985,13 @@ ARTICLE_TWO = "https://club.example/team-news/press-conference"
 DEEPER = "https://club.example/team-news/deeper"
 PRIVATE = "https://club.example/team-news/private/injury-list"
 OFF_HOST = "https://other.example/team-news/rumour"
+#: Where three links printed with a dot segment would land. The first is what a browser makes
+#: of ``/team-news/a/../b``; the other two are addresses a server may normalise out from under
+#: the path ``robots.txt`` judged. All three sit under the index's own path as the prefix rule
+#: reads it, so only the dot rule keeps them out.
+DOT_RESOLVED = "https://club.example/team-news/b"
+DOT_ENCODED = "https://club.example/team-news/%2e%2e/tickets"
+DOT_ABSOLUTE = "https://club.example/team-news/./x"
 
 #: An index written the way a club writes one: navigation, a list of headlines, and links
 #: that must not be followed sitting between the ones that must.
@@ -764,6 +1009,9 @@ INDEX = (
     "<li><a href='http://club.example/team-news/insecure'>Plain http</a></li>"
     "<li><a href='/team-news/private/injury-list'>Private</a></li>"
     "<li><a href='/team-news/../tickets'>Climbing out</a></li>"
+    "<li><a href='/team-news/a/../b'>Climbing back in</a></li>"
+    "<li><a href='/team-news/%2e%2e/tickets'>Climbing out, encoded</a></li>"
+    "<li><a href='//club.example/team-news/./x'>A dot, protocol-relative</a></li>"
     "<li><a href='/team-news/café'>Not ASCII</a></li>"
     "<li><a href='mailto:press@club.example'>Mail</a></li>"
     "</ul></body></html>"
@@ -796,6 +1044,9 @@ def _news_host(**overrides: Any) -> _Opener:
         PRIVATE: _Reply(b"<p>Private.</p>", final_url=PRIVATE),
         OFF_HOST: _Reply(b"<p>Rumour.</p>", final_url=OFF_HOST),
         "https://other.example/robots.txt": _allowing_robots(),
+        DOT_RESOLVED: _Reply(b"<p>Resolved.</p>", final_url=DOT_RESOLVED),
+        DOT_ENCODED: _Reply(b"<p>Encoded.</p>", final_url=DOT_ENCODED),
+        DOT_ABSOLUTE: _Reply(b"<p>Absolute.</p>", final_url=DOT_ABSOLUTE),
     }
     replies.update(overrides)
     return _Opener(replies)
@@ -1002,6 +1253,74 @@ def test_a_page_registered_at_the_root_of_its_host_follows_nothing() -> None:
     index = fetch_club_document(root, opener=opener, now=lambda: FIXED_NOW)
 
     assert article_links(root, index) == ()
+
+
+def test_a_link_printed_with_a_dot_segment_is_skipped_and_not_resolved() -> None:
+    """Literal or encoded, relative or absolute: the page did not print a clean address.
+
+    ``/team-news/a/../b`` is the case that shows the rule is about what was printed. A browser
+    resolves it to ``/team-news/b``, which is under the index and would pass every other rule,
+    so only a check on the printed path keeps the reader from requesting an address the page
+    never wrote down.
+    """
+
+    opener = _news_host()
+
+    documents, _refused = _read_news_host(opener)
+
+    for skipped in (DOT_RESOLVED, DOT_ENCODED, DOT_ABSOLUTE):
+        assert skipped not in opener.requested, skipped
+        assert skipped not in [document.requested_url for document in documents], skipped
+
+
+def test_a_link_resolved_against_a_served_address_with_a_dot_segment_is_skipped() -> None:
+    """The printed link is clean here; the address it resolves against is not.
+
+    A query-only link keeps the served page's path as it arrived, encoded dot included, so
+    the resolved path is checked as well as the printed one.
+    """
+
+    served_at = f"{PAGE}/%2e/list"
+    page = b"<a href='?page=2'>Next</a><a href='/team-news/saka-fit'>Saka</a>"
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(page, final_url=served_at)})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert article_links(SOURCE, index) == (ARTICLE_ONE,)
+
+
+def test_links_are_judged_against_the_registered_path_and_not_the_served_one() -> None:
+    """A same-origin redirect to a shallower path does not widen what is followed.
+
+    ``/team-news`` answered at ``/en`` would otherwise make everything under ``/en`` an
+    article, tickets and shop included, which is not what "``/news`` leads to ``/news/...``"
+    in the permission record says. A page served somewhere else is registered where it is
+    served, as Newcastle was.
+    """
+
+    served_at = "https://club.example/en"
+    tickets = "https://club.example/en/tickets/buy"
+    shop = "https://club.example/en/shop/x"
+    page = (
+        b"<a href='/en/tickets/buy'>Tickets</a>"
+        b"<a href='/team-news/saka-fit'>Saka</a>"
+        b"<a href='/en/shop/x'>Shop</a>"
+    )
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(page, final_url=served_at),
+            ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+            tickets: _Reply(b"<p>Tickets.</p>", final_url=tickets),
+            shop: _Reply(b"<p>Shop.</p>", final_url=shop),
+        }
+    )
+
+    documents, refused = _read_news_host(opener)
+
+    assert refused == ()
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    assert tickets not in opener.requested
+    assert shop not in opener.requested
 
 
 # --- a reading ages -----------------------------------------------------------

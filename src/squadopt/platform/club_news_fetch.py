@@ -8,9 +8,11 @@ by it. Nothing in ``data`` or ``application`` reaches a network because of this 
 **Five refusals happen before any bytes are used**, and each one exists because the
 alternative is a silent wrong answer rather than a missing one:
 
-- *The source is not in the registry.* A URL nobody recorded terms for is not read. The
-  registry is the record of what we may read, so a URL absent from it is a URL nobody has
-  answered that question about.
+- *The host is not in the registry.* A host nobody recorded terms for is never contacted,
+  by a link or, through :func:`default_opener`, by a redirect. The registry is the record of
+  what we may read, and a reading is of a host, so on a registered host this reader requests
+  its ``robots.txt``, the registered pages, the article links described below and the
+  same-origin addresses those redirect to, and nothing else.
 - *The host's terms reading is too old, or undated.* A reading is a person's judgement of a
   host on a day, and a host can change its terms without telling anyone. A reading older than
   :data:`TERMS_READING_VALID_DAYS` is not relied on, and the host is not contacted at all, not
@@ -26,11 +28,19 @@ alternative is a silent wrong answer rather than a missing one:
 **It follows one kind of link, and only from a registered page.** A club's news index names
 its articles and carries almost none of their words, so a run that read only the index read
 headlines. From a registered HTML page the reader follows links that stay on the registered
-origin and sit under the page's own path (``/news`` leads to ``/news/...``), in the order the
-page lists them, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per host per run. Each article is
+origin and sit under the registered page's own path (``/news`` leads to ``/news/...``, even
+when a same-origin redirect served the page at another path), in the order the page lists
+them, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per host per run. A link whose printed or
+resolved path has a ``.`` or ``..`` segment is skipped rather than resolved. Each article is
 asked of the same ``robots.txt``, waited for under the same interval and judged by the same
 refusals as a registered page, and is stored as its own document with its own readable text.
 A link to any other host is never requested, whatever it says.
+
+**A redirect is followed only within the origin that was asked.** :func:`default_opener`
+stops at a redirect to another scheme, host or port before anything is sent there
+(:class:`SameOriginRedirects`), so a registered page or an article that moved to another host
+costs that page and sends the other host nothing. The same holds for ``robots.txt``: one that
+redirects to another origin is a preference that could not be read, and its host is refused.
 
 **What it does not do.** It does not crawl: an article's own links are not followed, a page
 reached from an article is not read, and a feed's item links are not followed either, because
@@ -328,8 +338,59 @@ class _Read:
 Opener = Callable[[urllib.request.Request, float], Any]
 
 
+def _comparable_origin(url: str) -> tuple[str, str]:
+    """Scheme and host of a URL with the case folded that the standards say does not matter."""
+
+    parsed = urllib.parse.urlsplit(url)
+    return parsed.scheme.lower(), parsed.netloc.lower()
+
+
+class SameOriginRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only when it stays on the origin that was asked; otherwise stop unsent.
+
+    ``urlopen`` follows a 30x to any host. The origin check in :func:`fetch_club_document`
+    reads the final URL, and a final URL exists only after the request to it has gone, so on
+    its own that check discards the other host's bytes but has already sent that host a
+    request carrying our identity, with its ``robots.txt`` never asked and its terms never
+    read. Here the new address is known and nothing has been sent to it yet.
+
+    Same origin means the same scheme and the same host and port, with the host compared
+    without case, as host names are. Anything else raises the ``HTTPError`` the standard
+    handler raises for a redirect it will not follow, so :func:`read_url` reports it as the
+    30x it was and does not retry it. The target is not named in the error: a refusal's text
+    is read by ``robots_allows`` for a 404, and an address is not a status. The refused
+    response's body is closed here rather than left for the collector, since nothing reads it.
+    """
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        if _comparable_origin(newurl) != _comparable_origin(req.full_url):
+            fp.close()
+            raise urllib.error.HTTPError(
+                req.full_url,
+                code,
+                f"{msg}, a redirect to another origin, which is not followed",
+                headers,
+                fp,
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def default_opener(request: urllib.request.Request, timeout: float) -> Any:
-    return urllib.request.urlopen(request, timeout=timeout)
+    """The network, with redirects kept on the origin each request was sent to.
+
+    Built per call rather than once at import, so the machine's proxy settings are the ones
+    in force when the request is made.
+    """
+
+    return urllib.request.build_opener(SameOriginRedirects()).open(request, timeout=timeout)
 
 
 def _instant(moment: datetime) -> str:
@@ -595,10 +656,13 @@ def fetch_club_document(
 ) -> RawDocument:
     """Read one registered club page into a :class:`RawDocument`, or refuse.
 
-    ``final_url`` is what the server actually served after any redirect, because a citation
-    names the page that was read rather than the one that was asked for. The fetch instant
-    is taken from the injected clock so a test can pin it; the publication claim comes from
-    the response header or stays absent.
+    ``final_url`` is what the server actually served after any redirect within the origin,
+    because a citation names the page that was read rather than the one that was asked for.
+    A redirect to another origin is refused: by :class:`SameOriginRedirects` before it is
+    followed, when the default opener is used, and otherwise by the origin check below, which
+    runs whenever ``robots.txt`` is asked. The fetch instant is taken from the injected clock
+    so a test can pin it; the publication claim comes from the response header or stays
+    absent.
 
     The host's terms reading is judged first, before ``robots.txt`` is asked, so a host whose
     reading has aged receives no request at all from this run.
@@ -622,11 +686,11 @@ def fetch_club_document(
         # hypothetical: `www.nufc.co.uk/news` redirects to `www.newcastleunited.com/en/news`,
         # and the first real run read one host under a reading signed for the other (#781).
         #
-        # The request has already gone; the final URL is not knowable before the response,
-        # and a HEAD preflight would double every fetch and still not bind what the GET
-        # returns. So what this refusal buys is narrower and still worth having: the bytes
-        # are not used, the club is recorded as not covered rather than read, and once the
-        # registry names the serving host with a reading of its own the redirect is gone.
+        # With `default_opener` this line is not reached for such a redirect: the transport
+        # refuses it before the other host is sent anything (`SameOriginRedirects`), and the
+        # page arrives here as the 30x it was. This check stays for an opener that follows
+        # redirects itself, where the request has already gone and all it can still do is
+        # keep the bytes out and record the club as not covered.
         raise ClubNewsFetchError(
             f"{source.url} was answered by {_origin_of(read.final_url)}, which is not the "
             f"origin this run asked for permission at ({source.origin}). Its bytes are not "
@@ -698,20 +762,33 @@ def _printable_ascii(url: str) -> bool:
     return all(33 <= ord(character) < 127 for character in url)
 
 
+def _has_dot_segment(path: str) -> bool:
+    """Whether a path has a ``.`` or ``..`` segment, written out or percent-encoded."""
+
+    segments = urllib.parse.unquote(path).split("/")
+    return "." in segments or ".." in segments
+
+
 def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
     """The article URLs a registered page links to, under the one rule this lane follows.
 
-    A link counts when, resolved against the page that was actually served, it
+    A link counts when
 
-    - is on the registered origin: the same scheme and the same host, with the host compared
-      without case and nothing else loosened, so a port, a user name or a look-alike host is
-      another origin and is never named here;
-    - sits strictly under the registered page's own path, or under the path a same-origin
-      redirect served it at, so ``/news`` leads to ``/news/...`` and not to ``/tickets``;
-    - carries no ``.`` or ``..`` segment, because a path that climbs out of the index's path
-      would be judged by ``robots.txt`` under one path and answered by the server under
-      another;
-    - is printable ASCII, which is what a request line carries. A link that would need
+    - the path the page printed has no ``.`` or ``..`` segment, literal or percent-encoded,
+      and neither has the path it resolves to against the page that was actually served. A
+      link like ``/team-news/a/../b`` is skipped, not resolved into ``/team-news/b``: that
+      is an address the page did not print, and an encoded one is worse, since ``robots.txt``
+      would judge it under one path and a server that normalises it would answer another;
+    - it resolves to the registered origin: the same scheme and the same host, with the host
+      compared without case and nothing else loosened, so a port, a user name or a look-alike
+      host is another origin and is never named here;
+    - it sits strictly under the **registered** page's own path, so ``/news`` leads to
+      ``/news/...`` and not to ``/tickets``. Where a same-origin redirect served the page is
+      used to resolve relative links and for nothing else: a page registered at ``/news`` and
+      served at ``/en`` follows nothing under ``/en``, because a shallower served path would
+      make the shop and the ticket office articles. A page served somewhere else is
+      registered where it is served;
+    - it is printable ASCII, which is what a request line carries. A link that would need
       re-encoding is skipped rather than rewritten into an address the page did not print.
 
     The fragment is dropped, since it names a place in a page and not a page; a repeated link
@@ -733,28 +810,24 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
     reader.close()
 
     registered = urllib.parse.urlsplit(source.url)
-    served = urllib.parse.urlsplit(index.final_url)
-    prefixes = tuple(
-        sorted(
-            {f"{path.rstrip('/')}/" for path in (registered.path, served.path) if path.strip("/")}
-        )
-    )
+    if not registered.path.strip("/"):
+        return ()
+    prefix = f"{registered.path.rstrip('/')}/"
     links: list[str] = []
     for href in reader.hrefs:
+        printed = href.strip()
         try:
-            parts = urllib.parse.urlsplit(urllib.parse.urljoin(index.final_url, href.strip()))
+            printed_path = urllib.parse.urlsplit(printed).path
+            parts = urllib.parse.urlsplit(urllib.parse.urljoin(index.final_url, printed))
         except ValueError:
+            continue
+        if _has_dot_segment(printed_path) or _has_dot_segment(parts.path):
             continue
         if parts.scheme.lower() != registered.scheme.lower():
             continue
         if parts.netloc.lower() != registered.netloc.lower():
             continue
-        if not any(
-            parts.path.startswith(prefix) and len(parts.path) > len(prefix) for prefix in prefixes
-        ):
-            continue
-        segments = urllib.parse.unquote(parts.path).split("/")
-        if "." in segments or ".." in segments:
+        if not (parts.path.startswith(prefix) and len(parts.path) > len(prefix)):
             continue
         url = urllib.parse.urlunsplit(
             (registered.scheme, registered.netloc, parts.path, parts.query, "")
@@ -908,6 +981,7 @@ __all__ = [
     "ClubNewsFetchError",
     "ClubSource",
     "HostManners",
+    "SameOriginRedirects",
     "article_links",
     "default_opener",
     "fetch_club_document",
