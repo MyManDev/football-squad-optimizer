@@ -524,4 +524,28 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
       expect(data.loadEntryAdvice).not.toHaveBeenCalled();
     },
   );
+
+  it("names a plan that did not solve in the reader's language, never as its code", async () => {
+    const copy = MESSAGES[language].leagueMembers;
+    const index = mockEntryAdviceIndex(ENTRY);
+    vi.mocked(data.loadEntryAdviceIndex).mockResolvedValue({
+      ...index,
+      payload: {
+        ...index.payload,
+        unavailable: ["saf-puan", "ortak-koru", "fark-yarat"].map((strategy) => ({
+          strategy,
+          rival_entry_id: null,
+          reason: "not_solved_for_member",
+        })),
+      },
+    });
+    vi.mocked(data.loadEntrySquad).mockRejectedValue(
+      new data.LeagueDataMissing(`entries/${ENTRY}.json`),
+    );
+    open(language);
+    expect(await screen.findByText(copy.entryNotAvailable)).toBeInTheDocument();
+    const sentence = copy.publicationReasons.not_solved_for_member;
+    expect(await screen.findAllByText(sentence)).toHaveLength(1);
+    expect(screen.queryByText("not_solved_for_member")).not.toBeInTheDocument();
+  });
 });
