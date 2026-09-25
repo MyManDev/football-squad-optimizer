@@ -3,6 +3,14 @@ import { CHIP_NAMES, currentChipHalf, isEntryChips } from "../chipShape";
 import type { EntrySquad } from "../types";
 import styles from "./ViewerChips.module.css";
 
+/** The order D-Lig lists the chips in: the two squad chips, then the two points chips. */
+const SHOWN = [
+  "wildcard",
+  "freehit",
+  "3xc",
+  "bboost",
+] as const satisfies readonly (typeof CHIP_NAMES)[number][];
+
 /**
  * The viewer's chips for the half of the season being played, one line a chip ('hazır',
  * 'kullanıldı · 4. hafta'), as D-Lig draws them beside the table. In the first half, a
@@ -32,7 +40,7 @@ export function ViewerChips({ squad }: { squad: EntrySquad }) {
       ) : (
         <>
           <ul className={styles.list}>
-            {CHIP_NAMES.map((chip) => {
+            {SHOWN.map((chip) => {
               const window = chips.states[chip]?.[half] ?? null;
               return (
                 <li key={chip} className={styles.chip} data-state={window?.state ?? "none"}>

@@ -73,7 +73,7 @@ export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagu
             {weeks.map((week) => (
               <li key={week.gameweek} className={styles.week}>
                 <span className={styles.weekName}>
-                  {copy.weekLabel(week.gameweek)}
+                  {copy.karneWeek(week.gameweek)}
                   {week.provisional ? (
                     <span className={styles.provisional}>{board.provisional}</span>
                   ) : null}

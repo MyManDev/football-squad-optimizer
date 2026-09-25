@@ -958,6 +958,8 @@ const en = {
     karneTitle: "The system's record",
     karneLede:
       "How many points SquadOpt's own paper squad scored each week, beside the league mean.",
+    // The record's short week name beside its bars; the full name stays in each week's label.
+    karneWeek: (gameweek: number) => `GW${gameweek}`,
     karneOurs: "SquadOpt squad",
     karneLeague: "League mean",
     karneGame: "FPL average",
@@ -2031,6 +2033,7 @@ const tr: MessageSchema<typeof en> = {
     karneTitle: "Sistemin karnesi",
     karneLede:
       "SquadOpt'un kendi kâğıt kadrosu her hafta kaç puan aldı, lig ortalamasıyla yan yana.",
+    karneWeek: (gameweek) => `${gameweek}. hafta`,
     karneOurs: "SquadOpt kadrosu",
     karneLeague: "Lig ortalaması",
     karneGame: "FPL ortalaması",
