@@ -197,6 +197,8 @@ def _compare(
                 "fields": fields,
                 "control_solver_status": before["solver_status"],
                 "candidate_solver_status": after["solver_status"],
+                "control_optimality_gap": round(float(before["optimality_gap"]), 3),
+                "candidate_optimality_gap": round(float(after["optimality_gap"]), 3),
                 "changed_players_brought_in": sorted((squad_after - squad_before) & changed),
             }
         )
