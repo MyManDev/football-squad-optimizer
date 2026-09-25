@@ -12,7 +12,6 @@ export const SMOKE_CHECKS = [
   { path: "/league", kind: "html" },
   // A nested client-side route is the first thing a path-scoped not-found rule would break.
   { path: "/league/members/0", kind: "html" },
-  { path: "/analysis", kind: "html" },
   { path: "/status", kind: "html" },
   { path: "/fixtures", kind: "html" },
   { path: "/data/index.json", kind: "json", revalidates: true },

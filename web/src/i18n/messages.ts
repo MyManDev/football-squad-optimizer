@@ -702,6 +702,8 @@ const en = {
         "Prices are held at the captured values; no price change is modelled.",
       "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
         "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.":
+        "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.",
     } as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
       `The pure-points plan a price would be measured against was not proven optimal: its planner objective (the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, which is not a points total) is within ${gap} of the best value the search could prove. That distance is on the objective, not on points, so it bounds no price and no price is stated.`,
@@ -1821,6 +1823,8 @@ const tr: MessageSchema<typeof en> = {
         "Fiyatlar veri kesitindeki değerlerde tutulur; fiyat değişimi modellenmez.",
       "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
         "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.":
+        "Mevcut model, savunma katkısı (DEFCON) puanı verilmeyen sezonlarla eğitildi; bu yüzden bu puanları tahmin etmez.",
     },
     controlUnprovenBody: (gap: string) =>
       `Bir fiyatın ölçüleceği saf puan planı en iyi diye kanıtlanamadı: planlayıcı amaç değeri (ilk on bir kaptan iki kat, artı yedeklerin onda biri, eksi transfer cezaları; bir puan toplamı değil) aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu uzaklık puan üzerinde değil amaç değeri üzerinde; bir fiyatı sınırlamaz, bu yüzden fiyat belirtilmiyor.`,

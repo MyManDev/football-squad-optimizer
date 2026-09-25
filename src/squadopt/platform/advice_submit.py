@@ -30,6 +30,7 @@ is the discipline around that one write:
 from __future__ import annotations
 
 import math
+import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -108,17 +109,21 @@ class FixedWindowRateLimiter:
         self.window_seconds = self._window
         self._clock = clock
         self._counts: dict[str, tuple[float, int]] = {}
+        # The api runs submissions in its thread pool, so two requests can count one
+        # bucket at once; without the lock both read the same count and one is lost.
+        self._lock = threading.Lock()
 
     def allow(self, bucket: str) -> bool:
-        now = self._clock()
-        started, count = self._counts.get(bucket, (now, 0))
-        if now - started >= self._window:
-            started, count = now, 0
-        if count >= self._limit:
-            self._counts[bucket] = (started, count)
-            return False
-        self._counts[bucket] = (started, count + 1)
-        return True
+        with self._lock:
+            now = self._clock()
+            started, count = self._counts.get(bucket, (now, 0))
+            if now - started >= self._window:
+                started, count = now, 0
+            if count >= self._limit:
+                self._counts[bucket] = (started, count)
+                return False
+            self._counts[bucket] = (started, count + 1)
+            return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +162,8 @@ class AdviceSubmitService:
         # Only the admission callback accesses this map, under the queue transaction.
         # Addresses never enter queue/spec documents; process restart forgets ownership.
         self._client_jobs: dict[str, str] = {}
+        # Serializes the idempotency check with the enqueue it decides; see ``submit``.
+        self._admission = threading.Lock()
 
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
@@ -276,104 +283,112 @@ class AdviceSubmitService:
         )
         fingerprint = command.request_fingerprint
 
-        history = self._queue.jobs()
-        if idempotency_key is not None:
-            # Idempotency history survives terminal state: a key reused for a
-            # different request is a conflict whether or not the first job finished.
-            #
-            # "Different" is decided by the **cache key** as well as the fingerprint. The
-            # fingerprint names the client's fields and the capture; it says nothing about
-            # the handoff, the repository commit or the configuration. So a key replayed
-            # after ops republished a handoff matched here, and the caller was handed the
-            # older job with a 202 — it would poll that job to completion and then be told
-            # its own answer had never been computed, because the completed answer lives at
-            # an address this request does not read.
-            for job in history:
-                if job.idempotency_key == idempotency_key:
-                    if job.request_fingerprint != fingerprint or job.cache_key != cache_key:
-                        raise IdempotencyConflictError(
-                            "This Idempotency-Key was already used for a different request."
-                        )
-                    if not job.is_terminal:
-                        return SubmitOutcome(kind="job", job=job)
-                    # Terminal replay of the same request: the cache answers when it
-                    # can; a failed job means the same key may honestly try again.
-                    replay = self._reader.cached(cache_key)
-                    if replay is not None:
-                        return SubmitOutcome(kind="hit", payload=replay)
-                    break
+        # The key check reads the history and the enqueue writes it later, under the queue
+        # lock but by cache key only. Two submissions from the api's thread pool could both
+        # read a history without the other's job, so one key was accepted for two requests.
+        # One lock per process holds the read through the write; resolving, the cache read
+        # and the rate limit stay outside it. Separate api processes are not serialized.
+        with self._admission:
+            history = self._queue.jobs()
+            if idempotency_key is not None:
+                # Idempotency history survives terminal state: a key reused for a
+                # different request is a conflict whether or not the first job finished.
+                #
+                # "Different" is decided by the **cache key** as well as the fingerprint. The
+                # fingerprint names the client's fields and the capture; it says nothing about
+                # the handoff, the repository commit or the configuration. So a key replayed
+                # after ops republished a handoff matched here, and the caller was handed the
+                # older job with a 202 — it would poll that job to completion and then be told
+                # its own answer had never been computed, because the completed answer lives at
+                # an address this request does not read.
+                for job in history:
+                    if job.idempotency_key == idempotency_key:
+                        if job.request_fingerprint != fingerprint or job.cache_key != cache_key:
+                            raise IdempotencyConflictError(
+                                "This Idempotency-Key was already used for a different request."
+                            )
+                        if not job.is_terminal:
+                            return SubmitOutcome(kind="job", job=job)
+                        # Terminal replay of the same request: the cache answers when it
+                        # can; a failed job means the same key may honestly try again.
+                        replay = self._reader.cached(cache_key)
+                        if replay is not None:
+                            return SubmitOutcome(kind="hit", payload=replay)
+                        break
 
-        # Addressed by the answer, not by the request. Two valid contexts — a redeploy is
-        # enough — share a fingerprint, so counting and naming by it gave both the same
-        # job id: the second submission reserved its own index, reached ``submit``, and
-        # collided on a name that is create-once. One caller got 202 and the other a 500.
-        attempt_ordinal = sum(1 for job in history if job.cache_key == cache_key)
-        record = AdviceJob(
-            job_id=f"advice-{cache_key[:16]}-{attempt_ordinal + 1}",
-            status="queued",
-            request_fingerprint=fingerprint,
-            cache_key=cache_key,
-            created_at_utc=at_utc,
-            updated_at_utc=at_utc,
-            idempotency_key=command.idempotency_key,
-        )
+            # Addressed by the answer, not by the request. Two valid contexts — a redeploy is
+            # enough — share a fingerprint, so counting and naming by it gave both the same
+            # job id: the second submission reserved its own index, reached ``submit``, and
+            # collided on a name that is create-once. One caller got 202 and the other a 500.
+            attempt_ordinal = sum(1 for job in history if job.cache_key == cache_key)
+            record = AdviceJob(
+                job_id=f"advice-{cache_key[:16]}-{attempt_ordinal + 1}",
+                status="queued",
+                request_fingerprint=fingerprint,
+                cache_key=cache_key,
+                created_at_utc=at_utc,
+                updated_at_utc=at_utc,
+                idempotency_key=command.idempotency_key,
+            )
 
-        @contextmanager
-        def admit() -> Iterator[None]:
-            self._client_jobs = {
-                identifier: owner
-                for identifier, owner in self._client_jobs.items()
-                if (owned := self._queue.load(identifier)) is not None and not owned.is_terminal
-            }
-            if (
-                sum(owner == client_bucket for owner in self._client_jobs.values())
-                >= self._max_open_jobs_per_client
-            ):
-                raise OpenJobLimitedError(
-                    "This connection already has the allowed open computations."
-                )
-            self._client_jobs[record.job_id] = client_bucket
-            try:
-                yield
-            except BaseException:
-                self._client_jobs.pop(record.job_id, None)
-                raise
+            @contextmanager
+            def admit() -> Iterator[None]:
+                self._client_jobs = {
+                    identifier: owner
+                    for identifier, owner in self._client_jobs.items()
+                    if (owned := self._queue.load(identifier)) is not None and not owned.is_terminal
+                }
+                if (
+                    sum(owner == client_bucket for owner in self._client_jobs.values())
+                    >= self._max_open_jobs_per_client
+                ):
+                    raise OpenJobLimitedError(
+                        "This connection already has the allowed open computations."
+                    )
+                self._client_jobs[record.job_id] = client_bucket
+                try:
+                    yield
+                except BaseException:
+                    self._client_jobs.pop(record.job_id, None)
+                    raise
 
-        def prepare() -> None:
-            # Only new work reaches this callback: late cache hits and open-job
-            # replays still answer after the deadline, without publishing a new spec.
-            if self._deadline_for is not None and datetime.fromisoformat(
-                at_utc
-            ) >= datetime.fromisoformat(self._deadline_for(context)):
-                raise DeadlinePassedError("This gameweek's deadline has passed.")
-            if self._specs is not None:
-                # Before the job exists, never after: a worker may claim the instant the
-                # record lands, and a claimed job whose request cannot be read is a job
-                # nobody can answer. The rival is normalized exactly as the cache key
-                # normalizes it, so requests that share an address share a meaning.
-                self._specs.put(
-                    cache_key,
-                    AdviceJobSpec(
-                        league_id=int(league_id),
-                        entry_id=int(entry_id),
-                        strategy=strategy,
-                        window=int(window),
-                        context=context,
-                        rival_entry_id=(
-                            rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+            def prepare() -> None:
+                # Only new work reaches this callback: late cache hits and open-job
+                # replays still answer after the deadline, without publishing a new spec.
+                if self._deadline_for is not None and datetime.fromisoformat(
+                    at_utc
+                ) >= datetime.fromisoformat(self._deadline_for(context)):
+                    raise DeadlinePassedError("This gameweek's deadline has passed.")
+                if self._specs is not None:
+                    # Before the job exists, never after: a worker may claim the instant the
+                    # record lands, and a claimed job whose request cannot be read is a job
+                    # nobody can answer. The rival is normalized exactly as the cache key
+                    # normalizes it, so requests that share an address share a meaning.
+                    self._specs.put(
+                        cache_key,
+                        AdviceJobSpec(
+                            league_id=int(league_id),
+                            entry_id=int(entry_id),
+                            strategy=strategy,
+                            window=int(window),
+                            context=context,
+                            rival_entry_id=(
+                                rival_entry_id
+                                if self._reader.strategy_uses_rival(strategy)
+                                else None
+                            ),
+                            # Exactly what entered the key: the switch values and the identity
+                            # of the inputs they were accepted against.
+                            switches=resolved.switches,
                         ),
-                        # Exactly what entered the key: the switch values and the identity
-                        # of the inputs they were accepted against.
-                        switches=resolved.switches,
-                    ),
-                )
+                    )
 
-        # Completion publishes cache bytes and removes the open reservation under the
-        # same lock as this final cache check and enqueue decision. An earlier miss must
-        # not create a second job after another worker has already answered it.
-        winner = self._queue.submit_unless_cached(
-            record, read_cached=self._reader.cached, admit=admit, prepare=prepare
-        )
-        if isinstance(winner, bytes):
-            return SubmitOutcome(kind="hit", payload=winner)
-        return SubmitOutcome(kind="job", job=winner)
+            # Completion publishes cache bytes and removes the open reservation under the
+            # same lock as this final cache check and enqueue decision. An earlier miss must
+            # not create a second job after another worker has already answered it.
+            winner = self._queue.submit_unless_cached(
+                record, read_cached=self._reader.cached, admit=admit, prepare=prepare
+            )
+            if isinstance(winner, bytes):
+                return SubmitOutcome(kind="hit", payload=winner)
+            return SubmitOutcome(kind="job", job=winner)
