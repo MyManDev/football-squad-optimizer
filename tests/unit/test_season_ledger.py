@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 from squadopt.data.snapshots import read_snapshot, write_snapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.live import (
     SEASON_LEDGER_CONTRACT_VERSION,
     LedgerError,
@@ -89,7 +89,12 @@ def _bootstrap(**overrides: Any) -> bytes:
     return json.dumps(document).encode("utf-8")
 
 
-def _capture(tmp_path: Path, bootstrap: bytes | None = None, captured_at: str = CAPTURED_AT) -> Any:
+def _capture(
+    tmp_path: Path,
+    bootstrap: bytes | None = None,
+    captured_at: str = CAPTURED_AT,
+    extra: dict[str, bytes] | None = None,
+) -> Any:
     metadata = write_snapshot(
         tmp_path,
         source="fpl-live",
@@ -97,9 +102,30 @@ def _capture(tmp_path: Path, bootstrap: bytes | None = None, captured_at: str = 
         payloads={
             BOOTSTRAP_PAYLOAD: _bootstrap() if bootstrap is None else bootstrap,
             FIXTURES_PAYLOAD: b"[]",
+            **(extra or {}),
         },
     )
     return read_snapshot(tmp_path, metadata.snapshot_id)
+
+
+def _live(points: dict[int, int], default: int = 2) -> bytes:
+    """One week's live document, keyed by element id as the platform publishes it."""
+
+    return json.dumps(
+        {
+            "elements": [
+                {
+                    "id": element["id"],
+                    "stats": {
+                        "minutes": 90,
+                        "starts": 1,
+                        "total_points": points.get(element["code"], default),
+                    },
+                }
+                for element in _elements()
+            ]
+        }
+    ).encode("utf-8")
 
 
 def _panel(*, players: tuple[int, ...] = ()) -> pd.DataFrame:
@@ -522,11 +548,12 @@ def test_realized_points_must_cover_every_selected_player(
 def test_event_points_are_read_by_persistent_code_from_a_finished_gameweek(
     tmp_path: Path,
 ) -> None:
-    finished = [dict(EVENTS[0], finished=True), EVENTS[1]]
+    finished = [dict(EVENTS[0], finished=True, data_checked=True), EVENTS[1]]
     snapshot = _capture(
         tmp_path,
         bootstrap=_bootstrap(events=finished, elements=_elements(event_points={1001: 7})),
         captured_at="2026-08-24T09:00:00Z",
+        extra={live_payload(1): _live({1001: 7})},
     )
 
     points = extract_event_points(snapshot, gameweek=1)
@@ -536,6 +563,30 @@ def test_event_points_are_read_by_persistent_code_from_a_finished_gameweek(
     assert set(points) == {element["code"] for element in _elements()}
 
 
+def test_a_capture_on_the_following_week_settles_the_named_week_from_its_live_document(
+    tmp_path: Path,
+) -> None:
+    """The late-settle case: GW2 is current, so the bootstrap's event_points are GW2's."""
+
+    events = [
+        dict(EVENTS[0], finished=True, data_checked=True, is_current=False),
+        dict(EVENTS[1], finished=False, data_checked=False, is_current=True),
+    ]
+    gw2_running = {element["code"]: 9 for element in _elements()} | {1001: 13}
+    snapshot = _capture(
+        tmp_path,
+        bootstrap=_bootstrap(events=events, elements=_elements(event_points=gw2_running)),
+        captured_at="2026-08-29T09:00:00Z",
+        extra={live_payload(1): _live({1001: 7}), live_payload(2): _live(gw2_running)},
+    )
+
+    points = extract_event_points(snapshot, gameweek=1)
+
+    assert points[1001] == 7.0
+    assert all(value == 2.0 for code, value in points.items() if code != 1001)
+    assert set(points) == set(gw2_running)
+
+
 def test_an_unfinished_gameweek_cannot_be_settled(tmp_path: Path) -> None:
     snapshot = _capture(tmp_path, bootstrap=_bootstrap(elements=_elements(event_points={})))
 
@@ -543,11 +594,47 @@ def test_an_unfinished_gameweek_cannot_be_settled(tmp_path: Path) -> None:
         extract_event_points(snapshot, gameweek=1)
 
 
-def test_a_capture_without_event_points_cannot_settle(tmp_path: Path) -> None:
-    finished = [dict(EVENTS[0], finished=True), EVENTS[1]]
-    snapshot = _capture(tmp_path, bootstrap=_bootstrap(events=finished))
+def test_a_finished_gameweek_that_is_not_yet_checked_cannot_be_settled(tmp_path: Path) -> None:
+    finished = [dict(EVENTS[0], finished=True, data_checked=False), EVENTS[1]]
+    snapshot = _capture(
+        tmp_path,
+        bootstrap=_bootstrap(events=finished, elements=_elements(event_points={})),
+        extra={live_payload(1): _live({})},
+    )
 
-    with pytest.raises(LedgerError, match="no event_points"):
+    with pytest.raises(LedgerError, match="finished but not yet checked"):
+        extract_event_points(snapshot, gameweek=1)
+
+
+def test_a_capture_without_the_weeks_live_document_cannot_settle(tmp_path: Path) -> None:
+    """Refused by name, and the bootstrap's event_points are never read in its place."""
+
+    finished = [dict(EVENTS[0], finished=True, data_checked=True), EVENTS[1]]
+    snapshot = _capture(
+        tmp_path,
+        bootstrap=_bootstrap(events=finished, elements=_elements(event_points={})),
+        extra={live_payload(2): _live({})},
+    )
+
+    with pytest.raises(LedgerError) as refused:
+        extract_event_points(snapshot, gameweek=1)
+
+    message = str(refused.value)
+    assert "event-gw01-live.json" in message and "gameweek 1" in message
+    assert snapshot.metadata.snapshot_id in message
+
+
+def test_a_live_document_naming_a_player_the_bootstrap_lacks_is_refused(tmp_path: Path) -> None:
+    finished = [dict(EVENTS[0], finished=True, data_checked=True), EVENTS[1]]
+    live = json.loads(_live({}))
+    live["elements"].append({"id": 999, "stats": {"minutes": 90, "starts": 1, "total_points": 5}})
+    snapshot = _capture(
+        tmp_path,
+        bootstrap=_bootstrap(events=finished),
+        extra={live_payload(1): json.dumps(live).encode("utf-8")},
+    )
+
+    with pytest.raises(LedgerError, match="cannot be read as gameweek 1's outcome"):
         extract_event_points(snapshot, gameweek=1)
 
 
