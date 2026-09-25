@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,6 +64,13 @@ from squadopt.platform.queue_contracts import (
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
 _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
+# One pattern for the GET query and the POST body: a strategy is a short slug, and
+# anything else is refused before it can reach the menu or be echoed in an error.
+_STRATEGY_PATTERN: Final = r"^[a-z][a-z0-9._-]{0,63}$"
+# The largest advice body the web client can build is 795 bytes (every field at its
+# maximum, 30 preference ids and the rival at 2**53 - 1); the largest a test sends is
+# 129. Four KiB is over five times the first, and a larger body is refused unparsed.
+ADVICE_BODY_MAX_BYTES: Final = 4096
 # A queue transaction holds its lock for milliseconds and gives up after five seconds, so
 # a client told to come back in a couple of seconds finds it free.
 _QUEUE_BUSY_RETRY_AFTER_SECONDS: Final = 2
@@ -120,8 +128,10 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
     strategy = body.get("strategy")
-    if not isinstance(strategy, str) or not strategy.strip():
-        raise BackendApiContractError("strategy must be a non-empty string.")
+    if not isinstance(strategy, str) or not re.fullmatch(_STRATEGY_PATTERN, strategy):
+        raise BackendApiContractError(
+            "strategy must be a lowercase slug of at most 64 letters, digits, '.', '_' or '-'."
+        )
     window = body.get("window")
     if isinstance(window, bool) or window not in (1, 3, 5):
         raise BackendApiContractError("window must be 1, 3, or 5.")
@@ -438,7 +448,7 @@ def create_app(
     def read_advice(
         league_id: Annotated[int, ApiPath(ge=1)],
         entry_id: Annotated[int, ApiPath(ge=1)],
-        strategy: Annotated[str, Query(pattern=r"^[a-z][a-z0-9._-]{0,63}$")],
+        strategy: Annotated[str, Query(pattern=_STRATEGY_PATTERN)],
         window: Annotated[int, Query()],
         rival: Annotated[int | None, Query(ge=1)] = None,
         top100_weight: Annotated[int, Query()] = 0,
@@ -508,9 +518,25 @@ def create_app(
     ) -> Response:
         if advice_submit is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        # A cross-site form can send text/plain without a CORS preflight; only a JSON body
+        # is read, so such a request files no job. Media types ignore case and parameters.
+        media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if media_type != "application/json":
+            return _contract_error(
+                415, "UNSUPPORTED_MEDIA_TYPE", "The POST body must be sent as application/json."
+            )
+        raw = bytearray()
+        async for chunk in request.stream():
+            if len(raw) + len(chunk) > ADVICE_BODY_MAX_BYTES:
+                return _contract_error(
+                    413,
+                    "PAYLOAD_TOO_LARGE",
+                    f"The POST body may be at most {ADVICE_BODY_MAX_BYTES} bytes.",
+                )
+            raw.extend(chunk)
         try:
-            body = await request.json()
-        except Exception:
+            body = json.loads(raw)
+        except (ValueError, RecursionError):
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
         try:
             strategy, window, rival, top100_weight, managers_word, chip, model = _parse_advise_body(

@@ -1018,15 +1018,15 @@ const en = {
         "Chip strategy cannot be combined with the manager's word. Choose Hold chips to use that input. The Top 100 weight remains available with chip strategy.",
       blocked:
         "Switch the manager's word off to choose a chip strategy. You can keep the Top 100 weight.",
-      note: "Automatic plans chip timing and transfers together. A named chip forces this week; hold preserves all chips throughout the window.",
+      note: "A named chip forces this week; hold preserves all chips throughout the window.",
     },
   },
   reasonCodes: {
     no_capture: () => "no capture is held; the calendar is unknown",
     settle_due: (p: ReasonParams) =>
-      `gameweek ${p.gameweek} is finished in the latest capture and its decision has no outcome`,
+      `gameweek ${p.gameweek} is finished and checked in the latest capture and its decision has no outcome`,
     recapture_for_outcome: (p: ReasonParams) =>
-      `gameweek ${p.gameweek} was decided but is not marked finished; the capture is ${p.capture_age_hours} h old`,
+      `gameweek ${p.gameweek} was decided but is not yet marked finished and checked; the capture is ${p.capture_age_hours} h old`,
     await_outcome: (p: ReasonParams) =>
       `gameweek ${p.gameweek} awaits its outcome; next look after ${p.recapture_hours} h`,
     deadline_missed: (p: ReasonParams) =>
@@ -2111,15 +2111,15 @@ const tr: MessageSchema<typeof en> = {
         "Çip stratejisi teknik direktör yorumuyla birleştirilmez. Yorumu kullanmak için Çipleri sakla seçeneğine geç. Top 100 ağırlığı çip stratejisiyle kullanılabilir.",
       blocked:
         "Çip stratejisini seçmek için teknik direktör yorumunu kapat. Top 100 ağırlığını koruyabilirsin.",
-      note: "Otomatik: çipleri kullanma veya saklama zamanını transferlerle birlikte planlar. Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz.",
+      note: "Elle seçim bu haftayı zorlar; sakla seçimi pencere boyunca çip kullanmaz.",
     },
   },
   reasonCodes: {
     no_capture: () => "elde capture yok; takvim bilinmiyor",
     settle_due: (p: ReasonParams) =>
-      `oyun haftası ${p.gameweek} son capture'da bitmiş görünüyor ve kararının sonucu işlenmemiş`,
+      `oyun haftası ${p.gameweek} son veri çekiminde bitmiş ve kontrol edilmiş görünüyor, kararının sonucu henüz işlenmedi`,
     recapture_for_outcome: (p: ReasonParams) =>
-      `oyun haftası ${p.gameweek} karara bağlandı ama bitmiş işaretli değil; capture ${p.capture_age_hours} saatlik`,
+      `oyun haftası ${p.gameweek} karara bağlandı ama henüz bitmiş ve kontrol edilmiş olarak işaretli değil; veri çekimi ${p.capture_age_hours} saatlik`,
     await_outcome: (p: ReasonParams) =>
       `oyun haftası ${p.gameweek} sonucunu bekliyor; ${p.recapture_hours} saat sonra tekrar bakılacak`,
     deadline_missed: (p: ReasonParams) =>

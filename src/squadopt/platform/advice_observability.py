@@ -56,6 +56,7 @@ WORKER_COUNTER_FAMILIES: Final = (
     "advice_jobs_total",
     "advice_solver_status_total",
     "advice_worker_queue_busy_total",
+    "advice_worker_round_failed_total",
 )
 
 _HISTOGRAM_BUCKETS: Final[tuple[float, ...]] = (
