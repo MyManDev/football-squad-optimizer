@@ -1,4 +1,10 @@
-"""Check a published league tree using the three release checks from the tooling seed."""
+"""Check a published league tree using the three release checks from the tooling seed.
+
+Each check expects what each member's advice index declares. An absence the index states,
+with its reason (a menu this run left out, a window or rival pair that did not solve, a
+member with no advice this week), is reported and is not a finding; a document the index
+names that the tree lacks is.
+"""
 
 import argparse
 import json
@@ -22,6 +28,10 @@ QUOTE_FORBIDDEN = re.compile(
     r"|\b50\s*[-/]\s*50\b|fifty[\s-]fifty",
     re.IGNORECASE,
 )
+#: The pure-points strategy, whose longer windows need no rival.
+PURE = "saf-puan"
+#: The Top 100 weights beyond the published plan, for an index that does not list them.
+MENU_WEIGHTS = (5, 10, 20, 30, 40, 50)
 
 
 class Tree:
@@ -71,32 +81,119 @@ def walk(node: object, where: str, problems: list[str]) -> None:
         problems.append(f"{where}: forbidden text {node[:80]!r}")
 
 
+def refusal(index: dict[str, Any]) -> str | None:
+    """The reason a refused member's index states, or None for a member with advice.
+
+    A member the run could not advise gets an index that names no window for any strategy,
+    computes nothing, and repeats one reason per strategy in ``unavailable``; a member with
+    advice always has the one-week pure-points window.
+    """
+
+    windows = index.get("windows")
+    if not isinstance(windows, dict) or any(windows.values()) or index.get("computed"):
+        return None
+    reasons = [row.get("reason") for row in index.get("unavailable") or []]
+    return str(reasons[0]) if reasons else None
+
+
+def stated_unavailable(index: dict[str, Any]) -> dict[tuple[str, int, int | None], str]:
+    """Every (strategy, window, rival) the index says did not solve, with its reason.
+
+    A row without a window is the one-week pair, as the producer writes it and the page
+    reads it.
+    """
+
+    return {
+        (row["strategy"], row.get("window", 1), row.get("rival_entry_id")): str(row.get("reason"))
+        for row in index.get("unavailable") or []
+    }
+
+
+def menu_weights(menu: dict[str, Any]) -> tuple[int, ...]:
+    """The Top 100 weights the menu offers beyond the plan it publishes."""
+
+    published = menu.get("published_weight", 0)
+    return tuple(int(w) for w in menu.get("weights", (0, *MENU_WEIGHTS)) if w != published)
+
+
+def print_absences(absences: list[tuple[int, str]]) -> None:
+    """Name what the indexes say is absent, one line per statement; none of it is a finding."""
+
+    grouped: defaultdict[str, list[int]] = defaultdict(list)
+    for entry, statement in absences:
+        grouped[statement].append(entry)
+    for statement, entries in sorted(grouped.items()):
+        members = ", ".join(str(entry) for entry in entries)
+        print(f"  stated absence, {len(entries)} member(s): {statement} ({members})")
+
+
 def check_variants(read: Callable[[str], Any]) -> list[str]:
     problems: list[str] = []
+    absences: list[tuple[int, str]] = []
     kinds: Counter[tuple[str, int, bool]] = Counter()
     statuses: Counter[tuple[int, str | None]] = Counter()
     ceilings: dict[int, list[float]] = {}
     members = read("members.json")["payload"]["members"]
     humans = [m["entry_id"] for m in members if m.get("member_kind") == "human"]
     for entry in humans:
-        index = read(f"advice/{entry}/index.json")["payload"]
+        envelope = read(f"advice/{entry}/index.json")
+        if envelope is None:
+            problems.append(f"{entry}: no index")
+            continue
+        index = envelope["payload"]
+        refused = refusal(index)
+        if refused is not None:
+            absences.append((entry, f"no advice this week: {refused}"))
+            continue
         rival = index["default_rival_entry_id"]
+        windows = index.get("windows") or {}
+        stated = stated_unavailable(index)
+        for (strategy, window, rival_id), reason in stated.items():
+            against = f" vs {rival_id}" if rival_id is not None else ""
+            absences.append((entry, f"{strategy} window {window}{against} not solved: {reason}"))
+        # The pure-points windows the index names, and, against the default rival, every
+        # rival strategy's windows: the menu is built from these and nothing else.
+        longer = [window for window in windows.get(PURE, []) if window != 1]
+        for window in longer:
+            if read(f"advice/{entry}/{PURE}/{window}.json") is None:
+                problems.append(f"{entry}: advice/{entry}/{PURE}/{window}.json not published")
+        strategies = (
+            [s for s in index.get("strategies") or windows if s != PURE]
+            if rival is not None
+            else []
+        )
+        rival_windows = {
+            strategy: [1, *(w for w in windows.get(strategy, []) if w != 1)]
+            for strategy in strategies
+        }
+        for strategy in strategies:
+            for window in longer:
+                if (
+                    window not in rival_windows[strategy]
+                    and (strategy, window, rival) not in stated
+                ):
+                    problems.append(
+                        f"{entry}: {strategy} window {window} neither published nor stated "
+                        f"unavailable (windows {windows.get(strategy)})"
+                    )
         menu = index.get("top100") or {}
         documents = menu.get("documents") or []
-        expected = {("saf-puan", w, None, s) for w in (3, 5) for s in (5, 10, 20, 30, 40, 50)}
-        if rival is not None:
+        expected: set[tuple[str, int, int | None, int]] = set()
+        if menu.get("available") is True:
+            weights = menu_weights(menu)
+            expected |= {(PURE, w, None, s) for w in longer for s in weights}
             expected |= {
-                (st, w, rival, s)
-                for st in ("ortak-koru", "fark-yarat")
-                for w in (1, 3, 5)
-                for s in (5, 10, 20, 30, 40, 50)
+                (strategy, window, rival, s)
+                for strategy, strategy_windows in rival_windows.items()
+                for window in strategy_windows
+                if (strategy, window, rival) not in stated
+                for s in weights
             }
+        else:
+            absences.append((entry, f"Top 100 menu not published: {menu.get('reason')}"))
         got = {(d["strategy"], d["window"], d["rival_entry_id"], d["weight"]) for d in documents}
         for missing in sorted(expected - got, key=str):
             problems.append(f"{entry}: no document for {missing}")
-        for strategy in ("ortak-koru", "fark-yarat"):
-            if rival is not None and index["windows"].get(strategy) != [1, 3, 5]:
-                problems.append(f"{entry}: {strategy} windows {index['windows'].get(strategy)}")
         targets = [
             (d["path"], d["strategy"], d["window"], d["rival_entry_id"], d["weight"])
             for d in documents
@@ -148,6 +245,7 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
             f"  window {window}: ceiling mean {sum(values) / len(values):.2f}, "
             f"max {max(values):.2f}"
         )
+    print_absences(absences)
     print(f"\n{'ALL GOOD' if not problems else str(len(problems)) + ' PROBLEM(S)'}")
     for problem in problems[:40]:
         print("  " + problem)
@@ -157,6 +255,7 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
 
 def check_top100(read: Callable[[str], Any]) -> list[str]:
     problems: list[str] = []
+    absences: list[tuple[int, str]] = []
     changed: defaultdict[int, int] = defaultdict(int)
     costs: defaultdict[int, list[float]] = defaultdict(list)
     statuses: defaultdict[str, defaultdict[str | None, int]] = defaultdict(lambda: defaultdict(int))
@@ -169,10 +268,21 @@ def check_top100(read: Callable[[str], Any]) -> list[str]:
         if index is None:
             problems.append(f"{entry}: no index")
             continue
-        menu = index["payload"].get("top100")
-        if not menu or not menu.get("available"):
-            problems.append(f"{entry}: menu unavailable {menu}")
+        refused = refusal(index["payload"])
+        if refused is not None:
+            absences.append((entry, f"no advice this week: {refused}"))
             continue
+        menu = index["payload"].get("top100")
+        if not isinstance(menu, dict):
+            problems.append(f"{entry}: index has no top100 entry")
+            continue
+        if menu.get("available") is not True:
+            absences.append((entry, f"Top 100 menu not published: {menu.get('reason')}"))
+            continue
+        stated = {
+            (int(row["weight"]), bool(row["word"])): str(row.get("reason"))
+            for row in menu.get("unavailable") or []
+        }
         base = read(f"advice/{entry}/saf-puan/1.json")
         if base is None or "top100" in base["payload"]:
             problems.append(f"{entry}: baseline missing or carries top100")
@@ -183,13 +293,16 @@ def check_top100(read: Callable[[str], Any]) -> list[str]:
         ):
             if word and not word_on and paths:
                 problems.append(f"{entry}: word paths without the word")
-            for weight in ("5", "10", "20", "30", "40", "50"):
+            for weight in (str(value) for value in menu_weights(menu)):
                 path = paths.get(weight)
                 expected = (
                     f"advice/{entry}/saf-puan/1/top100-{weight}{'-hoca-sozu' if word else ''}.json"
                 )
                 if path is None:
-                    if word_on or not word:
+                    reason = stated.get((int(weight), word))
+                    if reason is not None:
+                        absences.append((entry, f"Top 100 {label} {weight} not solved: {reason}"))
+                    elif word_on or not word:
                         problems.append(f"{entry}: {label} {weight} missing")
                     continue
                 if path != expected:
@@ -237,6 +350,7 @@ def check_top100(read: Callable[[str], Any]) -> list[str]:
         )
     print(f"  solver status {dict((k, dict(v)) for k, v in statuses.items())}")
     print(f"  move reasons {dict(reasons)}")
+    print_absences(absences)
     print(f"\n{'ALL GOOD' if not problems else str(len(problems)) + ' PROBLEM(S)'}")
     for problem in problems[:40]:
         print("  " + problem)
@@ -263,9 +377,14 @@ def check_word(tree: Tree) -> list[str]:
     for member in humans:
         entry = member["entry_id"]
         advice_dir = f"advice/{entry}"
-        index = read(f"{advice_dir}/index.json")["payload"]
+        envelope = read(f"{advice_dir}/index.json")
+        if envelope is None:
+            check(False, f"{entry}: no index")
+            continue
+        index = envelope["payload"]
+        refused = refusal(index)
         evidence = index.get("evidence")
-        if not isinstance(evidence, dict):
+        if refused is None and not isinstance(evidence, dict):
             check(False, f"{entry}: index has no evidence entry")
             continue
         word_file = f"{advice_dir}/saf-puan/1/hoca-sozu.json"
@@ -274,6 +393,9 @@ def check_word(tree: Tree) -> list[str]:
             if tree.live
             else (Path(tree.root) / "league" / word_file).is_file()
         )
+        if refused is not None:
+            check(not word_exists, f"{entry}: no advice this week ({refused}) and no file")
+            continue
         if not evidence.get("available"):
             check(
                 not word_exists,

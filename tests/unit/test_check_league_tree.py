@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 from scripts.check_league_tree import Tree, main
 
+from squadopt.application.league_views import MemberRenderTask, _refused_member_index
+from squadopt.application.top100_weight import NO_TOP100_THIS_RUN
+
 
 def _write(root: Path, path: str, payload: dict) -> None:
     target = root / "league" / path
@@ -14,9 +17,14 @@ def _write(root: Path, path: str, payload: dict) -> None:
     target.write_text(json.dumps({"payload": payload}), encoding="utf-8")
 
 
+def _read(root: Path, path: str) -> dict:
+    return json.loads((root / "league" / path).read_bytes())["payload"]
+
+
 def _tree(root: Path) -> None:
     _write(root, "members.json", {"members": [{"entry_id": 1, "member_kind": "human"}]})
-    _write(root, "advice/1/saf-puan/1.json", {})
+    for window in (1, 3, 5):
+        _write(root, f"advice/1/saf-puan/{window}.json", {})
     word = {
         "mode": "saf-puan",
         "window": 1,
@@ -81,8 +89,10 @@ def _tree(root: Path) -> None:
         "advice/1/index.json",
         {
             "default_rival_entry_id": 2,
-            "windows": {"ortak-koru": [1, 3, 5], "fark-yarat": [1, 3, 5]},
+            "strategies": ["saf-puan", "ortak-koru", "fark-yarat"],
+            "windows": {"saf-puan": [1, 3, 5], "ortak-koru": [1, 3, 5], "fark-yarat": [1, 3, 5]},
             "computed": [],
+            "unavailable": [],
             "evidence": {
                 "available": True,
                 "binding": False,
@@ -91,12 +101,44 @@ def _tree(root: Path) -> None:
             },
             "top100": {
                 "available": True,
+                "published_weight": 0,
+                "weights": [0, 5, 10, 20, 30, 40, 50],
                 "paths": paths,
                 "word_paths": word_paths,
+                "unavailable": [],
                 "documents": documents,
             },
         },
     )
+
+
+def _skip_top100(root: Path) -> None:
+    """Turn the tree into what a ``--skip-top100`` run writes: no menu, and the index says so."""
+
+    index = _read(root, "advice/1/index.json")
+    index["top100"] = {"available": False, "reason": NO_TOP100_THIS_RUN}
+    _write(root, "advice/1/index.json", index)
+    for path in (root / "league/advice/1").rglob("top100-*.json"):
+        path.unlink()
+
+
+def _refuse(root: Path, entry: int, reason: str) -> None:
+    """Add a member the run could not advise, with the index the producer writes for one."""
+
+    members = _read(root, "members.json")
+    members["members"].append({"entry_id": entry, "member_kind": "human"})
+    _write(root, "members.json", members)
+    task = MemberRenderTask(
+        entry_id=entry,
+        label=str(entry),
+        season="2026-27",
+        gameweek=6,
+        league_id=9,
+        rival_ids=(1,),
+        default_rival_id=1,
+        rival_strategies=("ortak-koru", "fark-yarat"),
+    )
+    _write(root, f"advice/{entry}/index.json", _refused_member_index(task, reason=reason))
 
 
 @pytest.mark.parametrize("defect", [None, "variants", "top100", "word"])
@@ -125,6 +167,95 @@ def test_the_three_checks_keep_their_clean_and_defective_outcomes(
         assert "non-binding keeps the captain" in output
     else:
         assert output.count("ALL GOOD") == 2
+
+
+def test_a_skip_top100_tree_with_a_refused_member_passes_and_names_both_absences(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _tree(tmp_path)
+    _skip_top100(tmp_path)
+    _refuse(tmp_path, 3, "No current price for player 7.")
+    assert main([str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert output.count("ALL GOOD") == 3
+    # The variants and Top 100 checks each name both absences, and neither is a finding.
+    assert output.count(f"1 member(s): Top 100 menu not published: {NO_TOP100_THIS_RUN} (1)") == 2
+    assert output.count("1 member(s): no advice this week: No current price for player 7. (3)") == 2
+    assert "ok  3: no advice this week (No current price for player 7.) and no file" in output
+
+
+@pytest.mark.parametrize(
+    ("skip_top100", "missing"),
+    [
+        (False, "advice/1/fark-yarat/5/vs-2/top100-50.json"),
+        (False, "advice/1/saf-puan/1/top100-20.json"),
+        (False, "advice/1/saf-puan/3.json"),
+        (True, "advice/1/saf-puan/5.json"),
+    ],
+)
+def test_a_document_the_index_lists_and_the_tree_lacks_is_still_a_finding(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], skip_top100: bool, missing: str
+) -> None:
+    _tree(tmp_path)
+    if skip_top100:
+        _skip_top100(tmp_path)
+    (tmp_path / "league" / missing).unlink()
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert f"1: {missing} not published" in output
+    assert output.count("ALL GOOD") == 2
+
+
+def test_what_the_index_states_unavailable_is_satisfied_and_what_it_omits_is_not(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _tree(tmp_path)
+    index = _read(tmp_path, "advice/1/index.json")
+    menu = index["top100"]
+    # The pure-points window 5 did not solve, so no rival strategy reached it and no weight
+    # was solved over it; the one-week ortak-koru pair against the default rival did not
+    # solve; and the one-week plan at weight 20 did not solve, with or without the word.
+    index["windows"] = {"saf-puan": [1, 3], "ortak-koru": [1, 3], "fark-yarat": [1, 3]}
+    index["unavailable"] = [
+        {"strategy": "saf-puan", "rival_entry_id": None, "window": 5, "reason": "not_solved"},
+        {"strategy": "ortak-koru", "rival_entry_id": 2, "reason": "not_solved"},
+    ]
+    gone = [
+        document
+        for document in menu["documents"]
+        if document["window"] == 5
+        or (document["strategy"] == "ortak-koru" and document["window"] == 1)
+    ]
+    menu["documents"] = [document for document in menu["documents"] if document not in gone]
+    removed = [
+        *(document["path"] for document in gone),
+        menu["paths"].pop("20"),
+        menu["word_paths"].pop("20"),
+        "advice/1/saf-puan/5.json",
+    ]
+    menu["unavailable"] = [
+        {"weight": 20, "word": word, "reason": "not_solved"} for word in (False, True)
+    ]
+    for path in removed:
+        (tmp_path / "league" / path).unlink()
+    _write(tmp_path, "advice/1/index.json", index)
+    assert main([str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert output.count("ALL GOOD") == 3
+    assert "1 member(s): saf-puan window 5 not solved: not_solved (1)" in output
+    assert "1 member(s): ortak-koru window 1 vs 2 not solved: not_solved (1)" in output
+    assert "1 member(s): Top 100 plain 20 not solved: not_solved (1)" in output
+    assert "1 member(s): Top 100 word 20 not solved: not_solved (1)" in output
+
+    # The same tree with nothing stated: the absences are findings again.
+    index["unavailable"] = []
+    menu["unavailable"] = []
+    _write(tmp_path, "advice/1/index.json", index)
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert "1: no document for ('ortak-koru', 1, 2, 5)" in output
+    assert "1: plain 20 missing" in output
+    assert "stated absence" not in output
 
 
 def test_a_truncated_unavailable_word_file_is_still_a_file(tmp_path, capsys):
