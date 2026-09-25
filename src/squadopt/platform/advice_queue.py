@@ -49,8 +49,13 @@ from squadopt.platform.queue_contracts import (
 )
 
 #: How long a finished answer keeps asking for the queue's lock to record its completion.
-#: A tenth of the lease: the heartbeat still refreshes the claim while it waits, and each
-#: attempt already waits the lock's own bounded timeout.
+#: A tenth of the lease. The heartbeat needs the same lock, so it cannot refresh the claim
+#: while the lock is busy; the margin keeps it instead. An attempt that starts before the
+#: deadline still waits the lock's own 5 s (10 s when the heartbeat holds the in-process
+#: lock), so the whole wait stays under 40 s; 31.3 s was measured with the default
+#: heartbeat and 36.0 s with one every 0.5 s. A claim last refreshed at most one heartbeat
+#: interval (100 s) earlier stays inside the 300 s lease. If recovery walks a claim back
+#: first anyway, ``complete`` finds the lease lost and publishes nothing.
 DEFAULT_COMPLETE_RETRY_SECONDS: Final = DEFAULT_LEASE_SECONDS / 10.0
 _COMPLETE_RETRY_PAUSE_SECONDS: Final = 0.25
 

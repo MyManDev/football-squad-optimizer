@@ -6,6 +6,7 @@ import logging
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -383,6 +384,16 @@ def test_a_lock_busy_past_the_budget_keeps_the_answer_and_leaves_the_job_to_reco
     cache = FileAdviceCache(tmp_path / "cache")
     queue.submit(_job())
     holders: list[threading.Thread] = []
+    stored: list[str] = []
+    real_store = queue.store
+
+    def watched_store(job: AdviceJob) -> None:
+        # Recorded before the lock is asked for: a failure record that is only attempted,
+        # and then times out on the same busy lock, still counts.
+        stored.append(job.status)
+        real_store(job)
+
+    monkeypatch.setattr(queue, "store", watched_store)
 
     def compute(job: AdviceJob) -> bytes:
         holders.append(_hold_the_lock(root, LOCK_TIMEOUT * 3))
@@ -403,7 +414,9 @@ def test_a_lock_busy_past_the_budget_keeps_the_answer_and_leaves_the_job_to_reco
         )
     holders[0].join(timeout=5)
 
-    # Contention is not a failed computation: the job is still open and the answer kept.
+    # Contention is not a failed computation: no failure record was even attempted, the job
+    # is still open and the answer is kept.
+    assert "failed" not in stored
     still = queue.load("job-0001")
     assert still is not None and still.status == "running" and still.error is None
     assert cache.get(CACHE_KEY) == b'{"advice": 1}'
@@ -420,3 +433,46 @@ def test_a_lock_busy_past_the_budget_keeps_the_answer_and_leaves_the_job_to_reco
     done = run_advice_worker_once(queue, cache, must_not_solve_again, at_utc="2026-08-27T12:10:30Z")
     assert done is not None and done.status == "completed" and done.result_ref == CACHE_KEY
     assert cache.get(CACHE_KEY) == b'{"advice": 1}'
+
+
+class _CompleteAlwaysBusy:
+    """A queue whose lock is busy only for ``complete``; every other operation is real."""
+
+    def __init__(self, queue: FileJobQueue) -> None:
+        self._queue = queue
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._queue, name)
+
+    def complete(self, job: AdviceJob, **_kwargs: Any) -> AdviceJob:
+        raise QueueLockTimeout("Queue metadata transaction is busy.")
+
+
+def test_contention_at_completion_is_never_stored_as_a_failure(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No timing: only ``complete`` is busy, so a failure record would be stored if tried."""
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+
+    logger = logging.getLogger("test.advice.contention")
+    with (
+        caplog.at_level(logging.INFO, logger=logger.name),
+        pytest.raises(QueueLockTimeout),
+    ):
+        run_advice_worker_once(
+            _CompleteAlwaysBusy(queue),
+            cache,
+            lambda job: b'{"advice": 1}',
+            at_utc="2026-08-27T12:00:30Z",
+            complete_retry_seconds=0.0,
+            log=AdviceLog("worker", logger),
+        )
+
+    still = queue.load("job-0001")
+    assert still is not None and still.status == "running" and still.error is None
+    assert cache.get(CACHE_KEY) == b'{"advice": 1}'
+    events = [json.loads(record.getMessage())["event"] for record in caplog.records]
+    assert "advice_job_failed" not in events
