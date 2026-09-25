@@ -214,9 +214,11 @@ for (const language of ["tr", "en"] as const) {
       exact: true,
     });
     const body = page.locator("#sidebar [class*='body']").first();
-    expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
-      true,
-    );
+    // Read once the drawer has settled: on a loaded runner the first reading can land while
+    // the drawer is still sliding in and its body has not taken its final height.
+    await expect
+      .poll(() => body.evaluate((element) => element.scrollHeight > element.clientHeight))
+      .toBe(true);
     for (const to of ["top", "bottom"] as const) {
       await body.evaluate((element, where) => {
         element.scrollTop = where === "top" ? 0 : element.scrollHeight;

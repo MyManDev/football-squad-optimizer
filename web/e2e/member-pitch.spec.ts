@@ -105,7 +105,13 @@ async function open(page: Page, width: number, height: number, plan = PLAN, live
   // Measure once the calendar has arrived (the plates' codes and the rail come from it)
   // and the fonts have loaded, so nothing moves between two readings.
   await expect(page.locator('[data-mark="rail-xi"]')).toBeAttached();
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  // Ask for every face the stylesheet declares rather than only those already requested:
+  // on a slow runner `fonts.ready` can settle before a face starts loading, and a reading
+  // taken in the fallback face moves text by a line.
+  await page.evaluate(async () => {
+    await Promise.all([...document.fonts].map((face) => face.load().catch(() => undefined)));
+    await document.fonts.ready;
+  });
 }
 
 type Box = { x: number; y: number; width: number; height: number };
