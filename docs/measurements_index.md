@@ -262,4 +262,4 @@ was written.
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·
 `gw1_blocker_report_template.md` · `fw10_holdout_plan.md` · `opening_week_runbook.md` ·
 `artifact_preflight_spec.md` · `projection_horizon_contract.md` ·
-`rotation_evidence_prereg.md`
+`rotation_evidence_prereg.md` · `football_prospective_prereg.md`
