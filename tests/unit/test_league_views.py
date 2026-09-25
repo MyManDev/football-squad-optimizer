@@ -1646,24 +1646,42 @@ def test_a_rival_that_cannot_be_priced_is_recorded_not_fatal(
 CLOCK_CUT = "was stopped by the 1800s wall-clock safety cap"
 
 
-@pytest.mark.parametrize("stage", ["window", "rival", "baseline"])
+#: What the first member's one-week solve raises in each baseline case: the solver's and
+#: the planner's own words (operator diagnostics), and a gap in the member's own data.
+BASELINE_ERRORS = {
+    "baseline": ("SolverExecutionError", "CP-SAT rejected the generated model as invalid."),
+    "baseline-planner": ("TransferPlanningError", "Transfer counts failed verification."),
+    "baseline-data": ("DataError", "No current price for player 1004."),
+}
+
+
+@pytest.mark.parametrize("stage", ["window", "rival", *BASELINE_ERRORS])
 def test_one_members_solver_error_stays_that_members(
     world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: str
 ) -> None:
-    """The first member's solve raises ``SolverExecutionError`` (a window the wall clock
-    cut short, a rival pair, the baseline itself): that member records it where the
-    module records every other failure, and the second member still gets every document."""
+    """The first member's solve raises (a window the wall clock cut short, a rival pair,
+    the baseline itself): that member records it where the module records every other
+    failure, and the second member still gets every document. A refused member's public
+    index never carries the solver's or the planner's words."""
 
     import datetime
 
     import squadopt.application.advice as advice_module
     import squadopt.application.league_views as league_views_module
     from squadopt.application.advice import member_horizon_builder
+    from squadopt.data.errors import DataError
     from squadopt.optimization import SolverExecutionError
+    from squadopt.planning import TransferPlanningError
 
     def cut(entry_id: int, what: str) -> None:
         if entry_id == 101:
             raise SolverExecutionError(f"The {what} for entry 101 {CLOCK_CUT}.")
+
+    errors = {
+        "SolverExecutionError": SolverExecutionError,
+        "TransferPlanningError": TransferPlanningError,
+        "DataError": DataError,
+    }
 
     if stage == "window":
         real_window = advice_module.build_window_payload
@@ -1684,9 +1702,11 @@ def test_one_members_solver_error_stays_that_members(
         monkeypatch.setattr(league_views_module, "advise_entry", advise)
     else:
         real_control = league_views_module.solve_member_control
+        kind, detail = BASELINE_ERRORS[stage]
 
         def control(picks: EntryPicks, *args: Any) -> Any:
-            cut(picks.entry_id, "one-week plan")
+            if picks.entry_id == 101:
+                raise errors[kind](detail)
             return real_control(picks, *args)
 
         monkeypatch.setattr(league_views_module, "solve_member_control", control)
@@ -1721,14 +1741,26 @@ def test_one_members_solver_error_stays_that_members(
     assert by_id[202].rendered
     assert {"entries/202.json", "advice/202/saf-puan/1.json", "advice/202/index.json"} <= files
     assert CLOCK_CUT not in by_id[202].reason
-    index = json.loads((tmp_path / "league/advice/101/index.json").read_text(encoding="utf-8"))[
-        "payload"
-    ]
-    if stage == "baseline":
-        # No plan at all: the member is refused, with the solver's words on their note.
-        assert not by_id[101].rendered and CLOCK_CUT in by_id[101].reason
+    raw_index = (tmp_path / "league/advice/101/index.json").read_text(encoding="utf-8")
+    index = json.loads(raw_index)["payload"]
+    if stage in BASELINE_ERRORS:
+        # No plan at all: the member is refused, with the error's own words on their note.
+        _kind, detail = BASELINE_ERRORS[stage]
+        assert not by_id[101].rendered and detail in by_id[101].reason
         assert "advice/101/saf-puan/1.json" not in files
+        assert "entries/101.json" not in files
         assert index["computed"] == [] and not any(index["windows"].values())
+        reasons = {row["reason"] for row in index["unavailable"]}
+        if stage == "baseline-data":
+            # A gap in the member's own data is stated in its own words, as it always was.
+            assert reasons == {detail}
+        else:
+            # The index is public and the page shows its reason: the solver's and the
+            # planner's words are the operator's, so the index carries the code the page
+            # translates and no exception text at all.
+            assert reasons == {"not_solved_for_member"}
+            assert detail not in raw_index
+            assert "CP-SAT" not in raw_index and "verification" not in raw_index
         return
     assert by_id[101].rendered and "advice/101/saf-puan/1.json" in files
     if stage == "window":
@@ -2045,3 +2077,31 @@ def test_the_public_reason_is_a_sentence_the_page_knows_or_one_code() -> None:
     diagnostic = "No plan within the limit: deterministic time used was 12.0, relative gap 0.31"
     assert public_reason(diagnostic) == "not_solved_for_member"
     assert public_reason("") == "not_solved_for_member"
+
+
+def test_a_programming_error_in_one_members_solve_still_stops_the_run(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``MEMBER_SOLVE_ERRORS`` is the member's data, the planner and the solver only: a
+    ``KeyError`` would hit every member alike, so it stops the run rather than publishing
+    a league in which every member is quietly refused."""
+
+    import squadopt.application.league_views as league_views_module
+
+    def control(picks: EntryPicks, *args: Any) -> Any:
+        raise KeyError("price_tenths")
+
+    monkeypatch.setattr(league_views_module, "solve_member_control", control)
+    inputs, projection, rules = _world_context(world)
+    with pytest.raises(KeyError, match="price_tenths"):
+        build_league_views(
+            _Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+            (EntryRegistration(101, "member-101", "2026-08-23T00:00:00Z"),),
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / "league",
+        )
+    assert not (tmp_path / "league" / "members.json").exists()

@@ -51,8 +51,14 @@ export function LeagueMemberPage() {
     return (
       <EmptyState title={missing ? copy.entryNotAvailable : copy.entryUnreadable}>
         <p>{missing ? copy.entryNotAvailableBody : copy.entryUnreadableBody}</p>
+        {/* A code or sentence the copy knows is shown in the reader's language: a plan the
+            planner could not solve is published as a code, never as the solver's words. */}
         {reasons.filter(Boolean).map((reason) => (
-          <p key={reason}>{reason}</p>
+          <p key={reason}>
+            {Object.hasOwn(copy.publicationReasons, reason)
+              ? copy.publicationReasons[reason]
+              : reason}
+          </p>
         ))}
         <Link to="/league/members">{copy.backToMembers}</Link>{" "}
         {!missing ? (
