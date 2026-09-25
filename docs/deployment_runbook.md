@@ -255,7 +255,7 @@ one. Previews spend from the same day and stop at eight; on a busy day the previ
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
 `deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
-retains the eleven smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
+retains the ten smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
 path. These are operator commands, not scheduled jobs; inspect their output and stop
@@ -351,12 +351,12 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **eleven** checks, and they are not all "must return 200". The list
+The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
-Eight are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
-`/league`, `/league/members/0`, `/analysis`, `/status`, `/fixtures`. The nested member path is there
+Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
+`/league`, `/league/members/0`, `/status`, `/fixtures`. The nested member path is there
 deliberately, because a path-scoped not-found rule would break a nested client-side route first
 and nothing else on the list would notice.
 
