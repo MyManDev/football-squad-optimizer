@@ -12,6 +12,7 @@ import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../../../fix
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
+import { textByNode } from "../../../testSupport/textByNode";
 import type { ScoreboardState } from "../components/karne";
 import { writeViewerEntry } from "../identity/useViewerEntry";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
@@ -79,6 +80,13 @@ function week(
     members_mean_net: league,
     members_counted: 15,
   };
+}
+
+/** The mode badge in each "ours" cell of the full scoreboard table, as the reader sees it. */
+function badgesIn(table: HTMLElement): string[] {
+  return [...table.querySelectorAll("tbody td:first-of-type > span")].map(
+    (badge) => badge.textContent ?? "",
+  );
 }
 
 function board(weeks: ScoreboardGameweek[], leagueId = 352490): ScoreboardState {
@@ -299,23 +307,52 @@ describe.each(["tr", "en"] as const)("the system's record beside the table in %s
     expect(within(full).getByRole("table", { name: scoreboard.caption })).toBeInTheDocument();
     expect(full).toHaveTextContent(MESSAGES[language].scoreboardComparisons.legacy);
     expect(full).toHaveTextContent(scoreboard.modeNote);
-    expect(full).toHaveTextContent(scoreboard.modes.live);
+    // The badge in the week's own cell, not the mode note under the table (which names
+    // both modes too, and would satisfy a check on the whole section by itself).
+    const table = within(full).getByRole("table", { name: scoreboard.caption });
+    expect(badgesIn(table)).toEqual([language === "tr" ? "canlı" : "live"]);
   });
 
-  it("names the capture and the modes in the reader's language, keeping the snapshot id", () => {
+  it("names the capture, the modes and the week column in the reader's language, keeping the snapshot id", () => {
     const replay = week(2, 68, 79.7, 70);
     replay.ours!.mode = "replay";
-    show({ scoreboard: board([week(1, 26, 54.3, 50), replay]) }, language);
+    const first = week(1, 26, 54.3, 50);
+    // One comparison row, so the section also draws the comparison table and its header.
+    first.comparisons = [
+      {
+        kind: "system",
+        net: 26,
+        scoring_basis: "named_eleven_no_autosubs",
+        source_snapshot_id: "fpl-live-20260922T151216Z-000000000000",
+        diagnostics: {
+          zero_minute_starters: 0,
+          minutes_shortfall: -12,
+          captain_shortfall: 2.5,
+          autosub_recovery: 3,
+        },
+      },
+    ];
+    show({ scoreboard: board([first, replay]) }, language);
     const full = screen.getByText(copy.karneFull).closest("details")!;
+    const table = within(full).getByRole("table", { name: scoreboard.caption });
+    expect(badgesIn(table)).toEqual(
+      language === "tr" ? ["canlı", "sonradan kayıt"] : ["live", "replay"],
+    );
+    const comparisons = within(full).getByRole("table", {
+      name: MESSAGES[language].scoreboardComparisons.title,
+    });
+    expect(within(comparisons).getAllByRole("columnheader")[0]).toHaveTextContent(
+      language === "tr" ? /^OH$/ : /^GW$/,
+    );
     // The id is provenance and reads the same in both languages; the word before it does not.
     const shown = "fpl-live-20260922T151216";
     expect(full).toHaveTextContent(scoreboard.aside(`${shown}Z-000000000000`));
-    const text = full.textContent!.replaceAll(shown, "");
+    // Node by node: textContent glues a badge to the next element's text ("liveAdı"), and
+    // a whole-word check cannot see it there.
+    const text = textByNode(full).replaceAll(shown, "");
     if (language === "tr") {
       expect(full).toHaveTextContent(`veri çekimi ${shown}…`);
-      expect(full).toHaveTextContent("canlı");
-      expect(full).toHaveTextContent("sonradan kayıt");
-      expect(text).not.toMatch(/\b(capture|ledger|live|replay)\b/i);
+      expect(text).not.toMatch(/\b(capture|ledger|live|replay|bench|snapshot|GW)\b/i);
     } else {
       expect(full).toHaveTextContent(`capture ${shown}…`);
       expect(text).toMatch(/\blive\b/);

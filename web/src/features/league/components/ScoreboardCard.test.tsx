@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { textByNode } from "../../../testSupport/textByNode";
 import type { LeagueViewEnvelope, Scoreboard } from "../types";
 import { ScoreboardCard, ScoreboardSection } from "./ScoreboardCard";
 
@@ -153,6 +154,20 @@ function everyNote(): LeagueViewEnvelope<Scoreboard> {
   return value;
 }
 
+/** The mode badge in each "ours" cell of a scoreboard table, as the reader sees it. */
+function badgesIn(table: HTMLElement): string[] {
+  return [...table.querySelectorAll("tbody td:first-of-type > span")].map(
+    (badge) => badge.textContent ?? "",
+  );
+}
+
+/** The first column header of each table on screen: the scoreboard's, then the comparisons'. */
+function weekHeaders(): string[] {
+  return screen
+    .getAllByRole("table")
+    .map((table) => within(table).getAllByRole("columnheader")[0]!.textContent ?? "");
+}
+
 function renderCard(envelope: LeagueViewEnvelope<Scoreboard>, language: Language = "en") {
   return render(
     <LanguageProvider initialLanguage={language}>
@@ -280,16 +295,33 @@ describe("scoreboard card", () => {
     ).toBeInTheDocument();
     const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
     expect(container.textContent).toContain(`veri çekimi ${shown}…`);
-    // The snapshot id stays as it is; everything around it, the hidden caption included,
-    // is Turkish.
-    expect(container.textContent!.replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
+    // The badges themselves, one per row with a ledger entry, in the reader's words.
+    const table = screen.getByRole("table", { name: copy.caption });
+    expect(badgesIn(table)).toEqual(["canlı", "sonradan kayıt"]);
+    // The comparison table heads its week column as the scoreboard table does.
+    expect(weekHeaders()).toEqual(["OH", "OH"]);
+    // The snapshot id stays as it is; every other text node, the hidden caption included,
+    // is Turkish. Read node by node: textContent glues a badge or a header cell to the next
+    // element's text ("liveAdı", "GWKarar") and a whole-word check cannot see it there.
+    expect(textByNode(container).replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
   });
+
+  it.each(["en", "tr"] as const)(
+    "heads the comparison table's week column as the scoreboard table does in %s",
+    (language) => {
+      renderCard(everyNote(), language);
+      const [scoreboardWeek, comparisonsWeek] = weekHeaders();
+      expect(comparisonsWeek).toBe(scoreboardWeek);
+      expect(scoreboardWeek).toBe(language === "en" ? "GW" : "OH");
+    },
+  );
 
   it("keeps the English card's pipeline words as they were", () => {
     const { container } = renderCard(everyNote(), "en");
     const copy = MESSAGES.en.leagueScoreboard;
     const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
     expect(container.textContent).toContain(`capture ${shown}…`);
+    expect(badgesIn(screen.getByRole("table", { name: copy.caption }))).toEqual(["live", "replay"]);
     expect(screen.getByText(copy.modeNote)).toBeInTheDocument();
     expect(copy.modeNote.startsWith("live: decided before the deadline, from a capture")).toBe(
       true,
