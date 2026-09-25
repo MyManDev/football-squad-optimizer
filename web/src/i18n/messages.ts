@@ -511,6 +511,7 @@ const en = {
       "A gameweek marked provisional has finished but has not been data-checked in this capture: bonus points land fixture by fixture, so its scores can still move.",
     modeNote:
       "live: decided before the deadline, from a capture that run took. replay: recorded after that deadline, or from a capture the run did not take but named.",
+    modes: { live: "live", replay: "replay" },
   },
   leagueEntry: {
     title: "Find your league",
@@ -1582,7 +1583,7 @@ const tr: MessageSchema<typeof en> = {
   },
   scoreboardComparisons: {
     title: "Haftalık karşılaştırma ve hata ayrıştırması",
-    week: "GW",
+    week: "OH",
     name: "Karar",
     net: "Puan",
     zero: "Sıfır dakikalı ilk 11",
@@ -1613,13 +1614,13 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueScoreboard: {
     title: "Haftalık skor tablosu",
-    aside: (snapshot) => `capture ${snapshot.slice(0, 24)}…`,
+    aside: (snapshot) => `veri çekimi ${snapshot.slice(0, 24)}…`,
     loading: "Skor tablosu yükleniyor…",
     notPublished:
       "Skor tablosu henüz yayımlanmadı. Onu yazan ilk haftalık çalıştırmadan sonra görünür.",
     notAvailable: "Skor tablosu okunamadı.",
     caption:
-      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan, sıfır dakikalı ilk 11, dakika açığı, kaptan açığı ve otomatik değişiklik getirisi",
+      "Biten her oyun haftası için: kâğıt kadromuzun neti, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan, sıfır dakikalı ilk 11, dakika açığı, kaptan açığı ve otomatik değişiklik getirisi",
     gameweek: "OH",
     ours: "SquadOpt · net",
     members: "Lig üyeleri · ortalama net",
@@ -1632,7 +1633,7 @@ const tr: MessageSchema<typeof en> = {
     highest: "En yüksek",
     notSettled: "kararlaştırıldı, sonuçlanmadı",
     provisional: "geçici",
-    noGameweek: "Bu capture'da henüz biten oyun haftası yok.",
+    noGameweek: "Bu veri çekiminde henüz biten oyun haftası yok.",
     cumulative: (gameweek) => `OH${gameweek} sonuna kadar kümülatif`,
     oursCovers: (gameweeks) => `yalnız OH ${gameweeks}`,
     oursNone: "sonuçlanmış hafta yok",
@@ -1640,13 +1641,14 @@ const tr: MessageSchema<typeof en> = {
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
     membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:
-      "Kadromuz kâğıt üstünde izlenen bir kadrodur. Karşılaştırma tablosu her satırın puanlama temelini gösterir. Eski kararlarda dondurulmuş bench sırası ve yardımcı kaptan olmadığı için yalnızca adı konan ilk 11 puanlanır. Yeni kararlar ikisini de kaydeder ve resmi otomatik değişikliklerle puanlanabilir. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
+      "Kadromuz kâğıt üstünde izlenen bir kadrodur. Karşılaştırma tablosu her satırın puanlama temelini gösterir. Eski kararlarda dondurulmuş yedek sırası ve yardımcı kaptan olmadığı için yalnızca adı konan ilk 11 puanlanır. Yeni kararlar ikisini de kaydeder ve resmi otomatik değişikliklerle puanlanabilir. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
     grossNote:
-      "Bu capture'daki Top-100 ortalaması transfer cezaları düşülmeden hesaplanmıştır: kohortun kendi sıralama tablosundaki haftalık toplamdır ve cezalar çıkarılmamıştır; yanındaki net sütunlarla aynı ölçüde değildir, ikisi karşılaştırılamaz. Ancak haftanın elite-picks capture'ı yüz üyenin hepsini kapsadığında netlenir.",
+      "Bu veri çekimindeki Top-100 ortalaması transfer cezaları düşülmeden hesaplanmıştır: kohortun kendi sıralama tablosundaki haftalık toplamdır ve cezalar çıkarılmamıştır; yanındaki net sütunlarla aynı ölçüde değildir, ikisi karşılaştırılamaz. Ancak haftanın ilk 100 kadrosunu okuyan veri çekimi yüz üyenin hepsini kapsadığında netlenir.",
     provisionalNote:
-      "Geçici işaretli bir oyun haftası bitmiştir ama bu capture'da veri denetimi tamamlanmamıştır: bonus puanlar maç maç işlendiği için puanları hâlâ değişebilir.",
+      "Geçici işaretli bir oyun haftası bitmiştir ama bu veri çekiminde verisi henüz denetlenmemiştir: bonus puanlar maç maç işlendiği için puanları hâlâ değişebilir.",
     modeNote:
-      "live: son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı. replay: son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı.",
+      "canlı: son tarihten önce, o çalıştırmanın kendi yaptığı veri çekiminden kararlaştırıldı. sonradan kayıt: son tarihten sonra kaydedildi ya da çalıştırmanın kendisinin yapmadığı, adıyla verilen bir veri çekiminden kararlaştırıldı.",
+    modes: { live: "canlı", replay: "sonradan kayıt" },
   },
   leagueEntry: {
     title: "Ligini bul",

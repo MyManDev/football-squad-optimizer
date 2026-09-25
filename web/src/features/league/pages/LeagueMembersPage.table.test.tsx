@@ -299,6 +299,29 @@ describe.each(["tr", "en"] as const)("the system's record beside the table in %s
     expect(within(full).getByRole("table", { name: scoreboard.caption })).toBeInTheDocument();
     expect(full).toHaveTextContent(MESSAGES[language].scoreboardComparisons.legacy);
     expect(full).toHaveTextContent(scoreboard.modeNote);
+    expect(full).toHaveTextContent(scoreboard.modes.live);
+  });
+
+  it("names the capture and the modes in the reader's language, keeping the snapshot id", () => {
+    const replay = week(2, 68, 79.7, 70);
+    replay.ours!.mode = "replay";
+    show({ scoreboard: board([week(1, 26, 54.3, 50), replay]) }, language);
+    const full = screen.getByText(copy.karneFull).closest("details")!;
+    // The id is provenance and reads the same in both languages; the word before it does not.
+    const shown = "fpl-live-20260922T151216";
+    expect(full).toHaveTextContent(scoreboard.aside(`${shown}Z-000000000000`));
+    const text = full.textContent!.replaceAll(shown, "");
+    if (language === "tr") {
+      expect(full).toHaveTextContent(`veri çekimi ${shown}…`);
+      expect(full).toHaveTextContent("canlı");
+      expect(full).toHaveTextContent("sonradan kayıt");
+      expect(text).not.toMatch(/\b(capture|ledger|live|replay)\b/i);
+    } else {
+      expect(full).toHaveTextContent(`capture ${shown}…`);
+      expect(text).toMatch(/\blive\b/);
+      expect(text).toMatch(/\breplay\b/);
+      expect(text).toMatch(/\bledger\b/);
+    }
   });
 
   it.each([
