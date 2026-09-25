@@ -27,7 +27,7 @@ export function DecisionPreferencesPanel({
   squad: EntrySquad;
   available: boolean;
 }) {
-  const { language } = useLanguage();
+  const { language, messages } = useLanguage();
   const tr = language === "tr";
   const [params, setParams] = useSearchParams();
   const selected = preferencesFromUrl(params);
@@ -106,13 +106,13 @@ export function DecisionPreferencesPanel({
     <Card title={tr ? "Karar tercihlerim" : "My decision preferences"}>
       <p>
         {tr
-          ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir. Oyuncuyu tutmak ilk 11 garantisi değildir. Tahmin puanları değişmez; optimizer bu sınırlar içinde karar verir."
+          ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir. Oyuncuyu tutmak ilk 11 garantisi değildir. Tahmin puanları değişmez; çözücü bu sınırlar içinde karar verir."
           : "These constraints apply throughout the selected 1, 3 or 5 weeks. Keeping a player does not guarantee a start. Forecast points stay unchanged; the optimizer decides within these limits."}
       </p>
       {!available && (
         <p>
           {tr
-            ? "Tercihli hesaplama bu veri görüntüsü için henüz kullanılabilir değil."
+            ? "Tercihli hesaplama bu veri çekimi için henüz kullanılabilir değil."
             : "Preference computation is not available for this capture."}
         </p>
       )}
@@ -183,7 +183,12 @@ export function DecisionPreferencesPanel({
             <option value="">{tr ? "Pozisyon seç" : "Choose position"}</option>
             {[...new Set(catalog.filter((p) => p.team === team).map((p) => p.position))].map(
               (p) => (
-                <option key={p}>{p}</option>
+                <option key={p} value={p}>
+                  {/* The roster's code stays the value; the Turkish page names the position. */}
+                  {tr && Object.hasOwn(messages.positions, p)
+                    ? messages.positions[p as keyof typeof messages.positions]
+                    : p}
+                </option>
               ),
             )}
           </select>

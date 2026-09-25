@@ -60,7 +60,14 @@ describe.each(["tr", "en"] as const)("member selection in %s", (language) => {
   it("stores a selected row and navigates to its shareable member URL", () => {
     openMembers(language);
     const row = screen.getByRole("link", { name: firstMember.manager_name! }).closest("tr")!;
-    fireEvent.click(within(row).getByRole("button", { name: copy.viewerSelect }));
+    fireEvent.click(
+      within(row).getByRole("button", {
+        name: copy.viewerSelectFor(
+          firstMember.manager_name ?? copy.unknownMember,
+          firstMember.team_name ?? copy.unknownTeam,
+        ),
+      }),
+    );
     expect(readViewerEntry()).toEqual({
       entryId: firstMember.entry_id,
       verified: false,
