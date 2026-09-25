@@ -191,18 +191,19 @@
 
 /* The phone's compact strip, as D-Phone-Bu-Hafta draws it: a sidebar-green band right
    under the phone bar. The team, the week and the short deadline share the first line
-   (a long team name pushes the week to the next), and the score bug follows as quiet
-   label-and-figure pairs in sentence case. Labels are ink2 on the band (6.1:1). */
+   (a long team name pushes the week to the next), and the score bug follows as one row of
+   quiet cells, the label in sentence case over the figure, split by hairlines as on a
+   desktop. Labels are ink2 on the band (6.1:1). */
 @media (max-width: 599.98px) {
   .topBar {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px var(--space-3);
+    gap: var(--space-1) var(--space-3);
     min-height: 0;
     margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
-    padding: var(--space-2) var(--space-4) 10px;
+    padding: var(--space-2) var(--space-4);
     border-bottom: 0;
     background: var(--color-surface-2);
   }
@@ -239,33 +240,29 @@
   .scoreBug {
     flex: 1 1 100%;
     flex-wrap: wrap;
-    gap: 0 var(--space-3);
-    margin: 2px 0 0;
+    row-gap: var(--space-1);
+    margin: 0;
   }
 
-  .scoreCell,
-  .scoreCell:first-child,
-  .scoreCell:last-child {
-    flex-direction: row;
-    align-items: baseline;
-    gap: var(--space-1);
-    padding: 0;
+  .scoreCell {
+    padding: 0 var(--space-2);
   }
 
-  .scoreCell + .scoreCell {
-    border-left: 0;
+  .scoreCell:first-child {
+    padding-left: 0;
   }
 
   .scoreCell dt {
     font-family: var(--font-body);
     font-weight: 400;
+    line-height: 14px;
     letter-spacing: 0;
     text-transform: none;
   }
 
   .scoreCell dd {
     font-size: 16px;
-    line-height: 20px;
+    line-height: 18px;
   }
 }
 
@@ -409,7 +406,9 @@ section.notice p {
   }
 }
 
+/* A named container: the proof stamp reads its width (MemberDecision.module.css). */
 .decision {
+  container: decision / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -421,6 +420,16 @@ section.notice p {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-2) var(--space-4);
+}
+
+/* From 600 px the stamp keeps the right-hand column however long the heading's summary
+   is: the summary wraps under the heading rather than pushing the stamp to a line of its
+   own, where its right-aligned parts would stand out of line. */
+@media (min-width: 600px) {
+  .headingRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
 }
 
 .headingText {
@@ -455,8 +464,17 @@ section.notice p {
     gap: var(--space-4);
   }
 
+  /* Two columns, so the proof stamp can stand beside the transfer facts; everything else
+     takes the whole row (MemberDecision.module.css places and orders the parts). */
   .decision {
-    gap: var(--space-3);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .decision > *,
+  .headingRow > * {
+    grid-column: 1 / -1;
   }
 
   .headingRow {
@@ -574,6 +592,22 @@ section.notice p {
   }
 }
 
+/* On a phone the disclosure reads as the artboard draws it, a quiet underlined line with
+   its icon rather than a box, so it and the history link share one row. */
+@media (max-width: 599.98px) {
+  .honestyBlock {
+    column-gap: var(--space-5);
+  }
+
+  .howSummary {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
 /* ---- Secondary tools, each closed until asked for ---- */
 
 .tools {
@@ -595,8 +629,9 @@ section.notice p {
   gap: var(--space-2);
   min-height: 40px;
   font-family: var(--font-display);
-  font-size: var(--step-1);
+  font-size: 16px;
   font-weight: 700;
+  line-height: 20px;
   cursor: pointer;
   list-style: none;
 }
@@ -621,9 +656,73 @@ section.notice p {
   padding: var(--space-1) 0 var(--space-5);
 }
 
+/* The panels inside the tools keep some plain controls of their own. They wear the page's
+   look here: an outlined ink button as wide as its words (never the browser's grey slab
+   stretched across the column), and a table read from the left with hairline rows. */
+.toolBody button:not([class]) {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolBody button:not([class]):hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.toolBody button:not([class]):disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.toolBody table:not([class]) {
+  border-collapse: collapse;
+}
+
+.toolBody table:not([class]) th,
+.toolBody table:not([class]) td {
+  padding: 6px var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.toolBody table:not([class]) thead th {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 600;
+}
+
+/* A panel's own headings sit under the tool's name, so each level is smaller than it and
+   never larger than the level above (the browser's default h3 is larger than this h2). */
+.toolBody h2,
+.toolBody h3 {
+  font-size: var(--step-0);
+}
+
+.toolBody h4 {
+  font-size: var(--step--1);
+}
+
+/* A panel's paragraphs are spaced by the panel's own rhythm, not the browser's margins on
+   top of it, which left gaps of 40 px between two sentences. */
+.toolBody section > p {
+  margin-block: 0;
+}
+
 @media (max-width: 1179.98px) {
   .toolSummary {
     min-height: 48px;
+  }
+
+  .toolBody button:not([class]) {
+    min-height: 44px;
   }
 }
 
@@ -667,20 +766,10 @@ section.notice p {
   color: var(--color-text-muted);
 }
 
-.bench {
-  display: flex;
-  flex-direction: column;
-}
-
 .lineup {
   margin-top: var(--space-2);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
-}
-
-/* The week's lineup as the squad section's list view, right under its heading row. */
-.lineupList {
-  max-width: 720px;
 }
 
 .lineupTitle {
@@ -715,38 +804,6 @@ section.notice p {
 
 .armband dd {
   margin: 2px 0 0;
-}
-
-.benchRow {
-  display: grid;
-  grid-template-columns: 2rem minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: 8px 0;
-  border-top: 1px solid var(--color-line);
-}
-
-.benchRow:first-child {
-  border-top: none;
-}
-
-.benchPoints {
-  text-align: right;
-}
-
-@media (max-width: 640px) {
-  .benchRow {
-    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
-  }
-
-  .benchRow .muted {
-    grid-column: 2 / -1;
-  }
-
-  .benchRow .benchPoints {
-    grid-row: 1;
-    grid-column: 3;
-  }
 }
 
 .window {

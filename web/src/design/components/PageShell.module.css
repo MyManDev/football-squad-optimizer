@@ -316,6 +316,24 @@
   padding: var(--space-2) 0;
 }
 
+/* Beside the page (open or as the rail), in a window tall enough to hold the plan with
+   Hesapla above it, the footer stays at the sidebar's foot: the notes under Hesapla scroll
+   under it, and the language switch is never cut off by the window's edge. In a shorter
+   window it stays in the flow after the notes, so it can never cover Hesapla. The drawer
+   keeps it in the flow too, because Hesapla is what stays pinned there. */
+@media (min-height: 800px) {
+  .sidebar:not([data-mode="drawer"]) .footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--color-surface-2);
+  }
+
+  .sidebar[data-mode="open"] .footer {
+    border-top: 1px solid var(--color-line);
+  }
+}
+
 .status {
   display: inline-flex;
   align-items: center;

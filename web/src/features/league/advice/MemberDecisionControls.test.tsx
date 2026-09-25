@@ -337,11 +337,29 @@ describe("member decision controls", () => {
     expect(
       screen.getByText(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].short),
     ).toBeInTheDocument();
-    // The notes that explain the options wait behind a closed disclosure.
+    // The notes that explain the options are a part of their own, which the sidebar puts
+    // under Hesapla: the plan part does not carry them.
+    expect(screen.queryByText(MESSAGES.tr.leagueMembers.optionNotes)).toBeNull();
+    plan.unmount();
+
+    const notesPart = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?mode=fark-yarat`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            part="notes"
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    // They wait behind a closed disclosure, and hold no input of their own.
     const notes = screen.getByText(MESSAGES.tr.leagueMembers.optionNotes).closest("details")!;
     expect(notes).not.toHaveAttribute("open");
     expect(notes).toHaveTextContent(MESSAGES.tr.leagueMembers.rivalNote);
-    plan.unmount();
+    expect(notesPart.container.querySelectorAll("input, select")).toHaveLength(0);
+    notesPart.unmount();
 
     const advanced = render(
       <LanguageProvider initialLanguage="tr">

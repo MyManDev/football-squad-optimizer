@@ -25,6 +25,7 @@ import type {
 import type { AdviceIssue, ShownAdvice } from "./memberPageTypes";
 import styles from "./LeagueMemberPage.module.css";
 import board from "./MemberDecision.module.css";
+import lineup from "./MemberLineup.module.css";
 
 /**
  * Why no advice is shown, in the two states the page can tell apart. A combination the
@@ -144,14 +145,14 @@ export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
       </p>
       {view.solver_status === "OPTIMAL" ? (
         <>
-          <p className={board.stampBox}>
+          <p className={board.stampBox} data-stamp="">
             <CheckIcon />
             {copy.stampOptimal}
           </p>
           <p className={board.stampCaption}>{copy.stampOptimalCaption}</p>
         </>
       ) : view.solver_status === "FEASIBLE" ? (
-        <p className={`${board.stampTags} ${board.stampUnproven}`}>
+        <p className={`${board.stampTags} ${board.stampUnproven}`} data-stamp="">
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>
         </p>
       ) : null}
@@ -392,10 +393,16 @@ export function AdviceDetails({
 }
 
 /** The week's lineup as a list, on the basis the chip scores it: the pitch's list view. */
-export function PlanLineup({ view }: { view: EntryAdvice }) {
+export function PlanLineup({
+  view,
+  codes = null,
+}: {
+  view: EntryAdvice;
+  codes?: ClubCodes | null;
+}) {
   const { language } = useLanguage();
   const { chipBasis } = adviceBasis(view, CHIP_COPY[language]);
-  return <LineupSection view={view} chipBasis={chipBasis} />;
+  return <LineupSection view={view} chipBasis={chipBasis} codes={codes} />;
 }
 
 /** The decision and its details together, as one plan reads when shown on its own. */
@@ -1172,51 +1179,83 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
 }
 
 /**
- * The rest of the decision: armband, chip, the eleven and the bench order. Rendered only
- * when the producer published them: a document from before the producer carried the plan
- * week, or a decision handed over without it, shows the moves alone. How the lineup is
- * chosen is said in the page's "How was this worked out?".
+ * The rest of the decision as the squad section's list view (D-Phone-Kadro): the plan's
+ * own total, the armband and the chip, then the eleven in pitch order and the bench in its
+ * order, one row a player with the position (or the bench place), the name, the club, the
+ * C, V and YENİ marks the pitch carries, and the expected points as a bar at a fixed scale
+ * beside the figure. Rendered only when the producer published the whole lineup: a
+ * document from before the producer carried the plan week shows the moves alone. How the
+ * lineup is chosen is said in the page's "How was this worked out?".
  */
-function LineupSection({ view, chipBasis }: { view: EntryAdvice; chipBasis: string | null }) {
+function LineupSection({
+  view,
+  chipBasis,
+  codes,
+}: {
+  view: EntryAdvice;
+  chipBasis: string | null;
+  codes: ClubCodes | null;
+}) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
   if (!captain || !vice || !eleven || !bench) return null;
   const chipName = view.chip ? (copy.chipNames[view.chip] ?? view.chip) : null;
-  const mark = (player: AdvicePlayer) =>
-    player.player_id === captain.player_id ? "C" : player.player_id === vice.player_id ? "V" : null;
+  const incoming = new Set(view.moves.map((move) => move.player_in?.player_id));
+  const code = (position: string) =>
+    Object.hasOwn(messages.positionCodes, position)
+      ? messages.positionCodes[position as keyof typeof messages.positionCodes]
+      : position;
+  const word = (position: string) =>
+    Object.hasOwn(messages.positions, position)
+      ? messages.positions[position as keyof typeof messages.positions]
+      : null;
+  // One scale for every bar in the list: 20 px a point on the widest column, so eight
+  // points fill the track; a list with a bigger figure widens the scale to hold it.
+  const figures = [...eleven, ...bench]
+    .map((player) => player.expected_points)
+    .filter(finiteNumber);
+  const scale = Math.max(8, Math.ceil(Math.max(0, ...figures)));
   return (
-    <section className={styles.lineupList} aria-label={copy.lineupTitle}>
+    <section
+      className={lineup.list}
+      aria-label={copy.lineupTitle}
+      style={{ "--scale": scale } as CSSProperties}
+    >
       <h3 className="visually-hidden">{copy.lineupTitle}</h3>
       {finiteNumber(view.expected_own_points) ? (
-        <p className={styles.planCost}>
-          <strong className="num">
-            {chipBasis !== null
-              ? CHIP_COPY[language].expectedOwnPoints(
-                  points(view.expected_own_points, 1, locale),
-                  chipBasis,
-                )
-              : copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
-          </strong>
+        <p className={lineup.own}>
+          {chipBasis !== null
+            ? CHIP_COPY[language].expectedOwnPoints(
+                points(view.expected_own_points, 1, locale),
+                chipBasis,
+              )
+            : copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
         </p>
       ) : null}
-      <dl className={styles.armband}>
+      <dl className={lineup.armband}>
         <div>
           <dt>{copy.captainLabel}</dt>
           <dd>
-            <strong>{captain.name}</strong>{" "}
-            <span className={styles.muted}>
-              {captain.team} · {captain.position}
+            <span className={lineup.markCaptain} aria-hidden="true">
+              {copy.captainMark}
             </span>
+            <strong className={lineup.armName}>
+              <PlayerName player={captain} />
+            </strong>
+            <ClubMark team={captain.team} codes={codes} />
           </dd>
         </div>
         <div>
           <dt>{copy.viceCaptainLabel}</dt>
           <dd>
-            <strong>{vice.name}</strong>{" "}
-            <span className={styles.muted}>
-              {vice.team} · {vice.position}
+            <span className={lineup.markVice} aria-hidden="true">
+              {copy.viceMark}
             </span>
+            <strong className={lineup.armName}>
+              <PlayerName player={vice} />
+            </strong>
+            <ClubMark team={vice.team} codes={codes} />
           </dd>
         </div>
         <div>
@@ -1224,51 +1263,111 @@ function LineupSection({ view, chipBasis }: { view: EntryAdvice; chipBasis: stri
           <dd>{chipName ? <Badge tone="good">{chipName}</Badge> : copy.chipNone}</dd>
         </div>
       </dl>
-      <h4 className={styles.lineupSub}>{copy.startingXiLabel}</h4>
-      <div className={styles.bench}>
+      <h4 className={lineup.title}>{copy.startingXiLabel}</h4>
+      <ol className={lineup.rows}>
         {eleven.map((player, index) => (
-          <LineupRow key={player.player_id} player={player} order={index + 1} mark={mark(player)} />
+          <LineupRow
+            key={player.player_id}
+            player={player}
+            groupStart={index > 0 && eleven[index - 1]!.position !== player.position}
+            lead={code(player.position)}
+            detail={null}
+            mark={
+              player.player_id === captain.player_id
+                ? "C"
+                : player.player_id === vice.player_id
+                  ? "V"
+                  : null
+            }
+            isNew={incoming.has(player.player_id)}
+            codes={codes}
+          />
         ))}
-      </div>
-      <h4 className={styles.lineupSub}>{copy.benchOrderLabel}</h4>
-      <div className={styles.bench}>
+      </ol>
+      <h4 className={lineup.title}>{copy.benchOrderLabel}</h4>
+      <ol className={lineup.rows}>
         {bench.map((player, index) => (
-          <LineupRow key={player.player_id} player={player} order={index + 1} mark={null} />
+          <LineupRow
+            key={player.player_id}
+            player={player}
+            groupStart={false}
+            lead={String(index + 1)}
+            detail={word(player.position)}
+            mark={null}
+            isNew={incoming.has(player.player_id)}
+            codes={codes}
+          />
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
 
 function LineupRow({
   player,
-  order,
+  groupStart,
+  lead,
+  detail,
   mark,
+  isNew,
+  codes,
 }: {
   player: AdvicePlayer;
-  order: number;
+  /** The first of a new position in the eleven, set a little apart from the one before. */
+  groupStart: boolean;
+  /** The position code for the eleven, the published place for the bench. */
+  lead: string;
+  /** The position word, which the bench rows add after the club. */
+  detail: string | null;
   mark: "C" | "V" | null;
+  isNew: boolean;
+  codes: ClubCodes | null;
 }) {
-  const { locale } = useLanguage();
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const xp = finiteNumber(player.expected_points) ? player.expected_points : null;
   return (
-    <div className={styles.benchRow}>
-      <span className="num">{order}</span>
-      <strong>
-        {player.name}
-        {mark ? (
-          <>
-            {" "}
-            <Badge tone={mark === "C" ? "good" : "neutral"}>{mark}</Badge>
-          </>
-        ) : null}
-      </strong>
-      <span className={styles.muted}>
-        {player.team} · {player.position}
+    <li className={lineup.row} data-group={groupStart ? "" : undefined}>
+      <span className={lineup.lead}>{lead}</span>
+      <span className={lineup.player}>
+        <span className={lineup.nameLine}>
+          <strong className={lineup.name}>
+            <PlayerName player={player} />
+          </strong>
+          {mark === "C" ? (
+            <span
+              className={lineup.markCaptain}
+              role="img"
+              aria-label={messages.squad.captainLabel}
+            >
+              {copy.captainMark}
+            </span>
+          ) : null}
+          {mark === "V" ? (
+            <span
+              className={lineup.markVice}
+              role="img"
+              aria-label={messages.squad.viceCaptainLabel}
+            >
+              {copy.viceMark}
+            </span>
+          ) : null}
+        </span>
+        <span className={lineup.meta}>
+          <ClubMark team={player.team} codes={codes} />
+          {detail ? <span>{detail}</span> : null}
+          {isNew ? <span className={lineup.new}>{copy.boardNew}</span> : null}
+        </span>
       </span>
-      <span className={`${styles.benchPoints} num`}>
-        {player.expected_points != null ? `${points(player.expected_points, 1, locale)} xP` : ""}
-      </span>
-    </div>
+      {xp !== null ? (
+        <span className={lineup.track} aria-hidden="true">
+          <span className={lineup.bar} style={{ "--xp": Math.max(0, xp) } as CSSProperties} />
+        </span>
+      ) : (
+        <span />
+      )}
+      <span className={lineup.value}>{xp !== null ? `${figure(xp, locale)} xP` : ""}</span>
+    </li>
   );
 }
 

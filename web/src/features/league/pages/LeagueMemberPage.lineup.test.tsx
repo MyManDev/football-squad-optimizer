@@ -70,6 +70,68 @@ describe("the advice card carries the whole decision", () => {
     expect(rows).toHaveLength(15);
   });
 
+  it("reads the week out one row a player, with the pitch's marks and a bar per figure", () => {
+    const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const payload = base.payload;
+    const eleven = payload.starting_xi!;
+    // One starter with no published figure: no bar, no figure, never a 0.
+    const silent = eleven[1]!;
+    const withSilent: EntryAdvice = {
+      ...payload,
+      starting_xi: eleven.map((player) => {
+        if (player.player_id !== silent.player_id) return player;
+        const { expected_points: _unstated, ...rest } = player;
+        return rest;
+      }),
+    };
+    renderAdvice({ ...base, payload: withSilent });
+    openList();
+    const lineup = screen.getByRole("region", { name: "Bu haftaki kadron" });
+    const [first, second] = within(lineup).getAllByRole("list");
+    const starters = within(first!).getAllByRole("listitem");
+    const bench = within(second!).getAllByRole("listitem");
+    expect(starters).toHaveLength(11);
+    expect(bench).toHaveLength(4);
+    const codes = MESSAGES.tr.positionCodes;
+    // The eleven lead with the position code, the bench with its published place.
+    starters.forEach((row, index) =>
+      expect(row.firstElementChild).toHaveTextContent(
+        codes[eleven[index]!.position as keyof typeof codes],
+      ),
+    );
+    expect(bench.map((row) => row.firstElementChild!.textContent)).toEqual(["1", "2", "3", "4"]);
+    // The bench adds the position word after the club, as the held list does.
+    expect(bench[0]).toHaveTextContent(MESSAGES.tr.positions.GK);
+    // The captain and vice-captain carry the pitch's marks, each on one row only.
+    const captain = within(lineup).getAllByRole("img", { name: MESSAGES.tr.squad.captainLabel });
+    expect(captain).toHaveLength(1);
+    expect(captain[0]!.closest("li")).toHaveTextContent(payload.captain!.name);
+    const vice = within(lineup).getAllByRole("img", { name: MESSAGES.tr.squad.viceCaptainLabel });
+    expect(vice).toHaveLength(1);
+    expect(vice[0]!.closest("li")).toHaveTextContent(payload.vice_captain!.name);
+    // Every player a move brings in is marked new, and nobody else.
+    const incoming = new Set(payload.moves.map((move) => move.player_in?.name));
+    for (const row of starters) {
+      const name = eleven.find((player) => row.textContent!.includes(player.name))!.name;
+      expect(within(row).queryByText(MESSAGES.tr.leagueMembers.boardNew) !== null).toBe(
+        incoming.has(name),
+      );
+    }
+    // The starter with no figure has neither a bar nor a number; the others have both.
+    const silentRow = starters.find((row) => row.textContent!.includes(silent.name))!;
+    expect(silentRow.textContent).not.toMatch(/xP/);
+    expect(silentRow.querySelector("[style]")).toBeNull();
+    expect(within(lineup).getAllByText(/xP$/)).toHaveLength(14);
+    const bars = lineup.querySelectorAll<HTMLElement>("li [style]");
+    expect(bars).toHaveLength(14);
+    // One scale for the whole list: at least eight points, and at least the biggest figure.
+    const scale = Number(lineup.style.getPropertyValue("--scale"));
+    const figures = [...withSilent.starting_xi!, ...payload.bench!]
+      .map((player) => player.expected_points)
+      .filter((value): value is number => typeof value === "number");
+    expect(scale).toBeGreaterThanOrEqual(Math.max(8, ...figures));
+  });
+
   it("names the chip the plan plays", () => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     renderAdvice({ ...base, payload: { ...base.payload, chip: "3xc" } }, "en");

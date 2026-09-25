@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { MESSAGES } from "../src/i18n/messages";
-import { mockEntryAdviceEnvelope } from "../src/fixtures/league";
+import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import type { AdvicePlayer, EntryAdvice } from "../src/features/league/types";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
 
@@ -74,15 +74,28 @@ function codedCalendar() {
   return { ...calendar, payload: { ...calendar.payload, gameweeks: [{ ...week!, fixtures }] } };
 }
 
-async function open(page: Page, width: number, height: number, plan = PLAN) {
+/**
+ * Opens the member page on the mocked week. `live` serves the squad and the plan as a live
+ * capture rather than example data, as the real GW6 week is, so no example-data tag takes
+ * a line of its own where the fold is measured.
+ */
+async function open(page: Page, width: number, height: number, plan = PLAN, live = false) {
   await page.setViewportSize({ width, height });
   await installLeagueMocks(page);
   await page.route("**/data/fixtures.json", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(codedCalendar()) }),
   );
+  const served = live ? { ...plan, source_kind: "live" as const } : plan;
   await page.route(`**/data/league/advice/${ENTRY}/saf-puan/1.json`, (route) =>
-    route.fulfill({ contentType: "application/json", body: JSON.stringify(plan) }),
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(served) }),
   );
+  if (live)
+    await page.route(`**/data/league/entries/${ENTRY}.json`, (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ...mockEntrySquadEnvelopes[ENTRY]!, source_kind: "live" }),
+      }),
+    );
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
   await page.goto(`/league/members/${ENTRY}`);
@@ -308,3 +321,68 @@ test("a two-move week fits the owner's laptop: the decision above 640, the pitch
   await page.setViewportSize({ width: 1366, height: 768 });
   await expect.poll(async () => bottom(decision)).toBeLessThanOrEqual(640);
 });
+
+test("a two-move week keeps the decision in a phone's first screen, the stamp beside the transfer facts", async ({
+  page,
+}, testInfo) => {
+  await open(page, 390, 844, twoMoves(), true);
+  const decision = page.locator('[data-mark="decision"]');
+  const boards = decision.getByRole("article");
+  await expect(boards).toHaveCount(2);
+  const box = async (locator: Locator) => (await locator.boundingBox())!;
+  const bottom = async (locator: Locator) => {
+    const { y, height } = await box(locator);
+    return y + height;
+  };
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  // D-Phone-Bu-Hafta's lines: the boards and the captain above 548, the gain with its
+  // stamp above 664 and the two honesty lines above 844, the whole first screen.
+  expect(await bottom(boards.nth(1))).toBeLessThanOrEqual(548);
+  // The captain line is the paragraph that names the vice-captain too (the gain's caption
+  // also says 'kaptan').
+  const captain = decision.locator("p").filter({
+    has: page.getByText(copy.leagueMembers.viceCaptainLabel, { exact: true }),
+  });
+  expect(await bottom(captain)).toBeLessThanOrEqual(548);
+  const stamp = decision.getByText(copy.leagueMembers.stampOptimal, { exact: true });
+  const caption = decision.getByText(copy.leagueMembers.stampOptimalCaption, { exact: true });
+  expect(await bottom(caption)).toBeLessThanOrEqual(664);
+  expect(await bottom(page.locator('[data-mark="honesty"]'))).toBeLessThanOrEqual(844);
+  // The stamp stands beside the week's transfer facts, as the artboard draws it, after the
+  // captain line and the gain figure.
+  const facts = decision.locator("ul").filter({ hasText: copy.leagueMembers.hitPointsFact("0") });
+  const [stampBox, factsBox, captainBox] = await Promise.all([
+    box(stamp),
+    box(facts),
+    box(captain),
+  ]);
+  expect(factsBox.x).toBeGreaterThan(stampBox.x + stampBox.width);
+  expect(Math.abs(centre(factsBox).y - centre(stampBox).y)).toBeLessThanOrEqual(8);
+  expect(stampBox.y).toBeGreaterThan(captainBox.y + captainBox.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("member-390.png") });
+});
+
+for (const [width, height] of [
+  [1440, 900],
+  [1366, 768],
+  [1280, 720],
+] as const)
+  test(`the sidebar's foot never covers Hesapla at ${width}x${height}`, async ({ page }) => {
+    await open(page, width, height, twoMoves());
+    const compute = page
+      .locator("#sidebar")
+      .getByRole("button", { name: copy.leagueMembers.computeButton, exact: true });
+    await compute.scrollIntoViewIfNeeded();
+    await expect(compute).toBeInViewport({ ratio: 1 });
+    // Whatever stands at the button's centre is the button itself, not the pinned footer.
+    expect(
+      await compute.evaluate((button) => {
+        const { left, top, width: w, height: h } = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(left + w / 2, top + h / 2);
+        return hit === button || button.contains(hit);
+      }),
+    ).toBe(true);
+    // The language switch stays reachable in the sidebar.
+    await expect(page.locator("#sidebar").getByRole("button", { name: /^TR/ })).toBeAttached();
+  });

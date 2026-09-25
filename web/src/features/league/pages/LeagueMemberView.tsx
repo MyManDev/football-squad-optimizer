@@ -292,6 +292,13 @@ function LeagueMemberContent({
               deadlinePassed={deadlinePassed !== null}
             />
           </div>
+          <MemberDecisionControls
+            entryId={entryId}
+            members={members}
+            index={selection.status === "index-error" ? null : index}
+            capabilities={capabilities}
+            part="notes"
+          />
         </ShellPortal>
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
@@ -345,7 +352,7 @@ function LeagueMemberContent({
                 onPitch={onPitch}
                 plan={plan}
                 codes={codes}
-                list={plan && hasLineup(plan) ? <PlanLineup view={plan} /> : null}
+                list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
               />
               {railPlacement === "flow" ? rail : null}
             </div>

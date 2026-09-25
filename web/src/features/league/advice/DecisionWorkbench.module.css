@@ -5,6 +5,11 @@
   margin-block: var(--space-3);
 }
 
+/* No plan pinned yet: no empty band where the plans will stand. */
+.grid:empty {
+  display: none;
+}
+
 .plan {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
@@ -32,6 +37,32 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* An outlined ink button as wide as its words, as the page's other secondary actions. */
+.pin,
+.actions button {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pin:hover:not(:disabled),
+.actions button:hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.pin:disabled,
+.actions button:disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 .actions button {

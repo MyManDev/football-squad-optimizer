@@ -140,6 +140,13 @@ textarea {
   font: inherit;
 }
 
+/* A native radio or checkbox a component leaves as it is still wears the palette: an ink
+   dot and tick, never the browser's blue. */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-text);
+}
+
 a {
   color: var(--color-accent);
 }

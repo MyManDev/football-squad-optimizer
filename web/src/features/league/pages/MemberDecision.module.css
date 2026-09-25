@@ -201,8 +201,8 @@
 }
 
 /* A board narrower than two columns of it: the phone's layout, as D-Phone-Bu-Hafta draws
-   it. A 28 px strip holds DEĞİŞİKLİK and the gain, the two 52 px panels sit 4 px apart
-   inside a 4 px bezel, so a board is 140 px tall. */
+   it. A 28 px strip holds DEĞİŞİKLİK and the gain, the two 48 px panels sit 4 px apart
+   inside a 4 px bezel, so a board is 132 px tall. */
 @container (max-width: 439px) {
   .board {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -249,7 +249,7 @@
       "word name meta"
       "word strip meta";
     column-gap: var(--space-2);
-    min-height: 52px;
+    min-height: 48px;
     padding: 4px var(--space-3) 4px var(--space-2);
   }
 
@@ -262,7 +262,7 @@
 
   .name {
     font-size: 22px;
-    line-height: 26px;
+    line-height: 24px;
   }
 
   .meta {
@@ -602,44 +602,109 @@
   text-wrap: pretty;
 }
 
+/* Where the decision column is narrower (a tablet, a desktop with the sidebar open under
+   1440 px), the stamp's sentence takes two balanced lines so the stamp keeps its place at
+   the right of the heading instead of dropping under it. */
+@container decision (max-width: 759.98px) {
+  .stampCaption {
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+}
+
 /* On a phone the decision reads as D-Phone-Bu-Hafta draws it: the boards, the captain
-   line, the gain strip, then the proof stamp and the sentences that qualify it. */
+   line, the gain figure and its bar, the proof stamp beside the week's transfer facts with
+   its sentence under both, then the boards' shared reason and the sentences that qualify
+   the plan. LeagueMemberPage.module.css makes the decision a two-column grid there; the
+   boards' wrapper, the gain strip and the stamp step aside (display: contents) so each of
+   their parts takes its own place in that grid, in the order below. */
 @media (max-width: 599.98px) {
+  .boards,
+  .gain,
+  .gainTop,
+  .stamp {
+    display: contents;
+  }
+
+  .grid,
+  .reason,
+  .noMove,
+  .missing,
+  .captain,
+  .gainHead,
+  .bar,
+  .gainList,
+  .facts,
+  .stampTags,
+  .stampCaption,
+  .states {
+    grid-column: 1 / -1;
+  }
+
   .grid {
     gap: var(--space-2);
   }
 
   .captain {
     order: 1;
-    min-height: 44px;
+    min-height: 36px;
   }
 
-  .gain {
+  .gainHead {
     order: 2;
+    margin-top: var(--space-1);
   }
 
-  .stamp {
+  .bar,
+  .gainList {
     order: 3;
-    align-items: flex-start;
+  }
+
+  .stampTags {
+    order: 4;
+    justify-content: flex-start;
+  }
+
+  /* The stamp (or the unproven badge) stands in the first column, the transfer facts
+     beside it; with no stamp the facts take the whole row. */
+  .stampBox,
+  .stampUnproven {
+    order: 5;
+    grid-column: 1;
+    justify-self: start;
+    align-self: center;
+  }
+
+  .facts {
+    order: 6;
+    align-self: center;
+  }
+
+  :global([data-mark="decision"]):has([data-stamp]) .facts {
+    grid-column: 2;
+  }
+
+  .stampCaption {
+    order: 7;
     max-width: none;
+    text-align: left;
+    text-wrap: wrap;
+  }
+
+  /* The reason shared by every board follows the stamp, with the plan's other sentences;
+     a board with a reason of its own keeps it under that board. */
+  .reason {
+    order: 8;
   }
 
   .states {
-    order: 4;
+    order: 9;
   }
 
   /* The vice-captain carries the name only, as the phone artboard draws it, so the
      captain line stays on one line. */
   .viceClub {
     display: none;
-  }
-
-  .stampTags {
-    justify-content: flex-start;
-  }
-
-  .stampCaption {
-    text-align: left;
   }
 }
 

@@ -102,7 +102,9 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--color-surface);
+  /* The page's own green, so the week column reads as part of its row while it covers
+     the figures sliding under it. */
+  background: var(--color-bg);
   text-align: left;
   min-width: 8rem;
   max-width: 12rem;

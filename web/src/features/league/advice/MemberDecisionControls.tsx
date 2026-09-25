@@ -39,12 +39,12 @@
  *
  * The controls come in two parts. The plan part (strategy, the rival where one is needed,
  * the window and the model) is what the member changes every week; the page renders it in
- * the sidebar beside Hesapla. The advanced part (the manager's word, the Top 100 weight and
+ * the sidebar above Hesapla. The advanced part (the manager's word, the Top 100 weight and
  * the chip) sits on the page under a closed disclosure. `part` picks one; without it both
  * render, one after the other, so every input is on the page exactly once either way. The
  * notes that explain the options (what each strategy asks for, the declared rule, what a
- * longer window assumes) sit under a closed "About these options" in the plan part: they
- * stay one click away without pushing Hesapla down the sidebar.
+ * longer window assumes) are a third part, a closed "About these options" with no input in
+ * it: the sidebar puts it under Hesapla, so it never pushes the button down.
  */
 
 import { useSearchParams } from "react-router";
@@ -75,8 +75,8 @@ function signedPoints(points: number): string {
   return points > 0 ? `+${points}` : String(points);
 }
 
-/** Which part of the controls to render; both, one after the other, when none is named. */
-export type DecisionControlsPart = "plan" | "advanced";
+/** Which part of the controls to render; all of them, in turn, when none is named. */
+export type DecisionControlsPart = "plan" | "notes" | "advanced";
 
 export function MemberDecisionControls({
   entryId,
@@ -374,54 +374,54 @@ export function MemberDecisionControls({
           </div>
         </fieldset>
       ) : null}
-
-      <details className={styles.notes}>
-        <summary>
-          <DisclosureIcon className={styles.notesIcon} />
-          {copy.optionNotes}
-        </summary>
-        <div className={styles.notesBody}>
-          <p>
-            {copy.strategyIntro} <Badge tone="accent">{messages.decision.shareable}</Badge>
-          </p>
-          <dl className={styles.descriptions}>
-            {strategies.map((slug) => (
-              <div key={slug}>
-                <dt>{copy.strategies[slug].name}</dt>
-                <dd>{copy.strategies[slug].description}</dd>
-              </div>
-            ))}
-          </dl>
-          {suggested ? (
-            <p>
-              {copy.rulePickNote(
-                nameOf(suggested.rival_entry_id),
-                signedPoints(suggested.points_ahead_of_rival),
-                suggested.gameweeks_remaining,
-              )}
-            </p>
-          ) : null}
-          {needsRival ? (
-            <>
-              <p>{copy.rivalNote}</p>
-              {windows.length > 1 ? <p>{top100Copy.rivalWindows}</p> : null}
-              {(computable?.rivals.length ?? 0) > 0 ? <p>{computeCopy.rivalComputable}</p> : null}
-            </>
-          ) : null}
-          <p>
-            {selection.request.model === "football"
-              ? copy.modelWindowNote
-              : windows.length > 1
-                ? copy.windowLimits
-                : copy.windowNotComputed}
-          </p>
-          {showModel ? <p>{copy.modelNote}</p> : null}
-          {computable && computable.strategies.length > 0 ? (
-            <p>{computeCopy.controlsNote}</p>
-          ) : null}
-        </div>
-      </details>
     </div>
+  );
+
+  const notes = (
+    <details className={styles.notes}>
+      <summary>
+        <DisclosureIcon className={styles.notesIcon} />
+        {copy.optionNotes}
+      </summary>
+      <div className={styles.notesBody}>
+        <p>
+          {copy.strategyIntro} <Badge tone="accent">{messages.decision.shareable}</Badge>
+        </p>
+        <dl className={styles.descriptions}>
+          {strategies.map((slug) => (
+            <div key={slug}>
+              <dt>{copy.strategies[slug].name}</dt>
+              <dd>{copy.strategies[slug].description}</dd>
+            </div>
+          ))}
+        </dl>
+        {suggested ? (
+          <p>
+            {copy.rulePickNote(
+              nameOf(suggested.rival_entry_id),
+              signedPoints(suggested.points_ahead_of_rival),
+              suggested.gameweeks_remaining,
+            )}
+          </p>
+        ) : null}
+        {needsRival ? (
+          <>
+            <p>{copy.rivalNote}</p>
+            {windows.length > 1 ? <p>{top100Copy.rivalWindows}</p> : null}
+            {(computable?.rivals.length ?? 0) > 0 ? <p>{computeCopy.rivalComputable}</p> : null}
+          </>
+        ) : null}
+        <p>
+          {selection.request.model === "football"
+            ? copy.modelWindowNote
+            : windows.length > 1
+              ? copy.windowLimits
+              : copy.windowNotComputed}
+        </p>
+        {showModel ? <p>{copy.modelNote}</p> : null}
+        {computable && computable.strategies.length > 0 ? <p>{computeCopy.controlsNote}</p> : null}
+      </div>
+    </details>
   );
 
   const advanced = (
@@ -547,10 +547,12 @@ export function MemberDecisionControls({
   );
 
   if (part === "plan") return plan;
+  if (part === "notes") return notes;
   if (part === "advanced") return advanced;
   return (
     <>
       {plan}
+      {notes}
       {advanced}
     </>
   );

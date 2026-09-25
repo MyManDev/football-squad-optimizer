@@ -4,6 +4,8 @@ export const CHIP_FORECAST_COPY = {
     calendarFalse: "No blank or double appears in the examined weeks",
     calendarNull: "This calendar reading was refused.",
     calendarEmpty: "No later gameweek remains in a held chip window.",
+    /** The examined gameweeks, first to last, after the calendar sentence. */
+    range: (first: number, last: number) => `${first} to ${last}`,
     title: "Chip outlook",
     published: "Published reading",
     computed: "Newly computed reading",
@@ -61,6 +63,7 @@ export const CHIP_FORECAST_COPY = {
     calendarFalse: "İncelenen haftalarda boş veya çift maç yok",
     calendarNull: "Bu takvim okuması yapılamadı.",
     calendarEmpty: "Eldeki chip pencerelerinde sonraki bir hafta kalmadı.",
+    range: (first: number, last: number) => `${first}. ile ${last}. hafta arası`,
     title: "Chip görünümü",
     published: "Yayımlanmış okuma",
     computed: "Yeni hesaplanan okuma",

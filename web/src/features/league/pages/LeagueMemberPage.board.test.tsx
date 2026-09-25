@@ -389,7 +389,9 @@ describe("the gain strip and the captain line", () => {
 
   it("puts the captain and the vice-captain on one line with their clubs", () => {
     show("tr");
-    const line = screen.getByText("Haaland").closest("p")!;
+    // The squad's list view names the armband too; the captain line is the decision's.
+    const decision = document.querySelector<HTMLElement>('[data-mark="decision"]')!;
+    const line = within(decision).getByText("Haaland").closest("p")!;
     expect(line).toHaveTextContent("Kaptan");
     expect(line).toHaveTextContent("MCI");
     expect(line).toHaveTextContent("8,0 xP");

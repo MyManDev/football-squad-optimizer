@@ -50,9 +50,11 @@ export function MemberSquad({
   const planned = onPitch.source === "plan";
   const hasList = planned && list != null;
   const own = planned && finite(plan?.expected_own_points) ? plan.expected_own_points : null;
+  // The list view states the plan's own total in its first line, so the heading row
+  // does not say it twice.
   const line = [
     formation(onPitch.eleven),
-    own !== null ? copy.squadOwnPoints(figure(own, locale)) : null,
+    own !== null && !(hasList && view === "list") ? copy.squadOwnPoints(figure(own, locale)) : null,
   ]
     .filter(Boolean)
     .join(" · ");

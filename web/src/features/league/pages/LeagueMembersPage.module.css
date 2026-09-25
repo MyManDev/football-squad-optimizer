@@ -237,14 +237,17 @@ td.total {
   font-weight: 600;
   line-height: 20px;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
+/* A name that needs two lines splits evenly rather than leaving its last word alone. */
 .manager {
   grid-area: manager;
   color: var(--color-text-muted);
   font-size: var(--step--2);
   line-height: 16px;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .leader {
@@ -483,8 +486,11 @@ td.total {
       "manager select";
   }
 
+  /* A heading that wraps in the narrow figure columns ('Son hafta') keeps its last line on
+     the same baseline as the one-line headings beside it. */
   .table thead th {
     height: auto;
     padding-block: var(--space-1);
+    vertical-align: bottom;
   }
 }

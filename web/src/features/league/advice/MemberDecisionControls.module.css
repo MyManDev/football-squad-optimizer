@@ -7,15 +7,19 @@
 .plan {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
 }
 
+/* The heading with the plan now in force at its right, as D-Bu-Hafta draws it; a plan too
+   long for that (strategy, window and model) moves under the heading as a whole line of its
+   own and reads from the left, instead of leaving a word behind at the right. */
 .planHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: 2px var(--space-2);
 }
 
 .planTitle {
@@ -31,7 +35,7 @@
   color: var(--color-text-muted);
   font-size: var(--step--2);
   line-height: 16px;
-  text-align: right;
+  text-wrap: pretty;
 }
 
 .field {
@@ -212,6 +216,11 @@
 
 .segment:has(input:checked:focus-visible) {
   outline-color: var(--color-lime);
+}
+
+/* Under Hesapla in the sidebar, a step apart from the button's own lines. */
+.notes {
+  margin-top: var(--space-2);
 }
 
 .notes > summary {

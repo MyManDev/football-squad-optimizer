@@ -134,6 +134,13 @@ const en = {
     MID: "midfielder",
     FWD: "forward",
   },
+  /** The position as the week's list leads a row with it: a short code, not a word. */
+  positionCodes: {
+    GK: "GK",
+    DEF: "DEF",
+    MID: "MID",
+    FWD: "FWD",
+  },
   squad: {
     loading: "Loading the latest decision…",
     dataError: "The site data could not be read.",
@@ -1245,6 +1252,12 @@ const tr: MessageSchema<typeof en> = {
     DEF: "defans",
     MID: "orta saha",
     FWD: "forvet",
+  },
+  positionCodes: {
+    GK: "KL",
+    DEF: "DF",
+    MID: "OS",
+    FWD: "FV",
   },
   squad: {
     loading: "Son karar yükleniyor…",
