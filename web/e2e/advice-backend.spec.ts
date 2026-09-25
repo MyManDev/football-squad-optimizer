@@ -92,7 +92,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await page
     .getByRole("row")
     .filter({ has: page.locator(`a[href="/league/members/${context.entryId}"]`) })
-    .getByRole("button", { name: "Bu benim", exact: true })
+    .getByRole("button", { name: "Bu benim" })
     .click();
   expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",

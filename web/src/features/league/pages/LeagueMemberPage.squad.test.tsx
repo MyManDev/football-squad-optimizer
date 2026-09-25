@@ -96,7 +96,7 @@ describe("the member's published squad", () => {
       within(pitch)
         .getAllByRole("listitem")
         .map((row) => row.getAttribute("aria-label")),
-    ).toEqual(["GK", "DEF", "MID", "FWD"]);
+    ).toEqual((["GK", "DEF", "MID", "FWD"] as const).map((code) => copy.positions[code]));
     for (const player of squad.payload.starting_xi) {
       expect(within(pitch).getByTitle(player.name)).toHaveTextContent(player.short_name);
     }
@@ -190,6 +190,25 @@ describe("the member's published squad", () => {
       );
       for (const player of [...squad.payload.starting_xi, ...squad.payload.bench]) {
         expect(held).toHaveTextContent(player.name);
+      }
+      // Each row's figure prints the short "xP", hidden from a screen reader; in Turkish
+      // "beklenen puan" is read out in its place, in English the "xP" itself.
+      const members = copy.leagueMembers;
+      const withFigure = [...squad.payload.starting_xi, ...squad.payload.bench].filter(
+        (player) => typeof player.expected_points === "number",
+      );
+      expect(withFigure.length).toBeGreaterThan(0);
+      if (language === "en") {
+        // One word both ways: plain text after the figure, as before.
+        expect(within(held).getAllByText(/^-?\d+(\.\d+)? xP$/)).toHaveLength(withFigure.length);
+      } else {
+        const printed = within(held).getAllByText(members.pointsUnitAbbreviation);
+        expect(printed).toHaveLength(withFigure.length);
+        for (const unit of printed) expect(unit).toHaveAttribute("aria-hidden", "true");
+        const spoken = within(held).getAllByText(members.pointsUnitSpoken);
+        expect(spoken).toHaveLength(withFigure.length);
+        for (const unit of spoken) expect(unit).toHaveClass("visually-hidden");
+        expect(held).not.toHaveTextContent(/\d puan/);
       }
       expect(screen.getAllByText("Proposed Vice Only").length).toBeGreaterThan(0);
     },

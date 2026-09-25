@@ -117,9 +117,12 @@ async function open(page: Page, width: number, height: number, plan = PLAN, live
 type Box = { x: number; y: number; width: number; height: number };
 const centre = (box: Box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
 
-/** The plates of one line of the pitch, in the published order. */
+/**
+ * The plates of one line of the pitch, in the published order. The line is found by its
+ * position code in `data-line`; its accessible name is the position word in the page language.
+ */
 async function plates(pitch: Locator, line: string): Promise<Box[]> {
-  const item = pitch.locator(`[role="listitem"][aria-label="${line}"]`);
+  const item = pitch.locator(`[role="listitem"][data-line="${line.toLowerCase()}"]`);
   const boxes: Box[] = [];
   for (const plate of await item.locator("[title]").all()) {
     // The title is on the name; the plate is its parent.
@@ -259,7 +262,7 @@ test("a line of five on the smallest phone keeps every club code whole and every
   await open(page, 375, 667, { ...week, payload });
   const pitch = page.getByRole("list", { name: copy.squad.pitchLabel });
   await pitch.scrollIntoViewIfNeeded();
-  await expect(pitch.locator('[role="listitem"][aria-label="MID"] [title]')).toHaveCount(5);
+  await expect(pitch.locator('[role="listitem"][data-line="mid"] [title]')).toHaveCount(5);
   await expect(pitch.getByText(copy.leagueMembers.boardNew, { exact: true })).toHaveCount(2);
   expect(await plateFaults(pitch, false)).toEqual([]);
   expect(
