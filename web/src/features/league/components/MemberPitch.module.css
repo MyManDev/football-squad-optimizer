@@ -20,7 +20,7 @@
   container: field / inline-size;
   position: relative;
   max-width: 540px;
-  height: clamp(400px, 112cqw, 604px);
+  height: clamp(420px, 112cqw, 604px);
   overflow: hidden;
   border-radius: var(--radius-m);
   background: repeating-linear-gradient(
@@ -183,7 +183,7 @@
 }
 
 .line[data-line="gk"] .token {
-  top: calc(100% - 38px);
+  top: calc(100% - 40px);
 }
 
 .line[data-line="def"] .token {
@@ -198,27 +198,31 @@
   top: calc(25% + 19px);
 }
 
+/* Upright, as the tablet artboards draw it: the name, the club and the figure on three
+   centred lines, so a narrow plate in a line of five still prints its club code whole. */
 .plate {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "name name name"
-    "code . xp";
-  column-gap: 4px;
-  height: 40px;
-  padding: 4px 5px;
+    "name"
+    "code"
+    "xp";
+  height: 52px;
+  padding: 3px 4px;
   border-radius: var(--radius-s);
   background: var(--color-chip);
   color: var(--color-chip-text);
   font-size: var(--step--2);
   line-height: 16px;
+  text-align: center;
 }
 
 .name {
   grid-area: name;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   min-width: 0;
   font-weight: 600;
@@ -243,22 +247,18 @@
   display: none;
 }
 
-/* Four or five upright plates in a row are too narrow for the swatch beside the code and
-   the figure; the code is printed either way, so the swatch goes. */
-.line[data-many] .swatchUpright {
-  display: none;
-}
-
 .code {
   grid-area: code;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   min-width: 0;
   overflow: hidden;
   color: var(--color-chip-muted);
   font-family: var(--font-mono);
   font-weight: 500;
+  line-height: 14px;
   white-space: nowrap;
 }
 
@@ -276,12 +276,14 @@
   white-space: nowrap;
 }
 
-/* Upright, YENİ and the armband stand on the plate's top edge, outside it, so a narrow
-   plate keeps its name. */
+/* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
+   narrow plate keeps its name and a tag never reads as the next plate's. Where a plate
+   carries both, they stand side by side about its centre. */
 .new,
 .mark {
   position: absolute;
   bottom: calc(100% + 2px);
+  left: 50%;
   height: 16px;
   border-radius: var(--radius-s);
   color: var(--color-text);
@@ -290,10 +292,10 @@
   font-weight: 800;
   line-height: 16px;
   text-align: center;
+  transform: translateX(-50%);
 }
 
 .new {
-  left: 0;
   padding: 0 4px;
   background: var(--color-lime);
   letter-spacing: 0.04em;
@@ -301,9 +303,16 @@
 }
 
 .mark {
-  right: 0;
   width: 16px;
   background: var(--color-lime);
+}
+
+.plate:has(.mark) .new {
+  transform: translateX(calc(-100% - 2px));
+}
+
+.plate:has(.new) .mark {
+  transform: translateX(2px);
 }
 
 .vice {
@@ -505,12 +514,25 @@
     display: none;
   }
 
+  /* Across, two lines: the name, then the club, YENİ and the figure. */
   .plate {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
       "name name name name"
       "code new . xp";
+    column-gap: 4px;
+    height: 40px;
     padding: 4px 8px;
+    text-align: left;
+  }
+
+  .name,
+  .code {
+    justify-content: flex-start;
+  }
+
+  .code {
+    line-height: 16px;
   }
 
   .name {
@@ -536,6 +558,14 @@
     top: 4px;
     right: 8px;
     bottom: auto;
+    left: auto;
+  }
+
+  .new,
+  .mark,
+  .plate:has(.mark) .new,
+  .plate:has(.new) .mark {
+    transform: none;
   }
 
   .attack {

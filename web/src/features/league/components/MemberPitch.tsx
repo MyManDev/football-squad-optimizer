@@ -194,7 +194,6 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
                 key={line.position}
                 className={styles.line}
                 data-line={line.position.toLowerCase()}
-                data-many={line.players.length >= 4 ? "true" : undefined}
                 role="listitem"
                 aria-label={line.position}
                 style={

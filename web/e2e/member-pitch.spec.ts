@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { MESSAGES } from "../src/i18n/messages";
 import { mockEntryAdviceEnvelope } from "../src/fixtures/league";
 import type { AdvicePlayer, EntryAdvice } from "../src/features/league/types";
-import { installLeagueMocks } from "./leagueMocks";
+import { installLeagueMocks, openCalendar } from "./leagueMocks";
 
 const ENTRY = 35249001;
 const copy = MESSAGES.tr;
@@ -42,9 +42,44 @@ function twoMoves(): typeof PLAN {
   return { ...PLAN, payload };
 }
 
+/**
+ * The open calendar with the week's round filled in: every club of the plan plays, under a
+ * three-letter short name, so the plates print club codes as the published calendar gives
+ * them (the mock's clubs are not the league's, so no static code would name them).
+ */
+function codedCalendar() {
+  const calendar = openCalendar();
+  const players = [...PLAN.payload.starting_xi!, ...(PLAN.payload.bench ?? [])];
+  const teams = [...new Set(players.map((player) => player.team))].map((name, index) => ({
+    team_id: index + 1,
+    name,
+    short_name: name
+      .replace(/[^A-Za-z]/g, "")
+      .slice(0, 3)
+      .toUpperCase(),
+  }));
+  if (teams.length % 2 === 1) teams.push({ team_id: 99, name: "Visitors", short_name: "VIS" });
+  const fixtures = teams
+    .filter((_, index) => index % 2 === 0)
+    .map((home, index) => ({
+      fixture_id: index + 1,
+      kickoff_utc: null,
+      home,
+      away: teams[index * 2 + 1]!,
+      finished: false,
+      home_score: null,
+      away_score: null,
+    }));
+  const [week] = calendar.payload.gameweeks;
+  return { ...calendar, payload: { ...calendar.payload, gameweeks: [{ ...week!, fixtures }] } };
+}
+
 async function open(page: Page, width: number, height: number, plan = PLAN) {
   await page.setViewportSize({ width, height });
   await installLeagueMocks(page);
+  await page.route("**/data/fixtures.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(codedCalendar()) }),
+  );
   await page.route(`**/data/league/advice/${ENTRY}/saf-puan/1.json`, (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(plan) }),
   );
@@ -54,6 +89,10 @@ async function open(page: Page, width: number, height: number, plan = PLAN) {
   await expect(
     page.getByRole("heading", { name: copy.leagueMembers.squadAfterTitle }),
   ).toBeVisible();
+  // Measure once the calendar has arrived (the plates' codes and the rail come from it)
+  // and the fonts have loaded, so nothing moves between two readings.
+  await expect(page.locator('[data-mark="rail-xi"]')).toBeAttached();
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -71,6 +110,43 @@ async function plates(pitch: Locator, line: string): Promise<Box[]> {
 }
 
 const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+/**
+ * What is wrong with the plates: an armband or YENİ that is not inside its plate across the
+ * pitch, or not centred over it upright (so it could read as the next plate's), and a club
+ * code cut short.
+ */
+async function plateFaults(pitch: Locator, across: boolean): Promise<string[]> {
+  return pitch.evaluate(
+    (list, { across, fresh }) => {
+      const faults: string[] = [];
+      for (const name of list.querySelectorAll("[title]")) {
+        const plate = name.parentElement!;
+        const own = plate.getBoundingClientRect();
+        const tags = [...plate.children].filter(
+          (child) => child.getAttribute("role") === "img" || child.textContent === fresh,
+        );
+        if (tags.length > 0) {
+          const boxes = tags.map((tag) => tag.getBoundingClientRect());
+          const left = Math.min(...boxes.map((tag) => tag.left));
+          const right = Math.max(...boxes.map((tag) => tag.right));
+          const fits = across
+            ? left >= own.left - 0.5 && right <= own.right + 0.5
+            : Math.abs((left + right) / 2 - (own.left + own.right) / 2) <= 1;
+          if (!fits) faults.push(`tags of ${name.getAttribute("title")}`);
+        }
+        // A club the calendar does not name is printed by its name and may be cut short.
+        const code = plate.querySelector("[class*='codeText']");
+        if (code && /^[A-Z]{3}$/.test(code.textContent ?? "")) {
+          if (code.scrollWidth > code.clientWidth + 0.5)
+            faults.push(`club code of ${name.getAttribute("title")}`);
+        } else faults.push(`no club code for ${name.getAttribute("title")}`);
+      }
+      return faults;
+    },
+    { across, fresh: copy.leagueMembers.boardNew },
+  );
+}
 
 for (const [width, height, across] of [
   [1440, 900, true],
@@ -135,6 +211,10 @@ for (const [width, height, across] of [
         box.y + box.height > plate.y;
       expect(overlaps).toBe(false);
     }
+    // The armband and YENİ belong visibly to their own plate: inside it across the pitch,
+    // centred over it upright, so neither reads as the next plate's. Every club code is
+    // printed whole, however many share a line.
+    expect(await plateFaults(pitch, across)).toEqual([]);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
@@ -143,6 +223,33 @@ for (const [width, height, across] of [
     await pitch.screenshot({ path: testInfo.outputPath(`pitch-${width}.png`) });
   });
 }
+
+test("a line of five on the smallest phone keeps every club code whole and every tag on its own plate", async ({
+  page,
+}, testInfo) => {
+  // The two-move week's eleven drawn as 3-5-2: the same players, the positions by place.
+  const shape = ["GK", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD"];
+  const week = twoMoves();
+  const payload: EntryAdvice = {
+    ...week.payload,
+    starting_xi: week.payload.starting_xi!.map((player, index) => ({
+      ...player,
+      position: shape[index] as AdvicePlayer["position"],
+    })),
+  };
+  await open(page, 375, 667, { ...week, payload });
+  const pitch = page.getByRole("list", { name: copy.squad.pitchLabel });
+  await pitch.scrollIntoViewIfNeeded();
+  await expect(pitch.locator('[role="listitem"][aria-label="MID"] [title]')).toHaveCount(5);
+  await expect(pitch.getByText(copy.leagueMembers.boardNew, { exact: true })).toHaveCount(2);
+  expect(await plateFaults(pitch, false)).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await pitch.screenshot({ path: testInfo.outputPath("pitch-375-five.png") });
+});
 
 test("a two-move week fits the owner's laptop: the decision above 640, the pitch, bench and honesty above 900", async ({
   page,
