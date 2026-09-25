@@ -7,9 +7,12 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 
 ## Current position
 
-Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026. Each
-line names the code or the record it can be checked against. The phase sections below keep
-their goals; this section is what exists today.
+Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026; the five
+commits after it on `develop` up to `a5ba8d86` (#811, #812, #813, #815, #817) were read on
+26 September 2026 for anything they change here. Each line names the code or the record it
+can be checked against, and `tests/unit/test_roadmap_current_position.py` checks several of
+them against those records. The phase sections below keep their goals; this section is what
+exists today.
 
 ### What a member gets
 
@@ -34,6 +37,11 @@ capture `fpl-live-20260922T214539Z-364991a4f832`):
   at (#685, #728, `application/chip_forecast.py`). It uses the decaying threshold without
   the reservation. Over four development seasons each threshold rule beat never playing a
   chip, and none separated from another (`docs/chip_forecast_rule.md`).
+- Only in a week whose build publishes the rival menu (GW5 did; GW6 did not): the rival
+  strategies against the other members, and the pick of the declared rule
+  `gap_and_weeks_strategy_rule_v1` among `saf-puan`, `ortak-koru` and `fark-yarat`
+  (`application/strategies/rule.py`, placed in the index by `application/league_views.py`).
+  The backend does not compute that pick on request.
 
 **Computed on request** through the advice backend, which offers the whole member menu
 (`menu_capabilities` in `application/advice_capabilities.py`) and publishes what the current
@@ -42,9 +50,8 @@ capture can answer (the capabilities document in `platform/advice_read.py`):
 - The rival strategies against a named rival, at one, three or five weeks (#604):
   `ortak-koru` (an overlap floor with the rival, declared at nine players) and `fark-yarat`
   (an overlap ceiling, declared at five), each priced in expected points against the
-  member's own plan. The declared rule `gap_and_weeks_strategy_rule_v1` suggests one. Gate 1
-  of the strategy bench fails at every horizon, so none is `gated_pass` and none may be
-  called safer (`docs/strategy_bench.md`).
+  member's own plan. Gate 1 of the strategy bench fails at every horizon, so none is
+  `gated_pass` and none may be called safer (`docs/strategy_bench.md`).
 - The Top 100 influence: a weight the member chooses (0, 5, 10, 20, 30, 40 or 50) on how
   many Top 100 teams started each player last week, at every window and on the rival
   strategies (#594, #599). The plan is chosen on the weighted points and every number shown
@@ -83,28 +90,42 @@ What a strategy may publish is a closed list with no probability and no spread i
 - **The logon watcher.** `scripts/start_backend_at_logon.ps1 -Register` puts a Startup
   shortcut that runs the script with `-Watch` at logon: it starts what is not running, then
   checks every 60 seconds and starts a component after three failed checks in a row (#623,
-  #658). The owner runs `-Register` on the machine; the repository cannot show whether that
-  has been done. `scripts/release/restart_backend.ps1` restarts the recorded backend on a new
-  release (#663).
+  #658). The owner runs `-Register` on the machine; until #813 that call stopped before the
+  script ran when started with `powershell -File` and no `-RepoRoot`, and the repository
+  cannot show whether it has been done. `scripts/release/restart_backend.ps1` restarts the
+  recorded backend on a new release (#663; the same fix in #813).
 - **The uptime check.** The `Backend uptime` workflow opens a `backend-down` issue when
   `/health` fails and closes it on recovery (#676). Its schedule fires hours apart, not every
-  fifteen minutes (measured in the hosting document). The last outage issue, #795, was open
-  from 2026-09-24T15:26Z to 2026-09-25T11:14Z.
+  fifteen minutes (measured in the hosting document). Its issues are the outage record, read
+  with `gh issue list --label backend-down --state all`: on 26 September 2026 that listed four
+  (#747, #787, #795, #821), each closed by the workflow with the time health came back.
 
 ### Where the evidence stands
 
-- **Phase A: engineering complete, three weeks settled.** The published ledger
-  (`web/public/data/2026-27/ledger.json`) holds GW1 and GW5 decided live and GW4 as a replay.
-  GW2 and GW3 were rolled with no decision (`docs/season_ledger_2026-27.md`). The exit asks
-  for eight prospective gameweeks: if every week from GW6 on is decided live before its
-  deadline, GW11 is the eighth. The GW3 Top-100 cohort was lost before it could be settled
-  (see Phase A below).
+- **Phase A: engineering complete; no paired gameweek scored yet.** The published ledger
+  (`web/public/data/2026-27/ledger.json`) holds three settled decisions: GW1 and GW5 decided
+  live and GW4 as a replay. GW2 and GW3 were rolled with no decision
+  (`docs/season_ledger_2026-27.md`). Those ledger decisions are not what the exit counts: it
+  asks for eight valid paired gameweeks as `docs/benchmark_v2_prereg.md` defines them, the
+  system's decision against the ownership template and the `as_of_top_100_v1` cohort. GW1
+  cannot be one, since the protocol gives GW1 no cohort and its capture is gone from the
+  operational `data/snapshots`. GW4's ledger decision is a replay. GW5 is the first
+  candidate, a live decision with an overall Top-100 cohort captured before its deadline
+  (`fpl-top100-20260918T122433Z-ce78d1e94c1e`), and it has not been scored into a record. If
+  every week from GW6 on is decided live with its cohort captured before the deadline, GW12
+  is the eighth. The GW3 cohort was lost before it could be settled (see Phase A below).
 - **Phase B: complete.**
-- **Phase C: the component base is the live default and is published bare.** The GW4 and GW5
-  decisions name `phase_c_control_components_v1` (`gw04/recommendation.json` and
-  `gw05/recommendation.json` under `web/public/data/2026-27/`); the Top 100 reaches a
-  member's plan only as the weight above. The elite family's instrument, the Top 100
-  effect reader, is fixed to read after GW12 and after GW20 (`docs/top100_effect_prereg.md`).
+- **Phase C: the component base is the live default; members have had it bare since GW5.**
+  GW4's member advice (`site-2026-27-gw04-decision`, #499 and #500) was solved on the
+  uplifted handoff `phase-c-component-elite-top100-v1`, as its window plans state and
+  `docs/top100_effect_prereg.md` records. The `gw04/recommendation.json` under
+  `web/public/data/2026-27/` that names `phase_c_control_components_v1` is the control replay
+  written after the deadline, which the ledger marks `replay`. From GW5 on the published weeks
+  carry the bare base: the weekly runbook runs them with `--projection component-only`,
+  `gw05/recommendation.json` names `phase_c_control_components_v1`, and neither the GW5 nor
+  the GW6 window plans state the uplift. The Top 100 now reaches a member's plan only as the
+  weight above. The elite family's instrument, the Top 100 effect reader, is fixed to read
+  after GW12 and after GW20 (`docs/top100_effect_prereg.md`).
 - **Phase D: calibration failed.** S1 passes and S2 fails on the 137 frozen folds, so
   `PHASE_E_CALIBRATED_VERSIONS` stays empty (`application/phase_e.py`) and no scenario
   claim reaches a member.
@@ -213,17 +234,25 @@ history use the existing in-season estimate row by row. Old captures without the
 payloads fall back to the legacy model with a recorded reason; `--control-only` is the explicit
 rollback. See [`docs/phase_c_operational_component.md`](../phase_c_operational_component.md).
 
-**The published decisions carry the bare component base, not the Top-100 uplift.** The
-five-per-cent uplift still exists as its own model version,
+**Since GW5 the published decisions carry the bare component base; GW4's carried the
+Top-100 uplift.** The five-per-cent uplift is its own model version,
 `phase-c-component-elite-top100-v1` (#395): the producer multiplies it on top of the component
 base when it is given both evidence artifact paths, and the weekly runner's default
-`--projection component` builds that handoff. It is not what members are published. A week
-that offers the Top 100 menu runs with `--projection component-only`, because a member's own
-weight must not stack on the frozen uplift ([weekly runbook](../weekly_runbook.md)), and the
-GW4 and GW5 decisions both name `phase_c_control_components_v1`. The Top 100 now reaches a
-plan only as the weight a member chooses, priced on base points
-(`application/top100_weight.py`, #594). This paragraph said until 25 September 2026 that the
-uplift was the default weekly path; it is corrected here rather than quietly.
+`--projection component` builds that handoff. GW4's member advice (`site-2026-27-gw04-decision`,
+#499 and #500) was solved on `phase-c-component-elite-top100-v1`. Its window plans say so:
+`window_stated_limits` in `application/advice.py` prints the uplift sentence only for a
+projection that carries the elite evidence fingerprint, and `docs/top100_effect_prereg.md`
+records that the handoff that decided GW4 carried the uplift. The
+`web/public/data/2026-27/gw04/recommendation.json` that names `phase_c_control_components_v1`
+is the control replay written after the deadline, and the ledger marks GW4 `replay`. From GW5
+on, a week that offers the Top 100 menu runs with `--projection component-only`, because a
+member's own weight must not stack on the frozen uplift ([weekly runbook](../weekly_runbook.md)).
+The GW5 decision names `phase_c_control_components_v1`, and neither the GW5 nor the GW6 window
+plans state the uplift, so the uplift has not been what members are published since GW5. The
+Top 100 now reaches a plan only as the weight a member chooses, priced on base points
+(`application/top100_weight.py`, #594). Until 25 September 2026 this paragraph called the
+uplift the default weekly path. That described the runner's default, which is unchanged, and
+it was what decided GW4; what changed from GW5 on is the operator's flag.
 
 The uplift was never measured as a candidate on the component base: on 8 September 2026 the
 owner amended the promotion boundary to admit a bounded, fitted-nothing uplift without one,
