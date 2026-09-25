@@ -252,13 +252,10 @@ export function MemberDecisionControls({
         agresif: messages.decision.modes.aggressive,
         "asiri-agresif": messages.decision.modes.extreme,
       }[strategy];
-  const now = [
-    strategyName,
-    messages.decision.week(windowSize),
-    showModel ? copy.modelNames[chosenModel] : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // The plan in force, as D-Bu-Hafta writes it beside the heading: the strategy and the
+  // window. The model is the radio group just under it, and the decision's own heading row
+  // names all three.
+  const now = [strategyName, messages.decision.week(windowSize)].filter(Boolean).join(" · ");
 
   const plan = (
     <div className={styles.plan}>

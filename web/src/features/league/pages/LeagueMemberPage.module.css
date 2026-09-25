@@ -272,7 +272,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-1) 0 var(--space-2);
+  padding: 0 0 2px;
 }
 
 .whoLeague {
@@ -288,9 +288,9 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  min-height: 40px;
+  min-height: 36px;
   margin: 0 calc(-1 * var(--space-2));
-  padding: 2px var(--space-2);
+  padding: 0 var(--space-2);
   border-radius: var(--radius-s);
   color: var(--color-text);
   text-decoration: none;
@@ -328,7 +328,7 @@
 /* ---- Hesapla under the plan; pinned to the bottom of the phone and tablet drawer ---- */
 
 .computeDock {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 :global(#sidebar[data-mode="drawer"]) .computeDock {
@@ -706,14 +706,34 @@ section.notice p {
   font-size: var(--step-0);
 }
 
+/* A chip's name over its verdict: the name is the heading, never smaller than the line
+   under it. */
 .toolBody h4 {
-  font-size: var(--step--1);
+  font-size: var(--step-0);
 }
 
 /* A panel's paragraphs are spaced by the panel's own rhythm, not the browser's margins on
-   top of it, which left gaps of 40 px between two sentences. */
+   top of it, which left gaps of 40 px between two sentences, and read in lines a person
+   can follow (the column is wider than a line of prose should be). */
 .toolBody section > p {
   margin-block: 0;
+}
+
+.toolBody p {
+  max-width: var(--measure);
+}
+
+/* One chip's reading: its name, the verdict and the figures as one block, 4 px apart,
+   with the space between two chips instead of between their lines. */
+.toolBody article:not([class]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.toolBody article:not([class]) > * {
+  margin: 0;
 }
 
 @media (max-width: 1179.98px) {
@@ -777,13 +797,6 @@ section.notice p {
   font-family: var(--font-display);
   font-size: var(--step-1);
   font-weight: 700;
-}
-
-.lineupSub {
-  margin: var(--space-3) 0 var(--space-1);
-  font-size: var(--step--1);
-  font-weight: 600;
-  color: var(--color-text-muted);
 }
 
 .armband {

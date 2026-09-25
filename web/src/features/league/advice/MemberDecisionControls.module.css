@@ -1,6 +1,7 @@
 /*
  * The plan part sits in the sidebar (surface-2): labels are ink2, never ink3, which is
- * 4.36:1 there. Rows are 30 px on a desktop and 44 px targets below 1180 px, where the
+ * 4.36:1 there. Rows are 28 px on a desktop, so Hesapla stays above a small laptop's fold
+ * with every strategy and both models listed, and 44 px targets below 1180 px, where the
  * sidebar is a drawer over the page. The inputs are real radios, drawn to D's look.
  */
 
@@ -12,8 +13,8 @@
 }
 
 /* The heading with the plan now in force at its right, as D-Bu-Hafta draws it; a plan too
-   long for that (strategy, window and model) moves under the heading as a whole line of its
-   own and reads from the left, instead of leaving a word behind at the right. */
+   long for that (a long strategy name) moves under the heading as a whole line of its own
+   and reads from the left, instead of leaving a word behind at the right. */
 .planHead {
   display: flex;
   flex-wrap: wrap;
@@ -51,7 +52,7 @@
 .field > legend,
 .label {
   padding: 0;
-  margin-bottom: var(--space-1);
+  margin-bottom: 2px;
   color: var(--color-text-muted);
   font-size: var(--step--2);
   font-weight: 500;
@@ -67,7 +68,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 30px;
+  min-height: 28px;
   font-size: var(--step-0);
   line-height: 20px;
   cursor: pointer;
@@ -172,7 +173,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 30px;
   font-size: var(--step-0);
   line-height: 20px;
   white-space: nowrap;

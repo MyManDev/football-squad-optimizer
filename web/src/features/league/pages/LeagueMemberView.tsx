@@ -256,42 +256,41 @@ function LeagueMemberContent({
             capabilities={capabilities}
             part="plan"
           />
-          <div className={styles.computeDock} data-compute-dock>
-            <AdviceRequestPanel
-              request={request}
-              job={job}
-              selectionAvailable={
-                selectionAvailable &&
-                !selection.evidence.on &&
-                selection.top100.weight === 0 &&
-                selection.chip.chip === null
-              }
-              service={
-                selection.computable
-                  ? "ready"
-                  : computeService === "ready"
-                    ? "static"
-                    : computeService
-              }
-              computable={computeAvailable}
-              pending={computePending}
-              published={
-                adviceLoading || !indexReadable
-                  ? undefined
-                  : selection.status === "not-listed" || selection.status === "declared-unavailable"
-                    ? false
-                    : selectionAvailable &&
-                        advice &&
-                        !adviceIssue &&
-                        !rejectedContext &&
-                        !rejectedUnreadable
-                      ? true
-                      : undefined
-              }
-              chipChosen={selection.chip.chip !== null}
-              deadlinePassed={deadlinePassed !== null}
-            />
-          </div>
+          <AdviceRequestPanel
+            dockClassName={styles.computeDock}
+            request={request}
+            job={job}
+            selectionAvailable={
+              selectionAvailable &&
+              !selection.evidence.on &&
+              selection.top100.weight === 0 &&
+              selection.chip.chip === null
+            }
+            service={
+              selection.computable
+                ? "ready"
+                : computeService === "ready"
+                  ? "static"
+                  : computeService
+            }
+            computable={computeAvailable}
+            pending={computePending}
+            published={
+              adviceLoading || !indexReadable
+                ? undefined
+                : selection.status === "not-listed" || selection.status === "declared-unavailable"
+                  ? false
+                  : selectionAvailable &&
+                      advice &&
+                      !adviceIssue &&
+                      !rejectedContext &&
+                      !rejectedUnreadable
+                    ? true
+                    : undefined
+            }
+            chipChosen={selection.chip.chip !== null}
+            deadlinePassed={deadlinePassed !== null}
+          />
           <MemberDecisionControls
             entryId={entryId}
             members={members}

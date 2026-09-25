@@ -17,9 +17,10 @@
  *
  * It is drawn compact, for the sidebar under the plan: the button first, then the state
  * of the request, then the notes that say why the button is off or how long it takes, and
- * last whose squad the computation starts from. In the phone drawer the page pins it to
- * the bottom of the drawer; there the self/other line and, once a state shows, the
- * duration note step aside so the pinned block stays short.
+ * last whose squad the computation starts from. The button and the state are one block
+ * (`data-compute-dock`), the notes a second one after it, so the page can pin the first to
+ * the bottom of the phone drawer while the notes stay in the drawer's flow: the pinned
+ * block is the button and what happened to the request, never a paragraph of caveats.
  */
 
 import { Badge } from "../../../design/components/Badge";
@@ -48,6 +49,7 @@ export function AdviceRequestPanel({
   chipChosen = false,
   pending = false,
   deadlinePassed = false,
+  dockClassName,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
@@ -69,6 +71,8 @@ export function AdviceRequestPanel({
    * nothing is asked of the service and the panel says why; the page explains above it.
    */
   deadlinePassed?: boolean;
+  /** The page's class for the button's block, which it may pin in a drawer. */
+  dockClassName?: string;
 }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -83,102 +87,105 @@ export function AdviceRequestPanel({
       : service !== "other-capture" && selectionAvailable && canComputeAdvice(request));
 
   return (
-    <div className={styles.panel}>
-      <button
-        type="button"
-        className={styles.compute}
-        disabled={!supported || state.phase === "requesting" || state.phase === "waiting"}
-        onClick={() => {
-          if (supported) compute(request);
-        }}
+    <>
+      <div
+        className={dockClassName ? `${styles.panel} ${dockClassName}` : styles.panel}
+        data-compute-dock
       >
-        {copy.computeButton}
-      </button>
+        <button
+          type="button"
+          className={styles.compute}
+          disabled={!supported || state.phase === "requesting" || state.phase === "waiting"}
+          onClick={() => {
+            if (supported) compute(request);
+          }}
+        >
+          {copy.computeButton}
+        </button>
 
-      {state.phase === "requesting" ? (
-        <p className={styles.state}>{copy.computeRequesting}</p>
-      ) : null}
-      {state.phase === "waiting" ? (
-        <div className={styles.state}>
-          <p>
+        {state.phase === "requesting" ? (
+          <p className={styles.state}>{copy.computeRequesting}</p>
+        ) : null}
+        {state.phase === "waiting" ? (
+          <p className={styles.state}>
             <Badge tone="accent">
               {state.status === "queued" ? copy.computeQueued : copy.computeRunning}
             </Badge>{" "}
             {state.fallback !== null ? copy.computeWaitingWithFallback : copy.computeWaiting}
           </p>
-          <p className={styles.hint}>{computeCopy.leaveOpen}</p>
-        </div>
-      ) : null}
-      {state.phase === "done" ? (
-        <p className={styles.state}>
-          <Badge tone={state.source === "api-cache" ? "good" : "accent"}>
-            {state.source === "api-cache" ? copy.computeDone : copy.computePublished}
-          </Badge>{" "}
-          {copy.computeProvenance(
-            String(state.envelope.payload.source_snapshot_id ?? "—"),
-            state.envelope.generated_at_utc,
-          )}
-          {state.source === "static-fallback" ? <> {copy.computeStaticFallback}</> : null}
-        </p>
-      ) : null}
-      {state.phase === "unavailable" ? (
-        <p className={styles.state}>
-          {state.reason == null
-            ? copy.computeUnavailable
-            : failureSentence(computeCopy, state.reason)}
-        </p>
-      ) : null}
-      {state.phase === "failed" ? (
-        <p className={styles.state}>
-          {state.reason == null
-            ? copy.computeFailed
-            : failureSentence(computeCopy, state.reason, state.retryAfterSeconds)}
-        </p>
-      ) : null}
+        ) : null}
+        {state.phase === "done" ? (
+          <p className={styles.state}>
+            <Badge tone={state.source === "api-cache" ? "good" : "accent"}>
+              {state.source === "api-cache" ? copy.computeDone : copy.computePublished}
+            </Badge>{" "}
+            {copy.computeProvenance(
+              String(state.envelope.payload.source_snapshot_id ?? "—"),
+              state.envelope.generated_at_utc,
+            )}
+            {state.source === "static-fallback" ? <> {copy.computeStaticFallback}</> : null}
+          </p>
+        ) : null}
+        {state.phase === "unavailable" ? (
+          <p className={styles.state}>
+            {state.reason == null
+              ? copy.computeUnavailable
+              : failureSentence(computeCopy, state.reason)}
+          </p>
+        ) : null}
+        {state.phase === "failed" ? (
+          <p className={styles.state}>
+            {state.reason == null
+              ? copy.computeFailed
+              : failureSentence(computeCopy, state.reason, state.retryAfterSeconds)}
+          </p>
+        ) : null}
+      </div>
 
-      {deadlinePassed ? (
-        <p role="note" className={styles.note}>
-          {computeCopy.deadlinePassedCompute}
-        </p>
-      ) : null}
-      {!deadlinePassed && !supported && !pending && service !== "other-capture" ? (
-        <p role="note" className={styles.note}>
-          {service !== "ready"
-            ? copy.computeUnsupportedSelection
-            : chipChosen
-              ? computeCopy.chipUnavailable
-              : computeCopy.notComputable}
-        </p>
-      ) : null}
-      {!deadlinePassed && service === "unreachable" ? (
-        <p role="note" className={styles.note}>
-          {published === true
-            ? computeCopy.serviceUnreachablePublished
-            : published === false
-              ? computeCopy.serviceUnreachableAbsent
-              : computeCopy.serviceUnreachable}
-        </p>
-      ) : null}
-      {!deadlinePassed && service === "other-capture" ? (
-        <p role="note" className={styles.note}>
-          {computeCopy.otherCapture}
-        </p>
-      ) : null}
-      {service === "ready" && supported ? (
-        <p role="note" className={`${styles.note} ${styles.durationNote}`}>
-          {published === false ? <>{computeCopy.notPrecomputed} </> : null}
-          {chipChosen ? (
-            computeCopy.chipDurationUnknown
-          ) : (
-            <>
-              {computeCopy.duration[request.window]} {computeCopy.durationNote}
-            </>
-          )}
-        </p>
-      ) : null}
-      <p className={`${styles.note} ${styles.whose}`}>
-        {isSelf ? copy.computeBodySelf : copy.computeBodyOther}
-      </p>
-    </div>
+      <div className={styles.notes}>
+        {state.phase === "waiting" ? <p className={styles.note}>{computeCopy.leaveOpen}</p> : null}
+        {deadlinePassed ? (
+          <p role="note" className={styles.note}>
+            {computeCopy.deadlinePassedCompute}
+          </p>
+        ) : null}
+        {!deadlinePassed && !supported && !pending && service !== "other-capture" ? (
+          <p role="note" className={styles.note}>
+            {service !== "ready"
+              ? copy.computeUnsupportedSelection
+              : chipChosen
+                ? computeCopy.chipUnavailable
+                : computeCopy.notComputable}
+          </p>
+        ) : null}
+        {!deadlinePassed && service === "unreachable" ? (
+          <p role="note" className={styles.note}>
+            {published === true
+              ? computeCopy.serviceUnreachablePublished
+              : published === false
+                ? computeCopy.serviceUnreachableAbsent
+                : computeCopy.serviceUnreachable}
+          </p>
+        ) : null}
+        {!deadlinePassed && service === "other-capture" ? (
+          <p role="note" className={styles.note}>
+            {computeCopy.otherCapture}
+          </p>
+        ) : null}
+        {service === "ready" && supported ? (
+          <p role="note" className={styles.note}>
+            {published === false ? <>{computeCopy.notPrecomputed} </> : null}
+            {chipChosen ? (
+              computeCopy.chipDurationUnknown
+            ) : (
+              <>
+                {computeCopy.duration[request.window]} {computeCopy.durationNote}
+              </>
+            )}
+          </p>
+        ) : null}
+        <p className={styles.note}>{isSelf ? copy.computeBodySelf : copy.computeBodyOther}</p>
+      </div>
+    </>
   );
 }

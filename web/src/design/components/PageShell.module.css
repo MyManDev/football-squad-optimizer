@@ -263,11 +263,13 @@
   margin: var(--space-1) calc(-1 * var(--space-2)) 0;
 }
 
+/* 34 px beside the page, where a pointer uses it and the plan under it has to keep Hesapla
+   above a small laptop's fold; the rail and the drawer make them 44 px targets. */
 .navItem {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  height: 36px;
+  height: 34px;
   padding: 0 var(--space-2);
   border-radius: var(--radius-s);
   color: var(--color-text);

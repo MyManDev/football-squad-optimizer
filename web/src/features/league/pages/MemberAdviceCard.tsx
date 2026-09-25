@@ -870,7 +870,7 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
   const label = weeks > 1 ? copy.windowLimitsLabel : copy.planLimitsLabel;
   return (
     <section className={styles.lineup} aria-label={label}>
-      <h4 className={styles.lineupSub}>{label}</h4>
+      <h3 className={styles.lineupTitle}>{label}</h3>
       <ul className={styles.limits}>
         {limits.map((sentence) => {
           const weight = top100LimitWeight(sentence);
@@ -1223,14 +1223,15 @@ function LineupSection({
       style={{ "--scale": scale } as CSSProperties}
     >
       <h3 className="visually-hidden">{copy.lineupTitle}</h3>
+      {/* The total as the pitch's heading prints it, so switching views keeps the figure. */}
       {finiteNumber(view.expected_own_points) ? (
         <p className={lineup.own}>
           {chipBasis !== null
             ? CHIP_COPY[language].expectedOwnPoints(
-                points(view.expected_own_points, 1, locale),
+                figure(view.expected_own_points, locale),
                 chipBasis,
               )
-            : copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
+            : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
         </p>
       ) : null}
       <dl className={lineup.armband}>
