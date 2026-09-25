@@ -55,8 +55,8 @@ const OTHER_RIVAL = INDEX.rival_entry_ids.find(
   (id) => id !== DEFAULT_RIVAL && !INDEX.unavailable.some((row) => row.rival_entry_id === id),
 )!;
 const copy = MESSAGES.tr.leagueMembers;
-// A heading only the advice card carries: the recommended lineup.
-const PLAN_SHOWN = copy.lineupTitle;
+// A heading only a shown plan carries: its eleven drawn after the transfers.
+const PLAN_SHOWN = copy.squadAfterTitle;
 const computeCopy = COMPUTE_COPY.tr;
 
 const CAPABILITIES: AdviceCapabilities = {

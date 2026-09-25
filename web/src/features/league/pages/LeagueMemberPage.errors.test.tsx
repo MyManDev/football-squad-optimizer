@@ -455,7 +455,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     { movement: "up", places: 1.5, expected: "unknown" },
     { movement: "down", places: -1, expected: "unknown" },
     { movement: "unknown", places: null, expected: "unknown" },
-    { movement: "down", places: 2, expected: "↓ 2" },
+    { movement: "down", places: 2, expected: "down 2" },
     { movement: "new", places: null, expected: "new" },
   ] as const)(
     "preserves missing versus measured movement: $movement/$places",
@@ -474,15 +474,16 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
         </LanguageProvider>,
       );
       const row = screen.getByRole("link", { name: member.manager_name! }).closest("tr")!;
-      const movementCell = within(row).getAllByRole("cell").at(-1)!;
-      expect(movementCell).toHaveTextContent(
+      // Movement is the second column, after the rank; its words are its name.
+      const movementCell = within(row).getAllByRole("cell")[1]!;
+      expect(movementCell).toHaveAccessibleName(
         expected === "unknown"
           ? copy.noPreviousRank
           : expected === "same"
             ? copy.movementLabel("same", 0)
             : expected === "new"
               ? copy.newMember
-              : expected,
+              : copy.movementLabel("down", 2),
       );
     },
   );
@@ -523,4 +524,28 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
       expect(data.loadEntryAdvice).not.toHaveBeenCalled();
     },
   );
+
+  it("names a plan that did not solve in the reader's language, never as its code", async () => {
+    const copy = MESSAGES[language].leagueMembers;
+    const index = mockEntryAdviceIndex(ENTRY);
+    vi.mocked(data.loadEntryAdviceIndex).mockResolvedValue({
+      ...index,
+      payload: {
+        ...index.payload,
+        unavailable: ["saf-puan", "ortak-koru", "fark-yarat"].map((strategy) => ({
+          strategy,
+          rival_entry_id: null,
+          reason: "not_solved_for_member",
+        })),
+      },
+    });
+    vi.mocked(data.loadEntrySquad).mockRejectedValue(
+      new data.LeagueDataMissing(`entries/${ENTRY}.json`),
+    );
+    open(language);
+    expect(await screen.findByText(copy.entryNotAvailable)).toBeInTheDocument();
+    const sentence = copy.publicationReasons.not_solved_for_member;
+    expect(await screen.findAllByText(sentence)).toHaveLength(1);
+    expect(screen.queryByText("not_solved_for_member")).not.toBeInTheDocument();
+  });
 });

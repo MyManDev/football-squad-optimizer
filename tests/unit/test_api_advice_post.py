@@ -10,7 +10,7 @@ from threading import Barrier
 import pytest
 from fastapi.testclient import TestClient
 
-from squadopt.api.app import create_app
+from squadopt.api.app import ADVICE_BODY_MAX_BYTES, create_app
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import API_COUNTER_FAMILIES, AdviceMetrics
@@ -549,6 +549,123 @@ def test_the_strict_body_refuses_extras_and_bool_windows(tmp_path: Path) -> None
 
     bool_window = client.post(ADVICE_URL, json={"strategy": "saf-puan", "window": True})
     assert bool_window.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [None, "text/plain", "text/plain; charset=utf-8", "application/x-www-form-urlencoded"],
+)
+def test_a_body_that_is_not_declared_json_is_refused_unread(
+    tmp_path: Path, content_type: str | None
+) -> None:
+    """A cross-site form can send these without a preflight; none of them may file a job."""
+
+    client, _cache, queue = _world(tmp_path)
+    headers = {"Origin": "https://elsewhere.example"}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
+
+    refused = client.post(ADVICE_URL, content=json.dumps(BODY).encode(), headers=headers)
+
+    assert refused.status_code == 415
+    assert refused.json()["error"]["code"] == "UNSUPPORTED_MEDIA_TYPE"
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize(
+    "content_type", ["application/json; charset=utf-8", "Application/JSON", "application/json"]
+)
+def test_json_with_a_charset_or_any_case_is_accepted(tmp_path: Path, content_type: str) -> None:
+    client, _cache, queue = _world(tmp_path)
+
+    accepted = client.post(
+        ADVICE_URL, content=json.dumps(BODY).encode(), headers={"Content-Type": content_type}
+    )
+
+    assert accepted.status_code == 202
+    assert len(queue.jobs()) == 1
+
+
+def test_a_body_over_the_cap_is_refused_before_it_is_parsed(tmp_path: Path) -> None:
+    client, _cache, queue = _world(tmp_path)
+    too_large = {**BODY, "preferences": {"keep_players": [1] * 3000}}
+    # Not JSON at all: a 413 rather than a 422 shows the size is checked before parsing.
+    unreadable = b"{" + b" " * ADVICE_BODY_MAX_BYTES
+    for raw in (json.dumps(too_large).encode(), unreadable):
+        assert len(raw) > ADVICE_BODY_MAX_BYTES
+
+        refused = client.post(ADVICE_URL, content=raw, headers={"Content-Type": "application/json"})
+
+        assert refused.status_code == 413
+        assert refused.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+        assert str(ADVICE_BODY_MAX_BYTES) in refused.json()["error"]["message"]
+    assert queue.jobs() == ()
+
+
+def test_a_body_exactly_at_the_cap_is_read(tmp_path: Path) -> None:
+    client, _cache, queue = _world(tmp_path)
+    compact = json.dumps(BODY).encode()
+    at_cap = compact + b" " * (ADVICE_BODY_MAX_BYTES - len(compact))
+    assert len(at_cap) == ADVICE_BODY_MAX_BYTES
+
+    accepted = client.post(ADVICE_URL, content=at_cap, headers={"Content-Type": "application/json"})
+
+    assert accepted.status_code == 202
+    assert len(queue.jobs()) == 1
+
+
+def test_the_largest_body_the_page_can_build_is_well_under_the_cap() -> None:
+    """Every field at its maximum, serialized the way the web client's JSON.stringify does."""
+
+    largest = {
+        "preferences": {
+            "keep_players": [2**53 - 1 - index for index in range(15)],
+            "avoid_players": [2**53 - 16 - index for index in range(15)],
+            "no_hits": True,
+            "save_chips": True,
+        },
+        "strategy": "a" * 64,
+        "window": 5,
+        "rival_entry_id": 2**53 - 1,
+        "model": "football",
+        "top100_weight": 50,
+        "managers_word": True,
+        "chip": "wildcard",
+    }
+    encoded = json.dumps(largest, separators=(",", ":")).encode()
+
+    assert len(encoded) == 795
+    assert len(encoded) * 5 <= ADVICE_BODY_MAX_BYTES
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"not json", b"\xff\xfe", b"[" * 2000 + b"]" * 2000],
+    ids=["text", "not-utf8", "nested-2000-deep"],
+)
+def test_a_body_that_is_not_json_is_a_validation_failure(tmp_path: Path, raw: bytes) -> None:
+    client, _cache, queue = _world(tmp_path)
+
+    refused = client.post(ADVICE_URL, content=raw, headers={"Content-Type": "application/json"})
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize(
+    "strategy", ["", "Saf-Puan", "saf puan", "saf-puan\n", "-saf", "a" * 65, "<script>"]
+)
+def test_the_body_strategy_follows_the_query_pattern(tmp_path: Path, strategy: str) -> None:
+    client, _cache, queue = _world(tmp_path)
+
+    refused = client.post(ADVICE_URL, json={"strategy": strategy, "window": 1})
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    if strategy:
+        assert strategy not in refused.json()["error"]["message"]  # never echoed back
+    assert queue.jobs() == ()
 
 
 def test_idempotency_history_survives_terminal_jobs(tmp_path: Path) -> None:

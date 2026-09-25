@@ -391,7 +391,9 @@ The advice routes add their own codes:
 | 404 | `LEAGUE_NOT_CONNECTED`, `UNKNOWN_ENTRY`, `UNKNOWN_STRATEGY`, `NOT_COMPUTED` | The league, member or strategy is not served here, or nothing is cached at the address |
 | 409 | `IDEMPOTENCY_CONFLICT` | One `Idempotency-Key` reused for a different request |
 | 409 | `REQUEST_CONFLICT` | The address already records a different request; a defect, logged |
-| 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token |
+| 413 | `PAYLOAD_TOO_LARGE` | The POST body is over 4096 bytes (`ADVICE_BODY_MAX_BYTES`); it is refused before it is parsed |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | The POST's `Content-Type` is not `application/json` (parameters such as `charset` are allowed). A cross-site form's `text/plain` POST needs no preflight, so this is what keeps it from filing a job |
+| 422 | `VALIDATION_FAILED` | Malformed body, query or `Idempotency-Key`; a malformed key spends no rate-limit token. The body's `strategy` must match the query's pattern, `^[a-z][a-z0-9._-]{0,63}$` |
 | 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival, chip or switch combination the menu does not offer |
 | 422 | `DEADLINE_PASSED` | The resolved capture's gameweek has closed. New work is refused before the spec or job is written; cached answers and existing open-job replays remain available. `error.details.public_reason` carries English and Turkish sentences |
 | 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |

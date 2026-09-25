@@ -1,13 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PageShell } from "../../design/components/PageShell";
 import { AS_A_CHANCE } from "../../testSupport/honesty";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
-import type { Language } from "../../i18n/messages";
+import { MESSAGES, type Language } from "../../i18n/messages";
 import { fixtureWeeks, upcomingFixtureWeeks, loadFixtures } from "./data";
-import { FixturePanels } from "./FixturePanels";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { FixturesPage } from "./FixturesPage";
 import type { Fixture, FixturesPayload } from "./types";
@@ -97,12 +97,10 @@ function surface(node: React.ReactNode, language: Language = "en", path = "/leag
   );
 }
 
-/** The read has come back and the query has had its chance to render what it got. */
-async function settled(fetchMock: ReturnType<typeof serve>) {
-  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  });
+/** The region the fixtures page gives one gameweek, found by its heading. */
+async function gameweekRegion(name: string) {
+  const heading = await screen.findByRole("heading", { level: 2, name });
+  return heading.closest("section")!;
 }
 
 beforeEach(() => {
@@ -114,99 +112,44 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("the fixture rails", () => {
+describe("fixtures in the shell", () => {
   it.each(["tr", "en"] as const)(
-    "show this week left and next week right in %s",
+    "carries no league-wide rail and links the fixture list from the sidebar in %s",
     async (language) => {
-      serve(published(payload()));
-      render(surface(<FixturePanels />, language));
+      const fetchMock = serve(published(payload()));
+      const { container } = render(
+        surface(
+          <PageShell>
+            <p>page</p>
+          </PageShell>,
+          language,
+          "/gw/2026-27/1",
+        ),
+      );
       const copy = FIXTURES_COPY[language];
+      const shell = MESSAGES[language].shell;
 
-      const left = await screen.findByRole("complementary", { name: copy.thisWeek });
-      expect(left).toHaveTextContent(language === "tr" ? "OH3" : "GW3");
-      expect(left).toHaveTextContent(copy.deadline(""));
-      expect(within(left).getAllByRole("listitem")).toHaveLength(3);
+      // The two margin rails and the closed list under the page are gone: the member page
+      // carries its own fixtures, and /fixtures carries the whole list.
+      expect(screen.queryByRole("complementary", { name: copy.thisWeek })).toBeNull();
+      expect(screen.queryByRole("complementary", { name: copy.nextWeek })).toBeNull();
+      expect(
+        screen.getAllByRole("complementary").map((node) => node.getAttribute("aria-label")),
+      ).toEqual([shell.sidebar]);
+      expect(container.querySelector("details")).toBeNull();
 
-      const right = screen.getByRole("complementary", { name: copy.nextWeek });
-      expect(right).toHaveTextContent(language === "tr" ? "OH4" : "GW4");
-      expect(within(right).getAllByRole("listitem")).toHaveLength(1);
-      expect(within(right).getByTitle("Brentford")).toHaveTextContent("BRE");
-
-      for (const rail of [left, right]) {
-        expect(within(rail).getByRole("link", { name: copy.pastLink })).toHaveAttribute(
-          "href",
-          "/fixtures",
-        );
-      }
+      const nav = screen.getByRole("navigation", { name: shell.primary });
+      expect(within(nav).getByRole("link", { name: shell.fixtures })).toHaveAttribute(
+        "href",
+        "/fixtures",
+      );
+      // The shell reads no document of its own.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
     },
   );
-
-  it("shows a finished fixture's score and an unfinished one's kickoff, never a score", async () => {
-    serve(published(payload()));
-    render(surface(<FixturePanels />));
-    const left = await screen.findByRole("complementary", { name: "Upcoming gameweek" });
-    const [finished, scheduled] = within(left).getAllByRole("listitem");
-
-    expect(finished).toHaveTextContent("CHE1 - 2ARS");
-    expect(within(scheduled!).getByText(/^\d{2}:\d{2}$/)).toHaveAttribute(
-      "datetime",
-      "2026-09-20T13:00:00Z",
-    );
-    expect(scheduled).not.toHaveTextContent(/\d - \d/);
-  });
-
-  it("labels a fixture with no kickoff from the copy and prints no time for it", async () => {
-    serve(published(payload()));
-    render(surface(<FixturePanels />));
-    const left = await screen.findByRole("complementary", { name: "Upcoming gameweek" });
-    expect(within(left).getByText(FIXTURES_COPY.en.unscheduled)).toBeInTheDocument();
-    const row = within(left).getAllByRole("listitem")[2]!;
-    expect(row).toHaveTextContent("ARSvBRE");
-    expect(row.querySelector("time")).toBeNull();
-  });
-
-  it("keeps the same two lists closed under the page for a narrow screen", async () => {
-    serve(published(payload()));
-    const { container } = render(surface(<FixturePanels />));
-    await screen.findByRole("complementary", { name: "Upcoming gameweek" });
-    const stacked = container.querySelector("details")!;
-    expect(stacked.open).toBe(false);
-    expect(within(stacked).getByText(FIXTURES_COPY.en.summary)).toBeInTheDocument();
-    expect(stacked.querySelectorAll("li")).toHaveLength(4);
-  });
-
-  it("omits next week when the current gameweek is the last one published", async () => {
-    serve(published(payload(4)));
-    render(surface(<FixturePanels />));
-    await screen.findByRole("complementary", { name: "Upcoming gameweek" });
-    expect(screen.queryByRole("complementary", { name: "Following gameweek" })).toBeNull();
-  });
-
-  it.each([
-    ["a 404", "Not found", 404],
-    ["the host's HTML shell", "<!doctype html><html><body></body></html>", 200],
-    ["another contract", JSON.stringify({ contract_version: "ui_view_v1", payload: {} }), 200],
-    ["a document with no open gameweek", published(payload(null)), 200],
-  ])("renders nothing for %s", async (_label, body, status) => {
-    const fetchMock = serve(body, status);
-    render(surface(<FixturePanels />));
-    await settled(fetchMock);
-    expect(screen.getByTestId("surface")).toBeEmptyDOMElement();
-  });
-
-  it("renders nothing on the fixtures page, which lists both weeks itself", async () => {
-    const fetchMock = serve(published(payload()));
-    render(surface(<FixturePanels />, "en", "/fixtures"));
-    await settled(fetchMock);
-    expect(screen.getByTestId("surface")).toBeEmptyDOMElement();
-  });
-
-  it("says nothing but schedule and result", async () => {
-    serve(published(payload()));
-    render(surface(<FixturePanels />, "tr"));
-    await screen.findByRole("complementary", { name: FIXTURES_COPY.tr.thisWeek });
-    expect(screen.getByTestId("surface").textContent).not.toMatch(AS_A_CHANCE);
-  });
 });
 
 describe("the fixtures page", () => {
@@ -230,6 +173,60 @@ describe("the fixtures page", () => {
     serve("Not found", 404);
     render(surface(<FixturesPage />, "tr", "/fixtures"));
     expect(await screen.findByText(FIXTURES_COPY.tr.notPublished)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["the host's HTML shell", "<!doctype html><html><body></body></html>"],
+    ["another contract", JSON.stringify({ contract_version: "ui_view_v1", payload: {} })],
+  ])("treats %s as no fixture list, not as an error", async (_label, body) => {
+    serve(body);
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    expect(await screen.findByText(FIXTURES_COPY.en.notPublished)).toBeInTheDocument();
+  });
+
+  it("shows a finished fixture's score and an unfinished one's kickoff, never a score", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    const week = await gameweekRegion("Upcoming gameweek · Gameweek 3");
+    const [finished, scheduled] = within(week).getAllByRole("listitem");
+
+    expect(finished).toHaveTextContent("CHE1 - 2ARS");
+    expect(within(scheduled!).getByText(/^\d{2}:\d{2}$/)).toHaveAttribute(
+      "datetime",
+      "2026-09-20T13:00:00Z",
+    );
+    expect(scheduled).not.toHaveTextContent(/\d - \d/);
+  });
+
+  it("labels a fixture with no kickoff from the copy and prints no time for it", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    const week = await gameweekRegion("Upcoming gameweek · Gameweek 3");
+    expect(within(week).getByText(FIXTURES_COPY.en.unscheduled)).toBeInTheDocument();
+    const row = within(week).getAllByRole("listitem")[2]!;
+    expect(row).toHaveTextContent("ARSvBRE");
+    expect(row.querySelector("time")).toBeNull();
+  });
+
+  it("omits next week when the current gameweek is the last one published", async () => {
+    serve(published(payload(4)));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    await gameweekRegion("Upcoming gameweek · Gameweek 4");
+    expect(screen.queryByRole("heading", { level: 2, name: /^Following gameweek/ })).toBeNull();
+  });
+
+  it("names no upcoming week once no deadline is open", async () => {
+    serve(published(payload(null)));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    await gameweekRegion("Gameweek 4");
+    expect(screen.queryByRole("heading", { level: 2, name: /^Upcoming gameweek/ })).toBeNull();
+  });
+
+  it("says nothing but schedule and result", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "tr", "/fixtures"));
+    await gameweekRegion(`${FIXTURES_COPY.tr.thisWeek} · Oyun haftası 3`);
+    expect(screen.getByTestId("surface").textContent).not.toMatch(AS_A_CHANCE);
   });
 });
 

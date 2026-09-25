@@ -42,10 +42,14 @@ writes the week's other views as usual. Nothing is backfilled from an older capt
 
 ## The page
 
-On a wide screen the shell shows `current_gameweek` in the left margin and the gameweek
-after it in the right margin; on a narrow one the same two lists sit closed under the
-page. `/fixtures` lists both and then every earlier gameweek, newest first. None of this
-keeps state: when a later capture names a later `current_gameweek`, next week becomes this
-week, a new week appears as next, and the week that was current joins the archive.
+`/fixtures` lists the upcoming gameweek (`current_gameweek`, or the next week whose
+deadline or kickoffs are still ahead), the gameweek after it, and then every earlier
+gameweek, newest first. It is reached from the sidebar's 'Fikstür' item on every screen
+and, on a phone, from the 'Fikstür' button in the phone bar. The shell itself reads no
+document: the league-wide lists it used to show in the page margins are gone, and a
+member's own fixtures belong to the member page. None of this keeps state: when a later
+capture names a later `current_gameweek`, next week becomes this week, a new week appears
+as next, and the week that was current joins the archive.
 
-A published tree with no `data/fixtures.json` renders no panels and no error.
+A published tree with no `data/fixtures.json` shows the page's "not published yet" line
+and no error.

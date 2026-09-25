@@ -503,6 +503,7 @@ the command above, a bad data release is the `metadata.json` deletion under
 | every advice route 503 | `/ready`: one of the four checks is false, and it names which |
 | advice routes answer `503 NOT_READY` naming two weeks | `league_tree_matches_capture` is false: the published `members.json` and the current capture are for different weeks; publish the one that is behind |
 | jobs queue but never finish | is a worker process running, and is it mounting the same `SQUADOPT_BACKEND_STORE_ROOT`? A worker that exited 1 at startup could not reach the store |
+| worker logs `advice_worker_round_failed` | one round raised something unexpected; the event carries the error and its trace. The worker waits (one idle, doubling up to 60 s) and tries again, so a cause that lasts repeats the event and keeps adding to `advice_worker_round_failed_total`. A job that round held is walked back by recovery after its lease |
 | POST answers `503 NOT_READY` | the store probe is failing; `/ready` names the check, and a missing volume shows up as `cache_store` |
 | job `failed` with `CONTEXT_UNAVAILABLE` | the capture moved on between accepting and computing; asking again is the fix |
 | job `failed` with `REQUEST_UNREADABLE` | the spec beside the job's key is missing — the store lost a write, so check the probe |
