@@ -1,0 +1,56 @@
+{
+  "artifact_type": "record",
+  "by_recent_weeks_missed": {
+    "0": {
+      "read": false,
+      "reason": "fewer than 30 rows",
+      "rows": 13
+    },
+    "1": {
+      "availability_multiplier": 0.042134831460674156,
+      "calibration_gap": 0.09373729365773179,
+      "fitted_appearance_probability": 0.12182718129818122,
+      "further_reduction": 0.11669401354685335,
+      "read": true,
+      "realised_appearance_rate": 0.028089887640449437,
+      "rows": 178
+    },
+    "no_prior_weeks": {
+      "read": false,
+      "reason": "the record holds no settled week before this one",
+      "rows": 178
+    }
+  },
+  "contract_version": "double_reduction_v1",
+  "fitted_sha256": "43943826ea832ebc18881ad35b355d7012ba13871a2003fa538b7bcec6c2a8ba",
+  "minimum_bucket_rows": 30,
+  "population_rows": 369,
+  "promotes": null,
+  "provenance": {
+    "repository_commit": "4ea174809a6b8eeff9f9415a8603f04e6cf0a8d5",
+    "working_tree_dirty": false
+  },
+  "question": "Do the fitted appearance probability and the availability multiplier reduce the same risk twice?",
+  "recency_window": 3,
+  "settled_weeks": [
+    {
+      "below_full_without_fitted_probability": 4,
+      "fitted_source": "decided_appearance.csv",
+      "gameweek": 4,
+      "priced_below_full": 178,
+      "recent_weeks_held": 0,
+      "rows": 659,
+      "season": "2026-27"
+    },
+    {
+      "below_full_without_fitted_probability": 4,
+      "fitted_source": "decided_appearance.csv",
+      "gameweek": 5,
+      "priced_below_full": 191,
+      "recent_weeks_held": 1,
+      "rows": 667,
+      "season": "2026-27"
+    }
+  ],
+  "supports": "2 settled week(s). One bucket (1) is thick enough to read, which gives a level and not a contrast: the question is whether the gap differs between recently absent players and present ones, and that needs two."
+}
