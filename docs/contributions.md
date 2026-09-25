@@ -74,8 +74,9 @@ kickoff, and its numbered successor from the published calendar, above every ear
 Closing the FPL deadline does not hide remaining weekend fixtures. The list includes the
 capture date; this is not a real-time scores service. The sidebar links it on every screen
 (a 264px column from 1180px, a 72px icon rail from 600px, a drawer below that), and phones
-also have a 'Fikstür' button in the sticky phone bar. The shell carries no league-wide
-fixture rail. Advancing the clock selects later weeks but never invents a score,
+also have a 'Fikstür' button in the sticky phone bar: it links to this page, except on a
+member page, where it opens that member's own fixture sheet. The shell carries no
+league-wide fixture rail. Advancing the clock selects later weeks but never invents a score,
 reschedules a fixture, edits the publication or runs a capture.
 
 Verify browser submission, the pending/public separation, approval, reload, retraction,
