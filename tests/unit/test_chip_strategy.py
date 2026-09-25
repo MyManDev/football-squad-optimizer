@@ -61,6 +61,62 @@ def test_chip_strategy_exercises_expiring_right_and_keeps_new_one(
     assert info["basis"] == "selection_utility"
 
 
+def _long_right_near_equal_weeks(players, config, chip):
+    """A window GW6-8 whose three weeks differ by at most 3%, the right open to GW19.
+
+    Eleven opportunities remain after the window. GW7 is the best week, by 2%.
+    """
+
+    table = _horizon_table(players, (6, 7, 8))
+    for gameweek, scale in ((7, 1.02), (8, 0.99)):
+        table.loc[table.gameweek.eq(gameweek), "expected_points"] *= scale
+    return optimize_chip_strategy(
+        PlanningHorizon(table),
+        OPTIMAL_INITIAL,
+        config,
+        TransferPlanningConfig(),
+        ChipAvailability(available={chip: frozenset(range(6, 20))}),
+    )
+
+
+@pytest.mark.parametrize("chip", ["3xc", "bboost"])
+def test_today_a_right_with_many_opportunities_left_is_spent_in_the_windows_best_week(
+    known_optimum_players, small_config, chip
+):
+    """What the planner does now, pinned: the defect of audit 2026-09-25, H3.
+
+    The holding value is built from the window's own weeks, so it stays below the best of
+    them however many opportunities remain, and the chip is played in that week. This
+    changes together with the expected failure below once the tail values the season.
+    """
+
+    result = _long_right_near_equal_weeks(known_optimum_players, small_config, chip)
+    assert result.solver_status is SolverStatus.OPTIMAL
+    (reservation,) = result.diagnostics["chip_strategy"]["reservations"]
+    assert reservation["remaining_opportunities"] == 11
+    assert reservation["sample_max"] - reservation["sample_min"] < 0.04 * reservation["sample_max"]
+    assert reservation["holding_value"] < reservation["sample_max"]
+    assert result.chips_played == {7: chip}
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason=(
+        "Audit 2026-09-25, H3: the tail value comes from the window's own weeks, so it can "
+        "never beat the window's best week and a right with 11 opportunities left is spent "
+        "inside the window. Passes once the tail values the captured season calendar."
+    ),
+)
+@pytest.mark.parametrize("chip", ["3xc", "bboost"])
+def test_a_right_with_many_opportunities_left_and_near_equal_weeks_is_held(
+    known_optimum_players, small_config, chip
+):
+    result = _long_right_near_equal_weeks(known_optimum_players, small_config, chip)
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.chips_played == {}
+
+
 def test_old_calibration_is_not_silently_reused(known_optimum_players, small_config):
     horizon = PlanningHorizon(_horizon_table(known_optimum_players))
     with pytest.raises(ValueError, match="own continuation"):

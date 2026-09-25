@@ -14,7 +14,13 @@ import {
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import type { AdviceRequest } from "./adviceClient";
 import { CHIP_NAMES } from "../chipShape";
-import { chipPath, parseChip, type ChipSelection, type MemberChip } from "./chipChoice";
+import {
+  AUTOMATIC_CHIP_OFFERED,
+  chipPath,
+  parseChip,
+  type ChipSelection,
+  type MemberChip,
+} from "./chipChoice";
 import {
   TOP100_WEIGHTS,
   parseTop100,
@@ -450,6 +456,8 @@ function withComputable(
     windowComputable &&
     capabilities.chipStrategyWindows?.includes(window) === true &&
     capabilities.chipsByEntry?.[entryId] !== undefined;
+  // A link naming automatic timing falls back like any chip the page does not offer.
+  const automaticChip = AUTOMATIC_CHIP_OFFERED && chipStrategy;
   const chips =
     (baseline || chipStrategy) && windowComputable
       ? (capabilities.chipsByEntry?.[entryId] ?? [])
@@ -482,7 +490,7 @@ function withComputable(
     ? null
     : (baseline || chipStrategy) &&
         askedChip !== null &&
-        (askedChip === "auto" ? chipStrategy : chips.includes(askedChip))
+        (askedChip === "auto" ? automaticChip : chips.includes(askedChip))
       ? askedChip
       : published.chip.chip;
   const request: AdviceRequest = {
@@ -514,7 +522,7 @@ function withComputable(
   const canAsk =
     (!football || capabilities.models?.includes("football") === true) &&
     windowComputable &&
-    (chip === null || (chip === "auto" ? chipStrategy : chips.includes(chip))) &&
+    (chip === null || (chip === "auto" ? automaticChip : chips.includes(chip))) &&
     (!capability.requiresRival || rivalEntryId !== null) &&
     (weight === 0 || settings.includes(weight)) &&
     (!wordOn || word);
