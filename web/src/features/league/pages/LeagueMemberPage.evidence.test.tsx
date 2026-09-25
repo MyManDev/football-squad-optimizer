@@ -147,6 +147,32 @@ describe("the manager's word on the advice card", () => {
     expect(container.textContent).toContain(EVIDENCE_COPY.en.cost("0.0"));
   });
 
+  it("prints no price for a word that binds nobody when the plan it keeps is unproven", () => {
+    // Binding nobody, the document is the pure-points plan itself at a price of 0, and 0
+    // is exact only under that plan's proof. A document from before that rule carries the
+    // plan's objective gap as a ceiling, which bounds no price, so neither is printed.
+    const advice = switchedOn([item({ role: "not_starting" })], {
+      solver_status: "FEASIBLE",
+      optimality_gap: 1.5,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 1.5,
+    });
+    delete advice.payload.control_solver_status;
+    advice.payload.evidence = { ...advice.payload.evidence!, binding: false };
+    for (const [language, zero, gap] of [
+      ["en", "0.0", "1.5"],
+      ["tr", "0,0", "1,5"],
+    ] as const) {
+      const { container, unmount } = renderPage(language, advice);
+      const text = container.textContent ?? "";
+      expect(sectionText(container)).toContain(EVIDENCE_COPY[language].unchanged);
+      expect(text).not.toContain(EVIDENCE_COPY[language].cost(zero));
+      expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(gap));
+      expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(zero));
+      unmount();
+    }
+  });
+
   it("withholds a quote the producer withheld, and says why", () => {
     const withheld = item({ words: null, words_status: "withheld_figure", role: "not_captain" });
     const { container } = renderPage("tr", switchedOn([withheld]));

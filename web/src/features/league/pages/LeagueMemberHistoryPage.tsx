@@ -391,36 +391,32 @@ function RecordedPlans({ week, members }: { week: WeekReview; members: EntryView
       <p>{copy.recordedPlansNote}</p>
       <ul>
         {week.recorded_plans.map((plan) => {
-          const price = publishedPrice({
-            ...plan,
-            word: plan.managers_word === true,
-            top100: plan.top100_weight !== undefined,
-          });
-          const capped =
+          // A record keeps the price and its ceiling, not the proofs behind them. A ceiling
+          // is published only where the plan the price is measured against was proven, and
+          // it is then the price itself. A record with no ceiling, or (from before that
+          // rule) one that differs from its price, was measured against a plan nobody
+          // proved, and its figure bounds nothing, so no price is printed for it.
+          const price =
             plan.expected_points_cost_ceiling !== undefined &&
-            plan.expected_points_cost_ceiling !== plan.expected_points_cost;
+            plan.expected_points_cost_ceiling === plan.expected_points_cost
+              ? publishedPrice({
+                  ...plan,
+                  word: plan.managers_word === true,
+                  top100: plan.top100_weight !== undefined,
+                })
+              : undefined;
           const top100Copy = TOP100_COPY[language];
           const evidenceCopy = EVIDENCE_COPY[language];
           const priceText =
             plan.top100_weight !== undefined
               ? plan.strategy !== "saf-puan"
-                ? capped
-                  ? top100Copy.strategyCostAtMost
-                  : top100Copy.strategyCost
+                ? top100Copy.strategyCost
                 : plan.managers_word
-                  ? capped
-                    ? top100Copy.combinedCostAtMost
-                    : top100Copy.combinedCost
-                  : capped
-                    ? top100Copy.costAtMost
-                    : top100Copy.cost
+                  ? top100Copy.combinedCost
+                  : top100Copy.cost
               : plan.managers_word
-                ? capped
-                  ? evidenceCopy.costAtMost
-                  : evidenceCopy.cost
-                : capped
-                  ? messages.leagueMembers.planCostAtMost
-                  : messages.leagueMembers.planCost;
+                ? evidenceCopy.cost
+                : messages.leagueMembers.planCost;
           const rival = members.find(
             (member) => member.member_kind === "human" && member.entry_id === plan.rival_entry_id,
           );

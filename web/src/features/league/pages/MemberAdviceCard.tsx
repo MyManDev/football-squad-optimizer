@@ -188,14 +188,20 @@ export function AdviceDecision({
           (member) => member.member_kind === "human" && member.entry_id === view.rival_entry_id,
         ) ?? null);
   const rivalName = rival ? (rival.team_name ?? rival.manager_name ?? null) : null;
-  // A price tag is a difference between two solved plans. It is the cost itself only
-  // where both proofs finished; where one did not, the producer publishes the bound it
-  // measured as `expected_points_cost_ceiling` and this page states that (the most the
-  // strategy can cost) instead of a figure it cannot stand behind. A document that is
-  // unproven and carries no ceiling has no honest figure to print, so it prints none;
-  // and a price below zero is a giveaway no constrained plan can hand out, so no
-  // producer's number is rendered as one.
+  // A price tag is a difference between two solved plans: the member's pure-points plan
+  // it is measured against (the anchor) and the priced one. It is the cost itself only
+  // where both proofs finished. Where only the priced plan's proof is missing, the
+  // producer publishes `expected_points_cost_ceiling` and this page states that (the most
+  // the strategy can cost) instead of a figure it cannot stand behind. Where the anchor's
+  // proof is missing, the solver's bound is on its objective and bounds no price, so the
+  // producer publishes no ceiling and this page prints no price, even for an older
+  // document that carries one. A document that is unproven and carries no ceiling has no
+  // honest figure to print, so it prints none; and a price below zero is a giveaway no
+  // constrained plan can hand out, so no producer's number is rendered as one.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
+  // A document without a control of its own (the manager's word that binds nobody is the
+  // control's plan) is its own anchor.
+  const anchorUnproven = (view.control_solver_status ?? view.solver_status) === "FEASIBLE";
   const explainedUnproven =
     view.solver_status === "FEASIBLE" ||
     (view.control_solver_status === "FEASIBLE" && !view.chip_choice);
@@ -206,20 +212,24 @@ export function AdviceDecision({
   // with the word on as well, the one number is the pair's.
   const top100Priced = view.top100 !== undefined;
   const strategyPriced = top100Priced && view.mode !== "saf-puan";
-  const price = publishedPrice({
-    strategy: view.mode,
-    word: wordPriced,
-    top100: top100Priced,
-    unproven,
-    expected_points_cost: view.expected_points_cost,
-    expected_points_cost_ceiling: view.expected_points_cost_ceiling,
-  });
+  const price = anchorUnproven
+    ? undefined
+    : publishedPrice({
+        strategy: view.mode,
+        word: wordPriced,
+        top100: top100Priced,
+        unproven,
+        expected_points_cost: view.expected_points_cost,
+        expected_points_cost_ceiling: view.expected_points_cost_ceiling,
+      });
   const evidenceCopy = EVIDENCE_COPY[language];
   const top100Copy = TOP100_COPY[language];
   const alternative = view.alternative_plan;
-  const alternativePrice = unproven
-    ? alternative?.expected_points_cost_ceiling
-    : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
+  const alternativePrice = anchorUnproven
+    ? undefined
+    : unproven
+      ? alternative?.expected_points_cost_ceiling
+      : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
   // A bound on the planner's objective covers the whole plan at once, so the copy has to
   // say how many gameweeks that is. A one-week document publishes no plan weeks.
   const planWeeks = view.plan_weeks?.length ?? 1;
@@ -278,7 +288,7 @@ export function AdviceDecision({
               ? planWeeks > 1
                 ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
                 : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
-              : top100Priced
+              : top100Priced && price != null
                 ? top100Copy.unproven
                 : copy.unprovenPlanGapUnknown}
           </p>

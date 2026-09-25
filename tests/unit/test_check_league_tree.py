@@ -175,3 +175,55 @@ def test_local_word_figure_hit_is_reported_once(tmp_path, capsys):
     path.write_text(json.dumps(document))
     assert main([str(tmp_path)]) == 1
     assert capsys.readouterr().out.count("league/advice/1/saf-puan/1/hoca-sozu.json") == 1
+
+
+@pytest.mark.parametrize(
+    ("changes", "clean"),
+    [
+        # A ceiling over a control that was found without a proof is a figure nothing
+        # bounds, on every kind of priced document.
+        ({"control_solver_status": "FEASIBLE"}, False),
+        # The same document without it is what the producer publishes.
+        ({"control_solver_status": "FEASIBLE", "expected_points_cost_ceiling": None}, True),
+        # Under a proof the ceiling is the price itself, and missing it is a defect.
+        ({"control_solver_status": "OPTIMAL", "expected_points_cost_ceiling": 1.5}, False),
+        ({"control_solver_status": "OPTIMAL", "expected_points_cost_ceiling": None}, False),
+    ],
+)
+def test_a_ceiling_is_the_price_under_a_proven_control_and_absent_otherwise(
+    tmp_path: Path, changes: dict[str, object], clean: bool, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _tree(tmp_path)
+    for relative in (
+        "advice/1/saf-puan/3/top100-5.json",
+        "advice/1/saf-puan/1/top100-5.json",
+    ):
+        path = tmp_path / "league" / relative
+        document = json.loads(path.read_bytes())
+        for key, value in changes.items():
+            if value is None:
+                document["payload"].pop(key, None)
+            else:
+                document["payload"][key] = value
+        path.write_text(json.dumps(document), encoding="utf-8")
+    assert main([str(tmp_path)]) == (0 if clean else 1)
+    output = capsys.readouterr().out
+    assert output.count("ALL GOOD") == (3 if clean else 1)
+
+
+@pytest.mark.parametrize("status", ["FEASIBLE", "OPTIMAL"])
+def test_a_word_that_binds_nobody_is_its_own_control(
+    tmp_path: Path, status: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _tree(tmp_path)
+    path = tmp_path / "league/advice/1/saf-puan/1/hoca-sozu.json"
+    document = json.loads(path.read_bytes())
+    document["payload"]["solver_status"] = status
+    path.write_text(json.dumps(document), encoding="utf-8")
+    # A zero price with a zero ceiling is exact only under the plan's own proof.
+    code = main([str(tmp_path)])
+    output = capsys.readouterr().out
+    if status == "OPTIMAL":
+        assert code == 0
+    else:
+        assert code == 1 and "over an unproven control" in output

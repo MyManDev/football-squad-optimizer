@@ -31,9 +31,12 @@ it.each<Language>(["tr", "en"])(
     expect(section).toHaveTextContent("Player 1");
     expect(section).toHaveTextContent("#17");
     expect(section).toHaveTextContent(`${TOP100_COPY[language].legend} 20`);
-    expect(section).toHaveTextContent(
+    // This record's ceiling differs from its price, which only a price measured against
+    // an unproven pure-points plan ever did; that figure bounds nothing, so no price.
+    expect(section).not.toHaveTextContent(
       TOP100_COPY[language].combinedCostAtMost(language === "tr" ? "4,0" : "4.0"),
     );
+    expect(section).not.toHaveTextContent(language === "tr" ? "4,0" : "4.0");
     expect(section).not.toHaveTextContent(language === "tr" ? "2,5" : "2.5");
     const rows = section.querySelectorAll(":scope > ul > li");
     for (const index of [0, 2])
@@ -54,6 +57,27 @@ it.each<Language>(["tr", "en"])(
     await userEvent.click(screen.getByText(MESSAGES[language].suggestionHistory.recordedPlans));
     const price = language === "tr" ? "4,0" : "4.0";
     expect(screen.getByText(TOP100_COPY[language].combinedCost(price))).toBeVisible();
+    expect(
+      screen.queryByText(TOP100_COPY[language].combinedCostAtMost(price)),
+    ).not.toBeInTheDocument();
+  },
+);
+it.each<Language>(["tr", "en"])(
+  "prints no price for a priced record that carries no ceiling in %s",
+  async (language) => {
+    // A ceiling is published only where the plan the price is measured against was
+    // proven; a priced record without one was measured against a plan nobody proved.
+    const value = history();
+    Object.assign(value.payload.weeks[0], {
+      recorded_plans: [
+        { ...planRows[1], expected_points_cost: 2.5, expected_points_cost_ceiling: undefined },
+      ],
+    });
+    show(value, language);
+    await userEvent.selectOptions(screen.getByRole("combobox"), "4");
+    await userEvent.click(screen.getByText(MESSAGES[language].suggestionHistory.recordedPlans));
+    const price = language === "tr" ? "2,5" : "2.5";
+    expect(screen.queryByText(TOP100_COPY[language].combinedCost(price))).not.toBeInTheDocument();
     expect(
       screen.queryByText(TOP100_COPY[language].combinedCostAtMost(price)),
     ).not.toBeInTheDocument();
