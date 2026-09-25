@@ -1,12 +1,21 @@
 """The operator scripts find their checkout when run as documented, with `powershell -File`.
 
-Windows PowerShell 5.1 leaves `$PSScriptRoot` empty while it binds a script's parameter
-defaults under `-File` (it is set in the script body, and under `&` or `-Command`). A default
-of `Split-Path -Parent $PSScriptRoot` therefore failed before the script ran, with "Cannot
-bind argument to parameter 'Path' because it is an empty string", unless `-RepoRoot` was
-passed. The mocked tests elsewhere always pass `-RepoRoot` or invoke the script with `&`, so
-none of them could see it. The runs here copy each script into a disposable checkout and
-start it the documented way; neither reaches a live process, port 8000 or the network.
+Windows PowerShell 5.1 leaves `$PSScriptRoot`, `$PSCommandPath` and
+`$MyInvocation.MyCommand.Path` empty while it binds the parameter defaults of an advanced
+script (one with `[CmdletBinding()]` or a `[Parameter()]` attribute) started with `-File`.
+They are set in the script body, and in the defaults when the script is called with `&`, from
+`-Command` or from another script; a plain script sees them in its defaults under `-File` too.
+Both scripts that failed declared `[CmdletBinding()]`, so their default of `Split-Path -Parent
+$PSScriptRoot` failed before either ran, with "Cannot bind argument to parameter 'Path'
+because it is an empty string", unless `-RepoRoot` was passed. The first PowerShell test below
+measures that rule on the machine running the suite. The static check holds every param block
+under `scripts/` to it whatever its attributes, on purpose: a plain script that gains an
+attribute later would break the same way.
+
+The mocked tests elsewhere always pass `-RepoRoot` or invoke the script with `&`, so none of
+them could see it. The runs here use scratch scripts, or copy each fixed script into a
+disposable checkout and start it the documented way; none reaches a live process, port 8000
+or the network.
 """
 
 from __future__ import annotations
@@ -49,6 +58,64 @@ def test_no_parameter_default_reads_the_script_location(path: Path) -> None:
     assert "param(" in path.read_text(encoding="ascii"), path
     found = re.search(r"\$(PSScriptRoot|PSCommandPath|MyInvocation)\b", _param_block(path), re.I)
     assert found is None, f"{path.name} reads {found.group(0) if found else ''} in param()"
+
+
+_PROBE = """{binding}param(
+    {attribute}[string]$Root = "[$PSScriptRoot]",
+    [string]$Command = "[$PSCommandPath]",
+    [string]$Invocation = "[$($MyInvocation.MyCommand.Path)]"
+)
+Write-Output "$Root|$Command|$Invocation|[$PSScriptRoot]"
+"""
+
+
+@windows_powershell
+@pytest.mark.parametrize(
+    ("kind", "launch", "empty"),
+    [
+        ("plain", "file", False),
+        ("cmdletbinding", "file", True),
+        ("parameter-attribute", "file", True),
+        ("cmdletbinding", "command", False),
+        ("cmdletbinding", "call-from-file", False),
+    ],
+)
+def test_only_an_advanced_script_under_file_loses_its_location_in_defaults(
+    tmp_path: Path, kind: str, launch: str, empty: bool
+) -> None:
+    """The rule the module docstring states, measured on the PowerShell running the suite."""
+
+    probe = tmp_path / "probe.ps1"
+    probe.write_text(
+        _PROBE.format(
+            binding="[CmdletBinding()]\n" if kind == "cmdletbinding" else "",
+            attribute="[Parameter()]" if kind == "parameter-attribute" else "",
+        ),
+        encoding="ascii",
+    )
+    if launch == "file":
+        target = ["-File", str(probe)]
+    elif launch == "command":
+        target = ["-Command", f"& '{probe}'"]
+    else:
+        caller = tmp_path / "caller.ps1"
+        caller.write_text("& (Join-Path $PSScriptRoot 'probe.ps1')\n", encoding="ascii")
+        target = ["-File", str(caller)]
+    result = subprocess.run(
+        [str(POWERSHELL), "-NoProfile", "-ExecutionPolicy", "Bypass", *target],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    root, command, invocation, body = result.stdout.strip().split("|")
+    assert body == f"[{tmp_path}]"
+    if empty:
+        assert (root, command, invocation) == ("[]", "[]", "[]")
+    else:
+        assert (root, command, invocation) == (f"[{tmp_path}]", f"[{probe}]", f"[{probe}]")
 
 
 @windows_powershell
