@@ -164,7 +164,9 @@ mount and must never be reported as one.
 
 ## Readiness
 
-`GET /ready` reports four checks and is ready only when all four hold:
+`GET /ready` reports six checks and is ready only when all six hold. The body is the
+verdict and one boolean per check, never a path, an age or a count, because it is served
+publicly beside `/health`:
 
 | Check | False when |
 | --- | --- |
@@ -172,9 +174,22 @@ mount and must never be reported as one.
 | `league_tree` | ops has published no `league/members.json` under the site data root |
 | `league_tree_matches_capture` | `members.json` is for another season or gameweek than the one the current capture targets (or names no gameweek, or there is no context to compare with) |
 | `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
+| `worker_heartbeat` | no advice worker has rewritten its heartbeat under `workers/` in the store for 120 s (60 idle waits of 2 s) |
+| `queue_wait` | a job has waited in the queue for more than 300 s (one claim lease) since it last entered it, or the queue could not be read |
 
-An unready backend answers advice routes with a coded 503. It does not present an empty cache as
-a computed absence.
+An unready backend answers advice routes with a coded 503 when one of the first four checks is
+false. It does not present an empty cache as a computed absence. The last two do not gate the
+advice routes: with no live worker a POST is still accepted and its job waits for one.
+Readiness reports that, and the `Backend uptime` workflow raises it as an issue.
+
+Each worker rewrites `workers/worker-<pid>.json` (its pid and the time) at the top of every
+round of its loop, and every 30 s while a round holds a job, so a long solve does not read as a
+stopped worker. The longest gap a live loop leaves is the 60 s cap on its error backoff plus one
+round's queue-lock waits (5 s each), inside the 120 s bound. A worker that stops cleanly removes
+its document; one whose process is ended from outside leaves it to go stale, and the next worker
+to start removes documents nobody has rewritten for a day. The api reads the documents and the
+queue at most once every 5 s, however often `/ready` is asked. The bounds are stated in
+`src/squadopt/platform/worker_heartbeat.py`.
 
 The tree and the capture are published separately, so one can be a week ahead of the other
 while both stay readable. When they disagree the advice routes answer `503 NOT_READY` and the
@@ -421,7 +436,9 @@ the environment's own base charge, log ingestion and retention, and egress. Pric
 dependency. `/ready` is data-dependent by design — false until ops has published a capture,
 its handoff and the league tree — so wiring it as the platform's probe would keep a correctly
 deployed revision from ever going healthy, and with one replica the platform's own 503 would
-hide which of the three checks failed. `/ready` stays the operator's own `curl`.
+hide which of the checks failed. `/ready` stays the operator's own `curl`, and the `Backend
+uptime` workflow's second probe, which reports which checks were false without restarting
+anything.
 
 **Bootstrap order.** [Preparing the shared mount](#preparing-the-shared-mount) is the same
 `mkdir` and `chown` here as locally, and it runs **before** the first revision that contains
@@ -500,9 +517,9 @@ the command above, a bad data release is the `metadata.json` deletion under
 
 | Symptom | Where to look |
 | --- | --- |
-| every advice route 503 | `/ready`: one of the four checks is false, and it names which |
+| every advice route 503 | `/ready`: one of the first four checks is false, and it names which |
 | advice routes answer `503 NOT_READY` naming two weeks | `league_tree_matches_capture` is false: the published `members.json` and the current capture are for different weeks; publish the one that is behind |
-| jobs queue but never finish | is a worker process running, and is it mounting the same `SQUADOPT_BACKEND_STORE_ROOT`? A worker that exited 1 at startup could not reach the store |
+| jobs queue but never finish | `/ready` says `worker_heartbeat` or `queue_wait` is false. Is a worker process running, and is it mounting the same `SQUADOPT_BACKEND_STORE_ROOT`? A worker that exited 1 at startup could not reach the store |
 | worker logs `advice_worker_round_failed` | one round raised something unexpected; the event carries the error and its trace. The worker waits (one idle, doubling up to 60 s) and tries again, so a cause that lasts repeats the event and keeps adding to `advice_worker_round_failed_total`. A job that round held is walked back by recovery after its lease |
 | POST answers `503 NOT_READY` | the store probe is failing; `/ready` names the check, and a missing volume shows up as `cache_store` |
 | job `failed` with `CONTEXT_UNAVAILABLE` | the capture moved on between accepting and computing; asking again is the fix |

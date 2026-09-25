@@ -21,6 +21,9 @@ async function run({
   healthUrl = "",
   production = true,
   response = 200,
+  readyResponse = response,
+  readyBody,
+  incidentBody = "Real incident",
   tamper,
   failClose = false,
   ignoreClose = false,
@@ -31,13 +34,14 @@ async function run({
     number: 42,
     state: "open",
     title: "Backend health check failed",
-    body: "Real incident",
+    body: incidentBody,
     labels: [{ name: "backend-down" }],
   };
   const issues = new Map(production ? [[42, real]] : []);
   const calls = [];
   const logs = [];
   const failures = [];
+  const urls = [];
   let fetches = 0;
   const api = {
     listForRepo: "listForRepo",
@@ -71,7 +75,10 @@ async function run({
     update: async (args) => {
       calls.push(["update", args]);
       if (failClose) throw new Error("close denied");
-      if (!ignoreClose) Object.assign(issues.get(args.issue_number), { state: args.state });
+      const changed = Object.fromEntries(
+        Object.entries(args).filter(([key]) => ["state", "body"].includes(key)),
+      );
+      if (!ignoreClose) Object.assign(issues.get(args.issue_number), changed);
     },
   };
   const github = {
@@ -107,16 +114,26 @@ async function run({
       },
       github,
       { info: (line) => logs.push(line), setFailed: (line) => failures.push(line) },
-      async () => {
+      async (url) => {
         fetches += 1;
-        return { status: response, body: { cancel: async () => {} } };
+        urls.push(String(url));
+        const ready = String(url).endsWith("/ready");
+        const status = ready ? readyResponse : response;
+        const body =
+          ready && readyBody === undefined
+            ? JSON.stringify({
+                ready: status === 200,
+                checks: { worker_heartbeat: status === 200 },
+              })
+            : (readyBody ?? "{}");
+        return { status, text: async () => body, body: { cancel: async () => {} } };
       },
       (callback) => callback(),
     );
   } catch (caught) {
     error = caught;
   }
-  return { issues, calls, logs, failures, fetches, error };
+  return { issues, calls, logs, failures, fetches, urls, error };
 }
 
 describe("backend alarm issue exercise", () => {
@@ -127,7 +144,11 @@ describe("backend alarm issue exercise", () => {
     expect(workflow).toMatch(/exercise:\s+description:[^\n]+\n\s+type: boolean\n\s+default: false/);
     const result = await run({ event: "schedule", exercise: "true", production: false });
     expect(result.error).toBeUndefined();
-    expect(result.fetches).toBe(1);
+    expect(result.fetches).toBe(2);
+    expect(result.urls).toEqual([
+      "https://squadopt-api.mymandev.com/health",
+      "https://squadopt-api.mymandev.com/ready",
+    ]);
     expect(result.calls.filter(([kind]) => kind === "create")).toEqual([]);
     expect(result.calls.find(([kind]) => kind === "list")[1].labels).toBe("backend-down");
   });
@@ -221,7 +242,7 @@ describe("backend alarm issue exercise", () => {
       response: 503,
     });
     expect(down.error).toBeUndefined();
-    expect(down.fetches).toBe(2);
+    expect(down.fetches).toBe(4);
     expect(down.issues.get(99).labels).toEqual(["backend-down"]);
     expect(down.issues.get(99).state).toBe("open");
     const up = await run({ event: "schedule", exercise: "false" });
@@ -229,5 +250,99 @@ describe("backend alarm issue exercise", () => {
     expect(up.issues.get(42).state).toBe("closed");
     const dry = await run({ exercise: "false", dryRun: "true" });
     expect(dry.issues.get(42).state).toBe("open");
+  });
+});
+
+describe("backend readiness probe", () => {
+  const notReady = JSON.stringify({
+    ready: false,
+    checks: {
+      capture_context: true,
+      worker_heartbeat: false,
+      "C:/store/workers": false,
+      queue_wait: false,
+    },
+    detail: "a body the issue must not carry",
+  });
+
+  it("opens the backend-down incident naming only the false checks while health still answers", async () => {
+    const result = await run({
+      event: "schedule",
+      exercise: "false",
+      production: false,
+      readyResponse: 503,
+      readyBody: notReady,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.fetches).toBe(4);
+    const issue = result.issues.get(99);
+    expect(issue.labels).toEqual(["backend-down"]);
+    expect(issue.title).toBe("Backend health or readiness check failed");
+    expect(issue.body).toContain("Failing: ready (HTTP 503, false: worker_heartbeat, queue_wait).");
+    expect(issue.body).toContain("health HTTP 200");
+    for (const leak of ["C:/store", "must not carry", "https://", "mymandev"]) {
+      expect(issue.body).not.toContain(leak);
+    }
+  });
+
+  it("records a continuing failure only when what fails changes", async () => {
+    const changed = await run({
+      event: "schedule",
+      exercise: "false",
+      readyResponse: 503,
+      readyBody: notReady,
+    });
+    expect(changed.error).toBeUndefined();
+    const comments = changed.calls.filter(([kind]) => kind === "comment");
+    expect(comments).toHaveLength(1);
+    expect(comments[0][1].issue_number).toBe(42);
+    expect(comments[0][1].body).toContain("false: worker_heartbeat, queue_wait");
+    const incident = changed.issues.get(42);
+    expect(incident.state).toBe("open");
+    expect(incident.body).toBe(
+      "Real incident\nFailing: ready (HTTP 503, false: worker_heartbeat, queue_wait).",
+    );
+    expect(changed.issues.has(99)).toBe(false);
+
+    const same = await run({
+      event: "schedule",
+      exercise: "false",
+      readyResponse: 503,
+      readyBody: notReady,
+      incidentBody: incident.body.replace(/\n/g, "\r\n"),
+    });
+    expect(same.error).toBeUndefined();
+    expect(same.calls.some(([kind]) => ["comment", "update", "create"].includes(kind))).toBe(false);
+    expect(same.logs.some((line) => line.startsWith("Check: no change;"))).toBe(true);
+  });
+
+  it("does not take a 200 that never says ready as ready", async () => {
+    const result = await run({
+      event: "schedule",
+      exercise: "false",
+      production: false,
+      readyBody: "not json",
+    });
+    expect(result.issues.get(99).body).toContain("Failing: ready (HTTP 200 without ready: true).");
+  });
+
+  it("probes the ready URL beside a dry run's test health URL", async () => {
+    const result = await run({
+      exercise: "false",
+      dryRun: "true",
+      production: false,
+      healthUrl: "https://example.test/base/health",
+      readyResponse: 503,
+      readyBody: notReady,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.urls.slice(0, 2)).toEqual([
+      "https://example.test/base/health",
+      "https://example.test/base/ready",
+    ]);
+    expect(result.calls.some(([kind]) => ["comment", "update", "create"].includes(kind))).toBe(
+      false,
+    );
+    expect(result.logs.some((line) => line.startsWith("Dry run: would open incident;"))).toBe(true);
   });
 });
