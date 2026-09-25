@@ -352,7 +352,23 @@ test("a two-move week keeps the decision in a phone's first screen, the stamp be
   expect(await bottom(captain)).toBeLessThanOrEqual(548);
   const stamp = decision.getByText(copy.leagueMembers.stampOptimal, { exact: true });
   const caption = decision.getByText(copy.leagueMembers.stampOptimalCaption, { exact: true });
-  expect(await bottom(caption)).toBeLessThanOrEqual(664);
+  // When a runner draws the page taller than this machine does, say where: the bottom of
+  // every block above the stamp, so a failure names the block that grew.
+  const layout = await page.evaluate(() => {
+    const at = (selector: string) => {
+      const element = document.querySelector(selector);
+      return element ? Math.round(element.getBoundingClientRect().bottom) : null;
+    };
+    const decision = document.querySelector('[data-mark="decision"]');
+    const blocks = decision
+      ? Array.from(decision.querySelectorAll(":scope > *, :scope > * > *")).map((element) => {
+          const box = element.getBoundingClientRect();
+          return `${element.tagName.toLowerCase()}.${String((element as HTMLElement).className).split(" ")[0]}:${Math.round(box.top)}-${Math.round(box.bottom)}`;
+        })
+      : [];
+    return { phoneBar: at("body header"), topBar: at("main header"), blocks };
+  });
+  expect(await bottom(caption), JSON.stringify(layout)).toBeLessThanOrEqual(664);
   expect(await bottom(page.locator('[data-mark="honesty"]'))).toBeLessThanOrEqual(844);
   // The stamp stands beside the week's transfer facts, as the artboard draws it, after the
   // captain line and the gain figure.
