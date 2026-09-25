@@ -12,11 +12,11 @@ the member's points nor the registry order is used to reconstruct a previous ran
 - Missing, null or zero previous rank: `unknown` and `null`, shown as a dash and named
   “Previous rank unavailable” / “Önceki sıra bilinmiyor”. Zero is not a position and does
   not prove that the member just joined. A missing current rank also prevents movement.
+- Negative, boolean, fractional or text previous ranks fail parsing instead of being
+  coerced into a plausible movement. Both standings parsers use the same rule.
 
 Movement is the table's second column, after the rank. The words are each cell's
 accessible name, so a screen reader hears them rather than the glyphs.
-- Negative, boolean, fractional or text previous ranks fail parsing instead of being
-  coerced into a plausible movement. Both standings parsers use the same rule.
 
 The movement compares the game's current and previous weekly standings in the capture.
 The adjacent scores come from the last completed and checked gameweek's member history.
