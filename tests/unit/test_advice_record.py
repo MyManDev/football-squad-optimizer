@@ -145,6 +145,7 @@ def _build(
     free_transfers: int = 1,
     now: datetime.datetime = WHEN,
     capture: str | None = None,
+    totals: tuple[int, int] = (80, 70),
 ) -> None:
     inputs, projection, rules = _world_context(world, capture)
     provider = _Provider(
@@ -168,8 +169,8 @@ def _build(
         league_name="Test League",
         out_dir=out_dir,
         standings={
-            101: MemberStanding(101, "A", "Manager A", 1, 40, 80),
-            202: MemberStanding(202, "B", "Manager B", 2, 30, 70),
+            101: MemberStanding(101, "A", "Manager A", 1, 40, totals[0]),
+            202: MemberStanding(202, "B", "Manager B", 2, 30, totals[1]),
         },
         scored_gameweek=1,
         now=now,
@@ -305,6 +306,13 @@ def test_the_publish_records_what_each_member_was_told(
         document["published_path"]
         for document in record["advice"]  # type: ignore[union-attr]
     }
+    assert told == {
+        "strategy": "saf-puan",
+        "window": 1,
+        "rival_entry_id": None,
+        "published_path": "advice/101/saf-puan/1.json",
+        "source": "page_default",
+    }
 
     # Every recorded document is the file that was published, byte for byte.
     for document in record["advice"]:  # type: ignore[union-attr]
@@ -361,6 +369,92 @@ def test_the_publish_records_what_each_member_was_told(
     assert provenance["planner_policy_id"] == "member_planning_policy_v2"
     assert len(str(provenance["transfer_config_fingerprint"])) == 64
     assert record["league_view_contract_version"] == "provisional_league_ui_v1"
+
+    # Level with the rival, the rule's pick is the pure-points plan itself, and it is still
+    # kept in its own field rather than folded into ``told``.
+    index = _index(out, 101)
+    assert index["suggested_strategy"]["strategy"] == "saf-puan"
+    assert record["suggested_strategy"] == {
+        **index["suggested_strategy"],
+        "published_path": "advice/101/saf-puan/1.json",
+    }
+
+
+def _index(out: Path, entry_id: int) -> dict[str, Any]:
+    document: dict[str, Any] = json.loads(
+        (out / "advice" / str(entry_id) / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    return document
+
+
+def test_told_names_the_page_default_when_the_rule_picks_a_rival_strategy(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The page opens on pure points whatever the rule marks, and the record says so.
+
+    Member 101 leads by 300 and member 202 trails by as much, far outside the band with 37
+    weeks left, so the rule marks ``ortak-koru`` for one and ``fark-yarat`` for the other.
+    The page still opens on ``saf-puan/1.json`` for both: the rule's pick is a label, never
+    a preselection. ``told`` names what the page showed, and the pick is kept beside it as
+    the index published it, with the address of the file it marks. In this world 101's
+    ``ortak-koru`` solves and 202's ``fark-yarat`` does not (the index lists it as
+    unavailable), so the pick keeps its address for one and has none for the other.
+    """
+
+    out, records = tmp_path / "site", tmp_path / "records"
+    _build(world, out, record_root=records, totals=(400, 100))
+    for entry_id, picked, written in ((101, "ortak-koru", True), (202, "fark-yarat", False)):
+        index = _index(out, entry_id)
+        # The premises: the rule really did pick a rival strategy for this member, and its
+        # file exists exactly when the index says the strategy solved.
+        assert index["suggested_strategy"]["strategy"] == picked
+        marked = f"advice/{entry_id}/{picked}/1.json"
+        assert (out / marked).is_file() is written
+        assert any(row["strategy"] == picked for row in index["unavailable"]) is not written
+        record: dict[str, Any] = load_member_advice_record(
+            records, SEASON, 2, entry_id, world["gw2_id"]
+        )
+        assert record["told"] == {
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": None,
+            "published_path": f"advice/{entry_id}/saf-puan/1.json",
+            "source": "page_default",
+        }
+        documents = {item["published_path"]: item for item in record["advice"]}
+        assert documents[f"advice/{entry_id}/saf-puan/1.json"]["scoring_complete"] is True
+        assert record["suggested_strategy"] == {
+            **index["suggested_strategy"],
+            "published_path": marked if written else None,
+        }
+        # A marked file that was written is one the record carries.
+        assert (marked in documents) is written
+
+
+def test_a_record_with_no_rule_pick_says_so_rather_than_leaving_the_key_out(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """``None`` means the rule stated nothing; only an older record lacks the key."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad())})
+    records = tmp_path / "records"
+    build_league_views(
+        provider,
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "site",
+        now=WHEN,
+        advice_record_root=records,
+    )
+    record: dict[str, Any] = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])
+    assert "suggested_strategy" in record and record["suggested_strategy"] is None
+    assert record["told"]["published_path"] == "advice/101/saf-puan/1.json"
+    assert record["told"]["source"] == "page_default"
 
 
 def test_writing_the_record_does_not_move_a_single_published_byte(
