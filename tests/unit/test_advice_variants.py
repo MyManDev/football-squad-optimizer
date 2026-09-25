@@ -29,9 +29,7 @@ from squadopt.application.advice import (
     solve_member_control,
     solve_pricing_control,
     solve_window_plan,
-    unproven_bench_allowance,
     window_horizon,
-    window_payload,
 )
 from squadopt.application.advice_variants import (
     RIVAL_WINDOW_LIMIT,
@@ -174,10 +172,12 @@ def _priced_against(payload: dict[str, Any], control: dict[str, Any]) -> None:
     )
     assert payload["expected_points_cost"] == pytest.approx(max(against, total) - total)
     assert payload["expected_points_cost"] >= 0
-    assert payload["expected_points_cost_ceiling"] >= payload["expected_points_cost"]
     assert payload["control_solver_status"] == control["solver_status"]
+    # The ceiling is the price under the control's proof and absent without it.
     if control["solver_status"] == "OPTIMAL":
         assert payload["expected_points_cost_ceiling"] == payload["expected_points_cost"]
+    else:
+        assert "expected_points_cost_ceiling" not in payload
 
 
 def test_a_weighted_horizon_scales_every_week_and_keeps_its_provenance(
@@ -370,7 +370,8 @@ def test_a_one_week_rival_strategy_under_a_setting_that_favours_nobody_is_the_st
         reference_payload=reference,
     ).payload
     assert favoured["expected_points_cost"] >= 0
-    assert favoured["expected_points_cost_ceiling"] >= favoured["expected_points_cost"]
+    assert favoured["control_solver_status"] == pricing.solver_status.name == "OPTIMAL"
+    assert favoured["expected_points_cost_ceiling"] == favoured["expected_points_cost"]
     points = base_points(world["projection"])
     for player in favoured["starting_xi"]:
         assert player["expected_points"] == points[player["player_id"]]
@@ -566,36 +567,62 @@ def test_a_member_window_is_solved_at_the_window_linearization_level(
     assert plan.diagnostics["linearization_level"] == WINDOW_LINEARIZATION_LEVEL == 2
 
 
-def test_an_unproven_ceiling_carries_the_bench_the_bound_leaves_out(
-    world: dict[str, Any],
+def test_a_window_priced_against_an_unproven_control_publishes_no_ceiling(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    assert unproven_bench_allowance(0.0, 9.0) == 0.0
-    assert unproven_bench_allowance(2.5, 9.0) == pytest.approx(0.9)
-    mine = world["provider"].picks(ENTRY, SEASON, 1)
-    horizon = window_horizon(world["inputs"], 3, world["builder"])
-    plan = solve_window_plan(mine, world["inputs"], world["rules"], horizon, window=3)
-    payload = window_payload(mine, world["projection"], plan, league_id=LEAGUE, window=3)
-    bound = variants._control_bench_bound(payload, horizon)
-    assert bound >= float(plan.total_projected_bench_points or 0.0) - 1e-9
-    total = sum(r["expected_points"] - r["transfer_hit_points"] for r in payload["plan_weeks"])
-    # A found-not-proven control prices with the allowance; a proven one does not.
-    priced: dict[str, Any] = {}
-    variants._price(
-        priced,
-        control_payload={**payload, "solver_status": "FEASIBLE", "optimality_gap": 2.0},
-        selected_total=total,
-        base=horizon,
-    )
-    assert priced["expected_points_cost"] == 0.0
-    assert priced["expected_points_cost_ceiling"] == pytest.approx(2.0 + 0.1 * bound)
+    """A window's price has a ceiling only under the pure-points window's proof.
+
+    That window's gap is on its objective over every week at once (a tenth of each week's
+    bench, each paid transfer at the caution margin), which bounds no price in base
+    points. So a proven control prices with the ceiling equal to the price, and an
+    unproven one with none: on a Top 100 window, on a rival window, and on a rival window
+    restated from a pure-points document that carried a ceiling of its own.
+    """
+
+    control = _window_control(world, 3)
+    unproven = {**control, "solver_status": "FEASIBLE", "optimality_gap": 2.0}
+    total = sum(r["expected_points"] - r["transfer_hit_points"] for r in control["plan_weeks"])
     proven: dict[str, Any] = {}
     variants._price(
-        proven,
-        control_payload={**payload, "solver_status": "OPTIMAL"},
-        selected_total=total,
-        base=horizon,
+        proven, control_payload={**control, "solver_status": "OPTIMAL"}, selected_total=total - 1.5
     )
-    assert proven["expected_points_cost_ceiling"] == 0.0
+    assert proven["expected_points_cost"] == pytest.approx(1.5)
+    assert proven["expected_points_cost_ceiling"] == proven["expected_points_cost"]
+    carried: dict[str, Any] = {"expected_points_cost_ceiling": 0.0}
+    variants._price(carried, control_payload=unproven, selected_total=total)
+    assert carried["expected_points_cost"] == 0.0
+    assert "expected_points_cost_ceiling" not in carried
+
+    weighted = advise_window_with_top100(
+        _request(window=3),
+        weight=50,
+        counts=world["counts"],
+        **_common(world),
+        horizon_builder=world["builder"],
+        control_payload=unproven,
+    ).payload
+    request = _request(strategy="ortak-koru", window=3, rival_entry_id=RIVAL)
+    arguments = {**_common(world), "horizon_builder": world["builder"], "control_payload": unproven}
+    rival = advise_rival_window(request, weight=0, counts=None, **arguments).payload
+
+    def refuse(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("the window must not be solved again")
+
+    monkeypatch.setattr(variants, "solve_window_plan", refuse)
+    restated = advise_rival_window(
+        request,
+        weight=0,
+        counts=None,
+        **arguments,
+        applied_level=int(str(rival["overlap_applied"])),
+        pure_payload={**control, "expected_points_cost": 0.0, "expected_points_cost_ceiling": 0.0},
+    ).payload
+    for payload in (weighted, rival, restated):
+        assert payload["control_solver_status"] == "FEASIBLE"
+        assert payload["control_optimality_gap"] == 2.0
+        assert float(str(payload["expected_points_cost"])) >= 0
+        assert "expected_points_cost_ceiling" not in payload
+        _publishable(payload)
 
 
 def test_a_window_that_already_holds_the_band_is_the_strategys_window(
