@@ -89,6 +89,8 @@ from squadopt.planning import (
     TransferPlanningError,
     TransferPlanResult,
 )
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
 #: The multi-week solve's budget, as the system's own horizon path spends it: twenty
 #: deterministic units per gameweek, under one wall-clock ceiling. A plan the budget
@@ -548,6 +550,33 @@ NO_CHIP_LIMIT: str = (
 #: like, so without this sentence the absence reads as a decision.
 ONE_WEEK_STATED_LIMITS: tuple[str, ...] = (NO_CHIP_LIMIT,)
 
+#: What the current model cannot see. The component model, and its Top-100 version on the
+#: same base, is fitted on ``COMPONENT_TRAINING_SEASONS``, none of which awarded
+#: defensive-contribution points, so it has no part that forecasts them while the live
+#: game awards them. The carry-over versions are left out: they carry realized points
+#: forward, and those include the points wherever the game awarded them, so the sentence
+#: would not be true of them. The football model forecasts them per fixture and never
+#: carries these versions.
+NO_DEFCON_LIMIT: str = (
+    "The current model was trained on seasons that awarded no defensive-contribution "
+    "(DEFCON) points, so it does not forecast those points."
+)
+
+_TRAINED_WITHOUT_DEFCON: frozenset[str] = frozenset(
+    {COMPONENT_MODEL_VERSION, COMPONENT_ELITE_MODEL_VERSION}
+)
+
+
+def forecast_stated_limits(projection: Projection) -> list[str]:
+    """What the model behind ``projection`` cannot see, read from the projection itself.
+
+    The projection names its own model version (``project`` records the handoff's), so
+    the sentence is published where the version says it is true and nowhere else.
+    """
+
+    version = projection.diagnostics.get("model_version")
+    return [NO_DEFCON_LIMIT] if version in _TRAINED_WITHOUT_DEFCON else []
+
 
 def build_advice_payload(
     picks: EntryPicks,
@@ -693,7 +722,8 @@ def build_advice_payload(
         # What this plan assumes, in the producer's own sentence. A one-week solve is
         # handed no chip either, and the payload said nothing about it, so a reader had
         # no way to tell a chip that was weighed and declined from one never offered.
-        "stated_limits": list(ONE_WEEK_STATED_LIMITS),
+        # The model's own limit follows, where the projection's model has one.
+        "stated_limits": [*ONE_WEEK_STATED_LIMITS, *forecast_stated_limits(projection)],
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
         # Which squad the advice stands on: the captured week's own, or the one held
@@ -738,7 +768,8 @@ def window_stated_limits(projection: Projection) -> list[str]:
     from carrying one (``InSeasonProjection``), so a non-null
     ``projection_evidence_fingerprint`` is the fact rather than an assumption about how
     the operator ran the week. Absent, the sentence is dropped rather than softened:
-    what the numbers rest on is stated only where it is true.
+    what the numbers rest on is stated only where it is true. The model's own limit
+    (``forecast_stated_limits``) follows the window's, on the same rule.
     """
 
     carries_uplift = projection.diagnostics.get("projection_evidence_fingerprint") is not None
@@ -749,9 +780,12 @@ def window_stated_limits(projection: Projection) -> list[str]:
             *[sentence for sentence in WINDOW_STATED_LIMITS[1:] if sentence != WINDOW_TOP100_LIMIT],
         ]
     return [
-        sentence
-        for sentence in WINDOW_STATED_LIMITS
-        if carries_uplift or sentence != WINDOW_TOP100_LIMIT
+        *(
+            sentence
+            for sentence in WINDOW_STATED_LIMITS
+            if carries_uplift or sentence != WINDOW_TOP100_LIMIT
+        ),
+        *forecast_stated_limits(projection),
     ]
 
 
@@ -1943,6 +1977,7 @@ __all__: tuple[str, ...] = (
     "COMPUTED_WINDOW",
     "MEMBER_WINDOWS",
     "NO_CHIP_LIMIT",
+    "NO_DEFCON_LIMIT",
     "ONE_WEEK_STATED_LIMITS",
     "WINDOW_STATED_LIMITS",
     "WINDOW_TOP100_LIMIT",
@@ -1955,6 +1990,7 @@ __all__: tuple[str, ...] = (
     "bound_slack",
     "build_advice_payload",
     "build_window_payload",
+    "forecast_stated_limits",
     "lineup_fields",
     "member_horizon_builder",
     "net_expected_points",
