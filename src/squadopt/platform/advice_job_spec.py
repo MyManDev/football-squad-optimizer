@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Protocol
 
+from squadopt.platform._damaged_entry import is_damaged, quarantine
 from squadopt.platform.advice_read import AdviceRequestContext
 
 __all__ = [
@@ -212,11 +213,20 @@ class FileAdviceJobSpecStore:
         return AdviceJobSpec.from_payload(document)
 
     def put(self, key: str, spec: AdviceJobSpec) -> None:
-        """Write once. The same meaning again is a no-op; a different one is a defect."""
+        """Write once. The same meaning again is a no-op; a different one is a defect.
+
+        A spec that is not JSON at all is neither: it is what a crash left before this store
+        fsynced its writes. It is moved aside and the address written again, where it used
+        to answer every later request for the same answer with 409 ``REQUEST_CONFLICT``.
+        The bytes are fsynced before the link, so this write cannot leave one behind.
+        """
 
         payload = _serialize(spec)
         path = self._path(key)
         existing = self._read(path)
+        if existing is not None and is_damaged(existing):
+            quarantine(path, existing, component="specs")
+            existing = None
         if existing is not None:
             _require_identical(key, existing, payload)
             return
@@ -225,6 +235,8 @@ class FileAdviceJobSpecStore:
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
             try:
                 os.link(temporary, path)  # atomic create; fails if the key exists
             except FileExistsError:

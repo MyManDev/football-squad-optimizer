@@ -507,6 +507,7 @@ the command above, a bad data release is the `metadata.json` deletion under
 | POST answers `503 NOT_READY` | the store probe is failing; `/ready` names the check, and a missing volume shows up as `cache_store` |
 | job `failed` with `CONTEXT_UNAVAILABLE` | the capture moved on between accepting and computing; asking again is the fix |
 | job `failed` with `REQUEST_UNREADABLE` | the spec beside the job's key is missing — the store lost a write, so check the probe |
+| api or worker logs `advice_damaged_entry_quarantined` | a cache entry or job spec (`source`) was not JSON at all: what an unclean shutdown could leave before the two stores fsynced their writes. It was moved to `moved_to` in the same directory, and the next request computes or files it again, so a job that failed `REQUEST_UNREADABLE` over it is answered by asking again. The moved file is kept for inspection and can be deleted |
 | job `failed` with `ENTRY_NOT_IN_CAPTURE` | `members.json` lists the member or the rival, but the current capture holds no picks for them; re-capture with `--entries` |
 | job `failed` with `SWITCH_INPUTS_CHANGED` | the Top 100 export or the rotation table was replaced between accepting and computing; asking again is the fix |
 | job `failed` with `MANAGERS_WORD_NOT_SOLVED` | the word was asked for together with a Top 100 setting and this member's plan under both could not be produced; the capture has the club news, so it is this member's outcome and not a missing input. The job's stored message says why, and the same request without the word still answers |

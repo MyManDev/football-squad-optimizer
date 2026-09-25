@@ -849,6 +849,54 @@ def test_get_and_post_refuse_identical_corrupt_cache_without_new_job(
     assert len(queue.jobs()) == 1
 
 
+def test_a_torn_cache_entry_is_computed_again_not_an_error_for_good(tmp_path: Path) -> None:
+    client, cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    job = queue.load(posted.json()["job_id"])
+    run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc="2026-08-27T18:00:00Z"
+    )
+    path = tmp_path / "cache" / job.cache_key[:2] / f"{job.cache_key}.json"
+    path.write_bytes(b"")  # what a power loss before the fsync could leave behind
+
+    missed = client.get(ADVICE_URL, params=BODY)
+    assert missed.status_code == 404
+    assert missed.json()["error"]["code"] == "NOT_COMPUTED"
+    assert [p.name.startswith(f"{path.name}.damaged-") for p in path.parent.iterdir()] == [True]
+    again = client.post(ADVICE_URL, json=BODY)
+    assert again.status_code == 202
+    assert again.json()["job_id"] != job.job_id
+    run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc="2026-08-27T18:05:00Z"
+    )
+    assert client.get(ADVICE_URL, params=BODY).content == _valid_advice_document()
+
+
+def test_a_torn_job_spec_is_written_again_not_a_conflict_for_good(tmp_path: Path) -> None:
+    from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
+
+    specs = FileAdviceJobSpecStore(tmp_path / "specs")
+    client, cache, queue = _world(tmp_path, specs=specs)
+    posted = client.post(ADVICE_URL, json=BODY)
+    job = queue.load(posted.json()["job_id"])
+    path = tmp_path / "specs" / job.cache_key[:2] / f"{job.cache_key}.json"
+    written = path.read_bytes()
+    path.write_bytes(b"\x00" * len(written))  # the name linked, the bytes never written
+
+    def compute_from_spec(claimed: AdviceJob) -> bytes:
+        specs.get(claimed.cache_key)  # the worker cannot read what it was asked
+        return _valid_advice_document()
+
+    failed = run_advice_worker_once(queue, cache, compute_from_spec, at_utc="2026-08-27T18:00:00Z")
+    assert failed is not None and failed.status == "failed"
+
+    again = client.post(ADVICE_URL, json=BODY)
+    assert again.status_code == 202  # was 409 REQUEST_CONFLICT on every later request
+    assert path.read_bytes() == written
+    run_advice_worker_once(queue, cache, compute_from_spec, at_utc="2026-08-27T18:05:00Z")
+    assert client.post(ADVICE_URL, json=BODY).content == _valid_advice_document()
+
+
 def test_corrupt_job_is_unavailable_not_missing(tmp_path: Path) -> None:
     client, _cache, _queue = _world(tmp_path)
     posted = client.post(ADVICE_URL, json=BODY)
