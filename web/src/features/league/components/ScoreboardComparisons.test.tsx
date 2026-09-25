@@ -61,6 +61,12 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
     for (const text of strings) expect(text).not.toMatch(AS_A_CHANCE);
     for (const word of ["chance", "likelihood", "odds"]) expect(word).toMatch(AS_A_CHANCE);
   });
+  it("names its table's region once, so the page has no two landmarks of one name", () => {
+    show(week());
+    const copy = MESSAGES[language].scoreboardComparisons;
+    expect(screen.getAllByRole("region", { name: copy.title })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 3, name: copy.title })).toBeInTheDocument();
+  });
   it("separates measured zero, missing data and scoring bases with integer starter counts", () => {
     const value = week();
     value.comparisons![0]!.diagnostics.zero_minute_starters = 2;

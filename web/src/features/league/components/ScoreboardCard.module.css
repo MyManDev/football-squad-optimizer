@@ -32,10 +32,8 @@
 .table thead th {
   border-top: none;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--step--2);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .table tfoot th {
@@ -44,7 +42,7 @@
 
 .total td,
 .total th {
-  border-top: 2px solid var(--color-line);
+  border-top: 1px solid var(--color-text-muted);
 }
 
 .right {
@@ -59,7 +57,6 @@
 /* A gross Top-100 mean is not on the net columns' basis; it is ruled off from them
    rather than sitting flush in the same run of numbers. */
 .gross {
-  border-left: 2px solid var(--color-line);
-  border-right: 2px solid var(--color-line);
+  border-inline: 1px solid var(--color-line);
   color: var(--color-text-muted);
 }
