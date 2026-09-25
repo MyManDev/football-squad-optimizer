@@ -341,6 +341,27 @@ for (const language of ["tr", "en"] as const) {
     expect(box.x + box.width).toBeCloseTo(390, 0);
     expect(box.width).toBeLessThanOrEqual(350);
     expect(box.height).toBeCloseTo(664, 0);
+    expect(
+      await page.evaluate(() => {
+        const sheet = document.getElementById("fixture-sheet")!.getBoundingClientRect();
+        const middle = sheet.top + sheet.height / 2;
+        const inside = document.elementFromPoint(sheet.left + sheet.width / 2, middle);
+        const beside = document.elementFromPoint(sheet.left / 2, middle);
+        return [!!inside?.closest("#fixture-sheet"), String(beside?.className).includes("scrim")];
+      }),
+    ).toEqual([true, true]);
+    // Taller than a phone with Safari's bars shown, it scrolls inside itself and keeps its
+    // close button in view at either end.
+    const sheetBody = page.locator("#fixture-sheet");
+    expect(await sheetBody.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+      true,
+    );
+    for (const to of ["bottom", "top"] as const) {
+      await sheetBody.evaluate((element, where) => {
+        element.scrollTop = where === "top" ? 0 : element.scrollHeight;
+      }, to);
+      await expect(close).toBeInViewport({ ratio: 1 });
+    }
     // The page behind is locked and out of reach.
     await expect(page.locator("main")).toHaveAttribute("inert", "");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe(
