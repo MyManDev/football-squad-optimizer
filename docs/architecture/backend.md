@@ -135,6 +135,8 @@ write-once store is right to refuse them.
 not the clock's. These bytes live at a content-addressed key whose immutability is checked on
 every write, so a wall-clock field would make an honest recomputation — after a recovered
 claim, say — indistinguishable from a determinism defect.
+A recovered claim recomputes unless its answer is already cached; a first attempt always
+computes and compares.
 
 ### The loop
 
@@ -149,8 +151,10 @@ One computation at a time per worker: CP-SAT runs a single search worker by desi
 replica scales by replication (ADR 0006). An empty queue waits rather than spins. SIGTERM and
 SIGINT are honoured *after* the job in hand finishes, so a container stop costs nobody their
 solve. Abandoned claims are walked back periodically through the contract's own
-`running -> queued` edge, which increments `attempt`; past `--max-attempts` (default 3) the
-job is failed with `TOO_MANY_ATTEMPTS` rather than crash-looping. The claim's lease is 300
+`running -> queued` edge, which increments `attempt`. A retried attempt whose answer is
+already in the cache (an earlier attempt finished it and lost only the job record) completes
+from the cache at any attempt, without computing; otherwise, past `--max-attempts` (default 3)
+the job is failed with `TOO_MANY_ATTEMPTS` rather than crash-looping. The claim's lease is 300
 seconds against a measured 3.0–29.6 s *single* solve, and one member's plan is several
 solves, so the claim is kept alive while the computation runs: `run_advice_worker_once`
 refreshes it through `queue.heartbeat` on a background thread every `heartbeat_seconds`,
