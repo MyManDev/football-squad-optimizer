@@ -10,10 +10,11 @@ citation in front of a member. So the tests below are mostly about the second ne
 happening quietly.
 """
 
+import http.client
 import json
 import urllib.error
 import urllib.request
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -330,6 +331,128 @@ def test_a_persistent_server_error_reports_every_attempt() -> None:
         read_url(PAGE, opener=opener, sleeper=sleeper)
 
     assert delays == [2.0, 4.0, 8.0]
+
+
+# --- failures urllib does not wrap --------------------------------------------
+
+#: What urllib raises raw once the request is sent: a read that times out, a host that
+#: hangs up before answering, and a body shorter than its declared length. Built fresh for
+#: each raise. The short body's expected count is 404 on purpose (see the robots test).
+TRANSPORT_FAILURES: dict[str, Callable[[], Exception]] = {
+    "timeout": lambda: TimeoutError("timed out"),
+    "hang-up": lambda: http.client.RemoteDisconnected(
+        "Remote end closed connection without response"
+    ),
+    "short body": lambda: http.client.IncompleteRead(b"<p>Saka", 404),
+}
+
+
+class _FailingRead(_Reply):
+    """A response whose headers arrived and whose body did not."""
+
+    def __init__(self, failure: Exception) -> None:
+        super().__init__()
+        self._failure = failure
+
+    def read(self, amount: int | None = None) -> bytes:
+        raise self._failure
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_transport_failure_is_retried_and_then_succeeds(
+    failure: Callable[[], Exception],
+) -> None:
+    """Said "later" like a 503, so it gets the 503's patience rather than ending the run."""
+
+    delays, sleeper = _slept()
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [failure(), _Reply()]})
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    assert document.club == "Example FC"
+    assert opener.requested.count(PAGE) == 2
+    assert delays == [2.0]
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_transport_failure_on_every_attempt_names_the_url(
+    failure: Callable[[], Exception],
+) -> None:
+    """It ends as this module's error, so the caller's per-club catch sees it."""
+
+    delays, sleeper = _slept()
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [failure() for _ in range(4)]})
+
+    with pytest.raises(ClubNewsFetchError, match="on 4 attempts") as raised:
+        read_url(PAGE, opener=opener, sleeper=sleeper)
+
+    assert PAGE in str(raised.value)
+    assert type(failure()).__name__ in str(raised.value)
+    assert opener.requested.count(PAGE) == 4
+    assert delays == [2.0, 4.0, 8.0]
+
+
+def test_a_body_that_fails_while_it_is_read_is_retried() -> None:
+    """The headers arrived, so the open succeeded; the failure is in `read`."""
+
+    delays, sleeper = _slept()
+    cut_short = _FailingRead(http.client.IncompleteRead(b"<p>Saka", 20))
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [cut_short, _Reply()]})
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    assert document.content == b"<p>Saka trained fully.</p>"
+    assert delays == [2.0]
+
+
+def test_a_body_that_times_out_on_every_read_names_the_url() -> None:
+    delays, sleeper = _slept()
+    opener = _Opener(
+        {ROBOTS: _allowing_robots(), PAGE: [_FailingRead(TimeoutError("timed out"))] * 4}
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="TimeoutError") as raised:
+        read_url(PAGE, opener=opener, sleeper=sleeper)
+
+    assert PAGE in str(raised.value)
+    assert delays == [2.0, 4.0, 8.0]
+
+
+def test_one_slow_host_does_not_cost_the_other_clubs_their_pages() -> None:
+    """The audit's case: a timeout used to escape the loop and lose the fast host's page."""
+
+    other = ClubSource(club="Other FC", url="https://other.example/news")
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: [TimeoutError("timed out") for _ in range(4)],
+            "https://other.example/robots.txt": _allowing_robots(),
+            other.url: _Reply(final_url=other.url),
+        }
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE, other), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert [document.club for document in documents] == ["Other FC"]
+    assert [club for club, _reason in refused] == ["Example FC"]
+    assert PAGE in refused[0][1]
+
+
+def test_a_robots_file_cut_short_is_not_consent() -> None:
+    """A short body counting 404 bytes is a failed read, not a host with no robots file.
+
+    `robots_allows` still reads "404" in a refusal's text as "no robots file", so the
+    refusal names the failure by its type and not by its text.
+    """
+
+    opener = _Opener({ROBOTS: [http.client.IncompleteRead(b"User-agent", 404)], PAGE: _Reply()})
+
+    with pytest.raises(ClubNewsFetchError, match="preference is unknown"):
+        fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None)
+
+    assert PAGE not in opener.requested
 
 
 # --- one club failing does not fail the week --------------------------------

@@ -5,9 +5,12 @@ against a fake `fetch`. The sleeps are injected so the backoff is asserted rathe
 waited out.
 """
 
+import http.client
 import json
 import re
 import urllib.error
+import urllib.request
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -119,6 +122,87 @@ def test_an_unreachable_host_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(fpl_capture, "_read", reader)
     with pytest.raises(DataSourceError, match="Could not reach"):
         fpl_capture.fetch(URL, sleeper=lambda _: None)
+
+
+#: What urllib raises raw once the request is sent: a read that times out, a host that
+#: hangs up before answering, and a body shorter than its declared length.
+TRANSPORT_FAILURES: dict[str, Callable[[], Exception]] = {
+    "timeout": lambda: TimeoutError("timed out"),
+    "hang-up": lambda: http.client.RemoteDisconnected(
+        "Remote end closed connection without response"
+    ),
+    "short body": lambda: http.client.IncompleteRead(b"{", 900),
+}
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_dropped_response_is_retried_and_then_succeeds(
+    failure: Callable[[], Exception], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The host was reached, so like a 503 this says "later" rather than ending the capture."""
+
+    calls: list[int] = []
+
+    def reader(url: str) -> bytes:
+        calls.append(len(calls))
+        if len(calls) < 3:
+            raise failure()
+        return b"ok"
+
+    monkeypatch.setattr(fpl_capture, "_read", reader)
+    slept: list[float] = []
+    assert fpl_capture.fetch(URL, sleeper=slept.append) == b"ok"
+    assert len(calls) == 3
+    assert slept == [2.0, 4.0]
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_response_that_keeps_failing_is_a_data_error_naming_the_url(
+    failure: Callable[[], Exception], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The capture commands catch DataError only; a raw one used to end them in a traceback."""
+
+    calls: list[int] = []
+
+    def reader(url: str) -> bytes:
+        calls.append(len(calls))
+        raise failure()
+
+    monkeypatch.setattr(fpl_capture, "_read", reader)
+    slept: list[float] = []
+    with pytest.raises(DataSourceError, match="on all 3 attempts") as raised:
+        fpl_capture.fetch(URL, attempts=3, sleeper=slept.append)
+    assert URL in str(raised.value)
+    assert type(failure()).__name__ in str(raised.value)
+    assert len(calls) == 3
+    assert slept == [2.0, 4.0]
+
+
+def test_a_body_cut_short_inside_the_real_reader_is_a_data_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Through `_read` itself, so the read after a successful open is covered, not a stub."""
+
+    opened: list[str] = []
+
+    class _CutShort:
+        def __enter__(self) -> "_CutShort":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            raise http.client.IncompleteRead(b"{", 900)
+
+    def urlopen(request: urllib.request.Request, timeout: float) -> _CutShort:
+        opened.append(request.full_url)
+        return _CutShort()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    with pytest.raises(DataSourceError, match="IncompleteRead"):
+        fpl_capture.fetch(URL, attempts=2, sleeper=lambda _: None)
+    assert opened == [URL, URL]
 
 
 # --- registered endpoints -------------------------------------------------------------

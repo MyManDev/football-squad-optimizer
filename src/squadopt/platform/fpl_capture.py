@@ -5,6 +5,7 @@ HTTP adapter here lets installed CLI entry points provide it without importing a
 module under ``scripts``.
 """
 
+import http.client
 import re
 import time
 import urllib.error
@@ -66,7 +67,8 @@ def fetch(
     It is now two plus three per registered entry, so the same polite pause the old error
     message told a human to take is taken here instead: 429 and 5xx are retried with a
     bounded backoff, because they say "later", while every other 4xx says "never" and is
-    raised immediately. The last failure is reported rather than swallowed.
+    raised immediately. A response that times out, is dropped or ends short once the host
+    has been reached says "later" too. The last failure is reported rather than swallowed.
     """
 
     delay = RETRY_INITIAL_SECONDS
@@ -83,6 +85,17 @@ def fetch(
             print(f"  waiting  HTTP {error.code} from {url}; retrying in {delay:.0f}s")
         except urllib.error.URLError as error:
             raise DataSourceError(f"Could not reach {url}: {error.reason}") from error
+        except (OSError, http.client.HTTPException) as error:
+            # urllib wraps only the sending of the request in URLError. A read that times
+            # out, a host that hangs up and a body cut short arrive raw (TimeoutError,
+            # RemoteDisconnected, IncompleteRead), and the capture commands catch only
+            # DataError, so these used to end a capture with a traceback after one try.
+            # The host was reached, so like a 503 this says "later" and is retried.
+            if attempt == attempts:
+                raise DataSourceError(
+                    f"{url} was not read on all {attempts} attempts: {error!r}"
+                ) from error
+            print(f"  waiting  {type(error).__name__} from {url}; retrying in {delay:.0f}s")
         sleeper(delay)
         delay = min(delay * 2, RETRY_MAX_SECONDS)
     raise DataSourceError(f"{url} was never read.")  # pragma: no cover - loop always returns

@@ -26,6 +26,7 @@ tidied copy would not be those bytes. And it never fills a publication time in f
 fetch instant; see :class:`RawDocument` for the three clocks.
 """
 
+import http.client
 import json
 import time
 import urllib.error
@@ -287,9 +288,11 @@ def read_url(
 
     The retry rule is ``fpl_capture.fetch``'s and for the same reason: 429 and 5xx say
     "later" and are retried with a bounded backoff, while every other 4xx says "never" and
-    is raised at once. The loop is here rather than shared because that function returns
-    bytes alone, and this adapter needs the final URL, the status, the content type and the
-    publication header as well. A third caller that needs a response should be the one to
+    is raised at once. A timeout, a dropped connection or a short body while the response
+    is read is retried the same way, and reported as this module's error. The loop is here
+    rather than shared because that function returns bytes alone, and this adapter needs
+    the final URL, the status, the content type and the publication header as well. A third
+    caller that needs a response should be the one to
     extract the shared helper, rather than this becoming the second copy that outlives its
     excuse.
     """
@@ -309,6 +312,20 @@ def read_url(
             if attempt == attempts:
                 raise ClubNewsFetchError(
                     f"{url} could not be reached on {attempts} attempts: {error.reason}"
+                ) from error
+        except (OSError, http.client.HTTPException) as error:
+            # urllib wraps only the sending of the request in URLError. The response is
+            # read afterwards, so a read that times out, a host that hangs up and a body cut
+            # short arrive raw (TimeoutError, RemoteDisconnected, IncompleteRead). Left raw,
+            # one slow host escaped `fetch_registered_documents` and cost every other club's
+            # page that week. They say "later", as a 503 does, so they get its retries.
+            if attempt == attempts:
+                # The error is named by its type only. Its text can carry digits (a byte
+                # count, an errno, a line of the TLS library), and `robots_allows` still
+                # reads "404" in a refusal's text as a host with no robots file.
+                raise ClubNewsFetchError(
+                    f"{url} was not read on {attempts} attempts: the response failed after "
+                    f"the request was sent ({type(error).__name__})."
                 ) from error
         sleeper(delay)
         delay = min(delay * 2, RETRY_MAX_SECONDS)
