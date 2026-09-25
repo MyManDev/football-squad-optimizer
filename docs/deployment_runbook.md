@@ -141,7 +141,10 @@ finding, and leaves nothing on disk:
 - the frozen root index against the candidate: every file it names exists, every gameweek view
   is named, and its weeks and latest view are the ones the candidate's season ledger holds;
 - `data/fixtures.json` against the outcome capture it must come from;
-- the league tree release check (`scripts.check_league_tree`) on the candidate's `data`.
+- the league tree release check (`scripts.check_league_tree`) on the candidate's `data`. It
+  also runs on the accepted tree, and a finding the accepted tree already has is counted and
+  printed rather than refused: it sits in advice members read before the deadline, which this
+  publish cannot change.
 
 The command prints each check it passed. Report that output, the complete changed-file list and
 the independent scoreboard cells before/after in #632 before a site-data PR: that report asks

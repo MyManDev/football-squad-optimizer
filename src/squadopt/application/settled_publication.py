@@ -14,8 +14,9 @@ before it can be added to the boundary below.
 The checks an operator used to run by hand on the finished candidate run here, before
 the candidate is written: the rebuilt season documents against the schemas the accepted
 tree froze, the frozen root index against the candidate's files, the fixture list against
-the outcome capture, and (from the command line) the league tree release check. A
-candidate that fails any of them is refused and never appears on disk.
+the outcome capture, and (from the command line) the league tree release check, which
+refuses what it finds in the candidate and not in the accepted tree. A candidate that
+fails any of them is refused and never appears on disk.
 """
 
 import hashlib
@@ -23,6 +24,7 @@ import json
 import re
 import shutil
 import stat
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -88,8 +90,9 @@ class SettledPublicationResult:
     checks: tuple[str, ...] = ()
 
 
-#: The league tree release check, run on the candidate's ``data`` directory before it is
-#: written. It returns its findings; any finding refuses the candidate.
+#: The league tree release check of a ``data`` directory, returning its findings. It runs
+#: on the accepted tree and on the candidate before the candidate is written; a finding
+#: the candidate has and the accepted tree does not refuses the candidate.
 LeagueTreeCheck = Callable[[Path], Sequence[str]]
 
 _CONTRACT_VERSION = re.compile(r"[a-z0-9_]+")
@@ -488,6 +491,36 @@ def _check_root_index(data: Path, season: str) -> str:
     return f"the frozen data/index.json names the candidate's {len(files)} files and weeks"
 
 
+def _check_league_tree(
+    data: Path, request: SettledPublicationRequest, league_tree_check: LeagueTreeCheck
+) -> str:
+    """Refuse what the league tree check finds in the candidate and not in the accepted tree.
+
+    The check reads mostly advice, and this publish can change none of it: a finding the
+    accepted tree already has is in bytes members read before the deadline, which only a
+    new decision publish could replace. Refusing on it would leave the week unpublishable
+    whenever the checker grew stricter after the decision shipped (measured on 2026-09-25: a
+    stricter price rule proposed for the checker finds 600 problems in the shipped GW5
+    advice). So those are counted and reported, and only a finding this publish introduced
+    refuses.
+    """
+
+    accepted = Counter(league_tree_check(request.accepted_dir / "data"))
+    introduced = list((Counter(league_tree_check(data)) - accepted).elements())
+    if introduced:
+        raise DataError(
+            f"The candidate fails the league tree check with {len(introduced)} finding(s) "
+            f"the accepted tree does not have; the first: {introduced[0]}"
+        )
+    carried = sum(accepted.values())
+    if carried:
+        return (
+            f"the league tree check found nothing new ({carried} finding(s) the accepted "
+            "tree already had)"
+        )
+    return "the league tree check found nothing"
+
+
 def _check_candidate(
     data: Path, request: SettledPublicationRequest, league_tree_check: LeagueTreeCheck | None
 ) -> tuple[str, ...]:
@@ -497,13 +530,7 @@ def _check_candidate(
         _check_root_index(data, request.season),
     ]
     if league_tree_check is not None:
-        findings = list(league_tree_check(data))
-        if findings:
-            raise DataError(
-                f"The candidate fails the league tree check with {len(findings)} "
-                f"finding(s); the first: {findings[0]}"
-            )
-        checks.append("the league tree check found nothing")
+        checks.append(_check_league_tree(data, request, league_tree_check))
     return tuple(checks)
 
 
@@ -512,8 +539,9 @@ def publish_settled(
 ) -> SettledPublicationResult:
     """Build a complete scratch candidate, or expose no candidate at all on refusal.
 
-    ``league_tree_check`` runs with the other checks, before the candidate is written. The
-    command line passes ``scripts.check_league_tree``, which this package cannot import.
+    ``league_tree_check`` runs with the other checks, on the accepted tree and on the
+    candidate, before the candidate is written. The command line passes
+    ``scripts.check_league_tree``, which this package cannot import.
     """
     accepted, members, snapshot, scores = _preflight(request)
     stamp = snapshot.metadata.captured_at_utc

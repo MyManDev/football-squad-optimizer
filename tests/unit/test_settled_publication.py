@@ -692,10 +692,11 @@ def test_cli_reports_the_actual_candidate_file_list(
     assert STAMP in output and "data/league/members.json" in output
     assert "data/league/series-horizon.json" in output
     assert "data/league/entries/101.json" not in output
-    # The candidate was checked where it was generated, before it was written.
-    assert len(checked) == 1 and checked[0].name == "data"
-    assert checked[0].parents[2] == request.out_dir.parent
-    assert checked[0].parent != request.out_dir
+    # The accepted tree, then the candidate where it was generated, before it was written.
+    accepted, candidate = checked
+    assert accepted == request.accepted_dir / "data"
+    assert candidate.name == "data" and candidate.parents[2] == request.out_dir.parent
+    assert candidate.parent != request.out_dir
     # Every check it ran is printed, and no check is left for the operator to run.
     rebuilt = len(list((request.out_dir / "data" / SEASON).rglob("*.json"))) + 1
     assert "Checked before the candidate was written:" in output
@@ -715,13 +716,21 @@ def test_cli_refuses_a_candidate_the_league_tree_check_finds_fault_with(
     import scripts.build_settled_site as cli
 
     request = world(tmp_path)
+    accepted = request.accepted_dir / "data"
     monkeypatch.setattr(
-        cli, "run_checks", lambda tree: ["101: advice/101/saf-puan/3.json not published"]
+        cli,
+        "run_checks",
+        lambda tree: (
+            [] if Path(tree.root) == accepted else ["101: members.json has no member_kind"]
+        ),
     )
     assert cli.main(cli_arguments(request)) == 1
     error = capsys.readouterr().err
-    assert "Settled publication refused: The candidate fails the league tree check" in error
-    assert "101: advice/101/saf-puan/3.json not published" in error
+    assert (
+        "Settled publication refused: The candidate fails the league tree check with 1 "
+        "finding(s) the accepted tree does not have; the first: 101: members.json has no "
+        "member_kind"
+    ) in error
     assert not request.out_dir.exists()
     assert not list(request.out_dir.parent.glob("settled-*"))
 
@@ -736,9 +745,7 @@ def test_cli_tree_check_is_the_release_checker_on_the_candidate(
     assert league_tree_findings(data) == []
     (data / "league/advice/1/saf-puan/3.json").unlink()
     assert league_tree_findings(data) == ["1: advice/1/saf-puan/3.json not published"]
-    assert f"League tree check on the candidate before it is written ({data})" in (
-        capsys.readouterr().out
-    )
+    assert f"League tree check on {data}:" in capsys.readouterr().out
 
 
 def test_missing_past_week_with_only_ordinary_cells_refuses(tmp_path: Path) -> None:
@@ -923,31 +930,66 @@ def test_a_frozen_root_index_that_disagrees_with_the_candidate_refuses(
     assert_refused_before_writing(request)
 
 
-def test_the_league_tree_check_reads_the_settled_candidate_not_the_accepted_tree(
+def test_the_league_tree_check_reads_the_accepted_tree_and_then_the_settled_candidate(
     tmp_path: Path,
 ) -> None:
     request = world(tmp_path)
-    seen: list[dict[str, Any]] = []
+    seen: list[tuple[bool, int]] = []
 
     def check(data: Path) -> list[str]:
-        seen.append(json.loads((data / "league/members.json").read_bytes())["payload"])
-        assert not data.is_relative_to(request.accepted_dir)
+        payload = json.loads((data / "league/members.json").read_bytes())["payload"]
+        seen.append((data.is_relative_to(request.accepted_dir), payload["scored_gameweek"]))
         return []
 
     result = publication.publish_settled(request, league_tree_check=check)
-    assert [payload["scored_gameweek"] for payload in seen] == [5]
+    assert seen == [(True, 4), (False, 5)]
     assert result.checks[-1] == "the league tree check found nothing"
 
 
-def test_a_league_tree_check_finding_refuses_and_writes_nothing(tmp_path: Path) -> None:
+def accepted_or_candidate(
+    request: publication.SettledPublicationRequest,
+    accepted: list[str],
+    candidate: list[str],
+) -> publication.LeagueTreeCheck:
+    return lambda data: accepted if data.is_relative_to(request.accepted_dir) else candidate
+
+
+def test_a_league_tree_finding_this_publish_introduced_refuses_and_writes_nothing(
+    tmp_path: Path,
+) -> None:
     request = world(tmp_path)
     before = inventory(request.accepted_dir)
+    # One finding the accepted tree already had, and a second copy of it that it did not.
+    already = "101: advice/101/saf-puan/3.json ceiling 1.5 over an unproven control"
     with pytest.raises(
         DataError,
-        match=r"fails the league tree check with 2 finding\(s\); the first: 101: index",
+        match=r"fails the league tree check with 2 finding\(s\) the accepted tree does not "
+        r"have; the first: 102: members\.json",
     ):
         publication.publish_settled(
-            request, league_tree_check=lambda data: ["101: index", "102: index"]
+            request,
+            league_tree_check=accepted_or_candidate(
+                request, [already], ["102: members.json", already, already]
+            ),
         )
     assert_refused_before_writing(request)
     assert inventory(request.accepted_dir) == before
+
+
+def test_league_tree_findings_the_accepted_tree_already_had_are_counted_not_refused(
+    tmp_path: Path,
+) -> None:
+    # Advice is immutable here: a finding in it is in bytes members read before the
+    # deadline, so it cannot make the outcome week unpublishable.
+    request = world(tmp_path)
+    findings = [
+        "101: advice/101/saf-puan/3.json ceiling 1.5 over an unproven control",
+        "102: advice/102/saf-puan/3.json ceiling 2.5 over an unproven control",
+    ]
+    result = publication.publish_settled(
+        request, league_tree_check=accepted_or_candidate(request, findings, findings)
+    )
+    assert result.checks[-1] == (
+        "the league tree check found nothing new (2 finding(s) the accepted tree already had)"
+    )
+    assert request.out_dir.is_dir()

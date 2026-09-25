@@ -3,8 +3,8 @@
 All inputs are explicit. The ledger must already be settled; this command never
 executes a weekly operation. Before the candidate is written it is held to the frozen
 schemas, the frozen root index, the outcome capture's fixture list and the league tree
-release check; any finding refuses it. Post its changed-file list for review before a
-site PR.
+release check (whatever that finds in the candidate and not in the accepted tree); any
+finding refuses it. Post its changed-file list for review before a site PR.
 """
 
 import argparse
@@ -18,8 +18,8 @@ from squadopt.data.errors import DataError
 
 
 def league_tree_findings(data: Path) -> list[str]:
-    """``python -m scripts.check_league_tree <candidate>/data``, run before it is written."""
-    print(f"League tree check on the candidate before it is written ({data}):")
+    """``python -m scripts.check_league_tree <data>``, on the accepted tree and the candidate."""
+    print(f"League tree check on {data}:")
     return run_checks(Tree(str(data)))
 
 
