@@ -15,7 +15,9 @@ param(
     # The gameweek this release settles, asserted by the verifier rather than printed. Omit it
     # for a decision release, which settles nothing.
     [int]$SettledGameweek,
-    [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
+    # Defaults to the checkout this script lives in, resolved below: Windows PowerShell 5.1
+    # leaves $PSScriptRoot empty while it binds these defaults under -File.
+    [string]$RepoRoot = "",
     [string]$StoreRoot = "",
     [string]$SiteDataRoot = "",
     [string]$Python = "",
@@ -26,6 +28,11 @@ param(
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
+if (-not $RepoRoot) {
+    $scriptDirectory = $PSScriptRoot
+    if (-not $scriptDirectory) { $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path }
+    $RepoRoot = Split-Path -Parent (Split-Path -Parent $scriptDirectory)
+}
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 if (-not $StoreRoot) { $StoreRoot = Join-Path $RepoRoot "data\runtime\backend" }
 if (-not $SiteDataRoot) { $SiteDataRoot = Join-Path $RepoRoot "web\public\data" }

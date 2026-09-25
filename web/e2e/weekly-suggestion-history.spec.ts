@@ -8,7 +8,9 @@ import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
 test.beforeEach(async ({ page }) => {
-  // These acceptance tests are offline; a remote font must not hold document load open.
+  // Nothing here reaches past the local preview: the one test that opens a member page
+  // installs the league mocks, which refuse the advice API, and the remote font stylesheet
+  // is answered empty so it cannot hold document load open.
   await page.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ contentType: "text/css", body: "" }),
   );
@@ -19,6 +21,9 @@ for (const language of ["tr", "en"] as const) {
     page,
   }) => {
     const historyDocument = structuredClone(fixture);
+    // The fixture's Top 100 record without the manager's word.
+    const settingOnly: Record<string, unknown> = { ...recordedPlans[1] };
+    delete settingOnly.managers_word;
     Object.assign(historyDocument.payload.weeks[0], {
       status: "unsettled",
       reason: "not_settled",
@@ -28,7 +33,18 @@ for (const language of ["tr", "en"] as const) {
       players: [],
       outcome_snapshot_id: null,
       outcome_captured_at_utc: null,
-      recorded_plans: recordedPlans,
+      recorded_plans: [
+        ...recordedPlans,
+        // A setting priced against a proven pure-points plan: its ceiling is its price.
+        {
+          ...settingOnly,
+          published_path: "advice/101/saf-puan/1/top100-30.json",
+          top100_weight: 30,
+          moves: [],
+          expected_points_cost: 1.5,
+          expected_points_cost_ceiling: 1.5,
+        },
+      ],
     });
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.route("**/data/league/history/101.json", (route) =>
@@ -47,9 +63,18 @@ for (const language of ["tr", "en"] as const) {
     await expect(details.getByText(new RegExp(`${TOP100_COPY[language].legend} 20`))).toBeVisible();
     await expect(details.getByText(/Player 1/)).toBeVisible();
     await expect(details).toContainText("#17");
-    await expect(details).toContainText(
-      TOP100_COPY[language].combinedCostAtMost(language === "tr" ? "4,0" : "4.0"),
+    const decimal = (value: string) => (language === "tr" ? value.replace(".", ",") : value);
+    // The recorded price whose ceiling is its price is printed as the price.
+    await expect(details).toContainText(TOP100_COPY[language].cost(decimal("1.5")));
+    // The fixture's word-and-setting record carries a ceiling (4.0) above its price (2.5),
+    // which only a price measured against an unproven pure-points plan ever did: that
+    // figure bounds nothing, so neither number is printed for it.
+    await expect(details).not.toContainText(
+      TOP100_COPY[language].combinedCostAtMost(decimal("4.0")),
     );
+    await expect(details).not.toContainText(TOP100_COPY[language].combinedCost(decimal("2.5")));
+    await expect(details).not.toContainText(decimal("4.0"));
+    await expect(details).not.toContainText(decimal("2.5"));
     await expect(details).toContainText(MESSAGES[language].leagueMembers.chipNames.bboost);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

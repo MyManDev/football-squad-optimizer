@@ -89,13 +89,13 @@ from squadopt.planning import (
     TransferPlanningError,
     TransferPlanResult,
 )
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
 #: The multi-week solve's budget, as the system's own horizon path spends it: twenty
 #: deterministic units per gameweek, under one wall-clock ceiling. A plan the budget
 #: cannot prove is published FEASIBLE with its gap, never dropped.
 WINDOW_DETERMINISTIC_UNITS_PER_WEEK = 20.0
-#: The planner's bench weight, read from its own defaults rather than restated.
-_BENCH_WEIGHT: float = OptimizationConfig().bench_weight
 #: The wall-clock ceiling is a safety stop, never a budget. Only the deterministic budget
 #: above may decide where a truncated search stops, because only it is a function of the
 #: inputs; ``build_window_payload`` refuses a plan this ceiling cut short rather than
@@ -485,29 +485,34 @@ def net_expected_points(plan: TransferPlanResult) -> float:
     return float(score) - float(hits)
 
 
-def bound_slack(plan: TransferPlanResult) -> float:
-    """How far above this plan's own value the solver's own bound still stands.
+def publish_price_ceiling(target: dict[str, object], price: float, *, anchor_proven: bool) -> None:
+    """Set ``expected_points_cost_ceiling`` on ``target``: the price itself, under a proof only.
 
-    ``OPTIMAL`` is a proof: the bound and the value meet, so the slack is zero and every
-    reading taken from this plan is exact. Any other status is a plan the search found
-    without finishing the proof, and the planner records the measured distance to its
-    bound beside it (``absolute_optimality_gap``, in expected points). A solve that
-    reached no plan at all never gets this far — the rival path refuses it first.
+    A price is the net expected points of the plan it is measured against (the anchor: the
+    member's own pure-points plan) less the priced plan's, both at the game's hit charge.
+    Under ``OPTIMAL`` the anchor is the plan the planner returns with its proof finished,
+    so the price is measured against the right plan and the most the priced plan can cost
+    is the price: the ceiling is that number. It reads as "at most" where only the priced
+    plan's own proof is missing, since a better priced plan could only cost less.
 
-    An unproven plan whose bound was not recorded is refused rather than read as zero:
-    "the proof did not finish" and "the proof finished at zero" are different facts, and
-    only one of them can be published as a bound.
+    Without a proof on the anchor, nothing published bounds the price. The solver's gap
+    (``absolute_optimality_gap``) is in planner-objective units, not expected points: the
+    eleven with the captain doubled, plus a tenth of the bench, less each paid transfer
+    at the planning charge. The plan the search did not reach can therefore out-net the
+    anchor by the gap, plus a tenth of the bench the anchor carries, plus the planning
+    charge less the game's four points for every paid transfer it makes beyond the
+    anchor's. The member's own plan is solved under the caution margin of 8, so on an
+    uncapped week that last term is bounded by nothing but the squad size. The rival
+    price's anchor is solved at the charge and has no such term; it keeps the same rule
+    so that the sentence means one thing on every document. So no figure is published:
+    the key is left out (and removed if a copied document carried one) rather than
+    written as zero, and the page prints no price sentence.
     """
 
-    if plan.solver_status is SolverStatus.OPTIMAL:
-        return 0.0
-    raw = plan.diagnostics.get("absolute_optimality_gap")
-    if raw is None:
-        raise EntryError(
-            f"A {plan.solver_status.name} plan carries no measured bound gap; its distance "
-            "from the best possible plan is unknown and may not be read as zero."
-        )
-    return max(0.0, float(str(raw)))
+    if anchor_proven:
+        target["expected_points_cost_ceiling"] = float(price)
+    else:
+        target.pop("expected_points_cost_ceiling", None)
 
 
 def _control_for(
@@ -547,6 +552,33 @@ NO_CHIP_LIMIT: str = (
 #: from the payload: "no chip this week" is what a plan that never considered one looks
 #: like, so without this sentence the absence reads as a decision.
 ONE_WEEK_STATED_LIMITS: tuple[str, ...] = (NO_CHIP_LIMIT,)
+
+#: What the current model cannot see. The component model, and its Top-100 version on the
+#: same base, is fitted on ``COMPONENT_TRAINING_SEASONS``, none of which awarded
+#: defensive-contribution points, so it has no part that forecasts them while the live
+#: game awards them. The carry-over versions are left out: they carry realized points
+#: forward, and those include the points wherever the game awarded them, so the sentence
+#: would not be true of them. The football model forecasts them per fixture and never
+#: carries these versions.
+NO_DEFCON_LIMIT: str = (
+    "The current model was trained on seasons that awarded no defensive-contribution "
+    "(DEFCON) points, so it does not forecast those points."
+)
+
+_TRAINED_WITHOUT_DEFCON: frozenset[str] = frozenset(
+    {COMPONENT_MODEL_VERSION, COMPONENT_ELITE_MODEL_VERSION}
+)
+
+
+def forecast_stated_limits(projection: Projection) -> list[str]:
+    """What the model behind ``projection`` cannot see, read from the projection itself.
+
+    The projection names its own model version (``project`` records the handoff's), so
+    the sentence is published where the version says it is true and nowhere else.
+    """
+
+    version = projection.diagnostics.get("model_version")
+    return [NO_DEFCON_LIMIT] if version in _TRAINED_WITHOUT_DEFCON else []
 
 
 def build_advice_payload(
@@ -669,9 +701,11 @@ def build_advice_payload(
         # The mode's whole-plan price against the pure-points pick, in expected points —
         # the only cross-mode number the site may show (no probability ships, ever). It
         # is the measured difference between two solved plans, which is the cost itself
-        # only when both were proved; the rival path publishes the bound beside it
-        # (``expected_points_cost_ceiling``) and the page reads that one when a proof is
-        # missing.
+        # only when both were proved. A priced path publishes it again as
+        # ``expected_points_cost_ceiling`` when the plan it is measured against was
+        # proved, which the page reads as "at most" when the priced plan's own proof is
+        # missing, and publishes no ceiling when the anchor's proof is missing
+        # (``publish_price_ceiling``).
         "expected_points_cost": float(expected_points_cost),
         "rival_label": rival_label,
         # The solver's own account of the plan: OPTIMAL is a proof, FEASIBLE is a found
@@ -693,7 +727,8 @@ def build_advice_payload(
         # What this plan assumes, in the producer's own sentence. A one-week solve is
         # handed no chip either, and the payload said nothing about it, so a reader had
         # no way to tell a chip that was weighed and declined from one never offered.
-        "stated_limits": list(ONE_WEEK_STATED_LIMITS),
+        # The model's own limit follows, where the projection's model has one.
+        "stated_limits": [*ONE_WEEK_STATED_LIMITS, *forecast_stated_limits(projection)],
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
         # Which squad the advice stands on: the captured week's own, or the one held
@@ -738,7 +773,8 @@ def window_stated_limits(projection: Projection) -> list[str]:
     from carrying one (``InSeasonProjection``), so a non-null
     ``projection_evidence_fingerprint`` is the fact rather than an assumption about how
     the operator ran the week. Absent, the sentence is dropped rather than softened:
-    what the numbers rest on is stated only where it is true.
+    what the numbers rest on is stated only where it is true. The model's own limit
+    (``forecast_stated_limits``) follows the window's, on the same rule.
     """
 
     carries_uplift = projection.diagnostics.get("projection_evidence_fingerprint") is not None
@@ -749,9 +785,12 @@ def window_stated_limits(projection: Projection) -> list[str]:
             *[sentence for sentence in WINDOW_STATED_LIMITS[1:] if sentence != WINDOW_TOP100_LIMIT],
         ]
     return [
-        sentence
-        for sentence in WINDOW_STATED_LIMITS
-        if carries_uplift or sentence != WINDOW_TOP100_LIMIT
+        *(
+            sentence
+            for sentence in WINDOW_STATED_LIMITS
+            if carries_uplift or sentence != WINDOW_TOP100_LIMIT
+        ),
+        *forecast_stated_limits(projection),
     ]
 
 
@@ -1198,13 +1237,14 @@ def advise_with_managers_word(
     **Whether the word binds** is read off the member's own control, the pure-points plan
     solved under the same planning policy: if that plan already starts nobody the rule
     benches and captains nobody it bars, it is also the best plan under the rule, so the
-    document is the control's plan at a price of zero (and a ceiling of the control's own
-    bound slack, zero under a proof). Only when the control breaks the rule is a second
-    plan solved under it. **The price** compares two plans solved under one policy, the
-    control and the constrained plan, net of the hits each pays at the game's charge, and
-    is floored at zero; the ceiling adds the control's bound slack. Anchoring on a plan
-    solved at the charge instead (as the rival band does) would put the caution margin's
-    own effect on unrelated transfers into the price of the club's word.
+    document is the control's plan at a price of zero. Only when the control breaks the
+    rule is a second plan solved under it. **The price** compares two plans solved under
+    one policy, the control and the constrained plan, net of the hits each pays at the
+    game's charge, and is floored at zero. Either way the ceiling is the price when the
+    control is proven and is not published when it is not (``publish_price_ceiling``):
+    the control's bound gap is on the planner's objective and bounds no price. Anchoring
+    on a plan solved at the charge instead (as the rival band does) would put the caution
+    margin's own effect on unrelated transfers into the price of the club's word.
 
     Either way the rows are measured under the rule, and a vice-captain the rule bars from
     the armband is replaced (``_vice_not_barred``).
@@ -1247,7 +1287,9 @@ def advise_with_managers_word(
         if exclusion is not None:
             _vice_not_barred(payload, exclusion.not_captain)
         payload["expected_points_cost"] = 0.0
-        payload["expected_points_cost_ceiling"] = bound_slack(solved.plan)
+        publish_price_ceiling(
+            payload, 0.0, anchor_proven=solved.plan.solver_status is SolverStatus.OPTIMAL
+        )
         payload["evidence"] = _evidence(words.about({*picks.squad, *control_squad}), binding=False)
         return payload
 
@@ -1263,9 +1305,7 @@ def advise_with_managers_word(
     # costs under the policy that chose the plan, not the policy's own caution on other
     # transfers. Floored at zero: the rule only removes plans.
     constrained_net = net_expected_points(plan)
-    control_value = net_expected_points(solved.plan)
-    control_net = max(control_value, constrained_net)
-    control_ceiling = max(control_net, control_value + bound_slack(solved.plan))
+    control_net = max(net_expected_points(solved.plan), constrained_net)
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
     raw_control_gap = solved.plan.diagnostics.get("absolute_optimality_gap")
     cost = control_net - constrained_net
@@ -1302,7 +1342,9 @@ def advise_with_managers_word(
         exclusion=exclusion,
         move_reason=move_reason,
     )
-    payload["expected_points_cost_ceiling"] = max(cost, control_ceiling - constrained_net)
+    publish_price_ceiling(
+        payload, cost, anchor_proven=solved.plan.solver_status is SolverStatus.OPTIMAL
+    )
     payload["control_solver_status"] = solved.plan.solver_status.name
     payload["control_optimality_gap"] = (
         float(str(raw_control_gap)) if raw_control_gap is not None else None
@@ -1334,6 +1376,19 @@ TOP100_SOLVE_ERRORS: tuple[type[Exception], ...] = (
     KeyError,
     ValueError,
 )
+#: What one member's own solve (the baseline, a rival pair, a window) may fail with and
+#: still be recorded against that member rather than raised through the batch: the
+#: member's data, the planner refusing, or a window the wall clock cut short
+#: (``SolverExecutionError``), so one member's clock does not cost every other member their
+#: advice. Unlike a Top 100 setting's set it leaves out ``KeyError`` and ``ValueError``: a
+#: programming error would hit every member alike, and it should stop the run rather than
+#: publish a league in which every member is quietly refused.
+MEMBER_SOLVE_ERRORS: tuple[type[Exception], ...] = (
+    EntryError,
+    DataError,
+    SolverExecutionError,
+    TransferPlanningError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1350,22 +1405,6 @@ class Top100Advice:
     word_payload: dict[str, object] | None = None
     word_unavailable: str = ""
     notes: tuple[str, ...] = ()
-
-
-def unproven_bench_allowance(slack: float, control_bench_points: float) -> float:
-    """What an unproven control's bound leaves out of a price ceiling, in points.
-
-    The solver's gap is measured on its objective, which adds the bench at the planner's
-    bench weight to the eleven, while a price compares elevens. A better plan the search
-    did not reach could therefore out-score the control's eleven by the gap **plus** up
-    to the weighted bench the control carries. Under a proof the price is against the
-    plan the member is shown and nothing is added; without one, the ceiling carries this
-    too, so "at most" stays true of the eleven's points.
-    """
-
-    if slack <= 0.0:
-        return 0.0
-    return _BENCH_WEIGHT * max(0.0, control_bench_points)
 
 
 def _setting_rows(payload: dict[str, object]) -> None:
@@ -1443,10 +1482,11 @@ def advise_with_top100(
     points, by the same completion rule every plan uses.
 
     **The price** is what choosing on the weight gives up in the base model against the
-    control, both net of the game's hit charge, floored at zero; the ceiling adds the
-    control's own bound slack, so under a proof it is the price. A plan the base model
-    scores above the control (the planner's objective also weighs the bench and its
-    caution margin, which this total does not) is floored and named in ``notes``.
+    control, both net of the game's hit charge, floored at zero; the ceiling is the price
+    when the control is proven and is not published when it is not
+    (``publish_price_ceiling``). A plan the base model scores above the control (the
+    planner's objective also weighs the bench and its caution margin, which this total
+    does not) is floored and named in ``notes``.
 
     **With the manager's word**, the weighted plan is re-solved under the declared rule
     when it breaks it, as ``advise_with_managers_word`` does for the control, and the
@@ -1473,10 +1513,7 @@ def advise_with_top100(
     weighted_points = base_points(weighted)
     control_week = solved.plan.weeks[0]
     control_value = base_net(control_week, points)
-    slack = bound_slack(solved.plan)
-    bench_allowance = unproven_bench_allowance(
-        slack, float(solved.plan.total_projected_bench_points or 0.0)
-    )
+    control_proven = solved.plan.solver_status is SolverStatus.OPTIMAL
     raw_control_gap = solved.plan.diagnostics.get("absolute_optimality_gap")
     control_outs, control_ins = _move_ids(solved.decision)
     preferred_outs, preferred_ins = _move_ids(preferred.decision)
@@ -1538,9 +1575,7 @@ def advise_with_top100(
             # on the weighted points; they are stated on the base ones.
             choice_points=weighted_points,
         )
-        payload["expected_points_cost_ceiling"] = max(
-            cost, control_value + slack + bench_allowance - selected
-        )
+        publish_price_ceiling(payload, cost, anchor_proven=control_proven)
         _setting_rows(payload)
         payload["control_solver_status"] = solved.plan.solver_status.name
         payload["control_optimality_gap"] = (
@@ -1694,11 +1729,11 @@ def _advise_against_rival(
     net of the hits each plan pays and both from this member's own solves. A control the
     solver found but could not prove is used as it is and published beside the tag as
     ``control_solver_status`` with its measured gap; only a control with no solution
-    refuses. Because that tag is then a difference of two values the solver could not
-    prove, it is published together with ``expected_points_cost_ceiling`` — the most the
-    band can cost, carrying the control's own bound — and the page states the ceiling
-    rather than the difference whenever a proof is missing. Under a proof the two are
-    the same number and nothing a member reads moves.
+    refuses. The tag is published with ``expected_points_cost_ceiling`` beside it only
+    when that control is proven, and then the two are the same number: the page reads it
+    as the most the band can cost when the banded plan's own proof is missing. An
+    unproven control's gap is on the planner's objective and bounds no price, so no
+    ceiling is published and the page prints no price (``publish_price_ceiling``).
 
     Beyond ``rival_entry_id`` — the identity field naming whose squad the tag was priced
     against, which the request itself carries and the reader's client checks the answer
@@ -1822,29 +1857,23 @@ def _advise_against_rival(
     control_net = max(solved_nets)
     # --- what the tag may be claimed to be, once a proof is missing ------------------
     #
-    # Write C* for the best plan with no strategy constraint and S* for the best plan
-    # inside the band. The true cost is C* - S*, and it is never below zero: the band
-    # only removes plans, so C* >= S*. Neither is known here. What is known is what the
-    # solver returned and how far its own bound still stands above it:
+    # Write C* for the plan the pricing solve returns once its proof finishes and S* for
+    # the best plan inside the band. The true cost is C* - S*.
     #
-    #     control_net <= C* <= pricing_net + control_slack
-    #     strategy_net <= S* <= strategy_net + bound_slack(plan)
+    # With the pricing control proven, C* is that plan, so C* = pricing_net <= control_net;
+    # and S* >= strategy_net, because the band plan returned here is one a member could
+    # play. The cost is then at most the tag, and the ceiling states exactly that: the
+    # same number, which the page reads as "at most" when the band plan is the unproven
+    # one.
     #
-    # Subtracting, the true cost lies between (tag - the band plan's slack) and
-    # (control_ceiling - strategy_net), and never below zero. Under a proof both slacks
-    # are zero, both ends meet the tag, and the tag *is* the cost — which is why nothing
-    # a proven plan publishes moves.
+    # With the pricing control unproven, nothing published bounds C* in points: the
+    # solver's gap is on its objective, which also counts a tenth of the bench, so a plan
+    # the search did not reach can out-net the anchor by more than the gap. No ceiling is
+    # published then, and the page prints no price (``publish_price_ceiling``).
     #
-    # Only the ceiling is published. The floor is max(0, tag - the band plan's slack),
-    # which collapses to zero exactly when the band plan is the unproven one, so the
-    # pair would usually read "between 0 and X" — and a floor printed beside a ceiling
-    # reads as an interval around a central estimate, which is the one thing the
-    # envelope may never look like. The member's question is whether the constraint is
-    # affordable, and the most it can cost answers it in one deterministic number.
-    control_slack = bound_slack(pricing_plan)
-    # The bound belongs to the pricing solve, so it is carried from that plan's own
-    # value; the anchor above may already stand higher, and C* cannot be below it.
-    control_ceiling = max(control_net, pricing_net + control_slack)
+    # A floor is never published beside the ceiling: a floor and a ceiling together read
+    # as an interval around a central estimate, which the envelope may never look like.
+    control_proven = pricing_plan.solver_status is SolverStatus.OPTIMAL
     payload = build_advice_payload(
         picks,
         inputs,
@@ -1881,11 +1910,10 @@ def _advise_against_rival(
     hits = plan.total_transfer_hit_points
     my_hits = float(hits) if hits is not None and math.isfinite(hits) else 0.0
     payload["rival_entry_id"] = rival_entry_id
-    # The most this band can cost, from the solver's own bound (see the arithmetic
-    # above). Equal to ``expected_points_cost`` under a proof, never below it, and never
-    # below zero, so a reader who reads only this number is never told a constrained
-    # plan hands them points.
-    payload["expected_points_cost_ceiling"] = control_ceiling - strategy_net
+    # The most this band can cost (see the arithmetic above): the tag itself, published
+    # only under a proven pricing control, and never below zero, so a reader who reads
+    # only this number is never told a constrained plan hands them points.
+    publish_price_ceiling(payload, control_net - strategy_net, anchor_proven=control_proven)
     payload["overlap_count"] = len(squad_ids & rival_eleven)
     # What the strategy asked for, what the free transfers could reach, and the cap
     # itself: a target a member cannot afford without hits is stated, never bought.
@@ -1893,22 +1921,22 @@ def _advise_against_rival(
     payload["overlap_target"] = target
     payload["overlap_applied"] = applied
     payload["plan_kind"] = chosen_kind
-    other_hits = other[0].total_transfer_hit_points if other is not None else None
-    payload["alternative_plan"] = (
-        None
-        if other is None
-        else {
+    alternative: dict[str, object] | None = None
+    if other is not None:
+        other_hits = other[0].total_transfer_hit_points
+        other_cost = control_net - priced_net(other[0])
+        alternative = {
             "kind": (
                 "with_hits" if chosen_kind == "within_free_transfers" else "within_free_transfers"
             ),
             "overlap_applied": other[2],
             "transfer_hit_points": float(other_hits) if other_hits is not None else None,
-            "expected_points_cost": control_net - priced_net(other[0]),
-            # The same ceiling arithmetic: the candidate the member did not get is
-            # priced against the same control, so it carries the same bound.
-            "expected_points_cost_ceiling": control_ceiling - priced_net(other[0]),
+            "expected_points_cost": other_cost,
         }
-    )
+        # The same rule: the candidate the member did not get is priced against the same
+        # control, so it carries a ceiling exactly when the published plan does.
+        publish_price_ceiling(alternative, other_cost, anchor_proven=control_proven)
+    payload["alternative_plan"] = alternative
     # A mean and only a mean: shared players cancel exactly in the fixed-decision
     # comparison, so this is projection arithmetic over the differentials, net of the
     # hits this plan pays (the rival's future transfers are unknown and not guessed).
@@ -1917,7 +1945,7 @@ def _advise_against_rival(
     payload["expected_gap_vs_rival"] = (my_expected - my_hits) - rival_expected
     payload["captain_agreement"] = my_captain == rival_captain
     # The pricing control's own account beside the price it anchors: a FEASIBLE control
-    # makes the tag a reading with a stated bound, not a proof.
+    # makes the tag a reading with no ceiling, not a proof.
     payload["control_solver_status"] = pricing_plan.solver_status.name
     payload["control_optimality_gap"] = (
         float(str(raw_control_gap)) if raw_control_gap is not None else None
@@ -1930,6 +1958,7 @@ __all__: tuple[str, ...] = (
     "COMPUTED_WINDOW",
     "MEMBER_WINDOWS",
     "NO_CHIP_LIMIT",
+    "NO_DEFCON_LIMIT",
     "ONE_WEEK_STATED_LIMITS",
     "WINDOW_STATED_LIMITS",
     "WINDOW_TOP100_LIMIT",
@@ -1939,12 +1968,13 @@ __all__: tuple[str, ...] = (
     "advise_entry",
     "advise_with_managers_word",
     "best_eleven_points",
-    "bound_slack",
     "build_advice_payload",
     "build_window_payload",
+    "forecast_stated_limits",
     "lineup_fields",
     "member_horizon_builder",
     "net_expected_points",
+    "publish_price_ceiling",
     "solve_member_control",
     "window_stated_limits",
 )
