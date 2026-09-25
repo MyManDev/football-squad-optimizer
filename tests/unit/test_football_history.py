@@ -102,8 +102,23 @@ def test_two_different_rows_for_one_player_fixture_are_refused() -> None:
         ("assists", -1, InvalidValueError, "assists"),
         ("club", None, InvalidValueError, "club"),
         ("minutes", 130, InvalidValueError, "101"),
+        ("kickoff", "not a date", InvalidValueError, "kickoff"),
+        ("kickoff", "2026-13-45T14:00:00Z", InvalidValueError, "kickoff"),
+        ("kickoff", 12345678901234567890, InvalidValueError, "kickoff"),
+        ("club", [3], InvalidValueError, "club"),
     ],
-    ids=["text minutes", "text dc", "infinite xg", "negative", "no club", "130 minutes"],
+    ids=[
+        "text minutes",
+        "text dc",
+        "infinite xg",
+        "negative",
+        "no club",
+        "130 minutes",
+        "text kickoff",
+        "impossible kickoff",
+        "out of range kickoff",
+        "unhashable club",
+    ],
 )
 def test_a_bad_value_is_a_data_error_that_names_it(
     column: str, value: object, error: type[DataError], named: str

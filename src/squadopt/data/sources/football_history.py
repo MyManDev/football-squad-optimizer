@@ -52,17 +52,53 @@ def _numeric(frame: pd.DataFrame, column: str) -> pd.Series:
         ) from error
 
 
+def _unhashable(value: object) -> bool:
+    try:
+        hash(value)
+    except TypeError:
+        return True
+    return False
+
+
+def _without_repeats(frame: pd.DataFrame) -> pd.DataFrame:
+    try:
+        return frame.drop_duplicates().copy()
+    except TypeError as error:
+        columns = [
+            column
+            for position, column in enumerate(frame.columns)
+            if frame.iloc[:, position].map(_unhashable).any()
+        ]
+        raise InvalidValueError(
+            f"Football history columns {format_examples(columns)} hold values that cannot be "
+            f"compared: {error}"
+        ) from error
+
+
+def _kickoffs(frame: pd.DataFrame) -> pd.Series:
+    try:
+        return pd.to_datetime(frame.kickoff, utc=True)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise InvalidValueError(
+            f"Football history column 'kickoff' is not a date: {error}"
+        ) from error
+
+
 def normalize_history(frame: pd.DataFrame) -> pd.DataFrame:
     """Validate and derive the football v1 history, raising the data layer's errors.
 
-    A renamed or dropped column is refused by name rather than surfacing as a KeyError,
-    and every refusal is a ``DataError`` (``docs/data_contract.md``, section 4).
+    These refusals are ``DataError`` subclasses (``docs/data_contract.md``, section 4):
+    an absent column, refused by name rather than surfacing as a KeyError
+    (``MissingColumnsError``); two different rows for one season, fixture and player
+    code (``DuplicateRecordsError``); and a value that cannot be compared, a kickoff that
+    is not a date, or an outcome that is not numeric, missing, not finite, negative or an
+    impossible minute and clean-sheet pair (``InvalidValueError``).
     """
     required = (*_KEY_FIELDS, *_OUTCOME_FIELDS, *_IDENTITY_FIELDS, "position")
     absent = [column for column in dict.fromkeys(required) if column not in frame]
     if absent:
         raise MissingColumnsError(f"Football history lacks columns {format_examples(absent)}.")
-    frame = frame.drop_duplicates().copy()
+    frame = _without_repeats(frame)
     conflicting = frame.duplicated(list(_KEY_FIELDS), keep=False)
     if conflicting.any():
         keys = frame.loc[conflicting, list(_KEY_FIELDS)].drop_duplicates()
@@ -70,7 +106,7 @@ def normalize_history(frame: pd.DataFrame) -> pd.DataFrame:
             "Conflicting football player-fixture rows for (season, fixture, player code) "
             f"{format_examples(list(keys.itertuples(index=False, name=None)))}."
         )
-    frame["kickoff"] = pd.to_datetime(frame.kickoff, utc=True)
+    frame["kickoff"] = _kickoffs(frame)
     fields = list(_OUTCOME_FIELDS)
     for col in fields:
         frame[col] = _numeric(frame, col)
