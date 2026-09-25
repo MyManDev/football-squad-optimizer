@@ -425,7 +425,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         browser_context["apiPid"] = api.pid
         environment["SQUADOPT_BROWSER_CONTEXT"] = json.dumps(browser_context)
         with _process(
-            [sys.executable, "-m", "squadopt.platform.advice_worker", "--max-jobs", "5"],
+            [sys.executable, "-m", "squadopt.platform.advice_worker", "--max-jobs", "4"],
             environment,
             worker_log,
         ) as worker:
@@ -446,11 +446,15 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
             )
             assert worker.wait(timeout=5) == 0, worker_log.read_text(encoding="utf-8")
 
-    # A fresh reader proves five distinct jobs persisted, and reload queued nothing extra.
+    # A fresh reader proves four distinct jobs persisted, and reload queued nothing extra.
     fresh = build_backend(config)
     jobs = fresh.queue.jobs()
-    assert len(jobs) == 5
+    assert len(jobs) == 4
     assert all(job.status == "completed" for job in jobs)
+    # The browser's automatic chip request was refused before a job existed (audit H3).
+    specs = [fresh.job_specs.get(job.cache_key) for job in jobs]
+    chips = [spec.switch("chip").get("chip") for spec in specs if spec is not None]
+    assert len(chips) == 4 and "auto" not in chips and "bboost" in chips
     answer = fresh.reader.read_advice(
         league_id=league_id, entry_id=entry_id, strategy="saf-puan", window=1
     )

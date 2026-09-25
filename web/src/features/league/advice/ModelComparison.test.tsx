@@ -50,6 +50,9 @@ it("only computes on click, keeping the same five-week Top100 question under the
   );
   expect(requestAdvice).toHaveBeenCalledTimes(1);
   expect(screen.getByText(/yüksek sayı daha başarılı model demek değildir/)).toBeVisible();
+  // The Top 100 setting is named as the weight it is, never as a share.
+  expect(screen.getByText(/Top 100 ağırlığı 20/)).toBeInTheDocument();
+  expect(view.container.textContent).not.toContain("%");
 });
 
 it("does not compare an old baseline or submit after the deadline", async () => {
@@ -72,10 +75,33 @@ it("does not compare an old baseline or submit after the deadline", async () => 
       <ModelComparison request={request} selected={baseline} client={client} deadlinePassed />
     </LanguageProvider>,
   );
-  expect(screen.queryByText("777.77")).not.toBeInTheDocument();
+  expect(screen.queryByText(/777[.,]77/)).not.toBeInTheDocument();
   const button = screen.getByRole("button", { name: "Diğer modeli de hesapla" });
   expect(button).toBeDisabled();
   fireEvent.click(button);
   expect(client.requestAdvice).not.toHaveBeenCalled();
   await waitFor(() => expect(client.readAdvice).toHaveBeenCalled());
+});
+
+it("writes the selected plan's figure the way the rest of the Turkish page does", () => {
+  const request: AdviceRequest = {
+    leagueId: 352490,
+    entryId: 101,
+    strategy: "saf-puan",
+    window: 1,
+  };
+  const baseline = mockEntryAdviceEnvelope(101, "saf-puan", 1);
+  baseline.payload.expected_own_points = 56.11;
+  const client: AdviceClient = {
+    readAdvice: vi.fn(async () => ({ kind: "not-computed" as const })),
+    requestAdvice: vi.fn(),
+    readJob: vi.fn(),
+  };
+  render(
+    <LanguageProvider initialLanguage="tr">
+      <ModelComparison request={request} selected={baseline} client={client} />
+    </LanguageProvider>,
+  );
+  expect(screen.getByText("56,11")).toBeInTheDocument();
+  expect(screen.queryByText("56.11")).not.toBeInTheDocument();
 });

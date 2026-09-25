@@ -1,0 +1,195 @@
+/*
+ * The squad section's list view ('Liste'), as D-Phone-Kadro draws it: the plan's own total,
+ * the armband and the chip on one quiet line, then one row a player. A row leads with the
+ * position code (or the bench place), carries the name with the C, V and YENİ marks the
+ * pitch carries, the club under it, and the expected points as a grass-green bar on one
+ * scale for the whole list beside the figure. No boxes and no hairlines between rows:
+ * space separates the positions.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.own {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.armband {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+}
+
+.armband > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.armband dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.armband dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+.armName {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.markCaptain,
+.markVice {
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.markCaptain {
+  background: var(--color-lime);
+  color: var(--color-text);
+}
+
+.markVice {
+  border: 1.5px solid var(--color-text);
+  color: var(--color-text);
+}
+
+.title {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 240px) minmax(64px, 1fr) 72px;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 40px;
+  padding: 2px 0;
+}
+
+/* The first player of a new position stands a little apart from the line before. */
+.row[data-group] {
+  margin-top: var(--space-2);
+}
+
+.lead {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.player {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.name {
+  min-width: 0;
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.meta :global(*) {
+  color: inherit;
+}
+
+.new {
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The track is the scale: every bar in the list is its figure over the same --scale. */
+.track {
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.bar {
+  display: block;
+  width: calc(var(--xp) / var(--scale) * 100%);
+  height: 100%;
+  background: var(--color-pitch);
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 599.98px) {
+  .row {
+    grid-template-columns: 24px minmax(0, 1fr) minmax(56px, 96px) 64px;
+    column-gap: var(--space-2);
+    min-height: 38px;
+  }
+}

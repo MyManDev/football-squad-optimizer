@@ -4,11 +4,14 @@
  * The card used to print three different quantities in the same units: a raw difference
  * between two players' projections on each move row, the eleven with the captain doubled
  * as the lineup total, and the planner's own objective as the solver's bound. This holds
- * the repair: the rows and the lineup total are one basis, the rows add up to the plan's
+ * the repair: the boards and the lineup total are one basis, the boards add up to the plan's
  * gain against holding the squad, and a figure that rounds to zero is never given a sign.
+ *
+ * In direction D a move is a substitution board whose LED figure is its share, and the
+ * plan's gain is the gain strip's figure with the sentence that names its basis beside it.
  */
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -64,13 +67,24 @@ function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | 
   return document.body.textContent ?? "";
 }
 
+/** The substitution boards, in the order the plan publishes its moves. */
+function boards(): HTMLElement[] {
+  const decision = screen.getByRole("region", { name: COPY.decisionTitle });
+  return within(decision).getAllByRole("article");
+}
+
+/** The gain strip's figure and the sentence beside it, as one line of text. */
+function gainLine(caption: string): string {
+  return screen.getByText(caption).closest("p")?.textContent ?? "";
+}
+
 function withPayload(patch: Partial<EntryAdvice>): LeagueViewEnvelope<EntryAdvice> {
   const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
   return { ...base, payload: { ...base.payload, ...patch } };
 }
 
 describe("the card states one basis for the rows, the total and the gain", () => {
-  it("prints each row and the plan's gain as the eleven with the captain doubled", () => {
+  it("prints each board's share and the plan's gain as the eleven with the captain doubled", () => {
     const text = renderAdvice(
       withPayload({
         moves: [move("m1", 1.2), move("m2", 0.5)],
@@ -79,12 +93,17 @@ describe("the card states one basis for the rows, the total and the gain", () =>
       }),
     );
 
-    expect(text).toContain(COPY.projectedGain("+1.2"));
-    expect(text).toContain(COPY.projectedGain("+0.5"));
-    // The rows are read in order, which is what makes them add up, and the total they
-    // add up to is on the page beside them.
+    const [first, second] = boards();
+    expect(within(first!).getByText("+1.2")).toBeInTheDocument();
+    expect(within(second!).getByText("+0.5")).toBeInTheDocument();
+    for (const board of [first!, second!]) {
+      expect(within(board).getByText(COPY.boardGainLabel)).toBeInTheDocument();
+    }
+    // The boards are read in order, which is what makes them add up, and the total they
+    // add up to is on the page beside them, with the basis it is measured on.
     expect(text).toContain(COPY.moveRowsBasis);
-    expect(text).toContain(COPY.planGainVsHold("+1.7"));
+    expect(gainLine(COPY.gainCaption)).toBe(`+1.7 ${COPY.gainCaption}`);
+    expect(COPY.gainCaption).toContain("for the eleven with the captain doubled");
   });
 
   it("names the week's transfer cost in the gain sentence when the plan pays one", () => {
@@ -96,8 +115,12 @@ describe("the card states one basis for the rows, the total and the gain", () =>
       }),
     );
 
-    expect(text).toContain(COPY.planGainVsHoldBeforeCost("+3.5", "4.0"));
-    expect(text).not.toContain(COPY.planGainVsHold("+3.5"));
+    expect(text).toContain(COPY.gainCaptionBeforeCost("4.0"));
+    expect(gainLine(COPY.gainCaptionBeforeCost("4.0"))).toBe(
+      `+3.5 ${COPY.gainCaptionBeforeCost("4.0")}`,
+    );
+    // The plain sentence, which leaves the week's charge unsaid, is not the one printed.
+    expect(screen.queryByText(COPY.gainCaption)).toBeNull();
   });
 
   it("prints no gain sentence where the producer measured none", () => {
@@ -110,7 +133,7 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     delete (absent.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
 
     expect(renderAdvice(absent)).not.toContain("against keeping the squad you hold");
-    expect(COPY.planGainVsHold("+1.0")).toContain("against keeping the squad you hold");
+    expect(COPY.gainCaption).toContain("against keeping the squad you hold");
   });
 
   it("says a row's share was not published rather than printing it as zero", () => {
@@ -119,7 +142,10 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     );
 
     expect(text).toContain(COPY.projectedGainUnknown);
-    expect(text).not.toContain(COPY.projectedGain("0.0"));
+    const [board] = boards();
+    expect(within(board!).getByText(COPY.projectedGainUnknown)).toBeInTheDocument();
+    expect(within(board!).queryByText(COPY.boardGainLabel)).toBeNull();
+    expect(board!.textContent).not.toMatch(/[+−-]?0[.,]0\b/);
   });
 
   it("does not relabel an older document's row as a share of a gain it never published", () => {
@@ -131,7 +157,9 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     const text = renderAdvice(legacy);
 
     expect(text).toContain(COPY.projectedGainUnknown);
-    expect(text).not.toContain(COPY.projectedGain("+2.5"));
+    expect(text).not.toContain("+2.5");
+    const [board] = boards();
+    expect(within(board!).queryByText(COPY.boardGainLabel)).toBeNull();
   });
 
   it("never prints a minus in front of a zero", () => {

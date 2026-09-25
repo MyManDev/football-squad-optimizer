@@ -1,12 +1,69 @@
 import { describe, expect, it } from "vitest";
 
-import { countdown, percent, pounds, shortDigest, signedPoints } from "./format";
+import {
+  countdown,
+  deadlineLong,
+  deadlineShort,
+  figure,
+  money,
+  percent,
+  pounds,
+  shortDigest,
+  signedFigure,
+  signedPoints,
+} from "./format";
 
 describe("format", () => {
   it("formats tenths as pounds", () => {
     expect(pounds(1000)).toBe("£100.0m");
     expect(pounds(55)).toBe("£5.5m");
     expect(pounds(-5)).toBe("-£0.5m");
+  });
+  it("writes money in the reader's notation, one decimal, from tenths", () => {
+    // The league's own way of writing a bank: comma decimal, no currency sign.
+    expect(money(8, "tr-TR")).toBe("0,8m");
+    expect(money(1014, "tr-TR")).toBe("101,4m");
+    expect(money(0, "tr-TR")).toBe("0,0m");
+    expect(money(8, "en-GB")).toBe("£0.8m");
+    expect(money(1000)).toBe("£100.0m");
+    expect(money(-5, "tr-TR")).toBe("-0,5m");
+    expect(money(-5, "en-GB")).toBe("-£0.5m");
+    // Large values are not grouped: '1000,0m', never '1.000,0m'.
+    expect(money(10000, "tr-TR")).toBe("1000,0m");
+  });
+  it("writes a deadline long and short, in both languages", () => {
+    // The GW6 deadline as fixtures.json publishes it: 10:00 UTC is 13:00 in Istanbul.
+    const deadline = "2026-10-10T10:00:00Z";
+    const zone = "Europe/Istanbul";
+    expect(deadlineLong(deadline, "tr-TR", zone)).toBe("10 Ekim Cumartesi · 13:00");
+    expect(deadlineShort(deadline, "tr-TR", zone)).toBe("10 Eki Cmt 13:00");
+    expect(deadlineLong(deadline, "en-GB", zone)).toBe("Saturday 10 October · 13:00");
+    expect(deadlineShort(deadline, "en-GB", zone)).toBe("Sat 10 Oct 13:00");
+  });
+  it("takes the date and the hour from the reader's zone, not from UTC", () => {
+    // 22:30 UTC on Saturday is already 01:30 on Sunday in Istanbul, and 23:30 in London.
+    expect(deadlineLong("2026-10-10T22:30:00Z", "tr-TR", "Europe/Istanbul")).toBe(
+      "11 Ekim Pazar · 01:30",
+    );
+    expect(deadlineShort("2026-10-10T22:30:00Z", "en-GB", "Europe/Istanbul")).toBe(
+      "Sun 11 Oct 01:30",
+    );
+    expect(deadlineShort("2026-10-10T22:30:00Z", "en-GB", "Europe/London")).toBe(
+      "Sat 10 Oct 23:30",
+    );
+    // Hours keep two digits and midnight is 00, never 24.
+    expect(deadlineShort("2026-12-31T21:00:00Z", "tr-TR", "Europe/Istanbul")).toBe(
+      "1 Oca Cum 00:00",
+    );
+  });
+  it("uses the device's zone when none is given, as the rest of the site does", () => {
+    const deadline = "2026-10-10T10:00:00Z";
+    const device = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(deadlineShort(deadline, "tr-TR")).toBe(deadlineShort(deadline, "tr-TR", device));
+  });
+  it("returns an unreadable deadline as it was given", () => {
+    expect(deadlineLong("not a date", "tr-TR")).toBe("not a date");
+    expect(deadlineShort("", "en-GB")).toBe("");
   });
   it("signs points and formats probabilities", () => {
     expect(signedPoints(1.25)).toBe("+1.3");
@@ -26,6 +83,23 @@ describe("format", () => {
     expect(signedPoints(-0.04, 2)).toBe("−0.04");
     expect(signedPoints(-0.06)).toBe("−0.1");
     expect(signedPoints(-0.04, 1, "tr-TR")).toBe("0,0");
+  });
+  it("writes a board figure with one or two decimals, in the reader's notation", () => {
+    // The GW6 plan's own numbers: the two rows add up to the gain on the page.
+    expect(signedFigure(2.3565723928800963, "tr-TR")).toBe("+2,36");
+    expect(signedFigure(0.6539544173418577, "tr-TR")).toBe("+0,65");
+    expect(signedFigure(3.010526810221954, "tr-TR")).toBe("+3,01");
+    expect(figure(7.9988702038468515, "tr-TR")).toBe("8,0");
+    expect(figure(3.6, "en-GB")).toBe("3.6");
+    expect(figure(3.937285604836282, "en-GB")).toBe("3.94");
+    expect(signedFigure(1.7)).toBe("+1.7");
+    expect(signedFigure(-0.4, "tr-TR")).toBe("−0,4");
+  });
+  it("never signs a board figure that rounds to zero", () => {
+    expect(signedFigure(-0.004)).toBe("0.0");
+    expect(signedFigure(0.004, "tr-TR")).toBe("0,0");
+    expect(signedFigure(-0)).toBe("0.0");
+    expect(signedFigure(-0.04)).toBe("−0.04");
   });
   it("counts down in days and hours, and closes", () => {
     const now = new Date("2026-08-19T10:00:00Z");

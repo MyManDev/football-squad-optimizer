@@ -24,7 +24,9 @@ in the package contract; no deadline run searches hyperparameters.
 
 ## Time boundary
 
-The capture stores at most the five event-live documents immediately before the target gameweek.
+The capture stores every played event-live document from GW1, because the football history
+reads all of them. The component model reads at most the five immediately before the target
+gameweek and selects them by name itself, so the longer capture does not change its inputs.
 The target gameweek is never fetched as history. Every historical gameweek must be fully settled
 before its minutes and points can become a feature. The live feature builder shifts every rolling
 outcome, so a target row cannot read its own result.

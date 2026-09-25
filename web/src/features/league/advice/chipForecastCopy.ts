@@ -4,6 +4,8 @@ export const CHIP_FORECAST_COPY = {
     calendarFalse: "No blank or double appears in the examined weeks",
     calendarNull: "This calendar reading was refused.",
     calendarEmpty: "No later gameweek remains in a held chip window.",
+    /** The examined gameweeks, first to last, after the calendar sentence. */
+    range: (first: number, last: number) => `${first} to ${last}`,
     title: "Chip outlook",
     published: "Published reading",
     computed: "Newly computed reading",
@@ -32,7 +34,7 @@ export const CHIP_FORECAST_COPY = {
     squad:
       "The present fifteen and bench are held unchanged. Future transfers, injuries and rotation are not included. Players without a fixture this week are left out of later estimates.",
     evidence:
-      "Development-season evidence: threshold_only minus off was +2.74 points a gameweek [+1.18, +4.26]. This is not decaying minus off, and it is not a measured gain for your team.",
+      "Development-season evidence: playing each chip when this rule's threshold was met, against never playing it, was worth +2.74 points a gameweek [+1.18, +4.26]. That is not the figure for the rule whose threshold loosens over the season, and it is not a measured gain for your team.",
     limits:
       "The system's own squad used this season's two chip windows over older seasons. Those managers had one set, so ownership and prices still describe that world.",
     action:
@@ -60,42 +62,43 @@ export const CHIP_FORECAST_COPY = {
     calendarTrue: "İncelenen haftalarda boş veya çift maç var",
     calendarFalse: "İncelenen haftalarda boş veya çift maç yok",
     calendarNull: "Bu takvim okuması yapılamadı.",
-    calendarEmpty: "Eldeki chip pencerelerinde sonraki bir hafta kalmadı.",
-    title: "Chip görünümü",
+    calendarEmpty: "Eldeki çip pencerelerinde sonraki bir hafta kalmadı.",
+    range: (first: number, last: number) => `${first}. ile ${last}. hafta arası`,
+    title: "Çip görünümü",
     published: "Yayımlanmış okuma",
     computed: "Yeni hesaplanan okuma",
     separate:
-      "Bu okumalar ayrıdır. Yeni hesap yalnızca seçtiğin chip'i ölçer; diğer chip'lerin bu haftaki katkısı bilinmiyor olarak kalır.",
+      "Bu okumalar ayrıdır. Yeni hesap yalnızca seçtiğin çipi ölçer; diğer çiplerin bu haftaki katkısı bilinmiyor olarak kalır.",
     play: "Kural bu hafta kullanmayı gösteriyor",
     hold: "Kural bekletmeyi gösteriyor",
     unknown: "Bu haftanın katkısı hesaplanmadı",
-    reserved: "Kural bu chip'i boş veya çift maçlı bir hafta için bekletiyor.",
+    reserved: "Kural bu çipi boş veya çift maçlı bir hafta için bekletiyor.",
     gain: "Bu haftanın beklenen katkısı",
     threshold: "Kural eşiği",
     later: "Takvim okumasının gösterdiği hafta",
     laterGain: "Ölçeklenmiş değer",
     noLater: "Bu pencerenin sonraki haftalarında kural eşiğini geçen bir hafta yok.",
     noEstimate:
-      "Sonraki haftalar için değer üretilemiyor: bu chip'in okuduğu oyuncuların hiçbirinin bu hafta maçı yok.",
+      "Sonraki haftalar için değer üretilemiyor: bu çipin okuduğu oyuncuların hiçbirinin bu hafta maçı yok.",
     whole:
-      "Bu chip için sonraki haftaların katkısı hesaplanmıyor. Her hafta için yeni bir kadro hesabı gerekir.",
+      "Bu çip için sonraki haftaların katkısı hesaplanmıyor. Her hafta için yeni bir kadro hesabı gerekir.",
     structure: "Sonraki boş veya çift maçlı haftalar",
     noStructure:
-      "Bu chip'in takvim penceresinde henüz sonraki bir boş veya çift maçlı hafta görünmüyor.",
+      "Bu çipin takvim penceresinde henüz sonraki bir boş veya çift maçlı hafta görünmüyor.",
     doubling: "çift maçlı kulüp",
     blank: "maçı olmayan kulüp",
-    noChips: "Mevcut pencerede kullanılabilir chip yok.",
+    noChips: "Mevcut pencerede kullanılabilir çip yok.",
     calendar:
       "Adı verilen hafta, bu haftanın beklentisini maç takvimine taşır; o hafta için yeni bir oyuncu hesabı değildir. Kupa ertelemeleri bu haftayı değiştirebilir.",
     squad:
       "Mevcut on beşli ve yedekler değişmeden tutulur. Gelecek transferler, sakatlıklar ve rotasyon hesaba katılmaz. Bu hafta maçı olmayan oyuncular sonraki hafta hesaplarına alınmaz.",
     evidence:
-      "Geliştirme sezonlarındaki ölçüm: threshold_only eksi off, hafta başına +2,74 puan [+1,18, +4,26]. Bu, decaying eksi off değildir; senin takımın için ölçülmüş bir katkı da değildir.",
+      "Geliştirme sezonlarındaki ölçüm: çipi bu kuralın eşiği geçildiğinde oynamak, hiç oynamamaya göre hafta başına +2,74 puan getirdi [+1,18, +4,26]. Bu, eşiği sezon içinde gevşeyen kuralın sonucu değildir; senin takımın için ölçülmüş bir katkı da değildir.",
     limits:
-      "Sistemin kendi kadrosu eski sezonlarda bu sezonun iki chip penceresiyle oynatıldı. O sezonların menajerlerinde tek set vardı; sahiplik ve fiyatlar o düzeni yansıtıyor.",
+      "Sistemin kendi kadrosu eski sezonlarda bu sezonun iki çip penceresiyle oynatıldı. O sezonların menajerlerinde tek set vardı; sahiplik ve fiyatlar o düzeni yansıtıyor.",
     action:
-      "Bu okuma her yayında yeniden hesaplanır. Senin yerine chip kullanmaz; FPL'de kararı sen verirsin.",
-    unavailable: "Chip görünümü gösterilemiyor. Bu durum planını değiştirmez.",
+      "Bu okuma her yayında yeniden hesaplanır. Senin yerine çip kullanmaz; FPL'de kararı sen verirsin.",
+    unavailable: "Çip görünümü gösterilemiyor. Bu durum planını değiştirmez.",
     reasons: {
       fixtures_unscheduled:
         "Bazı maçların haftası belli değil; sonraki haftaların maç sayıları eksik.",
@@ -105,11 +108,11 @@ export const CHIP_FORECAST_COPY = {
       club_roster_missing: "Tam kulüp listesi eksik.",
       club_roster_incomplete: "Kadro ve takvimdeki kulüpler tam kulüp listesiyle eşleşmiyor.",
       capture_mismatch: "Bu okuma ekrandaki kadro ve yakalamayla eşleşmiyor.",
-      chip_history_unknown: "Chip geçmişin yakalanmadığı için elindeki chip'ler belirlenemiyor.",
-      chip_window_unreadable: "Mevcut chip penceresi belirlenemedi.",
+      chip_history_unknown: "Çip geçmişin yakalanmadığı için elindeki çipler belirlenemiyor.",
+      chip_window_unreadable: "Mevcut çip penceresi belirlenemedi.",
       squad_projection_missing: "Elindeki bazı oyuncuların bu hafta için hesabı yok.",
-      forecast_inputs_unreadable: "Girdiler kullanılabilir bir chip okuması oluşturmuyor.",
-      forecast_unreadable: "Yayımlanmış chip okuması eksik veya tutarsız.",
+      forecast_inputs_unreadable: "Girdiler kullanılabilir bir çip okuması oluşturmuyor.",
+      forecast_unreadable: "Yayımlanmış çip okuması eksik veya tutarsız.",
     },
   },
 } as const;

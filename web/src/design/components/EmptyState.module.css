@@ -1,19 +1,18 @@
+/* A quiet statement in the column: no box, a heading and at most a line or two under it. */
 .empty {
-  border: 1px dashed var(--color-line);
-  border-radius: var(--radius-m);
-  padding: var(--space-5);
-  text-align: center;
+  padding-block: var(--space-5);
   color: var(--color-text-muted);
 }
 
 .title {
   font-family: var(--font-display);
   font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--color-text);
 }
 
 .body {
   margin-top: var(--space-2);
   max-width: var(--measure);
-  margin-inline: auto;
 }
