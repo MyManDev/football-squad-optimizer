@@ -63,13 +63,34 @@ describe("league member points", () => {
         language,
       );
       const copy = MESSAGES[language].leagueMembers;
-      expect(
-        [...container.querySelectorAll("tbody tr")].map(
-          (row) => row.querySelector("td:last-child")?.textContent,
-        ),
-      ).toEqual([copy.noPreviousRank, copy.movementLabel("same", 0), "↑ 2", "↓ 3"]);
+      // Movement is the second column, after the rank: an arrow and the places, '=' for
+      // no change, a dash for an unknown previous rank. Each cell's words are its name.
+      const cells = [...container.querySelectorAll("tbody tr")].map(
+        (row) => row.querySelectorAll("td")[1]!,
+      );
+      const words = [
+        copy.noPreviousRank,
+        copy.movementLabel("same", 0),
+        copy.movementLabel("up", 2),
+        copy.movementLabel("down", 3),
+      ];
+      expect(cells).toHaveLength(words.length);
+      cells.forEach((cell, index) => expect(cell).toHaveAccessibleName(words[index]));
+      expect(cells.map((cell) => cell.querySelector('[aria-hidden="true"]')?.textContent)).toEqual([
+        "—",
+        "=",
+        "2",
+        "3",
+      ]);
+      expect(cells[2]!.querySelector("svg path")).not.toBeNull();
       expect(screen.getByText(copy.movementNote)).toBeInTheDocument();
-      for (const text of [copy.noPreviousRank, copy.movementNote, copy.movementLabel("same", 0)])
+      for (const text of [
+        copy.noPreviousRank,
+        copy.movementNote,
+        copy.movementLabel("same", 0),
+        copy.movementLabel("up", 2),
+        copy.movementLabel("down", 3),
+      ])
         expect(text).not.toMatch(AS_A_CHANCE);
     },
   );
@@ -285,7 +306,7 @@ describe("league member surfaces", () => {
   it("renders member standings, the public-data notice and an example badge", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Lig Üyeleri" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Lig tablosu" })).toBeInTheDocument();
     expect(screen.getByText("örnek veri")).toBeInTheDocument();
     expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(11);

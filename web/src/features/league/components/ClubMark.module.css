@@ -1,0 +1,18 @@
+.club {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  outline: 1px solid var(--color-board);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}

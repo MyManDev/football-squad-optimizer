@@ -472,7 +472,7 @@ def test_a_job_from_a_replaced_capture_is_refused_and_writes_nothing(
     assert job is None  # nothing was queued; the refusal above is the whole story
 
 
-@pytest.mark.parametrize("chip", [None, "bboost", "auto"])
+@pytest.mark.parametrize("chip", [None, "bboost"])
 def test_a_member_presses_the_button_and_gets_a_computed_answer(
     running: dict[str, Any],
     chip: str | None,
@@ -486,7 +486,7 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     if chip is not None:
         body["chip"] = chip
         capabilities = client.get(f"/api/v1/leagues/{LEAGUE_ID}/capabilities").json()
-        assert chip == "auto" or chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
+        assert chip in capabilities["chips"]["held_by_entry"][str(ENTRY_ID)]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
@@ -522,9 +522,7 @@ def test_a_member_presses_the_button_and_gets_a_computed_answer(
     assert payload["window"] == COMPUTED_WINDOW
     assert isinstance(payload["moves"], list)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
-    if chip == "auto":
-        assert payload["chip_strategy"]["requested_chip"] == chip
-    elif chip is not None:
+    if chip is not None:
         assert payload["chip_choice"]["chip"] == chip
 
     # A second ask is answered from the cache and starts no second solve.

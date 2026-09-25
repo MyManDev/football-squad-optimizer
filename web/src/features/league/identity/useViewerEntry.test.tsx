@@ -1,6 +1,6 @@
 /** The viewer claim: held in memory during navigation, never an identity. */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -25,6 +25,11 @@ function renderMembers() {
   );
 }
 
+/** The table row marked as the visitor's own, or null. */
+function claimedRow() {
+  return document.querySelector<HTMLTableRowElement>('#league-member-list tr[aria-current="true"]');
+}
+
 describe("the viewer claim", () => {
   it("selecting a row stores the claim and shows it as a claim", () => {
     renderMembers();
@@ -35,7 +40,10 @@ describe("the viewer claim", () => {
     const buttons = screen.getAllByRole("button", { name: "Bu benim" });
     fireEvent.click(buttons[0]);
 
-    expect(screen.getByText("Sen")).toBeInTheDocument();
+    // The claimed row is marked as the visitor's own, and says so in words.
+    const own = claimedRow();
+    expect(own).toHaveTextContent("· sen");
+    expect(within(own!).queryByRole("button", { name: "Bu benim" })).toBeNull();
     const stored = readViewerEntry();
     expect(stored).not.toBeNull();
     expect(stored?.verified).toBe(false); // an assertion, deliberately not an identity
@@ -49,12 +57,13 @@ describe("the viewer claim", () => {
     first.unmount();
 
     renderMembers();
-    expect(screen.getByText("Sen")).toBeInTheDocument();
+    expect(claimedRow()).toHaveTextContent("· sen");
     expect(readViewerEntry()?.entryId).toBe(claimed);
 
-    fireEvent.click(screen.getByRole("button", { name: "Seçimi Kaldır" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seçimi kaldır" }));
     expect(readViewerEntry()).toBeNull();
-    expect(screen.queryByText("Sen")).not.toBeInTheDocument();
+    expect(claimedRow()).toBeNull();
+    expect(document.body).not.toHaveTextContent("· sen");
   });
 
   it("previous stored selections are ignored", () => {

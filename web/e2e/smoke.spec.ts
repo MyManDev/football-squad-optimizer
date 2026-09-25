@@ -60,9 +60,9 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
   await expect(page.getByRole("table", { name: /sezon ledger/i })).toBeVisible();
 });
 
-test("status is reachable from the footer", async ({ page }) => {
+test("status is reachable from the sidebar", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Operasyon Durumu" }).click();
+  await page.locator("#sidebar").getByRole("link", { name: "Operasyon Durumu" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Durum");
 });
 
@@ -75,12 +75,15 @@ test("language selection switches the full frame and persists across routes", as
   await expect(page).toHaveURL(/mode=garantici&window=3/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
+  // 'League' is the member list; the league entry page is 'This week' with no member.
   await page.getByRole("link", { name: "League", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find your league");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("League table");
   await page.reload();
   await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
     "href",
-    "/",
+    "/league/members",
   );
+  await page.getByRole("link", { name: "This week", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find your league");
   await expect(page.getByRole("link", { name: "Suggested Moves" })).toHaveCount(0);
 });

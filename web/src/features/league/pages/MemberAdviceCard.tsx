@@ -1,13 +1,19 @@
+import { useId, type CSSProperties } from "react";
+
 import { Badge } from "../../../design/components/Badge";
-import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { points, signedPoints, utcShort } from "../../../lib/format";
-import { CHIP_COPY, chipLimit, chipRescores } from "../advice/chipCopy";
+import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
+import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
+import type { FixturesPayload } from "../../fixtures/types";
+import { CHIP_COPY, chipLimit, chipRescores, type ChipCopy } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { publishedPrice } from "../advice/publishedPrice";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
+import { clubWeeks, nextThree } from "../clubFixtures";
+import { ClubMark } from "../components/ClubMark";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
+import { BoardArrow, CheckIcon } from "../components/memberIcons";
 import type {
   AdviceMove,
   AdvicePlayer,
@@ -18,12 +24,15 @@ import type {
 } from "../types";
 import type { AdviceIssue, ShownAdvice } from "./memberPageTypes";
 import styles from "./LeagueMemberPage.module.css";
+import board from "./MemberDecision.module.css";
+import lineup from "./MemberLineup.module.css";
 
 /**
  * Why no advice is shown, in the two states the page can tell apart. A combination the
  * producer never solved is a normal outcome; a document that failed to load is a fault,
  * and saying "not published yet" for it would tell the reader to wait for a publish that
- * already happened — on a page whose squad, read from the same build, is above it.
+ * already happened, on a page whose squad, read from the same build, is on the same page.
+ * It stands where the substitution boards would, under the decision heading.
  */
 export function MissingAdviceCard({
   issue,
@@ -45,8 +54,8 @@ export function MissingAdviceCard({
         ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
         : [copy.publicationStates[issue].title, copy.publicationStates[issue].body];
   return (
-    <Card title={copy.advice}>
-      <p className={styles.honesty}>
+    <div className={board.missing}>
+      <p className={board.missingTitle}>
         <strong>{issueCopy[0]}</strong>
       </p>
       <p className={styles.muted}>{issueCopy[1]}</p>
@@ -58,12 +67,14 @@ export function MissingAdviceCard({
         </p>
       ) : null}
       {onRetry ? (
-        <button type="button" onClick={onRetry}>
-          {copy.retryPublishedRead}
-        </button>
+        <p>
+          <button type="button" className={board.retry} onClick={onRetry}>
+            {copy.retryPublishedRead}
+          </button>
+        </p>
       ) : null}
       {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
-    </Card>
+    </div>
   );
 }
 
@@ -100,18 +111,70 @@ function hasPublishedPlan(view: EntryAdvice): boolean {
   );
 }
 
-export function AdviceCard({
+/**
+ * The basis every number on the board is stated on.
+ *
+ * A move's figure is a share of the plan's gain against holding, and only a document that
+ * publishes that gain carries shares of it. A document from before the producer did carries
+ * a different quantity on those rows, the raw difference between the two players' own
+ * projections, so its numbers are not printed under this label. A Triple Captain or Bench
+ * Boost week scores on its own basis, and the producer states the rows, the gain and the
+ * lineup total on it; the sentences name that basis.
+ */
+function adviceBasis(view: EntryAdvice, chipCopy: ChipCopy) {
+  const rowsAreShares = view.expected_gain_vs_hold !== undefined;
+  const scoredChip = view.chip_strategy?.selected_chip ?? view.chip_choice?.chip;
+  const chipBasis = scoredChip && chipRescores(scoredChip) ? chipCopy.basis[scoredChip] : null;
+  return { rowsAreShares, chipBasis };
+}
+
+/**
+ * The proof stamp beside the decision heading. KANITLANDI · OPTIMAL only for a plan the
+ * solver proved (OPTIMAL); a plan it found without finishing the proof (FEASIBLE) keeps the
+ * "proof incomplete" badge, and its gap sentence stands under the boards. Any other status
+ * claims nothing.
+ */
+export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
+  const copy = useLanguage().messages.leagueMembers;
+  const view = shown.envelope.payload;
+  return (
+    <div className={board.stamp}>
+      <p className={board.stampTags}>
+        {shown.origin === "computed" ? <Badge tone="good">{copy.adviceComputedBadge}</Badge> : null}
+        <ExampleDataBadge sourceKind={shown.envelope.source_kind} />
+      </p>
+      {view.solver_status === "OPTIMAL" ? (
+        <>
+          <p className={board.stampBox} data-stamp="">
+            <CheckIcon />
+            {copy.stampOptimal}
+          </p>
+          <p className={board.stampCaption}>{copy.stampOptimalCaption}</p>
+        </>
+      ) : view.solver_status === "FEASIBLE" ? (
+        <p className={`${board.stampTags} ${board.stampUnproven}`} data-stamp="">
+          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The decision itself: one substitution board per move, the gain strip, the captain line,
+ * and the sentences that change how the plan may be read (the proof, the price, the rival
+ * bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
+ */
+export function AdviceDecision({
   shown,
   members = [],
   squad,
-  rivalSquad,
-  windowControl = null,
+  fixtures = null,
 }: {
   shown: ShownAdvice;
-  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   members?: EntryView[];
   squad: LeagueViewEnvelope<EntrySquad>;
-  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+  fixtures?: FixturesPayload | null;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -127,8 +190,8 @@ export function AdviceCard({
   const rivalName = rival ? (rival.team_name ?? rival.manager_name ?? null) : null;
   // A price tag is a difference between two solved plans. It is the cost itself only
   // where both proofs finished; where one did not, the producer publishes the bound it
-  // measured as `expected_points_cost_ceiling` and this page states that — the most the
-  // strategy can cost — instead of a figure it cannot stand behind. A document that is
+  // measured as `expected_points_cost_ceiling` and this page states that (the most the
+  // strategy can cost) instead of a figure it cannot stand behind. A document that is
   // unproven and carries no ceiling has no honest figure to print, so it prints none;
   // and a price below zero is a giveaway no constrained plan can hand out, so no
   // producer's number is rendered as one.
@@ -160,192 +223,609 @@ export function AdviceCard({
   // A bound on the planner's objective covers the whole plan at once, so the copy has to
   // say how many gameweeks that is. A one-week document publishes no plan weeks.
   const planWeeks = view.plan_weeks?.length ?? 1;
-  // A move row is a share of the plan's gain against holding, and only a document that
-  // publishes that gain carries shares of it. A document from before the producer did
-  // carries a different quantity on those rows, the raw difference between the two
-  // players' own projections, so its numbers are not printed under this label.
-  const rowsAreShares = view.expected_gain_vs_hold !== undefined;
-  // A Triple Captain or Bench Boost week scores on its own basis, and the producer states
-  // the rows, the gain and the lineup total on it; the sentences name that basis.
   const chipCopy = CHIP_COPY[language];
-  const scoredChip = view.chip_strategy?.selected_chip ?? view.chip_choice?.chip;
-  const chipBasis = scoredChip && chipRescores(scoredChip) ? chipCopy.basis[scoredChip] : null;
+  const { rowsAreShares, chipBasis } = adviceBasis(view, chipCopy);
+  const codes = clubCodesFromFixtures(fixtures);
+  const reasons = view.moves.map((move) => reasonFor(copy, language, move.reason_code));
+  // Boards that share a caption say it once, under them; a caption that differs stays with
+  // its own board.
+  const sharedReason = reasons.every((reason) => reason === reasons[0]);
   return (
-    <Card
-      title={copy.advice}
-      aside={
-        <>
-          {origin === "computed" ? <Badge tone="good">{copy.adviceComputedBadge}</Badge> : null}{" "}
-          <ExampleDataBadge sourceKind={envelope.source_kind} />
-        </>
-      }
-    >
+    <>
       {origin === "published-while-computing" ? (
         <p className={styles.honesty}>{copy.advicePublishedWhileComputing}</p>
       ) : null}
       {origin === "baseline-while-computing" ? (
         <p className={styles.honesty}>{copy.adviceBaselineWhileComputing}</p>
       ) : null}
-      <p className={styles.honesty}>{copy.honestyRule}</p>
-      <p className={styles.honesty}>{copy.independentAdviceRule}</p>
-      {basisNote ? (
-        <p className={styles.honesty}>
-          {basisNote.kind === "week"
-            ? copy.freeHitSquadBasis(basisNote.week)
-            : copy.squadBasisUnconfirmed}
-        </p>
-      ) : null}
-      {view.solver_status === "FEASIBLE" ? (
-        <p className={styles.honesty}>
-          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-          {finiteNumber(view.optimality_gap)
-            ? planWeeks > 1
-              ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
-              : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
-            : top100Priced
-              ? top100Copy.unproven
-              : copy.unprovenPlanGapUnknown}
-        </p>
-      ) : null}
-      {price != null ? (
-        <p className={styles.planCost}>
-          <strong className="num">
-            {strategyPriced
-              ? unproven
-                ? top100Copy.strategyCostAtMost(points(price, 1, locale))
-                : top100Copy.strategyCost(points(price, 1, locale))
-              : top100Priced
-                ? wordPriced
-                  ? unproven
-                    ? top100Copy.combinedCostAtMost(points(price, 1, locale))
-                    : top100Copy.combinedCost(points(price, 1, locale))
-                  : unproven
-                    ? top100Copy.costAtMost(points(price, 1, locale))
-                    : top100Copy.cost(points(price, 1, locale))
-                : wordPriced
-                  ? unproven
-                    ? evidenceCopy.costAtMost(points(price, 1, locale))
-                    : evidenceCopy.cost(points(price, 1, locale))
-                  : unproven
-                    ? copy.planCostAtMost(points(price, 1, locale))
-                    : copy.planCost(points(price, 1, locale))}
-          </strong>
-          {(rivalName ?? view.rival_label) ? (
-            <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
-          ) : null}
-        </p>
-      ) : null}
-      {view.control_solver_status === "FEASIBLE" && !view.chip_choice ? (
-        <p className={styles.honesty}>
-          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-          {finiteNumber(view.control_optimality_gap)
-            ? copy.controlUnprovenBody(points(view.control_optimality_gap, 1, locale))
-            : copy.controlGapUnknown}
-        </p>
-      ) : null}
-      {explainedUnproven ? <p className={styles.honesty}>{copy.unprovenPlanNextStep}</p> : null}
-      {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
-        <p className={styles.muted}>
-          {copy.overlapLine(view.overlap_count)} ·{" "}
-          {copy.gapLine(signedPoints(view.expected_gap_vs_rival, 1, locale))}
-          {view.captain_agreement ? ` · ${copy.captainShared}` : ""}
-        </p>
-      ) : null}
-      {view.plan_kind && finiteNumber(view.transfer_cap) && finiteNumber(view.overlap_target) ? (
-        <p className={styles.muted}>
-          {view.plan_kind === "within_free_transfers"
-            ? finiteNumber(view.overlap_applied)
-              ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied)
-              : copy.planWithinFreeUnknown(view.transfer_cap, view.overlap_target)
-            : copy.planWithHits(view.transfer_cap, view.overlap_target)}
-          {alternative &&
-          finiteNumber(alternative.overlap_applied) &&
-          finiteNumber(alternativePrice) &&
-          alternativePrice >= 0
-            ? ` ${
-                alternative.kind === "with_hits"
-                  ? (unproven ? copy.alternativeWithHitsAtMost : copy.alternativeWithHits)(
-                      alternative.overlap_applied,
-                      finiteNumber(alternative.transfer_hit_points)
-                        ? points(alternative.transfer_hit_points, 0, locale)
-                        : copy.hitPointsNotPublished,
-                      points(alternativePrice, 1, locale),
-                    )
-                  : (unproven ? copy.alternativeWithinFreeAtMost : copy.alternativeWithinFree)(
-                      alternative.overlap_applied,
-                      points(alternativePrice, 1, locale),
-                    )
-              }`
-            : ""}
-        </p>
-      ) : null}
       {view.moves.length === 0 ? (
-        <p className={styles.muted}>{hasPublishedPlan(view) ? copy.noMove : copy.noPlanInRecord}</p>
+        <p className={board.noMove}>{hasPublishedPlan(view) ? copy.noMove : copy.noPlanInRecord}</p>
       ) : (
-        <>
-          <div className={styles.moves}>
-            {view.moves.map((move) => (
-              <AdviceRow
-                key={move.move_id}
-                move={move}
-                measured={rowsAreShares}
-                chipBasis={chipBasis}
-              />
+        <div className={board.boards}>
+          <div className={board.grid}>
+            {view.moves.map((move, index) => (
+              <div className={board.cell} key={move.move_id}>
+                <SubstitutionBoard
+                  move={move}
+                  index={index}
+                  count={view.moves.length}
+                  measured={rowsAreShares}
+                  codes={codes}
+                  fixtures={fixtures}
+                  season={view.season}
+                  gameweek={view.gameweek}
+                />
+                {sharedReason ? null : <p className={board.reason}>{reasons[index]}</p>}
+              </div>
             ))}
           </div>
-          {/* Each row is conditional on the rows above it, which is what makes them add
-              up. Said once, and only where there is more than one row to read in order. */}
-          {rowsAreShares && view.moves.length > 1 ? (
-            <p className={styles.muted}>
-              {chipBasis !== null ? chipCopy.moveRowsBasis(chipBasis) : copy.moveRowsBasis}
-            </p>
-          ) : null}
-          {/* The week's hit charge, once, because the game charges the week and not any
-              one move. Absent on documents published before the producer stated it. */}
-          {view.transfer_hit_points != null ? (
-            <p className={styles.muted}>
-              {copy.weekTransferCost(points(view.transfer_hit_points, 1, locale))}
-            </p>
-          ) : null}
-        </>
+          {sharedReason ? <p className={board.reason}>{reasons[0]}</p> : null}
+        </div>
       )}
-      {/* What the plan is worth against doing nothing, on the same basis as the rows
-          above it and as the lineup total below. Rendered only where the producer
-          measured it: a document without the number gets no sentence, not a zero. */}
-      {finiteNumber(view.expected_gain_vs_hold) ? (
-        <p className={styles.planCost}>
-          <strong className="num">
-            {finiteNumber(view.transfer_hit_points) && view.transfer_hit_points > 0
-              ? chipBasis !== null
-                ? chipCopy.planGainVsHoldBeforeCost(
-                    signedPoints(view.expected_gain_vs_hold, 1, locale),
-                    points(view.transfer_hit_points, 1, locale),
-                    chipBasis,
-                  )
-                : copy.planGainVsHoldBeforeCost(
-                    signedPoints(view.expected_gain_vs_hold, 1, locale),
-                    points(view.transfer_hit_points, 1, locale),
-                  )
-              : chipBasis !== null
-                ? chipCopy.planGainVsHold(
-                    signedPoints(view.expected_gain_vs_hold, 1, locale),
-                    chipBasis,
-                  )
-                : copy.planGainVsHold(signedPoints(view.expected_gain_vs_hold, 1, locale))}
-          </strong>
-        </p>
-      ) : null}
+      <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
+      <CaptainLine view={view} codes={codes} />
+      <div className={board.states}>
+        {basisNote ? (
+          <p className={styles.honesty}>
+            {basisNote.kind === "week"
+              ? copy.freeHitSquadBasis(basisNote.week)
+              : copy.squadBasisUnconfirmed}
+          </p>
+        ) : null}
+        {view.solver_status === "FEASIBLE" ? (
+          <p className={styles.honesty}>
+            {finiteNumber(view.optimality_gap)
+              ? planWeeks > 1
+                ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
+                : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
+              : top100Priced
+                ? top100Copy.unproven
+                : copy.unprovenPlanGapUnknown}
+          </p>
+        ) : null}
+        {price != null ? (
+          <p className={styles.planCost}>
+            <strong className="num">
+              {strategyPriced
+                ? unproven
+                  ? top100Copy.strategyCostAtMost(points(price, 1, locale))
+                  : top100Copy.strategyCost(points(price, 1, locale))
+                : top100Priced
+                  ? wordPriced
+                    ? unproven
+                      ? top100Copy.combinedCostAtMost(points(price, 1, locale))
+                      : top100Copy.combinedCost(points(price, 1, locale))
+                    : unproven
+                      ? top100Copy.costAtMost(points(price, 1, locale))
+                      : top100Copy.cost(points(price, 1, locale))
+                  : wordPriced
+                    ? unproven
+                      ? evidenceCopy.costAtMost(points(price, 1, locale))
+                      : evidenceCopy.cost(points(price, 1, locale))
+                    : unproven
+                      ? copy.planCostAtMost(points(price, 1, locale))
+                      : copy.planCost(points(price, 1, locale))}
+            </strong>
+            {(rivalName ?? view.rival_label) ? (
+              <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
+            ) : null}
+          </p>
+        ) : null}
+        {view.control_solver_status === "FEASIBLE" && !view.chip_choice ? (
+          <p className={styles.honesty}>
+            <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
+            {finiteNumber(view.control_optimality_gap)
+              ? copy.controlUnprovenBody(points(view.control_optimality_gap, 1, locale))
+              : copy.controlGapUnknown}
+          </p>
+        ) : null}
+        {explainedUnproven ? <p className={styles.honesty}>{copy.unprovenPlanNextStep}</p> : null}
+        {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
+          <p className={styles.muted}>
+            {copy.overlapLine(view.overlap_count)} ·{" "}
+            {copy.gapLine(signedPoints(view.expected_gap_vs_rival, 1, locale))}
+            {view.captain_agreement ? ` · ${copy.captainShared}` : ""}
+          </p>
+        ) : null}
+        {view.plan_kind && finiteNumber(view.transfer_cap) && finiteNumber(view.overlap_target) ? (
+          <p className={styles.muted}>
+            {view.plan_kind === "within_free_transfers"
+              ? finiteNumber(view.overlap_applied)
+                ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied)
+                : copy.planWithinFreeUnknown(view.transfer_cap, view.overlap_target)
+              : copy.planWithHits(view.transfer_cap, view.overlap_target)}
+            {alternative &&
+            finiteNumber(alternative.overlap_applied) &&
+            finiteNumber(alternativePrice) &&
+            alternativePrice >= 0
+              ? ` ${
+                  alternative.kind === "with_hits"
+                    ? (unproven ? copy.alternativeWithHitsAtMost : copy.alternativeWithHits)(
+                        alternative.overlap_applied,
+                        finiteNumber(alternative.transfer_hit_points)
+                          ? points(alternative.transfer_hit_points, 0, locale)
+                          : copy.hitPointsNotPublished,
+                        points(alternativePrice, 1, locale),
+                      )
+                    : (unproven ? copy.alternativeWithinFreeAtMost : copy.alternativeWithinFree)(
+                        alternative.overlap_applied,
+                        points(alternativePrice, 1, locale),
+                      )
+                }`
+              : ""}
+          </p>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+/**
+ * What a switch adds to the plan (rival players, the club's word, the Top 100 weight, the
+ * chip), what the plan assumes, and the window. Each renders only where the document
+ * carries it. The week's lineup is the squad section's list view (`PlanLineup`).
+ */
+export function AdviceDetails({
+  shown,
+  squad,
+  rivalSquad,
+  windowControl = null,
+}: {
+  shown: ShownAdvice;
+  squad: LeagueViewEnvelope<EntrySquad>;
+  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
+}) {
+  const { envelope } = shown;
+  const view = envelope.payload;
+  return (
+    <div className={board.details}>
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <EvidenceSection view={view} />
       <Top100Section view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
-      <LineupSection view={view} chipBasis={chipBasis} />
       <StatedLimits view={view} />
       <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
-      <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
-    </Card>
+    </div>
+  );
+}
+
+/** The week's lineup as a list, on the basis the chip scores it: the pitch's list view. */
+export function PlanLineup({
+  view,
+  codes = null,
+}: {
+  view: EntryAdvice;
+  codes?: ClubCodes | null;
+}) {
+  const { language } = useLanguage();
+  const { chipBasis } = adviceBasis(view, CHIP_COPY[language]);
+  return <LineupSection view={view} chipBasis={chipBasis} codes={codes} />;
+}
+
+/** The decision and its details together, as one plan reads when shown on its own. */
+export function AdviceCard({
+  shown,
+  members = [],
+  squad,
+  rivalSquad,
+  windowControl = null,
+  fixtures = null,
+}: {
+  shown: ShownAdvice;
+  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
+  members?: EntryView[];
+  squad: LeagueViewEnvelope<EntrySquad>;
+  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+  fixtures?: FixturesPayload | null;
+}) {
+  return (
+    <>
+      <AdviceDecision shown={shown} members={members} squad={squad} fixtures={fixtures} />
+      <AdviceDetails
+        shown={shown}
+        squad={squad}
+        rivalSquad={rivalSquad}
+        windowControl={windowControl}
+      />
+    </>
+  );
+}
+
+/**
+ * The sentences about how this plan's numbers are built, for the page's "How was this
+ * worked out?" disclosure: the lineup rule, how the boards add up, and the week's hit
+ * charge, said once because the game charges the week and not any one move.
+ */
+export function AdviceMethodNotes({ view }: { view: EntryAdvice }) {
+  const { language, locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const chipCopy = CHIP_COPY[language];
+  const { rowsAreShares, chipBasis } = adviceBasis(view, chipCopy);
+  const lineup = view.captain && view.vice_captain && view.starting_xi && view.bench;
+  return (
+    <>
+      {lineup ? <p>{copy.lineupRule}</p> : null}
+      {/* Each board is conditional on the boards before it, which is what makes them add
+          up. Said only where there is more than one to read in order. */}
+      {rowsAreShares && view.moves.length > 1 ? (
+        <p>{chipBasis !== null ? chipCopy.moveRowsBasis(chipBasis) : copy.moveRowsBasis}</p>
+      ) : null}
+      {/* Absent on documents published before the producer stated the week's charge. */}
+      {view.moves.length > 0 && view.transfer_hit_points != null ? (
+        <p>{copy.weekTransferCost(points(view.transfer_hit_points, 1, locale))}</p>
+      ) : null}
+    </>
+  );
+}
+
+type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
+
+/** The caption under a move, keyed on the reason the producer stated for it. */
+function reasonFor(
+  copy: MemberCopy,
+  language: "tr" | "en",
+  code: AdviceMove["reason_code"],
+): string {
+  if (code === "manager_word") return EVIDENCE_COPY[language].moveReason;
+  if (code === "top100_preference") return TOP100_COPY[language].moveReason;
+  if (code === "window_value") return copy.windowValueReason;
+  if (code === "points_gain") return copy.pointsGainReason;
+  return copy.modeTradeoffReason;
+}
+
+/**
+ * The name a board or plate prints: the game's short name. Where the full name differs,
+ * it is what a screen reader hears and what the page's text carries; the short name is
+ * what the eye reads.
+ */
+function PlayerName({ player }: { player: AdvicePlayer | null }) {
+  const { messages } = useLanguage();
+  if (!player) return <span>{messages.suggestionHistory.unknownPlayer}</span>;
+  if (player.short_name === player.name || player.short_name.trim() === "")
+    return <span>{player.name}</span>;
+  return (
+    <>
+      <span aria-hidden="true">{player.short_name}</span>
+      <span className="visually-hidden">{player.name}</span>
+    </>
+  );
+}
+
+/**
+ * The club's next three gameweeks as one line, 'BOU E · EVE D · TOT E': every opponent in
+ * a double week, 'maç yok' in a blank one, and nothing at all when the calendar is absent
+ * or does not list the weeks. The stylesheet shows it below 1180 px, where the fixture
+ * rail is not beside the board.
+ */
+function FixtureStrip({
+  team,
+  codes,
+  fixtures,
+  season,
+  gameweek,
+}: {
+  team: string;
+  codes: ClubCodes;
+  fixtures: FixturesPayload | null;
+  season: string;
+  gameweek: number;
+}) {
+  const copy = useLanguage().messages.leagueMembers;
+  const weeks = clubWeeks(fixtures, season, team, nextThree(gameweek), codes).filter(
+    (week) => week !== null,
+  );
+  if (weeks.length === 0) return null;
+  const text = weeks
+    .map((week) =>
+      week.matches.length === 0
+        ? copy.fixtureNone
+        : week.matches
+            .map((match) => `${match.opponent} ${match.home ? copy.fixtureHome : copy.fixtureAway}`)
+            .join(" / "),
+    )
+    .join(" · ");
+  return (
+    <span className={board.strip}>
+      <span className="visually-hidden">
+        {copy.fixtureStrip(weeks[0]!.gameweek, weeks[weeks.length - 1]!.gameweek)}:{" "}
+      </span>
+      {text}
+    </span>
+  );
+}
+
+function BoardPanel({
+  kind,
+  player,
+  codes,
+  fixtures,
+  season,
+  gameweek,
+}: {
+  kind: "out" | "in";
+  player: AdvicePlayer | null;
+  codes: ClubCodes;
+  fixtures: FixturesPayload | null;
+  season: string;
+  gameweek: number;
+}) {
+  const { messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  return (
+    <div className={`${board.panel} ${kind === "out" ? board.out : board.in}`}>
+      <span className={board.word}>
+        <BoardArrow direction={kind === "out" ? "down" : "up"} />
+        {kind === "out" ? copy.out : copy.in}
+      </span>
+      <span className={board.name}>
+        <PlayerName player={player} />
+        {kind === "in" ? <span className={board.new}>{copy.boardNew}</span> : null}
+      </span>
+      {player ? (
+        <span className={board.meta}>
+          <ClubMark team={player.team} codes={codes} />
+          {Object.hasOwn(messages.positions, player.position) ? (
+            <>
+              <span className={board.sep} aria-hidden="true">
+                ·
+              </span>
+              <span className={board.position}>
+                {messages.positions[player.position as keyof typeof messages.positions]}
+              </span>
+            </>
+          ) : null}
+        </span>
+      ) : null}
+      {player ? (
+        <FixtureStrip
+          team={player.team}
+          codes={codes}
+          fixtures={fixtures}
+          season={season}
+          gameweek={gameweek}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One move as the fourth official's board: DEĞİŞİKLİK i/n, the player going out on red
+ * and the one coming in on green, each with the word, an arrow, the club and the position
+ * (colour is never the only signal), and the move's share of the plan's gain in LED
+ * digits, only where the producer published it as a share.
+ */
+function SubstitutionBoard({
+  move,
+  index,
+  count,
+  measured,
+  codes,
+  fixtures,
+  season,
+  gameweek,
+}: {
+  move: AdviceMove;
+  index: number;
+  count: number;
+  measured: boolean;
+  codes: ClubCodes;
+  fixtures: FixturesPayload | null;
+  season: string;
+  gameweek: number;
+}) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const headId = useId();
+  const value =
+    measured && finiteNumber(move.expected_points_delta)
+      ? signedFigure(move.expected_points_delta, locale)
+      : null;
+  return (
+    <article className={board.board} aria-labelledby={headId}>
+      <h3 className={board.boardHead} id={headId}>
+        {copy.boardChange(index + 1, count)}
+      </h3>
+      <div className={board.panels}>
+        <BoardPanel
+          kind="out"
+          player={move.player_out}
+          codes={codes}
+          fixtures={fixtures}
+          season={season}
+          gameweek={gameweek}
+        />
+        <BoardPanel
+          kind="in"
+          player={move.player_in}
+          codes={codes}
+          fixtures={fixtures}
+          season={season}
+          gameweek={gameweek}
+        />
+      </div>
+      <p className={board.led}>
+        {value !== null ? (
+          <>
+            <span className={board.ledValue}>{value}</span>
+            <span className={board.ledLabel}>{copy.boardGainLabel}</span>
+          </>
+        ) : (
+          <span className={board.ledUnknown}>{copy.projectedGainUnknown}</span>
+        )}
+      </p>
+    </article>
+  );
+}
+
+/**
+ * What the plan is worth against doing nothing, on the same basis as the boards and the
+ * lineup total: the figure, and beside it the sentence that says what it is measured
+ * against. Where every board's share is published and none is below zero they are drawn
+ * as one stacked bar at a fixed scale; otherwise the shares are listed with their signs.
+ * A document without the gain gets no figure, not a zero. Under it, the transfers this
+ * week uses of the free ones held and the week's hit charge, each only where published.
+ */
+function GainStrip({
+  view,
+  squad,
+  measured,
+  chipBasis,
+}: {
+  view: EntryAdvice;
+  squad: EntrySquad;
+  measured: boolean;
+  chipBasis: string | null;
+}) {
+  const { language, locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const chipCopy = CHIP_COPY[language];
+  const gain = view.expected_gain_vs_hold;
+  const hits = view.transfer_hit_points;
+  const shares = view.moves.map((move) => move.expected_points_delta);
+  const allShares = measured && shares.length > 0 && shares.every(finiteNumber);
+  const stacked =
+    allShares && finiteNumber(gain) && gain > 0 && shares.every((share) => (share ?? 0) >= 0);
+  const freeKnown =
+    squad.free_transfers_known === true &&
+    Number.isSafeInteger(squad.free_transfers) &&
+    squad.free_transfers >= 0;
+  // A Wildcard or Free Hit week makes its moves without spending a free transfer (the
+  // planner pins the ones used to zero and keeps those held), so it says that instead.
+  const weekChip = view.chip ?? view.chip_choice?.chip ?? null;
+  const unlimited = weekChip === "wildcard" || weekChip === "freehit";
+  const facts = [
+    // Free transfers used of those held: a move beyond them is a hit, stated beside it.
+    freeKnown && view.moves.length > 0
+      ? unlimited
+        ? copy.freeTransfersKeptUnderChip(
+            copy.chipNames[weekChip] ?? weekChip,
+            squad.free_transfers,
+          )
+        : copy.freeTransfersUsed(
+            Math.min(view.moves.length, squad.free_transfers),
+            squad.free_transfers,
+          )
+      : null,
+    finiteNumber(hits) && view.moves.length > 0
+      ? copy.hitPointsFact(hits.toLocaleString(locale, { maximumFractionDigits: 1 }))
+      : null,
+  ].filter((fact): fact is string => fact !== null);
+  if (!finiteNumber(gain) && facts.length === 0) return null;
+  const cost = finiteNumber(hits) && hits > 0 ? points(hits, 1, locale) : null;
+  const caption =
+    cost !== null
+      ? chipBasis !== null
+        ? chipCopy.gainCaptionBeforeCost(cost, chipBasis)
+        : copy.gainCaptionBeforeCost(cost)
+      : chipBasis !== null
+        ? chipCopy.gainCaption(chipBasis)
+        : copy.gainCaption;
+  const shortName = (move: AdviceMove) => move.player_in?.short_name || move.player_in?.name || "";
+  return (
+    <div className={board.gain}>
+      <div className={board.gainTop}>
+        {finiteNumber(gain) ? (
+          <p className={board.gainHead}>
+            <strong
+              className={board.gainFigure}
+              data-sign={gain >= 0.005 ? "up" : gain <= -0.005 ? "down" : undefined}
+            >
+              {signedFigure(gain, locale)}
+            </strong>{" "}
+            <span className={board.gainCaption}>{caption}</span>
+          </p>
+        ) : null}
+        {facts.length > 0 ? (
+          <ul className={board.facts}>
+            {facts.map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      {stacked ? (
+        <div className={board.bar} aria-hidden="true">
+          <div
+            className={board.segments}
+            style={
+              {
+                "--total": shares.reduce<number>((sum, share) => sum + (share ?? 0), 0),
+              } as CSSProperties
+            }
+          >
+            {view.moves.map((move, index) => {
+              const share = move.expected_points_delta!;
+              // Room for a label is judged at the phone's scale, the narrower of the two.
+              const room = share * 80;
+              const label =
+                room >= 120
+                  ? `${shortName(move)} ${signedFigure(share, locale)}`
+                  : room >= 44
+                    ? signedFigure(share, locale)
+                    : "";
+              return (
+                <span
+                  key={move.move_id}
+                  className={index % 2 === 0 ? board.segment : `${board.segment} ${board.alt}`}
+                  style={{ "--share": share } as CSSProperties}
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+          <span className={board.tick}>{signedFigure(gain!, locale)}</span>
+        </div>
+      ) : allShares && view.moves.length > 1 ? (
+        <p className={board.gainList}>
+          {view.moves.map((move, index) => (
+            <span key={move.move_id}>
+              {index > 0 ? " · " : null}
+              <span className={board.gainItem}>
+                {shortName(move)} {signedFigure(move.expected_points_delta!, locale)}
+              </span>
+            </span>
+          ))}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The armband: C, the captain, the club and the expected points; V and the vice-captain. */
+function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const { captain, vice_captain: vice } = view;
+  if (!captain || !vice) return null;
+  return (
+    <p className={board.captain}>
+      <span className={board.armband}>
+        <span className={board.armLabel}>{copy.captainLabel}</span>
+        <span className={board.markCaptain} aria-hidden="true">
+          {copy.captainMark}
+        </span>
+        <strong className={board.armName}>{captain.short_name || captain.name}</strong>
+        <ClubMark team={captain.team} codes={codes} />
+        {finiteNumber(captain.expected_points) ? (
+          <span className={board.armPoints}>{figure(captain.expected_points, locale)} xP</span>
+        ) : null}
+      </span>
+      <span className={board.armband}>
+        <span className={board.armLabel}>{copy.viceCaptainLabel}</span>
+        <span className={board.markVice} aria-hidden="true">
+          {copy.viceMark}
+        </span>
+        <strong className={board.armName}>{vice.short_name || vice.name}</strong>
+        <span className={board.viceClub}>
+          <ClubMark team={vice.team} codes={codes} />
+        </span>
+      </span>
+    </p>
   );
 }
 
@@ -399,7 +879,7 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
   const label = weeks > 1 ? copy.windowLimitsLabel : copy.planLimitsLabel;
   return (
     <section className={styles.lineup} aria-label={label}>
-      <h4 className={styles.lineupSub}>{label}</h4>
+      <h3 className={styles.lineupTitle}>{label}</h3>
       <ul className={styles.limits}>
         {limits.map((sentence) => {
           const weight = top100LimitWeight(sentence);
@@ -424,11 +904,13 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
 }
 
 /**
- * A three- or five-week window: one row per gameweek — transfers, hit points, chip,
- * expected points. The moves and the lineup above are the first week's; the rest of the
+ * A three- or five-week window: one row per gameweek (transfers, hit points, chip,
+ * expected points). The moves and the lineup above are the first week's; the rest of the
  * window lives here. What the window assumes is stated above, beside every other plan's
  * assumptions. Rendered only when the producer published it, so a one-week document shows
- * nothing extra.
+ * nothing extra. The table never scrolls sideways: on a phone each week is a block of its
+ * own, the week and its expected points on the first line, then who comes in, who goes
+ * out, the hit points and the chip, each under its column's name.
  */
 function WindowSection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
@@ -436,65 +918,78 @@ function WindowSection({ view }: { view: EntryAdvice }) {
   const weeks = view.plan_weeks;
   if (!weeks || weeks.length === 0) return null;
   const names = (players: AdvicePlayer[]) =>
-    players.length === 0 ? "—" : players.map((player) => player.name).join(", ");
+    players.length === 0 ? copy.rivalPlayersNone : players.map((player) => player.name).join(", ");
   const title = copy.windowTitle(weeks.length);
   return (
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <div
-        className={styles.windowScroll}
-        tabIndex={0}
-        role="region"
-        aria-label={`${copy.windowWeek}: ${weeks.map((week) => week.gameweek).join(", ")}`}
-      >
-        <table className={styles.windowTable}>
-          <thead>
-            <tr>
-              <th scope="col">{copy.windowWeek}</th>
-              <th scope="col">{copy.in}</th>
-              <th scope="col">{copy.out}</th>
-              <th scope="col" className={styles.right}>
-                {copy.windowHits}
+      {/* The roles are stated because a phone lays each week out as a block, and a table
+          whose parts change their display must still read as a table. */}
+      <table className={styles.windowTable} role="table">
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader" className={styles.weekColumn}>
+              {copy.windowWeek}
+            </th>
+            <th scope="col" role="columnheader">
+              {copy.in}
+            </th>
+            <th scope="col" role="columnheader">
+              {copy.out}
+            </th>
+            <th scope="col" role="columnheader" className={`${styles.right} ${styles.hitsColumn}`}>
+              {copy.windowHits}
+            </th>
+            <th scope="col" role="columnheader" className={styles.chipColumn}>
+              {copy.chipLabel}
+            </th>
+            <th
+              scope="col"
+              role="columnheader"
+              className={`${styles.right} ${styles.pointsColumn}`}
+            >
+              {copy.windowPoints}
+            </th>
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {weeks.map((week) => (
+            <tr key={week.gameweek} role="row">
+              <th scope="row" role="rowheader" className={`${styles.weekCell} num`}>
+                {copy.windowWeekOf(week.gameweek)}
               </th>
-              <th scope="col">{copy.chipLabel}</th>
-              <th scope="col" className={styles.right}>
-                {copy.windowPoints}
-              </th>
+              <td role="cell" className={styles.inCell} data-label={copy.in}>
+                {names(week.transfers_in)}
+              </td>
+              <td role="cell" className={styles.outCell} data-label={copy.out}>
+                {names(week.transfers_out)}
+              </td>
+              <td
+                role="cell"
+                className={`${styles.right} ${styles.hitsCell} num`}
+                data-label={copy.windowHits}
+              >
+                {points(week.transfer_hit_points, 0, locale)}
+              </td>
+              <td role="cell" className={styles.chipCell} data-label={copy.chipLabel}>
+                {week.chip ? (copy.chipNames[week.chip] ?? week.chip) : copy.rivalPlayersNone}
+              </td>
+              <td
+                role="cell"
+                className={`${styles.right} ${styles.pointsCell} num`}
+                data-label={copy.windowPoints}
+              >
+                {points(week.expected_points, 1, locale)}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {weeks.map((week) => (
-              <tr key={week.gameweek}>
-                <th scope="row" className="num">
-                  {copy.windowWeekOf(week.gameweek)}
-                </th>
-                <td>{names(week.transfers_in)}</td>
-                <td>{names(week.transfers_out)}</td>
-                <td className={`${styles.right} num`}>
-                  {points(week.transfer_hit_points, 0, locale)}
-                </td>
-                <td>{week.chip ? (copy.chipNames[week.chip] ?? week.chip) : "—"}</td>
-                <td className={`${styles.right} num`}>{points(week.expected_points, 1, locale)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </section>
   );
 }
 
-/**
- * The rest of the decision: armband, chip, the eleven and the bench order. Rendered only
- * when the producer published them — a document from before the producer carried the
- * plan week, or a decision handed over without it, shows the moves alone.
- */
-/**
- * What the club's own page said, as the producer applied it. The words are the source's,
- * cut from the captured bytes; the category is the model's; the role is the declared
- * rule's. Example data says so on the section itself, not only in a badge elsewhere.
- */
 /** A source link only for a web address: a capture's final URL is data, not markup. */
 function webAddress(url: string | null): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null;
@@ -516,6 +1011,11 @@ function dateline(iso: string | null, precision: string | null, locale: string):
   return utcShort(iso, locale);
 }
 
+/**
+ * What the club's own page said, as the producer applied it. The words are the source's,
+ * cut from the captured bytes; the category is the model's; the role is the declared
+ * rule's. Example data says so on the section itself, not only in a badge elsewhere.
+ */
 function EvidenceSection({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();
   const copy = EVIDENCE_COPY[language];
@@ -607,68 +1107,61 @@ function Top100Section({ view }: { view: EntryAdvice }) {
 }
 
 /**
- * A chip the member chose: which chip, what the chip week is expected to score above the
- * member's own plan without it, and that the number is one gameweek's and nothing more.
- * A gain, so it is never worded as something given up, and never as a reason to play the
- * chip now. Rendered only on a chip document.
+ * A chip strategy the service planned: the chip this week (or hold), the plan week by
+ * week, and for the automatic strategy what its holding values are and are not. The Top
+ * 100 setting is named as the weight it is, never as a share.
  */
 function ChipStrategySection({ view }: { view: EntryAdvice }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const strategy = view.chip_strategy;
   if (!strategy) return null;
-  const tr = language === "tr";
+  const copy = messages.leagueMembers.chipStrategy;
   const name = (chip: string | null) =>
-    chip ? (messages.leagueMembers.chipNames[chip] ?? chip) : tr ? "Sakla" : "Hold";
+    chip ? (messages.leagueMembers.chipNames[chip] ?? chip) : copy.hold;
   return (
     <section className={styles.adviceSection} data-testid="chip-strategy">
-      <h3 className={styles.lineupTitle}>{tr ? "Çip stratejisi" : "Chip strategy"}</h3>
+      <h3 className={styles.lineupTitle}>{copy.title}</h3>
       <p>
-        {strategy.mode === "auto"
-          ? tr
-            ? "Otomatik plan · bu hafta: "
-            : "Automatic plan · this week: "
-          : tr
-            ? "Senin seçimin · bu hafta: "
-            : "Your choice · this week: "}
+        {strategy.mode === "auto" ? copy.autoThisWeek : copy.ownThisWeek}:{" "}
         <strong>{name(strategy.selected_chip)}</strong>
       </p>
-      <p>{(view.plan_weeks ?? []).map((w) => `GW${w.gameweek}: ${name(w.chip)}`).join(" · ")}</p>
+      <p>
+        {(view.plan_weeks ?? [])
+          .map((week) => `${messages.common.gameweekShort(week.gameweek)}: ${name(week.chip)}`)
+          .join(" · ")}
+      </p>
       {strategy.mode === "auto" && (
         <>
-          <p className={styles.honesty}>
-            {tr
-              ? "Saklama değerleri seçilen modelin bu yakalamadaki fırsatlarından hesaplanan bir yaklaşımdır. Sezon boyunca üstünlük veya tam stokastik MDP kanıtı değildir. Sonraki tarihler yeni veride yeniden planlanır."
-              : "Holding values approximate future opportunities from the selected model in this capture. They do not prove season-long superiority or a full stochastic MDP. Later dates are replanned with new data."}
-          </p>
-          <p>
-            {tr
-              ? "Gelecek fırsatlar sabit bir dağılım varsayar; sakatlıklar ve çipler arası rekabet bu değeri değiştirebilir. Wildcard'ın tahmin penceresi dışındaki uzun vadeli etkisi ölçülmüş değildir."
-              : "Future opportunities assume a stationary distribution; injuries and competition between chips may change their value. Wildcard effects beyond the forecast window are unmeasured."}
-          </p>
+          <p className={styles.honesty}>{copy.autoHonesty}</p>
+          <p>{copy.autoFuture}</p>
           <ul>
-            {strategy.reservations.map((r) => (
-              <li key={`${r.chip}-${r.first_gameweek}`}>
-                {name(r.chip)} · {tr ? "son hafta" : "expiry"} GW{r.last_gameweek} ·{" "}
-                {tr ? "saklama değeri" : "holding value"} {points(r.holding_value, 1, locale)}
+            {strategy.reservations.map((reservation) => (
+              <li key={`${reservation.chip}-${reservation.first_gameweek}`}>
+                {name(reservation.chip)} · {copy.expiry}{" "}
+                {messages.common.gameweekShort(reservation.last_gameweek)} · {copy.holdingValue}{" "}
+                {points(reservation.holding_value, 1, locale)}
                 {" · "}
-                {r.remaining_opportunities}{" "}
-                {tr ? "pencere sonrası fırsat" : "opportunities beyond the window"}
+                {reservation.remaining_opportunities} {copy.opportunities}
               </li>
             ))}
           </ul>
         </>
       )}
       <p className={styles.muted}>
-        {tr
-          ? `Top100 etkisi: %${strategy.top100_weight}. Saklama değeri ve çözüm açığı seçim faydası birimindedir; maç puanı tahmini değildir.`
-          : `Top100 influence: ${strategy.top100_weight}%. Holding values and the solver gap are selection utility, not match-point forecasts.`}
+        {copy.utilityNote(strategy.top100_weight)}
         {strategy.objective_gap !== null &&
-          ` ${tr ? "Çözüm açığı" : "Solver gap"}: ${points(strategy.objective_gap, 2, locale)}.`}
+          ` ${copy.solverGap}: ${points(strategy.objective_gap, 2, locale)}.`}
       </p>
     </section>
   );
 }
 
+/**
+ * A chip the member chose: which chip, what the chip week is expected to score above the
+ * member's own plan without it, and that the number is one gameweek's and nothing more.
+ * A gain, so it is never worded as something given up, and never as a reason to play the
+ * chip now. Rendered only on a chip document.
+ */
 function ChipChoiceSection({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();
   const copy = CHIP_COPY[language];
@@ -694,47 +1187,85 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
   );
 }
 
-function LineupSection({ view, chipBasis }: { view: EntryAdvice; chipBasis: string | null }) {
+/**
+ * The rest of the decision as the squad section's list view (D-Phone-Kadro): the plan's
+ * own total, the armband and the chip, then the eleven in pitch order and the bench in its
+ * order, one row a player with the position (or the bench place), the name, the club, the
+ * C, V and YENİ marks the pitch carries, and the expected points as a bar at a fixed scale
+ * beside the figure. Rendered only when the producer published the whole lineup: a
+ * document from before the producer carried the plan week shows the moves alone. How the
+ * lineup is chosen is said in the page's "How was this worked out?".
+ */
+function LineupSection({
+  view,
+  chipBasis,
+  codes,
+}: {
+  view: EntryAdvice;
+  chipBasis: string | null;
+  codes: ClubCodes | null;
+}) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
   if (!captain || !vice || !eleven || !bench) return null;
   const chipName = view.chip ? (copy.chipNames[view.chip] ?? view.chip) : null;
-  const mark = (player: AdvicePlayer) =>
-    player.player_id === captain.player_id ? "C" : player.player_id === vice.player_id ? "V" : null;
+  const incoming = new Set(view.moves.map((move) => move.player_in?.player_id));
+  const code = (position: string) =>
+    Object.hasOwn(messages.positionCodes, position)
+      ? messages.positionCodes[position as keyof typeof messages.positionCodes]
+      : position;
+  const word = (position: string) =>
+    Object.hasOwn(messages.positions, position)
+      ? messages.positions[position as keyof typeof messages.positions]
+      : null;
+  // One scale for every bar in the list: 20 px a point on the widest column, so eight
+  // points fill the track; a list with a bigger figure widens the scale to hold it.
+  const figures = [...eleven, ...bench]
+    .map((player) => player.expected_points)
+    .filter(finiteNumber);
+  const scale = Math.max(8, Math.ceil(Math.max(0, ...figures)));
   return (
-    <section className={styles.lineup} aria-label={copy.lineupTitle}>
-      <h3 className={styles.lineupTitle}>{copy.lineupTitle}</h3>
-      <p className={styles.honesty}>{copy.lineupRule}</p>
+    <section
+      className={lineup.list}
+      aria-label={copy.lineupTitle}
+      style={{ "--scale": scale } as CSSProperties}
+    >
+      <h3 className="visually-hidden">{copy.lineupTitle}</h3>
+      {/* The total as the pitch's heading prints it, so switching views keeps the figure. */}
       {finiteNumber(view.expected_own_points) ? (
-        <p className={styles.planCost}>
-          <strong className="num">
-            {chipBasis !== null
-              ? CHIP_COPY[language].expectedOwnPoints(
-                  points(view.expected_own_points, 1, locale),
-                  chipBasis,
-                )
-              : copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
-          </strong>
+        <p className={lineup.own}>
+          {chipBasis !== null
+            ? CHIP_COPY[language].expectedOwnPoints(
+                figure(view.expected_own_points, locale),
+                chipBasis,
+              )
+            : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
         </p>
       ) : null}
-      <dl className={styles.armband}>
+      <dl className={lineup.armband}>
         <div>
           <dt>{copy.captainLabel}</dt>
           <dd>
-            <strong>{captain.name}</strong>{" "}
-            <span className={styles.muted}>
-              {captain.team} · {captain.position}
+            <span className={lineup.markCaptain} aria-hidden="true">
+              {copy.captainMark}
             </span>
+            <strong className={lineup.armName}>
+              <PlayerName player={captain} />
+            </strong>
+            <ClubMark team={captain.team} codes={codes} />
           </dd>
         </div>
         <div>
           <dt>{copy.viceCaptainLabel}</dt>
           <dd>
-            <strong>{vice.name}</strong>{" "}
-            <span className={styles.muted}>
-              {vice.team} · {vice.position}
+            <span className={lineup.markVice} aria-hidden="true">
+              {copy.viceMark}
             </span>
+            <strong className={lineup.armName}>
+              <PlayerName player={vice} />
+            </strong>
+            <ClubMark team={vice.team} codes={codes} />
           </dd>
         </div>
         <div>
@@ -742,104 +1273,111 @@ function LineupSection({ view, chipBasis }: { view: EntryAdvice; chipBasis: stri
           <dd>{chipName ? <Badge tone="good">{chipName}</Badge> : copy.chipNone}</dd>
         </div>
       </dl>
-      <h4 className={styles.lineupSub}>{copy.startingXiLabel}</h4>
-      <div className={styles.bench}>
+      <h4 className={lineup.title}>{copy.startingXiLabel}</h4>
+      <ol className={lineup.rows}>
         {eleven.map((player, index) => (
-          <LineupRow key={player.player_id} player={player} order={index + 1} mark={mark(player)} />
+          <LineupRow
+            key={player.player_id}
+            player={player}
+            groupStart={index > 0 && eleven[index - 1]!.position !== player.position}
+            lead={code(player.position)}
+            detail={null}
+            mark={
+              player.player_id === captain.player_id
+                ? "C"
+                : player.player_id === vice.player_id
+                  ? "V"
+                  : null
+            }
+            isNew={incoming.has(player.player_id)}
+            codes={codes}
+          />
         ))}
-      </div>
-      <h4 className={styles.lineupSub}>{copy.benchOrderLabel}</h4>
-      <div className={styles.bench}>
+      </ol>
+      <h4 className={lineup.title}>{copy.benchOrderLabel}</h4>
+      <ol className={lineup.rows}>
         {bench.map((player, index) => (
-          <LineupRow key={player.player_id} player={player} order={index + 1} mark={null} />
+          <LineupRow
+            key={player.player_id}
+            player={player}
+            groupStart={false}
+            lead={String(index + 1)}
+            detail={word(player.position)}
+            mark={null}
+            isNew={incoming.has(player.player_id)}
+            codes={codes}
+          />
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
 
 function LineupRow({
   player,
-  order,
+  groupStart,
+  lead,
+  detail,
   mark,
+  isNew,
+  codes,
 }: {
   player: AdvicePlayer;
-  order: number;
+  /** The first of a new position in the eleven, set a little apart from the one before. */
+  groupStart: boolean;
+  /** The position code for the eleven, the published place for the bench. */
+  lead: string;
+  /** The position word, which the bench rows add after the club. */
+  detail: string | null;
   mark: "C" | "V" | null;
+  isNew: boolean;
+  codes: ClubCodes | null;
 }) {
-  const { locale } = useLanguage();
-  return (
-    <div className={styles.benchRow}>
-      <span className="num">{order}</span>
-      <strong>
-        {player.name}
-        {mark ? (
-          <>
-            {" "}
-            <Badge tone={mark === "C" ? "good" : "neutral"}>{mark}</Badge>
-          </>
-        ) : null}
-      </strong>
-      <span className={styles.muted}>
-        {player.team} · {player.position}
-      </span>
-      <span className={`${styles.benchPoints} num`}>
-        {player.expected_points != null ? `${points(player.expected_points, 1, locale)} xP` : ""}
-      </span>
-    </div>
-  );
-}
-
-type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
-
-/** The caption under a move, keyed on the reason the producer stated for it. */
-function reasonFor(copy: MemberCopy, code: AdviceMove["reason_code"]): string {
-  if (code === "window_value") return copy.windowValueReason;
-  if (code === "points_gain") return copy.pointsGainReason;
-  return copy.modeTradeoffReason;
-}
-
-function AdviceRow({
-  move,
-  measured,
-  chipBasis,
-}: {
-  move: AdviceMove;
-  measured: boolean;
-  chipBasis: string | null;
-}) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const reason =
-    move.reason_code === "manager_word"
-      ? EVIDENCE_COPY[language].moveReason
-      : move.reason_code === "top100_preference"
-        ? TOP100_COPY[language].moveReason
-        : reasonFor(copy, move.reason_code);
+  const xp = finiteNumber(player.expected_points) ? player.expected_points : null;
   return (
-    <article className={styles.move}>
-      <div className={styles.movePlayers}>
-        <span>
-          {copy.out}: <strong>{move.player_out?.name ?? "—"}</strong>
+    <li className={lineup.row} data-group={groupStart ? "" : undefined}>
+      <span className={lineup.lead}>{lead}</span>
+      <span className={lineup.player}>
+        <span className={lineup.nameLine}>
+          <strong className={lineup.name}>
+            <PlayerName player={player} />
+          </strong>
+          {mark === "C" ? (
+            <span
+              className={lineup.markCaptain}
+              role="img"
+              aria-label={messages.squad.captainLabel}
+            >
+              {copy.captainMark}
+            </span>
+          ) : null}
+          {mark === "V" ? (
+            <span
+              className={lineup.markVice}
+              role="img"
+              aria-label={messages.squad.viceCaptainLabel}
+            >
+              {copy.viceMark}
+            </span>
+          ) : null}
         </span>
-        <span>
-          {copy.in}: <strong>{move.player_in?.name ?? "—"}</strong>
+        <span className={lineup.meta}>
+          <ClubMark team={player.team} codes={codes} />
+          {detail ? <span>{detail}</span> : null}
+          {isNew ? <span className={lineup.new}>{copy.boardNew}</span> : null}
         </span>
-      </div>
-      <div className={styles.moveNumbers}>
-        <span>
-          {measured && finiteNumber(move.expected_points_delta)
-            ? chipBasis !== null
-              ? CHIP_COPY[language].projectedGain(
-                  signedPoints(move.expected_points_delta, 1, locale),
-                  chipBasis,
-                )
-              : copy.projectedGain(signedPoints(move.expected_points_delta, 1, locale))
-            : copy.projectedGainUnknown}
+      </span>
+      {xp !== null ? (
+        <span className={lineup.track} aria-hidden="true">
+          <span className={lineup.bar} style={{ "--xp": Math.max(0, xp) } as CSSProperties} />
         </span>
-      </div>
-      <p className={styles.muted}>{reason}</p>
-    </article>
+      ) : (
+        <span />
+      )}
+      <span className={lineup.value}>{xp !== null ? `${figure(xp, locale)} xP` : ""}</span>
+    </li>
   );
 }
 
