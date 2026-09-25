@@ -66,9 +66,9 @@ from typing import Any, Final
 import pandas as pd
 
 from squadopt.data.atomic import replace_retrying
-from squadopt.data.errors import RenameRefusedError
+from squadopt.data.errors import DataError, RenameRefusedError
 from squadopt.data.snapshots import CapturedSnapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, live_event_outcomes, live_payload
 from squadopt.evaluation.models import EvaluationValidationError, ScoringBasis
 from squadopt.evaluation.scoring import complete_optimization_decision
 from squadopt.live.errors import LedgerError as LedgerError
@@ -630,19 +630,27 @@ def record_roll(
 
 
 def extract_event_points(snapshot: CapturedSnapshot, *, gameweek: int) -> dict[int, float]:
-    """Read realized points for one finished gameweek from a later capture.
+    """Read realized points for one finished and checked gameweek from a later capture.
 
-    The raw bootstrap payload is read directly: `event_points` describes the
-    capture's current event, so the named gameweek must be marked finished in the
-    same capture — otherwise these numbers describe a match still being played.
-    Player identity uses the persistent `code`, matching the live projection.
+    The points come from the capture's own live document for the named week
+    (``event-gwNN-live.json``), never from the bootstrap's ``event_points``. Those describe
+    whatever event the capture is on, so a capture taken after the next deadline would file
+    the following week's points under this week's name, and an outcome can never be
+    corrected. A capture that holds no live document for the week is refused; nothing else
+    is read in its place.
+
+    The bootstrap still decides whether the week may be read at all: it must be
+    ``finished`` **and** ``data_checked`` there, the two flags ``scored_gameweeks`` requires
+    of every other settled reader. Bonus lands after the last kick-off, so a total read
+    before the check is short by different amounts for different players. The live
+    document is read by :func:`live_event_outcomes`, the same reader those records use, and
+    player identity is the persistent ``code``, matching the live projection.
     """
 
+    snapshot_id = snapshot.metadata.snapshot_id
     payload = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
     if payload is None:
-        raise LedgerError(
-            f"Snapshot {snapshot.metadata.snapshot_id!r} carries no bootstrap payload."
-        )
+        raise LedgerError(f"Snapshot {snapshot_id!r} carries no bootstrap payload.")
     document = json.loads(payload.decode("utf-8"))
     events = document.get("events")
     if not isinstance(events, list):
@@ -658,23 +666,34 @@ def extract_event_points(snapshot: CapturedSnapshot, *, gameweek: int) -> dict[i
             f"Gameweek {gameweek} is not finished in this capture; realized points "
             "read now would describe matches still being played."
         )
-    elements = document.get("elements")
-    if not isinstance(elements, list) or not elements:
-        raise LedgerError("Bootstrap payload has no elements list.")
-    points: dict[int, float] = {}
-    for element in elements:
-        if not isinstance(element, dict) or "code" not in element:
-            raise LedgerError("Bootstrap elements must carry persistent player codes.")
-        if "event_points" not in element:
-            raise LedgerError(
-                "Bootstrap elements carry no event_points; realized outcomes cannot "
-                "be read from this capture."
-            )
-        value = float(element["event_points"])
-        if not math.isfinite(value):
-            raise LedgerError("event_points must be finite.")
-        points[int(element["code"])] = value
-    return points
+    if event.get("data_checked") is not True:
+        raise LedgerError(
+            f"Gameweek {gameweek} is finished but not yet checked in snapshot {snapshot_id!r}; "
+            "bonus may still be landing, so its points are not final. Settle from a capture "
+            "taken after the week is checked."
+        )
+    name = live_payload(gameweek)
+    live = snapshot.payloads.get(name)
+    if live is None:
+        raise LedgerError(
+            f"Snapshot {snapshot_id!r} holds no {name}, the live record of gameweek "
+            f"{gameweek}. The bootstrap's event_points describe the capture's current event, "
+            f"which need not be gameweek {gameweek}, so they are not read instead. Settle "
+            "from a capture that holds that week's live document."
+        )
+    try:
+        outcomes = live_event_outcomes(live, payload, gameweek=gameweek)
+    except DataError as error:
+        raise LedgerError(
+            f"Snapshot {snapshot_id!r}: {name} cannot be read as gameweek {gameweek}'s "
+            f"outcome. {error}"
+        ) from error
+    return {
+        int(player): float(value)
+        for player, value in zip(
+            outcomes["player_id"].tolist(), outcomes["total_points"].tolist(), strict=True
+        )
+    }
 
 
 def score_named_eleven(decision: Mapping[str, Any], event_points: Mapping[int, float]) -> float:

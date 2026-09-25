@@ -122,7 +122,9 @@ week's scores are final. `bootstrap-static.json`'s event then carries `finished:
 is impossible by design, and a settle taken from provisional points would write a wrong
 outcome into a ledger that does not permit corrections.
 
-Then capture again (the later bootstrap carries realized `event_points`) and settle:
+Then capture again (the capture keeps the week's own `event-gw01-live.json`, which settle
+scores; the bootstrap's `event_points` are never read, because they follow whichever week is
+current) and settle:
 
 ```console
 squadopt gameweek settle --gameweek 1

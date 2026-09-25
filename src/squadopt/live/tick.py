@@ -29,6 +29,7 @@ from squadopt.data.sources.fpl_live import (
     GameweekDeadline,
     gameweek_deadlines,
     next_open_deadline,
+    scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live.recommendation import SUPPORTED_TARGET_GAMEWEEK, infer_season
@@ -171,18 +172,28 @@ def plan_tick(
     actions: list[TickAction] = []
 
     # ---- settle: decided gameweeks without an outcome -----------------------------
+    # Finished is the last kick-off; checked is bonus landing. The settle refuses a week
+    # that is not both, so planning one on `finished` alone would fail the tick every
+    # hour between the two. Read only when a week is finished, so a calendar with nothing
+    # to settle never depends on the second flag.
+    unsettled = sorted(ledger.decided - ledger.settled)
+    checked = (
+        scored_gameweeks(bootstrap)
+        if any(week in deadlines and deadlines[week].finished for week in unsettled)
+        else frozenset()
+    )
     settle_capture_requested = False
-    for gameweek in sorted(ledger.decided - ledger.settled):
+    for gameweek in unsettled:
         published = deadlines.get(gameweek)
         if published is None:
             continue
         deadline = as_instant(published.deadline_utc)
-        if published.finished:
+        if gameweek in checked:
             actions.append(
                 TickAction(
                     "settle",
-                    f"gameweek {gameweek} is finished in the latest capture and its "
-                    "decision has no outcome",
+                    f"gameweek {gameweek} is finished and checked in the latest capture and "
+                    "its decision has no outcome",
                     reason_code="settle_due",
                     reason_params={"gameweek": gameweek},
                     gameweek=gameweek,
@@ -195,8 +206,8 @@ def plan_tick(
                     actions.append(
                         TickAction(
                             "capture",
-                            f"gameweek {gameweek} was decided, is not marked finished in "
-                            f"the latest capture ({latest_held.snapshot_id}), and that "
+                            f"gameweek {gameweek} was decided, is not marked finished and "
+                            f"checked in the latest capture ({latest_held.snapshot_id}), and that "
                             f"capture is {_hours(now - latest_at):.1f} h old",
                             reason_code="recapture_for_outcome",
                             reason_params={

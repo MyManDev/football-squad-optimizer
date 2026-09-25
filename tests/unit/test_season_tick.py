@@ -16,7 +16,7 @@ import tests.unit.test_live_transfers as world_module
 
 from squadopt.application.season import TickRequest, plan_season_tick
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.live import (
     CONTROL_MODEL_NAME,
     HeldSnapshot,
@@ -136,16 +136,26 @@ def test_settling_waits_for_the_grace_period_then_polls_then_settles(tmp_path: P
     fresh = _capture(tmp_path / "s", "2026-08-24T12:00:00Z")
     hold = _plan("2026-08-24T18:00:00Z", [late, fresh], ledger, tmp_path)
     assert hold.actions[0].kind == "wait" and "next look after 12 h" in hold.actions[0].reason
-    # A capture that marks it finished: settle from it.
-    finished = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
-    done = _capture(tmp_path / "s", "2026-08-25T09:00:00Z", events=finished)
-    settle = _plan("2026-08-25T10:00:00Z", [late, fresh, done], ledger, tmp_path)
+    # Finished but not yet checked: bonus may still land, and the settle would refuse.
+    unchecked = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    finished = _capture(tmp_path / "s", "2026-08-25T09:00:00Z", events=unchecked)
+    pending = _plan("2026-08-25T10:00:00Z", [late, fresh, finished], ledger, tmp_path)
+    assert all(a.kind != "settle" for a in pending.actions)
+    assert pending.actions[0].kind == "wait" and pending.actions[0].gameweek == 1
+    # A capture that marks it finished and checked: settle from it.
+    checked = [
+        dict(world_module.EVENTS[0], finished=True, data_checked=True),
+        *world_module.EVENTS[1:],
+    ]
+    done = _capture(tmp_path / "s", "2026-08-25T12:00:00Z", events=checked)
+    held = [late, fresh, finished, done]
+    settle = _plan("2026-08-25T13:00:00Z", held, ledger, tmp_path)
     kinds = [a.kind for a in settle.actions]
     assert kinds[0] == "settle" and settle.actions[0].snapshot_id == done.metadata.snapshot_id
     # And once settled, nothing about GW1 remains.
     after = _plan(
-        "2026-08-25T10:00:00Z",
-        [late, fresh, done],
+        "2026-08-25T13:00:00Z",
+        held,
         LedgerState(decided=frozenset({1}), settled=frozenset({1})),
         tmp_path,
     )
@@ -195,6 +205,7 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         "captures": 0,
         "events": list(world_module.EVENTS),
         "elements": world_module._elements(),
+        "live": {},
     }
 
     def fake_capture(root: Path, *, dry_run: bool = False):
@@ -208,12 +219,20 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
                     events=state["events"], elements=state["elements"]
                 ),
                 FIXTURES_PAYLOAD: b"[]",
+                **state["live"],
             },
         )
         return metadata
 
     state["capture"] = fake_capture
     return state
+
+
+def _gw1_checked() -> list[dict[str, Any]]:
+    return [
+        dict(world_module.EVENTS[0], finished=True, data_checked=True),
+        *world_module.EVENTS[1:],
+    ]
 
 
 def _tick(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -> int:
@@ -283,10 +302,11 @@ def test_the_runner_settles_after_the_gameweek_and_then_idles(
     monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert _tick(monkeypatch, world) == 0  # GW1 captured and decided
-    # Three days later the gameweek is finished and points are published.
+    # Three days later the gameweek is finished, checked, and its points are published.
     world["clock"] = "2026-08-24T18:00:00Z"
-    world["events"] = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    world["events"] = _gw1_checked()
     world["elements"] = world_module._elements(event_points=3)
+    world["live"] = {live_payload(1): world_module._live(3)}
     assert _tick(monkeypatch, world) == 0
     outcome = world["ledger_root"] / SEASON / "gw01" / "outcome.json"
     assert outcome.is_file()
@@ -303,8 +323,9 @@ def test_the_runner_decides_the_second_gameweek_only_with_a_handoff(
 ) -> None:
     assert _tick(monkeypatch, world) == 0  # GW1
     world["clock"] = "2026-08-24T18:00:00Z"
-    world["events"] = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    world["events"] = _gw1_checked()
     world["elements"] = world_module._elements(event_points=3)
+    world["live"] = {live_payload(1): world_module._live(3)}
     assert _tick(monkeypatch, world) == 0  # settle GW1
     # GW2 window, no handoff: capture, then wait and say where the handoff is expected.
     world["clock"] = "2026-08-28T15:00:00Z"
