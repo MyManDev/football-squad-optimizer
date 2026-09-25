@@ -416,11 +416,13 @@ def _metadata_parses(path: Path) -> bool:
     since) would make an unreadable capture the newest and stop every reader of that source,
     so it is skipped here and named in the log, and the previous capture stays the newest.
     This checks the shape only; the checksums, fingerprint and identifier are still checked
-    by ``read_snapshot``, which is where a capture is trusted.
+    by ``read_snapshot``, which is where a capture is trusted. The file is decoded the way
+    ``read_snapshot`` decodes it (UTF-8, no byte order mark): ``json.loads`` on raw bytes
+    would also accept UTF-16, UTF-32 and a UTF-8 BOM, and list a capture the reader refuses.
     """
 
     try:
-        parsed = json.loads(path.read_bytes())
+        parsed = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         _LOGGER.warning(
             "Skipping snapshot %s: its %s cannot be read as JSON (%s).",

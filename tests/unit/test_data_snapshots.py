@@ -419,6 +419,31 @@ def test_a_capture_whose_metadata_does_not_parse_is_skipped_and_logged(
     assert all(reason in record.getMessage() for record in caplog.records)
 
 
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-8-sig"], ids=["utf-16", "utf-8 with a BOM"])
+def test_metadata_the_reader_cannot_decode_is_not_listed_even_when_it_is_an_object(
+    encoding: str, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The listing decodes metadata the way ``read_snapshot`` does: UTF-8, no byte order mark.
+
+    ``json.loads`` on raw bytes also accepts UTF-16, UTF-32 and a UTF-8 BOM, which the reader
+    refuses. Here the newest capture's own metadata, a whole and correct object, is re-encoded
+    so that only its encoding is wrong; listing it would make it the newest capture and the
+    reader would then fail on it.
+    """
+
+    earlier = _write(tmp_path, captured_at="2026-08-21T16:00:00Z")
+    unreadable = _write(tmp_path, captured_at="2026-08-21T17:00:00Z")
+    metadata_path = tmp_path / unreadable / METADATA_FILENAME
+    metadata_path.write_bytes(metadata_path.read_text(encoding="utf-8").encode(encoding))
+
+    with pytest.raises((SnapshotIntegrityError, UnicodeDecodeError)):
+        read_snapshot(tmp_path, unreadable)
+    with caplog.at_level(logging.WARNING, logger="squadopt.data.snapshots"):
+        assert list_snapshot_ids(tmp_path, source=SOURCE) == (earlier,)
+
+    assert any(unreadable in record.getMessage() for record in caplog.records)
+
+
 def test_another_sources_broken_metadata_is_not_opened_for_a_filtered_listing(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
