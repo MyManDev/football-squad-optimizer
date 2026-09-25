@@ -37,13 +37,13 @@ describe("the viewer claim", () => {
     // The claim rule is stated before anyone selects: it is a claim, not a login.
     expect(screen.getByText("Hangisi sensin?")).toBeInTheDocument();
 
-    const buttons = screen.getAllByRole("button", { name: "Bu benim" });
+    const buttons = screen.getAllByRole("button", { name: /^Bu benim: / });
     fireEvent.click(buttons[0]);
 
     // The claimed row is marked as the visitor's own, and says so in words.
     const own = claimedRow();
     expect(own).toHaveTextContent("· sen");
-    expect(within(own!).queryByRole("button", { name: "Bu benim" })).toBeNull();
+    expect(within(own!).queryByRole("button", { name: /^Bu benim/ })).toBeNull();
     const stored = readViewerEntry();
     expect(stored).not.toBeNull();
     expect(stored?.verified).toBe(false); // an assertion, deliberately not an identity
@@ -52,7 +52,7 @@ describe("the viewer claim", () => {
 
   it("the claim survives a fresh render, and clearing removes it", () => {
     const first = renderMembers();
-    fireEvent.click(screen.getAllByRole("button", { name: "Bu benim" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /^Bu benim: / })[0]);
     const claimed = readViewerEntry()?.entryId;
     first.unmount();
 

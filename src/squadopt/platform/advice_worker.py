@@ -37,6 +37,7 @@ import argparse
 import json
 import signal
 import time
+import traceback
 from collections.abc import Callable, Sequence
 from contextlib import ExitStack
 from datetime import UTC, datetime
@@ -90,6 +91,7 @@ __all__ = [
     "DEFAULT_HEARTBEAT_SECONDS",
     "DEFAULT_IDLE_SECONDS",
     "DEFAULT_MAX_ATTEMPTS",
+    "DEFAULT_MAX_BACKOFF_SECONDS",
     "DEFAULT_RECOVER_EVERY_SECONDS",
     "build_advice_compute",
     "main",
@@ -102,6 +104,9 @@ DEFAULT_RECOVER_EVERY_SECONDS: Final = 30.0
 # A third of the lease: two refreshes may be missed before a live claim looks stale.
 DEFAULT_HEARTBEAT_SECONDS: Final = DEFAULT_LEASE_SECONDS / 3.0
 DEFAULT_MAX_ATTEMPTS: Final = 3
+# The longest wait after rounds that keep raising: a lasting fault is retried and logged
+# once a minute rather than every idle, and a passing one costs at most this much.
+DEFAULT_MAX_BACKOFF_SECONDS: Final = 60.0
 
 
 def _utc_now() -> datetime:
@@ -367,6 +372,7 @@ def run_advice_worker(
     recover_every_seconds: float = DEFAULT_RECOVER_EVERY_SECONDS,
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
     heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
+    max_backoff_seconds: float = DEFAULT_MAX_BACKOFF_SECONDS,
     store_ready: Callable[[], bool] | None = None,
     contexts: CaptureContextProvider | None = None,
     max_jobs: int | None = None,
@@ -385,12 +391,21 @@ def run_advice_worker(
     cannot finish. An unready store means no new work: the loop idles and keeps asking, so
     a passing mount brings it back without a restart. Nothing here manages a computation
     already in progress — a round is entered or it is not.
+
+    A round that raises anything else (the store refusing a claim, a failure record that
+    could not be written, a clock that stepped back behind a job's stamp) is logged with
+    its trace and waited out, from one idle doubling up to ``max_backoff_seconds``, and
+    the next round that works resets the wait. Such an error used to end the process
+    while the api kept accepting jobs. Whatever job that round held stays with the queue,
+    and recovery walks it back after its lease. ``KeyboardInterrupt`` and ``SystemExit``
+    are not caught.
     """
 
     processed = 0
     recovered_at = 0.0
     waiting_on_store = False
     warmed = None
+    failed_rounds = 0
     while not should_stop():
         if store_ready is not None and not store_ready():
             if not waiting_on_store and log is not None:
@@ -458,6 +473,23 @@ def run_advice_worker(
                 log.event("advice_worker_queue_busy")
             _wait(sleep, should_stop, idle_seconds, poll_seconds)
             continue
+        except Exception as error:
+            failed_rounds += 1
+            backoff = min(idle_seconds * 2.0 ** min(failed_rounds - 1, 16), max_backoff_seconds)
+            if metrics is not None:
+                metrics.increment("advice_worker_round_failed_total")
+            if log is not None:
+                log.event(
+                    "advice_worker_round_failed",
+                    error_type=type(error).__name__,
+                    detail=str(error) or None,
+                    consecutive=failed_rounds,
+                    backoff_seconds=round(backoff, 3),
+                    trace="".join(traceback.format_exception(error)),
+                )
+            _wait(sleep, should_stop, backoff, poll_seconds)
+            continue
+        failed_rounds = 0
         if job is not None:
             processed += 1
             if max_jobs is not None and processed >= max_jobs:

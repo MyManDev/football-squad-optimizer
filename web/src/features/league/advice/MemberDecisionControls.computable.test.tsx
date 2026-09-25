@@ -128,6 +128,27 @@ describe("the controls with the service's capabilities", () => {
     expect(enabledValues("top100")).toEqual(["0"]);
     expect(inputs("llm")[0]).toBeDisabled();
   });
+  it.each([1, 3, 5])(
+    "offers a named chip with Top100 over %s weeks, and never the automatic strategy",
+    (window) => {
+      // Audit 2026-09-25, H3: a link naming chip=auto shows no Automatic radio and
+      // leaves the chip unchosen, while the capability keeps the named chips open.
+      const { container } = renderControls(`mode=saf-puan&window=${window}&top100=20&chip=auto`, {
+        ...WHOLE_MENU,
+        chipStrategyWindows: [1, 3, 5],
+        chipsByEntry: { [ENTRY]: ["3xc"] },
+      });
+      expect(inputs("chip").map((input) => input.value)).not.toContain("auto");
+      expect(container).not.toHaveTextContent(/Otomatik strateji|Automatic strategy/);
+      expect(container).toHaveTextContent(MESSAGES.tr.leagueMembers.chipStrategy.note);
+      expect(enabledValues("chip")).toEqual(["", "3xc"]);
+      expect(inputs("chip").find((input) => input.value === "")).toBeChecked();
+      fireEvent.click(inputs("chip").find((input) => input.value === "3xc")!);
+      expect(query().get("chip")).toBe("3xc");
+      expect(query().get("window")).toBe(String(window));
+      expect(query().get("top100")).toBe("20");
+    },
+  );
   it.each(["mode=saf-puan&window=3", "mode=ortak-koru&window=1"])(
     "explains why service-only chips are disabled for %s",
     (search) => {

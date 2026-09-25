@@ -1,16 +1,19 @@
 """The POST: a hit, one open job per request, idempotency, CORS, and rate limits."""
 
 import json
+import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, BrokenBarrierError, Event, Lock, Thread
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
-from squadopt.api.app import create_app
+from squadopt.api.app import ADVICE_BODY_MAX_BYTES, create_app
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import API_COUNTER_FAMILIES, AdviceMetrics
@@ -19,10 +22,13 @@ from squadopt.platform.advice_read import (
     AdviceReadStore,
     AdviceRequestContext,
     FileLeagueDirectory,
+    PreferencePlayers,
 )
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
     FixedWindowRateLimiter,
+    SubmitOutcome,
+    client_address_bucket,
 )
 from squadopt.platform.jobs_contract import AdviceJob, JobError
 
@@ -90,6 +96,8 @@ def _world(
     metrics: AdviceMetrics | None = None,
     submit_services: list[AdviceSubmitService] | None = None,
     utc_now: Callable[[], datetime] = lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
+    preference_players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None]
+    | None = None,
     **app_kwargs: object,
 ):
     _publish_members(tmp_path / "site")
@@ -100,6 +108,7 @@ def _world(
         cache,
         _Context(),
         {"saf-puan": False, "fark-yarat": True},
+        preference_players=preference_players,
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     if submit_services is not None:
@@ -452,6 +461,207 @@ def test_a_cache_hit_spends_no_rate_limit_token(tmp_path: Path) -> None:
     assert client.post(ADVICE_URL, json=BODY).status_code == 200
 
 
+# --- the member's budget is spent on admitted work, and only on ids the capture has ------
+
+ENTRY_BUCKET = f"entry:{CONTEXT.capture_snapshot_id}:313686"
+SQUAD = frozenset(range(1, 16))
+ROSTER = frozenset(range(1, 701))
+
+
+def _players(context: AdviceRequestContext, league_id: int, entry_id: int) -> PreferencePlayers:
+    assert context == CONTEXT and league_id == LEAGUE_ID
+    return PreferencePlayers(squad=SQUAD, roster=ROSTER)
+
+
+def _outcome(response: Any) -> str:
+    return "JOB" if response.status_code == 202 else response.json()["error"]["code"]
+
+
+def test_forty_distinct_avoid_lists_leave_the_entry_budget_for_another_client(
+    tmp_path: Path,
+) -> None:
+    """The audit's run: one address, forty misses, and another client still computes.
+
+    Every avoid list is a different address, so each POST is a miss. Before the fix each
+    one charged the member's (capture, entry) bucket before deduplication and before the
+    open-job cap, so thirty of them emptied it and the next client was told to wait 60 s.
+    """
+
+    limiter = FixedWindowRateLimiter(limit=30, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter, preference_players=_players)
+
+    outcomes = [
+        _outcome(
+            client.post(ADVICE_URL, json={**BODY, "preferences": {"avoid_players": [100 + n]}})
+        )
+        for n in range(40)
+    ]
+
+    assert outcomes.count("JOB") == 4
+    assert outcomes.count("OPEN_JOB_LIMITED") == 26
+    assert outcomes.count("RATE_LIMITED") == 10  # the address's own budget, 30 misses
+    assert limiter._counts[ENTRY_BUCKET][1] == 4  # only the admitted jobs were charged
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        response = other.post(ADVICE_URL, json={**BODY, "window": 3})
+    assert response.status_code == 202, response.text
+    assert len(queue.jobs()) == 5
+
+
+def test_joining_an_open_job_spends_no_entry_token(tmp_path: Path) -> None:
+    limiter = FixedWindowRateLimiter(limit=2, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter)
+    first = client.post(ADVICE_URL, json=BODY)
+    assert first.status_code == 202
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        joined = other.post(ADVICE_URL, json=BODY)
+        assert joined.status_code == 202
+        assert joined.json()["job_id"] == first.json()["job_id"]
+        # The member's second token is still there for new work.
+        assert other.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    # And the entry bucket still holds: two admitted jobs were its whole budget.
+    with TestClient(client.app, client=("a-third-client", 123)) as third:
+        refused = third.post(ADVICE_URL, json={**BODY, "window": 5})
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "RATE_LIMITED"
+    assert refused.headers["Retry-After"] == "60"
+    assert len(queue.jobs()) == 2
+
+
+def test_an_open_job_refusal_spends_no_entry_token(tmp_path: Path) -> None:
+    services: list[AdviceSubmitService] = []
+    limiter = FixedWindowRateLimiter(limit=2, window_seconds=60.0)
+    client, _cache, queue = _world(
+        tmp_path, rate_limiter=limiter, max_open_jobs_per_client=1, submit_services=services
+    )
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    refused = client.post(ADVICE_URL, json={**BODY, "window": 3})
+    assert _outcome(refused) == "OPEN_JOB_LIMITED"
+    assert limiter._counts[ENTRY_BUCKET][1] == 1
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        assert other.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    assert len(queue.jobs()) == 2
+    assert sorted(services[0]._client_jobs.values()) == ["another-client", "testclient"]
+
+
+def test_new_work_refused_at_preparation_spends_no_entry_token(tmp_path: Path) -> None:
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    client, _cache, queue = _world(
+        tmp_path, rate_limiter=limiter, deadline_for=lambda context: "2026-08-27T11:00:00Z"
+    )
+    assert _outcome(client.post(ADVICE_URL, json=BODY)) == "DEADLINE_PASSED"
+    assert limiter.has_room(ENTRY_BUCKET)
+    assert queue.jobs() == ()
+
+
+def test_a_full_entry_bucket_refuses_with_no_job_and_no_reservation(tmp_path: Path) -> None:
+    services: list[AdviceSubmitService] = []
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter, submit_services=services)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    with TestClient(client.app, client=("another-client", 123)) as other:
+        refused = other.post(ADVICE_URL, json={**BODY, "window": 3})
+    assert _outcome(refused) == "RATE_LIMITED"
+    assert len(queue.jobs()) == 1
+    assert list(services[0]._client_jobs.values()) == ["testclient"]
+
+
+@pytest.mark.parametrize(
+    ("host", "bucket"),
+    [
+        ("2001:db8:1:2:aaaa:bbbb:cccc:dddd", "2001:db8:1:2::/64"),
+        ("2001:db8:1:2::1", "2001:db8:1:2::/64"),
+        ("2001:DB8:1:2::1", "2001:db8:1:2::/64"),
+        ("fe80::1%eth0", "fe80::/64"),
+        ("::ffff:203.0.113.9", "203.0.113.9"),
+        ("203.0.113.9", "203.0.113.9"),
+        ("testclient", "testclient"),
+        ("unknown", "unknown"),
+    ],
+)
+def test_a_client_is_counted_by_its_ipv4_address_or_its_ipv6_64(host: str, bucket: str) -> None:
+    assert client_address_bucket(host) == bucket
+
+
+def test_addresses_in_one_ipv6_64_share_one_budget_and_one_open_job_cap(tmp_path: Path) -> None:
+    other_url = ADVICE_URL.replace("313686", "2199732")
+
+    def post(client: TestClient, host: str, url: str) -> str:
+        with TestClient(client.app, client=(host, 443)) as requester:
+            return _outcome(requester.post(url, json=BODY))
+
+    limited, _cache, _queue = _world(
+        tmp_path / "rate", rate_limiter=FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    )
+    assert post(limited, "2001:db8:1:2::1", ADVICE_URL) == "JOB"
+    assert post(limited, "2001:db8:1:2::ffff", other_url) == "RATE_LIMITED"
+    assert post(limited, "2001:db8:1:3::1", other_url) == "JOB"
+
+    capped, _cache, _queue = _world(tmp_path / "open", max_open_jobs_per_client=1)
+    assert post(capped, "2001:db8:1:2::1", ADVICE_URL) == "JOB"
+    assert post(capped, "2001:db8:1:2::2", other_url) == "OPEN_JOB_LIMITED"
+    assert post(capped, "2001:db8:1:3::1", other_url) == "JOB"
+
+
+def test_the_limiter_forgets_a_bucket_once_its_window_has_passed() -> None:
+    now = [0.0]
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0, clock=lambda: now[0])
+    for index in range(100):
+        assert limiter.allow(f"ip:client-{index}")
+    assert limiter.has_room("ip:unseen") and not limiter.has_room("ip:client-0")
+    assert not limiter.allow("ip:client-0")
+    assert len(limiter._counts) == 100  # looking spends nothing and stores nothing
+
+    now[0] = 60.0
+    assert limiter.allow("ip:late")
+    assert set(limiter._counts) == {"ip:late"}
+    assert limiter.allow("ip:client-0")  # a forgotten bucket starts a fresh window
+
+
+@pytest.mark.parametrize(
+    "preferences",
+    [
+        {"keep_players": [16]},
+        {"avoid_players": [701]},
+        {"keep_players": [1], "avoid_players": [2**53 - 1]},
+    ],
+    ids=["kept-not-held", "avoided-not-in-roster", "one-good-one-unknown"],
+)
+def test_players_the_capture_does_not_have_are_refused_before_any_work(
+    tmp_path: Path, preferences: dict[str, list[int]]
+) -> None:
+    limiter = FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    client, _cache, queue = _world(tmp_path, rate_limiter=limiter, preference_players=_players)
+
+    posted = client.post(ADVICE_URL, json={**BODY, "preferences": preferences})
+    read = client.get(ADVICE_URL, params={**BODY, "preferences": json.dumps(preferences)})
+
+    for response in (posted, read):
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert queue.jobs() == ()
+    # The refusal spent nothing: the one token still admits a request the capture can hold.
+    accepted = {"keep_players": [1, 15], "avoid_players": [700]}
+    assert client.post(ADVICE_URL, json={**BODY, "preferences": accepted}).status_code == 202
+
+
+@pytest.mark.parametrize(
+    "players",
+    [None, lambda _context, _league, _entry: None],
+    ids=["no-squad-reader", "squad-unreadable"],
+)
+def test_named_players_are_refused_when_the_squad_cannot_be_read(
+    tmp_path: Path,
+    players: Callable[[AdviceRequestContext, int, int], PreferencePlayers | None] | None,
+) -> None:
+    client, _cache, queue = _world(tmp_path, preference_players=players)
+    refused = client.post(ADVICE_URL, json={**BODY, "preferences": {"avoid_players": [5]}})
+    assert _outcome(refused) == "UNSUPPORTED_ADVICE_REQUEST"
+    # The two flags name no player and need no squad.
+    flags = {"no_hits": True, "save_chips": True}
+    assert client.post(ADVICE_URL, json={**BODY, "preferences": flags}).status_code == 202
+    assert len(queue.jobs()) == 1
+
+
 def test_a_tree_from_another_week_is_not_ready_and_queues_nothing(tmp_path: Path) -> None:
     """Last week's members beside this week's capture: refused as readiness, both named."""
 
@@ -549,6 +759,123 @@ def test_the_strict_body_refuses_extras_and_bool_windows(tmp_path: Path) -> None
 
     bool_window = client.post(ADVICE_URL, json={"strategy": "saf-puan", "window": True})
     assert bool_window.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [None, "text/plain", "text/plain; charset=utf-8", "application/x-www-form-urlencoded"],
+)
+def test_a_body_that_is_not_declared_json_is_refused_unread(
+    tmp_path: Path, content_type: str | None
+) -> None:
+    """A cross-site form can send these without a preflight; none of them may file a job."""
+
+    client, _cache, queue = _world(tmp_path)
+    headers = {"Origin": "https://elsewhere.example"}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
+
+    refused = client.post(ADVICE_URL, content=json.dumps(BODY).encode(), headers=headers)
+
+    assert refused.status_code == 415
+    assert refused.json()["error"]["code"] == "UNSUPPORTED_MEDIA_TYPE"
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize(
+    "content_type", ["application/json; charset=utf-8", "Application/JSON", "application/json"]
+)
+def test_json_with_a_charset_or_any_case_is_accepted(tmp_path: Path, content_type: str) -> None:
+    client, _cache, queue = _world(tmp_path)
+
+    accepted = client.post(
+        ADVICE_URL, content=json.dumps(BODY).encode(), headers={"Content-Type": content_type}
+    )
+
+    assert accepted.status_code == 202
+    assert len(queue.jobs()) == 1
+
+
+def test_a_body_over_the_cap_is_refused_before_it_is_parsed(tmp_path: Path) -> None:
+    client, _cache, queue = _world(tmp_path)
+    too_large = {**BODY, "preferences": {"keep_players": [1] * 3000}}
+    # Not JSON at all: a 413 rather than a 422 shows the size is checked before parsing.
+    unreadable = b"{" + b" " * ADVICE_BODY_MAX_BYTES
+    for raw in (json.dumps(too_large).encode(), unreadable):
+        assert len(raw) > ADVICE_BODY_MAX_BYTES
+
+        refused = client.post(ADVICE_URL, content=raw, headers={"Content-Type": "application/json"})
+
+        assert refused.status_code == 413
+        assert refused.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+        assert str(ADVICE_BODY_MAX_BYTES) in refused.json()["error"]["message"]
+    assert queue.jobs() == ()
+
+
+def test_a_body_exactly_at_the_cap_is_read(tmp_path: Path) -> None:
+    client, _cache, queue = _world(tmp_path)
+    compact = json.dumps(BODY).encode()
+    at_cap = compact + b" " * (ADVICE_BODY_MAX_BYTES - len(compact))
+    assert len(at_cap) == ADVICE_BODY_MAX_BYTES
+
+    accepted = client.post(ADVICE_URL, content=at_cap, headers={"Content-Type": "application/json"})
+
+    assert accepted.status_code == 202
+    assert len(queue.jobs()) == 1
+
+
+def test_the_largest_body_the_page_can_build_is_well_under_the_cap() -> None:
+    """Every field at its maximum, serialized the way the web client's JSON.stringify does."""
+
+    largest = {
+        "preferences": {
+            "keep_players": [2**53 - 1 - index for index in range(15)],
+            "avoid_players": [2**53 - 16 - index for index in range(15)],
+            "no_hits": True,
+            "save_chips": True,
+        },
+        "strategy": "a" * 64,
+        "window": 5,
+        "rival_entry_id": 2**53 - 1,
+        "model": "football",
+        "top100_weight": 50,
+        "managers_word": True,
+        "chip": "wildcard",
+    }
+    encoded = json.dumps(largest, separators=(",", ":")).encode()
+
+    assert len(encoded) == 795
+    assert len(encoded) * 5 <= ADVICE_BODY_MAX_BYTES
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"not json", b"\xff\xfe", b"[" * 2000 + b"]" * 2000],
+    ids=["text", "not-utf8", "nested-2000-deep"],
+)
+def test_a_body_that_is_not_json_is_a_validation_failure(tmp_path: Path, raw: bytes) -> None:
+    client, _cache, queue = _world(tmp_path)
+
+    refused = client.post(ADVICE_URL, content=raw, headers={"Content-Type": "application/json"})
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize(
+    "strategy", ["", "Saf-Puan", "saf puan", "saf-puan\n", "-saf", "a" * 65, "<script>"]
+)
+def test_the_body_strategy_follows_the_query_pattern(tmp_path: Path, strategy: str) -> None:
+    client, _cache, queue = _world(tmp_path)
+
+    refused = client.post(ADVICE_URL, json={"strategy": strategy, "window": 1})
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    if strategy:
+        assert strategy not in refused.json()["error"]["message"]  # never echoed back
+    assert queue.jobs() == ()
 
 
 def test_idempotency_history_survives_terminal_jobs(tmp_path: Path) -> None:
@@ -732,6 +1059,54 @@ def test_get_and_post_refuse_identical_corrupt_cache_without_new_job(
     assert len(queue.jobs()) == 1
 
 
+def test_a_torn_cache_entry_is_computed_again_not_an_error_for_good(tmp_path: Path) -> None:
+    client, cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    job = queue.load(posted.json()["job_id"])
+    run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc="2026-08-27T18:00:00Z"
+    )
+    path = tmp_path / "cache" / job.cache_key[:2] / f"{job.cache_key}.json"
+    path.write_bytes(b"")  # what a power loss before the fsync could leave behind
+
+    missed = client.get(ADVICE_URL, params=BODY)
+    assert missed.status_code == 404
+    assert missed.json()["error"]["code"] == "NOT_COMPUTED"
+    assert [p.name.startswith(f"{path.name}.damaged-") for p in path.parent.iterdir()] == [True]
+    again = client.post(ADVICE_URL, json=BODY)
+    assert again.status_code == 202
+    assert again.json()["job_id"] != job.job_id
+    run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc="2026-08-27T18:05:00Z"
+    )
+    assert client.get(ADVICE_URL, params=BODY).content == _valid_advice_document()
+
+
+def test_a_torn_job_spec_is_written_again_not_a_conflict_for_good(tmp_path: Path) -> None:
+    from squadopt.platform.advice_job_spec import FileAdviceJobSpecStore
+
+    specs = FileAdviceJobSpecStore(tmp_path / "specs")
+    client, cache, queue = _world(tmp_path, specs=specs)
+    posted = client.post(ADVICE_URL, json=BODY)
+    job = queue.load(posted.json()["job_id"])
+    path = tmp_path / "specs" / job.cache_key[:2] / f"{job.cache_key}.json"
+    written = path.read_bytes()
+    path.write_bytes(b"\x00" * len(written))  # the name linked, the bytes never written
+
+    def compute_from_spec(claimed: AdviceJob) -> bytes:
+        specs.get(claimed.cache_key)  # the worker cannot read what it was asked
+        return _valid_advice_document()
+
+    failed = run_advice_worker_once(queue, cache, compute_from_spec, at_utc="2026-08-27T18:00:00Z")
+    assert failed is not None and failed.status == "failed"
+
+    again = client.post(ADVICE_URL, json=BODY)
+    assert again.status_code == 202  # was 409 REQUEST_CONFLICT on every later request
+    assert path.read_bytes() == written
+    run_advice_worker_once(queue, cache, compute_from_spec, at_utc="2026-08-27T18:05:00Z")
+    assert client.post(ADVICE_URL, json=BODY).content == _valid_advice_document()
+
+
 def test_corrupt_job_is_unavailable_not_missing(tmp_path: Path) -> None:
     client, _cache, _queue = _world(tmp_path)
     posted = client.post(ADVICE_URL, json=BODY)
@@ -827,3 +1202,99 @@ def test_two_meanings_under_one_address_is_a_conflict(tmp_path: Path) -> None:
     response = client.post(ADVICE_URL, json=BODY)
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "REQUEST_CONFLICT"
+
+
+def test_a_slow_submit_does_not_hold_other_requests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    services: list[AdviceSubmitService] = []
+    client, _cache, queue = _world(tmp_path, submit_services=services)
+    submit = services[0].submit
+    entered, release = Event(), Event()
+
+    def slow_submit(**fields: object) -> SubmitOutcome:
+        entered.set()
+        # Sleeps until the test lets it go; the bound makes a regression fail, not hang.
+        release.wait(timeout=5)
+        return submit(**fields)
+
+    monkeypatch.setattr(services[0], "submit", slow_submit)
+    # One client is one event loop, shared by both requests as uvicorn's one loop is.
+    with TestClient(client.app) as shared, ThreadPoolExecutor(max_workers=1) as poster:
+        pending = poster.submit(shared.post, ADVICE_URL, json=BODY)
+        assert entered.wait(timeout=10)
+        health = shared.get("/health")
+        answered_while_submitting = not pending.done()
+        release.set()
+        accepted = pending.result(timeout=10)
+    assert health.status_code == 200
+    assert answered_while_submitting
+    assert accepted.status_code == 202
+    assert [job.job_id for job in queue.jobs()] == [accepted.json()["job_id"]]
+
+
+def test_the_rate_limiter_counts_every_thread() -> None:
+    limiter = FixedWindowRateLimiter(2000, 3600.0)
+    allowed: list[int] = []
+    tally = Lock()
+    start = Barrier(8)
+
+    def spend() -> None:
+        start.wait(timeout=10)
+        mine = sum(limiter.allow("ip:203.0.113.9") for _ in range(500))
+        with tally:
+            allowed.append(mine)
+
+    # A tiny switch interval makes the threads interleave inside allow; unlocked, the
+    # read and the write of one bucket's count raced and let far more than the limit in.
+    interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        threads = [Thread(target=spend) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+    finally:
+        sys.setswitchinterval(interval)
+    assert len(allowed) == 8
+    assert sum(allowed) == 2000
+
+
+def test_one_key_sent_for_two_requests_at_once_is_still_a_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _cache, queue = _world(tmp_path)
+    scan = queue.jobs
+    both_read = Barrier(2)
+
+    def history() -> tuple[AdviceJob, ...]:
+        # Holds each submission after its history read until the other has read too, so
+        # an unserialized check lets both see an empty history and both enqueue. Serialized,
+        # the second can never arrive while the first waits, and the timeout lets it go.
+        found = scan()
+        with suppress(BrokenBarrierError):
+            both_read.wait(timeout=2)
+        return found
+
+    monkeypatch.setattr(queue, "jobs", history)
+    key = {"Idempotency-Key": "client:shared:1"}
+    requests = (BODY, {**BODY, "window": 3})
+    # One client is one event loop, shared by both requests as uvicorn's one loop is.
+    with TestClient(client.app) as shared, ThreadPoolExecutor(max_workers=2) as posters:
+        answers = list(
+            posters.map(lambda body: shared.post(ADVICE_URL, json=body, headers=key), requests)
+        )
+    monkeypatch.setattr(queue, "jobs", scan)
+
+    assert sorted(answer.status_code for answer in answers) == [202, 409]
+    accepted, refused = sorted(answers, key=lambda answer: answer.status_code)
+    assert refused.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert [
+        job.job_id for job in queue.jobs() if job.idempotency_key == key["Idempotency-Key"]
+    ] == [accepted.json()["job_id"]]
+    # The accepted request keeps its key: replayed, it is the same job, not a conflict.
+    body = requests[answers.index(accepted)]
+    replay = client.post(ADVICE_URL, json=body, headers=key)
+    assert replay.status_code == 202
+    assert replay.json()["job_id"] == accepted.json()["job_id"]

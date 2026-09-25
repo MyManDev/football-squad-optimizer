@@ -12,14 +12,46 @@ from tests.unit.test_league_views import _Provider
 from tests.unit.test_member_windows import ENTRY, SEASON
 
 from squadopt.application.advice import NO_CHIP_LIMIT
+from squadopt.application.advice_capabilities import AUTOMATIC_CHIP
+from squadopt.application.advice_chip_strategy import advise_chip_strategy
 from squadopt.application.advice_menu import advise_menu_entry
-from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.application.entries import EntryError
+from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.live.chip_strategy import strategy_chip_availability
 from squadopt.live.rules import ChipWindow
 from squadopt.platform.advice_documents import validate_advice_document
 
 world = variants._world
 window_world = windows._window_world
+
+
+def _advise(w, *, window, chip, weight, preferences=NO_PREFERENCES):
+    """The member menu, or the planner itself for the automatic strategy the menu refuses.
+
+    The automatic strategy is off the member menu (audit 2026-09-25, H3) but stays in the
+    code for research, so its accounting is still checked here, one call below the menu.
+    """
+
+    request = _request(window=window, chip=chip, top100_weight=weight, preferences=preferences)
+    if chip != AUTOMATIC_CHIP:
+        return advise_menu_entry(request, **_collaborators(w), top100_counts=w["counts"])
+    return advise_chip_strategy(
+        request.entry_request(),
+        chip=chip,
+        top100_weight=weight,
+        **_collaborators(w),
+        counts=w["counts"],
+        preferences=preferences,
+    )
+
+
+@pytest.mark.parametrize("window", [1, 3, 5])
+def test_the_member_menu_refuses_the_automatic_chip_strategy(world, window):
+    with pytest.raises(EntryError, match="automatic chip strategy is not offered"):
+        advise_menu_entry(
+            _request(window=window, chip=AUTOMATIC_CHIP),
+            **_collaborators(prepared(world)),
+        )
 
 
 @pytest.mark.parametrize(
@@ -30,11 +62,7 @@ def test_preferences_are_applied_and_identified_by_real_menu(world, length, weig
     picks = w["provider"].picks(ENTRY, SEASON, 1)
     keep = tuple(picks.squad)[:2]
     preferences = DecisionPreferences(keep_players=keep, no_hits=True, save_chips=chip is None)
-    payload = advise_menu_entry(
-        _request(window=length, chip=chip, top100_weight=weight, preferences=preferences),
-        **_collaborators(w),
-        top100_counts=w["counts"],
-    )
+    payload = _advise(w, window=length, chip=chip, weight=weight, preferences=preferences)
     assert payload["preferences"] == preferences.payload()
     assert payload["preferences_scope"] == "all_selected_weeks"
     selected = {p["player_id"] for p in payload["starting_xi"] + payload["bench"]}
@@ -72,11 +100,7 @@ def prepared(world):
 )
 def test_joint_advice_scores_chips_in_raw_points(world, window, chip, weight):
     w = prepared(world)
-    payload = advise_menu_entry(
-        _request(window=window, chip=chip, top100_weight=weight),
-        **_collaborators(w),
-        top100_counts=w["counts"],
-    )
+    payload = _advise(w, window=window, chip=chip, weight=weight)
     validate_advice_document(
         json.dumps(
             {

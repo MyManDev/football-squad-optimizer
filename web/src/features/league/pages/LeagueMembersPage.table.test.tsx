@@ -167,7 +167,18 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
       screen.queryByRole("heading", { name: MESSAGES[language].memberResources.chipsTitle }),
     ).toBeNull();
     expect(screen.queryByText(copy.followerLabel)).toBeNull();
-    expect(screen.getAllByRole("button", { name: copy.viewerSelect })).toHaveLength(humans.length);
+    expect(
+      screen.getAllByRole("button", { name: new RegExp(`^${copy.viewerSelect}: `) }),
+    ).toHaveLength(humans.length);
+    // Every row's button is named for that row, starting with the words it shows, so no
+    // two of them share one name (getByRole finds exactly one for each member).
+    for (const member of humans) {
+      const name = copy.viewerSelectFor(
+        member.manager_name ?? copy.unknownMember,
+        member.team_name ?? copy.unknownTeam,
+      );
+      expect(screen.getByRole("button", { name })).toHaveTextContent(copy.viewerSelect);
+    }
     expect(screen.getByText(copy.viewerPrompt, { exact: false })).toBeInTheDocument();
   });
 
@@ -177,7 +188,9 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
     const own = rowOf(leader.manager_name!);
     expect(own).toHaveAttribute("aria-current", "true");
     expect(own).toHaveTextContent(`· ${copy.viewerYouBadge}`);
-    expect(within(own).queryByRole("button", { name: copy.viewerSelect })).toBeNull();
+    expect(
+      within(own).queryByRole("button", { name: new RegExp(`^${copy.viewerSelect}`) }),
+    ).toBeNull();
     expect(document.querySelectorAll('tr[aria-current="true"]')).toHaveLength(1);
     // Rank among the members, total and the week net of its hit; without the squad
     // document there is no bank and no free-transfer cell, rather than a 0.

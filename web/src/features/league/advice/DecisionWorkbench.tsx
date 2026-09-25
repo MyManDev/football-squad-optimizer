@@ -14,6 +14,12 @@ import {
 } from "./decisionBoard";
 import styles from "./DecisionWorkbench.module.css";
 
+/** The solver's two published statuses in the Turkish page's words; any other stays as sent. */
+const SOLVER_STATUS_TR: Record<string, string> = {
+  OPTIMAL: "en iyisi kanıtlandı",
+  FEASIBLE: "bulundu, en iyisi kanıtlanmadı",
+};
+
 /** A personal choice among computed plans, never an automatic model promotion. */
 type Props = {
   request: AdviceRequest;
@@ -58,7 +64,7 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
       </p>
       <p>
         {tr
-          ? "Tercihin FPL hesabında transfer yapmaz veya çip kullanmaz. Planlar ve notun yalnız bu tarayıcı sekmesinde tutulur; kadro veya veri görüntüsü değişirse sıfırlanır."
+          ? "Tercihin FPL hesabında transfer yapmaz veya çip kullanmaz. Planlar ve notun yalnız bu tarayıcı sekmesinde tutulur; kadro veya veri çekimi değişirse sıfırlanır."
           : "Your preference does not make transfers or play chips in FPL. Plans and your note stay in this browser tab only and reset when the squad or data snapshot changes."}
       </p>
       <button
@@ -130,7 +136,8 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                   {tr ? "Tutulan oyuncu" : "Kept players"}:{" "}
                   {c.request.preferences.keep_players.length} ·{" "}
                   {tr ? "Alınmayacak oyuncu" : "Avoided players"}:{" "}
-                  {c.request.preferences.avoid_players.length} · {tr ? "Hit yok" : "No hits"}:{" "}
+                  {c.request.preferences.avoid_players.length} ·{" "}
+                  {tr ? "Transfer cezası yok" : "No hits"}:{" "}
                   {c.request.preferences.no_hits ? (tr ? "Evet" : "Yes") : tr ? "Hayır" : "No"} ·{" "}
                   {tr ? "Çipleri sakla" : "Save chips"}:{" "}
                   {c.request.preferences.save_chips ? (tr ? "Evet" : "Yes") : tr ? "Hayır" : "No"}
@@ -151,9 +158,13 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                 <dd>{p.captain?.name}</dd>
                 <dt>{tr ? "İlk hafta çipi" : "First-week chip"}</dt>
                 <dd>{chipName(p.chip)}</dd>
-                <dt>{tr ? "Çözüm" : "Solver"}</dt>
-                <dd>{p.solver_status}</dd>
-                <dt>{tr ? "Amaç fonksiyonu sınır farkı" : "Objective bound gap"}</dt>
+                <dt>{tr ? "Çözücü" : "Solver"}</dt>
+                <dd>
+                  {tr
+                    ? (SOLVER_STATUS_TR[p.solver_status ?? ""] ?? p.solver_status)
+                    : p.solver_status}
+                </dd>
+                <dt>{tr ? "Kanıtın açık bıraktığı fark" : "Objective bound gap"}</dt>
                 <dd>{number(p.optimality_gap)}</dd>
               </dl>
               <p>

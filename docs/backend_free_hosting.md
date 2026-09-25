@@ -325,7 +325,9 @@ Cloudflare answers 502 and the site serves the static tree.
   hammering, not a quota. That Block is the only action a Free rule may take was not
   confirmed on the page; it is the action to choose.
 - **The application's own limit is the one that protects the solver.** 30 POSTs per 60 s per
-  client address and per (capture, entry), applied after a cache miss; at most one open
+  client address (an IPv6 client by its /64), charged on every cache miss, and 30 admitted
+  jobs per 60 s per (capture, entry), so joining an open job or being refused one spends
+  nothing of the member's budget; at most one open
   job per distinct request; a computed answer is served from the cache for ever after.
   Polls are not limited by the application, which is what the Cloudflare rule is for.
 - **What a Cloudflare block looks like to the site.** Cloudflare's 403 and 429 pages carry
@@ -546,7 +548,7 @@ implementations drifting.
 
 ## Recommendation
 
-The `Backend uptime` workflow checks public `/health` every 15 minutes, with a 10-second timeout and one retry after 20 seconds. A failed check opens one `backend-down` issue; continuing failure is silent, and recovery comments on and closes that issue. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time and status, never a URL or response body. Scheduled Actions can be delayed and are not an exact uptime guarantee. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
+The `Backend uptime` workflow asks for public `/health` on a `*/15` schedule, with a 10-second timeout and one retry after 20 seconds. **It does not run every fifteen minutes, and the gap is not small.** Measured over the workflow's whole life to 2026-09-24, 111.1 hours from its first run, 31 scheduled runs landed where `*/15` asks for 444: a rate of 7%. No interval came close to fifteen minutes. The shortest was 1 hour 55 minutes, the median 3 hours 33, and the longest 6 hours 52; 30 of the 30 intervals exceeded an hour and 18 of them exceeded three. GitHub deprioritises high-frequency `schedule` triggers on shared runners and drops what it cannot place, so the real time to detection is hours, and so is the time to notice a recovery. A failed check opens one `backend-down` issue; continuing failure is silent, and recovery comments on and closes that issue. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time and status, never a URL or response body. Scheduled Actions can be delayed and are not an exact uptime guarantee, which the numbers above put a size on rather than leaving as a caveat. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
 
 **Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
 coordinate publication with the backend code revision. The existing tunnel hostname is
