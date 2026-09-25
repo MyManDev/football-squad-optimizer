@@ -23,7 +23,7 @@ import squadopt.application.commands as command_services
 import squadopt.live.transfers as live_transfers
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.live import (
     InSeasonProjection,
     LedgerError,
@@ -119,6 +119,22 @@ def _elements(
                 record["event_points"] = event_points
             records.append(record)
     return records
+
+
+def _live(points: int) -> bytes:
+    """One week's live document, every element scoring ``points``: what a settle reads."""
+
+    return json.dumps(
+        {
+            "elements": [
+                {
+                    "id": element["id"],
+                    "stats": {"minutes": 90, "starts": 1, "total_points": points},
+                }
+                for element in _elements()
+            ]
+        }
+    ).encode("utf-8")
 
 
 def _game_config() -> dict[str, Any]:
@@ -823,6 +839,15 @@ def test_settling_a_transfer_week_nets_hits_and_counts_the_boosted_bench(
 ) -> None:
     _decide_gw1(monkeypatch, world)
     assert _decide_gw2(monkeypatch, world, _handoff(world), "--chip", "bboost") == 0
+    # The settle reads GW2's own live document. It is added to a capture written here, so
+    # the world other suites share keeps exactly the payloads it had.
+    settled = read_snapshot(world["snapshot_root"], world["settle_id"])
+    settle_capture = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-01T10:00:00Z",
+        payloads={**settled.payloads, live_payload(2): _live(3)},
+    )
     exit_code = _run(
         monkeypatch,
         world,
@@ -831,7 +856,7 @@ def test_settling_a_transfer_week_nets_hits_and_counts_the_boosted_bench(
         "--gameweek",
         "2",
         "--snapshot-id",
-        world["settle_id"],
+        settle_capture.snapshot_id,
     )
 
     assert exit_code == 0

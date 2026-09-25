@@ -22,8 +22,8 @@ from squadopt.application import (
 from squadopt.application.build import recommendation_view_from_ledger
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
-from squadopt.live import load_ledger
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
+from squadopt.live import LedgerError, load_ledger
 from squadopt.platform.cli import main as cli_main
 
 
@@ -39,7 +39,10 @@ def _world(tmp_path: Path) -> dict[str, Any]:
             FIXTURES_PAYLOAD: b"[]",
         },
     )
-    finished = [dict(gameweek_world.EVENTS[0], finished=True), gameweek_world.EVENTS[1]]
+    finished = [
+        dict(gameweek_world.EVENTS[0], finished=True, data_checked=True),
+        gameweek_world.EVENTS[1],
+    ]
     settle_metadata = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -50,6 +53,7 @@ def _world(tmp_path: Path) -> dict[str, Any]:
                 elements=gameweek_world._elements(event_points=3),
             ),
             FIXTURES_PAYLOAD: b"[]",
+            live_payload(1): gameweek_world._live(3),
         },
     )
     return {
@@ -178,6 +182,74 @@ def test_settle_returns_the_outcome_and_regenerated_summary(world: dict[str, Any
     assert result.outcome_path.is_file()
     assert result.summary_path == world["summary"]
     assert "Settled gameweeks: 1" in result.summary
+
+
+def _capture_after_the_next_deadline(world: dict[str, Any], *, holds_week_one: bool) -> str:
+    """A capture on GW2: the bootstrap's event_points are GW2's running points, not GW1's."""
+
+    events = [
+        dict(gameweek_world.EVENTS[0], finished=True, data_checked=True, is_current=False),
+        dict(gameweek_world.EVENTS[1], data_checked=False, is_current=True),
+    ]
+    payloads = {
+        BOOTSTRAP_PAYLOAD: gameweek_world._bootstrap(
+            events=events, elements=gameweek_world._elements(event_points=9)
+        ),
+        FIXTURES_PAYLOAD: b"[]",
+        live_payload(2): gameweek_world._live(9),
+    }
+    if holds_week_one:
+        payloads[live_payload(1)] = gameweek_world._live(3)
+    metadata = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-29T09:00:00Z",
+        payloads=payloads,
+    )
+    return metadata.snapshot_id
+
+
+def _settle_week_one(world: dict[str, Any], snapshot_id: str | None) -> SettleResult:
+    return settle(
+        SettleRequest(
+            snapshot_root=world["snapshot_root"],
+            snapshot_id=snapshot_id,
+            ledger_root=world["ledger_root"],
+            summary_root=world["summary"].parent,
+            gameweek=1,
+            summary_output=world["summary"],
+        )
+    )
+
+
+def test_a_late_settle_records_the_week_it_names_not_the_captures_current_week(
+    world: dict[str, Any],
+) -> None:
+    decide(_decide_request(world), panel_builder=lambda root: gameweek_world._panel())
+    late_id = _capture_after_the_next_deadline(world, holds_week_one=True)
+
+    # No capture named: the newest is picked, and it is already on GW2.
+    result = _settle_week_one(world, None)
+
+    assert result.snapshot_id == late_id
+    outcome = json.loads(result.outcome_path.read_text(encoding="utf-8"))
+    # Every player scored 3 in GW1 (9 so far in GW2): eleven starters plus the captain again.
+    assert outcome["realized_xi_score"] == pytest.approx(12 * 3.0)
+    assert set(outcome["realized_points_by_player"].values()) == {3.0}
+    assert outcome["source_snapshot_id"] == late_id
+
+
+def test_a_capture_without_the_named_weeks_live_document_records_nothing(
+    world: dict[str, Any],
+) -> None:
+    decide(_decide_request(world), panel_builder=lambda root: gameweek_world._panel())
+    late_id = _capture_after_the_next_deadline(world, holds_week_one=False)
+
+    with pytest.raises(LedgerError, match=r"holds no event-gw01-live\.json") as refused:
+        _settle_week_one(world, late_id)
+
+    assert late_id in str(refused.value)
+    assert load_ledger(world["ledger_root"], gameweek_world.SEASON)[0].outcome is None
 
 
 def test_tick_dry_run_needs_no_network_capture(tmp_path: Path) -> None:

@@ -16,7 +16,7 @@ import indexFixture from "../../../../public/data/index.json";
 import publishedStatus from "../../../../public/data/2026-27/status.json";
 import type { DataClient, Loaded } from "../../../data/client";
 import { DataClientContext } from "../../../data/queries";
-import type { SiteIndex, StatusView } from "../../../data/schema";
+import type { SiteIndex, StatusView, TickActionView } from "../../../data/schema";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
@@ -242,4 +242,65 @@ describe("the gameweek tile", () => {
       expect(open).toBe(closed);
     },
   );
+});
+
+/**
+ * An action is shown through its reason code's translation, so the translation has to say
+ * what the planner means by the code. A settle needs the week finished and checked, so a
+ * week that is finished but not yet checked is recaptured too. The page must not call that
+ * week unfinished, and the English sentence the planner records is only the fallback.
+ */
+describe("the settle reasons", () => {
+  function action(kind: TickActionView["kind"], code: string): TickActionView {
+    return {
+      gameweek: 1,
+      handoff_path: null,
+      kind,
+      reason: "the planner's own sentence, shown only when the code is unknown",
+      reason_code: code,
+      reason_params: { gameweek: 1, capture_age_hours: 13 },
+      snapshot_id: null,
+    };
+  }
+
+  it.each([
+    {
+      language: "en",
+      expected:
+        "gameweek 1 was decided but is not yet marked finished and checked; the capture is 13 h old",
+    },
+    {
+      language: "tr",
+      expected:
+        "oyun haftası 1 karara bağlandı ama henüz bitmiş ve kontrol edilmiş olarak işaretli değil; veri çekimi 13 saatlik",
+    },
+  ] as const)(
+    "names both flags when it recaptures, in $language",
+    async ({ language, expected }) => {
+      renderStatus(
+        { ...PUBLISHED, is_idle: false, actions: [action("capture", "recapture_for_outcome")] },
+        language,
+      );
+      expect(await screen.findByText(expected)).toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    {
+      language: "en",
+      expected:
+        "gameweek 1 is finished and checked in the latest capture and its decision has no outcome",
+    },
+    {
+      language: "tr",
+      expected:
+        "oyun haftası 1 son veri çekiminde bitmiş ve kontrol edilmiş görünüyor, kararının sonucu henüz işlenmedi",
+    },
+  ] as const)("names both flags when it settles, in $language", async ({ language, expected }) => {
+    renderStatus(
+      { ...PUBLISHED, is_idle: false, actions: [action("settle", "settle_due")] },
+      language,
+    );
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+  });
 });

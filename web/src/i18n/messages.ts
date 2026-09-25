@@ -1024,9 +1024,9 @@ const en = {
   reasonCodes: {
     no_capture: () => "no capture is held; the calendar is unknown",
     settle_due: (p: ReasonParams) =>
-      `gameweek ${p.gameweek} is finished in the latest capture and its decision has no outcome`,
+      `gameweek ${p.gameweek} is finished and checked in the latest capture and its decision has no outcome`,
     recapture_for_outcome: (p: ReasonParams) =>
-      `gameweek ${p.gameweek} was decided but is not marked finished; the capture is ${p.capture_age_hours} h old`,
+      `gameweek ${p.gameweek} was decided but is not yet marked finished and checked; the capture is ${p.capture_age_hours} h old`,
     await_outcome: (p: ReasonParams) =>
       `gameweek ${p.gameweek} awaits its outcome; next look after ${p.recapture_hours} h`,
     deadline_missed: (p: ReasonParams) =>
@@ -2117,9 +2117,9 @@ const tr: MessageSchema<typeof en> = {
   reasonCodes: {
     no_capture: () => "elde capture yok; takvim bilinmiyor",
     settle_due: (p: ReasonParams) =>
-      `oyun haftası ${p.gameweek} son capture'da bitmiş görünüyor ve kararının sonucu işlenmemiş`,
+      `oyun haftası ${p.gameweek} son veri çekiminde bitmiş ve kontrol edilmiş görünüyor, kararının sonucu henüz işlenmedi`,
     recapture_for_outcome: (p: ReasonParams) =>
-      `oyun haftası ${p.gameweek} karara bağlandı ama bitmiş işaretli değil; capture ${p.capture_age_hours} saatlik`,
+      `oyun haftası ${p.gameweek} karara bağlandı ama henüz bitmiş ve kontrol edilmiş olarak işaretli değil; veri çekimi ${p.capture_age_hours} saatlik`,
     await_outcome: (p: ReasonParams) =>
       `oyun haftası ${p.gameweek} sonucunu bekliyor; ${p.recapture_hours} saat sonra tekrar bakılacak`,
     deadline_missed: (p: ReasonParams) =>
