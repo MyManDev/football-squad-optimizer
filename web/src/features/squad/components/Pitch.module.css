@@ -25,7 +25,6 @@
   background: var(--color-chip);
   color: var(--color-chip-text);
   border-radius: var(--radius-s);
-  box-shadow: var(--shadow-1);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -37,10 +36,10 @@
   right: -8px;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  font: 700 12px/20px var(--font-mono);
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  color: var(--color-text);
+  font: 800 12px/20px var(--font-display);
   text-align: center;
 }
 
@@ -58,7 +57,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--step--2);
   color: var(--color-chip-muted);
 }
 
@@ -75,7 +74,7 @@
   padding-top: 3px;
   border-top: 1px solid color-mix(in srgb, var(--color-chip-muted) 30%, transparent);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--step--2);
   color: var(--color-chip-muted);
 }
 
@@ -83,8 +82,8 @@
   justify-self: end;
   padding: 0 4px;
   border: 1px solid color-mix(in srgb, var(--color-chip-muted) 45%, transparent);
-  border-radius: 999px;
-  font-weight: 700;
+  border-radius: var(--radius-s);
+  font-weight: 600;
 }
 
 @media (max-width: 480px) {

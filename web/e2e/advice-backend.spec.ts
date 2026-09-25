@@ -238,6 +238,12 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
     await expect(advice).toBeVisible();
     if (selection.body.chip === "auto") {
+      // The chip row is among the advanced settings, closed until asked for.
+      await page
+        .locator("main details summary", {
+          hasText: MESSAGES.tr.leagueMembers.advancedSettings,
+        })
+        .click();
       await expect(
         page.getByRole("radio", { name: "Otomatik strateji", exact: true }),
       ).toBeChecked();

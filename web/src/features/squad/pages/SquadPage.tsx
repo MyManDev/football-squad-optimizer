@@ -229,7 +229,7 @@ function Squad({
         </Card>
       ) : null}
 
-      <Card tone="pitch" title={copy.startingXi} aside={copy.starterCount(view.starting_xi.length)}>
+      <Card title={copy.startingXi} aside={copy.starterCount(view.starting_xi.length)}>
         <Pitch
           starters={view.starting_xi}
           showOutcomes={view.settled}

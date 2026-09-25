@@ -1,8 +1,25 @@
-/** Formatting only — the frontend never computes a number it shows, it formats one. */
+/** Formatting only: the frontend never computes a number it shows, it formats one. */
 
 export function pounds(tenths: number): string {
   const sign = tenths < 0 ? "-" : "";
   return `${sign}£${(Math.abs(tenths) / 10).toFixed(1)}m`;
+}
+
+const isTurkish = (locale: string) => locale.toLowerCase().startsWith("tr");
+
+/**
+ * Money the game publishes in tenths of a million, in the reader's own notation: Turkish
+ * reads '0,8m' (comma decimal, no currency sign, as the league writes it), English reads
+ * '£0.8m'. One decimal always, because a tenth is the unit the number was published in.
+ */
+export function money(tenths: number, locale = "en-GB"): string {
+  const sign = tenths < 0 ? "-" : "";
+  const value = (Math.abs(tenths) / 10).toLocaleString(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    useGrouping: false,
+  });
+  return isTurkish(locale) ? `${sign}${value}m` : `${sign}£${value}m`;
 }
 
 export function points(value: number, digits = 1, locale = "en-GB"): string {
@@ -23,6 +40,26 @@ export function signedPoints(value: number, digits = 1, locale = "en-GB"): strin
   const scale = 10 ** digits;
   const rounded = Math.round(value * scale) / scale;
   const text = points(Math.abs(rounded), digits, locale);
+  return rounded > 0 ? `+${text}` : rounded < 0 ? `−${text}` : text;
+}
+
+/**
+ * A figure on the decision board, the gain strip and the player plates: at most two
+ * decimals and at least one, so '2,36', '3,6' and '8,0'. Two decimals let the board's
+ * figures add up to the plan's gain the way the producer's rows do (2,36 + 0,65 = 3,01),
+ * which one decimal cannot promise; the trailing zero goes, the first decimal stays.
+ */
+export function figure(value: number, locale = "en-GB"): string {
+  return value.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
+
+/**
+ * `figure` with its sign, taken after rounding to two decimals exactly as `signedPoints`
+ * does: a value that rounds to zero prints unsigned.
+ */
+export function signedFigure(value: number, locale = "en-GB"): string {
+  const rounded = Math.round(value * 100) / 100;
+  const text = figure(Math.abs(rounded), locale);
   return rounded > 0 ? `+${text}` : rounded < 0 ? `−${text}` : text;
 }
 
@@ -59,6 +96,62 @@ export function local(iso: string, locale = "en-GB"): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+type DeadlineStyle = "long" | "short";
+
+function deadlineParts(
+  iso: string,
+  locale: string,
+  style: DeadlineStyle,
+  timeZone: string | undefined,
+) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat(locale, {
+    timeZone,
+    weekday: style,
+    day: "numeric",
+    month: style,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return {
+    weekday: part("weekday"),
+    day: part("day"),
+    month: part("month"),
+    time: `${part("hour")}:${part("minute")}`,
+  };
+}
+
+/**
+ * A deadline in the reader's own time, as every other time on the site is, written out:
+ * '10 Ekim Cumartesi · 13:00' in Turkish, 'Saturday 10 October · 13:00' in English (the
+ * GW6 deadline on a device set to Istanbul). `timeZone` is for tests. An unreadable
+ * timestamp is returned as given.
+ */
+export function deadlineLong(iso: string, locale = "en-GB", timeZone?: string): string {
+  const parts = deadlineParts(iso, locale, "long", timeZone);
+  if (parts === null) return iso;
+  const date = isTurkish(locale)
+    ? `${parts.day} ${parts.month} ${parts.weekday}`
+    : `${parts.weekday} ${parts.day} ${parts.month}`;
+  return `${date} · ${parts.time}`;
+}
+
+/**
+ * The same deadline for a narrow line: '10 Eki Cmt 13:00' in Turkish, 'Sat 10 Oct 13:00'
+ * in English.
+ */
+export function deadlineShort(iso: string, locale = "en-GB", timeZone?: string): string {
+  const parts = deadlineParts(iso, locale, "short", timeZone);
+  if (parts === null) return iso;
+  return isTurkish(locale)
+    ? `${parts.day} ${parts.month} ${parts.weekday} ${parts.time}`
+    : `${parts.weekday} ${parts.day} ${parts.month} ${parts.time}`;
 }
 
 export interface CountdownLabels {

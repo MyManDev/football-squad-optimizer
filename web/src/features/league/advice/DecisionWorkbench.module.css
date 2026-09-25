@@ -5,9 +5,14 @@
   margin-block: var(--space-3);
 }
 
+/* No plan pinned yet: no empty band where the plans will stand. */
+.grid:empty {
+  display: none;
+}
+
 .plan {
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   padding: var(--space-3);
   min-width: 0;
   overflow-wrap: anywhere;
@@ -34,6 +39,32 @@
   gap: var(--space-2);
 }
 
+/* An outlined ink button as wide as its words, as the page's other secondary actions. */
+.pin,
+.actions button {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pin:hover:not(:disabled),
+.actions button:hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.pin:disabled,
+.actions button:disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
 .actions button {
   min-height: 44px;
 }
@@ -49,4 +80,18 @@
   width: 100%;
   max-width: 100%;
   min-height: 6rem;
+}
+
+/* Touch targets on the member page below 1180 px, where the page is used by finger. */
+@media (max-width: 1179.98px) {
+  .pin {
+    min-height: 44px;
+  }
+
+  /* Padding, not flex, so the summary keeps its disclosure marker. */
+  .summary {
+    padding-block: 12px;
+    line-height: 20px;
+    cursor: pointer;
+  }
 }

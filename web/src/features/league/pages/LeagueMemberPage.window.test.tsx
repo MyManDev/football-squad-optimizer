@@ -4,7 +4,7 @@
  * can act on in either language, never as a promise about the later weeks.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -56,7 +56,10 @@ describe("the advice card shows a window week by week", () => {
     expect(within(rows[3]!).getByText("Bench Boost")).toBeInTheDocument();
     // What the window assumes is its own region now, beside every other plan's.
     expect(screen.getByRole("region", { name: "Bu pencerenin varsaydıkları" })).toBeInTheDocument();
-    // The first week's moves and lineup still render above, unchanged in shape.
+    // The first week's moves and lineup still render above, unchanged in shape: the
+    // eleven on the pitch, and the same week as a list one toggle away.
+    expect(screen.getByRole("list", { name: MESSAGES.tr.squad.pitchLabel })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: MESSAGES.tr.leagueMembers.viewList }));
     expect(screen.getByRole("region", { name: "Bu haftaki kadron" })).toBeInTheDocument();
     expect(screen.getByText("Kanıt tamamlanamadı")).toBeInTheDocument();
   });
