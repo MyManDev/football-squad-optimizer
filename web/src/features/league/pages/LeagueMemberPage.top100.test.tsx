@@ -127,17 +127,65 @@ describe("a Top 100 weighted plan on the advice card", () => {
       weighted(30, false, {
         solver_status: "FEASIBLE",
         optimality_gap: null,
-        expected_points_cost: 0.2,
+        expected_points_cost: 1.7,
         expected_points_cost_ceiling: 1.7,
       }),
       "mode=saf-puan&window=1&top100=30",
     );
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.en.costAtMost("1.7"));
-    expect(page).not.toContain("0.2 expected points");
+    expect(page).not.toContain(TOP100_COPY.en.cost("1.7"));
     expect(page).toContain(TOP100_COPY.en.unproven);
     expect(page).not.toContain(MESSAGES.en.leagueMembers.unprovenPlanGapUnknown);
   });
+
+  it("states no price when the plan it is measured against is unproven", () => {
+    // The producer publishes no ceiling then; an older document carries one, which
+    // bounds nothing, so the page prints neither it nor the difference, and does not
+    // promise a price below.
+    const { container } = renderPage(
+      "en",
+      weighted(30, false, {
+        solver_status: "FEASIBLE",
+        optimality_gap: null,
+        control_solver_status: "FEASIBLE",
+        control_optimality_gap: 2.5,
+        expected_points_cost: 0.2,
+        expected_points_cost_ceiling: 2.7,
+      }),
+      "mode=saf-puan&window=1&top100=30",
+    );
+    const page = container.textContent ?? "";
+    expect(page).not.toContain(TOP100_COPY.en.costAtMost("2.7"));
+    expect(page).not.toContain(TOP100_COPY.en.cost("0.2"));
+    expect(page).not.toContain(TOP100_COPY.en.unproven);
+    expect(page).toContain(MESSAGES.en.leagueMembers.unprovenPlanGapUnknown);
+    expect(page).toContain(MESSAGES.en.leagueMembers.controlUnprovenBody("2.5"));
+  });
+
+  it.each([
+    ["en", "0.2", "2.5"],
+    ["tr", "0,2", "2,5"],
+  ] as const)(
+    "does not point at a price it does not print when the setting changed the plan, in %s",
+    (language, price, gap) => {
+      const advice = weighted(30, false, {
+        control_solver_status: "FEASIBLE",
+        control_optimality_gap: 2.5,
+        expected_points_cost: 0.2,
+        top100: { ...weighted(30).payload.top100!, changed: true },
+      });
+      delete advice.payload.expected_points_cost_ceiling;
+      const { container } = renderPage(language, advice, "mode=saf-puan&window=1&top100=30");
+      const text = section(container);
+      expect(text).toContain(TOP100_COPY[language].changedNoPrice);
+      expect(text).not.toContain(TOP100_COPY[language].changed);
+      const page = container.textContent ?? "";
+      expect(page).not.toContain(TOP100_COPY[language].cost(price));
+      expect(page).not.toContain(TOP100_COPY[language].costAtMost(price));
+      expect(page).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+    },
+  );
 
   it("prices the word and the setting together when both are on", () => {
     const { container } = renderPage(
@@ -190,11 +238,11 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const advice = mockEntryAdviceTop100Envelope(ENTRY, 20, false, target);
     advice.payload = {
       ...advice.payload,
-      expected_points_cost: 0.2,
+      expected_points_cost: 12.5,
       expected_points_cost_ceiling: 12.5,
       solver_status: "FEASIBLE",
       optimality_gap: null,
-      control_solver_status: "FEASIBLE",
+      control_solver_status: "OPTIMAL",
       stated_limits: [
         "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.",
         "The plan was chosen with the Top 100 influence at 20; every expected-points number in this document is the base model's, without it.",
@@ -238,7 +286,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     );
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.strategyCostAtMost("12,5"));
-    expect(page).not.toContain("0,2 beklenen");
+    expect(page).not.toContain(TOP100_COPY.tr.strategyCost("12,5"));
     expect(page).toContain(TOP100_COPY.tr.limit(20));
     for (const sentence of Object.values(TOP100_COPY.tr.variantLimits)) {
       expect(page).toContain(sentence);
