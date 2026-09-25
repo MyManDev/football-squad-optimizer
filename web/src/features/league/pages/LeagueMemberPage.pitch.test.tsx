@@ -6,13 +6,13 @@
  * and the fixtures of the transfers and the eleven read from the published calendar.
  */
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PageShell } from "../../../design/components/PageShell";
-import { PHONE_QUERY } from "../../../design/shell/layout";
+import { DESKTOP_QUERY, PHONE_QUERY } from "../../../design/shell/layout";
 import { FIXTURE_SHEET_ID } from "../../../design/shell/ShellContext";
 import {
   mockEntryAdviceEnvelope,
@@ -558,6 +558,78 @@ describe("the reading order around the squad", () => {
     expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
     expect(before(decision, toggle)).toBe(true);
     expect(before(toggle, how)).toBe(true);
+  });
+});
+
+/**
+ * A viewport whose width can change under the page: every media query list answers from the
+ * current width, and `resize` fires the change listeners the shell layout subscribed with.
+ */
+function resizableViewport(initialWidth: number) {
+  let width = initialWidth;
+  const listeners = new Set<() => void>();
+  const matches = (query: string) =>
+    query === PHONE_QUERY ? width < 600 : query === DESKTOP_QUERY ? width >= 1180 : false;
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      media: query,
+      get matches() {
+        return matches(query);
+      },
+      addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+    }),
+  });
+  return (next: number) =>
+    act(() => {
+      width = next;
+      for (const listener of [...listeners]) listener();
+    });
+}
+
+describe("the honesty block across the phone breakpoint", () => {
+  // A phone turned to landscape, a resized window or a zoomed page crosses 600 px. The block
+  // changes place in the document, but it stays the same element: an open "Nasıl
+  // hesaplandı?" stays open and keeps the focus a keyboard user gave its summary.
+  it.each([
+    ["from a phone to a tablet", 390, 844, false],
+    ["from a tablet to a phone", 844, 390, false],
+    ["from a phone to a tablet, inside the shell", 390, 844, true],
+    ["from a tablet to a phone, inside the shell", 844, 390, true],
+  ] as const)("keeps the open disclosure %s", async (_case, from, to, inShell) => {
+    const resize = resizableViewport(from);
+    const user = userEvent.setup();
+    const page = <LeagueMemberView {...view()} />;
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+          {inShell ? <PageShell>{page}</PageShell> : page}
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const block = document.querySelector<HTMLElement>('[data-mark="honesty"]')!;
+    const details = block.querySelector("details")!;
+    const summary = within(block)
+      .getByText(MESSAGES.tr.leagueMembers.howComputed)
+      .closest("summary")!;
+    await user.click(summary);
+    expect(details.open).toBe(true);
+    expect(summary).toHaveFocus();
+
+    resize(to);
+
+    expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
+    expect(document.querySelector('[data-mark="honesty"]')).toBe(block);
+    expect(block.querySelector("details")).toBe(details);
+    expect(details.open).toBe(true);
+    // The reading order still follows the new layout.
+    const toggle = screen.getByRole("button", { name: MESSAGES.tr.leagueMembers.viewPitch });
+    const honestyFirst = Boolean(
+      block.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(honestyFirst).toBe(to < 600);
   });
 });
 

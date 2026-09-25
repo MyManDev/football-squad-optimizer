@@ -215,7 +215,7 @@ function LeagueMemberContent({
   // What to make of the decision: the two honesty lines, how it was worked out and the
   // member's history. Placed after the decision on a phone and after the squad elsewhere.
   const honesty = (
-    <div className={styles.honestyBlock} data-mark="honesty">
+    <div key="honesty" className={styles.honestyBlock} data-mark="honesty">
       <div className={styles.honestyLines}>
         <p>{copy.honestyModel}</p>
         <p>{copy.honestyDecision}</p>
@@ -250,6 +250,19 @@ function LeagueMemberContent({
           <Link to={`/league/members/${entryId}/history`}>{messages.suggestionHistory.title}</Link>
         </p>
       ) : null}
+    </div>
+  );
+  const squadArea = (
+    <div key="squad" className={styles.squadArea}>
+      <div className={styles.squadGrid}>
+        <MemberSquad
+          onPitch={onPitch}
+          plan={plan}
+          codes={codes}
+          list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
+        />
+        {railPlacement === "flow" ? rail : null}
+      </div>
     </div>
   );
 
@@ -388,21 +401,11 @@ function LeagueMemberContent({
             )}
           </div>
           {/* A phone reads the decision, then what to make of it, then the squad (as
-              D-Phone-Bu-Hafta draws it); wider layouts put the squad first. The block is
-              placed in the document where it is seen, so the tab order follows the screen. */}
-          {layout === "phone" ? honesty : null}
-          <div className={styles.squadArea}>
-            <div className={styles.squadGrid}>
-              <MemberSquad
-                onPitch={onPitch}
-                plan={plan}
-                codes={codes}
-                list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
-              />
-              {railPlacement === "flow" ? rail : null}
-            </div>
-          </div>
-          {layout === "phone" ? null : honesty}
+              D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed
+              in the document where they are seen, so the tab order follows the screen, and
+              they are keyed siblings, so crossing 600 px moves the existing elements rather
+              than making new ones: an open "Nasıl hesaplandı?" stays open. */}
+          {layout === "phone" ? [honesty, squadArea] : [squadArea, honesty]}
           {!adviceLoading && shown ? (
             <AdviceDetails
               shown={shown}
