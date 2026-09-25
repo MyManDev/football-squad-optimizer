@@ -11,17 +11,12 @@ software owner before anyone starts.
 
 ## Tracked as GitHub issues
 
-The two immediate Sprint 1 items are now resolved:
-
-- **A walk-forward backtest split.** The requirement is already specified in
-  [the experiment parameter contract](experimentation_spec.md) under "Time-based
-  evaluation and leakage control"; the issue is about implementing a helper that
-  satisfies it, not re-deciding it.
-- **A price-based prior for a player's opening gameweek.** Contract
-  `opening_price_prior_v1` fits the coefficient on 2020-21 through 2024-25 opening
-  rows and evaluates it on the untouched 2025-26 opening gameweek. Decayed
-  carry-over remains first choice; price replaces the constant only where no usable
-  earlier-season record exists.
+The two Sprint 1 items that started this list were done and their issues are closed:
+the walk-forward split helper (#6) and the price-based prior for a player's opening
+gameweek (#7, contract `opening_price_prior_v1`). The open part of item 1 is tracked in
+#531. Item 11, a shared contracts module, was delivered as `squadopt.contracts` and is
+enforced by the import-linter layers in `pyproject.toml`, so it has left this file; the
+other numbers are kept because code and records cite them.
 
 When one of the items below becomes real work, open an issue for it and delete it
 from this file, so there is only ever a single record of it.
@@ -45,7 +40,16 @@ matches, and window alignment.
 **Proposal.** A start-probability signal combined with a minutes-given-start
 estimate. `starts` is the natural input when a source provides it.
 `availability_status` would help, but only after its snapshot timing is verified —
-see item 4.
+see item 3.
+
+**Status: partly delivered; the rest is #531.** The live component base separates the
+chance of any appearance from the minutes given an appearance
+([component evaluation](phase_c_component_evaluation.md)). A start probability,
+`q_start_given_appearance`, is fitted and calibrated in the mean
+([participation calibration](participation_calibration.md)) but is not on the live path, and
+composing the points side through it bought no accuracy
+([participation composition](participation_composition.md)). The three-state participation
+model, and the double-reduction question to settle before it, are tracked in #531.
 
 ### 2. Partial optional columns
 
@@ -111,9 +115,11 @@ report](gw1_blocker_report_2021-2026.md), sections 2 to 5.
 
 ### 4. Fixture context features
 
-**Now.** `opponent_team_id`, `is_home`, and `fixture_difficulty` are classified as
-pre-match and carried through when present, but no feature uses them and the
-synthetic sample does not contain them.
+**When this was written** (Sprint 0), `opponent_team_id`, `is_home` and
+`fixture_difficulty` were classified as pre-match and carried through when present, no
+feature used them, and the synthetic sample did not contain them. The classification still
+stands in `PRE_MATCH_COLUMNS` (`src/squadopt/data/schema.py`); what uses the fixture
+context now is in the status below.
 
 **Proposal.** Opponent strength and home advantage adjustments, once a verified
 source supplies them. `fixture_difficulty` is only usable if the source's rating is
@@ -128,25 +134,34 @@ current-value fixture table is not sufficient for backtesting.
 any of them in the same way.**
 
 *Calendar-derived features are in use.* `attach_fixture_features` produces `fixture_count`
-and `home_fixture_count` — the latter derived from `is_home` — and three places read them:
-the expected-minutes stage scales by fixture count and caps at that many full matches, the
-two-stage production candidate consumes both, and the Issue #43 learned-rate candidate names
-both among its declared rate inputs. The versioning requirement above is met by
-`fixture_snapshot_v1`, which keys on the persistent team code and records the snapshot each
-row came from.
+and `home_fixture_count` (the latter derived from `is_home`), and these places read them:
+the expected-minutes stage scales by fixture count and caps at that many full matches; the
+Phase C component base, the live default since #351, takes both as pre-match features
+(`PRE_MATCH_FEATURE_COLUMNS` in `prediction/component_dataset.py`); the two-stage
+production model in `backtest/production.py` (`two-stage-appearance-calendar-v1`) consumes
+both; and the Issue #43 learned-rate candidate names both among its declared rate inputs.
+The versioning requirement above is met by `fixture_snapshot_v1`, which keys on the
+persistent team code and records the snapshot each row came from.
 
 *The source's own difficulty rating is still unused, and now the reason is written down
-rather than pending.* `attach_fixture_features` computes `mean_fixture_difficulty` and
-`minimum_fixture_difficulty` on every fold and **no model reads either**. The condition this
-item set — usable only if genuinely pre-match — was never settled, and
-[`features/strength.py`](../src/squadopt/features/strength.py) explains why it was not worth
-settling: the rating is opaque, so nobody here can say what it measures, and its stability
-within a season is unverified. A strength estimate computed from results already held is
-reproducible and its timing is ours to control, which is the better trade. Whether to keep
-computing two columns nothing consumes is an open question for the three owners, since
-`attach_fixture_features` is shared.
+rather than pending.* **No model reads `mean_fixture_difficulty` or
+`minimum_fixture_difficulty`.** Since #152 `attach_fixture_features` attaches them only when
+every fixture row carries a capture instant, which no archive row does, so on the
+development folds they are not computed at all, and every caller passes
+`unproven_difficulty="omit"` (the ruling is under "Cross-owner coordination" below).
+[`features/strength.py`](../src/squadopt/features/strength.py) explains why the rating was not
+worth settling as a feature: it is opaque, so nobody here can say what it measures, and its
+stability within a season is unverified. A strength estimate computed from results already
+held is reproducible and its timing is ours to control, which is the better trade.
 
-*The opponent-strength proposal has been measured.* Not by wiring it in, but by asking
+*The opponent-strength proposal: closed.* A fitted opponent rating applied at the decision
+lost 0.91 realized points a fold ([`opponent_projection_note.md`](opponent_projection_note.md)),
+and the frozen Route A candidate was closed as superseded on 2026-09-19 (#88), because the
+two-stage rate it was declared against no longer decides live squads. A new attempt needs a
+new declaration against the component base. What follows is the residual measurement that
+first motivated it.
+
+It was first measured not by wiring it in, but by asking
 whether the operational control's out-of-sample residuals still move with it. They do:
 attackers spread +0.162 across opponent-defence quartiles, monotone across all four;
 goalkeepers and defenders spread +0.322 against opponent attacks, larger but not monotone.
@@ -155,9 +170,10 @@ is not spending it. See [`opponent_strength_signal.md`](opponent_strength_signal
 is evidence for a candidate, not a candidate — consuming it changes the expected-points rate
 and needs its own declaration and a single run under the frozen gates.
 
-`opponent_team_id` at player-gameweek grain remains unmapped for the reason item 10 gives: a
-player with two fixtures in one gameweek has two opponents, so the column has no single
-correct value at that grain.
+*`opponent_team_id` at player-gameweek grain: closed, by design.* It stays unmapped for the
+reason item 10 gives: a player with two fixtures in one gameweek has two opponents, so the
+column has no single correct value at that grain. Fixture context lives at fixture grain in
+`fixture_snapshot_v1` instead.
 
 ### 5. Resolving the archive's price timing
 
@@ -195,10 +211,18 @@ comes back.
 
 ### 6. Additional source columns and older seasons
 
-**Now.** Only columns present in every supported season are mapped, so expected goals,
-expected assists, and `starts` are unused even where the archive has them. Seasons
-before 2020-21 are excluded entirely because their gameweek files omit `position` and
-`team`.
+**When this was written**, only columns present in every supported season were mapped,
+so expected goals, expected assists and `starts` were unused even where the archive had
+them.
+
+**Now.** The canonical panel (`vaastav.build_panel`) carries `starts` as a season-optional
+column for 2023-24, 2024-25 and 2025-26 (`SEASON_OPTIONAL_COLUMNS`). 2022-23 has the column
+but it reads zero for its first fifteen gameweeks, and because cleaning refuses a missing
+value (item 2) that whole season goes without it. Expected goals and expected assists are
+still not on the canonical panel: the football model reads them through its own archive
+reader (`src/squadopt/data/sources/football_history.py`, 2022-23 to 2025-26, with its
+own checks). Seasons before 2020-21 are still excluded because their gameweek files omit
+`position` and `team`.
 
 **Proposal.** Either handle per-season column availability explicitly — a panel with a
 column missing for one season currently fails canonical validation — or restrict the
@@ -229,7 +253,12 @@ ask how often the call happens.
 **Once per run.** Every caller loads the panel at the top and then iterates folds over the
 frame in memory: the `measure_*` and `export_*` scripts, `build_projection_handoff`,
 `recommend_current_squad`, the four `experiments/` studies, and `fpl_capture`'s identity
-check. The other entry point, `build_canonical_dataset`, is reached only by the tests
+check. The member-publication workers (`platform/publication_workers.py`) are the one
+repeated caller: each worker process builds the panel once in its initializer, beside the
+parent's own build (`league_publication.py`), so a league stage run with N workers cleans
+the archive N + 1 times, the workers in parallel. That is still about a second of cleaning
+per process, against a league stage measured in hours, so the answer below does not
+change. The other entry point, `build_canonical_dataset`, is reached only by the tests
 (`tests/integration/test_end_to_end.py`), over the committed synthetic sample.
 
 So a perfect vectorization has a **ceiling of about one second per run**, against walk-forward
@@ -247,12 +276,13 @@ than the archive's nine. Either makes the ceiling worth having; neither is true 
 
 ### 8. A versioned feature-generation contract
 
-**Now.** `FeatureConfig` is explicit, frozen, and validated, but it carries no
-version identifier.
+**When this was written**, `FeatureConfig` was explicit, frozen and validated, but it
+carried no version identifier.
 
 The experiment contract names "a versioned feature-generation contract and
 time-aware historical data pipeline" as the activation dependency for its
-`form_window` factor. The pipeline half is done; the versioning half is not.
+`form_window` factor. The pipeline half was done then; the versioning half is now done
+too (status below).
 
 **Proposal.** A version on `FeatureConfig`, surfaced in whatever record an
 evaluation run writes, so a stored result can be tied to the exact feature
@@ -465,21 +495,6 @@ history. Live capture can observe it; a model cannot be trained on it.
 The archive and live fixture payloads carry the same columns, so one adapter shape reads
 both. The identifier spaces and the missing provenance fields are the only real
 differences.
-
-### 11. A shared contracts module
-
-**Now.** `squadopt.data.schema` imports `Position`, `POSITIONS`, and
-`PROJECTION_REQUIRED_COLUMNS` from the optimization package.
-
-This was chosen on purpose: importing rather than restating means the two layers
-cannot drift apart, and a test locks the expected projection column tuple so an
-upstream change fails loudly. The cost is that the dependency points upward — the
-data layer sits below optimization and should not read from it.
-
-**Proposal.** A neutral module, for example `squadopt/contracts.py`, holding the
-shared vocabulary, with both `data` and `optimization` importing from it. Every
-data-layer reference already points at a single module, so the move itself is
-mechanical once the location is agreed.
 
 ### 12. Import-order inconsistency in tests
 
