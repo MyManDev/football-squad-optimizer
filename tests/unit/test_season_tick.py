@@ -162,6 +162,37 @@ def test_settling_waits_for_the_grace_period_then_polls_then_settles(tmp_path: P
     assert all(a.gameweek != 1 for a in after.actions)
 
 
+def test_a_finished_week_not_yet_checked_is_recaptured_once_the_capture_is_old(
+    tmp_path: Path,
+) -> None:
+    unchecked = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    finished = _capture(tmp_path / "s", "2026-08-25T09:00:00Z", events=unchecked)
+
+    plan = _plan("2026-08-25T22:00:00Z", [finished], LedgerState(decided=frozenset({1})), tmp_path)
+
+    (action,) = [a for a in plan.actions if a.gameweek == 1]
+    assert action.kind == "capture" and action.reason_code == "recapture_for_outcome"
+    assert "not marked finished and checked" in action.reason
+
+
+def test_an_unreadable_checked_flag_holds_the_settle_but_not_the_next_decide(
+    tmp_path: Path,
+) -> None:
+    finished = dict(world_module.EVENTS[0], finished=True)
+    del finished["data_checked"]
+    window = _capture(
+        tmp_path / "s", "2026-08-28T15:10:00Z", events=[finished, *world_module.EVENTS[1:]]
+    )
+
+    plan = _plan(
+        "2026-08-28T16:00:00Z", [window], LedgerState(decided=frozenset({1})), tmp_path / "h"
+    )
+
+    assert all(a.kind != "settle" for a in plan.actions)
+    (next_week,) = [a for a in plan.actions if a.gameweek == 2]
+    assert next_week.handoff_path == str(handoff_path_for(tmp_path / "h", SEASON, 2))
+
+
 def test_a_capture_is_never_requested_twice_in_one_plan(tmp_path: Path) -> None:
     """Settle poll and deadline capture due together: one capture serves both."""
 

@@ -666,9 +666,15 @@ def extract_event_points(snapshot: CapturedSnapshot, *, gameweek: int) -> dict[i
             f"Gameweek {gameweek} is not finished in this capture; realized points "
             "read now would describe matches still being played."
         )
-    if event.get("data_checked") is not True:
+    checked = event.get("data_checked")
+    if checked is not True:
+        state = (
+            "not yet checked"
+            if checked is False
+            else f"its data_checked flag is missing or not a boolean ({checked!r})"
+        )
         raise LedgerError(
-            f"Gameweek {gameweek} is finished but not yet checked in snapshot {snapshot_id!r}; "
+            f"Gameweek {gameweek} is finished but {state} in snapshot {snapshot_id!r}; "
             "bonus may still be landing, so its points are not final. Settle from a capture "
             "taken after the week is checked."
         )

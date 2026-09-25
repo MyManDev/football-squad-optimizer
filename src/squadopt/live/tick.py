@@ -22,7 +22,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Final, Literal
 
-from squadopt.data.errors import DataSourceError
+from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
@@ -175,13 +175,15 @@ def plan_tick(
     # Finished is the last kick-off; checked is bonus landing. The settle refuses a week
     # that is not both, so planning one on `finished` alone would fail the tick every
     # hour between the two. Read only when a week is finished, so a calendar with nothing
-    # to settle never depends on the second flag.
+    # to settle never depends on the second flag. A flag that cannot be read is not a
+    # checked week: the settle waits, and the decide planned below is not blocked by it.
     unsettled = sorted(ledger.decided - ledger.settled)
-    checked = (
-        scored_gameweeks(bootstrap)
-        if any(week in deadlines and deadlines[week].finished for week in unsettled)
-        else frozenset()
-    )
+    checked: frozenset[int] = frozenset()
+    if any(week in deadlines and deadlines[week].finished for week in unsettled):
+        try:
+            checked = scored_gameweeks(bootstrap)
+        except DataError:
+            checked = frozenset()
     settle_capture_requested = False
     for gameweek in unsettled:
         published = deadlines.get(gameweek)

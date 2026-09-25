@@ -229,7 +229,8 @@ is held (or when a decided gameweek needs a post-gameweek capture to settle, pol
 most every 12 h after a 48 h grace); **decide** when an in-window capture exists and the
 gameweek is undecided — GW1 from the capture alone, later gameweeks only if the
 producer's handoff `data/handoffs/<season>-gwNN.json` is present, otherwise it waits and
-names the path; **settle** when the latest capture marks a decided gameweek finished.
+names the path; **settle** when the latest capture marks a decided gameweek finished and
+checked.
 After a capture it re-plans once, so a deadline capture is decided in the same tick.
 Everything is idempotent — a second tick in the same state does nothing — and every
 step is the same code as the manual commands; the tick only chooses the moment. It
