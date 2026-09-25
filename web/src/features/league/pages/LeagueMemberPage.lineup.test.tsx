@@ -18,6 +18,11 @@ import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
+/** A row's figure and its Turkish unit, "8,0 puan": the list never prints the English "xP". */
+const UNIT = MESSAGES.tr.leagueMembers.pointsUnit;
+const FIGURE_IN_POINTS = new RegExp(`^-?\\d+(,\\d+)? ${UNIT}$`);
+const FIGURE_IN_POINTS_ANYWHERE = new RegExp(`\\d ${UNIT}|xP`);
+
 afterEach(cleanup);
 
 const ENTRY = 35249001;
@@ -66,7 +71,7 @@ describe("the advice card carries the whole decision", () => {
     expect(within(lineup).getAllByText(payload.vice_captain!.name).length).toBeGreaterThan(0);
     // The bench is listed in the producer's order, goalkeeper first.
     expect(payload.bench![0]!.position).toBe("GK");
-    const rows = within(lineup).getAllByText(/xP$/);
+    const rows = within(lineup).getAllByText(FIGURE_IN_POINTS);
     expect(rows).toHaveLength(15);
   });
 
@@ -119,9 +124,9 @@ describe("the advice card carries the whole decision", () => {
     }
     // The starter with no figure has neither a bar nor a number; the others have both.
     const silentRow = starters.find((row) => row.textContent!.includes(silent.name))!;
-    expect(silentRow.textContent).not.toMatch(/xP/);
+    expect(silentRow.textContent).not.toMatch(FIGURE_IN_POINTS_ANYWHERE);
     expect(silentRow.querySelector("[style]")).toBeNull();
-    expect(within(lineup).getAllByText(/xP$/)).toHaveLength(14);
+    expect(within(lineup).getAllByText(FIGURE_IN_POINTS)).toHaveLength(14);
     const bars = lineup.querySelectorAll<HTMLElement>("li [style]");
     expect(bars).toHaveLength(14);
     // One scale for the whole list: at least eight points, and at least the biggest figure.
@@ -176,7 +181,7 @@ describe("the advice card carries the whole decision", () => {
 
 describe("the published Free Hit squad basis", () => {
   it.each([
-    ["tr", "Free Hit oynadın; bu öneri GW 2 kadrona göre."],
+    ["tr", "Free Hit oynadın; bu öneri 2. hafta kadrona göre."],
     ["en", "Free Hit played; this advice stands on your GW 2 squad."],
   ] as const)("names the prior squad in %s", (language, expected) => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);

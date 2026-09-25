@@ -812,7 +812,9 @@ function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
         <strong className={board.armName}>{captain.short_name || captain.name}</strong>
         <ClubMark team={captain.team} codes={codes} />
         {finiteNumber(captain.expected_points) ? (
-          <span className={board.armPoints}>{figure(captain.expected_points, locale)} xP</span>
+          <span className={board.armPoints}>
+            {figure(captain.expected_points, locale)} {copy.pointsUnit}
+          </span>
         ) : null}
       </span>
       <span className={board.armband}>
@@ -1376,7 +1378,9 @@ function LineupRow({
       ) : (
         <span />
       )}
-      <span className={lineup.value}>{xp !== null ? `${figure(xp, locale)} xP` : ""}</span>
+      <span className={lineup.value}>
+        {xp !== null ? `${figure(xp, locale)} ${copy.pointsUnit}` : ""}
+      </span>
     </li>
   );
 }

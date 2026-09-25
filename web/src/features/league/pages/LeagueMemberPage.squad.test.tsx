@@ -96,7 +96,7 @@ describe("the member's published squad", () => {
       within(pitch)
         .getAllByRole("listitem")
         .map((row) => row.getAttribute("aria-label")),
-    ).toEqual(["GK", "DEF", "MID", "FWD"]);
+    ).toEqual((["GK", "DEF", "MID", "FWD"] as const).map((code) => copy.positions[code]));
     for (const player of squad.payload.starting_xi) {
       expect(within(pitch).getByTitle(player.name)).toHaveTextContent(player.short_name);
     }

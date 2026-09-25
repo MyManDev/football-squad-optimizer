@@ -142,7 +142,9 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
         {onBench ? ` · ${position(player.position)}` : null}
       </span>
       {finite(player.expected_points) ? (
-        <span className={styles.heldXp}>{figure(player.expected_points, locale)} xP</span>
+        <span className={styles.heldXp}>
+          {figure(player.expected_points, locale)} {copy.pointsUnit}
+        </span>
       ) : null}
     </li>
   );

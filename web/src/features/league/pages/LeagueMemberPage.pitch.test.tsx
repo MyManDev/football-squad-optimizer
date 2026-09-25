@@ -225,16 +225,15 @@ describe("the squad after the transfers, on the pitch", () => {
       ),
     ).toBeInTheDocument();
     const lines = within(pitch(language)).getAllByRole("listitem");
-    expect(lines.map((line) => line.getAttribute("aria-label"))).toEqual([
-      "GK",
-      "DEF",
-      "MID",
-      "FWD",
-    ]);
+    // Each line is named by the position word in the page's language, never by the code.
+    expect(lines.map((line) => line.getAttribute("aria-label"))).toEqual(
+      (["GK", "DEF", "MID", "FWD"] as const).map((code) => copy.positions[code]),
+    );
+    expect(lines.map((line) => line.dataset.line)).toEqual(["gk", "def", "mid", "fwd"]);
     const byLine = (position: string) =>
       Array.from(
         lines
-          .find((line) => line.getAttribute("aria-label") === position)!
+          .find((line) => line.dataset.line === position.toLowerCase())!
           .querySelectorAll("[title]"),
         (plate) => plate.getAttribute("title"),
       );
@@ -264,10 +263,13 @@ describe("the squad after the transfers, on the pitch", () => {
     expect(within(plateOf(BROBBEY.name)).getByText(copy.leagueMembers.boardNew)).toBeTruthy();
     // The club's code from the calendar, the figure as published, trimmed to two places.
     expect(plateOf(HAALAND.name)).toHaveTextContent("MCI");
-    expect(plateOf(HAALAND.name)).toHaveTextContent("8,0 xP");
-    expect(plateOf(MARTIN.name)).toHaveTextContent("3,94 xP");
+    // The unit is the Turkish words a screen reader hears, never the English "xP".
+    const unit = copy.leagueMembers.pointsUnitSpoken;
+    expect(plateOf(HAALAND.name)).toHaveTextContent(`8,0 ${unit}`);
+    expect(plateOf(MARTIN.name)).toHaveTextContent(`3,94 ${unit}`);
+    expect(pitch()).not.toHaveTextContent("xP");
     // A player whose figure is not published shows none, and never a 0.
-    expect(plateOf(SZOBOSZLAI.name)).not.toHaveTextContent(/xP|\d/);
+    expect(plateOf(SZOBOSZLAI.name)).not.toHaveTextContent(new RegExp(`${unit}|\\d`));
   });
 
   it("writes the direction of attack under the first defender in the published order", () => {
@@ -525,6 +527,37 @@ describe("the fixture sheet on a phone", () => {
     expect(screen.getByRole("main")).not.toHaveAttribute("inert");
     // Focus goes back to the button that opened it.
     expect(open).toHaveFocus();
+  });
+});
+
+describe("the reading order around the squad", () => {
+  // Tab order follows the document, so the document has to say what the screen shows.
+  const before = (first: Element, second: Element) =>
+    Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const parts = () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    return {
+      decision: document.querySelector('[data-mark="decision"]')!,
+      how: screen.getByText(copy.howComputed).closest("summary")!,
+      toggle: screen.getByRole("button", { name: copy.viewPitch }),
+    };
+  };
+
+  it("reads the decision, then what to make of it, then the squad on a phone", () => {
+    phone();
+    show("tr");
+    const { decision, how, toggle } = parts();
+    expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
+    expect(before(decision, how)).toBe(true);
+    expect(before(how, toggle)).toBe(true);
+  });
+
+  it("keeps the squad before the honesty block where the squad is drawn first", () => {
+    show("tr");
+    const { decision, how, toggle } = parts();
+    expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
+    expect(before(decision, toggle)).toBe(true);
+    expect(before(toggle, how)).toBe(true);
   });
 });
 
