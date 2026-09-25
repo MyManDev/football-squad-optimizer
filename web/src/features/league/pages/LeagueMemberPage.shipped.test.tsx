@@ -59,6 +59,41 @@ const strays: string[] = [];
 const clients: QueryClient[] = [];
 let consoleErrors: unknown[][] = [];
 
+/** A document as the page is served it: an override first, then the file on disk. */
+function servedText(relative: string): string | null {
+  if (overrides.has(relative)) return overrides.get(relative) ?? null;
+  const path = join(PUBLIC, relative);
+  return existsSync(path) ? readFileSync(path, "utf-8") : null;
+}
+
+function readServed<T>(relative: string): T {
+  const text = servedText(relative);
+  if (text === null) throw new Error(`Not published: ${relative}`);
+  return JSON.parse(text) as T;
+}
+
+/**
+ * A member the served tree publishes a squad and a plan index for. The producer may refuse
+ * any member, in any position on the list, and publish the week anyway.
+ */
+function isAdvised(entryId: number): boolean {
+  const index = servedText(`${LEAGUE}/advice/${entryId}/index.json`);
+  return (
+    servedText(`${LEAGUE}/entries/${entryId}.json`) !== null &&
+    index !== null &&
+    !isRefusedMemberIndex((JSON.parse(index) as LeagueViewEnvelope<EntryAdviceIndex>).payload)
+  );
+}
+
+/** The member the sensitivity check breaks: the first on the list the served tree advises. */
+function firstAdvisedMember(): number | undefined {
+  return humans.find(isAdvised);
+}
+
+/** Read before any test lays an override, so these describe the tree as committed. */
+const advised = firstAdvisedMember();
+const advisedAfterFirst = humans.slice(1).find(isAdvised);
+
 beforeEach(() => {
   vi.stubEnv("MODE", "production");
   vi.stubEnv("DEV", false);
@@ -76,15 +111,9 @@ beforeEach(() => {
         strays.push(address);
         throw new TypeError(`No network in this test: ${address}`);
       }
-      if (overrides.has(relative)) {
-        const body = overrides.get(relative);
-        return body == null ? new Response("", { status: 404 }) : new Response(body);
-      }
-      const path = join(PUBLIC, relative);
-      if (!existsSync(path)) return new Response("", { status: 404 });
-      return new Response(readFileSync(path, "utf-8"), {
-        headers: { "Content-Type": "application/json" },
-      });
+      const body = servedText(relative);
+      if (body === null) return new Response("", { status: 404 });
+      return new Response(body, { headers: { "Content-Type": "application/json" } });
     }),
   );
   const original = console.error;
@@ -145,13 +174,53 @@ function expectNoFailure(language: Language) {
   expect(consoleErrors).toEqual([]);
 }
 
+/**
+ * The reason as the page prints it: a code or sentence the copy knows is shown in the
+ * reader's language (a plan that did not solve is published as `not_solved_for_member`),
+ * and any other reason as it was written.
+ */
+function shownReason(language: Language, reason: string): string {
+  const known = MESSAGES[language].leagueMembers.publicationReasons;
+  return Object.hasOwn(known, reason) ? (known[reason] ?? reason) : reason;
+}
+
 async function expectNotAvailable(language: Language, reason: string) {
   const copy = MESSAGES[language].leagueMembers;
   expect(await screen.findByText(copy.entryNotAvailable, undefined, WAIT)).toBeInTheDocument();
   expect(screen.getByText(copy.entryNotAvailableBody)).toBeInTheDocument();
-  // The reason arrives with the index, which may land after the missing squad.
-  if (reason) expect(await screen.findByText(reason, undefined, WAIT)).toBeInTheDocument();
+  if (reason) {
+    // The reason arrives with the index, which may land after the missing squad.
+    const shown = shownReason(language, reason);
+    expect(await screen.findByText(shown, undefined, WAIT)).toBeInTheDocument();
+    if (shown !== reason) expect(screen.queryByText(reason)).toBeNull();
+  }
   expectNoFailure(language);
+}
+
+/**
+ * Lay the producer's refusal over a real member, as a publish that could not advise it
+ * writes one: the member list reports its data as empty, no squad is published, and the
+ * index is the one `_refused_member_index` writes.
+ */
+function refuseMember(entryId: number, reason: string) {
+  const members = readServed<LeagueViewEnvelope<LeagueMembers>>(`${LEAGUE}/members.json`);
+  for (const row of members.payload.members) {
+    if (row.entry_id === entryId) row.data_quality = "empty";
+  }
+  const refused: LeagueViewEnvelope<EntryAdviceIndex> = {
+    ...members,
+    payload: refusedMemberIndex({
+      leagueId: league!.league_id,
+      season: league!.season,
+      gameweek: league!.gameweek,
+      entryId,
+      rivalEntryIds: humans.filter((id) => id !== entryId).slice(0, 1),
+      reason,
+    }),
+  };
+  overrides.set(`${LEAGUE}/members.json`, JSON.stringify(members));
+  overrides.set(`${LEAGUE}/entries/${entryId}.json`, null);
+  overrides.set(`${LEAGUE}/advice/${entryId}/index.json`, JSON.stringify(refused));
 }
 
 /**
@@ -221,76 +290,79 @@ async function expectMemberDrawn(entryId: number, language: Language) {
   expectNoFailure(language);
 }
 
+/**
+ * Break a real member's plan, then its squad, and require the page to show a failure each
+ * time. The member is chosen from what the tree serves, so it must have a squad and an
+ * index that resolves a plan.
+ */
+async function expectBreakageNoticed(entryId: number) {
+  const index = readServed<LeagueViewEnvelope<EntryAdviceIndex>>(
+    `${LEAGUE}/advice/${entryId}/index.json`,
+  ).payload;
+  const squad = readServed<LeagueViewEnvelope<EntrySquad>>(`${LEAGUE}/entries/${entryId}.json`);
+  const selection = resolvePublishedAdvice(
+    new URLSearchParams(),
+    squad.payload.league_id,
+    entryId,
+    league!.members,
+    index,
+    { season: squad.payload.season, gameweek: squad.payload.gameweek },
+  );
+  expect(selection.status).toBe("ready");
+  const planPath = `${LEAGUE}/${selection.path!}`;
+  const plan = readServed<LeagueViewEnvelope<EntryAdvice>>(planPath);
+  overrides.set(planPath, JSON.stringify({ ...plan, payload: { ...plan.payload, moves: null } }));
+  await expect(expectMemberDrawn(entryId, "en")).rejects.toThrow();
+
+  cleanup();
+  overrides.delete(planPath);
+  overrides.set(
+    `${LEAGUE}/entries/${entryId}.json`,
+    JSON.stringify({ ...squad, payload: { ...squad.payload, starting_xi: null } }),
+  );
+  openMemberPage(entryId, "en");
+  const copy = MESSAGES.en.leagueMembers;
+  expect(await screen.findByText(copy.entryUnreadable, undefined, WAIT)).toBeInTheDocument();
+  expect(() => expectNoFailure("en")).toThrow();
+}
+
+const FREE_HIT = `Entry ${humans[0]} played a Free Hit in gameweek ${(league?.gameweek ?? 1) - 1}.`;
+
 describe.skipIf(!shipped)("every member page, from the published tree", () => {
   describe.each(["tr", "en"] as const)("in %s", (language) => {
     it.each(humans)("draws member %i with its heading and its decision", async (entryId) => {
       await expectMemberDrawn(entryId, language);
     });
 
-    it("draws a member the producer refused as not available, with the reason", async () => {
-      // The refusal is laid over a real member, so this runs whether or not the tree holds
-      // one: the member list reports no advice, no squad is published, and the index is the
-      // one the producer writes.
+    // The refusal is laid over a real member, so these run whether or not the tree holds
+    // one. A sentence the copy does not know is printed as written; the code the producer
+    // writes for a plan that did not solve is printed as the copy's sentence, never as code.
+    it.each([
+      ["a sentence the copy does not know", FREE_HIT],
+      ["the code for a plan that did not solve", "not_solved_for_member"],
+    ])("draws a refused member as not available, giving %s", async (_, reason) => {
       const entryId = humans[0]!;
-      const reason = `Entry ${entryId} played a Free Hit in gameweek ${league!.gameweek - 1}.`;
-      const members = readPublished<LeagueViewEnvelope<LeagueMembers>>(`${LEAGUE}/members.json`);
-      for (const row of members.payload.members) {
-        if (row.entry_id === entryId) row.data_quality = "empty";
-      }
-      const refused: LeagueViewEnvelope<EntryAdviceIndex> = {
-        ...members,
-        payload: refusedMemberIndex({
-          leagueId: league!.league_id,
-          season: league!.season,
-          gameweek: league!.gameweek,
-          entryId,
-          rivalEntryIds: humans.filter((id) => id !== entryId).slice(0, 1),
-          reason,
-        }),
-      };
-      overrides.set(`${LEAGUE}/members.json`, JSON.stringify(members));
-      overrides.set(`${LEAGUE}/entries/${entryId}.json`, null);
-      overrides.set(`${LEAGUE}/advice/${entryId}/index.json`, JSON.stringify(refused));
-
+      refuseMember(entryId, reason);
       openMemberPage(entryId, language);
       await expectNotAvailable(language, reason);
     });
   });
 
-  it("would notice a page that cannot draw a member's decision or squad", async () => {
-    // A check that has only ever seen good documents proves nothing about its own
-    // sensitivity. Break a real member's plan, then its squad, and require a failure.
-    const entryId = humans[0]!;
-    const index = readPublished<LeagueViewEnvelope<EntryAdviceIndex>>(
-      `${LEAGUE}/advice/${entryId}/index.json`,
-    ).payload;
-    const squad = readPublished<LeagueViewEnvelope<EntrySquad>>(
-      `${LEAGUE}/entries/${entryId}.json`,
-    );
-    const selection = resolvePublishedAdvice(
-      new URLSearchParams(),
-      squad.payload.league_id,
-      entryId,
-      league!.members,
-      index,
-      { season: squad.payload.season, gameweek: squad.payload.gameweek },
-    );
-    const plan = readPublished<LeagueViewEnvelope<EntryAdvice>>(`${LEAGUE}/${selection.path!}`);
-    overrides.set(
-      `${LEAGUE}/${selection.path!}`,
-      JSON.stringify({ ...plan, payload: { ...plan.payload, moves: null } }),
-    );
-    await expect(expectMemberDrawn(entryId, "en")).rejects.toThrow();
+  // A check that has only ever seen good documents proves nothing about its own sensitivity.
+  it.skipIf(advised === undefined)(
+    "would notice a page that cannot draw a member's decision or squad",
+    async () => {
+      await expectBreakageNoticed(advised!);
+    },
+  );
 
-    cleanup();
-    overrides.clear();
-    overrides.set(
-      `${LEAGUE}/entries/${entryId}.json`,
-      JSON.stringify({ ...squad, payload: { ...squad.payload, starting_xi: null } }),
-    );
-    openMemberPage(entryId, "en");
-    const copy = MESSAGES.en.leagueMembers;
-    expect(await screen.findByText(copy.entryUnreadable, undefined, WAIT)).toBeInTheDocument();
-    expect(() => expectNoFailure("en")).toThrow();
-  });
+  it.skipIf(advisedAfterFirst === undefined)(
+    "checks its own sensitivity on the next advised member when the first is refused",
+    async () => {
+      refuseMember(humans[0]!, FREE_HIT);
+      const chosen = firstAdvisedMember();
+      expect(chosen).toBe(advisedAfterFirst);
+      await expectBreakageNoticed(chosen!);
+    },
+  );
 });

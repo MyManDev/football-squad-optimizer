@@ -5,8 +5,11 @@ import type { EntryAdviceIndex } from "../features/league/types";
 // strategy listed with pure points first, nothing computed, no window promised for any
 // strategy, no suggestion, and the one reason once per strategy with no rival and no window.
 // No squad is published beside it and the member list reports the member's data as empty.
-// The page accepts it through the ordinary index validator and prints the reason where the
-// squad would be, so a tree holding one is honest, not broken.
+// The page accepts it through the ordinary index validator and shows the reason where the
+// squad would be, so a tree holding one is honest, not broken. A reason the copy knows is
+// shown as the copy's sentence in the reader's language, never as written: a plan the
+// planner or solver could not produce is published as the code `not_solved_for_member`.
+// Any other reason is shown as written.
 
 export const REFUSED_STRATEGIES = ["saf-puan", "ortak-koru", "fark-yarat"] as const;
 

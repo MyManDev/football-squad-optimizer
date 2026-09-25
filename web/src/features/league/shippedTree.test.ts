@@ -58,7 +58,8 @@ function walk(directory: string, found: string[] = []): string[] {
  * baseline (pure points, one week) must resolve, and its path is returned for the caller to
  * find on disk. A refused member's index must be the producer's refusal and nothing more:
  * the page never reads a plan for it, the member list says there is none, and no squad is
- * published, so the page says the member is not available and prints the index's reason.
+ * published, so the page says the member is not available and shows the index's reason
+ * (a code or sentence the copy knows, as the copy's sentence in the reader's language).
  */
 function holdMemberIndex(
   entryId: number,
