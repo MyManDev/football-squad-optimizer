@@ -22,7 +22,10 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.team_rating import (
     DixonColesConfig,
     _calibrated_clean_sheet,

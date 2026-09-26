@@ -1,5 +1,8 @@
 """Compatibility and deterministic evidence across the shared-layer extraction."""
 
+import ast
+from pathlib import Path
+
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
@@ -16,7 +19,6 @@ from squadopt.experiments import (
     ScreeningExperimentConfig,
 )
 from squadopt.experiments import config as experiment_config
-from squadopt.experiments import statistics as experiment_statistics
 from squadopt.optimization import config as optimizer_config
 from squadopt.optimization import validation
 from squadopt.optimization.coefficients import objective_coefficient_fingerprint
@@ -28,19 +30,9 @@ def test_legacy_imports_reexport_the_shared_objects() -> None:
     assert optimizer_config.POSITIONS is schema.POSITIONS is POSITIONS
     assert validation.REQUIRED_COLUMNS is schema.PROJECTION_REQUIRED_COLUMNS is REQUIRED_COLUMNS
     assert legacy_sort is sort_players_by_id
-    assert experiment_config.PromotionPolicy is PromotionPolicy is promotion.PromotionPolicy
+    assert PromotionPolicy is promotion.PromotionPolicy
     assert ExperimentError is promotion.ExperimentError
     assert ExperimentConfigurationError is promotion.ExperimentConfigurationError
-    assert experiment_statistics._percentile is statistics._percentile
-    assert experiment_statistics._bootstrap_seed is statistics._bootstrap_seed
-    assert (
-        experiment_statistics.season_aware_moving_block_indices
-        is statistics.season_aware_moving_block_indices
-    )
-    assert (
-        experiment_statistics.season_aware_moving_block_interval
-        is statistics.season_aware_moving_block_interval
-    )
 
 
 @pytest.mark.parametrize(
@@ -94,7 +86,7 @@ def test_shared_policy_errors_remain_catchable_by_legacy_hierarchy() -> None:
 
     assert type(caught.value) is ExperimentConfigurationError
     assert str(caught.value) == "moving_block_length must be at least 1."
-    assert issubclass(experiment_config.ExperimentExecutionError, ExperimentError)
+    assert issubclass(promotion.ExperimentExecutionError, ExperimentError)
     assert issubclass(experiment_config.FrozenCandidateError, ExperimentError)
 
 
@@ -118,3 +110,93 @@ def test_projection_and_policy_fingerprints_preserve_pre_extraction_values() -> 
     assert ProductionBenchmarkConfig().configuration_fingerprint == (
         "34a94f823b0fa2ef485199d7a9325a16aa607316fd57cc12904e882c4f420641"
     )
+
+
+# The 2026-09-10 one-release re-exports, removed on 2026-09-26 once site releases had shipped
+# (docs/architecture/dependency_rules.md, rule 2). Each old module maps to the names it no
+# longer serves; the names live in `data`, `contracts`, `evaluation` and `application` now.
+_REMOVED_RE_EXPORTS: dict[str, frozenset[str]] = {
+    "squadopt.backtest.export_precision": frozenset(
+        {"EXPORT_LINE_TERMINATOR", "write_export_table"}
+    ),
+    "squadopt.bayesopt.models": frozenset(
+        {
+            "BayesianFactor",
+            "BayesianOptimizationConfigurationError",
+            "BayesianOptimizationError",
+            "FactorKind",
+        }
+    ),
+    "squadopt.experiments.config": frozenset(
+        {
+            "ExperimentConfigurationError",
+            "ExperimentError",
+            "ExperimentExecutionError",
+            "PromotionPolicy",
+        }
+    ),
+    "squadopt.experiments.statistics": frozenset(
+        {
+            "_bootstrap_seed",
+            "_percentile",
+            "season_aware_moving_block_indices",
+            "season_aware_moving_block_interval",
+        }
+    ),
+    "squadopt.platform.capture_context": frozenset(
+        {"CapturePicksProvider", "capture_element_codes"}
+    ),
+    "squadopt.preflight.validator": frozenset({"compute_table_sha256"}),
+}
+_REMOVED_MODULES = ("squadopt.platform._long_paths",)
+_REPOSITORY = Path(__file__).resolve().parents[2]
+
+
+def _module_file(module: str) -> Path:
+    return _REPOSITORY / "src" / Path(*module.split(".")).with_suffix(".py")
+
+
+def test_the_removed_re_exports_are_not_declared_again() -> None:
+    for module in _REMOVED_MODULES:
+        assert not _module_file(module).exists(), module
+    for module, names in _REMOVED_RE_EXPORTS.items():
+        source = _module_file(module).read_text(encoding="utf-8")
+        assert "Compatibility re-export" not in source, module
+        assert "for one release" not in source, module
+        assert not names & _declared_exports(ast.parse(source)), module
+
+
+def _declared_exports(tree: ast.Module) -> set[str]:
+    """Names a module re-exports explicitly: `import x as x` aliases and `__all__` entries."""
+    declared: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            declared |= {alias.name for alias in node.names if alias.asname == alias.name}
+        elif isinstance(node, ast.Assign | ast.AnnAssign) and node.value is not None:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(target, ast.Name) and target.id == "__all__" for target in targets):
+                declared |= {
+                    item.value
+                    for item in ast.walk(node.value)
+                    if isinstance(item, ast.Constant) and isinstance(item.value, str)
+                }
+    return declared
+
+
+def test_nothing_imports_a_moved_name_from_its_old_module() -> None:
+    old_paths = {*_REMOVED_RE_EXPORTS, *_REMOVED_MODULES}
+    found: list[str] = []
+    for root in ("src", "tests", "scripts"):
+        for path in sorted((_REPOSITORY / root).rglob("*.py")):
+            source = path.read_text(encoding="utf-8")
+            if not any(module in source for module in old_paths):
+                continue
+            for node in ast.walk(ast.parse(source)):
+                if not isinstance(node, ast.ImportFrom) or node.module is None:
+                    continue
+                banned = _REMOVED_RE_EXPORTS.get(node.module, frozenset())
+                names = {alias.name for alias in node.names}
+                if node.module in _REMOVED_MODULES or names & banned:
+                    found.append(f"{path.relative_to(_REPOSITORY)}:{node.lineno}")
+
+    assert found == []

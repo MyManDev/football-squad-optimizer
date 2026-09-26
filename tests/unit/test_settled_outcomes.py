@@ -21,6 +21,7 @@ from scripts.export_settled_outcomes import (
 )
 
 from squadopt.application.evidence_io import write_json
+from squadopt.data.checksums import compute_table_sha256
 from squadopt.data.errors import DataSourceError, DataValidationError, DuplicateRecordsError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
@@ -34,7 +35,6 @@ from squadopt.features.settled_outcomes import (
     build_settled_outcomes,
     read_settled_outcomes_artifact,
 )
-from squadopt.preflight.validator import compute_table_sha256
 
 SEASON = "2026-27"
 GAMEWEEK = 4

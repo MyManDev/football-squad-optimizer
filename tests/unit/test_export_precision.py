@@ -22,9 +22,9 @@ from squadopt.backtest.export_precision import (
     measure_export_precision,
     precision_to_dict,
     precision_to_markdown,
-    write_export_table,
 )
 from squadopt.backtest.splits import BacktestConfigurationError
+from squadopt.data.tables import write_export_table
 from squadopt.preflight import compute_table_sha256
 
 

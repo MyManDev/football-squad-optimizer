@@ -56,7 +56,7 @@ from math import ceil, isfinite
 from numbers import Real
 from typing import Final
 
-from squadopt.experiments.config import ExperimentConfigurationError
+from squadopt.evaluation.promotion import ExperimentConfigurationError
 from squadopt.optimization.coefficients import scale_expected_points
 
 #: This criterion by name and version. A change to the arithmetic, the sides or the

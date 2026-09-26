@@ -32,7 +32,7 @@ import numpy as np
 from scipy.stats import qmc
 
 from squadopt.bayesopt import BayesianCandidate, BayesianFactor
-from squadopt.experiments.config import (
+from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )

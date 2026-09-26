@@ -40,7 +40,7 @@ from typing import Final
 
 import pandas as pd
 
-from squadopt.experiments.config import (
+from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )

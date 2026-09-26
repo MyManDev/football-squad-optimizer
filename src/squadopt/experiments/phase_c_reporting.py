@@ -10,7 +10,7 @@ from squadopt.evaluation import (
     PhaseCComponentEvaluation,
     PhaseCDecisionComparison,
 )
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.phase_c_ablation import (
     PhaseCAblationEvaluation,
     PhaseCArmEvaluation,

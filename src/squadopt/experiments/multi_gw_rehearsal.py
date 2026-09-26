@@ -33,7 +33,7 @@ from squadopt.backtest import (
     season_ranks,
     walk_forward_decision_points,
 )
-from squadopt.experiments.config import (
+from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )

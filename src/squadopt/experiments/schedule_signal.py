@@ -42,7 +42,10 @@ import numpy as np
 import pandas as pd
 
 from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.optimization import OptimizationConfig, optimize_squad
 
 SCHEDULE_SIGNAL_STUDY_CONTRACT_VERSION: Final = "schedule_signal_study_v1"
