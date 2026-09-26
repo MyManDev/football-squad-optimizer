@@ -24,9 +24,9 @@ Companion documents: [candidate gate](candidate_gate_spec.md),
    expected-minutes stage, cold-start ladder, availability rule, optimization
    contract, promotion gates), evaluation objective
    (`single_gameweek_realized_squad_points_v1`), and source reference.
-4. **Declaration reviewed.** All three owners have read the declaration. The review
-   confirms the changed component is singular and every frozen component is actually
-   unchanged in the code.
+4. **Declaration reviewed.** Both owners have read the declaration (all three until the
+   team change of 2026-09-25). The review confirms the changed component is singular and
+   every frozen component is actually unchanged in the code.
 5. **Fingerprints frozen.** `declaration_fingerprint` and the benchmark
    `configuration_fingerprint` are computed and recorded (issue comment or committed
    doc) **before** execution. From this point the declaration and the benchmark

@@ -23,6 +23,8 @@ export interface EvidenceCopy {
   intro: (clubs: number) => string;
   unchanged: string;
   changed: string;
+  /** The same, where no price is printed above to point at. */
+  changedNoPrice: string;
   wordsUnresolved: string;
   wordsWithheld: string;
   speakers: Record<string, string>;
@@ -50,6 +52,7 @@ const en: EvidenceCopy = {
     `Declared rule, not measured: a stated absence keeps a player out of the eleven, a stated doubt off the armband. Clubs read: ${clubs}.`,
   unchanged: "The club's page did not change this plan.",
   changed: "The club's page changed this plan; the cost is stated above.",
+  changedNoPrice: "The club's page changed this plan.",
   wordsUnresolved: "The cited words could not be resolved.",
   wordsWithheld: "The quote carries wording this site does not publish; read it at the source.",
   speakers: {
@@ -87,6 +90,7 @@ const tr: EvidenceCopy = {
     `Beyan edilmiş kural, ölçülmemiş: söylenmiş yokluk on birin, söylenmiş şüphe kaptanlığın dışında tutar. Okunan kulüp: ${clubs}.`,
   unchanged: "Kulübün sayfası bu planı değiştirmedi.",
   changed: "Kulübün sayfası bu planı değiştirdi; bedeli yukarıda yazılı.",
+  changedNoPrice: "Kulübün sayfası bu planı değiştirdi.",
   wordsUnresolved: "Alıntı çözülemedi.",
   wordsWithheld: "Alıntı bu sitenin yayımlamadığı bir ifade içeriyor; kaynağından okuyun.",
   speakers: {

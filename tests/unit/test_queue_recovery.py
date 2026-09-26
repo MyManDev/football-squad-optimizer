@@ -60,7 +60,7 @@ if boundary == 'cache':
     c.put = stop_after_cache
 if boundary == 'terminal':
     q._cleanup = lambda job: os._exit(73)
-q.complete(running, cache=c, payload=b'answer', at_utc='2026-08-27T12:00:02Z')
+q.complete(running, cache=c, payload=b'"answer"', at_utc='2026-08-27T12:00:02Z')
 raise AssertionError('crash boundary not reached')
 """
 
@@ -110,7 +110,7 @@ def test_polling_read_and_terminal_replace_share_the_process_lock(tmp_path: Path
 
     def complete() -> AdviceJob:
         started.set()
-        return queue.complete(running, cache=cache, payload=b"answer", at_utc=LATER)
+        return queue.complete(running, cache=cache, payload=b'"answer"', at_utc=LATER)
 
     try:
         assert child.stdin is not None and child.stdout is not None
@@ -128,7 +128,7 @@ def test_polling_read_and_terminal_replace_share_the_process_lock(tmp_path: Path
                 child.stdin.flush()
             completed = future.result(timeout=10)
         assert completed.status == "completed"
-        assert cache.get(KEY) == b"answer"
+        assert cache.get(KEY) == b'"answer"'
         assert queue.load("job-one") == completed
         _stdout, stderr = child.communicate(timeout=10)
         assert child.returncode == 0, stderr
@@ -159,11 +159,11 @@ def test_process_death_prefix_is_recoverable(tmp_path: Path, boundary: str) -> N
         winner, created = queue.submit_unique(job("retry"))
         assert not created and winner.job_id == "job-one"
         done = run_advice_worker_once(
-            queue, cache, lambda _: b"answer", at_utc=LATER, terminal_at_utc=lambda: LATER
+            queue, cache, lambda _: b'"answer"', at_utc=LATER, terminal_at_utc=lambda: LATER
         )
         assert done is not None and done.status == "completed"
         assert done.attempt == (2 if boundary in {"cache", "requeue"} else 1)
-    assert cache.get(KEY) == b"answer"
+    assert cache.get(KEY) == b'"answer"'
 
 
 def test_old_attempt_cannot_heartbeat_store_or_publish(tmp_path: Path) -> None:
@@ -182,12 +182,12 @@ def test_old_attempt_cannot_heartbeat_store_or_publish(tmp_path: Path) -> None:
     with pytest.raises(AdviceLeaseLostError):
         queue.store(old.transition("completed", at_utc=LATER, result_ref=KEY))
     with pytest.raises(AdviceLeaseLostError):
-        queue.complete(old, cache=cache, payload=b"obsolete", at_utc=LATER)
+        queue.complete(old, cache=cache, payload=b'"obsolete"', at_utc=LATER)
     assert marker.stat().st_mtime_ns == marker_before
     assert cache.get(KEY) is None
     assert queue.load(old.job_id) == current
-    queue.complete(current, cache=cache, payload=b"current", at_utc=LATER)
-    assert cache.get(KEY) == b"current"
+    queue.complete(current, cache=cache, payload=b'"current"', at_utc=LATER)
+    assert cache.get(KEY) == b'"current"'
 
 
 def test_worker_discarding_a_lost_attempt_does_not_fail_the_replacement(tmp_path: Path) -> None:
@@ -198,7 +198,7 @@ def test_worker_discarding_a_lost_attempt_does_not_fail_the_replacement(tmp_path
     def overtaken(_: AdviceJob) -> bytes:
         queue.recover(at_utc=LATER, lease_seconds=0)
         assert queue.claim(at_utc=LATER) is not None
-        return b"obsolete"
+        return b'"obsolete"'
 
     assert (
         run_advice_worker_once(queue, cache, overtaken, at_utc=START, terminal_at_utc=lambda: LATER)

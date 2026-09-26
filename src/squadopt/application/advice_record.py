@@ -80,10 +80,16 @@ from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLI
 #: that cannot be read as one, which is what v1 and v2 are: a reader of v2 that meets a key
 #: it does not know ignores it, and a reader that wants a key an older document lacks gets
 #: ``None``, which the document means rather than a value it is missing. Moving the version
-#: for an additive field would make every older record unreadable to gain nothing, and this
-#: string is read nowhere outside this module, so the move would be inert as well. A field
-#: whose absence cannot be read as absent, or a changed meaning for an existing key, is what
-#: moves it.
+#: for an additive field would make every older record unreadable to gain nothing: the
+#: settled reader (``weekly_suggestion_eval.select_record``) refuses a record carrying any
+#: other version. A field whose absence cannot be read as absent, or a changed meaning for an
+#: existing key, is what moves it.
+#:
+#: ``told.source`` ``page_default`` and the ``suggested_strategy`` field did not move it.
+#: ``told`` keeps its meaning, the document the member's page opens on, and now states it
+#: truly; ``suggested_strategy`` is written on every new record, ``None`` when the rule
+#: stated nothing, so its absence marks an older record rather than an empty value. How an
+#: older record is read is in :func:`build_member_advice_record`.
 MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks
@@ -506,6 +512,7 @@ def build_member_advice_record(
     generated_at_utc: str,
     league_view_contract_version: str,
     told: Mapping[str, object] | None = None,
+    suggested_strategy: Mapping[str, object] | None = None,
     transfer_config_fingerprint: str | None = None,
     commit: str | None = None,
     published_index: tuple[str, bytes] | None = None,
@@ -523,7 +530,22 @@ def build_member_advice_record(
     over bytes carrying it; :func:`record_member_advice` is where that is read as a replay.
 
     ``told`` names the document the member's page points at, so a later page can tell what
-    we told them from what we merely also computed.
+    we told them from what we merely also computed. The page opens on the one-week
+    pure-points plan and never preselects the declared rule's pick, so the publish passes
+    ``saf-puan/1.json`` here with ``source`` ``page_default``. ``suggested_strategy`` is the
+    rule's pick as the member's index published it, plus the ``published_path`` of its
+    one-week file (``None`` there when that file was not written); the field is ``None``
+    when the rule stated nothing, and it is written on every record either way.
+
+    An older record has no ``suggested_strategy`` key, and its ``told.source`` is
+    ``baseline`` or ``suggested_strategy``. ``baseline`` named the same document a new
+    record names. ``suggested_strategy`` named the rule's pick as told although the page
+    never opened on it, so for such a record ``told`` is what the page marked and
+    ``advice/<id>/saf-puan/1.json`` is what it showed; the two are one document whenever
+    ``told.strategy`` is ``saf-puan``. The readers in this repository (the settled review in
+    ``weekly_suggestion_eval``, the history rows, the settled publication, the price honesty
+    measurement and the Top 100 effect reader) take the pure-points document by its address
+    and never read ``told``, so they read both shapes the same way.
     """
 
     if not published:
@@ -559,6 +581,11 @@ def build_member_advice_record(
         "league_view_contract_version": league_view_contract_version,
         "player_id_space": PLAYER_ID_SPACE,
         "told": dict(told) if told is not None else None,
+        # The rule's pick, kept apart from ``told``: the page labels it and does not open
+        # on it. Always written, so an absent key means an older record, never "no pick".
+        "suggested_strategy": (
+            dict(suggested_strategy) if suggested_strategy is not None else None
+        ),
         # The state the advice was computed from. Without it a review page cannot tell a
         # member who ignored the advice from one who could not afford it, or read a plan
         # that spent a second free transfer the source never proved they had.
