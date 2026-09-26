@@ -584,7 +584,7 @@ class FileJobQueue:
             if create:
                 os.link(temporary, path)
             else:
-                os.replace(temporary, path)
+                replace_retrying(Path(temporary), path)
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)

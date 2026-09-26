@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from squadopt.data._long_paths import addressable
+from squadopt.data.atomic import replace_retrying
 from squadopt.live import InSeasonProjection, read_projection_handoff, write_projection_handoff
 
 
@@ -94,7 +95,7 @@ def publish_retained_handoff(path: Path, projection: InSeasonProjection) -> Path
         # Windows requires a writable handle for fsync/_commit.
         with temporary.open("r+b") as stream:
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        replace_retrying(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
     return path
