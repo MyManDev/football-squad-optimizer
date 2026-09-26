@@ -5,15 +5,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import secrets
 import shutil
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from squadopt.application.advice_record import load_member_advice_record, record_directory
 from squadopt.application.commands import DecideRequest, decide
 from squadopt.application.evidence_io import write_json
 from squadopt.application.league_publication import LeaguePublicationRequest, publish_league
@@ -143,6 +145,38 @@ def recorded_capture_directories(root: Path, season: str) -> list[Path]:
     )
 
 
+_ENTRY_DIRECTORY = re.compile(r"entry-([1-9][0-9]*)")
+
+
+def recorded_commits(root: Path, season: str, gameweek: int, snapshot_id: str) -> dict[int, object]:
+    """The commit each member's record of one capture names, by entry id.
+
+    Only members with a record of this capture appear. Each record is read the way every
+    reader of the store reads one, through its manifest, so a record that fails its own
+    digests is refused here rather than at the end of the league stage. A record that names
+    no commit maps to ``None``: there is nothing to compare, and the league stage's own
+    comparison of the whole record still applies to it.
+    """
+
+    week = root / season / f"gw{gameweek:02d}"
+    if not week.is_dir():
+        return {}
+    found: dict[int, object] = {}
+    for member in sorted(week.iterdir()):
+        matched = _ENTRY_DIRECTORY.fullmatch(member.name)
+        if matched is None or not member.is_dir():
+            continue
+        entry_id = int(matched.group(1))
+        if not record_directory(root, season, gameweek, entry_id, snapshot_id).is_dir():
+            continue
+        record = load_member_advice_record(root, season, gameweek, entry_id, snapshot_id)
+        provenance = record.get("provenance")
+        found[entry_id] = (
+            provenance.get("repository_commit") if isinstance(provenance, Mapping) else None
+        )
+    return found
+
+
 class WeeklyOperations:
     log: RunLog
     """Set by :meth:`execute`; the stages record through it."""
@@ -158,6 +192,7 @@ class WeeklyOperations:
         handoff: Path | None = None,
         record_advice: bool = False,
         publish_suffix: str = "",
+        no_advice_record: bool = False,
     ) -> None:
         if paths.out == paths.journal / "preview":
             paths = replace(paths, out=paths.journal / run_id / "preview")
@@ -165,6 +200,7 @@ class WeeklyOperations:
         self.repository_commit, self.resume = repository_commit, resume
         self.supplied_handoff = handoff
         self.record_advice = record_advice
+        self.no_advice_record = no_advice_record
         self.publish_names = PublishNames(
             request.season, request.gameweek, "decision", publish_suffix
         )
@@ -206,12 +242,21 @@ class WeeklyOperations:
             "ledger_inputs": list(map(str, self.ledger_inputs)),
             "record_inputs": list(map(str, self.record_inputs)),
         }
-        if record_advice or publish_suffix:
+        if record_advice or publish_suffix or no_advice_record:
             declaration["publication_options"] = {
                 "record_advice": record_advice,
                 "publish_suffix": publish_suffix,
+                "no_advice_record": no_advice_record,
             }
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
+
+    @property
+    def records_advice(self) -> bool:
+        """Whether the league stage writes the advice record: publication or explicit
+        recording asks for it, and ``--no-advice-record`` turns it off for a publication,
+        as the hand publish's switch of the same name does."""
+
+        return (self.request.publish or self.record_advice) and not self.no_advice_record
 
     def _receipt(
         self, name: str, value: dict[str, Any], outputs: tuple[Path, ...] = ()
@@ -249,6 +294,7 @@ class WeeklyOperations:
             rotation_root=self.paths.rotation,
             rules=rules,
         )
+        self._refuse_a_record_from_another_commit()
         if self.request.publish:
             # The publish stage checks this too, but only after every capture and solve
             # has been spent; asked here first so a run off the fresh origin/develop
@@ -271,6 +317,46 @@ class WeeklyOperations:
                 "decide_skip_reason": prepared.decide_skip_reason,
                 "mode_rule": MODE_RULE,
             },
+        )
+
+    def _refuse_a_record_from_another_commit(self) -> None:
+        """Stop a reused capture that already holds advice records from another commit.
+
+        A record is immutable and carries the commit that wrote it, so the league stage
+        refuses to record the same capture again from any other commit, and it finds out only
+        at its end, after every member has been solved (``advice_record._reconciled``). A
+        capture this run takes itself has no records yet, and a run that records nothing
+        cannot conflict, so only a reused capture this run would record is read. A record
+        that names no commit is not refused here: the record writer matches an unknown commit
+        against a known one rather than refusing it.
+        """
+
+        capture = self.request.snapshot_id
+        if capture is None or not self.records_advice:
+            return
+        recorded = recorded_commits(
+            self.paths.records, self.request.season, self.request.gameweek, capture
+        )
+        by_commit: dict[str, list[int]] = {}
+        for entry_id, commit in sorted(recorded.items()):
+            if commit is not None and commit != self.repository_commit:
+                by_commit.setdefault(str(commit), []).append(entry_id)
+        if not by_commit:
+            return
+        named = "; ".join(
+            f"{commit} ({'entry' if len(entries) == 1 else 'entries'} "
+            f"{', '.join(str(entry) for entry in entries)})"
+            for commit, entries in sorted(by_commit.items())
+        )
+        raise WeekError(
+            f"Capture {capture} already has advice records for {self.request.season} gameweek "
+            f"{self.request.gameweek} written by commit {named}, and this run's source "
+            f"revision is {self.repository_commit}. A record is immutable, so the league stage "
+            "would refuse to record this capture again from another commit, and only at its "
+            "end, after every member is solved. Stopped before any capture or solve. "
+            "Recovery: drop --snapshot-id so the run takes a fresh capture before the "
+            "deadline, which is recorded under its own directory; or publish without "
+            "recording (--publish --no-advice-record), which keeps the existing records."
         )
 
     def _cohort(self) -> WeeklyStageResult:
@@ -547,9 +633,10 @@ class WeeklyOperations:
         )
 
     def _league(self) -> WeeklyStageResult:
-        # Publication or explicit recording writes the record before history reads it.
-        # The publish stage copies this preview rather than solving again.
-        record = self.request.publish or self.record_advice
+        # Publication or explicit recording writes the record before history reads it,
+        # unless --no-advice-record turned it off. The publish stage copies this preview
+        # rather than solving again.
+        record = self.records_advice
         request = LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
@@ -732,6 +819,14 @@ class WeeklyOperations:
             stages=list(self.stages),
             resume=self.resume,
         )
+        if self.no_advice_record:
+            # A publication with no record of what it told the members is stated where the
+            # status page reads, not only in the journal's league receipt.
+            self.log.event(
+                "tick.week.advice_record.skipped",
+                reason="--no-advice-record",
+                capture=self.request.snapshot_id,
+            )
         with (
             QueueFileLock(p.journal / ".workspace.lock", timeout_seconds=0).hold(),
             self.run.hold(),
@@ -889,6 +984,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--record-advice", action="store_true", help="Record advice even without --publish."
     )
     parser.add_argument(
+        "--no-advice-record",
+        action="store_true",
+        help="Publish without recording the advice, as the hand publish's switch of the same "
+        "name does. The escape when the reused capture already holds records from another "
+        "commit and the deadline will not wait; the existing records are kept.",
+    )
+    parser.add_argument(
         "--publish-suffix", default="", help="Suffix for the site publication branch."
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -956,6 +1058,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.publish_suffix and not args.publish:
         parser.error("--publish-suffix requires --publish")
+    if args.no_advice_record and not args.publish:
+        parser.error("--no-advice-record requires --publish")
+    if args.no_advice_record and args.record_advice:
+        parser.error("--no-advice-record and --record-advice contradict each other")
     root = args.workspace.resolve()
     out = (root / args.out).resolve() if args.out is not None else None
     paths = WeeklyPaths.under(root, out=out)
@@ -988,8 +1094,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(request.plan().describe())
         names = PublishNames(request.season, request.gameweek, "decision", args.publish_suffix)
+        recording = (
+            "False (--no-advice-record)"
+            if args.no_advice_record
+            else str(request.publish or args.record_advice)
+        )
         print(
-            f"Record advice: {request.publish or args.record_advice}; "
+            f"Record advice: {recording}; "
             f"publish suffix: {args.publish_suffix or '(none)'}; site branch: {names.branch}"
         )
         if args.dry_run:
@@ -1011,6 +1122,7 @@ def main(argv: list[str] | None = None) -> int:
             handoff=handoff,
             record_advice=args.record_advice,
             publish_suffix=args.publish_suffix,
+            no_advice_record=args.no_advice_record,
         )
         completed = operation.execute()
         print(f"Verified weekly run: {completed}")
