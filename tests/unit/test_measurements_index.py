@@ -43,6 +43,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCS = REPOSITORY_ROOT / "docs"
 INDEX = DOCS / "measurements_index.md"
@@ -356,6 +358,13 @@ def test_every_artifact_that_flags_a_holdout_read_is_named_in_the_header() -> No
 PROJECTION_AUDIT = DOCS / "live_projection_audit.json"
 PROJECTION_AUDIT_PREREG = DOCS / "live_projection_audit_prereg.md"
 NEVER_MIXED = "never mixed with a live one"
+# The pooling rule the reader below re-derives, copied here rather than imported from the runner:
+# if the runner changes its rule, the record states the new one and this copy has to stop the
+# check, which an import would change along with the runner and never do.
+POOLING_RULE = (
+    "the handoff the ledger's decision names for that gameweek; where the ledger names "
+    "none of the kept handoffs, the last one by file name"
+)
 
 
 def _row_of(stem: str) -> str:
@@ -374,8 +383,21 @@ def _replays_pooled_beside_a_live_week(record: dict[str, Any]) -> list[str]:
     Each pooled gameweek enters with the handoff the runner's rule picks, which the record
     states as ``primary_projection_rule``: the one the ledger names, or the last kept one when
     the ledger names none. A pool of replays alone mixes nothing, so it returns no fingerprint.
+
+    It re-derives that choice from ``in_ledger``, which the runner sets from the ledger's own
+    fingerprint whatever it pools. A runner repaired to pool GW4's elite handoff in the replay's
+    place would still mark the replay ``in_ledger``, and this reader would still report it as
+    pooled. So it reads only a record whose stated rule is the one it implements, and stops on
+    any other with a message saying the runner's rule changed.
     """
 
+    rule = record["pooled"].get("primary_projection_rule")
+    assert rule == POOLING_RULE, (
+        "The runner's pooling rule changed: docs/live_projection_audit.json now states "
+        f"{rule!r}, and this reader re-derives the pooled handoff from `in_ledger` under the old "
+        f"rule ({POOLING_RULE!r}). The runner sets `in_ledger` from the ledger whatever it pools, "
+        "so update this reader to the new rule before holding the index row to it."
+    )
     chosen = []
     for gameweek in record["pooled"]["gameweeks"]:
         projections = record["gameweeks"][str(gameweek)]["projections"]
@@ -395,8 +417,12 @@ def test_the_projection_audit_row_says_when_its_pool_mixes_a_replay_with_a_live_
 
     Numbers from such a pool are not the protocol's pooled reading, and the record's own pooled
     table does not say a replay is in it. So the index row that quotes them has to name the
-    replay handoff and the clause the pool breaks. When the runner keeps replays out of the pool,
-    the check has nothing to hold the row to and passes.
+    replay handoff and the clause the pool breaks.
+
+    This does not pass on its own once the runner is repaired. A runner that changes which
+    handoff it pools states a new ``primary_projection_rule``, and the reader stops on it, so the
+    repair has to update the reader to its rule; only then does a pool with no replay leave this
+    check nothing to hold the row to.
     """
 
     prereg = " ".join(PROJECTION_AUDIT_PREREG.read_text(encoding="utf-8").split())
@@ -424,7 +450,7 @@ def test_the_mix_check_tells_a_mixed_pool_from_a_clean_one() -> None:
     replay = {"handoff_fingerprint": "e7abac4d", "in_ledger": True, "ledger_mode": "replay"}
     elite = {"handoff_fingerprint": "48f9e1ea", "in_ledger": False, "ledger_mode": None}
     live = {"handoff_fingerprint": "a8984200", "in_ledger": True, "ledger_mode": "live"}
-    pooled = {"gameweeks": [4, 5]}
+    pooled = {"gameweeks": [4, 5], "primary_projection_rule": POOLING_RULE}
 
     def record(week_four: list[dict[str, Any]], week_five: list[dict[str, Any]]) -> dict[str, Any]:
         weeks = {"4": {"projections": week_four}, "5": {"projections": week_five}}
@@ -434,3 +460,24 @@ def test_the_mix_check_tells_a_mixed_pool_from_a_clean_one() -> None:
     assert _replays_pooled_beside_a_live_week(record([elite, replay], [live])) == ["e7abac4d"]
     assert _replays_pooled_beside_a_live_week(record([elite], [live])) == []
     assert _replays_pooled_beside_a_live_week(record([replay], [replay])) == []
+
+
+def test_the_mix_check_stops_when_the_runner_pools_by_another_rule() -> None:
+    """The elite-handoff repair pools 48f9e1ea for GW4 while the ledger still names the replay,
+    so the runner still writes ``in_ledger`` on e7abac4d. Read under the old rule, that record
+    would report a replay the pool no longer holds. The reader has to stop and say the rule
+    changed, not pass or fail on a pool it has misread; a record that states no rule stops too.
+    """
+
+    replay = {"handoff_fingerprint": "e7abac4d", "in_ledger": True, "ledger_mode": "replay"}
+    elite = {"handoff_fingerprint": "48f9e1ea", "in_ledger": False, "ledger_mode": None}
+    live = {"handoff_fingerprint": "a8984200", "in_ledger": True, "ledger_mode": "live"}
+    weeks = {"4": {"projections": [replay, elite]}, "5": {"projections": [live]}}
+    repaired = "the last handoff kept from before the deadline, never a replay"
+
+    for pooled in (
+        {"gameweeks": [4, 5], "primary_projection_rule": repaired},
+        {"gameweeks": [4, 5]},
+    ):
+        with pytest.raises(AssertionError, match="pooling rule changed"):
+            _replays_pooled_beside_a_live_week({"gameweeks": weeks, "pooled": pooled})
