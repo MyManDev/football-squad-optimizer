@@ -3,8 +3,9 @@
  * probability. The rival-relative window probabilities fell three pre-registered
  * calibrations and the line is closed; the copy says so, and this test keeps every
  * rendered advice state — proven, unproven, priced modes, partial data — inside the
- * envelope: expected points and price tags only, no percent signs, no P(...), no
- * "probability" in any spelling the site uses.
+ * envelope: expected points and price tags only, no per cent sign but an ownership share's,
+ * no P(...), no "probability" in any spelling the site uses. The words are the shared
+ * guard's (`testSupport/honesty.ts`), not a copy of them.
  */
 
 import { cleanup, render } from "@testing-library/react";
@@ -19,16 +20,13 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { Language } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { ScoreboardCard } from "../components/ScoreboardCard";
 import type { EntryAdvice, LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
 afterEach(cleanup);
 
-// Keep the original patterns and cover the plan's full forbidden vocabulary.
-// The exact causal word "yüzden" means "because", not the numerical term "yüzde".
-const FORBIDDEN =
-  /%|probabilit|olasılık|olasılığ|\bP\(|chance|likelihood|quantile|spread|percentage|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım/i;
 // The mode copy that used to reach the member page ("reduce the chance of falling
 // behind") is not a probability claim by the regex but reads as one; it must not return.
 const MODE_PROMISE = /chance of falling behind|geride kalma ihtimalini/i;
@@ -134,7 +132,7 @@ describe("no advice state shows a probability, in either language", () => {
       it(`${language}: ${name}`, () => {
         const text = renderState(language, advice);
         expect(text.length).toBeGreaterThan(0);
-        const match = text.match(FORBIDDEN);
+        const match = text.match(AS_A_CHANCE);
         expect(match, match ? `forbidden fragment: …${match[0]}…` : undefined).toBeNull();
         expect(text.match(MODE_PROMISE)).toBeNull();
       });
@@ -235,7 +233,7 @@ describe("the weekly scoreboard shows no probability, in either language", () =>
         const text = container.textContent ?? "";
         unmount();
         expect(text.length).toBeGreaterThan(0);
-        const match = text.match(FORBIDDEN);
+        const match = text.match(AS_A_CHANCE);
         expect(match, match ? `forbidden fragment: …${match[0]}…` : undefined).toBeNull();
       });
     }

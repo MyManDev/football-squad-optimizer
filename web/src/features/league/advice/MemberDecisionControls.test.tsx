@@ -286,9 +286,7 @@ describe("member decision controls", () => {
         const text = container.textContent ?? "";
         // The rule's label is on the page for this sweep, not merely available to it.
         expect(text).toMatch(/rule's pick|Kuralın seçimi/i);
-        expect(text).not.toMatch(
-          /%|probabilit|olasılık|olasılığ|\bP\(|chance|likelihood|quantile|spread|percentage|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım/i,
-        );
+        expect(text).not.toMatch(AS_A_CHANCE);
         expect(text).not.toMatch(/chance of falling behind|geride kalma ihtimalini/i);
         unmount();
       }

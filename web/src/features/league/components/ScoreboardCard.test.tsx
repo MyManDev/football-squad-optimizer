@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { textByNode } from "../../../testSupport/textByNode";
 import type { LeagueViewEnvelope, Scoreboard } from "../types";
 import { ScoreboardCard, ScoreboardSection } from "./ScoreboardCard";
@@ -12,9 +13,6 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-
-// The web guard's regex, verbatim: no percent sign, no probability in any spelling.
-const FORBIDDEN = /%|probabilit|olasılık|\bP\(/i;
 
 /** The shape the producer wrote from the 2026-09-07 GW4 capture, with the numbers rounded. */
 const scoreboard: LeagueViewEnvelope<Scoreboard> = {
@@ -258,7 +256,7 @@ describe("scoreboard card", () => {
     expect(screen.getByRole("columnheader", { name: copy.ours })).toBeInTheDocument();
     expect(screen.getByRole("rowheader", { name: copy.cumulative(3) })).toBeInTheDocument();
     expect(screen.getByText(copy.paperLedger)).toBeInTheDocument();
-    expect(container.textContent).not.toMatch(FORBIDDEN);
+    expect(container.textContent).not.toMatch(AS_A_CHANCE);
   });
 
   it.each([
