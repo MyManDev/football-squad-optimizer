@@ -1,5 +1,5 @@
 import { checkedPreferences, preferencesKey } from "./decisionPreferences";
-import { LeagueDataError } from "../data";
+import { LeagueDataError } from "../dataErrors";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
 import { isAdvicePayload } from "./adviceShape";

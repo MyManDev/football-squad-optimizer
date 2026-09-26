@@ -11,21 +11,11 @@ from numbers import Integral, Real
 from types import MappingProxyType
 from typing import Final
 
-# Moved to squadopt.contracts.factors on 2026-09-10 (knob vocabulary PR). The names stay
-# importable here for one release; import them from squadopt.contracts after that.
 from squadopt.contracts.factors import (
-    BayesianFactor as BayesianFactor,
-)
-from squadopt.contracts.factors import (
-    BayesianOptimizationConfigurationError as BayesianOptimizationConfigurationError,
-)
-from squadopt.contracts.factors import (
-    BayesianOptimizationError as BayesianOptimizationError,
-)
-from squadopt.contracts.factors import (
-    FactorKind as FactorKind,
-)
-from squadopt.contracts.factors import (
+    BayesianFactor,
+    BayesianOptimizationConfigurationError,
+    BayesianOptimizationError,
+    FactorKind,
     _integer,
 )
 

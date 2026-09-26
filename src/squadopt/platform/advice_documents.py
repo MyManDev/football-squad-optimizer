@@ -24,8 +24,10 @@ from typing import Any, Final
 
 import jsonschema
 
+from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import preferences_schema
+from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 LEAGUE_CAPABILITIES_CONTRACT_VERSION: Final = "league_capabilities_v1"
@@ -179,7 +181,7 @@ def advice_read_schema() -> dict[str, Any]:
             "chip_strategy": {
                 "type": "object",
                 "properties": {
-                    "version": {"const": "model_opportunity_reservation_v1"},
+                    "version": {"const": CHIP_STRATEGY_VERSION},
                     "mode": {"enum": ["auto", "manual"]},
                     "requested_chip": {"enum": ["auto", "bboost", "3xc", "wildcard", "freehit"]},
                     "selected_chip": chip,
@@ -312,7 +314,7 @@ def advice_read_schema() -> dict[str, Any]:
                     "entry_id": {"type": "integer", "minimum": 1},
                     "league_id": {"type": "integer", "minimum": 1},
                     "mode": {"type": "string"},
-                    "window": {"type": "integer", "enum": [1, 3, 5]},
+                    "window": {"type": "integer", "enum": list(MEMBER_WINDOWS)},
                     "moves": {
                         "type": "array",
                         "items": {
@@ -430,7 +432,7 @@ def league_capabilities_schema() -> dict[str, Any]:
                     "properties": {
                         "windows": {
                             "type": "array",
-                            "items": {"type": "integer", "enum": [1, 3, 5]},
+                            "items": {"type": "integer", "enum": list(MEMBER_WINDOWS)},
                             "uniqueItems": True,
                         },
                         "requires_rival": {"type": "boolean"},
@@ -454,7 +456,7 @@ def league_capabilities_schema() -> dict[str, Any]:
             },
             "models": {
                 "type": "array",
-                "items": {"enum": ["current", "football"]},
+                "items": {"enum": list(PREDICTION_MODELS)},
                 "uniqueItems": True,
             },
             "managers_word": flag,
@@ -464,10 +466,10 @@ def league_capabilities_schema() -> dict[str, Any]:
                     "strategy": {
                         "type": "object",
                         "properties": {
-                            "version": {"const": "model_opportunity_reservation_v1"},
+                            "version": {"const": CHIP_STRATEGY_VERSION},
                             "windows": {
                                 "type": "array",
-                                "items": {"enum": [1, 3, 5]},
+                                "items": {"enum": list(MEMBER_WINDOWS)},
                                 "uniqueItems": True,
                             },
                         },

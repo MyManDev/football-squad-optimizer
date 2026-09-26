@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -12,8 +11,9 @@ import type { ScoreboardState } from "../components/karne";
 import { DisclosureIcon } from "../components/memberIcons";
 import { SystemKarne, SystemScoreboardDetails } from "../components/SystemKarne";
 import { ViewerChips } from "../components/ViewerChips";
-import { LeagueDataMissing, loadEntrySquad, loadLeagueMembers, loadScoreboard } from "../data";
+import { LeagueDataMissing } from "../data";
 import { useViewerEntry } from "../identity/useViewerEntry";
+import { useEntrySquad, useLeagueMembers, useLeagueScoreboard } from "../queries";
 import { follower, gapToLeader, leaderTotal, netWeekPoints } from "../standing";
 import type {
   EntrySquad,
@@ -31,28 +31,13 @@ export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { viewer } = useViewerEntry();
-  const query = useQuery({
-    queryKey: ["provisional-league-members"],
-    queryFn: loadLeagueMembers,
-    staleTime: 60_000,
-  });
+  const query = useLeagueMembers();
   // The system's record beside the table; the same document /league reads, without the
   // member histories that page also fetches.
-  const scoreboard = useQuery({
-    queryKey: ["provisional-league-scoreboard"],
-    queryFn: loadScoreboard,
-    staleTime: 60_000,
-    retry: false,
-  });
+  const scoreboard = useLeagueScoreboard();
   // The viewer's own squad document, only once the visitor has said who they are: it holds
   // the bank, the free transfers and the chips. The member page shares the read.
-  const viewerSquad = useQuery({
-    queryKey: ["provisional-entry-squad", viewer?.entryId ?? null],
-    queryFn: () => loadEntrySquad(viewer!.entryId),
-    enabled: viewer !== null,
-    staleTime: 60_000,
-    retry: false,
-  });
+  const viewerSquad = useEntrySquad(viewer?.entryId, viewer !== null);
   const fixtures = useFixtures();
   // Re-read once a minute, so an open page notices its deadline passing.
   const deadlinePassed = useDeadlinePassed(

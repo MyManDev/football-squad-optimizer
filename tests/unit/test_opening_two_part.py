@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.opening_two_part import (
     ORDERING_TOLERANCE,
     PART_ONE_DESIGN,

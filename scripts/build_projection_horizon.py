@@ -26,7 +26,6 @@ from pathlib import Path
 
 from scripts._experiment_cli import REPOSITORY_ROOT, write_json, write_text
 
-from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.errors import DataError
 from squadopt.data.fixtures import aggregate_team_gameweek
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -37,6 +36,7 @@ from squadopt.data.sources.fpl_live import (
     fixture_snapshot,
 )
 from squadopt.data.sources.vaastav import build_panel
+from squadopt.data.tables import write_export_table
 from squadopt.live import (
     build_projection_horizon,
     gameweek_fixture_fingerprints,

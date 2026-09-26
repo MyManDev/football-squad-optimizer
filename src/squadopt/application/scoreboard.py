@@ -65,10 +65,10 @@ from pathlib import Path
 from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
-from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.scoreboard_baselines import human_baseline_rows
 from squadopt.application.scoreboard_diagnostics import empty_diagnostics
 from squadopt.application.scoreboard_history import settled_scoreboard_entries
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE

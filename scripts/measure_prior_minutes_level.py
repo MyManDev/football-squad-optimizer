@@ -51,7 +51,7 @@ from squadopt.evaluation.prior_minutes_level import (
     row_factors,
 )
 from squadopt.evaluation.promotion import PromotionPolicy
-from squadopt.experiments.statistics import season_aware_moving_block_interval
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.features import CrossSeasonConfig
 from squadopt.optimization.models import SolverStatus
 

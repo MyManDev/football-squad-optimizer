@@ -1,8 +1,10 @@
 """The queue and the worker loop: claims are exclusive, failures become records."""
 
+import errno
 import functools
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -10,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from squadopt.data import atomic
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.advice_queue import (
@@ -476,3 +479,77 @@ def test_contention_at_completion_is_never_stored_as_a_failure(
     assert cache.get(CACHE_KEY) == b'{"advice": 1}'
     events = [json.loads(record.getMessage())["event"] for record in caplog.records]
     assert "advice_job_failed" not in events
+
+
+def test_a_queue_record_refused_twice_while_a_reader_holds_it_lands_on_a_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows refuses the rename (WinError 5) while a reader outside the lock holds it."""
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    real_replace = os.replace
+    refused: list[str] = []
+
+    def held(source: str | Path, destination: str | Path) -> None:
+        if str(destination).endswith("job-0001.json") and len(refused) < 2:
+            refused.append(str(destination))
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr("squadopt.data.atomic.os.replace", held)
+    monkeypatch.setattr("squadopt.data.atomic.time.sleep", lambda _seconds: None)
+    done = run_advice_worker_once(
+        queue, cache, lambda job: b'{"advice": 1}', at_utc="2026-08-27T12:00:30Z"
+    )
+
+    assert len(refused) == 2
+    assert done is not None and done.status == "completed"
+    assert queue.load("job-0001") == done
+    assert not list((tmp_path / "jobs").glob("*.tmp"))
+
+
+def test_a_terminal_record_refused_on_every_attempt_is_stored_as_a_failed_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A lasting refusal of the completion write stays inside the round, as ADVICE_FAILED.
+
+    The claim lands, then the terminal record is refused on all ``RENAME_RETRY_ATTEMPTS``
+    attempts (the first try and four retries, four pauses in between). The round's own
+    ``except Exception`` stores the failure record, which lands, so the worker loop never
+    sees the error. The answer was cached before the refused write.
+    """
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    real_replace = os.replace
+    calls: list[str] = []
+    refused: list[str] = []
+    pauses: list[float] = []
+
+    def held(source: str | Path, destination: str | Path) -> None:
+        if str(destination).endswith("job-0001.json"):
+            calls.append(str(destination))
+            # Call 1 is the claim; calls 2 to 6 are the terminal record; call 7 is the
+            # failure record.
+            if 2 <= len(calls) <= 1 + atomic.RENAME_RETRY_ATTEMPTS:
+                refused.append(str(destination))
+                raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr("squadopt.data.atomic.os.replace", held)
+    monkeypatch.setattr("squadopt.data.atomic.time.sleep", pauses.append)
+    done = run_advice_worker_once(
+        queue, cache, lambda job: b'{"advice": 1}', at_utc="2026-08-27T12:00:30Z"
+    )
+
+    assert len(refused) == atomic.RENAME_RETRY_ATTEMPTS == 5
+    assert pauses == [0.05, 0.1, 0.2, 0.4]
+    assert done is not None and done.status == "failed"
+    assert done.error is not None and done.error.code == "ADVICE_FAILED"
+    assert "was refused on all 5 attempts over 0.75 s" in done.error.message
+    assert queue.load("job-0001") == done
+    assert cache.get(CACHE_KEY) == b'{"advice": 1}'
+    assert not list((tmp_path / "jobs").glob("*.tmp"))

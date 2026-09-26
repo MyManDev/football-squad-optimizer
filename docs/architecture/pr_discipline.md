@@ -53,36 +53,54 @@ Five gates are wired into CI. All must pass on the delivering branch:
 ```
 
 **Run the full suite in parallel, not `-m "not slow"`.** The full suite is the merge gate, and
-the marker split no longer buys anything: measured on `43b0d7f`, the parallel full suite is
-**121 s** while the serial run is 453 s and deselecting `slow` still leaves ~331 s. So the
-fast-suite question is settled by parallelism rather than by marks — the whole gate now costs
-less than a third of what the subset used to. The nine `slow` tests are 0.4% of the 2,563
-collected and 27% of the serial wall clock; the marks are reasonable, but 21 of the 30 costliest
-items carry no mark at all (#230), so the subset was never the fast suite it looked like.
+the marker split no longer buys anything: measured on `43b0d7f`, the parallel full suite took
+**121 s** while the serial run took 453 s and deselecting `slow` still left ~331 s. So the
+fast-suite question is settled by parallelism rather than by marks: the whole gate cost less
+than a third of what the subset used to. On that commit the `slow` tests were 0.4% of those
+collected and 27% of the serial wall clock, and 21 of the 30 costliest items carried no mark at
+all (#230), so the subset was never the fast suite it looked like. Both counts change with every
+test PR, so read them rather than copy them: the last line of
+`python -m pytest --collect-only -q` is the number collected, and the same command with
+`-m slow` gives the number marked `slow`.
 
 Use a single `pytest path::test` for a quick local signal while iterating — `-n auto` is not in
 `addopts`, so that stays serial and starts instantly. Do not present a subset as having tested
 the change. Details and the full timing table are in [branching](branching.md).
 
-Note also that `scripts/` — **77 modules and 17,444 lines**, holding most of the entry-point
-logic — sits outside two of the five gates. *Which* two is worth stating correctly, because an
-earlier version of this paragraph named the wrong one and would have sent a reader looking in
-the wrong place.
+Note also that `scripts/`, which holds most of the entry-point logic, sits outside two of the
+five gates. Its size is read, not copied, because a figure copied here went stale as the
+directory grew:
+
+```console
+git ls-files 'scripts/*.py' | wc -l                       # modules
+git ls-files -z 'scripts/*.py' | xargs -0 cat | wc -l     # lines
+```
+
+*Which* two gates is worth stating correctly, because an earlier version of this paragraph named
+the wrong one and would have sent a reader looking in the wrong place.
 
 **Ruff does cover `scripts/`.** Gates 1 and 2 run `ruff check .` and `ruff format --check .`
-over the repository, and the format gate reports 77 files there. Ruff's `src` setting names
-`src` and `tests`, but that controls first-party *import resolution*, not which files are
-checked. For measurement scripts, the two gates that still stop at the package boundary are:
+over the repository, and `ruff format --check scripts` prints how many files the format gate
+checks there. Ruff's `src` setting names `src` and `tests`, but that controls first-party
+*import resolution*, not which files are checked. For measurement scripts, the two gates that
+still stop at the package boundary are:
 
-- **mypy**: the configured file set covers `src/squadopt` and four operator scripts
-  (`backend_status.py`, `release/verify_live.py`, `check_league_tree.py`,
-  `release/clean_body.py`); CI runs `python -m mypy` so it checks that complete set.
+- **mypy**: the configured file set (`[tool.mypy] files` in `pyproject.toml`) covers
+  `src/squadopt`, four operator scripts (`backend_status.py`, `release/verify_live.py`,
+  `check_league_tree.py`, `release/clean_body.py`) and the three shells that write the
+  published trees (`build_site.py`, `build_league_site.py`, `build_scoreboard.py`); CI runs
+  `python -m mypy` so it checks that complete set, and
+  `tests/unit/test_mypy_file_set_is_described.py` fails when this list and that set differ.
   The 19 September scan of all 121 scripts, using `--explicit-package-bases` to resolve
   duplicate-module discovery, found 125 errors in 26 files; measurement runners remain
   outside this task;
-- **`lint-imports`**, which analyses 167 files — exactly the number of modules under
-  `src/squadopt` — so the layering contract in [dependency rules](dependency_rules.md) is not
-  enforced in `scripts/` at all.
+- **`lint-imports`**, whose graph holds the modules under `src/squadopt` and, because
+  `include_external_packages` is on, one node for each top-level outside module they import
+  (the standard library included). Its "Analyzed ... files" line counts both, and
+  `git ls-files 'src/squadopt/*.py' | wc -l` is the package's share. The scripts are not part
+  of that graph, so the layering contract in [dependency rules](dependency_rules.md) is not
+  enforced in `scripts/` at all; the one contract that names `scripts` stops the package from
+  importing a script and says nothing about what a script imports.
 
 The second is the one to care about, because scripts cross package boundaries by nature rather
 than by accident: `scripts/measure_in_season_blend.py` imports from six subpackages in one file
@@ -139,8 +157,9 @@ Zones are in [ownership](ownership.md). In practice:
 
 - Stay in your zone. A change that needs someone else's zone is a conversation first, not a
   larger PR.
-- Shared boundaries — `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` —
-  need one approving review from each of the other two roles.
+- Shared boundaries (`contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`,
+  `backtest/`) need an approving review from each owner who did not write the change. Until
+  2026-09-25 they needed one from each of the other two roles.
 - If two people must work in the same area at once, split by file, not by function, and say so
   before starting.
 

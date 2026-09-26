@@ -18,6 +18,7 @@ import {
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { deadlineLong } from "../../../lib/format";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { FixturesPayload } from "../../fixtures/types";
 import { HttpAdviceClient } from "../advice/adviceClient";
 import { writeViewerEntry } from "../identity/useViewerEntry";
@@ -40,8 +41,6 @@ const MEMBERS = mockLeagueMembersEnvelope.payload.members;
 const SQUAD = mockEntrySquadEnvelopes[ENTRY]!;
 const HUMANS = MEMBERS.filter((member) => member.member_kind === "human").length;
 const GW = SQUAD.payload.gameweek;
-const FORBIDDEN =
-  /%|probabilit|olasılık|olasılığ|\bP\(|chance|likelihood|quantile|spread|percentage|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım/i;
 
 function player(
   id: number,
@@ -534,7 +533,7 @@ describe("honesty and the tools", () => {
         optimality_gap: 0.5,
       }),
     });
-    const match = (container.textContent ?? "").match(FORBIDDEN);
+    const match = (container.textContent ?? "").match(AS_A_CHANCE);
     expect(match, match ? `forbidden fragment: ${match[0]}` : undefined).toBeNull();
   });
 });

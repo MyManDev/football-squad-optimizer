@@ -1,10 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
-import { LeagueDataMissing, loadScoreboard } from "../data";
+import { LeagueDataMissing } from "../data";
+import { useLeagueScoreboard } from "../queries";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
 import { ScoreboardComparisons } from "./ScoreboardComparisons";
@@ -18,12 +17,7 @@ import { LiveSeriesSection } from "./LiveSeriesCard";
 export function ScoreboardSection() {
   const { messages } = useLanguage();
   const copy = messages.leagueScoreboard;
-  const query = useQuery({
-    queryKey: ["provisional-league-scoreboard"],
-    queryFn: loadScoreboard,
-    staleTime: 60_000,
-    retry: false,
-  });
+  const query = useLeagueScoreboard();
   if (query.isPending) {
     return (
       <Card tone="muted" title={copy.title}>
@@ -191,7 +185,7 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
             {ours.mode !== null && (
               <>
                 {" "}
-                <Badge tone={ours.mode === "live" ? "good" : "warn"}>{ours.mode}</Badge>
+                <Badge tone={ours.mode === "live" ? "good" : "warn"}>{copy.modes[ours.mode]}</Badge>
               </>
             )}
             {ours.net === null && <div className={styles.sub}>{copy.notSettled}</div>}

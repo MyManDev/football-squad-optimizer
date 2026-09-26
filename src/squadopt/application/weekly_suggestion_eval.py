@@ -1,7 +1,9 @@
 """Read-only, settled evaluation of recorded member advice; never invokes a solver.
 
-The archive proves recorded publication bytes, not that a member viewed or adopted them.
-Both capture and recorded publication must precede the deadline. Scores are descriptive
+The archive proves recorded bytes, not that a member viewed or adopted them. A run that
+records advice and never publishes it writes a record too, so a member's history counts
+only the record whose capture the published tree names for that member and week, and both
+that capture and the record's stamp must precede the deadline. Scores are descriptive
 counterfactuals; a difference against the member's actual score is not a causal gain.
 """
 
@@ -150,16 +152,97 @@ def _ids(value: object) -> tuple[int, ...]:
     return tuple(_identifier(item) for item in value)
 
 
-def select_record(
-    root: Path, *, season: str, gameweek: int, entry_id: int, deadline_utc: str
-) -> dict[str, Any] | None:
-    """Select the latest recorded publication, checking both clocks and all identities.
+#: What a published league tree says each member was shown: for ``(entry_id, gameweek)``,
+#: the capture that member's advice for that week was built from.
+PublishedCaptures = Mapping[tuple[int, int], str]
 
-    This intentionally does not change the legacy capture-ordered reader's semantics.
+
+def _published_payload(path: Path) -> dict[str, Any] | None:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    payload = document.get("payload") if isinstance(document, dict) else None
+    return payload if isinstance(payload, dict) else None
+
+
+def _named_capture(gameweek: object, capture: object) -> tuple[int, str] | None:
+    if type(gameweek) is not int or gameweek <= 0 or not isinstance(capture, str) or not capture:
+        return None
+    return gameweek, capture
+
+
+def published_page_captures(league_dir: Path) -> dict[tuple[int, int], str]:
+    """The capture each member page in a published league tree was built from.
+
+    ``entries/{id}.json`` is one member's page for one gameweek, addressed by the id in its
+    name, and its ``source_snapshot_id`` names the capture the page and its advice came
+    from. A page that names no capture names nothing here. A page that cannot be read is
+    skipped: the week it would have named is then not known to be published, which is an
+    absence, and one unreadable file does not stop a publication.
+    """
+    carried: dict[tuple[int, int], str] = {}
+    for path in sorted((league_dir / "entries").glob("*.json")):
+        payload = _published_payload(path)
+        if payload is None or not path.stem.isdigit():
+            continue
+        named = _named_capture(payload.get("gameweek"), payload.get("source_snapshot_id"))
+        if named is not None:
+            carried[int(path.stem), named[0]] = named[1]
+    return carried
+
+
+def published_advice_captures(league_dir: Path) -> dict[tuple[int, int], str]:
+    """Every member-week a published league tree says it showed, and the capture shown.
+
+    A member's page names its own week (:func:`published_page_captures`). Each earlier week
+    is named by the history the same tree carries (``advice_snapshot_id``), which the
+    publication that wrote it took, by this same rule, from the tree it replaced. Where both
+    name one week the page wins, because it is what the member is shown now.
+    """
+    carried: dict[tuple[int, int], str] = {}
+    for path in sorted((league_dir / "history").glob("*.json")):
+        payload = _published_payload(path)
+        if payload is None or not path.stem.isdigit() or payload.get("entry_id") != int(path.stem):
+            continue
+        weeks = payload.get("weeks")
+        for week in weeks if isinstance(weeks, list) else ():
+            if not isinstance(week, dict):
+                continue
+            named = _named_capture(week.get("gameweek"), week.get("advice_snapshot_id"))
+            if named is not None:
+                carried[int(path.stem), named[0]] = named[1]
+    carried.update(published_page_captures(league_dir))
+    return carried
+
+
+def select_record(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    published: PublishedCaptures | None = None,
+) -> dict[str, Any] | None:
+    """Select the recorded advice for one member-week, checking both clocks and all identities.
+
+    With ``published`` (:func:`published_advice_captures`), only the record of the capture
+    the published tree names for this member and week counts. A record's stamp is its
+    build's clock, not a publication time, and a run that never published wrote a record as
+    well, so the latest stamp alone is no evidence of what a member was shown.
+    When records pass both clocks and none of them is the published one, this raises
+    ``not_published`` rather than returning the latest.
+
+    Without ``published`` the latest record by its stamp is taken, as the measurement
+    readers that hold no published tree always have. That reading does not establish that a
+    member was shown the plan, so no member-facing document is built from it:
+    :func:`publish_suggestion_histories` requires the map.
+
     An unreadable candidate is refused instead of silently falling back to an older one.
     """
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
-    candidates: list[tuple[datetime, dict[str, Any]]] = []
+    candidates: list[tuple[datetime, str, dict[str, Any]]] = []
     for capture in recorded_captures(root, season, gameweek, entry_id):
         record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
         if (
@@ -174,23 +257,28 @@ def select_record(
         stamp = record.get("generated_at_utc")
         if not isinstance(stamp, str):
             raise SuggestionEvaluationError("Recorded publication time is missing.")
-        published = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
-        if published < capture.instant:
+        stamped = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
+        if stamped < capture.instant:
             raise SuggestionEvaluationError("Recorded publication precedes its capture.")
-        if capture.instant < deadline and published < deadline:
+        if capture.instant < deadline and stamped < deadline:
             try:
                 _advice(record)
             except SuggestionEvaluationError as error:
                 if str(error) == "missing_advice":
                     continue
                 raise
-            candidates.append((published, record))
+            candidates.append((stamped, capture.snapshot_id, record))
     if not candidates:
         return None
-    candidates.sort(key=lambda pair: pair[0])
+    if published is not None:
+        shown = published.get((entry_id, gameweek))
+        candidates = [candidate for candidate in candidates if candidate[1] == shown]
+        if not candidates:
+            raise SuggestionEvaluationError("not_published")
+    candidates.sort(key=lambda candidate: candidate[0])
     if len(candidates) > 1 and candidates[-2][0] == candidates[-1][0]:
         raise SuggestionEvaluationError("ambiguous_record")
-    return candidates[-1][1]
+    return candidates[-1][2]
 
 
 #: The basis ``score_recorded_advice`` produces, named where the scorer is chosen rather than
@@ -313,11 +401,17 @@ def evaluate_week(
     deadline_utc: str,
     captures: Sequence[CapturedSnapshot],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
+    published: PublishedCaptures | None = None,
 ) -> WeekReview:
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
         record = select_record(
-            root, season=season, gameweek=gameweek, entry_id=entry_id, deadline_utc=deadline_utc
+            root,
+            season=season,
+            gameweek=gameweek,
+            entry_id=entry_id,
+            deadline_utc=deadline_utc,
+            published=published,
         )
         if record is None:
             return WeekReview(**base, status="unavailable", reason="no_pre_deadline_record")
@@ -337,7 +431,9 @@ def evaluate_week(
             selected_records[entry_id, gameweek] = record
     except (DataError, ValueError, TypeError, KeyError, OSError) as error:
         reason = (
-            str(error) if str(error) in ("ambiguous_record", "missing_advice") else "invalid_record"
+            str(error)
+            if str(error) in ("ambiguous_record", "missing_advice", "not_published")
+            else "invalid_record"
         )
         return WeekReview(**base, status="unavailable", reason=reason)
     try:
@@ -407,11 +503,13 @@ def review_member_weeks(
     league_id: int,
     entry_ids: Sequence[int],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
+    published: PublishedCaptures | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
     This is the body the publisher serializes, so the document and any later reading of the
     same weeks are the same reviews rather than two walks that could drift apart.
+    ``published`` is passed to :func:`select_record` for every week.
     """
     if league_id != SUPPORTED_LEAGUE_ID or not re.fullmatch(r"\d{4}-\d{2}", season):
         raise SuggestionEvaluationError("Only league 352490 and a valid season are supported.")
@@ -452,6 +550,7 @@ def review_member_weeks(
                         deadline_utc=deadlines[week],
                         captures=captures,
                         selected_records=selected_records,
+                        published=published,
                     )
                 )
         reviews[entry_id] = tuple(weeks)
@@ -713,6 +812,7 @@ def publish_suggestion_histories(
     league_id: int,
     entry_ids: Sequence[int],
     out_dir: Path,
+    published: PublishedCaptures,
     policy: DetectionPolicy = DEFAULT_DETECTION_POLICY,
 ) -> tuple[Path, ...]:
     """Publish member-safe derived documents from existing verified, bounded captures.
@@ -722,6 +822,10 @@ def publish_suggestion_histories(
     horizon's key set against the keys it builds from these very histories, and two separate
     walks could return two sets that no reader could reconcile. A record that supports no
     horizon publishes histories and no horizon file.
+
+    ``published`` is what the tree these documents join says each member was shown
+    (:func:`published_advice_captures`), and it is required: a history shows a week as what
+    the member was told only when its record is the capture that tree names.
     """
     selected_records: dict[tuple[int, int], dict[str, Any]] = {}
     reviews = review_member_weeks(
@@ -732,6 +836,7 @@ def publish_suggestion_histories(
         league_id=league_id,
         entry_ids=entry_ids,
         selected_records=selected_records,
+        published=published,
     )
     written = []
     for entry_id in entry_ids:

@@ -3,8 +3,11 @@
 Cloudflare Pages publishes only the static `web/dist` artifact produced by the successful
 `web (node 22)` CI job. The deployment workflow downloads those already-tested bytes and never
 rebuilds them. It does **not** host the FastAPI application in `src/squadopt/api`; the backend
-is hosted beside Pages, not inside it ([ADR 0006](architecture/decisions/0006-backend-hosting.md),
-`deploy/compose.yaml`), and has its own runbook, [backend_runbook.md](backend_runbook.md).
+runs beside Pages, not inside it. Today it runs on the owner's Windows PC behind the
+`squadopt-api` Cloudflare Tunnel ([backend_free_hosting.md](backend_free_hosting.md)). The
+hosted topology [ADR 0006](architecture/decisions/0006-backend-hosting.md) chose and the
+`deploy/compose.yaml` startup describe a host that is not in use. The backend has its own
+runbook, [backend_runbook.md](backend_runbook.md).
 
 The current site fits the Cloudflare Pages Free plan. Static asset requests are free and
 unlimited; the operating budget assumes 500 deployments per month, 20,000 files per site, and
@@ -132,11 +135,23 @@ There are two normal publications per gameweek from GW2 onward:
 2. **Settled:** after outcomes are settled, regenerate the public data and season summary,
    merge to `main`, tag it `...-settled`, dispatch, and require green smoke.
 
-For the GW5 scratch candidate produced by `python -m scripts.build_settled_site`, run
-`python -m scripts.check_league_tree <candidate>/data` and report its result, the complete
-changed-file list and the independent scoreboard cells before/after in #632 before a site-data
-PR. This checker does not replace verification of rebuilt season documents against the frozen
-schemas or of the frozen root index against the candidate's file list. The producer preserves
+`python -m scripts.build_settled_site` produces the GW5 scratch candidate, and it checks the
+candidate before writing it. A finding in any check refuses the whole candidate, names the
+finding, and leaves nothing on disk:
+
+- every rebuilt season document and `data/fixtures.json` against the schema the accepted tree
+  froze for its `contract_version` (`data/schema/`);
+- the frozen root index against the candidate: every file it names exists, every gameweek view
+  is named, and its weeks and latest view are the ones the candidate's season ledger holds;
+- `data/fixtures.json` against the outcome capture it must come from;
+- the league tree release check (`scripts.check_league_tree`) on the candidate's `data`. It
+  also runs on the accepted tree, and a finding the accepted tree already has is counted and
+  printed rather than refused: it sits in advice members read before the deadline, which this
+  publish cannot change.
+
+The command prints each check it passed. Report that output, the complete changed-file list and
+the independent scoreboard cells before/after in #632 before a site-data PR: that report asks
+for an approval, which no command can give. The producer preserves
 accepted member advice bytes and never re-solves them. If an accepted advice document was
 changed after its immutable record was written, even to add a payload reporting field, its hash
 can differ and publication refuses with "Recorded comparison does not match accepted advice".
@@ -145,7 +160,12 @@ That refusal is the evidence guard working, not a silent overwrite or a producer
 Stop and reconcile which accepted bytes and records belong together; do not bypass the guard.
 The GW5 outcome refresh also updates `data/fixtures.json` from the same completed capture;
 accepted advice and entry files remain byte-identical. Generate the complete contribution
-roster with `scripts.build_player_catalog` from that capture before the site-data PR.
+roster with `scripts.build_player_catalog` from that capture before the site-data PR. That one
+stays a step: it writes `data/players.json` into the site-data tree after the candidate exists,
+and adding that path to the publisher's approved list is a boundary change for the owner to
+approve. The page's own validators (`shippedTree.test.ts`) need no run by hand here either: the
+site PR's CI runs them on the committed tree, and the deploy workflow refuses a tag without a
+successful `main` push CI, which runs them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
@@ -171,7 +191,8 @@ deadline for those five and keep the capture lead time from `docs/weekly_runbook
 **The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
 settled only when the source says both `finished` and `data_checked`
 (`application/scoreboard.py`), so a Tuesday that arrives before the check publishes "not settled
-yet" rather than a wrong number. Confirm the week is checked before spending a run:
+yet" rather than a wrong number. The settled publisher refuses an outcome capture in which the
+week is not both. Confirm the week is checked before taking that capture or settling from it:
 
 ```bash
 curl -s https://fantasy.premierleague.com/api/bootstrap-static/ \
@@ -289,10 +310,11 @@ main checkout on `develop`. **First check the backend is answering**, with a sin
 reads the launcher registry and the loopback metrics before its own error handling begins, so
 against a backend that is not running it stops on a raw exception and prints none of its
 recovery guidance. It can only replace a running backend, never start one. If it is down,
-pull develop by hand and start the backend with `run_backend_local.ps1` instead, then carry
-on. The processes belong to the logon session and nothing restarts them, so a logoff or a
-reboot between the publish and this step leaves nothing to restart. Replace `<same-ISO>` with the accepted candidate timestamp
-used for `ship.sh`. First preview the restart:
+start it by hand from the released code, as [a stopped backend](#a-stopped-backend-starts-from-the-release)
+below describes, then carry on. The processes belong to the logon session and nothing restarts
+them, so a logoff or a reboot between the publish and this step leaves nothing to restart.
+Replace `<same-ISO>` with the accepted candidate timestamp used for `ship.sh`. First preview
+the restart:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO> -DryRun
@@ -304,7 +326,21 @@ Only for the intended restart, run the same command without `-DryRun`:
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO>
 ```
 
-The script verifies the public site, requires the public capture to match the fetched
+The script first names the live release: the newest `site-*` tag whose production deploy
+succeeded, read with GitHub CLI from the `production <tag>` job of the newest successful
+`deploy-pages.yml` dispatch, or the tag given with `-ReleaseTag <tag>`, which needs no GitHub
+CLI. It fetches that tag and refuses when the fetched `origin/develop` differs from the tag's
+commit in `src`, `scripts` or `docs/contracts`, and lists the files; after the pull it checks
+the pulled HEAD the same way, before stopping anything. Those paths are the code the backend
+imports, the launcher that starts it and the contracts it answers in, so a develop that has
+moved past the release there would run code no release reviewed. Changes anywhere else, such
+as `web/`, do not refuse. The main checkout stays on `develop`, so the answer to that refusal
+is to wait for the next release and restart after it, or to pass `-Force`, which runs
+develop's code anyway and prints `FORCED`. `-Force` is one switch: it also permits open work.
+This check needs no running backend and comes before the registry is read, so the dry run
+prints the release and its verdict even when the backend is down.
+
+The script then verifies the public site, requires the public capture to match the fetched
 `origin/develop` publication, refuses open work unless `-Force`, and pulls with
 `--ff-only` before stopping the recorded backend.
 It keeps the recorded port and worker count, requires `/ready` and its published-week
@@ -314,9 +350,9 @@ process is stopped. It imports both backend entry points from the pulled source 
 stopping. The launcher resolves its commit independently of any inherited override.
 It does not claim an API-reported commit and never touches the tunnel. Dry-run performs
 the read-only checks and prints inputs and `-Stop -WhatIf` targets without pulling or
-changing processes. It does run `git fetch origin develop` to check the current
-candidate publication and prints that remote-tracking state was updated; the working
-tree and backend files stay unchanged. Real execution fetches as well. The helper requires
+changing processes. It does run `git fetch origin develop` and fetch the release tag, to
+check the current candidate publication and code, and prints that only Git refs were
+updated; the working tree and backend files stay unchanged. Real execution fetches as well. The helper requires
 the launcher's creation-time-checked process walk and `-Stop -WhatIf` support. A failed
 start or readiness check exits nonzero with a backend up/down state, the exact start
 command retaining the recorded port and worker count, the log directory and the last
@@ -343,6 +379,112 @@ permits a restart; `-Force` is an explicit operator exception, not the normal co
 `/ready` alone does not prove capture-ID or code-commit equality: its published-tree
 check is season/gameweek. `ship.sh` publishes the site only and does not restart the
 backend or tunnel.
+
+### A stopped backend starts from the release
+
+The restart helper cannot start a stopped backend, and develop may carry code no release has
+reviewed. Take the tag of the live release: the one `ship.sh` or `deploy.sh` printed, or the
+`Release <tag>` line the restart dry run prints before it stops on the missing backend. Then
+compare develop with it from the clean main checkout:
+
+```powershell
+git fetch origin develop "refs/tags/<tag>:refs/tags/<tag>"
+git diff --stat <tag> origin/develop -- src scripts docs/contracts web/public/data
+```
+
+Those paths are the code the backend imports, the launcher that starts it, the contracts it
+answers in and the published tree it reads. If the diff prints nothing, start from develop. If
+it lists files, do not start from develop: start from a release worktree instead.
+
+#### Starting from develop
+
+Move the main checkout to exactly the develop the diff compared, then compare the files on disk
+with the tag. `git pull` is not used here: it fetches again and can bring a newer develop than
+the one compared. This diff must print nothing too. It can list files only when the checkout
+holds changes of its own, and then the release worktree is the way.
+
+```powershell
+git merge --ff-only origin/develop
+git diff --stat <tag> -- src scripts docs/contracts web/public/data
+```
+
+Then start the backend:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Workers <n>
+```
+
+As it starts, the launcher prints a `code` line naming the source it runs and that source's
+commit, and records that commit. Here it must name the main checkout's `src`. The commit is
+develop's, not the tag's, because the tag sits on main's release merge, whose tree is
+develop's. Put the commit from the `code` line in place of `<commit>` below; the diff must
+print nothing. Then check that the `/ready` line reads `HTTP 200`:
+
+```powershell
+git diff --stat <tag> <commit> -- src scripts docs/contracts web/public/data
+```
+
+#### Starting from a release worktree
+
+Start the release's own launcher on the release's code and published tree, from a worktree
+outside the main checkout, and keep the main checkout's store, captures and handoffs:
+
+```powershell
+git worktree add <release-worktree> <tag>
+powershell -ExecutionPolicy Bypass -File <release-worktree>\scripts\run_backend_local.ps1 -RepoRoot <main-checkout> -SourceRoot <release-worktree>\src -SiteDataRoot <release-worktree>\web\public\data -Workers <n>
+```
+
+Its `code` line must name `<release-worktree>\src` at the tag's own commit, the one
+`git rev-parse "<tag>^{commit}"` prints.
+
+#### Back to the main checkout after the next release
+
+The restart helper refuses a backend started from a release worktree, because its recorded
+source root is not the main checkout's `src`, and nothing in a release moves the main checkout:
+`ship.sh` builds each release in a worktree of its own. The main checkout still holds the
+develop it had when the backend went down, so starting the backend there as it stands would
+run that old code on that old published tree, not the next release's. After the next release,
+with the backend queue drained (`run_backend_local.ps1 -Status` shows it), take the new
+release's tag as `<tag>` and compare again from the main checkout:
+
+```powershell
+git fetch origin develop "refs/tags/<tag>:refs/tags/<tag>"
+git diff --stat <tag> origin/develop -- src scripts docs/contracts web/public/data
+```
+
+If it lists files, develop has moved past this release as well: stop the backend with the
+`-Stop` command below, start it from a new worktree of the new tag as above, and then remove the
+old worktree. If it prints nothing, move the main checkout and compare again, as when starting
+from develop. Nothing has been stopped yet, so if the merge refuses or this diff lists files,
+the backend is still running and a new worktree of the new tag is the way:
+
+```powershell
+git merge --ff-only origin/develop
+git diff --stat <tag> -- src scripts docs/contracts web/public/data
+```
+
+Only when the merge succeeded and that diff printed nothing, stop the worktree's backend and
+start it from the main checkout. `-Stop` run from the main checkout finds the worktree's
+processes, because the worktree start used the main checkout's store:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop
+powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Workers <n>
+```
+
+Check the start as when starting from develop: the `code` line names the main checkout's `src`,
+the `/ready` line reads `HTTP 200`, and this diff, with the `code` line's commit in place of
+`<commit>`, prints nothing:
+
+```powershell
+git diff --stat <tag> <commit> -- src scripts docs/contracts web/public/data
+```
+
+Then remove the worktree, which nothing runs from any more:
+
+```powershell
+git worktree remove <release-worktree>
+```
 
 ## Daily circuit breaker
 

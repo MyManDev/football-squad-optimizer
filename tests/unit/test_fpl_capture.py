@@ -2,18 +2,23 @@
 
 Nothing here touches a network: `fetch` is exercised against a fake opener and `capture`
 against a fake `fetch`. The sleeps are injected so the backoff is asserted rather than
-waited out.
+waited out. The one test whose claim is about what http.client itself does with a body
+cut off talks to a server on the loopback interface, in this process, instead.
 """
 
+import http.client
 import json
 import re
 import urllib.error
+import urllib.request
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.fixtures.loopback_http import DIRECT_OPENER, serving, status_head
 
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION
 from squadopt.data.errors import DataError, DataSourceError
@@ -119,6 +124,119 @@ def test_an_unreachable_host_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(fpl_capture, "_read", reader)
     with pytest.raises(DataSourceError, match="Could not reach"):
         fpl_capture.fetch(URL, sleeper=lambda _: None)
+
+
+#: What urllib raises raw once the request is sent: a read that times out, a host that
+#: hangs up before answering, and a body shorter than its declared length.
+TRANSPORT_FAILURES: dict[str, Callable[[], Exception]] = {
+    "timeout": lambda: TimeoutError("timed out"),
+    "hang-up": lambda: http.client.RemoteDisconnected(
+        "Remote end closed connection without response"
+    ),
+    "short body": lambda: http.client.IncompleteRead(b"{", 900),
+}
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_dropped_response_is_retried_and_then_succeeds(
+    failure: Callable[[], Exception], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The host was reached, so like a 503 this says "later" rather than ending the capture."""
+
+    calls: list[int] = []
+
+    def reader(url: str) -> bytes:
+        calls.append(len(calls))
+        if len(calls) < 3:
+            raise failure()
+        return b"ok"
+
+    monkeypatch.setattr(fpl_capture, "_read", reader)
+    slept: list[float] = []
+    assert fpl_capture.fetch(URL, sleeper=slept.append) == b"ok"
+    assert len(calls) == 3
+    assert slept == [2.0, 4.0]
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_response_that_keeps_failing_is_a_data_error_naming_the_url(
+    failure: Callable[[], Exception], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cohort_capture catches DataError only; a raw error used to end it in a traceback."""
+
+    calls: list[int] = []
+
+    def reader(url: str) -> bytes:
+        calls.append(len(calls))
+        raise failure()
+
+    monkeypatch.setattr(fpl_capture, "_read", reader)
+    slept: list[float] = []
+    with pytest.raises(DataSourceError, match="on all 3 attempts") as raised:
+        fpl_capture.fetch(URL, attempts=3, sleeper=slept.append)
+    assert URL in str(raised.value)
+    assert type(failure()).__name__ in str(raised.value)
+    assert len(calls) == 3
+    assert slept == [2.0, 4.0]
+
+
+def test_a_body_cut_short_inside_the_real_reader_is_a_data_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Through `_read` itself, so the read after a successful open is covered, not a stub."""
+
+    opened: list[str] = []
+
+    class _CutShort:
+        def __enter__(self) -> "_CutShort":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            raise http.client.IncompleteRead(b"{", 900)
+
+    def urlopen(request: urllib.request.Request, timeout: float) -> _CutShort:
+        opened.append(request.full_url)
+        return _CutShort()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    with pytest.raises(DataSourceError, match="IncompleteRead"):
+        fpl_capture.fetch(URL, attempts=2, sleeper=lambda _: None)
+    assert opened == [URL, URL]
+
+
+#: The same two bytes of a payload, sent under each framing a body can have, and cut off.
+CUT_OFF_ANSWERS: dict[str, bytes] = {
+    "content-length": status_head(Content_Type="application/json", Content_Length="900") + b'{"',
+    "chunked": status_head(Content_Type="application/json", Transfer_Encoding="chunked")
+    + b'384\r\n{"',
+}
+
+
+@pytest.mark.parametrize("answer", CUT_OFF_ANSWERS.values(), ids=CUT_OFF_ANSWERS.keys())
+def test_a_body_cut_off_under_http_client_is_a_data_error(
+    answer: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Through http.client itself, on a loopback server.
+
+    `_read` reads with no amount, so a body sent with a Content-Length and cut off raises
+    `IncompleteRead` just as a chunked one does, and the capture needs no length check.
+    """
+
+    monkeypatch.setattr(urllib.request, "urlopen", DIRECT_OPENER.open)
+    slept: list[float] = []
+
+    with (
+        serving(answer) as server,
+        pytest.raises(DataSourceError, match="IncompleteRead") as raised,
+    ):
+        fpl_capture.fetch(f"{server.url}/api/bootstrap-static/", attempts=2, sleeper=slept.append)
+
+    assert server.url in str(raised.value)
+    assert len(server.answered) == 2
+    assert slept == [2.0]
 
 
 # --- registered endpoints -------------------------------------------------------------
@@ -398,7 +516,7 @@ def test_a_gw7_capture_builds_the_football_history(
             if name != "event-gw01-live.json"
         },
     )
-    with pytest.raises(ValueError, match="Missing captured football history GW1"):
+    with pytest.raises(DataSourceError, match="Missing captured football history GW1"):
         captured_history(without_gw01, season="2026-27", gameweek=7)
 
 

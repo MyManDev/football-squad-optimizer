@@ -6,6 +6,7 @@ the artifacts this exports are produced on the machine that holds the captures, 
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,8 @@ from scripts.export_settled_outcomes import (
     write_artifact,
 )
 
+from squadopt.application.evidence_io import write_json
+from squadopt.data.checksums import compute_table_sha256
 from squadopt.data.errors import DataSourceError, DataValidationError, DuplicateRecordsError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
@@ -32,7 +35,6 @@ from squadopt.features.settled_outcomes import (
     build_settled_outcomes,
     read_settled_outcomes_artifact,
 )
-from squadopt.preflight.validator import compute_table_sha256
 
 SEASON = "2026-27"
 GAMEWEEK = 4
@@ -554,6 +556,75 @@ def test_a_manifest_naming_another_capture_is_refused_with_the_field_named(
 
     with pytest.raises(RuntimeError, match="pre_deadline_snapshot_id"):
         _write(root, output)
+
+
+def _absent(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    """Every existence check of ``name`` answers no, as it did for the loser of a race."""
+
+    real = Path.exists
+
+    def exists(self: Path, *args: Any, **kwargs: Any) -> bool:
+        return False if self.name == name else real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "exists", exists)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "refusal"),
+    [("csv", "never overwritten"), ("manifest.json", "pre_deadline_snapshot_id")],
+)
+def test_a_file_that_lands_after_the_check_is_kept_byte_for_byte(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str, refusal: str
+) -> None:
+    """Two runs racing for one week: the second never replaces the first one's file.
+
+    A writer that looks for the file and then renames over it destroys a file that landed
+    between the two steps. Here every look answers "absent", as it did for that writer.
+    """
+
+    output = tmp_path / "out"
+    (pair,) = pair_captures(_captures(root))[0]
+    occupant = output / f"{table_name(SEASON, pair)}.{suffix}"
+    if suffix == "csv":
+        output.mkdir()
+        occupant.write_bytes(b"another table\n")
+    else:
+        _, _, manifest = _write(root, output)
+        other = {**manifest, "pre_deadline_snapshot_id": "fpl-live-20260101T000000Z-000000000000"}
+        occupant.write_text(json.dumps(other), encoding="utf-8")
+    kept = occupant.read_bytes()
+    _absent(monkeypatch, occupant.name)
+
+    with pytest.raises(RuntimeError, match=refusal):
+        _write(root, output)
+
+    assert occupant.read_bytes() == kept
+    assert not list(output.glob(".*.tmp-*")), "no temporary file survives"
+
+
+def test_a_manifest_left_with_crlf_line_ends_is_a_replay(root: Path, tmp_path: Path) -> None:
+    """On Windows the old writer went through text mode, so a manifest already on disk may
+    end its lines with CRLF. The same week again keeps that file and returns it."""
+
+    _, manifest_path, first = _write(root, tmp_path / "out")
+    crlf = manifest_path.read_bytes().replace(b"\n", b"\r\n")
+    manifest_path.write_bytes(crlf)
+
+    _, _, second = _write(root, tmp_path / "out")
+
+    assert manifest_path.read_bytes() == crlf
+    assert second == first
+
+
+def test_the_manifest_bytes_are_the_ones_the_old_writer_serialized(
+    root: Path, tmp_path: Path
+) -> None:
+    _, manifest_path, manifest = _write(root, tmp_path / "out")
+    old = tmp_path / "old.json"
+    write_json(old, manifest)
+
+    # The same serialization; the old writer's text mode wrote the platform's line end.
+    assert manifest_path.read_bytes() == old.read_bytes().replace(os.linesep.encode(), b"\n")
 
 
 def test_a_tampered_table_fails_its_checksum(root: Path, tmp_path: Path) -> None:

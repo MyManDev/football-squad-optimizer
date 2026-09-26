@@ -2,7 +2,10 @@
 
 Every test here is offline. The opener is injected, so what the adapter would have sent and
 how it judges what came back are both asserted without a request leaving the machine --
-which is also the only way to test a 429 followed by a 200, or a host that disallows us.
+which is also the only way to test a 429 followed by a 200, or a host that disallows us. The
+few tests whose claim is about what http.client itself does with a body cut short, and the
+few about how the real opener handles a redirect, talk to a server on the loopback interface
+in this process, or to a table put in place of urllib's https socket, instead of to a fake.
 
 The refusals carry the weight. A fetch that fails loudly costs a club's coverage for one
 week, which this lane records honestly; a fetch that succeeds with the wrong bytes puts a
@@ -10,22 +13,35 @@ citation in front of a member. So the tests below are mostly about the second ne
 happening quietly.
 """
 
+import http.client
+import io
 import json
+import threading
 import urllib.error
+import urllib.parse
 import urllib.request
-from collections.abc import Sequence
-from datetime import UTC, datetime
+import urllib.response
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from datetime import UTC, date, datetime, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.fixtures.loopback_http import DIRECT_OPENER, serving, status_head
 
 from squadopt.platform.club_news_fetch import (
     CLUB_NEWS_SOURCES_CONTRACT_VERSION,
+    MAXIMUM_ARTICLES_PER_HOST,
     MAXIMUM_DOCUMENT_BYTES,
     PER_ORIGIN_DELAY_SECONDS,
+    TERMS_READING_VALID_DAYS,
     ClubNewsFetchError,
     ClubSource,
+    SameOriginRedirects,
+    article_links,
+    default_opener,
     fetch_club_document,
     fetch_registered_documents,
     load_club_sources,
@@ -37,7 +53,10 @@ REGISTRY = Path(__file__).resolve().parents[2] / "data" / "sources" / "club_news
 
 PAGE = "https://club.example/team-news"
 ROBOTS = "https://club.example/robots.txt"
-SOURCE = ClubSource(club="Example FC", url=PAGE)
+#: A reading eleven days before the pinned clock, so every test below is inside the interval
+#: unless it says otherwise.
+READ_ON = date(2026, 9, 1)
+SOURCE = ClubSource(club="Example FC", url=PAGE, terms_read_on=READ_ON)
 FIXED_NOW = datetime(2026, 9, 12, 14, 5, 0, tzinfo=UTC)
 
 
@@ -178,6 +197,234 @@ def test_the_origin_refusal_follows_the_robots_switch() -> None:
     assert document.final_url == "https://cdn.other.example/team-news"
 
 
+# --- a redirect is followed only within the origin that was asked --------------
+
+
+@contextmanager
+def _loopback_host(
+    routes: dict[str, tuple[int, dict[str, str], bytes]],
+) -> Iterator[tuple[str, list[str]]]:
+    """A real HTTP server on the loopback, answering ``routes`` by path and recording each GET.
+
+    The fake opener above cannot show what this section is about: it hands back a prepared
+    ``final_url`` and never makes the request a redirect would make. Only a real transport
+    shows whether a redirect's target was sent a request, so these tests use one.
+    """
+
+    requested: list[str] = []
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            requested.append(self.path)
+            status, headers, body = routes.get(self.path, (404, {}, b""))
+            self.send_response(status)
+            for name, value in headers.items():
+                self.send_header(name, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}", requested
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def _no_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep a machine's proxy settings from carrying loopback requests anywhere else."""
+
+    monkeypatch.setenv("no_proxy", "*")
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_a_redirect_to_another_origin_is_never_requested_from_it() -> None:
+    """The other host is sent nothing, rather than sent a request whose answer is discarded.
+
+    The origin check in ``fetch_club_document`` reads the final URL, which exists only after
+    the request to it has gone. An article link is printed by a club's page and nobody checked
+    where it redirects, so the transport itself must stop at the redirect: the second server
+    here stands for a host with no reading and no ``robots.txt`` asked, and it is never called.
+    """
+
+    registered_routes: dict[str, tuple[int, dict[str, str], bytes]] = {}
+    elsewhere_routes = {"/elsewhere": (200, {"Content-Type": "text/html"}, b"<p>Other.</p>")}
+    with (
+        _loopback_host(elsewhere_routes) as (elsewhere, elsewhere_requested),
+        _loopback_host(registered_routes) as (origin, requested),
+    ):
+        registered_routes["/news/article"] = (302, {"Location": f"{elsewhere}/elsewhere"}, b"")
+
+        with pytest.raises(ClubNewsFetchError, match="HTTP 302") as refusal:
+            read_url(f"{origin}/news/article", opener=default_opener, sleeper=lambda _: None)
+
+    assert requested == ["/news/article"]
+    assert elsewhere_requested == []
+    assert "another origin" in str(refusal.value)
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_a_redirect_within_the_origin_is_still_followed() -> None:
+    """A page that moved on its own host is read where it moved to, as before."""
+
+    routes = {
+        "/news/old": (301, {"Location": "/news/new"}, b""),
+        "/news/new": (200, {"Content-Type": "text/html"}, b"<p>Moved.</p>"),
+    }
+    with _loopback_host(routes) as (origin, requested):
+        read = read_url(f"{origin}/news/old", opener=default_opener, sleeper=lambda _: None)
+
+    assert requested == ["/news/old", "/news/new"]
+    assert read.final_url == f"{origin}/news/new"
+    assert read.content == b"<p>Moved.</p>"
+
+
+def test_the_redirect_rule_compares_origins_before_anything_is_sent() -> None:
+    """Driven directly: a new request is built only for the same scheme, host and port.
+
+    The host is compared without case, as host names are; another port or plain http is
+    another origin, as it is for the registry.
+    """
+
+    handler = SameOriginRedirects()
+    request = urllib.request.Request(ARTICLE_ONE)
+    headers = http.client.HTTPMessage()
+
+    followed = handler.redirect_request(
+        request, io.BytesIO(), 302, "Found", headers, "https://Club.Example/team-news/b"
+    )
+
+    assert followed is not None
+    assert followed.full_url == "https://Club.Example/team-news/b"
+    for elsewhere in (
+        "https://other.example/team-news/b",
+        "https://club.example:8443/team-news/b",
+        "http://club.example/team-news/b",
+    ):
+        with pytest.raises(urllib.error.HTTPError, match="another origin"):
+            handler.redirect_request(request, io.BytesIO(), 302, "Found", headers, elsewhere)
+
+
+class _HttpsTable:
+    """urllib's https socket replaced by a table, with every request it is handed recorded.
+
+    Only the socket goes. ``default_opener`` still builds its own opener, the redirect handler
+    still decides whether a 30x is followed, and a followed one still arrives here as a new
+    request, so what is recorded is what a real run would have sent. That lets the whole
+    reader, with its https-only sources, run through the real transport offline.
+    """
+
+    def __init__(self, routes: dict[str, tuple[int, dict[str, str], bytes]]) -> None:
+        self.routes = routes
+        self.requested: list[str] = []
+
+    def answer(self, request: urllib.request.Request) -> urllib.response.addinfourl:
+        self.requested.append(request.full_url)
+        status, headers, body = self.routes.get(request.full_url, (404, {}, b""))
+        message = http.client.HTTPMessage()
+        for name, value in headers.items():
+            message[name] = value
+        response = urllib.response.addinfourl(io.BytesIO(body), message, request.full_url, status)
+        # What `http.client` sets and urllib's error processor reads as the reason phrase.
+        response.msg = http.client.responses.get(status, "")  # type: ignore[attr-defined]
+        return response
+
+
+def _answer_https_from(monkeypatch: pytest.MonkeyPatch, routes: Any) -> _HttpsTable:
+    table = _HttpsTable(routes)
+    monkeypatch.setattr(
+        urllib.request.HTTPSHandler,
+        "https_open",
+        lambda _handler, request: table.answer(request),
+    )
+    return table
+
+
+_ALLOW_ALL = (200, {"Content-Type": "text/plain"}, b"User-agent: *\nAllow: /\n")
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_an_article_that_redirects_off_the_host_sends_that_host_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The path article links opened, read the way a real run reads it.
+
+    A registered address is one somebody checked. An article link is printed by the club's
+    page, and nobody checked where it redirects. Here one redirects to a host with no reading:
+    that host receives no request, the article is named as not read, and the club's other
+    article and its registered page are read as before.
+    """
+
+    moved = f"{PAGE}/moved"
+    elsewhere = "https://other.example/team-news/moved"
+    page = b"<a href='/team-news/moved'>Moved</a><a href='/team-news/saka-fit'>Saka</a>"
+    table = _answer_https_from(
+        monkeypatch,
+        {
+            ROBOTS: _ALLOW_ALL,
+            PAGE: (200, {"Content-Type": "text/html"}, page),
+            moved: (302, {"Location": elsewhere}, b""),
+            "https://other.example/robots.txt": _ALLOW_ALL,
+            elsewhere: (200, {"Content-Type": "text/html"}, b"<p>Elsewhere.</p>"),
+            ARTICLE_ONE: (200, {"Content-Type": "text/html"}, ARTICLE_ONE_BODY),
+        },
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE,), now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert table.requested == [ROBOTS, PAGE, moved, ARTICLE_ONE]
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    assert len(refused) == 1
+    club, reason = refused[0]
+    assert club == "Example FC"
+    assert f"An article linked from {PAGE}" in reason
+    assert "HTTP 302" in reason
+    assert "another origin" in reason
+
+
+@pytest.mark.usefixtures("_no_proxy")
+def test_a_robots_file_that_redirects_off_the_host_is_one_that_could_not_be_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Another host's ``robots.txt`` does not answer for this one, so the host is refused.
+
+    Following the redirect used to parse the other host's file as this host's preference.
+    Now the other host is sent nothing, the preference is unknown, and the club is recorded
+    as not covered, which is what an unreadable ``robots.txt`` has always cost.
+    """
+
+    table = _answer_https_from(
+        monkeypatch,
+        {
+            ROBOTS: (301, {"Location": "https://other.example/robots.txt"}, b""),
+            "https://other.example/robots.txt": _ALLOW_ALL,
+            PAGE: (200, {"Content-Type": "text/html"}, b"<p>News.</p>"),
+        },
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE,), now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert table.requested == [ROBOTS]
+    assert documents == ()
+    assert len(refused) == 1
+    club, reason = refused[0]
+    assert club == "Example FC"
+    assert "could not be read" in reason
+    assert "HTTP 301" in reason
+
+
 def test_the_fetch_instant_comes_from_the_clock_and_not_the_response() -> None:
     """Pinned so a capture is reproducible and the third clock stays separable."""
 
@@ -284,7 +531,7 @@ def test_a_plain_http_source_is_refused_on_construction() -> None:
     """A citation into bytes an intermediary could have rewritten is not a citation."""
 
     with pytest.raises(ClubNewsFetchError, match="https"):
-        ClubSource(club="Example FC", url="http://club.example/team-news")
+        ClubSource(club="Example FC", url="http://club.example/team-news", terms_read_on=READ_ON)
 
 
 # --- the retry rule ---------------------------------------------------------
@@ -332,13 +579,290 @@ def test_a_persistent_server_error_reports_every_attempt() -> None:
     assert delays == [2.0, 4.0, 8.0]
 
 
+# --- failures urllib does not wrap --------------------------------------------
+
+#: What reaches the reader raw once the request is sent: a read that times out, a host that
+#: hangs up before answering, and a body cut short. Built fresh for each raise. They are
+#: raised from the opener here, which tests what the reader does with each one and not
+#: where it comes from. The bounded read this reader makes raises `IncompleteRead` by itself
+#: only for a chunked body; for a body sent with a Content-Length it is `_read_once` that
+#: raises it (the `_Declared` tests below, and the loopback tests at the end of this section).
+TRANSPORT_FAILURES: dict[str, Callable[[], Exception]] = {
+    "timeout": lambda: TimeoutError("timed out"),
+    "hang-up": lambda: http.client.RemoteDisconnected(
+        "Remote end closed connection without response"
+    ),
+    "short body": lambda: http.client.IncompleteRead(b"<p>Saka", 20),
+}
+
+
+class _FailingRead(_Reply):
+    """A response whose headers arrived and whose body did not."""
+
+    def __init__(self, failure: Exception) -> None:
+        super().__init__()
+        self._failure = failure
+
+    def read(self, amount: int | None = None) -> bytes:
+        raise self._failure
+
+
+class _Declared(_Reply):
+    """A response that declares a Content-Length and delivers only the bytes it is given.
+
+    `read(amount)` returns what arrived and raises nothing, which is what http.client's
+    bounded read does when a body sent with a Content-Length ends early: its own comment
+    there says it ought to raise `IncompleteRead` and does not, for compatibility.
+    """
+
+    def __init__(
+        self,
+        content: bytes,
+        *,
+        declared: int,
+        content_type: str = "text/html; charset=utf-8",
+        chunked: bool = False,
+    ) -> None:
+        super().__init__(content=content, content_type=content_type)
+        self.headers["Content-Length"] = str(declared)
+        self.chunked = chunked
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_transport_failure_is_retried_and_then_succeeds(
+    failure: Callable[[], Exception],
+) -> None:
+    """Said "later" like a 503, so it gets the 503's patience rather than ending the run."""
+
+    delays, sleeper = _slept()
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [failure(), _Reply()]})
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    assert document.club == "Example FC"
+    assert opener.requested.count(PAGE) == 2
+    assert delays == [2.0]
+
+
+@pytest.mark.parametrize("failure", TRANSPORT_FAILURES.values(), ids=TRANSPORT_FAILURES.keys())
+def test_a_transport_failure_on_every_attempt_names_the_url(
+    failure: Callable[[], Exception],
+) -> None:
+    """It ends as this module's error, so the caller's per-club catch sees it."""
+
+    delays, sleeper = _slept()
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [failure() for _ in range(4)]})
+
+    with pytest.raises(ClubNewsFetchError, match="on 4 attempts") as raised:
+        read_url(PAGE, opener=opener, sleeper=sleeper)
+
+    assert PAGE in str(raised.value)
+    assert type(failure()).__name__ in str(raised.value)
+    assert opener.requested.count(PAGE) == 4
+    assert delays == [2.0, 4.0, 8.0]
+
+
+def test_a_chunked_body_that_fails_while_it_is_read_is_retried() -> None:
+    """The headers arrived, so the open succeeded; http.client raises from `read` itself."""
+
+    delays, sleeper = _slept()
+    cut_short = _FailingRead(http.client.IncompleteRead(b"<p>Saka"))
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [cut_short, _Reply()]})
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    assert document.content == b"<p>Saka trained fully.</p>"
+    assert delays == [2.0]
+
+
+def test_a_body_that_times_out_on_every_read_names_the_url() -> None:
+    delays, sleeper = _slept()
+    opener = _Opener(
+        {ROBOTS: _allowing_robots(), PAGE: [_FailingRead(TimeoutError("timed out"))] * 4}
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="TimeoutError") as raised:
+        read_url(PAGE, opener=opener, sleeper=sleeper)
+
+    assert PAGE in str(raised.value)
+    assert delays == [2.0, 4.0, 8.0]
+
+
+def test_a_page_shorter_than_its_declared_length_is_retried() -> None:
+    """Returned short without an error, it would be hashed and coded as the whole page."""
+
+    whole = b"<p>Saka trained fully.</p>"
+    delays, sleeper = _slept()
+    cut_short = _Declared(whole[:7], declared=len(whole))
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: [cut_short, _Reply(content=whole)]})
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    assert document.content == whole
+    assert opener.requested.count(PAGE) == 2
+    assert delays == [2.0]
+
+
+def test_a_page_shorter_than_its_declared_length_every_time_is_refused() -> None:
+    delays, sleeper = _slept()
+    opener = _Opener(
+        {ROBOTS: _allowing_robots(), PAGE: [_Declared(b"<p>Saka", declared=26) for _ in range(4)]}
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="IncompleteRead") as raised:
+        read_url(PAGE, opener=opener, sleeper=sleeper)
+
+    assert PAGE in str(raised.value)
+    assert opener.requested.count(PAGE) == 4
+    assert delays == [2.0, 4.0, 8.0]
+
+
+def test_a_page_as_long_as_its_declared_length_is_read_once() -> None:
+    """The check compares with the declared length and does not refuse a page that met it."""
+
+    whole = b"<p>Saka trained fully.</p>"
+    opener = _opener(_Declared(whole, declared=len(whole)))
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert document.content == whole
+    assert opener.requested.count(PAGE) == 1
+
+
+def test_a_declared_length_over_the_ceiling_is_still_too_large_and_not_retried() -> None:
+    """Only the ceiling plus one byte is read, so a longer declaration is not a short read."""
+
+    served = _Declared(b"x" * (MAXIMUM_DOCUMENT_BYTES + 1), declared=3 * MAXIMUM_DOCUMENT_BYTES)
+    opener = _opener(served)
+
+    with pytest.raises(ClubNewsFetchError, match="wrong URL rather than a long page"):
+        fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested.count(PAGE) == 1
+
+
+def test_a_chunked_body_is_not_judged_by_a_content_length_beside_it() -> None:
+    """http.client ignores that header when the body is chunked, and so does the reader."""
+
+    whole = b"<p>Saka trained fully.</p>"
+    opener = _opener(_Declared(whole, declared=len(whole) + 50, chunked=True))
+
+    document = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert document.content == whole
+
+
+def test_one_slow_host_does_not_cost_the_other_clubs_their_pages() -> None:
+    """The audit's case: a timeout used to escape the loop and lose the fast host's page."""
+
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: [TimeoutError("timed out") for _ in range(4)],
+            "https://other.example/robots.txt": _allowing_robots(),
+            other.url: _Reply(final_url=other.url),
+        }
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE, other), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert [document.club for document in documents] == ["Other FC"]
+    assert [club for club, _reason in refused] == ["Example FC"]
+    assert PAGE in refused[0][1]
+
+
+#: A robots file that disallows the registered page, and two ways of receiving less of it
+#: than its Content-Length declares.
+ROBOTS_DISALLOWING = b"User-agent: *\nDisallow: /team-news\n"
+ROBOTS_CUT_SHORT: dict[str, Callable[[], _Declared]] = {
+    # The cut falls before the Disallow line, so what arrived reads as "allow everything".
+    "cut before its Disallow line": lambda: _Declared(
+        b"User-agent: *\n", declared=len(ROBOTS_DISALLOWING), content_type="text/plain"
+    ),
+    # 404 bytes are missing, so the error's own text says "404 more expected", and
+    # `robots_allows` still reads "404" in a refusal's text as a host with no robots file.
+    "404 bytes missing": lambda: _Declared(
+        b"User-agent", declared=len(b"User-agent") + 404, content_type="text/plain"
+    ),
+}
+
+
+def test_the_whole_robots_file_disallows_the_page() -> None:
+    """The control for the test below: served whole, this file refuses the page."""
+
+    robots = _Declared(
+        ROBOTS_DISALLOWING, declared=len(ROBOTS_DISALLOWING), content_type="text/plain"
+    )
+
+    assert not robots_allows(SOURCE, opener=_opener(robots=robots), sleeper=lambda _: None)
+
+
+@pytest.mark.parametrize("robots", ROBOTS_CUT_SHORT.values(), ids=ROBOTS_CUT_SHORT.keys())
+def test_a_robots_file_cut_short_is_not_consent(robots: Callable[[], _Declared]) -> None:
+    """A robots file shorter than it said it was is an unanswered question, not a yes."""
+
+    opener = _Opener({ROBOTS: robots(), PAGE: _Reply()})
+
+    with pytest.raises(ClubNewsFetchError, match="preference is unknown") as raised:
+        fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None)
+
+    assert "IncompleteRead" in str(raised.value)
+    assert PAGE not in opener.requested
+
+
+def _direct(request: urllib.request.Request, timeout: float) -> Any:
+    return DIRECT_OPENER.open(request, timeout=timeout)
+
+
+#: The same 14 bytes of a robots file, sent under each framing a body can have, and cut off.
+CUT_OFF_ANSWERS: dict[str, bytes] = {
+    "content-length": status_head(Content_Type="text/plain", Content_Length="100")
+    + b"User-agent: *\n",
+    "chunked": status_head(Content_Type="text/plain", Transfer_Encoding="chunked")
+    + b"40\r\nUser-agent: *\n",
+}
+
+
+def test_the_loopback_server_serves_a_whole_body() -> None:
+    """The control for the test below: the server and the real reader agree on a whole body."""
+
+    body = b"User-agent: *\nDisallow: /team-news\n"
+    answer = status_head(Content_Type="text/plain", Content_Length=str(len(body))) + body
+
+    with serving(answer) as server:
+        read = read_url(f"{server.url}/robots.txt", opener=_direct, sleeper=lambda _: None)
+
+    assert (read.status, read.content) == (200, body)
+    assert len(server.answered) == 1
+
+
+@pytest.mark.parametrize("answer", CUT_OFF_ANSWERS.values(), ids=CUT_OFF_ANSWERS.keys())
+def test_a_body_cut_off_under_http_client_is_retried_and_refused(answer: bytes) -> None:
+    """Through http.client itself, which returns a short Content-Length body without error."""
+
+    delays, sleeper = _slept()
+
+    with (
+        serving(answer) as server,
+        pytest.raises(ClubNewsFetchError, match="IncompleteRead") as raised,
+    ):
+        read_url(f"{server.url}/robots.txt", opener=_direct, attempts=2, sleeper=sleeper)
+
+    assert "on 2 attempts" in str(raised.value)
+    assert len(server.answered) == 2
+    assert delays == [2.0]
+
+
 # --- one club failing does not fail the week --------------------------------
 
 
 def test_a_refused_club_is_returned_beside_the_read_ones() -> None:
     """Declared and covered are different columns because this happens."""
 
-    other = ClubSource(club="Other FC", url="https://other.example/news")
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
     opener = _Opener(
         {
             ROBOTS: _allowing_robots(),
@@ -370,7 +894,7 @@ def _three_pages_on_one_host() -> tuple[tuple[ClubSource, ...], _Opener]:
     """One club publishing on three paths, which the registry now permits."""
 
     sources = tuple(
-        ClubSource(club="Example FC", url=f"https://club.example/{path}")
+        ClubSource(club="Example FC", url=f"https://club.example/{path}", terms_read_on=READ_ON)
         for path in ("team-news", "injuries", "press-conference")
     )
     replies: dict[str, Any] = {ROBOTS: _allowing_robots()}
@@ -412,7 +936,7 @@ def test_a_second_request_to_one_host_waits() -> None:
 def test_two_hosts_do_not_wait_for_each_other() -> None:
     """The debt is owed per host, so a slow neighbour does not slow an unrelated club."""
 
-    other = ClubSource(club="Other FC", url="https://other.example/news")
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
     opener = _Opener(
         {
             ROBOTS: _allowing_robots(),
@@ -584,7 +1108,7 @@ def test_every_registered_source_points_at_a_terms_reading(tmp_path: Path) -> No
         load_club_sources(path)
 
 
-def _registry(tmp_path: Path, *entries: dict[str, str]) -> Path:
+def _registry(tmp_path: Path, *entries: dict[str, str | None]) -> Path:
     """A registry file carrying exactly ``entries``, each with its terms pointer."""
 
     path = tmp_path / "sources.json"
@@ -593,7 +1117,12 @@ def _registry(tmp_path: Path, *entries: dict[str, str]) -> Path:
             {
                 "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
                 "sources": [
-                    {"terms_record": "docs/club_news_sources.md", **entry} for entry in entries
+                    {
+                        "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON.isoformat(),
+                        **entry,
+                    }
+                    for entry in entries
                 ],
             }
         ),
@@ -684,7 +1213,7 @@ def test_a_registry_under_another_contract_is_refused(tmp_path: Path) -> None:
 
     path = tmp_path / "sources.json"
     path.write_text(
-        json.dumps({"contract_version": "club_news_sources_v2", "sources": []}),
+        json.dumps({"contract_version": "club_news_sources_v1", "sources": []}),
         encoding="utf-8",
     )
 
@@ -716,6 +1245,7 @@ def test_registered_sources_are_read_in_the_declared_order(tmp_path: Path) -> No
                         "club": club,
                         "url": f"https://club.example/{index}",
                         "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON.isoformat(),
                     }
                     for index, club in enumerate(clubs)
                 ],
@@ -725,3 +1255,515 @@ def test_registered_sources_are_read_in_the_declared_order(tmp_path: Path) -> No
     )
 
     assert [source.club for source in load_club_sources(path)] == list(clubs)
+
+
+# --- a registered page, followed to its articles ------------------------------
+
+ARTICLE_ONE = "https://club.example/team-news/saka-fit"
+ARTICLE_TWO = "https://club.example/team-news/press-conference"
+DEEPER = "https://club.example/team-news/deeper"
+PRIVATE = "https://club.example/team-news/private/injury-list"
+OFF_HOST = "https://other.example/team-news/rumour"
+#: Where three links printed with a dot segment would land. The first is what a browser makes
+#: of ``/team-news/a/../b``; the other two are addresses a server may normalise out from under
+#: the path ``robots.txt`` judged. All three sit under the index's own path as the prefix rule
+#: reads it, so only the dot rule keeps them out.
+DOT_RESOLVED = "https://club.example/team-news/b"
+DOT_ENCODED = "https://club.example/team-news/%2e%2e/tickets"
+DOT_ABSOLUTE = "https://club.example/team-news/./x"
+
+#: An index written the way a club writes one: navigation, a list of headlines, and links
+#: that must not be followed sitting between the ones that must.
+INDEX = (
+    "<html><head><title>News</title></head><body>"
+    "<nav><a href='/tickets'>Tickets</a> <a href='/team-news'>News</a></nav>"
+    "<ul>"
+    "<li><a href='/team-news/saka-fit'>Saka fit for Saturday</a></li>"
+    "<li><a href='https://club.example/team-news/press-conference#video'>Press</a></li>"
+    "<li><a href='/team-news/saka-fit#comments'>Comments</a></li>"
+    "<li><a href='https://other.example/team-news/rumour'>Elsewhere</a></li>"
+    "<li><a href='//other.example/team-news/rumour'>Elsewhere, relative</a></li>"
+    "<li><a href='https://club.example.other.example/team-news/x'>Look-alike</a></li>"
+    "<li><a href='https://club.example:8443/team-news/x'>Another port</a></li>"
+    "<li><a href='http://club.example/team-news/insecure'>Plain http</a></li>"
+    "<li><a href='/team-news/private/injury-list'>Private</a></li>"
+    "<li><a href='/team-news/../tickets'>Climbing out</a></li>"
+    "<li><a href='/team-news/a/../b'>Climbing back in</a></li>"
+    "<li><a href='/team-news/%2e%2e/tickets'>Climbing out, encoded</a></li>"
+    "<li><a href='//club.example/team-news/./x'>A dot, protocol-relative</a></li>"
+    "<li><a href='/team-news/café'>Not ASCII</a></li>"
+    "<li><a href='mailto:press@club.example'>Mail</a></li>"
+    "</ul></body></html>"
+).encode()
+
+ARTICLE_ONE_BODY = (
+    b"<article><h1>Saka fit</h1><p>Saka trained fully on Thursday.</p>"
+    b"<a href='/team-news/deeper'>Read more</a></article>"
+)
+ARTICLE_TWO_BODY = b"<article><h1>Press conference</h1><p>Rice is rested for the cup.</p></article>"
+
+
+def _robots_keeping_private() -> _Reply:
+    return _allowing_robots(b"User-agent: *\nDisallow: /team-news/private\n")
+
+
+def _news_host(**overrides: Any) -> _Opener:
+    """The index above, its two articles, and every link that must stay unrequested served too.
+
+    Serving the off-host and deeper pages is deliberate: a test that only proved they were
+    not served could pass while the reader asked for them anyway.
+    """
+
+    replies: dict[str, Any] = {
+        ROBOTS: _robots_keeping_private(),
+        PAGE: _Reply(INDEX),
+        ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+        ARTICLE_TWO: _Reply(ARTICLE_TWO_BODY, final_url=ARTICLE_TWO),
+        DEEPER: _Reply(b"<p>Deeper.</p>", final_url=DEEPER),
+        PRIVATE: _Reply(b"<p>Private.</p>", final_url=PRIVATE),
+        OFF_HOST: _Reply(b"<p>Rumour.</p>", final_url=OFF_HOST),
+        "https://other.example/robots.txt": _allowing_robots(),
+        DOT_RESOLVED: _Reply(b"<p>Resolved.</p>", final_url=DOT_RESOLVED),
+        DOT_ENCODED: _Reply(b"<p>Encoded.</p>", final_url=DOT_ENCODED),
+        DOT_ABSOLUTE: _Reply(b"<p>Absolute.</p>", final_url=DOT_ABSOLUTE),
+    }
+    replies.update(overrides)
+    return _Opener(replies)
+
+
+def _read_news_host(opener: _Opener) -> tuple[Any, Any]:
+    return fetch_registered_documents(
+        (SOURCE,), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+
+def test_a_registered_page_is_followed_to_its_articles_on_the_same_host() -> None:
+    """I67: an index carries headlines, and the words a claim quotes are on the article.
+
+    Each article is its own document, in the order the index lists it, carrying the index's
+    club and its own readable text, so a claim cites the article and not the headline.
+    """
+
+    documents, _refused = _read_news_host(_news_host())
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE, ARTICLE_TWO]
+    assert {document.club for document in documents} == {"Example FC"}
+    one, two = documents[1], documents[2]
+    assert b"Saka trained fully on Thursday." in one.readable
+    assert b"Rice is rested" not in one.readable
+    assert b"Rice is rested for the cup." in two.readable
+    assert one.content == ARTICLE_ONE_BODY
+
+
+def test_no_link_off_the_registered_origin_is_ever_requested() -> None:
+    """Another host, a look-alike host, another port or plain http: none is registered."""
+
+    opener = _news_host()
+
+    _read_news_host(opener)
+
+    assert sorted(set(opener.requested)) == sorted({ROBOTS, PAGE, ARTICLE_ONE, ARTICLE_TWO})
+    assert not any("other.example" in url or url.startswith("http:") for url in opener.requested)
+
+
+def test_an_articles_own_links_are_not_followed() -> None:
+    """One step from a registered page and no further; this is not a crawler."""
+
+    opener = _news_host()
+
+    _read_news_host(opener)
+
+    assert DEEPER not in opener.requested
+
+
+def test_an_article_robots_disallows_is_not_requested_and_is_named() -> None:
+    """The host's stated preference decides each article path, as it decides the index."""
+
+    opener = _news_host()
+
+    documents, refused = _read_news_host(opener)
+
+    assert PRIVATE not in opener.requested
+    assert PRIVATE not in [document.requested_url for document in documents]
+    assert len(refused) == 1
+    club, reason = refused[0]
+    assert club == "Example FC"
+    assert f"An article linked from {PAGE}" in reason
+    assert "disallows" in reason
+    assert PRIVATE in reason
+
+
+def test_robots_is_asked_once_for_the_index_and_its_articles() -> None:
+    """The articles are paths of a host this run has already asked."""
+
+    opener = _news_host()
+
+    _read_news_host(opener)
+
+    assert opener.requested.count(ROBOTS) == 1
+
+
+def test_every_article_request_waits_like_any_second_request() -> None:
+    """Robots, the index and two articles: the first contact is free, the other three wait."""
+
+    delays, sleeper = _slept()
+
+    fetch_registered_documents(
+        (SOURCE,), opener=_news_host(), now=lambda: FIXED_NOW, sleeper=sleeper
+    )
+
+    assert delays == [PER_ORIGIN_DELAY_SECONDS] * 3
+
+
+def test_the_link_rule_keeps_same_origin_links_under_the_page_in_page_order() -> None:
+    """The rule itself, before robots: the private path is a link and robots judges it later."""
+
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(INDEX)})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert article_links(SOURCE, index) == (ARTICLE_ONE, ARTICLE_TWO, PRIVATE)
+
+
+def test_a_failed_article_costs_the_article_and_not_the_club() -> None:
+    """The registered page was read, so the club is read; the article is named as missing."""
+
+    missing = urllib.error.HTTPError(ARTICLE_TWO, 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+    documents, refused = _read_news_host(_news_host(**{ARTICLE_TWO: missing}))
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    reasons = [reason for _club, reason in refused]
+    assert any(ARTICLE_TWO in reason and "404" in reason for reason in reasons), reasons
+    assert all(reason.startswith("An article linked from") for reason in reasons)
+
+
+def test_an_article_answered_by_a_page_already_read_is_not_stored_twice() -> None:
+    """A removed article that redirects to the index would give one URL two sets of bytes."""
+
+    back_to_index = _Reply(INDEX, final_url=PAGE)
+
+    documents, refused = _read_news_host(_news_host(**{ARTICLE_ONE: back_to_index}))
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_TWO]
+    assert any("not stored a second time" in reason for _club, reason in refused)
+
+
+def test_a_registered_page_linked_from_another_is_read_once_as_itself() -> None:
+    """A link to a registered page is left for that page's own entry, so it is read once."""
+
+    injuries = "https://club.example/team-news/injuries"
+    index = b"<a href='/team-news/injuries'>Injuries</a><a href='/team-news/saka-fit'>Saka</a>"
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(index),
+            injuries: _Reply(b"<p>Nobody is injured.</p>", final_url=injuries),
+            ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+        }
+    )
+    registered = (SOURCE, ClubSource(club="Example FC", url=injuries, terms_read_on=READ_ON))
+
+    documents, refused = fetch_registered_documents(
+        registered, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert opener.requested.count(injuries) == 1
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE, injuries]
+
+
+def test_articles_are_capped_per_host_across_every_registered_page_it_serves() -> None:
+    """One server, one budget: two indexes on one host share the cap, in registry order."""
+
+    injuries = "https://club.example/injuries"
+    replies: dict[str, Any] = {ROBOTS: _allowing_robots()}
+    linked: dict[str, list[str]] = {PAGE: [], injuries: []}
+    for page, path in ((PAGE, "/team-news"), (injuries, "/injuries")):
+        for number in range(MAXIMUM_ARTICLES_PER_HOST):
+            url = f"https://club.example{path}/item-{number}"
+            linked[page].append(url)
+            replies[url] = _Reply(f"<p>Item {number}.</p>".encode(), final_url=url)
+        body = "".join(f"<a href='{url}'>{url}</a>" for url in linked[page])
+        replies[page] = _Reply(body.encode(), final_url=page)
+    registered = (SOURCE, ClubSource(club="Example FC", url=injuries, terms_read_on=READ_ON))
+    opener = _Opener(replies)
+
+    documents, refused = fetch_registered_documents(
+        registered, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    read = [document.requested_url for document in documents]
+    articles = [url for url in read if url not in (PAGE, injuries)]
+    assert refused == ()
+    assert read.count(injuries) == 1
+    assert articles == linked[PAGE][:MAXIMUM_ARTICLES_PER_HOST]
+    assert not any(url in opener.requested for url in linked[injuries])
+
+
+def test_a_feed_is_read_but_its_item_links_are_not_followed() -> None:
+    """A feed already carries its items' words, so following them would read them twice."""
+
+    feed = (
+        b"<rss><channel><item><title>Saka fit</title>"
+        b"<link>https://club.example/team-news/saka-fit</link>"
+        b"<description>Saka trained fully.</description></item></channel></rss>"
+    )
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(feed, content_type="application/rss+xml"),
+            ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+        }
+    )
+
+    documents, _refused = fetch_registered_documents(
+        (SOURCE,), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert [document.requested_url for document in documents] == [PAGE]
+    assert ARTICLE_ONE not in opener.requested
+
+
+def test_a_page_registered_at_the_root_of_its_host_follows_nothing() -> None:
+    """With no path to be under, every link on the site would count, so none does."""
+
+    root = ClubSource(club="Example FC", url="https://club.example/", terms_read_on=READ_ON)
+    opener = _Opener({ROBOTS: _allowing_robots(), root.url: _Reply(INDEX, final_url=root.url)})
+    index = fetch_club_document(root, opener=opener, now=lambda: FIXED_NOW)
+
+    assert article_links(root, index) == ()
+
+
+def test_a_link_printed_with_a_dot_segment_is_skipped_and_not_resolved() -> None:
+    """Literal or encoded, relative or absolute: the page did not print a clean address.
+
+    ``/team-news/a/../b`` is the case that shows the rule is about what was printed. A browser
+    resolves it to ``/team-news/b``, which is under the index and would pass every other rule,
+    so only a check on the printed path keeps the reader from requesting an address the page
+    never wrote down.
+    """
+
+    opener = _news_host()
+
+    documents, _refused = _read_news_host(opener)
+
+    for skipped in (DOT_RESOLVED, DOT_ENCODED, DOT_ABSOLUTE):
+        assert skipped not in opener.requested, skipped
+        assert skipped not in [document.requested_url for document in documents], skipped
+
+
+def test_a_link_resolved_against_a_served_address_with_a_dot_segment_is_skipped() -> None:
+    """The printed link is clean here; the address it resolves against is not.
+
+    A query-only link keeps the served page's path as it arrived, encoded dot included, so
+    the resolved path is checked as well as the printed one.
+    """
+
+    served_at = f"{PAGE}/%2e/list"
+    page = b"<a href='?page=2'>Next</a><a href='/team-news/saka-fit'>Saka</a>"
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(page, final_url=served_at)})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+
+    assert article_links(SOURCE, index) == (ARTICLE_ONE,)
+
+
+def test_links_are_judged_against_the_registered_path_and_not_the_served_one() -> None:
+    """A same-origin redirect to a shallower path does not widen what is followed.
+
+    ``/team-news`` answered at ``/en`` would otherwise make everything under ``/en`` an
+    article, tickets and shop included, which is not what "``/news`` leads to ``/news/...``"
+    in the permission record says. A page served somewhere else is registered where it is
+    served, as Newcastle was.
+    """
+
+    served_at = "https://club.example/en"
+    tickets = "https://club.example/en/tickets/buy"
+    shop = "https://club.example/en/shop/x"
+    page = (
+        b"<a href='/en/tickets/buy'>Tickets</a>"
+        b"<a href='/team-news/saka-fit'>Saka</a>"
+        b"<a href='/en/shop/x'>Shop</a>"
+    )
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(page, final_url=served_at),
+            ARTICLE_ONE: _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE),
+            tickets: _Reply(b"<p>Tickets.</p>", final_url=tickets),
+            shop: _Reply(b"<p>Shop.</p>", final_url=shop),
+        }
+    )
+
+    documents, refused = _read_news_host(opener)
+
+    assert refused == ()
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    assert tickets not in opener.requested
+    assert shop not in opener.requested
+
+
+# --- a reading ages -----------------------------------------------------------
+
+
+def _dated(read_on: date | None) -> ClubSource:
+    return ClubSource(club="Example FC", url=PAGE, terms_read_on=read_on)
+
+
+def test_a_host_whose_reading_has_aged_is_not_contacted_at_all() -> None:
+    """F26: not the page and not its robots.txt. A stale reading is refused before a request."""
+
+    opener = _opener()
+    stale = FIXED_NOW.date() - timedelta(days=TERMS_READING_VALID_DAYS + 1)
+
+    with pytest.raises(ClubNewsFetchError, match="days old") as refusal:
+        fetch_club_document(_dated(stale), opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested == []
+    assert stale.isoformat() in str(refusal.value)
+    assert "docs/club_news_sources.md" in str(refusal.value)
+
+
+def test_a_reading_is_relied_on_through_its_last_day() -> None:
+    """The boundary, pinned: exactly the interval old is still inside it."""
+
+    last_day = FIXED_NOW.date() - timedelta(days=TERMS_READING_VALID_DAYS)
+
+    document = fetch_club_document(_dated(last_day), opener=_opener(), now=lambda: FIXED_NOW)
+
+    assert document.club == "Example FC"
+
+
+def test_an_undated_host_is_not_contacted_at_all() -> None:
+    """Nobody read it, which is the placeholder's case, and unread is not fine."""
+
+    opener = _opener()
+
+    with pytest.raises(ClubNewsFetchError, match="Nobody has dated"):
+        fetch_club_document(_dated(None), opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested == []
+
+
+def test_a_reading_dated_after_the_fetch_is_refused() -> None:
+    """A typo in the year would otherwise stretch a permission by a year."""
+
+    opener = _opener()
+    future = FIXED_NOW.date() + timedelta(days=2)
+
+    with pytest.raises(ClubNewsFetchError, match="after this fetch"):
+        fetch_club_document(_dated(future), opener=opener, now=lambda: FIXED_NOW)
+
+    assert opener.requested == []
+
+
+def test_a_reading_signed_a_day_ahead_of_utc_is_read() -> None:
+    """A reader east of UTC can sign on a date UTC has not reached yet."""
+
+    tomorrow = FIXED_NOW.date() + timedelta(days=1)
+
+    document = fetch_club_document(_dated(tomorrow), opener=_opener(), now=lambda: FIXED_NOW)
+
+    assert document.club == "Example FC"
+
+
+def test_a_stale_host_costs_its_club_and_not_the_week() -> None:
+    """The refusal arrives in the per-club currency, beside the clubs that were read."""
+
+    stale = _dated(FIXED_NOW.date() - timedelta(days=TERMS_READING_VALID_DAYS + 30))
+    other = ClubSource(club="Other FC", url="https://other.example/news", terms_read_on=READ_ON)
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(),
+            "https://other.example/robots.txt": _allowing_robots(),
+            other.url: _Reply(final_url=other.url),
+        }
+    )
+
+    documents, refused = fetch_registered_documents(
+        (stale, other), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert [document.club for document in documents] == ["Other FC"]
+    assert [club for club, _reason in refused] == ["Example FC"]
+    assert not any(url.startswith("https://club.example") for url in opener.requested)
+
+
+def test_an_entry_with_no_reading_date_is_refused(tmp_path: Path) -> None:
+    """The key is required even where the answer is null: silence is not a date."""
+
+    path = tmp_path / "sources.json"
+    entry = {"club": "Example FC", "url": PAGE, "terms_record": "docs/club_news_sources.md"}
+    path.write_text(
+        json.dumps({"contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION, "sources": [entry]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="no 'terms_read_on'"):
+        load_club_sources(path)
+
+
+def test_a_reading_date_the_rule_cannot_read_is_refused(tmp_path: Path) -> None:
+    """A date written the local way is a reading the age rule cannot judge."""
+
+    path = _registry(tmp_path, {"club": "Example FC", "url": PAGE, "terms_read_on": "22/09/2026"})
+
+    with pytest.raises(ClubNewsFetchError, match="not a YYYY-MM-DD"):
+        load_club_sources(path)
+
+
+def test_a_null_reading_date_loads_and_is_carried_as_absent(tmp_path: Path) -> None:
+    """The placeholder's honest value reads; it is the fetch that refuses it."""
+
+    path = _registry(tmp_path, {"club": "Example FC", "url": PAGE, "terms_read_on": None})
+
+    (source,) = load_club_sources(path)
+
+    assert source.terms_read_on is None
+
+
+def test_one_host_dated_twice_is_refused(tmp_path: Path) -> None:
+    """A reading is of a host, so two of its pages cannot disagree about when it was read."""
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": PAGE, "terms_read_on": "2026-09-01"},
+        {
+            "club": "Example FC",
+            "url": "https://Club.Example/injuries",
+            "terms_read_on": "2026-09-02",
+        },
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="every page of one host"):
+        load_club_sources(path)
+
+
+def test_the_committed_registry_dates_match_the_signed_rows() -> None:
+    """The registry's date is copied from the table, and the two may not drift apart.
+
+    A row re-signed without the registry moving would keep refusing a host somebody just
+    read, and a registry date moved without the row would be a permission nobody signed.
+    """
+
+    rows = _reading_rows()
+
+    for source in load_club_sources(REGISTRY):
+        host = urllib.parse.urlsplit(source.url).netloc
+        _reader, signed = rows[host]
+        if source.terms_read_on is None:
+            assert signed == "—", host
+        else:
+            assert signed == source.terms_read_on.isoformat(), host
+
+
+def test_the_documented_interval_and_expiry_dates_are_the_codes() -> None:
+    """Prose that states a number is checked against the number it states."""
+
+    document = (REGISTRY.parents[2] / "docs" / "club_news_sources.md").read_text(encoding="utf-8")
+
+    assert f"{TERMS_READING_VALID_DAYS} days" in document
+    for source in load_club_sources(REGISTRY):
+        if source.terms_read_on is not None:
+            last_day = source.terms_read_on + timedelta(days=TERMS_READING_VALID_DAYS)
+            assert f"through {last_day.isoformat()}" in document, source.url

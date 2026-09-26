@@ -25,6 +25,7 @@ constraint costs is the difference between two of the member's own solves, publi
 
 import hashlib
 import json
+import logging
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -94,6 +95,15 @@ and links the source."""
 SOURCE_FIXTURE_FILE: Final = "fixture_file"
 SOURCE_CLUB_NEWS_CAPTURE: Final = "club_news_capture"
 
+SOURCE_CHECK_CITED_DOCUMENTS_HELD: Final = "cited_documents_held"
+"""The digest guard compared the source with the table and it holds every cited document."""
+SOURCE_CHECK_NOTHING_CITED: Final = "nothing_cited"
+"""The table cites no document, which is what a week with no claims looks like, so the digest
+guard had nothing to compare. It is not a pass: the source was not shown to be the one the
+table was coded from, only not shown to be a different one. Logged when it happens."""
+
+_LOG: Final = logging.getLogger(__name__)
+
 
 class ManagerWordsError(DataError):
     """The evidence or its source could not be read as the manager's word."""
@@ -143,6 +153,10 @@ class ManagerWords:
     evidence_table: str
     clubs_covered: tuple[str, ...]
     words: tuple[ManagerWord, ...]
+    source_check: str | None = None
+    """What the digest guard found when this was read from an artifact
+    (``SOURCE_CHECK_CITED_DOCUMENTS_HELD`` or ``SOURCE_CHECK_NOTHING_CITED``); ``None`` when
+    it was built directly and no guard ran."""
 
     @property
     def constraining(self) -> tuple[ManagerWord, ...]:
@@ -238,14 +252,20 @@ def _covered(table: pd.DataFrame, table_path: Path) -> tuple[str, ...]:
 
 
 def _require_the_coded_documents(
-    table: pd.DataFrame, table_path: Path, documents: Sequence[RawDocument]
-) -> None:
+    table: pd.DataFrame, table_path: Path, documents: Sequence[RawDocument], source_label: str
+) -> str:
     """Refuse documents that are not the ones this table's claims were coded from.
 
     The manifest lists the digest of every document a claim cites (``document_sha256s``,
     taken over the readable bytes the parser indexed). A source that holds none of them is a
     different week or a different source, and joining it would publish that source's label
     and link beside claims it never made.
+
+    **A table with no claims cites nothing, and then there is nothing to compare.** Any source
+    would pass a check over an empty list, so that case is not reported as a pass: it returns
+    ``SOURCE_CHECK_NOTHING_CITED`` and logs a warning naming the table and the source. It is
+    not refused either, because a quiet week with no claims is a real outcome (the first real
+    run was one) and its source label is still what the member is told was read.
     """
 
     declared = table.attrs.get("document_sha256s")
@@ -254,6 +274,16 @@ def _require_the_coded_documents(
             f"{Path(table_path).name} arrived without its manifest's document digests, so "
             "which documents its claims cite is not known."
         )
+    if not declared:
+        _LOG.warning(
+            "%s cites no document (claims coded: %s), so the club-news source %s could not be "
+            "checked against it: the digest guard had nothing to compare. Recorded as %s.",
+            Path(table_path).name,
+            table.attrs.get("claims_coded", "not recorded"),
+            source_label,
+            SOURCE_CHECK_NOTHING_CITED,
+        )
+        return SOURCE_CHECK_NOTHING_CITED
     held: set[str] = set()
     for document in documents:
         held.add(hashlib.sha256(document.readable).hexdigest())
@@ -265,6 +295,7 @@ def _require_the_coded_documents(
             f"{Path(table_path).name} cites (first: {missing[0][:12]}); it is not the "
             "source this table was coded from."
         )
+    return SOURCE_CHECK_CITED_DOCUMENTS_HELD
 
 
 def manager_words_from_artifact(
@@ -286,7 +317,7 @@ def manager_words_from_artifact(
             f"{sorted(gameweeks)}; one artifact is one decision week."
         )
     clubs = _covered(table, table_path)
-    _require_the_coded_documents(table, table_path, documents)
+    source_check = _require_the_coded_documents(table, table_path, documents, source_label)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
         disposition = _text(row.get("rotation_disposition"))
@@ -323,6 +354,7 @@ def manager_words_from_artifact(
         evidence_table=Path(table_path).name,
         clubs_covered=clubs,
         words=tuple(sorted(words, key=lambda word: word.player_id)),
+        source_check=source_check,
     )
 
 
@@ -370,6 +402,8 @@ __all__ = [
     "NOT_CAPTAIN_DISPOSITIONS",
     "NOT_STARTING_DISPOSITIONS",
     "QUOTE_WITHHELD_PATTERN",
+    "SOURCE_CHECK_CITED_DOCUMENTS_HELD",
+    "SOURCE_CHECK_NOTHING_CITED",
     "SOURCE_CLUB_NEWS_CAPTURE",
     "SOURCE_FIXTURE_FILE",
     "SOURCE_SYNTHETIC_FIXTURE",

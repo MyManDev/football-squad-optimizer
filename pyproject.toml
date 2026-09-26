@@ -90,12 +90,17 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.13"
 strict = true
 mypy_path = "src"
+# The package, the operator scripts, and the three thin shells an operator runs to build
+# the site, league and scoreboard trees by hand.
 files = [
     "src/squadopt",
     "scripts/backend_status.py",
     "scripts/release/verify_live.py",
     "scripts/check_league_tree.py",
     "scripts/release/clean_body.py",
+    "scripts/build_site.py",
+    "scripts/build_league_site.py",
+    "scripts/build_scoreboard.py",
 ]
 
 # SciPy ships no type information and `scipy-stubs` is a separate, partial third-party
@@ -107,39 +112,48 @@ ignore_missing_imports = true
 
 [tool.importlinter]
 root_package = "squadopt"
-include_external_packages = false
+# The graph carries imports of modules outside the package, so the contracts below can name
+# frameworks, network clients and OS modules as well as squadopt packages.
+include_external_packages = true
 
 # The layered modular monolith (docs/architecture/dependency_rules.md). Higher layers may
 # import lower ones, never the reverse. There are no baseline exceptions; a new
-# violation fails the gate.
+# violation fails the gate. `exhaustive` means every package directly under `squadopt` must
+# be named here, so a new one fails the gate until it is placed. `integration` imports only
+# `data` and `optimization`, so it sits directly above `optimization`.
 [[tool.importlinter.contracts]]
 name = "Layered architecture"
 type = "layers"
+containers = ["squadopt"]
+exhaustive = true
 layers = [
-    "squadopt.api",
-    "squadopt.platform",
-    "squadopt.application",
-    "squadopt.live",
-    "squadopt.experiments",
-    "squadopt.backtest",
-    "squadopt.recalibration",
-    "squadopt.preflight",
-    "squadopt.bayesopt",
-    "squadopt.planning",
-    "squadopt.risk",
-    "squadopt.scenarios",
-    "squadopt.uncertainty",
-    "squadopt.evaluation",
-    "squadopt.optimization",
-    "squadopt.prediction",
-    "squadopt.features",
-    "squadopt.data",
-    "squadopt.contracts",
+    "api",
+    "platform",
+    "application",
+    "live",
+    "experiments",
+    "backtest",
+    "recalibration",
+    "preflight",
+    "bayesopt",
+    "planning",
+    "risk",
+    "scenarios",
+    "uncertainty",
+    "evaluation",
+    "integration",
+    "optimization",
+    "prediction",
+    "features",
+    "data",
+    "contracts",
 ]
 
-# The product (adapters, runtime, use cases, live, planning) does not import the measurement
-# laboratory. The layers contract above is a valid linear extension and stays as the
-# tie-break; this contract is the rule it could not express (docs/architecture/dependency_rules.md).
+# Neither the product nor the domain imports the measurement laboratory. The layers contract
+# above is a valid linear extension and stays as the tie-break; this contract is the rule it
+# could not express (docs/architecture/dependency_rules.md). Every package outside the
+# laboratory is a source, so the rule does not depend on the layer order: `scenarios` sits
+# above `uncertainty` there, and only this contract refuses that import.
 [[tool.importlinter.contracts]]
 name = "Product does not import the laboratory"
 type = "forbidden"
@@ -149,6 +163,14 @@ source_modules = [
     "squadopt.application",
     "squadopt.live",
     "squadopt.planning",
+    "squadopt.scenarios",
+    "squadopt.optimization",
+    "squadopt.evaluation",
+    "squadopt.prediction",
+    "squadopt.features",
+    "squadopt.data",
+    "squadopt.contracts",
+    "squadopt.integration",
 ]
 forbidden_modules = [
     "squadopt.experiments",
@@ -190,4 +212,100 @@ forbidden_modules = [
     "squadopt.data",
     "squadopt.contracts",
 ]
+allow_indirect_imports = true
+
+# Frameworks, network clients and databases stay in the outer ring: only the HTTP adapter and
+# the platform import them (docs/architecture/platform_runtime.md, "Infrastructure
+# dependencies stop at the platform boundary"). An import inside a function counts, so an SDK
+# import deferred into a constructor is still refused. `subprocess` is not listed because
+# `data/source_revision.py` asks git for the commit it stamps.
+[[tool.importlinter.contracts]]
+name = "Frameworks, network and databases stay in api and platform"
+type = "forbidden"
+source_modules = [
+    "squadopt.application",
+    "squadopt.live",
+    "squadopt.experiments",
+    "squadopt.backtest",
+    "squadopt.recalibration",
+    "squadopt.preflight",
+    "squadopt.bayesopt",
+    "squadopt.planning",
+    "squadopt.risk",
+    "squadopt.scenarios",
+    "squadopt.uncertainty",
+    "squadopt.evaluation",
+    "squadopt.integration",
+    "squadopt.optimization",
+    "squadopt.prediction",
+    "squadopt.features",
+    "squadopt.data",
+    "squadopt.contracts",
+]
+forbidden_modules = [
+    "fastapi",
+    "starlette",
+    "uvicorn",
+    "anthropic",
+    "openai",
+    "google",
+    "httpx",
+    "httpx2",
+    "requests",
+    "aiohttp",
+    "urllib",
+    "http",
+    "socket",
+    "sqlite3",
+]
+
+# The installed package never depends on the repository's script shells
+# (docs/architecture/platform_runtime.md: platform code never reaches into `scripts/`). This
+# is the import half of that rule; it does not see a `python -m scripts.<name>` subprocess.
+[[tool.importlinter.contracts]]
+name = "The package never imports the repository scripts"
+type = "forbidden"
+source_modules = [
+    "squadopt.api",
+    "squadopt.platform",
+    "squadopt.application",
+    "squadopt.live",
+    "squadopt.experiments",
+    "squadopt.backtest",
+    "squadopt.recalibration",
+    "squadopt.preflight",
+    "squadopt.bayesopt",
+    "squadopt.planning",
+    "squadopt.risk",
+    "squadopt.scenarios",
+    "squadopt.uncertainty",
+    "squadopt.evaluation",
+    "squadopt.integration",
+    "squadopt.optimization",
+    "squadopt.prediction",
+    "squadopt.features",
+    "squadopt.data",
+    "squadopt.contracts",
+]
+forbidden_modules = ["scripts"]
+
+# The decision core computes; it does not touch the operating system or start processes.
+# Reading a file through pathlib or json is outside this rule, and the contract does not
+# claim it. Only direct imports count: a `data`, `features` or `prediction` module the core
+# imports is not held to the rule through that import, because that would put a new rule on
+# the data and prediction lane without its owner's agreement (the plan's own rule). Those
+# packages are not sources for the same reason.
+[[tool.importlinter.contracts]]
+name = "The decision core imports no OS or process module"
+type = "forbidden"
+source_modules = [
+    "squadopt.contracts",
+    "squadopt.optimization",
+    "squadopt.planning",
+    "squadopt.scenarios",
+    "squadopt.evaluation",
+    "squadopt.uncertainty",
+    "squadopt.risk",
+]
+forbidden_modules = ["os", "shutil", "tempfile", "subprocess"]
 allow_indirect_imports = true

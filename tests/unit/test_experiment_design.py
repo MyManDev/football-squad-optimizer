@@ -8,7 +8,7 @@ from squadopt.bayesopt import (
     BayesianOptimizationConfig,
     enumerate_candidates,
 )
-from squadopt.experiments.config import (
+from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )

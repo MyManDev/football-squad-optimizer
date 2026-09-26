@@ -74,7 +74,7 @@ from squadopt.evaluation.participation_composition import (
     state_points,
 )
 from squadopt.evaluation.promotion import PromotionPolicy
-from squadopt.experiments.statistics import season_aware_moving_block_interval
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.features import CrossSeasonConfig
 from squadopt.features.component_targets import START_TARGET_SUPPORTED_SEASONS
 from squadopt.optimization.models import SolverStatus

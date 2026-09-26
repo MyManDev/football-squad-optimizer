@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from squadopt.platform._long_paths import addressable
+from squadopt.data._long_paths import addressable
 
 BACKUP_SCHEMA_VERSION = "private_backup_v1"
 MANIFEST_NAME = "manifest.json"

@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
 
-from scripts._experiment_cli import REPOSITORY_ROOT, _git_revision
+from scripts._provenance import REPOSITORY_ROOT, _git_revision
 
 from squadopt.application.rotation_export import (
     _NAME_DIGEST_CHARACTERS as _NAME_DIGEST_CHARACTERS,

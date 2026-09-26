@@ -6,7 +6,7 @@ the public route or component contracts.
 | Module | Responsibility |
 | --- | --- |
 | `pages/LeagueMemberPage.tsx` | Route, loading/error states and the preserved direct system page. Re-exports `LeagueMemberView` and `AdviceIssue` for existing callers. |
-| `pages/useLeagueMemberData.ts` | Existing member/index/advice/rival React Query reads, keys, enablement, stale times and retry choices. |
+| `pages/useLeagueMemberData.ts` | Composes the member page's reads: the own squad, the member list, the advice index, the compute service's capabilities, the advice, the window control and the rival. It keys the index, capabilities, advice and window-control reads, decides when each read is enabled, and sets the capabilities read's `refetchOnWindowFocus: false`. The own squad, member list and rival reads come from the shared hooks in `queries.ts`. |
 | `pages/LeagueMemberView.tsx` | Page composition: the notices, the decision section, the squad section, the honesty lines and their disclosure, the plan's detail sections, and the closed tool sections (the held squad first). It renders the plan controls with Hesapla and the WHO block into the shell's sidebar slots through `ShellPortal` (inline when there is no shell), and places the one fixture rail: a column of its own from 1180 px (and without a shell), beside the squad on a tablet, and a sheet over the page, rendered outside `main`, on a phone. The published context key still remounts the content, the slots' parts included, when its league/member/season/week/capture changes. |
 | `pages/MemberTopBar.tsx` | The top bar (the team as the one `h1`, the week, the deadline from the fixture calendar, the score bug) and the sidebar's WHO block. |
 | `pages/useMemberAdviceView.ts` | Existing selection resolution, advice client/job lifecycle, reset effect, checked publication and shown-result choice. |
@@ -16,6 +16,7 @@ the public route or component contracts.
 | `components/MemberFixtureRail.tsx` | The transfers' and the eleven's next three gameweeks and who meets whom, joined to the fixture calendar by club; the phone sheet registers with the shell. |
 | `pages/memberPageTypes.ts` | Types shared by those modules; no runtime dependencies. |
 | `data.ts` | Static paths, fetch/deadline handling, response decoding, fixture policy and public loaders. |
+| `queries.ts` | `leagueKeys` (`members`, `scoreboard`, `entrySquad`), the one spelling of the league cache keys more than one page reads; the hooks `useLeagueMembers`, `useLeagueScoreboard` and `useEntrySquad` (no read while there is no entry id); and `LEAGUE_READ`, the one retry and stale-time setting that every `useQuery` call in the league feature spreads. `queries.test.tsx` fails when another league module spells a shared key or sets its own `retry` or `staleTime`, and when a league module's count of `useQuery(` calls differs from its count of `...LEAGUE_READ` spreads. `/league` (`pages/LeaguePage.tsx`) reads the site index, the ledger and `league.json` through `data/queries.ts`, with the client default of one retry, and stays outside that rule. |
 | `publicationShape.ts` | Pure envelope/member/squad/index shape checks. |
 | `dataErrors.ts` | The same error classes, re-exported from `data.ts` for compatibility. |
 

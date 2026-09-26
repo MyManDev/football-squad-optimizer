@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router";
 
-import { WINDOWS, isPlayMode, type PlayMode, type WindowSize } from "./modePrices";
+import { WINDOWS, isPlayMode, type PlayMode, type WindowSize } from "../../lib/decisionVocabulary";
 
 function isWindowSize(value: string | null): value is `${WindowSize}` {
   return WINDOWS.some((window) => String(window) === value);

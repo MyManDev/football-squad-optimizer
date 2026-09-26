@@ -12,7 +12,7 @@ on:
         type: boolean
         default: true
       health_url:
-        description: Optional test URL, accepted only for a dry run
+        description: Optional test health URL, accepted only for a dry run; the ready URL beside it is probed too
         type: string
         default: ""
       exercise:
@@ -29,10 +29,10 @@ concurrency:
 
 jobs:
   health:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
-      - name: Probe health and update the incident
+      - name: Probe health and readiness and update the incident
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DRY_RUN: ${{ inputs.dry_run || false }}
@@ -52,24 +52,65 @@ jobs:
               return;
             }
             const url = testUrl || "https://squadopt-api.mymandev.com/health";
-            let healthy = false;
-            let status = exercise ? "synthetic failed observation (no health request)" : undefined;
-            for (let attempt = 0; !exercise && attempt < 2; attempt += 1) {
+            let readyUrl;
+            try {
+              // Readiness is served beside liveness: /ready for /health.
+              readyUrl = new URL("ready", url).href;
+            } catch {
+              core.setFailed("The health URL is not a URL.");
+              return;
+            }
+            // Only names shaped like check names leave the body; nothing else of it is kept.
+            const checkName = /^[a-z][a-z0-9_]{0,63}$/;
+            async function probe(target, readiness) {
               try {
-                const response = await fetch(url, {
+                const response = await fetch(target, {
                   method: "GET",
                   headers: { "User-Agent": "squadopt-backend-uptime/1" },
                   signal: AbortSignal.timeout(10_000),
                   redirect: "error",
                 });
-                status = `HTTP ${response.status}`;
-                healthy = response.status === 200;
-                await response.body?.cancel();
+                const status = `HTTP ${response.status}`;
+                if (!readiness) {
+                  await response.body?.cancel();
+                  return { ok: response.status === 200, status };
+                }
+                const text = await response.text();
+                let report;
+                try {
+                  report = JSON.parse(text);
+                } catch {
+                  report = undefined;
+                }
+                const checks = report?.checks !== null && typeof report?.checks === "object"
+                  ? report.checks : {};
+                const failed = Object.keys(checks)
+                  .filter((name) => checks[name] !== true && checkName.test(name))
+                  .slice(0, 10);
+                const ok = response.status === 200 && report?.ready === true;
+                if (failed.length > 0) return { ok, status: `${status}, false: ${failed.join(", ")}` };
+                if (!ok && response.status === 200) return { ok, status: `${status} without ready: true` };
+                return { ok, status };
               } catch (error) {
-                healthy = false;
-                status = ["TimeoutError", "AbortError"].includes(error.name)
-                  ? "request timed out" : "request failed";
+                return {
+                  ok: false,
+                  status: ["TimeoutError", "AbortError"].includes(error.name)
+                    ? "request timed out" : "request failed",
+                };
               }
+            }
+            let healthy = false;
+            let status = exercise ? "synthetic failed observation (no health request)" : undefined;
+            let failure = "synthetic";
+            for (let attempt = 0; !exercise && attempt < 2; attempt += 1) {
+              const health = await probe(url, false);
+              const ready = await probe(readyUrl, true);
+              healthy = health.ok && ready.ok;
+              status = `health ${health.status}; ready ${ready.status}`;
+              failure = [
+                health.ok ? undefined : `health (${health.status})`,
+                ready.ok ? undefined : `ready (${ready.status})`,
+              ].filter(Boolean).join(", ");
               if (healthy) break;
               if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 20_000));
             }
@@ -84,9 +125,13 @@ jobs:
               return;
             }
             const incident = incidents[0];
+            // The incident's body keeps the latest failure on one line, so a continuing
+            // outage stays silent until what fails changes.
+            const failing = `Failing: ${failure}.`;
+            const known = (incident?.body ?? "").split(/\r?\n/).includes(failing);
             const action = healthy ? (incident ? "recover and close" : "no change")
-              : (incident ? "no change" : "open incident");
-            core.info(`${dryRun ? "Dry run: would " : "Health: "}${action}; ${status}`);
+              : (incident ? (known ? "no change" : "record what now fails") : "open incident");
+            core.info(`${dryRun ? "Dry run: would " : "Check: "}${action}; ${status}`);
             if (dryRun) return;
             const at = new Date().toISOString();
             if (!healthy && !incident) {
@@ -98,11 +143,11 @@ jobs:
               }
               const created = (await github.rest.issues.create({
                 ...context.repo,
-                title: exercise ? `[EXERCISE] Backend alarm permission, run ${context.runId}` : "Backend health check failed",
+                title: exercise ? `[EXERCISE] Backend alarm permission, run ${context.runId}` : "Backend health or readiness check failed",
                 labels: [label],
                 body: exercise
                   ? `${marker} at ${at}.\n\n${run}\n\nSynthetic failure and recovery. This is not a production incident.`
-                  : `The health check failed twice. Observed at ${at}. Result: ${status}.`,
+                  : `The backend check failed twice. Observed at ${at}. Result: ${status}.\n\n${failing}`,
               })).data;
               if (!exercise) return;
               core.info(`Exercise issue created: ${created.html_url}`);
@@ -130,10 +175,20 @@ jobs:
               })).data;
               if (closed.state !== "closed") throw new Error("Exercise issue did not close.");
               core.info(`Exercise issue closed: ${created.html_url}`);
+            } else if (!healthy && incident && !known) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: incident.number,
+                body: `Still failing at ${at}. Result: ${status}.\n\n${failing}`,
+              });
+              const kept = (incident.body ?? "").split(/\r?\n/)
+                .filter((line) => !line.startsWith("Failing: "));
+              await github.rest.issues.update({
+                ...context.repo, issue_number: incident.number, body: [...kept, failing].join("\n"),
+              });
             } else if (healthy && incident) {
               await github.rest.issues.createComment({
                 ...context.repo, issue_number: incident.number,
-                body: `Health recovered at ${at}. Result: ${status}.`,
+                body: `Health and readiness recovered at ${at}. Result: ${status}.`,
               });
               await github.rest.issues.update({ ...context.repo, issue_number: incident.number, state: "closed" });
             }

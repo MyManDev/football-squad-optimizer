@@ -5,12 +5,18 @@ The layer boundary decides where this lives. ``platform`` owns network capture a
 ``fpl_capture`` and is handed to the evidence path as an operation rather than imported
 by it. Nothing in ``data`` or ``application`` reaches a network because of this module.
 
-**Four refusals happen before any bytes are used**, and each one exists because the
+**Five refusals happen before any bytes are used**, and each one exists because the
 alternative is a silent wrong answer rather than a missing one:
 
-- *The source is not in the registry.* A URL nobody recorded terms for is not read. The
-  registry is the record of what we may read, so a URL absent from it is a URL nobody has
-  answered that question about.
+- *The host is not in the registry.* A host nobody recorded terms for is never contacted,
+  by a link or, through :func:`default_opener`, by a redirect. The registry is the record of
+  what we may read, and a reading is of a host, so on a registered host this reader requests
+  its ``robots.txt``, the registered pages, the article links described below and the
+  same-origin addresses those redirect to, and nothing else.
+- *The host's terms reading is too old, or undated.* A reading is a person's judgement of a
+  host on a day, and a host can change its terms without telling anyone. A reading older than
+  :data:`TERMS_READING_VALID_DAYS` is not relied on, and the host is not contacted at all, not
+  even for its ``robots.txt``.
 - *``robots.txt`` disallows the path.* The club is then reported as **not covered**, which
   is a state this lane already carries honestly all the way to the card: its players stay
   ``not_addressed``, and nothing pretends a page said nothing when it was never read.
@@ -19,13 +25,34 @@ alternative is a silent wrong answer rather than a missing one:
 - *The response is too large.* A ceiling, so a mistaken URL cannot pull a video into a
   capture that is meant to hold a team-news page.
 
-**What it does not do.** It does not crawl: one registered path per club per call, no link
-following, no discovery. It does not parse HTML -- the bytes are stored as they arrived and
-the coding step reads them, because a citation is a span into the bytes we hashed and a
-tidied copy would not be those bytes. And it never fills a publication time in from the
-fetch instant; see :class:`RawDocument` for the three clocks.
+**It follows one kind of link, and only from a registered page.** A club's news index names
+its articles and carries almost none of their words, so a run that read only the index read
+headlines. From a registered HTML page the reader follows links that stay on the registered
+origin and sit under the registered page's own path (``/news`` leads to ``/news/...``, even
+when a same-origin redirect served the page at another path), in the order the page lists
+them, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per host per run. A link whose printed or
+resolved path has a ``.`` or ``..`` segment is skipped rather than resolved. Each article is
+asked of the same ``robots.txt``, waited for under the same interval and judged by the same
+refusals as a registered page, and is stored as its own document with its own readable text.
+A link to any other host is never requested, whatever it says.
+
+**A redirect is followed only within the origin that was asked.** :func:`default_opener`
+stops at a redirect to another scheme, host or port before anything is sent there
+(:class:`SameOriginRedirects`), so a registered page or an article that moved to another host
+costs that page and sends the other host nothing. The same holds for ``robots.txt``: one that
+redirects to another origin is a preference that could not be read, and its host is refused.
+
+**What it does not do.** It does not crawl: an article's own links are not followed, a page
+reached from an article is not read, and a feed's item links are not followed either, because
+a feed already carries its items' words. It does not rewrite what it stores -- the bytes are
+kept as they arrived and the coding step reads the text extracted from them, because a
+citation is a span into bytes we hashed and a tidied copy would not be those bytes. And it
+never fills a publication time in from the fetch instant; see :class:`RawDocument` for the
+three clocks.
 """
 
+import html.parser
+import http.client
 import json
 import time
 import urllib.error
@@ -34,7 +61,7 @@ import urllib.request
 import urllib.robotparser
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Final
@@ -80,9 +107,34 @@ ROBOTS_PATH: Final = "/robots.txt"
 #: one club can publish on several paths.
 PER_ORIGIN_DELAY_SECONDS: Final = 1.0
 
+#: The most article pages one run requests from one host, across every registered page that
+#: host serves. Declared, not measured: it is the number of requests this lane is willing to
+#: add to a club's server twice a week, and each one also waits the interval above. Links are
+#: taken in the order the page lists them, so which articles the cap keeps is the page's own
+#: order and not a choice made here. A link that ``robots.txt`` disallows costs no request and
+#: does not count against it.
+MAXIMUM_ARTICLES_PER_HOST: Final = 10
+
+#: Media types whose links are followed. A feed is read but not followed: its items carry
+#: their own words, and following an item's link would read the same words twice.
+_INDEX_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/html", "application/xhtml+xml")
+
+#: How long a signed terms reading is relied on, in days after the date it was read. A host
+#: can change its terms without telling anyone, so a reading is evidence about the day it was
+#: made and a little after, not about the season. The number is the owner's to set; the rule
+#: is that a host whose reading is older than this is not contacted until somebody reads its
+#: terms again and dates the row. ``docs/club_news_sources.md`` states it for the reader.
+TERMS_READING_VALID_DAYS: Final = 90
+
+#: A reading dated after the fetch is a typo or a clock problem, and a typo in the year would
+#: otherwise extend a permission by a year. One day is allowed because a reader east of UTC
+#: can sign a row on a date UTC has not reached yet.
+_READING_DATE_SLACK: Final = timedelta(days=1)
+
 #: The registry's own contract. Bumped when the entry shape moves, because a registry read
 #: under one shape is not the same statement about permission as one read under another.
-CLUB_NEWS_SOURCES_CONTRACT_VERSION: Final = "club_news_sources_v1"
+#: ``v2`` added ``terms_read_on``, the date of each host's reading, which the age rule reads.
+CLUB_NEWS_SOURCES_CONTRACT_VERSION: Final = "club_news_sources_v2"
 
 
 class ClubNewsFetchError(ClubNewsError):
@@ -101,10 +153,15 @@ class ClubSource:
     ``club`` is spelled as the capture spells it -- the bootstrap payload's ``teams[].name``,
     which is ``Man Utd`` rather than ``Manchester United``. The registry carries that
     spelling because the join is against the capture and not against a tidier name.
+
+    ``terms_read_on`` is the date somebody read this host's terms and signed the row in
+    ``docs/club_news_sources.md``. ``None`` says nobody did, which is the placeholder's honest
+    value, and a source carrying it is refused before any request exactly as a stale one is.
     """
 
     club: str
     url: str
+    terms_read_on: date | None
 
     def __post_init__(self) -> None:
         if not self.club.strip():
@@ -136,10 +193,33 @@ class ClubSource:
         page is exactly the kind of guess this module does not make.
         """
 
-        parsed = urllib.parse.urlsplit(self.url)
-        return urllib.parse.urlunsplit(
-            (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, "")
-        )
+        return _address_of(self.url)
+
+
+def _address_of(url: str) -> str:
+    """A URL under :attr:`ClubSource.address`'s one normalisation, for any URL."""
+
+    parsed = urllib.parse.urlsplit(url)
+    return urllib.parse.urlunsplit(
+        (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, "")
+    )
+
+
+def _reading_date(value: object, *, location: Path, club: str) -> date | None:
+    """Read ``terms_read_on``: a calendar date, or ``null`` for a host nobody read."""
+
+    if value is None:
+        return None
+    if isinstance(value, str) and len(value) == len("YYYY-MM-DD"):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            pass
+    raise ClubNewsFetchError(
+        f"{location} dates {club!r}'s terms reading as {value!r}, which is not a YYYY-MM-DD "
+        "date or null. The date is what the age rule reads, so one it cannot read is a "
+        "reading it cannot judge."
+    )
 
 
 def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
@@ -166,6 +246,13 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
     digests -- a duplication the registry created, about a club that said something once.
     Hosts are compared case-insensitively because host names are; paths are not, because
     they are not.
+
+    **Every entry dates its reading**, in ``terms_read_on``, and the key is required even
+    where the answer is ``null``: an entry that says nothing about when its host was read is
+    indistinguishable from one whose date was forgotten. The date is not judged here, because
+    whether a reading is too old depends on the day of the fetch, not the day of the load.
+    What is judged here is that one host has one reading: two entries on the same host with
+    different dates would make "how old is this host's reading" a question with two answers.
     """
 
     location = Path(path)
@@ -194,6 +281,7 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
         )
     sources: list[ClubSource] = []
     seen: set[str] = set()
+    reading_by_origin: dict[str, date | None] = {}
     for entry in entries:
         if not isinstance(entry, dict):
             raise ClubNewsFetchError(f"{location} lists {entry!r}, which is not an object.")
@@ -210,7 +298,22 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
                 "registered only after somebody read that host's terms and wrote down what "
                 "they said; without that pointer this entry is a permission nobody gave."
             )
-        source = ClubSource(club=club, url=url)
+        if "terms_read_on" not in entry:
+            raise ClubNewsFetchError(
+                f"{location} registers {club!r} with no 'terms_read_on'. Every entry dates "
+                "its host's reading, or says null when nobody read it, because a reading "
+                "ages and one with no date cannot be told apart from one read last season."
+            )
+        read_on = _reading_date(entry["terms_read_on"], location=location, club=club)
+        source = ClubSource(club=club, url=url, terms_read_on=read_on)
+        origin = source.origin.lower()
+        if origin in reading_by_origin and reading_by_origin[origin] != read_on:
+            raise ClubNewsFetchError(
+                f"{location} dates the reading of {source.origin} both "
+                f"{reading_by_origin[origin]} and {read_on}. A reading is of a host, so every "
+                "page of one host carries the same date."
+            )
+        reading_by_origin[origin] = read_on
         if source.address in seen:
             raise ClubNewsFetchError(
                 f"{location} registers {url!r} twice. A club may have several pages, but one "
@@ -236,8 +339,59 @@ class _Read:
 Opener = Callable[[urllib.request.Request, float], Any]
 
 
+def _comparable_origin(url: str) -> tuple[str, str]:
+    """Scheme and host of a URL with the case folded that the standards say does not matter."""
+
+    parsed = urllib.parse.urlsplit(url)
+    return parsed.scheme.lower(), parsed.netloc.lower()
+
+
+class SameOriginRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only when it stays on the origin that was asked; otherwise stop unsent.
+
+    ``urlopen`` follows a 30x to any host. The origin check in :func:`fetch_club_document`
+    reads the final URL, and a final URL exists only after the request to it has gone, so on
+    its own that check discards the other host's bytes but has already sent that host a
+    request carrying our identity, with its ``robots.txt`` never asked and its terms never
+    read. Here the new address is known and nothing has been sent to it yet.
+
+    Same origin means the same scheme and the same host and port, with the host compared
+    without case, as host names are. Anything else raises the ``HTTPError`` the standard
+    handler raises for a redirect it will not follow, so :func:`read_url` reports it as the
+    30x it was and does not retry it. The target is not named in the error: a refusal's text
+    is read by ``robots_allows`` for a 404, and an address is not a status. The refused
+    response's body is closed here rather than left for the collector, since nothing reads it.
+    """
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        if _comparable_origin(newurl) != _comparable_origin(req.full_url):
+            fp.close()
+            raise urllib.error.HTTPError(
+                req.full_url,
+                code,
+                f"{msg}, a redirect to another origin, which is not followed",
+                headers,
+                fp,
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def default_opener(request: urllib.request.Request, timeout: float) -> Any:
-    return urllib.request.urlopen(request, timeout=timeout)
+    """The network, with redirects kept on the origin each request was sent to.
+
+    Built per call rather than once at import, so the machine's proxy settings are the ones
+    in force when the request is made.
+    """
+
+    return urllib.request.build_opener(SameOriginRedirects()).open(request, timeout=timeout)
 
 
 def _instant(moment: datetime) -> str:
@@ -260,12 +414,43 @@ def _transport_publication_claim(raw: str | None) -> str | None:
         return None
 
 
+def _declared_length(response: Any) -> int | None:
+    """The body length a response declared, or ``None`` where no declaration binds it.
+
+    Read as ``http.client`` reads it: a chunked body carries its own framing and any
+    Content-Length beside it is ignored, and a header that is not a whole number of at
+    least zero is treated as absent.
+    """
+
+    if getattr(response, "chunked", False):
+        return None
+    raw = response.headers.get("Content-Length")
+    if raw is None:
+        return None
+    try:
+        declared = int(raw)
+    except ValueError:
+        return None
+    return declared if declared >= 0 else None
+
+
 def _read_once(url: str, *, opener: Opener) -> _Read:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with opener(request, float(REQUEST_TIMEOUT_SECONDS)) as response:
         # One byte past the ceiling, so "too large" is detected rather than truncated into
         # a document that looks complete and hashes to something nobody can reproduce.
         content = bytes(response.read(MAXIMUM_DOCUMENT_BYTES + 1))
+        # The same holds for a body that ended early, and http.client does not report one
+        # sent with a Content-Length: a read with an amount returns the bytes that arrived
+        # and raises nothing (its own comment says it ought to, and does not for
+        # compatibility). With an amount, only a chunked body raises `IncompleteRead`. So the
+        # declared length is checked here, up to the ceiling, and a shortfall is raised as
+        # the error http.client would have raised; `read_url` retries it. Unchecked, a page
+        # cut short would be stored and coded as the whole page, and a robots.txt cut before
+        # its Disallow line would be read as consent.
+        declared = _declared_length(response)
+        if declared is not None and len(content) < min(declared, MAXIMUM_DOCUMENT_BYTES + 1):
+            raise http.client.IncompleteRead(content, declared - len(content))
         headers: Mapping[str, str] = response.headers
         return _Read(
             final_url=str(response.geturl()),
@@ -287,11 +472,15 @@ def read_url(
 
     The retry rule is ``fpl_capture.fetch``'s and for the same reason: 429 and 5xx say
     "later" and are retried with a bounded backoff, while every other 4xx says "never" and
-    is raised at once. The loop is here rather than shared because that function returns
-    bytes alone, and this adapter needs the final URL, the status, the content type and the
-    publication header as well. A third caller that needs a response should be the one to
-    extract the shared helper, rather than this becoming the second copy that outlives its
-    excuse.
+    is raised at once. A timeout, a dropped connection or a short body while the response
+    is read is retried the same way, and reported as this module's error. A short body is
+    one that ended before its chunked framing did, or before the length its Content-Length
+    declared (``_read_once`` checks that one, because http.client does not); a body with
+    neither ends when the connection does, and a cut there cannot be told from the end.
+    The loop is here rather than shared because that function returns bytes alone, and
+    this adapter needs the final URL, the status, the content type and the publication
+    header as well. A third caller that needs a response should be the one to extract the
+    shared helper, rather than this becoming the second copy that outlives its excuse.
     """
 
     delay = RETRY_INITIAL_SECONDS
@@ -310,6 +499,21 @@ def read_url(
                 raise ClubNewsFetchError(
                     f"{url} could not be reached on {attempts} attempts: {error.reason}"
                 ) from error
+        except (OSError, http.client.HTTPException) as error:
+            # urllib wraps only the sending of the request in URLError. The response is
+            # read afterwards, so a read that times out, a host that hangs up and a body cut
+            # short arrive raw (TimeoutError, RemoteDisconnected, IncompleteRead, the last
+            # from http.client for a chunked body and from `_read_once` otherwise). Left raw,
+            # one slow host escaped `fetch_registered_documents` and cost every other club's
+            # page that week. They say "later", as a 503 does, so they get its retries.
+            if attempt == attempts:
+                # The error is named by its type only. Its text can carry digits (a byte
+                # count, an errno, a line of the TLS library), and `robots_allows` still
+                # reads "404" in a refusal's text as a host with no robots file.
+                raise ClubNewsFetchError(
+                    f"{url} was not read on {attempts} attempts: the response failed after "
+                    f"the request was sent ({type(error).__name__})."
+                ) from error
         sleeper(delay)
         delay = min(delay * 2, RETRY_MAX_SECONDS)
     raise ClubNewsFetchError(f"{url} was not read and no failure was reported.")
@@ -318,8 +522,8 @@ def read_url(
 class HostManners:
     """One run's memory of the hosts it has spoken to, so it speaks to each of them once.
 
-    Two things are remembered, and both became necessary when a club gained the right to
-    register more than one page.
+    Three things are remembered. The first two became necessary when a club gained the right
+    to register more than one page, and the third when the reader began following articles.
 
     **The host's ``robots.txt``, parsed.** It used to be fetched once per document, so a club
     with three pages asked one host the same question three times. What is remembered is the
@@ -335,16 +539,27 @@ class HostManners:
     wait is the full declared interval rather than a measured remainder: inside one run the
     requests are back to back, and a conservative constant needs no clock to be right.
 
+    **How many article pages this run has requested from the host**, so the cap on followed
+    links is a cap per host and not per registered page. A host that serves two registered
+    indexes is one server, and it is owed one budget.
+
     The memory lives for one call and is passed in, not stored on the module. A cache that
     outlived the run would answer this week's question with last week's file, and a host's
     stated preference is not a thing to remember across weeks.
     """
 
-    def __init__(self, *, delay_seconds: float = PER_ORIGIN_DELAY_SECONDS) -> None:
+    def __init__(
+        self,
+        *,
+        delay_seconds: float = PER_ORIGIN_DELAY_SECONDS,
+        articles_per_host: int = MAXIMUM_ARTICLES_PER_HOST,
+    ) -> None:
         self._delay = float(delay_seconds)
+        self._article_cap = max(0, int(articles_per_host))
         self._robots: dict[str, urllib.robotparser.RobotFileParser] = {}
         self._refusals: dict[str, ClubNewsFetchError] = {}
         self._contacted: set[str] = set()
+        self._articles: dict[str, int] = {}
 
     def before_request(self, origin: str, sleeper: Callable[[float], None]) -> None:
         """Wait, if this run has already asked this host for something."""
@@ -352,6 +567,15 @@ class HostManners:
         if origin in self._contacted:
             sleeper(self._delay)
         self._contacted.add(origin)
+
+    def take_article(self, origin: str) -> bool:
+        """Spend one of this host's article requests for the run, or say none is left."""
+
+        used = self._articles.get(origin, 0)
+        if used >= self._article_cap:
+            return False
+        self._articles[origin] = used + 1
+        return True
 
     def robots(
         self, origin: str, read: Callable[[], urllib.robotparser.RobotFileParser]
@@ -437,6 +661,41 @@ def robots_allows(
     return bool(parser.can_fetch(USER_AGENT, source.url))
 
 
+def require_current_reading(source: ClubSource, moment: datetime) -> None:
+    """Refuse a host whose terms reading is undated, too old, or dated after ``moment``.
+
+    Judged against the fetch's own clock, so a test that pins the clock pins the verdict, and
+    a reading is valid through the day :data:`TERMS_READING_VALID_DAYS` days after it was
+    made. The refusal names the date and the remedy, because the operator who meets it on a
+    deadline needs to know it is a paperwork refusal and not an outage.
+    """
+
+    today = moment.astimezone(UTC).date()
+    read_on = source.terms_read_on
+    if read_on is None:
+        raise ClubNewsFetchError(
+            f"Nobody has dated a terms reading of {source.origin}, so {source.url} is not "
+            f"fetched and {source.club} is recorded as not covered. A host is contacted only "
+            "under a signed, dated reading in docs/club_news_sources.md."
+        )
+    if read_on > today + _READING_DATE_SLACK:
+        raise ClubNewsFetchError(
+            f"The terms reading of {source.origin} is dated {read_on.isoformat()}, after this "
+            f"fetch ({today.isoformat()}). A reading from the future is a typo or a wrong "
+            "clock, and either would stretch a permission nobody gave."
+        )
+    age = (today - read_on).days
+    if age > TERMS_READING_VALID_DAYS:
+        raise ClubNewsFetchError(
+            f"The terms reading of {source.origin} is {age} days old (read "
+            f"{read_on.isoformat()}), past the {TERMS_READING_VALID_DAYS} days a reading is "
+            f"relied on, so {source.url} is not fetched and {source.club} is recorded as not "
+            "covered. Read the host's terms and robots.txt again, sign the row in "
+            "docs/club_news_sources.md with the new date, and copy that date into the "
+            "registry's terms_read_on."
+        )
+
+
 def fetch_club_document(
     source: ClubSource,
     *,
@@ -448,12 +707,19 @@ def fetch_club_document(
 ) -> RawDocument:
     """Read one registered club page into a :class:`RawDocument`, or refuse.
 
-    ``final_url`` is what the server actually served after any redirect, because a citation
-    names the page that was read rather than the one that was asked for. The fetch instant
-    is taken from the injected clock so a test can pin it; the publication claim comes from
-    the response header or stays absent.
+    ``final_url`` is what the server actually served after any redirect within the origin,
+    because a citation names the page that was read rather than the one that was asked for.
+    A redirect to another origin is refused: by :class:`SameOriginRedirects` before it is
+    followed, when the default opener is used, and otherwise by the origin check below, which
+    runs whenever ``robots.txt`` is asked. The fetch instant is taken from the injected clock
+    so a test can pin it; the publication claim comes from the response header or stays
+    absent.
+
+    The host's terms reading is judged first, before ``robots.txt`` is asked, so a host whose
+    reading has aged receives no request at all from this run.
     """
 
+    require_current_reading(source, now())
     if check_robots and not robots_allows(source, opener=opener, sleeper=sleeper, manners=manners):
         raise ClubNewsFetchError(
             f"{source.origin}{ROBOTS_PATH} disallows {source.url} for this client, so "
@@ -471,11 +737,11 @@ def fetch_club_document(
         # hypothetical: `www.nufc.co.uk/news` redirects to `www.newcastleunited.com/en/news`,
         # and the first real run read one host under a reading signed for the other (#781).
         #
-        # The request has already gone; the final URL is not knowable before the response,
-        # and a HEAD preflight would double every fetch and still not bind what the GET
-        # returns. So what this refusal buys is narrower and still worth having: the bytes
-        # are not used, the club is recorded as not covered rather than read, and once the
-        # registry names the serving host with a reading of its own the redirect is gone.
+        # With `default_opener` this line is not reached for such a redirect: the transport
+        # refuses it before the other host is sent anything (`SameOriginRedirects`), and the
+        # page arrives here as the 30x it was. This check stays for an opener that follows
+        # redirects itself, where the request has already gone and all it can still do is
+        # keep the bytes out and record the club as not covered.
         raise ClubNewsFetchError(
             f"{source.url} was answered by {_origin_of(read.final_url)}, which is not the "
             f"origin this run asked for permission at ({source.origin}). Its bytes are not "
@@ -523,6 +789,179 @@ def fetch_club_document(
     )
 
 
+class _LinkReader(html.parser.HTMLParser):
+    """Collect the ``href`` of every ``<a>`` on a page, in the order the page lists them.
+
+    Attribute values arrive with character references already resolved, so ``&amp;`` in a
+    query string is the ``&`` a browser would send.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "a":
+            return
+        for name, value in attrs:
+            if name == "href" and value:
+                self.hrefs.append(value)
+                return
+
+
+def _printable_ascii(url: str) -> bool:
+    return all(33 <= ord(character) < 127 for character in url)
+
+
+def _has_dot_segment(path: str) -> bool:
+    """Whether a path has a ``.`` or ``..`` segment, written out or percent-encoded."""
+
+    segments = urllib.parse.unquote(path).split("/")
+    return "." in segments or ".." in segments
+
+
+def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
+    """The article URLs a registered page links to, under the one rule this lane follows.
+
+    A link counts when
+
+    - the path the page printed has no ``.`` or ``..`` segment, literal or percent-encoded,
+      and neither has the path it resolves to against the page that was actually served. A
+      link like ``/team-news/a/../b`` is skipped, not resolved into ``/team-news/b``: that
+      is an address the page did not print, and an encoded one is worse, since ``robots.txt``
+      would judge it under one path and a server that normalises it would answer another;
+    - it resolves to the registered origin: the same scheme and the same host, with the host
+      compared without case and nothing else loosened, so a port, a user name or a look-alike
+      host is another origin and is never named here;
+    - it sits strictly under the **registered** page's own path, so ``/news`` leads to
+      ``/news/...`` and not to ``/tickets``. Where a same-origin redirect served the page is
+      used to resolve relative links and for nothing else: a page registered at ``/news`` and
+      served at ``/en`` follows nothing under ``/en``, because a shallower served path would
+      make the shop and the ticket office articles. A page served somewhere else is
+      registered where it is served;
+    - it is printable ASCII, which is what a request line carries. A link that would need
+      re-encoding is skipped rather than rewritten into an address the page did not print.
+
+    The fragment is dropped, since it names a place in a page and not a page; a repeated link
+    is kept once; the page's order is kept. The URL is spelled with the registered origin's
+    own scheme and host, so every request this run makes to a host names it one way. Only an
+    HTML page is read for links, and a page registered at the root of its host has no path
+    for an article to be under, so nothing is followed from it.
+    """
+
+    media_type = index.content_type.split(";", 1)[0].strip().lower()
+    if media_type not in _INDEX_MEDIA_TYPES:
+        return ()
+    try:
+        markup = index.content.decode("utf-8")
+    except UnicodeDecodeError:
+        return ()
+    reader = _LinkReader()
+    reader.feed(markup)
+    reader.close()
+
+    registered = urllib.parse.urlsplit(source.url)
+    if not registered.path.strip("/"):
+        return ()
+    prefix = f"{registered.path.rstrip('/')}/"
+    links: list[str] = []
+    for href in reader.hrefs:
+        printed = href.strip()
+        try:
+            printed_path = urllib.parse.urlsplit(printed).path
+            parts = urllib.parse.urlsplit(urllib.parse.urljoin(index.final_url, printed))
+        except ValueError:
+            continue
+        if _has_dot_segment(printed_path) or _has_dot_segment(parts.path):
+            continue
+        if parts.scheme.lower() != registered.scheme.lower():
+            continue
+        if parts.netloc.lower() != registered.netloc.lower():
+            continue
+        if not (parts.path.startswith(prefix) and len(parts.path) > len(prefix)):
+            continue
+        url = urllib.parse.urlunsplit(
+            (registered.scheme, registered.netloc, parts.path, parts.query, "")
+        )
+        if _printable_ascii(url) and url not in links:
+            links.append(url)
+    return tuple(links)
+
+
+def _follow_articles(
+    source: ClubSource,
+    index: RawDocument,
+    *,
+    claimed: set[str],
+    opener: Opener,
+    now: Callable[[], datetime],
+    sleeper: Callable[[float], None],
+    check_robots: bool,
+    manners: HostManners,
+) -> tuple[list[RawDocument], list[tuple[str, str]]]:
+    """Read the articles one registered page links to, within the host's budget for the run.
+
+    ``claimed`` holds every address this run has registered, read or tried, and is updated
+    here. A link to a registered page is left for that page's own entry, and an article two
+    indexes both link to is asked for once. An article whose server answers with a page this
+    run already holds is not stored again: two documents answering for one URL with different
+    bytes would make a citation ambiguous, and the coding step would refuse the whole club.
+
+    A failed article costs that article. Its refusal names the page that linked to it, so it
+    is never mistaken for the registered page failing, and the club's coverage still rests on
+    the registered page that was read.
+    """
+
+    documents: list[RawDocument] = []
+    refused: list[tuple[str, str]] = []
+
+    def _refuse(reason: str) -> None:
+        refused.append((source.club, f"An article linked from {source.url} was not read: {reason}"))
+
+    for url in article_links(source, index):
+        address = _address_of(url)
+        if address in claimed:
+            continue
+        article = ClubSource(club=source.club, url=url, terms_read_on=source.terms_read_on)
+        try:
+            allowed = not check_robots or robots_allows(
+                article, opener=opener, sleeper=sleeper, manners=manners
+            )
+        except ClubNewsFetchError as error:
+            claimed.add(address)
+            _refuse(str(error))
+            continue
+        if not allowed:
+            claimed.add(address)
+            _refuse(f"{source.origin}{ROBOTS_PATH} disallows {url} for this client.")
+            continue
+        if not manners.take_article(source.origin):
+            break
+        claimed.add(address)
+        try:
+            document = fetch_club_document(
+                article,
+                opener=opener,
+                now=now,
+                sleeper=sleeper,
+                check_robots=check_robots,
+                manners=manners,
+            )
+        except ClubNewsFetchError as error:
+            _refuse(str(error))
+            continue
+        served = _address_of(document.final_url)
+        if served != address and served in claimed:
+            _refuse(
+                f"{url} was answered by {document.final_url}, a page this run has already "
+                "registered or read, so it is not stored a second time."
+            )
+            continue
+        claimed.add(served)
+        documents.append(document)
+    return documents, refused
+
+
 def fetch_registered_documents(
     sources: Sequence[ClubSource],
     *,
@@ -530,8 +969,9 @@ def fetch_registered_documents(
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
+    articles_per_host: int = MAXIMUM_ARTICLES_PER_HOST,
 ) -> tuple[tuple[RawDocument, ...], tuple[tuple[str, str], ...]]:
-    """Read every registered source, returning what was read and why the rest was not.
+    """Read every registered source and the articles it links to, and why the rest was not.
 
     One club failing does not fail the week. That is the whole reason the evidence table
     separates "declared" from "covered": a club whose page 404s and a club that published
@@ -539,45 +979,66 @@ def fetch_registered_documents(
     refusals beside the documents is what lets the caller record them apart instead of
     collapsing both into silence.
 
-    Ordered as the registry declares them, so two runs over the same registry produce the
-    same request order and the same capture.
+    Ordered as the registry declares them, each registered page followed by the articles it
+    links to in the page's own order, so two runs over the same registry and the same pages
+    produce the same request order and the same capture. Nothing is followed from a page that
+    was refused: an index that was not read names no articles.
     """
 
     if not sources:
         raise ClubNewsFetchError("No source was registered, so there is nothing to read.")
     documents: list[RawDocument] = []
     refused: list[tuple[str, str]] = []
-    manners = HostManners()
+    manners = HostManners(articles_per_host=articles_per_host)
+    claimed = {source.address for source in sources}
     for source in sources:
         try:
-            documents.append(
-                fetch_club_document(
-                    source,
-                    opener=opener,
-                    now=now,
-                    sleeper=sleeper,
-                    check_robots=check_robots,
-                    manners=manners,
-                )
+            index = fetch_club_document(
+                source,
+                opener=opener,
+                now=now,
+                sleeper=sleeper,
+                check_robots=check_robots,
+                manners=manners,
             )
         except ClubNewsFetchError as error:
             refused.append((source.club, str(error)))
+            continue
+        documents.append(index)
+        claimed.add(_address_of(index.final_url))
+        articles, article_refusals = _follow_articles(
+            source,
+            index,
+            claimed=claimed,
+            opener=opener,
+            now=now,
+            sleeper=sleeper,
+            check_robots=check_robots,
+            manners=manners,
+        )
+        documents.extend(articles)
+        refused.extend(article_refusals)
     return tuple(documents), tuple(refused)
 
 
 __all__ = [
     "CLUB_NEWS_SOURCES_CONTRACT_VERSION",
+    "MAXIMUM_ARTICLES_PER_HOST",
     "MAXIMUM_DOCUMENT_BYTES",
     "PER_ORIGIN_DELAY_SECONDS",
     "READABLE_CONTENT_TYPES",
     "ROBOTS_PATH",
+    "TERMS_READING_VALID_DAYS",
     "ClubNewsFetchError",
     "ClubSource",
     "HostManners",
+    "SameOriginRedirects",
+    "article_links",
     "default_opener",
     "fetch_club_document",
     "fetch_registered_documents",
     "load_club_sources",
     "read_url",
+    "require_current_reading",
     "robots_allows",
 ]

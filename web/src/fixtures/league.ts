@@ -13,7 +13,7 @@ import type {
   LeagueViewEnvelope,
 } from "../features/league/types";
 import { isMemberStrategy, strategyNeedsRival } from "../features/league/types";
-import type { WindowSize } from "../features/moves/modePrices";
+import type { WindowSize } from "../lib/decisionVocabulary";
 
 const GENERATED_AT = "2026-08-22T04:00:00Z";
 const LEAGUE_ID = 352490;
@@ -443,6 +443,15 @@ export const WINDOW_STATED_LIMITS: readonly string[] = [
   "Prices are held at the captured values; no price change is modelled.",
   NO_CHIP_STATED_LIMIT,
 ];
+
+/**
+ * The limit the backend adds to every answer the football model's
+ * `football_team_share_v1` forecast decided (`SHARES_BEFORE_AVAILABILITY_LIMIT` in the
+ * live layer): goal and assist shares are split before availability, and what availability
+ * removes is not passed to teammates. No mock document carries it; the page test publishes it.
+ */
+export const FOOTBALL_SHARE_STATED_LIMIT =
+  "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.";
 
 /** One row per gameweek of a pure-points window: the first week's move, one paid
  * transfer in the second week, a bench boost in the last. */

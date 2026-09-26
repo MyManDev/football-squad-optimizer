@@ -9,19 +9,22 @@
  *
  * Page-level tests already hold the rendered advice, scoreboard and member surfaces inside
  * that envelope. This one walks the source of every word those pages can show: every entry
- * in both catalogues, with function-valued entries called so their interpolated form is
- * checked too, not just the entries some page happens to render today.
+ * of every catalogue in `testSupport/catalogues.ts`, in both languages, with function-valued
+ * entries called so their interpolated form is checked too, not just the entries some page
+ * happens to render today; and every string a production component writes inline.
  */
 
+/// <reference types="node" />
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { CATALOGUES } from "../testSupport/catalogues";
 import { AS_A_CHANCE } from "../testSupport/honesty";
-import { CHIP_COPY } from "../features/league/advice/chipCopy";
-import { COMPUTE_COPY } from "../features/league/advice/computeCopy";
-import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
-import { TOP100_COPY } from "../features/league/advice/top100Copy";
-import { FIXTURES_COPY } from "../features/fixtures/fixturesCopy";
-import { MESSAGES, type Language } from "./messages";
+import type { Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
 
@@ -75,15 +78,22 @@ function collect(node: unknown, path: string, into: Map<string, string>): void {
 }
 
 const catalogue = new Map<string, string>();
-for (const language of LANGUAGES) collect(MESSAGES[language], language, catalogue);
-// Page-scoped copy kept out of the first visit's bundle is walked as if it were here.
-for (const language of LANGUAGES) {
-  collect(EVIDENCE_COPY[language], `${language}.evidenceCopy`, catalogue);
-  collect(TOP100_COPY[language], `${language}.top100Copy`, catalogue);
-  collect(CHIP_COPY[language], `${language}.chipCopy`, catalogue);
-  collect(COMPUTE_COPY[language], `${language}.computeCopy`, catalogue);
-  collect(FIXTURES_COPY[language], `${language}.fixturesCopy`, catalogue);
+// The site-wide catalogue's paths start at the language. A page-scoped copy module, kept out
+// of the first visit's bundle, is walked as if it were here, under its own name.
+for (const [name, copy] of Object.entries(CATALOGUES)) {
+  for (const language of LANGUAGES) {
+    collect(copy[language], name === "messages" ? language : `${language}.${name}`, catalogue);
+  }
 }
+
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/** Production modules under `src`: anything that is not a test, `test/` or `testSupport/`. */
+const PRODUCTION = (readdirSync(SRC, { recursive: true }) as string[])
+  .map((name) => name.replace(/\\/g, "/"))
+  .filter((name) => /\.tsx?$/.test(name) && !name.endsWith(".d.ts"))
+  .filter((name) => !/\.(test|spec)\.tsx?$/.test(name))
+  .filter((name) => !/(^|\/)(test|testSupport|__tests__)\//.test(name));
 
 describe("every string in both message catalogues", () => {
   it("was actually walked, both languages, strings and called functions alike", () => {
@@ -92,10 +102,20 @@ describe("every string in both message catalogues", () => {
     expect(catalogue.get("tr.squad.squadCost")).toBe("Kadro Maliyeti");
     // A function-valued entry, called, not skipped.
     expect(catalogue.get("en.squad.projectedPlayerPoints")).toBe("xP 1");
+    expect(catalogue.get("tr.chipForecastCopy.title")).toBe("Çip görünümü");
+    expect(catalogue.get("en.chipForecastCopy.range")).toBe("1 to 1");
     for (const path of catalogue.keys()) {
       const twin = path.startsWith("en.") ? `tr.${path.slice(3)}` : `en.${path.slice(3)}`;
       expect(catalogue.has(twin)).toBe(true);
     }
+  });
+
+  it("walks every copy module the source holds", () => {
+    const modules = PRODUCTION.filter((path) => /(^|\/)[^/]+Copy\.ts$/.test(path)).map((path) =>
+      path.replace(/^.*\/|\.ts$/g, ""),
+    );
+    const registered = Object.keys(CATALOGUES).filter((name) => name !== "messages");
+    expect(registered.sort()).toEqual(modules.sort());
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
@@ -152,5 +172,53 @@ describe("every string in both message catalogues", () => {
       expect(catalogue.has(`${language}.decision.modes.cost`)).toBe(true);
       expect(catalogue.has(`${language}.decision.modes.points`)).toBe(true);
     }
+  });
+});
+
+/**
+ * The words a production component writes inline: every string literal, the text of every
+ * template and every piece of JSX text. A module specifier names a file and a `style`
+ * attribute holds CSS (`width: "100%"`), so neither is copy and neither is read.
+ */
+function inlineText(path: string): { at: string; text: string }[] {
+  const source = ts.createSourceFile(
+    path,
+    readFileSync(join(SRC, path), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const found: { at: string; text: string }[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) return;
+    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && node.name.text === "style") return;
+    if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node) || ts.isJsxText(node)) {
+      const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+      const text = node.text.trim();
+      if (text !== "") found.push({ at: `${path}:${line}`, text });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+const INLINE = PRODUCTION.filter((path) => path.endsWith(".tsx")).flatMap(inlineText);
+
+describe("every string a production component writes inline", () => {
+  it("was actually read: literals, template text and JSX text, in both languages", () => {
+    expect(INLINE.length).toBeGreaterThan(1000);
+    const texts = new Set(INLINE.map(({ text }) => text));
+    expect(texts.has("İki modelin karşılaştırması")).toBe(true);
+    expect(texts.has("Aynı kadro, bütçe,")).toBe(true);
+    expect(texts.has("SquadOpt")).toBe(true);
+  });
+
+  it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
+    const offenders = INLINE.filter(({ text }) => AS_A_CHANCE.test(text)).map(
+      ({ at, text }) => `${at}: ${text}`,
+    );
+    expect(offenders).toEqual([]);
   });
 });

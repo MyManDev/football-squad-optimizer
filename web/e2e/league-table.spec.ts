@@ -14,9 +14,6 @@ const second = humans[1]!;
 
 test.beforeEach(async ({ page }) => {
   await installLeagueMocks(page);
-  await page.route("https://fonts.googleapis.com/**", (route) =>
-    route.fulfill({ contentType: "text/css", body: "" }),
-  );
 });
 
 /** Say "this is me" on the first member's row, then come back to the table in the same visit. */

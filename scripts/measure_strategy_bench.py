@@ -50,11 +50,11 @@ from scripts._experiment_cli import (
 
 from squadopt.application.strategies import STRATEGY_CATALOG, solve_strategy_plan
 from squadopt.data.sources.vaastav import build_panel
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.control_residuals import build_control_residual_table
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
-from squadopt.experiments.statistics import season_aware_moving_block_interval
 from squadopt.optimization import SolverStatus, optimize_squad
 from squadopt.planning import (
     InitialSquadState,

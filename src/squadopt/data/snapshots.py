@@ -18,6 +18,7 @@ repository records that a capture happened, never its contents.
 
 import hashlib
 import json
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Final
 
+from squadopt.data.atomic import write_document_once
 from squadopt.data.checksums import sha256_of_bytes
 from squadopt.data.errors import (
     DataSourceError,
@@ -55,6 +57,8 @@ _PAYLOAD_NAME_PATTERN: Final = re.compile(r"^[a-z0-9]+(?:[-_.][a-z0-9]+)*$")
 # metadata and is recomputed on every read.
 _ID_TIMESTAMP_FORMAT: Final = "%Y%m%dT%H%M%SZ"
 _ID_DIGEST_CHARACTERS: Final = 12
+
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,9 +189,9 @@ def write_snapshot(
     of what the world looked like at a moment, and a store that lets a record be
     rewritten cannot be used to defend a past decision.
 
-    Metadata is written last. A capture interrupted midway therefore leaves a
-    directory with no metadata, which reads as incomplete rather than as a snapshot
-    whose payloads happen to be truncated.
+    Metadata is written last, and atomically. A capture interrupted midway therefore
+    leaves a directory with no metadata, which reads as incomplete rather than as a
+    snapshot whose payloads happen to be truncated.
     """
 
     validated_source = _require_source(source)
@@ -232,7 +236,16 @@ def write_snapshot(
 
 
 def _write_metadata(path: Path, metadata: SnapshotMetadata) -> None:
-    document = {
+    """Publish the file that makes a directory a capture, whole or not at all.
+
+    ``metadata.json`` is what every listing looks for, so a truncated one would be the
+    newest capture and unreadable. It is completed and fsynced in a sibling and linked into
+    place by the create-once writer, so a process killed mid-write leaves no metadata (an
+    interrupted capture) rather than half of it. It is written as bytes, so its line endings
+    are LF on every machine rather than the platform's.
+    """
+
+    document: dict[str, object] = {
         "snapshot_id": metadata.snapshot_id,
         "source": metadata.source,
         "captured_at_utc": metadata.captured_at_utc,
@@ -240,7 +253,7 @@ def _write_metadata(path: Path, metadata: SnapshotMetadata) -> None:
         "checksums": dict(sorted(metadata.checksums.items())),
         "fingerprint": metadata.fingerprint,
     }
-    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_document_once(document, path)
 
 
 def _require_text(document: Mapping[str, object], key: str, path: Path) -> str:
@@ -373,6 +386,11 @@ def list_snapshot_ids(root: Path | str, *, source: str | None = None) -> tuple[s
     that wants "the newest capture of this kind" has to say which kind, and only then does
     the last entry of the returned tuple mean the newest one. Without it the tuple is every
     capture the root holds, which is a listing rather than a choice.
+
+    A directory is listed only when its ``metadata.json`` parses as a JSON object. The order
+    still comes from the names alone; the metadata of each capture of the requested source
+    is opened only to keep an unreadable one from being the newest (see
+    :func:`_metadata_parses`).
     """
 
     directory = Path(root)
@@ -383,7 +401,41 @@ def list_snapshot_ids(root: Path | str, *, source: str | None = None) -> tuple[s
         sorted(
             entry.name
             for entry in directory.iterdir()
-            if (entry / METADATA_FILENAME).is_file()
-            and (prefix is None or entry.name.startswith(prefix))
+            if (prefix is None or entry.name.startswith(prefix))
+            and (entry / METADATA_FILENAME).is_file()
+            and _metadata_parses(entry / METADATA_FILENAME)
         )
     )
+
+
+def _metadata_parses(path: Path) -> bool:
+    """Whether a capture's metadata is a JSON object, logging the directory when it is not.
+
+    Consumers take the last listed capture as the newest one. A metadata file that does not
+    parse (cut short by a killed writer before this store wrote it atomically, or damaged
+    since) would make an unreadable capture the newest and stop every reader of that source,
+    so it is skipped here and named in the log, and the previous capture stays the newest.
+    This checks the shape only; the checksums, fingerprint and identifier are still checked
+    by ``read_snapshot``, which is where a capture is trusted. The file is decoded the way
+    ``read_snapshot`` decodes it (UTF-8, no byte order mark): ``json.loads`` on raw bytes
+    would also accept UTF-16, UTF-32 and a UTF-8 BOM, and list a capture the reader refuses.
+    """
+
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        _LOGGER.warning(
+            "Skipping snapshot %s: its %s cannot be read as JSON (%s).",
+            path.parent.name,
+            METADATA_FILENAME,
+            error,
+        )
+        return False
+    if not isinstance(parsed, dict):
+        _LOGGER.warning(
+            "Skipping snapshot %s: its %s is not a JSON object.",
+            path.parent.name,
+            METADATA_FILENAME,
+        )
+        return False
+    return True

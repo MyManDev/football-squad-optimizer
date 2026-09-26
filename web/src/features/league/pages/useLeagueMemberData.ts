@@ -12,33 +12,22 @@ import {
   loadEntryAdviceEvidence,
   loadEntryAdviceIndex,
   loadEntryAdviceTop100,
-  loadEntrySquad,
-  loadLeagueMembers,
 } from "../data";
+import { LEAGUE_READ, useEntrySquad, useLeagueMembers } from "../queries";
 
 /** Read only the publication authorized by the current member index and URL. */
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
   const entryId = Number(entryParam);
   const validEntryId = Number.isSafeInteger(entryId) && entryId > 0;
-  const squad = useQuery({
-    queryKey: ["provisional-entry-squad", entryId],
-    queryFn: () => loadEntrySquad(entryId),
-    enabled: validEntryId,
-    staleTime: 60_000,
-  });
-  const membersQuery = useQuery({
-    queryKey: ["provisional-league-members"],
-    queryFn: loadLeagueMembers,
-    staleTime: 60_000,
-  });
+  const squad = useEntrySquad(entryId, validEntryId);
+  const membersQuery = useLeagueMembers();
   // The index says which (strategy, rival) files the producer wrote for this member; a
   // missing or unreadable index cannot authorize a guessed baseline read.
   const indexQuery = useQuery({
     queryKey: ["provisional-entry-advice-index", entryId],
     queryFn: () => loadEntryAdviceIndex(entryId),
     enabled: validEntryId,
-    staleTime: 60_000,
-    retry: false,
+    ...LEAGUE_READ,
   });
   const members = membersQuery.data?.payload.members ?? [];
   const index = indexQuery.isError ? null : (indexQuery.data?.payload ?? null);
@@ -53,8 +42,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     queryKey: ["advice-capabilities", leagueId],
     queryFn: ({ signal }) => client.readCapabilities!(leagueId!, { signal }),
     enabled: validEntryId && canAsk && leagueId !== undefined,
-    staleTime: 60_000,
-    retry: false,
+    ...LEAGUE_READ,
     refetchOnWindowFocus: false,
   });
   const capabilities = squad.data
@@ -136,7 +124,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
                 { signal },
               ),
     enabled: adviceEnabled,
-    staleTime: 60_000,
+    ...LEAGUE_READ,
   });
 
   const controlSelection = resolvePublishedAdvice(
@@ -172,20 +160,14 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
       (request.strategy !== "saf-puan" || selection.top100.weight !== 0) &&
       controlSelection.status === "ready" &&
       controlSelection.request.window === request.window,
-    staleTime: 60_000,
-    retry: false,
+    ...LEAGUE_READ,
   });
 
-  const rival = useQuery({
-    queryKey: ["provisional-entry-squad", request.rivalEntryId],
-    queryFn: () => loadEntrySquad(request.rivalEntryId!),
-    // A rival the service can be asked about is shown beside the computed plan as well.
-    enabled:
-      (adviceEnabled || (!!squad.data && selection.computable?.selection === true)) &&
-      request.rivalEntryId != null,
-    staleTime: 60_000,
-    retry: false,
-  });
+  // A rival the service can be asked about is shown beside the computed plan as well.
+  const rival = useEntrySquad(
+    request.rivalEntryId,
+    adviceEnabled || (!!squad.data && selection.computable?.selection === true),
+  );
 
   return {
     validEntryId,

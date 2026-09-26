@@ -1,5 +1,6 @@
 """Real file journals and OS process death, without production data or services."""
 
+import errno
 import json
 import os
 import subprocess
@@ -9,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from squadopt.data import atomic
+from squadopt.data.errors import RenameRefusedError
 from squadopt.platform.weekly_journal import (
     WeeklyJournalError,
     WeeklyReconciliationRequired,
@@ -261,3 +264,50 @@ def test_no_path_traversal_and_no_following_artifact_links(tmp_path: Path) -> No
         pytest.raises(WeeklyJournalError, match="Symlink"),
     ):
         run.stage("build", inputs=[link], operation=lambda: pytest.fail("Read linked file"))
+
+
+def _refuse_journal_renames(monkeypatch: pytest.MonkeyPatch, *, times: int) -> list[str]:
+    """Refuse the next ``times`` renames onto run.json the way Windows does (WinError 5).
+
+    A reader that holds the journal open outside the metadata lock cannot be provoked on
+    demand, so its error is injected. The retry's pauses are skipped, not slept.
+    """
+
+    real_replace = os.replace
+    refused: list[str] = []
+
+    def held(source: str | Path, destination: str | Path) -> None:
+        if str(destination).endswith("run.json") and len(refused) < times:
+            refused.append(str(destination))
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr("squadopt.data.atomic.os.replace", held)
+    monkeypatch.setattr("squadopt.data.atomic.time.sleep", lambda _seconds: None)
+    return refused
+
+
+def test_a_journal_write_refused_twice_lands_on_a_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with WeeklyRun(tmp_path, "week", {}, ["build"]).hold() as run:
+        refused = _refuse_journal_renames(monkeypatch, times=2)
+        run.stage("build", inputs=[], operation=lambda: artifact(tmp_path / "out"))
+        run.finish()
+    assert len(refused) == 2
+    assert inspect_run(tmp_path, "week")["status"] == "completed"
+    assert not list((tmp_path / "week").glob(".weekly-*.tmp"))
+
+
+def test_a_journal_write_refused_on_every_attempt_stops_with_a_named_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / "week" / "run.json"
+    with WeeklyRun(tmp_path, "week", {}, ["build"]).hold() as run:
+        before = journal.read_bytes()
+        refused = _refuse_journal_renames(monkeypatch, times=atomic.RENAME_RETRY_ATTEMPTS)
+        with pytest.raises(RenameRefusedError, match="refused on all"):
+            run.stage("build", inputs=[], operation=lambda: pytest.fail("Ran unrecorded"))
+    assert len(refused) == atomic.RENAME_RETRY_ATTEMPTS
+    assert journal.read_bytes() == before
+    assert not list((tmp_path / "week").glob(".weekly-*.tmp"))
