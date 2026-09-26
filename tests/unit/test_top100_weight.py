@@ -51,6 +51,7 @@ from squadopt.application.top100_weight import (
     validate_top100_weight,
     weighted_projection,
 )
+from squadopt.optimization import SolverStatus
 from squadopt.platform.advice_documents import validate_advice_document
 
 world = world_module._world  # re-register the fixture in this module
@@ -404,9 +405,9 @@ def test_a_weighted_document_publishes_the_weighted_decision_at_base_points(
     selected = base_net(week, points)
     assert payload["expected_points_cost"] == pytest.approx(max(control_value, selected) - selected)
     assert payload["expected_points_cost"] >= 0
-    assert payload["expected_points_cost_ceiling"] >= payload["expected_points_cost"]
-    if control.plan.solver_status.name == "OPTIMAL":
-        assert payload["expected_points_cost_ceiling"] == payload["expected_points_cost"]
+    # This world's control is proven, so the ceiling is the price itself.
+    assert control.plan.solver_status.name == "OPTIMAL"
+    assert payload["expected_points_cost_ceiling"] == payload["expected_points_cost"]
     assert payload["optimality_gap"] is None
     assert payload["control_solver_status"] == control.plan.solver_status.name
     assert payload["top100"] == {
@@ -539,10 +540,53 @@ def test_with_the_word_the_price_is_the_pairs_and_the_word_still_binds(
     assert payload["captain"]["player_id"] != squad[0]
     assert payload["vice_captain"]["player_id"] != squad[0]
     assert payload["top100"]["weight"] == 50
-    assert payload["expected_points_cost_ceiling"] >= payload["expected_points_cost"]
+    assert payload["expected_points_cost_ceiling"] == payload["expected_points_cost"]
     # The plain weighted document is untouched by the word.
     assert "evidence" not in advice.payload
     assert favoured  # the counts favoured someone
+
+
+def test_a_setting_priced_against_an_unproven_control_publishes_no_ceiling(
+    world: dict[str, Any],
+) -> None:
+    """With the control unproven, neither weighted document states a ceiling.
+
+    The price compares the weighted plan with the member's own control. Its gap is on the
+    planner's objective (bench at a tenth, hits at the caution margin) and bounds no price
+    in base points, so the ceiling is absent, never zero, on the plain document and on the
+    one with the manager's word; the tag and the control's own account stay.
+    """
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    proven = solve_member_control(picks, inputs, projection, rules)
+    unproven = replace(
+        proven,
+        plan=replace(
+            proven.plan,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={**dict(proven.plan.diagnostics), "absolute_optimality_gap": 2.5},
+        ),
+    )
+    advice = advise_with_top100(
+        _request(),
+        weight=50,
+        counts=_counts(PREFERRED),
+        provider=_Provider({101: picks}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=unproven,
+        words=_words(squad[0]),
+    )
+
+    assert advice.word_payload is not None
+    for payload in (advice.payload, advice.word_payload):
+        assert payload["control_solver_status"] == "FEASIBLE"
+        assert payload["control_optimality_gap"] == 2.5
+        assert float(str(payload["expected_points_cost"])) >= 0
+        assert "expected_points_cost_ceiling" not in payload
 
 
 def _decision(payload: dict[str, Any]) -> tuple[object, ...]:
