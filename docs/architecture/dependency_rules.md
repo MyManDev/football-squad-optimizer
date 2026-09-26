@@ -76,9 +76,22 @@ read meaning into it, and do not "fix" it:
 - `preflight` imports only `data`.
 - `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
   `scenarios` but is otherwise unconstrained.
-- `scenarios` does not import `uncertainty`, and `planning` imports only `optimization`.
+- `scenarios` does not import `uncertainty`, so the two could trade places. The import itself
+  is refused all the same: `uncertainty` is laboratory, and the contract `Product does not
+  import the laboratory` lists `scenarios` among its sources.
+- `planning` imports only `optimization` and `contracts` (`DecisionPreferences` from
+  `contracts.preferences`, in `planning/chip_strategy.py:14` and `planning/optimizer.py:14`).
 
 If a future import makes one of these positions load-bearing, say so here at the same time.
+
+Each line above is read from the import graph, not remembered. This prints the `squadopt`
+packages that one package imports directly (here `planning`; `grimp` is the graph library
+`import-linter` installs). Run it for the names in the list before changing it, and where a
+line here and the output disagree, the output is right:
+
+```console
+python -c "import sys, grimp; p = sys.argv[1]; g = grimp.build_graph('squadopt'); m = {'squadopt.' + p} | g.find_descendants('squadopt.' + p); print(sorted({i.split('.')[1] for x in m for i in g.find_modules_directly_imported_by(x) if i.startswith('squadopt.')} - {p}))" planning
+```
 
 ## No baseline exceptions
 
@@ -201,7 +214,7 @@ packages fall into five groups, each importing only groups below it:
 | adapters | `api` |
 | runtime | `platform` |
 | use cases | `application` |
-| domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `uncertainty`, `risk`, `prediction`, `features` |
+| domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `prediction`, `features` |
 | data | `data`, `contracts` |
 
 The measurement **laboratory** — `experiments`, `backtest`, `bayesopt`, `recalibration`,
