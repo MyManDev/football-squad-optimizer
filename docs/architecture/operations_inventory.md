@@ -3,7 +3,7 @@
 Investigated on 9 September 2026 during the enterprise transition. This records inspected
 configuration, rather than assuming that undocumented infrastructure exists. The table is
 that day's reading; where a row has changed since, the row says so and names the read that
-shows it (checked 25 September 2026).
+shows it (last checked 26 September 2026).
 
 | Read-only inspection | Finding |
 | --- | --- |
