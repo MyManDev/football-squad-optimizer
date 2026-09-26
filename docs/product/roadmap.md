@@ -68,11 +68,12 @@ capture can answer (the capabilities document in `platform/advice_read.py`):
   clubs Arsenal and Man Utd), which the page labelled example data. No real club's coded
   news has entered a published plan, and GW6 carries none (every GW6 index:
   `evidence.available` false, `no_evidence_this_run`). Liverpool and Newcastle are
-  registered for reading (`data/sources/club_news_sources.json`), but the weekly runbook
-  still names the committed fixture as the only club-news source wired up. The backend
-  offers the switch only when a club-news source is configured and a rotation table exists
-  for its capture, and `scripts/run_backend_local.ps1` sets that source to the same fixture
-  unless it is given another.
+  registered for reading (`data/sources/club_news_sources.json`); one real read of both,
+  made outside any publication for #621 on 22 September 2026, coded zero claims and entered
+  no plan. The weekly runbook still names the committed fixture as the only club-news
+  source wired up. The backend offers the switch only when a club-news source is configured
+  and a rotation table exists for its capture, and `scripts/run_backend_local.ps1` sets that
+  source to the same fixture unless it is given another.
 - A chip the member names, forced into the plan at one, three or five weeks (#646, #769,
   `application/advice_chip_strategy.py`). The automatic chip choice is refused until it can
   value holding a chip past the window (#802).
