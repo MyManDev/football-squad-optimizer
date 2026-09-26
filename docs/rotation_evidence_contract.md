@@ -135,6 +135,13 @@ Fully covered is therefore `clubs_covered` minus `clubs_partially_covered`, and 
 wants to know which page went missing has the capture: its index records every document's
 club and both URLs.
 
+**A followed article is not a registered page.** The reader follows article links from a
+registered page to pages under it on the same host (`docs/club_news_sources.md` states the
+rule), and stores each article as a document of the registered page's club. Both lists above
+stay about registered pages: an article that could not be read is named among the run's
+refusals and narrows nothing, since the articles a page links to are a capped sample and
+never a list the week declared. The capture's index names every article that was read.
+
 The field is recorded rather than derived, for the same reason `clubs_covered` is. From the
 payloads alone, a club whose second page was refused is indistinguishable from a club that
 only ever registered one — both arrive with one document. Only the run that read the registry

@@ -150,6 +150,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `_phase_e_inputs.py` | helper | imported by the Phase E runners and helpers | 2026-09-07 |
 | `_phase_e_live.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_shadow_live` | 2026-09-07 |
 | `_phase_e_shadow_live.py` | helper | imported by `run_phase_e_live_shadow` | 2026-09-07 |
+| `_provenance.py` | helper | imported by `_experiment_cli` and by the operational commands that must not load the laboratory: repository root, git revision, `write_json`, `write_text`; standard library only | 2026-09-26 |
 
 ## Retired compatibility commands
 

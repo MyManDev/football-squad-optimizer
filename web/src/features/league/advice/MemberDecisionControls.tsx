@@ -51,6 +51,7 @@ import { useSearchParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
+import { signedPoints } from "../../../lib/format";
 import { WINDOWS } from "../../moves/modePrices";
 import {
   isMemberStrategy,
@@ -70,11 +71,6 @@ import { TOP100_PARAMETER, TOP100_WEIGHTS } from "./top100";
 import { TOP100_COPY, top100Unavailable } from "./top100Copy";
 import styles from "./MemberDecisionControls.module.css";
 
-/** The gap as the rule read it: signed, so behind and ahead are visibly different. */
-function signedPoints(points: number): string {
-  return points > 0 ? `+${points}` : String(points);
-}
-
 /** Which part of the controls to render; all of them, in turn, when none is named. */
 export type DecisionControlsPart = "plan" | "notes" | "advanced";
 
@@ -91,7 +87,7 @@ export function MemberDecisionControls({
   capabilities?: AdviceCapabilities | null;
   part?: DecisionControlsPart;
 }) {
-  const { language, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [searchParams, setSearchParams] = useSearchParams();
   const resolve = (params: URLSearchParams) =>
@@ -396,7 +392,7 @@ export function MemberDecisionControls({
           <p>
             {copy.rulePickNote(
               nameOf(suggested.rival_entry_id),
-              signedPoints(suggested.points_ahead_of_rival),
+              signedPoints(suggested.points_ahead_of_rival, 1, locale),
               suggested.gameweeks_remaining,
             )}
           </p>

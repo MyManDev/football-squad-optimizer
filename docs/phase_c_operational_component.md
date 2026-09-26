@@ -230,7 +230,10 @@ unmeasured indefinitely, not unmeasured yet.
 ## Fallback and rollback
 
 A player absent from any required historical payload receives the existing in-season estimate for
-that player only. Missing is not converted to zero. An older capture carrying none of the bounded
+that player only. Missing is not converted to zero. That estimate divides the player's season minutes by the played
+gameweeks whose live document lists him, not by the calendar count, so a player registered
+after the season began is not charged the weeks before he was in the game
+(`in_season_listed_minutes.md`). An older capture carrying none of the bounded
 history uses the legacy `in-season-carry-over-v1` handoff and records the missing gameweeks as its
 fallback reason. A present but malformed payload fails; only absent or not-yet-final history is an
 expected fallback condition.
