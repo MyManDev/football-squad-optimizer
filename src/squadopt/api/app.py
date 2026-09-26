@@ -7,9 +7,10 @@ import logging
 import os
 import re
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 from fastapi import FastAPI, Query, Request
 from fastapi import Path as ApiPath
@@ -25,6 +26,7 @@ from squadopt.api.views import (
     PublishedViewNotFoundError,
     PublishedViewStore,
 )
+from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
 from squadopt.platform import BACKEND_API_VERSION, ApiError, ApiErrorResponse, ApiServiceInfo
 from squadopt.platform.advice_documents import AdviceDocumentError
 from squadopt.platform.advice_job_spec import AdviceJobSpecConflictError
@@ -101,20 +103,35 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
-def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, str | None, str]:
-    """The AdviseRequestBody schema, enforced in one place.
+@dataclass(frozen=True, slots=True)
+class AdviceSelection:
+    """One member's advice request, as both advice routes read it."""
 
-    Exactly the declared keys (additionalProperties: false), a string strategy, an
-    integer window of 1/3/5 with bool explicitly refused, and a rival that is null or
-    a positive integer. Every refusal is a contract error the route maps onto 422 —
-    a malformed body is the client's mistake, never this process's 500.
+    strategy: str
+    window: int
+    rival_entry_id: int | None
+    top100_weight: int
+    managers_word: bool
+    chip: str | None
+    model: str
+    preferences: DecisionPreferences
 
-    The two switches are optional and absent means off: ``top100_weight`` is one of the
+
+def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
+    """The AdviseRequestBody schema, enforced in one place for the GET and the POST.
+
+    The POST passes its JSON body and the GET its query values under the body's names, so
+    a request one route refuses the other refuses with the same message. Exactly the
+    declared keys (additionalProperties: false), a string strategy, a window the member
+    menu offers with bool explicitly refused, and a rival that is null or a positive
+    integer. The windows and the models are the application's (``advice_capabilities``).
+    Every refusal is a contract error the routes map onto 422: a malformed request is the
+    client's mistake, never this process's 500.
+
+    The switches are optional and absent means off: ``top100_weight`` is one of the
     offered settings (an integer, never a bool), ``managers_word`` a boolean.
     """
 
-    if not isinstance(body, dict):
-        raise BackendApiContractError("The POST body must be an object.")
     allowed = {
         "strategy",
         "window",
@@ -125,21 +142,21 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
         "model",
         "preferences",
     }
-    unexpected = set(body) - allowed
+    unexpected = set(fields) - allowed
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
-    strategy = body.get("strategy")
+    strategy = fields.get("strategy")
     if not isinstance(strategy, str) or not re.fullmatch(_STRATEGY_PATTERN, strategy):
         raise BackendApiContractError(
             "strategy must be a lowercase slug of at most 64 letters, digits, '.', '_' or '-'."
         )
-    window = body.get("window")
-    if isinstance(window, bool) or window not in (1, 3, 5):
+    window = fields.get("window")
+    if isinstance(window, bool) or window not in MEMBER_WINDOWS:
         raise BackendApiContractError("window must be 1, 3, or 5.")
-    rival = body.get("rival_entry_id")
+    rival = fields.get("rival_entry_id")
     if rival is not None and (isinstance(rival, bool) or not isinstance(rival, int) or rival < 1):
         raise BackendApiContractError("rival_entry_id must be null or a positive integer.")
-    weight = body.get("top100_weight", 0)
+    weight = fields.get("top100_weight", 0)
     if (
         isinstance(weight, bool)
         or not isinstance(weight, int)
@@ -148,22 +165,21 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None, int, bool, s
         raise BackendApiContractError(
             f"top100_weight must be one of {list(ADVISE_TOP100_WEIGHTS)}."
         )
-    word = body.get("managers_word", False)
+    word = fields.get("managers_word", False)
     if not isinstance(word, bool):
         raise BackendApiContractError("managers_word must be true or false.")
-    chip = body.get("chip")
+    chip = fields.get("chip")
     if chip is not None and chip not in ADVISE_CHIPS:
         raise BackendApiContractError("Unknown chip choice.")
-    model = body.get("model", "current")
-    if model not in ("current", "football"):
+    model = fields.get("model", "current")
+    if model not in PREDICTION_MODELS:
         raise BackendApiContractError("Unknown prediction model.")
     try:
-        DecisionPreferences.parse(body.get("preferences", {})).validate_selection(
-            strategy, word, chip
-        )
+        preferences = DecisionPreferences.parse(fields.get("preferences", {}))
+        preferences.validate_selection(strategy, word, chip)
     except ValueError as error:
         raise BackendApiContractError(str(error)) from error
-    return strategy, window, rival, weight, word, chip, model
+    return AdviceSelection(strategy, window, rival, weight, word, chip, model, preferences)
 
 
 def create_app(
@@ -460,35 +476,33 @@ def create_app(
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
-        if window not in (1, 3, 5):
-            return _contract_error(422, "VALIDATION_FAILED", "window must be 1, 3, or 5.")
-        if model not in ("current", "football"):
-            return _contract_error(422, "VALIDATION_FAILED", "Unknown prediction model.")
-        if top100_weight not in ADVISE_TOP100_WEIGHTS:
-            return _contract_error(
-                422,
-                "VALIDATION_FAILED",
-                f"top100_weight must be one of {list(ADVISE_TOP100_WEIGHTS)}.",
-            )
         try:
-            selected_preferences = DecisionPreferences.parse(
-                json.loads(preferences) if preferences is not None else {}
+            selection = parse_advice_selection(
+                {
+                    "strategy": strategy,
+                    "window": window,
+                    "rival_entry_id": rival,
+                    "top100_weight": top100_weight,
+                    "managers_word": managers_word,
+                    "chip": chip,
+                    "model": model,
+                    "preferences": json.loads(preferences) if preferences is not None else {},
+                }
             )
-            selected_preferences.validate_selection(strategy, managers_word, chip)
         except ValueError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         try:
             payload = advice_store.read_advice(
                 league_id=league_id,
                 entry_id=entry_id,
-                strategy=strategy,
-                window=window,
-                rival_entry_id=rival,
-                top100_weight=top100_weight,
-                managers_word=managers_word,
-                chip=chip,
-                model=model,
-                preferences=selected_preferences,
+                strategy=selection.strategy,
+                window=selection.window,
+                rival_entry_id=selection.rival_entry_id,
+                top100_weight=selection.top100_weight,
+                managers_word=selection.managers_word,
+                chip=selection.chip,
+                model=selection.model,
+                preferences=selection.preferences,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -539,10 +553,10 @@ def create_app(
             body = json.loads(raw)
         except (ValueError, RecursionError):
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
+        if not isinstance(body, dict):
+            return _contract_error(422, "VALIDATION_FAILED", "The POST body must be an object.")
         try:
-            strategy, window, rival, top100_weight, managers_word, chip, model = _parse_advise_body(
-                body
-            )
+            selection = parse_advice_selection(body)
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         current = datetime.now(UTC) if utc_now is None else utc_now()
@@ -556,17 +570,17 @@ def create_app(
             advice_submit.submit,
             league_id=league_id,
             entry_id=entry_id,
-            strategy=strategy,
-            window=window,
-            rival_entry_id=rival,
+            strategy=selection.strategy,
+            window=selection.window,
+            rival_entry_id=selection.rival_entry_id,
             idempotency_key=request.headers.get("Idempotency-Key"),
             client_bucket=request.client.host if request.client else "unknown",
             at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            top100_weight=top100_weight,
-            managers_word=managers_word,
-            chip=chip,
-            model=model,
-            preferences=DecisionPreferences.parse(body.get("preferences", {})),
+            top100_weight=selection.top100_weight,
+            managers_word=selection.managers_word,
+            chip=selection.chip,
+            model=selection.model,
+            preferences=selection.preferences,
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             if metrics is not None:

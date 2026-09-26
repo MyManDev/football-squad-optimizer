@@ -242,6 +242,32 @@ def test_the_whole_story_get_404_post_202_worker_poll_second_post_200(
     assert client.get(get_url).status_code == 200
 
 
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"window": 2}, "window must be 1, 3, or 5."),
+        ({"model": "other"}, "Unknown prediction model."),
+        ({"chip": "bogus"}, "Unknown chip choice."),
+        ({"top100_weight": 7}, "top100_weight must be one of [0, 5, 10, 20, 30, 40, 50]."),
+    ],
+)
+def test_the_get_and_the_post_refuse_a_selection_with_one_answer(
+    tmp_path: Path, change: dict[str, object], message: str
+) -> None:
+    """One parser reads both routes, so a value one refuses the other refuses the same way."""
+
+    client, _cache, _queue = _world(tmp_path)
+    selection = {**BODY, **change}
+
+    for response in (
+        client.post(ADVICE_URL, json=selection),
+        client.get(ADVICE_URL, params=selection),
+    ):
+        assert response.status_code == 422
+        error = response.json()["error"]
+        assert (error["code"], error["message"]) == ("VALIDATION_FAILED", message)
+
+
 def test_one_open_job_per_normalized_request(tmp_path: Path) -> None:
     client, _cache, queue = _world(tmp_path)
 
