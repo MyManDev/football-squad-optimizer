@@ -8,8 +8,8 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 ## Current position
 
 Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026; the
-eleven commits after it on `develop` up to `ee7ceb7a` (#811 to #820, and #822) were read on
-26 September 2026 for anything they change here, and the manager's word lines were checked
+twelve commits after it on `develop` up to `630f73ca` (#811 to #820, #822 and #827) were read
+on 26 September 2026 for anything they change here, and the manager's word lines were checked
 that day against every version of the published member indexes. Each line names the code or
 the record it can be checked against, and `tests/unit/test_roadmap_current_position.py`
 checks several of them against those records. The phase sections below keep their goals;
