@@ -291,10 +291,10 @@ forbidden_modules = ["scripts"]
 
 # The decision core computes; it does not touch the operating system or start processes.
 # Reading a file through pathlib or json is outside this rule, and the contract does not
-# claim it. Indirect imports count (the forbidden-contract default), so a `data`, `features`
-# or `prediction` module the core imports is held to the rule through that import.
-# `prediction` and `features` are not sources in their own right: that would be a new rule in
-# the data and prediction lane and waits for that owner's agreement.
+# claim it. Only direct imports count: a `data`, `features` or `prediction` module the core
+# imports is not held to the rule through that import, because that would put a new rule on
+# the data and prediction lane without its owner's agreement (the plan's own rule). Those
+# packages are not sources for the same reason.
 [[tool.importlinter.contracts]]
 name = "The decision core imports no OS or process module"
 type = "forbidden"
@@ -308,3 +308,4 @@ source_modules = [
     "squadopt.risk",
 ]
 forbidden_modules = ["os", "shutil", "tempfile", "subprocess"]
+allow_indirect_imports = true
