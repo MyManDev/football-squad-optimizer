@@ -143,8 +143,8 @@ item set — usable only if genuinely pre-match — was never settled, and
 settling: the rating is opaque, so nobody here can say what it measures, and its stability
 within a season is unverified. A strength estimate computed from results already held is
 reproducible and its timing is ours to control, which is the better trade. Whether to keep
-computing two columns nothing consumes is an open question for the three owners, since
-`attach_fixture_features` is shared.
+computing two columns nothing consumes is an open question for both owners (three until
+2026-09-25), since `attach_fixture_features` is shared.
 
 *The opponent-strength proposal has been measured.* Not by wiring it in, but by asking
 whether the operational control's out-of-sample residuals still move with it. They do:
