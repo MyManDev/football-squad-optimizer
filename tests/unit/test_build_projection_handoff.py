@@ -128,6 +128,28 @@ def _bootstrap(elements: list[dict[str, Any]] | None = None) -> bytes:
     return json.dumps(document).encode("utf-8")
 
 
+def _live(elements: list[dict[str, Any]] | None = None, *, unlisted: tuple[int, ...] = ()) -> bytes:
+    """One played week's live document, listing every element but the codes ``unlisted``.
+
+    The blend reads only who is listed, to count the weeks each player could have played
+    in; the component model's reading of these documents is injected where it matters.
+    """
+
+    return json.dumps(
+        {
+            "elements": [
+                {
+                    "id": record["id"],
+                    "stats": {"minutes": 0, "starts": 0, "total_points": 0},
+                    "explain": [],
+                }
+                for record in (_elements() if elements is None else elements)
+                if record["code"] not in unlisted
+            ]
+        }
+    ).encode("utf-8")
+
+
 def _fixtures() -> bytes:
     return json.dumps(
         [
@@ -526,7 +548,7 @@ def test_component_model_is_the_default_when_the_capture_has_settled_history(
                 _elements(played={1001: (90, 6), 1004: (20, 4), 1013: (75, 5)})
             ),
             FIXTURES_PAYLOAD: _fixtures(),
-            "event-gw01-live.json": b"unused by the injected component builder",
+            "event-gw01-live.json": _live(),
         },
     )
 
@@ -575,10 +597,7 @@ def test_the_component_model_reads_only_its_own_window_from_every_played_week(
         payloads={
             BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode("utf-8"),
             FIXTURES_PAYLOAD: _fixtures(),
-            **{
-                f"event-gw{week:02d}-live.json": b"unused by the injected component builder"
-                for week in range(1, 7)
-            },
+            **{f"event-gw{week:02d}-live.json": _live() for week in range(1, 7)},
         },
     )
     read: list[list[int]] = []
@@ -658,7 +677,7 @@ def test_evidence_on_the_component_base_is_its_own_promoted_identity(
                 _elements(played={1001: (90, 6), 1004: (20, 4), 1013: (75, 5)})
             ),
             FIXTURES_PAYLOAD: _fixtures(),
-            "event-gw01-live.json": b"unused by the injected component builder",
+            "event-gw01-live.json": _live(),
         },
     )
 
@@ -744,7 +763,7 @@ def test_control_only_is_an_explicit_rollback_even_with_component_history(
         payloads={
             BOOTSTRAP_PAYLOAD: _bootstrap(),
             FIXTURES_PAYLOAD: _fixtures(),
-            "event-gw01-live.json": b"unused",
+            "event-gw01-live.json": _live(),
         },
     )
     monkeypatch.setattr(
@@ -1034,3 +1053,115 @@ def test_the_refusal_reads_the_set_and_not_the_count(world: dict[str, Any]) -> N
 
     with pytest.raises(SystemExit, match=r"\[2\] are not finished and checked"):
         _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+
+
+# --- the minutes denominator is the weeks a player was listed in -------------
+
+
+def _listed_capture(
+    world: dict[str, Any],
+    *,
+    unlisted: dict[int, tuple[int, ...]],
+    captured_at: str = "2026-09-08T12:00:00Z",
+) -> Any:
+    """A capture open for gameweek 4 with all three played weeks' live documents.
+
+    ``unlisted`` maps a played week to the codes its document leaves out. Player 1001 has
+    270 minutes and 1013 has 75, so both carry season minutes.
+    """
+
+    opening = datetime(2026, 8, 21, 17, 30, tzinfo=UTC)
+    events = [
+        {
+            "id": week,
+            "deadline_time": (opening + timedelta(weeks=week - 1))
+            .isoformat()
+            .replace("+00:00", "Z"),
+            "finished": week < 4,
+            "data_checked": week < 4,
+        }
+        for week in range(1, 6)
+    ]
+    elements = _elements(played={1001: (270, 18), 1013: (75, 5)})
+    document = {"events": events, "teams": TEAMS, "elements": elements}
+    return write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc=captured_at,
+        payloads={
+            BOOTSTRAP_PAYLOAD: json.dumps(document).encode("utf-8"),
+            FIXTURES_PAYLOAD: _fixtures(),
+            **{
+                f"event-gw{week:02d}-live.json": _live(elements, unlisted=unlisted.get(week, ()))
+                for week in (1, 2, 3)
+            },
+        },
+    )
+
+
+def test_a_player_first_listed_in_gameweek_three_is_not_charged_the_weeks_before(
+    world: dict[str, Any],
+) -> None:
+    """The regression: 75 minutes in the one week he was registered for is 75 a week.
+
+    Dividing by the calendar's three weeks read it as 25 a week, two of them invented zeros,
+    and the direct-control route priced him with that number. Player 1013 has no completed
+    season, so his in-season term is shrunk against the price prior at the rate weight
+    75 / (75 + 270), and the term itself is his points per listed gameweek: 5 / 1, not 5 / 3.
+    Every other player is listed in every week and must not move.
+    """
+
+    late = _listed_capture(world, unlisted={1: (1013,), 2: (1013,)})
+    every_week = _listed_capture(world, unlisted={}, captured_at="2026-09-08T12:01:00Z")
+
+    listed, _, report = _build(world, snapshot_id=late.snapshot_id, control_only=True, dry_run=True)
+    calendar, _, _ = _build(
+        world, snapshot_id=every_week.snapshot_id, control_only=True, dry_run=True
+    )
+
+    assert report["gameweeks_played"] == 3
+    assert report["in_season_minutes_denominator"] == "gameweeks_listed"
+    assert report["players_listed_in_fewer_gameweeks"] == 1
+    assert report["players_listed_in_no_gameweek"] == 0
+    rate_weight = 75 / (75 + 270)
+    assert listed.expected_points[1013] - calendar.expected_points[1013] == pytest.approx(
+        rate_weight * (5 / 1 - 5 / 3)
+    )
+    others = {code: value for code, value in listed.expected_points.items() if code != 1013}
+    assert others == {code: calendar.expected_points[code] for code in others}
+
+
+def test_a_player_no_played_week_lists_has_no_in_season_zero(world: dict[str, Any]) -> None:
+    """Absent is not zero: an unlisted player's carried minutes are not pulled toward nothing.
+
+    Player 1012 has a completed season and no minutes. Listed in every week, his zero is an
+    observation and lowers his playing time; listed in none, there is no observation and the
+    carried record answers alone.
+    """
+
+    never = _listed_capture(world, unlisted={1: (1012,), 2: (1012,), 3: (1012,)})
+    every_week = _listed_capture(world, unlisted={}, captured_at="2026-09-08T12:01:00Z")
+
+    unlisted, _, report = _build(
+        world, snapshot_id=never.snapshot_id, control_only=True, dry_run=True
+    )
+    listed, _, _ = _build(
+        world, snapshot_id=every_week.snapshot_id, control_only=True, dry_run=True
+    )
+
+    assert report["players_listed_in_no_gameweek"] == 1
+    assert unlisted.expected_points[1012] > listed.expected_points[1012]
+    others = {code: value for code, value in unlisted.expected_points.items() if code != 1012}
+    assert others == {code: listed.expected_points[code] for code in others}
+
+
+def test_a_capture_without_every_played_week_keeps_the_calendar_count(
+    world: dict[str, Any],
+) -> None:
+    """Who was listed cannot be read from documents the capture does not hold."""
+
+    _, _, report = _build(world, snapshot_id=world["after"], dry_run=True)
+
+    assert report["in_season_minutes_denominator"] == "gameweeks_played"
+    assert "players_listed_in_fewer_gameweeks" not in report
+    assert "players_listed_in_no_gameweek" not in report

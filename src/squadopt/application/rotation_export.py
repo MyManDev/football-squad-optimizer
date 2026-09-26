@@ -266,13 +266,10 @@ def _artifact_name(*, season: str, target_gameweek: int, distinguishing_snapshot
 def _publish_once(payload: bytes, destination: Path) -> str:
     """Create a file exactly once, atomically, and say which of two happened.
 
-    Deliberately not a copy of ``export_player_evidence._publish``, which tests for an
-    existing file and then renames over it: between those two steps a concurrent writer can
-    publish, and the rename destroys its bytes without a word. Here the bytes are completed
-    and fsynced in a sibling temporary and published with a no-overwrite hard link, so the
-    loser of a race compares its own bytes with the winner's and reports a replay when they
-    agree. The Phase B export is frozen and not this lane's to change; the third table
-    writer that needs this should share one helper rather than grow a third copy.
+    The bytes are completed and fsynced in a sibling temporary and published with a
+    no-overwrite hard link, so the loser of a race compares its own bytes with the winner's
+    and reports a replay when they agree. ``squadopt.data.atomic.write_bytes_once`` does the
+    same, and the player evidence and settled outcomes exports publish through it.
     """
 
     destination.parent.mkdir(parents=True, exist_ok=True)

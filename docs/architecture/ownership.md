@@ -8,7 +8,15 @@ Ownership means review authority, not exclusive access. Anyone may read anything
 change to anything. The owner of a zone is who must approve a change to it, and who is
 accountable for its contracts staying honest.
 
-## The three roles
+## The two owners
+
+Changed on 2026-09-25. Two people review this repository: the owner, Ertuğrul
+(`@ErtugrulS32175`), and İbrahim (`@SpeedyV5`). Until that date this page named three roles,
+and the third, platform / backend, had its implementation led by İbrahim and its review
+authority, with the architecture and CI review, held by Tunay (`@tunayaslan`). Tunay left the
+team on 2026-09-25. The platform/backend role and the architecture and CI review moved to the
+owner; İbrahim's zone did not change. The role names below are kept because other documents
+use them to say what a zone is for, and two of them now belong to the same person.
 
 The review-authority names are not new. They are already used throughout the docs —
 `data_contract.md:3` ("Owner: data / data mining"), `candidate_declaration_review.md:65`
@@ -17,14 +25,19 @@ architecture/CI side named in `issue43_stage_a_review.md:104`. This document col
 one place, and adds what each role is *for*, because a zone list says where someone may commit
 without saying what they are accountable for producing.
 
-| Role | Owns the question | Zone |
-| --- | --- | --- |
-| **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
-| **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`; `live/`'s measurement and decision logic; core CI, dependency enforcement, and the current `application/` pilot |
-| **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`) since the handover below, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
-| **shared, all three** | (none) | `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` |
+| Owner | Role | Owns the question | Zone |
+| --- | --- | --- | --- |
+| **İbrahim** (`@SpeedyV5`) | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/`; club news and the LLM adapter (the `club_news` modules under `src/squadopt/data/sources/` and `src/squadopt/platform/`) |
+| **the owner** (`@ErtugrulS32175`) | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/`; core CI and `.github/`, dependency enforcement, branch protection, `application/`, `web/` and `docs/architecture/` |
+| **the owner** (`@ErtugrulS32175`), since 2026-09-25 | **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/` (apart from the club news modules), `api/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`), runtime registries and adapters, installed CLI, workers, persistence adapters, deployment (`deploy/`, the container image) and observability |
+| **shared, both owners** | (none) | (none) | `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` |
 
-The middle column is the useful half when a piece of work does not obviously belong to a
+Older documents are records of the rule in force when they were written. Where one says "all
+three owners", "a three-owner decision" or names the architecture/CI side (the ADR deciders,
+the pre-registrations, the #43 and fw10 records), it is history and is not edited; from
+2026-09-25 a decision it gave to three owners needs both.
+
+The question column is the useful half when a piece of work does not obviously belong to a
 directory. "Does the residual export cross machines byte for byte?" is a data-side question
 even though the writer lives in `scripts/`; "is this decision worth its risk?" is an
 optimization-side question even when the code is in `live/`.
@@ -39,38 +52,41 @@ the review authority for the packages and operational entry points that now exis
 
 ### Current implementation and review assignment
 
-The backend work assignment is now reflected in CODEOWNERS rather than leaving its author
-outside the listed zone:
+Rewritten on 2026-09-25 for the team change. CODEOWNERS records these rows:
 
-| Work | Implementation lead | Review responsibility |
+| Work | Owner | Listed in CODEOWNERS |
 | --- | --- | --- |
-| API, platform, workers, storage, image packaging and backend runbook | İbrahim (`@SpeedyV5`) | Ertuğrul (`@ErtugrulS32175`) handles integration sign-off; Tuna (`@tunayaslan`) retains backend review authority |
-| Operational `live/ledger.py`, `tick.py` and `recommendation.py` | İbrahim | The same backend reviewers; scientific or public-contract changes still need their existing owners |
-| Application and web integration, core CI and branch protection | Ertuğrul | Existing core-architecture reviewers; `web/` is assigned to Ertuğrul. `scripts/build_site.py` is a thin CLI over `application/site_publication.py` and is owned with it (Tuna and Ertuğrul in CODEOWNERS), not with the operational `live/` files |
+| API, platform, workers, storage, image packaging, deployment and backend runbook | the owner | `@SpeedyV5 @ErtugrulS32175`: İbrahim was the named implementation lead until 2026-09-25 and stays listed as an alternative reviewer |
+| Operational `live/ledger.py`, `tick.py` and `recommendation.py` | the owner | The same two accounts; scientific or public-contract changes still need their existing owners |
+| Club news and the LLM adapter under `platform/` | İbrahim | Covered by the `platform/` line, which lists him |
+| Application and web integration, core CI, branch protection and `docs/architecture/` | the owner | `@ErtugrulS32175`. `scripts/build_site.py` is a thin CLI over `application/site_publication.py` and is owned with it, not with the operational `live/` files |
 
-İbrahim's data-side ownership and Tuna's architecture authority remain in place. The backend
-paths list alternative reviewers; listing three people there does not extend the all-three
-approval rule below to the whole backend. For İbrahim's backend PRs, Ertuğrul records the
-integration review. A CI change still needs core-architecture sign-off even when it accompanies
-a backend change. The operational assignment does not transfer measurement or model work.
+İbrahim's data-side ownership is unchanged. The backend paths list alternative reviewers, so
+either approval is enough there; listing both accounts does not extend the shared-boundary rule
+below to the whole backend. Until 2026-09-25 the owner recorded the integration review on
+İbrahim's backend PRs and Tunay held backend and architecture review authority; the owner now
+holds both, and a CI change is the owner's to approve even when it accompanies a backend or data
+change. The operational assignment does not transfer measurement or model work.
 
 ## Core architecture and platform are different work
 
-Core architecture hardening stays with optimization/evaluation while that side completes the
-current programme: CI gates, import enforcement, dependency reproducibility, branch/review
-discipline, core logging, solver budget hooks, and the application-layer pilot. Platform work
-starts above that seam: run and artifact registries, runtime orchestration, CLI/API/workers,
-persistence, deployment, observability, and scaling.
+Core architecture hardening stays with optimization/evaluation: CI gates, import enforcement,
+dependency reproducibility, branch/review discipline, core logging, solver budget hooks, and the
+application layer. Platform work starts above that seam: run and artifact registries, runtime
+orchestration, CLI/API/workers, persistence, deployment, observability, and scaling.
 
 This is a responsibility split, not a second implementation. When platform work needs a
-missing application service, the core-architecture owner adds the smallest transport-neutral
-contract in its own PR; the platform owner then consumes it. A public application contract
-already consumed by the platform needs both owners to approve a breaking change.
+missing application service, the smallest transport-neutral contract lands first in its own
+application PR, and the platform consumes it in a later one. Until 2026-09-25 the two halves had
+different owners and a breaking change to a public application contract already consumed by the
+platform needed both to approve it. Both halves are now the owner's, so that second approval is
+gone; the order of the two PRs is not, because it is a layering rule rather than an approval
+rule.
 
 ## Shared boundaries
 
-Four surfaces need all three owners because every layer depends on them and a casual edit
-there is the most expensive kind:
+Four surfaces need both owners because every layer depends on them and a casual edit there is
+the most expensive kind:
 
 - **`contracts/`** — every package will import it by construction. It is also the natural
   dumping ground for anything awkward to place, so the friction is the safeguard. See
@@ -84,8 +100,10 @@ there is the most expensive kind:
   award it to whoever committed most recently, it is a joint surface. This is the one entry in
   the table that is a deliberate choice rather than a description of practice.
 
-A change to a shared boundary needs one approving review from each of the other two roles. A
-change that only *reads* a shared boundary needs nothing extra.
+A change to a shared boundary needs an approving review from each owner who did not write it,
+so a change from either owner needs the other's approval. Until 2026-09-25 it needed one
+approving review from each of the other two roles. A change that only *reads* a shared boundary
+needs nothing extra.
 
 ## `live/` and the handover
 
@@ -104,6 +122,10 @@ So the handover is in force. The platform/backend side owns the operational surf
 together with runtime orchestration, packaging, operational application services, and the
 script/CLI shells. Core CI and dependency enforcement remain core-architecture
 responsibilities; measurement logic and scientific contracts stay with the sides that own them.
+
+Since 2026-09-25 the platform/backend side is the owner's, so all of `live/` is the owner's
+again. İbrahim stays listed on the three operational files in CODEOWNERS as an alternative
+reviewer.
 
 What the condition was protecting, and what it is not: the risk was handing over an operational
 path that had never been run end to end, so nobody could tell a defect from a misunderstanding.
@@ -134,7 +156,9 @@ Outside the window, any PR touching the live path carries the replay check named
 
 The former combined architecture/CI role has been referenced with pending obligations in three
 places. These remain cross-system runtime/reproducibility reviews and therefore stay with the
-platform/backend role unless the acceptance record explicitly reassigns them:
+platform/backend role unless the acceptance record explicitly reassigns them. Since 2026-09-25
+that role is the owner's, so the owner owes all three, and the freeze in item 17 needs both
+owners rather than three:
 
 | Where | Item |
 | --- | --- |
@@ -163,7 +187,7 @@ distributional objects (`CalibratedProjectionResult`, `ScenarioSet`) sit *beside
 rather than inside it, and `ScenarioSet` contains one as its point-estimate anchor.
 
 So the day a probabilistic hand-off is proposed, it touches `REQUIRED_COLUMNS`
-(`optimization/validation.py:15`), which is a shared boundary and needs all three owners
+(`optimization/validation.py:15`), which is a shared boundary and needs both owners
 anyway. That conversation is the right moment to decide where `uncertainty/` belongs, because
 by then it will be a decision about live code rather than about a roadmap.
 
@@ -201,7 +225,9 @@ git log origin/develop --format='%an' -- src/squadopt/backtest | sort | uniq -c 
 Run it for any zone. If the table and the history disagree for a whole package, the table needs
 a deliberate decision rather than a quiet edit.
 
-Last reviewed against `99a3387a` (develop, 2026-09-12): the zone table, the backend handover
-rows and the `contracts/` entry were re-checked against `.github/CODEOWNERS` and the tree.
+Last reviewed against `0f49ba8d` (develop, 2026-09-25) for the team change: the owner table,
+the backend rows and the shared boundaries were re-checked against `.github/CODEOWNERS`, which
+now names only `@ErtugrulS32175` and `@SpeedyV5`. The review before it was against `99a3387a`
+(develop, 2026-09-12).
 The `src/squadopt/data/identity.py` section rests on the system map's measurement at `95a6f7e`; the
 remaining prose was not re-measured, and saying so is cheaper than implying it was.
