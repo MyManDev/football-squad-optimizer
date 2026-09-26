@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import platform
-import subprocess
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -13,14 +12,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# The laboratory-free half lives in _provenance, so an operational command can take it without
+# loading squadopt.experiments; the runners that import it from here get the same objects.
+from scripts._provenance import DEFAULT_ARCHIVE_ROOT as DEFAULT_ARCHIVE_ROOT
+from scripts._provenance import REPOSITORY_ROOT as REPOSITORY_ROOT
+from scripts._provenance import _git_revision as _git_revision
+from scripts._provenance import write_json as write_json
+from scripts._provenance import write_text as write_text
+
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, ARCHIVE_REPOSITORY, SUPPORTED_SEASONS
 from squadopt.evaluation import EvaluationResult
 from squadopt.experiments import SCREENING_EXPERIMENT_CONTRACT_VERSION
 from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import FEATURE_GENERATION_CONTRACT_VERSION
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 DEFAULT_ARTIFACT_ROOT = REPOSITORY_ROOT / "artifacts" / "sprint2"
 MANIFEST_PATH = REPOSITORY_ROOT / "data" / "sources" / "vaastav_fpl_manifest.json"
 DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
@@ -33,29 +38,6 @@ def _sha256(path: Path) -> str:
         while chunk := handle.read(1 << 20):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _git_revision() -> tuple[str, bool]:
-    try:
-        revision = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=REPOSITORY_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        dirty = bool(
-            subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=REPOSITORY_ROOT,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-        )
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise SystemExit(f"Cannot record repository provenance: {error}") from error
-    return revision, dirty
 
 
 def repository_provenance() -> dict[str, object]:
@@ -110,20 +92,6 @@ def artifact_metadata(
             "ortools": version("ortools"),
         },
     }
-
-
-def write_json(path: Path, value: object) -> None:
-    """Write one stable UTF-8 JSON artifact, creating only its parent directory."""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
-def write_text(path: Path, value: str) -> None:
-    """Write one UTF-8 text artifact, creating only its parent directory."""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
 
 
 def _edge_series(root: Path) -> dict[str, list[float]]:

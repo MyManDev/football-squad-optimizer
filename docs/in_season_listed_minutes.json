@@ -1,0 +1,826 @@
+{
+  "advice": {
+    "by_kind": {
+      "chip_3xc": {
+        "documents": 8,
+        "same_decision": 8
+      },
+      "chip_bboost": {
+        "documents": 9,
+        "same_decision": 9
+      },
+      "chip_freehit": {
+        "documents": 13,
+        "same_decision": 5
+      },
+      "chip_wildcard": {
+        "documents": 11,
+        "same_decision": 5
+      },
+      "window_1": {
+        "documents": 15,
+        "same_decision": 15
+      },
+      "window_3": {
+        "documents": 15,
+        "same_decision": 15
+      },
+      "window_5": {
+        "documents": 15,
+        "same_decision": 8
+      }
+    },
+    "captain_changed": 0,
+    "differing": [
+      {
+        "candidate_optimality_gap": 4.162,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.162,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 2
+      },
+      {
+        "candidate_optimality_gap": 4.162,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.162,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_wildcard",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 2
+      },
+      {
+        "candidate_optimality_gap": 0.0,
+        "candidate_solver_status": "OPTIMAL",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 1.29,
+        "control_solver_status": "FEASIBLE",
+        "document": "window_5",
+        "fields": [
+          "moves",
+          "starting_xi",
+          "bench",
+          "plan_weeks"
+        ],
+        "member": 2
+      },
+      {
+        "candidate_optimality_gap": 4.139,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.122,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "moves",
+          "starting_xi",
+          "bench"
+        ],
+        "member": 3
+      },
+      {
+        "candidate_optimality_gap": 4.367,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.354,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 1
+      },
+      {
+        "candidate_optimality_gap": 5.217,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 5.267,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "vice_captain",
+          "moves",
+          "starting_xi"
+        ],
+        "member": 4
+      },
+      {
+        "candidate_optimality_gap": 5.217,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 5.267,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_wildcard",
+        "fields": [
+          "vice_captain",
+          "moves",
+          "starting_xi"
+        ],
+        "member": 4
+      },
+      {
+        "candidate_optimality_gap": 4.395,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 5.922,
+        "control_solver_status": "FEASIBLE",
+        "document": "window_5",
+        "fields": [
+          "plan_weeks"
+        ],
+        "member": 4
+      },
+      {
+        "candidate_optimality_gap": 4.527,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.516,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_wildcard",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 5
+      },
+      {
+        "candidate_optimality_gap": 4.975,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.991,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 6
+      },
+      {
+        "candidate_optimality_gap": 4.975,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.991,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_wildcard",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 6
+      },
+      {
+        "candidate_optimality_gap": 4.347,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 0.0,
+        "control_solver_status": "OPTIMAL",
+        "document": "window_5",
+        "fields": [
+          "plan_weeks"
+        ],
+        "member": 6
+      },
+      {
+        "candidate_optimality_gap": 4.885,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 6.229,
+        "control_solver_status": "FEASIBLE",
+        "document": "window_5",
+        "fields": [
+          "plan_weeks"
+        ],
+        "member": 8
+      },
+      {
+        "candidate_optimality_gap": 4.864,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.89,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "vice_captain",
+          "moves",
+          "starting_xi",
+          "bench"
+        ],
+        "member": 11
+      },
+      {
+        "candidate_optimality_gap": 4.864,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.89,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_wildcard",
+        "fields": [
+          "vice_captain",
+          "moves",
+          "starting_xi",
+          "bench"
+        ],
+        "member": 11
+      },
+      {
+        "candidate_optimality_gap": 0.0,
+        "candidate_solver_status": "OPTIMAL",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.135,
+        "control_solver_status": "FEASIBLE",
+        "document": "window_5",
+        "fields": [
+          "plan_weeks"
+        ],
+        "member": 11
+      },
+      {
+        "candidate_optimality_gap": 0.0,
+        "candidate_solver_status": "OPTIMAL",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 1.626,
+        "control_solver_status": "FEASIBLE",
+        "document": "window_5",
+        "fields": [
+          "moves",
+          "starting_xi",
+          "bench",
+          "plan_weeks"
+        ],
+        "member": 12
+      },
+      {
+        "candidate_optimality_gap": 4.485,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.482,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 13
+      },
+      {
+        "candidate_optimality_gap": 4.485,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.482,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_wildcard",
+        "fields": [
+          "moves",
+          "bench"
+        ],
+        "member": 13
+      },
+      {
+        "candidate_optimality_gap": 1.931,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 1.633,
+        "control_solver_status": "FEASIBLE",
+        "document": "window_5",
+        "fields": [
+          "vice_captain",
+          "moves",
+          "starting_xi",
+          "plan_weeks"
+        ],
+        "member": 14
+      },
+      {
+        "candidate_optimality_gap": 4.995,
+        "candidate_solver_status": "FEASIBLE",
+        "changed_players_brought_in": [],
+        "control_optimality_gap": 4.95,
+        "control_solver_status": "FEASIBLE",
+        "document": "chip_freehit",
+        "fields": [
+          "moves",
+          "starting_xi",
+          "bench"
+        ],
+        "member": 15
+      }
+    ],
+    "differing_with_both_solves_proved": 0,
+    "documents": 86,
+    "largest_total_move": 1.205279,
+    "members": 15,
+    "solver_status_changed": 6,
+    "totals_moved": 10
+  },
+  "candidate_handoff_fingerprint": "8e2ece70b15ad595e757f52c62ad1170f04272c97c4dc6faf4b6337707fbde2d",
+  "candidate_minutes_denominator": "gameweeks_listed",
+  "control_against_published": {
+    "published_entries": 86,
+    "reproduced_by_the_control": 86
+  },
+  "control_handoff_fingerprint": "223cd1bab0fb9d6526bdcabebee74bcb7bcad7b1c04b6b5b79e53c8d53bc4326",
+  "created_utc": "2026-09-25T21:57:34+00:00",
+  "measurement": "in_season_listed_minutes",
+  "players": {
+    "appearance_probability_same_players": true,
+    "change_max": 0.690124,
+    "change_mean": 0.164924,
+    "change_min": -0.0125,
+    "changed": [
+      {
+        "candidate_expected_points": 2.72053,
+        "candidate_position_rank": 37,
+        "change": 0.690124,
+        "control_expected_points": 2.030406,
+        "control_position_rank": 71,
+        "gameweeks_listed": 3,
+        "name": "Ainsley Maitland-Niles",
+        "player_id": 154043,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 177,
+        "season_points": 21,
+        "team": "Everton"
+      },
+      {
+        "candidate_expected_points": 2.408395,
+        "candidate_position_rank": 57,
+        "change": 0.64,
+        "control_expected_points": 1.768395,
+        "control_position_rank": 76,
+        "gameweeks_listed": 3,
+        "name": "David Affengruber",
+        "player_id": 442299,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 180,
+        "season_points": 12,
+        "team": "Fulham"
+      },
+      {
+        "candidate_expected_points": 2.224087,
+        "candidate_position_rank": 87,
+        "change": 0.580497,
+        "control_expected_points": 1.64359,
+        "control_position_rank": 113,
+        "gameweeks_listed": 3,
+        "name": "Quinten Timber",
+        "player_id": 450063,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 50,
+        "season_minutes": 253,
+        "season_points": 9,
+        "team": "Crystal Palace"
+      },
+      {
+        "candidate_expected_points": 2.323529,
+        "candidate_position_rank": 81,
+        "change": 0.460158,
+        "control_expected_points": 1.86337,
+        "control_position_rank": 100,
+        "gameweeks_listed": 3,
+        "name": "Jos\u00e9 Mar\u00eda Andr\u00e9s Baixauli",
+        "player_id": 592984,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 55,
+        "season_minutes": 109,
+        "season_points": 12,
+        "team": "Brighton"
+      },
+      {
+        "candidate_expected_points": 1.648217,
+        "candidate_position_rank": 82,
+        "change": 0.45,
+        "control_expected_points": 1.198217,
+        "control_position_rank": 102,
+        "gameweeks_listed": 2,
+        "name": "Stephen Mfuni",
+        "player_id": 566213,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 40,
+        "season_minutes": 90,
+        "season_points": 6,
+        "team": "Coventry City"
+      },
+      {
+        "candidate_expected_points": 2.371498,
+        "candidate_position_rank": 78,
+        "change": 0.357991,
+        "control_expected_points": 2.013507,
+        "control_position_rank": 94,
+        "gameweeks_listed": 3,
+        "name": "Bradley Barcola",
+        "player_id": 482616,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 80,
+        "season_minutes": 168,
+        "season_points": 7,
+        "team": "Liverpool"
+      },
+      {
+        "candidate_expected_points": 2.129262,
+        "candidate_position_rank": 92,
+        "change": 0.277523,
+        "control_expected_points": 1.851739,
+        "control_position_rank": 101,
+        "gameweeks_listed": 4,
+        "name": "Exequiel Palacios",
+        "player_id": 218543,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 50,
+        "season_minutes": 275,
+        "season_points": 11,
+        "team": "Ipswich Town"
+      },
+      {
+        "candidate_expected_points": 1.62616,
+        "candidate_position_rank": 28,
+        "change": 0.196097,
+        "control_expected_points": 1.430064,
+        "control_position_rank": 33,
+        "gameweeks_listed": 3,
+        "name": "Matias Fernandez-Pardo",
+        "player_id": 613221,
+        "position": "FWD",
+        "position_size": 79,
+        "price_tenths": 60,
+        "season_minutes": 157,
+        "season_points": 4,
+        "team": "Newcastle"
+      },
+      {
+        "candidate_expected_points": 1.550859,
+        "candidate_position_rank": 124,
+        "change": 0.163153,
+        "control_expected_points": 1.387705,
+        "control_position_rank": 136,
+        "gameweeks_listed": 3,
+        "name": "Sorba Thomas",
+        "player_id": 243951,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 55,
+        "season_minutes": 119,
+        "season_points": 4,
+        "team": "Hull City"
+      },
+      {
+        "candidate_expected_points": 1.710962,
+        "candidate_position_rank": 26,
+        "change": 0.145455,
+        "control_expected_points": 1.565507,
+        "control_position_rank": 30,
+        "gameweeks_listed": 3,
+        "name": "Zian Flemming",
+        "player_id": 431639,
+        "position": "FWD",
+        "position_size": 79,
+        "price_tenths": 55,
+        "season_minutes": 60,
+        "season_points": 6,
+        "team": "Ipswich Town"
+      },
+      {
+        "candidate_expected_points": 1.982111,
+        "candidate_position_rank": 74,
+        "change": 0.12719,
+        "control_expected_points": 1.85492,
+        "control_position_rank": 74,
+        "gameweeks_listed": 4,
+        "name": "Aaron Wan-Bissaka",
+        "player_id": 214590,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 152,
+        "season_points": 6,
+        "team": "Aston Villa"
+      },
+      {
+        "candidate_expected_points": 0.895763,
+        "candidate_position_rank": 116,
+        "change": 0.121791,
+        "control_expected_points": 0.773972,
+        "control_position_rank": 118,
+        "gameweeks_listed": 3,
+        "name": "Ben Chilwell",
+        "player_id": 172850,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 29,
+        "season_points": 8,
+        "team": "Crystal Palace"
+      },
+      {
+        "candidate_expected_points": 1.260494,
+        "candidate_position_rank": 101,
+        "change": 0.1,
+        "control_expected_points": 1.160494,
+        "control_position_rank": 107,
+        "gameweeks_listed": 3,
+        "name": "Honest Ahanor",
+        "player_id": 605972,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 90,
+        "season_points": 3,
+        "team": "Crystal Palace"
+      },
+      {
+        "candidate_expected_points": 1.655549,
+        "candidate_position_rank": 112,
+        "change": 0.094737,
+        "control_expected_points": 1.560812,
+        "control_position_rank": 121,
+        "gameweeks_listed": 4,
+        "name": "Mohamed-Ali Cho",
+        "player_id": 490884,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 50,
+        "season_minutes": 72,
+        "season_points": 9,
+        "team": "Hull City"
+      },
+      {
+        "candidate_expected_points": 1.529144,
+        "candidate_position_rank": 125,
+        "change": 0.072727,
+        "control_expected_points": 1.456416,
+        "control_position_rank": 130,
+        "gameweeks_listed": 3,
+        "name": "Malick Fofana",
+        "player_id": 549940,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 55,
+        "season_minutes": 60,
+        "season_points": 3,
+        "team": "Sunderland"
+      },
+      {
+        "candidate_expected_points": 1.437126,
+        "candidate_position_rank": 133,
+        "change": 0.048208,
+        "control_expected_points": 1.388917,
+        "control_position_rank": 135,
+        "gameweeks_listed": 3,
+        "name": "Hugo Larsson",
+        "player_id": 551050,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 50,
+        "season_minutes": 37,
+        "season_points": 3,
+        "team": "Fulham"
+      },
+      {
+        "candidate_expected_points": 1.67339,
+        "candidate_position_rank": 110,
+        "change": 0.029043,
+        "control_expected_points": 1.644347,
+        "control_position_rank": 112,
+        "gameweeks_listed": 3,
+        "name": "Ibrahim Mbaye",
+        "player_id": 638987,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 60,
+        "season_minutes": 33,
+        "season_points": 2,
+        "team": "Aston Villa"
+      },
+      {
+        "candidate_expected_points": 1.439762,
+        "candidate_position_rank": 34,
+        "change": 0.018391,
+        "control_expected_points": 1.421371,
+        "control_position_rank": 34,
+        "gameweeks_listed": 3,
+        "name": "Robinio Vaz",
+        "player_id": 631000,
+        "position": "FWD",
+        "position_size": 79,
+        "price_tenths": 50,
+        "season_minutes": 20,
+        "season_points": 2,
+        "team": "Hull City"
+      },
+      {
+        "candidate_expected_points": 1.100959,
+        "candidate_position_rank": 110,
+        "change": 0.014912,
+        "control_expected_points": 1.086046,
+        "control_position_rank": 110,
+        "gameweeks_listed": 3,
+        "name": "Brooke Norton-Cuffy",
+        "player_id": 496181,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 40,
+        "season_minutes": 34,
+        "season_points": 1,
+        "team": "Hull City"
+      },
+      {
+        "candidate_expected_points": 1.240381,
+        "candidate_position_rank": 102,
+        "change": 0.012621,
+        "control_expected_points": 1.22776,
+        "control_position_rank": 100,
+        "gameweeks_listed": 4,
+        "name": "El Hadji Malick Diouf",
+        "player_id": 613804,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 39,
+        "season_points": 2,
+        "team": "Brentford"
+      },
+      {
+        "candidate_expected_points": 1.343509,
+        "candidate_position_rank": 147,
+        "change": 0.008791,
+        "control_expected_points": 1.334717,
+        "control_position_rank": 148,
+        "gameweeks_listed": 1,
+        "name": "Mahdi Nicoll-Jazuli",
+        "player_id": 636846,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 45,
+        "season_minutes": 3,
+        "season_points": 1,
+        "team": "Chelsea"
+      },
+      {
+        "candidate_expected_points": 1.283951,
+        "candidate_position_rank": 100,
+        "change": 0.008333,
+        "control_expected_points": 1.275618,
+        "control_position_rank": 99,
+        "gameweeks_listed": 3,
+        "name": "Melvin Bard",
+        "player_id": 437497,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 18,
+        "season_points": 1,
+        "team": "Leeds"
+      },
+      {
+        "candidate_expected_points": 1.560334,
+        "candidate_position_rank": 122,
+        "change": 0.007534,
+        "control_expected_points": 1.552799,
+        "control_position_rank": 122,
+        "gameweeks_listed": 4,
+        "name": "Ayyoub Bouaddi",
+        "player_id": 637238,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 55,
+        "season_minutes": 22,
+        "season_points": 2,
+        "team": "Man City"
+      },
+      {
+        "candidate_expected_points": 1.314156,
+        "candidate_position_rank": 151,
+        "change": 0.003915,
+        "control_expected_points": 1.310241,
+        "control_position_rank": 151,
+        "gameweeks_listed": 4,
+        "name": "Ryan McAidoo",
+        "player_id": 616288,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 45,
+        "season_minutes": 11,
+        "season_points": 2,
+        "team": "Man City"
+      },
+      {
+        "candidate_expected_points": 1.641885,
+        "candidate_position_rank": 116,
+        "change": 0.000492,
+        "control_expected_points": 1.641393,
+        "control_position_rank": 115,
+        "gameweeks_listed": 3,
+        "name": "Dar\u00edo Osorio",
+        "player_id": 533646,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 55,
+        "season_minutes": 1,
+        "season_points": 1,
+        "team": "Crystal Palace"
+      },
+      {
+        "candidate_expected_points": 1.492734,
+        "candidate_position_rank": 130,
+        "change": 0.000492,
+        "control_expected_points": 1.492242,
+        "control_position_rank": 128,
+        "gameweeks_listed": 3,
+        "name": "Jean-Matt\u00e9o Bahoya",
+        "player_id": 587982,
+        "position": "MID",
+        "position_size": 298,
+        "price_tenths": 50,
+        "season_minutes": 1,
+        "season_points": 1,
+        "team": "Leeds"
+      },
+      {
+        "candidate_expected_points": 1.194126,
+        "candidate_position_rank": 106,
+        "change": 0.000185,
+        "control_expected_points": 1.193941,
+        "control_position_rank": 105,
+        "gameweeks_listed": 4,
+        "name": "Kaden Braithwaite",
+        "player_id": 554054,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 40,
+        "season_minutes": 1,
+        "season_points": 1,
+        "team": "Man City"
+      },
+      {
+        "candidate_expected_points": 0.947994,
+        "candidate_position_rank": 115,
+        "change": -0.0125,
+        "control_expected_points": 0.960494,
+        "control_position_rank": 115,
+        "gameweeks_listed": 4,
+        "name": "Dayann M\u00e9thalie",
+        "player_id": 638411,
+        "position": "DEF",
+        "position_size": 217,
+        "price_tenths": 45,
+        "season_minutes": 90,
+        "season_points": -1,
+        "team": "Sunderland"
+      }
+    ],
+    "every_changed_player_listed_in_fewer_gameweeks": true,
+    "gameweeks_played": 5,
+    "largest_appearance_probability_change": 1.1712852909795402e-14,
+    "largest_change_among_the_rest": 3.3084646133829665e-14,
+    "players_changed": 28,
+    "players_listed_in_fewer_gameweeks": 57,
+    "players_listed_in_no_gameweek": 0,
+    "positions": {
+      "DEF": {
+        "best_candidate_rank_of_a_changed_player": 37,
+        "players": 217,
+        "top_20_order_unchanged": true
+      },
+      "FWD": {
+        "best_candidate_rank_of_a_changed_player": 26,
+        "players": 79,
+        "top_20_order_unchanged": true
+      },
+      "GK": {
+        "best_candidate_rank_of_a_changed_player": null,
+        "players": 73,
+        "top_20_order_unchanged": true
+      },
+      "MID": {
+        "best_candidate_rank_of_a_changed_player": 78,
+        "players": 298,
+        "top_20_order_unchanged": true
+      }
+    },
+    "roster": 667
+  },
+  "provenance": {
+    "repository_commit": "f1ab1bab37464221d621b128ba94ea4f11b3f3b0",
+    "working_tree_dirty": true
+  },
+  "snapshot_id": "fpl-live-20260922T214539Z-364991a4f832"
+}
