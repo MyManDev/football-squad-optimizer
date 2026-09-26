@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from scripts._experiment_cli import _git_revision
+from scripts._provenance import _git_revision
 
 from squadopt.application.player_evidence import (
     _FORBIDDEN_COLUMNS as _FORBIDDEN_COLUMNS,
