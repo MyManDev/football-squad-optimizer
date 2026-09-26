@@ -12,7 +12,7 @@ import { useSearchParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { isPlayMode } from "../../moves/modePrices";
+import { isPlayMode } from "../../../lib/decisionVocabulary";
 import { isMemberStrategy, type AdviceStrategy } from "../types";
 import {
   builtinTemplates,
