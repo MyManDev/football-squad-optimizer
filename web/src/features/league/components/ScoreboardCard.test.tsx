@@ -287,7 +287,9 @@ describe("scoreboard card", () => {
   it("speaks Turkish to a Turkish reader and keeps only the snapshot id as provenance", () => {
     const { container } = renderCard(everyNote(), "tr");
     const copy = MESSAGES.tr.leagueScoreboard;
-    // Every note the card can carry is on screen, so the check below reads all of them.
+    // The notes a card with finished weeks carries are on screen: the gross Top-100 and
+    // provisional notes, which need their weeks, and the mode note. The empty-table line is
+    // not: it shows only when no week has finished, so the empty-card test below reads it.
     for (const note of [copy.grossNote, copy.provisionalNote, copy.modeNote])
       expect(screen.getByText(note)).toBeInTheDocument();
     expect(
@@ -460,25 +462,36 @@ describe("scoreboard card", () => {
     },
   );
 
-  it("says when no gameweek has finished instead of drawing an empty table", () => {
-    const empty = structuredClone(scoreboard);
-    empty.payload.gameweeks = empty.payload.gameweeks.map((week) => ({ ...week, finished: false }));
-    empty.payload.cumulative = {
-      through_gameweek: null,
-      gameweeks: [],
-      ours_net: null,
-      ours_gameweeks: [],
-      ours_basis: null,
-      ours_excluded_gameweeks: [],
-      members_mean_total_points: null,
-      members_gameweeks: [],
-      members_counted: 0,
-      average_entry_score: null,
-    };
-    renderCard(empty);
-    expect(screen.getByText(MESSAGES.en.leagueScoreboard.noGameweek)).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  });
+  it.each(["en", "tr"] as const)(
+    "says when no gameweek has finished instead of drawing an empty table, in %s",
+    (language) => {
+      const empty = structuredClone(scoreboard);
+      empty.payload.gameweeks = empty.payload.gameweeks.map((week) => ({
+        ...week,
+        finished: false,
+      }));
+      empty.payload.cumulative = {
+        through_gameweek: null,
+        gameweeks: [],
+        ours_net: null,
+        ours_gameweeks: [],
+        ours_basis: null,
+        ours_excluded_gameweeks: [],
+        members_mean_total_points: null,
+        members_gameweeks: [],
+        members_counted: 0,
+        average_entry_score: null,
+      };
+      const { container } = renderCard(empty, language);
+      expect(screen.getByText(MESSAGES[language].leagueScoreboard.noGameweek)).toBeInTheDocument();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      if (language === "tr") {
+        // The empty card, its line included, is Turkish; only the snapshot id stays as it is.
+        const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
+        expect(textByNode(container).replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
+      }
+    },
+  );
 
   it.each(["tr", "en"] as const)(
     "does not call a settled week unsettled when it is left out for its basis, in %s",
