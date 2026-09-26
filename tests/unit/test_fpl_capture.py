@@ -162,7 +162,7 @@ def test_a_dropped_response_is_retried_and_then_succeeds(
 def test_a_response_that_keeps_failing_is_a_data_error_naming_the_url(
     failure: Callable[[], Exception], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The capture commands catch DataError only; a raw one used to end them in a traceback."""
+    """cohort_capture catches DataError only; a raw error used to end it in a traceback."""
 
     calls: list[int] = []
 

@@ -88,9 +88,11 @@ def fetch(
         except (OSError, http.client.HTTPException) as error:
             # urllib wraps only the sending of the request in URLError. A read that times
             # out, a host that hangs up and a body cut short arrive raw (TimeoutError,
-            # RemoteDisconnected, IncompleteRead), and the capture commands catch only
-            # DataError, so these used to end a capture with a traceback after one try.
-            # The host was reached, so like a 503 this says "later" and is retried.
+            # RemoteDisconnected, IncompleteRead). These used to leave after one try and not
+            # as a DataError: cohort_capture catches only DataError, so it passed them on as
+            # a traceback, and elite_capture, which catches everything, recorded the member
+            # as unobserved. The host was reached, so like a 503 this says "later" and is
+            # retried; in elite_capture that is up to RETRY_ATTEMPTS tries per member.
             if attempt == attempts:
                 raise DataSourceError(
                     f"{url} was not read on all {attempts} attempts: {error!r}"
