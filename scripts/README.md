@@ -1,7 +1,7 @@
 # Scripts
 
 One row per script, classified by what grep finds, not by what the name suggests: **shim** delegates to `src/squadopt`; **deprecated shell** is kept one release for old runbooks; **measurement runner** writes a committed `docs/` record (JSON, or the Markdown record the row names); **artifact-only runner** writes to git-ignored `artifacts/`, `data/`, or stdout; **operational** is named by a runbook, workflow, `run_week`, or platform code; **helper** is imported, not run; **fixture generator** regenerates a committed test fixture.
-The three build shims `build_site`, `build_league_site` and `build_scoreboard` are load-bearing: `src/squadopt/platform/weekly_publish.py` subprocesses them. Run everything as `python -m scripts.<name>` from the repository root.
+Run everything as `python -m scripts.<name>` from the repository root.
 Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Purpose | Catalog section |
@@ -17,10 +17,10 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
-| `build_league_site.py` | shim (load-bearing) | subprocessed by `platform/weekly_publish.py`; `docs/weekly_runbook.md` | 2026-09-10 |
+| `build_league_site.py` | shim | `squadopt.application.league_publication`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-09-10 |
-| `build_scoreboard.py` | shim (load-bearing) | subprocessed by `platform/weekly_publish.py`; `docs/weekly_runbook.md` | 2026-09-10 |
-| `build_site.py` | shim (load-bearing) | subprocessed by `platform/weekly_publish.py`; `docs/weekly_runbook.md` | 2026-09-10 |
+| `build_scoreboard.py` | shim | `squadopt.application.scoreboard`; `docs/weekly_runbook.md` | 2026-09-10 |
+| `build_site.py` | shim | `squadopt.application.site_publication`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `capture_club_news.py` | shim | `squadopt.platform.club_news_acquire`; `docs/weekly_runbook.md` | 2026-09-15 |
 | `capture_elite_picks.py` | shim | `squadopt.platform.elite_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `capture_top100_cohort.py` | shim | `squadopt.platform.cohort_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
