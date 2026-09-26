@@ -43,7 +43,6 @@ from scripts._experiment_cli import (
 )
 
 from squadopt.backtest.candidate_residuals import PREDICTED_POINTS_DECIMALS
-from squadopt.backtest.export_precision import write_export_table
 from squadopt.backtest.splits import DecisionPoint, season_ranks, walk_forward_decision_points
 from squadopt.data.errors import DataError
 from squadopt.data.sources.vaastav import (
@@ -52,6 +51,7 @@ from squadopt.data.sources.vaastav import (
     build_panel,
     load_team_codes,
 )
+from squadopt.data.tables import write_export_table
 from squadopt.features.component_targets import (
     START_TARGET_STATUS,
     START_TARGET_SUPPORTED_SEASONS,

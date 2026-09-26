@@ -76,7 +76,8 @@ Two things fix them. Values are written at `predicted_points_decimals`, measured
 `export_precision.md`. Lines are terminated with `\n` on every platform, because
 `DataFrame.to_csv` otherwise defaults to `os.linesep` and the same table would hash
 differently on Windows and Linux. Both are settled by writing through
-`write_export_table` (`src/squadopt/backtest/export_precision.py`); an export written any
+`squadopt.data.tables.write_export_table` (`src/squadopt/data/tables.py`, moved from
+`backtest/export_precision.py` on 2026-09-10); an export written any
 other way may record a digest that identifies the operating system as much as the table.
 
 Hashes recorded before this rule was written identify a table on the family of machine that

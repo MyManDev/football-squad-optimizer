@@ -10,8 +10,8 @@ import pytest
 import tests.unit.test_player_evidence as evidence_fixtures
 from scripts import export_player_evidence
 
-from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.errors import DataValidationError
+from squadopt.data.tables import write_export_table
 from squadopt.features.evidence import EVIDENCE_COLUMNS
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 

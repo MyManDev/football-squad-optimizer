@@ -27,7 +27,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.opening_newcomers import (
     POSITIONS,
     OpeningStudyConfig,

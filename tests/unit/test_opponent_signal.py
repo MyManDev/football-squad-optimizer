@@ -24,7 +24,7 @@ from scripts.build_opponent_signal import (
 )
 from tests.unit.test_team_rating import _matches
 
-from squadopt.experiments.config import ExperimentConfigurationError
+from squadopt.evaluation.promotion import ExperimentConfigurationError
 
 SEASONS = ("2021-22", "2022-23", "2023-24")
 

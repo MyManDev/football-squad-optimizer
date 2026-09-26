@@ -16,7 +16,7 @@ from squadopt.bayesopt import (
     BayesianOptimizationConfig,
     enumerate_candidates,
 )
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.policy_objective import BaselinePolicyObjective
 
 POLICY_GRID_CONTRACT_VERSION: Final = "exhaustive_policy_grid_v1"

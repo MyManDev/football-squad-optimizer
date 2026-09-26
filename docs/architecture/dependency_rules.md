@@ -89,8 +89,8 @@ are resolved by these shared owners:
 | --- | --- | --- |
 | `data.schema` to `optimization.config` / `optimization.validation` | `contracts.players`: `Position`, `POSITIONS`, `REQUIRED_COLUMNS` | Original optimization locations and `data.schema` still expose the same objects. |
 | `prediction.integration` to `optimization.coefficients` | `contracts.players.sort_players_by_id` | `optimization.coefficients.sort_players_by_id` re-exports the same function. |
-| `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | Original experiment locations re-export the policy and bootstrap helpers. |
-| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: `experiments` sits below `live`, so a re-export there would invert the layers contract (rule 1 outranks rule 2). The laboratory callers (barrel, `scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); `experiments.config` re-exports the execution error like the other two. |
+| `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | None since 2026-09-26: the one-release re-exports in `experiments.config` and `experiments.statistics` are removed; the `experiments` barrel still lists the policy, the errors and the interval as part of its interface. |
+| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: `experiments` sits below `live`, so a re-export there would invert the layers contract (rule 1 outranks rule 2). The laboratory callers (barrel, `scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); the error is imported from `evaluation.promotion`. |
 
 The policy's two exception base classes also live in `evaluation.promotion`, keeping their
 existing `ExperimentError` / `ExperimentConfigurationError` names and inheritance so callers
@@ -116,7 +116,7 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
 - `BayesianFactor` and `FactorKind` in `contracts/factors.py`: the bounded-knob grid a
   strategy declares and DoE/BO read. It is vocabulary two layers share (the product's
   strategy catalogue and the laboratory), which is why it lives here and not in
-  `bayesopt`; `bayesopt.models` re-exports the names for one release.
+  `bayesopt`; the one-release re-export in `bayesopt.models` was removed on 2026-09-26.
 - Identity and fingerprint primitives and the contract-version registry remain future
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.

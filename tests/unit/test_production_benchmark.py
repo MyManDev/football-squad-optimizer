@@ -36,7 +36,7 @@ from squadopt.backtest.production_benchmark import (
 )
 from squadopt.backtest.production_reporting import judgement_to_dict, judgement_to_markdown
 from squadopt.backtest.splits import BacktestConfigurationError
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.optimization import SolverStatus
 
 POLICY = PromotionPolicy()

@@ -30,7 +30,10 @@ import numpy as np
 import pandas as pd
 
 from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.residual_signal_scan import load_enrichment_rows
 from squadopt.features.config import MINUTES_PER_FULL_MATCH
 from squadopt.features.cross_season import (

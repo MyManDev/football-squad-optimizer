@@ -43,6 +43,7 @@ from squadopt.application.advice_capabilities import (
     menu_capabilities,
 )
 from squadopt.application.advice_menu import held_member_chips, held_member_squad
+from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import SourceRevisionError
@@ -69,7 +70,6 @@ from squadopt.platform.advice_switches import (
 from squadopt.platform.capture_context import (
     AdviceCaptureContext,
     CaptureIdentity,
-    CapturePicksProvider,
     handoff_fingerprint_for,
     latest_snapshot_id,
     load_capture_context,

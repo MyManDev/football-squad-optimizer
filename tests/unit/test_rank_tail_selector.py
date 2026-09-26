@@ -12,7 +12,7 @@ from fractions import Fraction
 
 import pytest
 
-from squadopt.experiments.config import ExperimentConfigurationError
+from squadopt.evaluation.promotion import ExperimentConfigurationError
 from squadopt.experiments.rank_tail_selector import (
     NULL_TAIL_FRACTION,
     TAIL_FRACTION_GRID,

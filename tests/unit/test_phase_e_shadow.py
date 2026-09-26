@@ -11,18 +11,18 @@ import pandas as pd
 import pytest
 from tests.unit.test_phase_e_selection import _candidates, _full_draw, _select
 
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import (
+    _percentile,
+    season_aware_moving_block_indices,
+    season_aware_moving_block_interval,
+)
 from squadopt.experiments.phase_e_shadow import (
     PhaseEShadowCandidate,
     PhaseEShadowError,
     PhaseEShadowFold,
     evaluate_phase_e_shadow,
     score_phase_e_shadow_fold,
-)
-from squadopt.experiments.statistics import (
-    _percentile,
-    season_aware_moving_block_indices,
-    season_aware_moving_block_interval,
 )
 
 
