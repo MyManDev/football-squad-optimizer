@@ -52,7 +52,7 @@ import { useSearchParams } from "react-router";
 import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
 import { signedPoints } from "../../../lib/format";
-import { WINDOWS } from "../../moves/modePrices";
+import { WINDOWS } from "../../../lib/decisionVocabulary";
 import {
   isMemberStrategy,
   strategyNeedsRival,

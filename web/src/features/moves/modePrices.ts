@@ -1,10 +1,7 @@
 import modePriceList from "../../../../docs/mode_price_list.json";
 
 import type { Messages } from "../../i18n/messages";
-
-export type PlayMode = "saf-puan" | "garantici" | "agresif" | "asiri-agresif";
-export const WINDOWS = [1, 3, 5] as const;
-export type WindowSize = (typeof WINDOWS)[number];
+import type { PlayMode } from "../../lib/decisionVocabulary";
 
 interface PriceCell {
   folds: number;
@@ -79,7 +76,3 @@ export function getPlayModes(
 }
 
 export const MODE_PRICE_FOLDS = budgetZero.garantici.folds;
-
-export function isPlayMode(value: string | null): value is PlayMode {
-  return ["saf-puan", "garantici", "agresif", "asiri-agresif"].includes(value ?? "");
-}

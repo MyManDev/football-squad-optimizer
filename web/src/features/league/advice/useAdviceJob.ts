@@ -19,7 +19,7 @@
 import { cancellableDelay, withRequestDeadline } from "../../../data/request";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { WindowSize } from "../../moves/modePrices";
+import type { WindowSize } from "../../../lib/decisionVocabulary";
 import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
 import { AdviceApiError, StaticOnlyAdviceClient, newIdempotencyKey } from "./adviceClient";
 import {

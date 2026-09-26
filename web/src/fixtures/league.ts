@@ -13,7 +13,7 @@ import type {
   LeagueViewEnvelope,
 } from "../features/league/types";
 import { isMemberStrategy, strategyNeedsRival } from "../features/league/types";
-import type { WindowSize } from "../features/moves/modePrices";
+import type { WindowSize } from "../lib/decisionVocabulary";
 
 const GENERATED_AT = "2026-08-22T04:00:00Z";
 const LEAGUE_ID = 352490;
