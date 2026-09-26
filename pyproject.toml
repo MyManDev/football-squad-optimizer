@@ -90,8 +90,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.13"
 strict = true
 mypy_path = "src"
-# The package, the operator scripts, and the three thin shells that write the published
-# site, league and scoreboard trees (`platform/weekly_publish.py` still runs them).
+# The package, the operator scripts, and the three thin shells an operator runs to build
+# the site, league and scoreboard trees by hand.
 files = [
     "src/squadopt",
     "scripts/backend_status.py",

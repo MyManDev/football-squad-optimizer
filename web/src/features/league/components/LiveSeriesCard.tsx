@@ -4,6 +4,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { loadLiveSeries, type LiveSeries } from "../history/liveSeries";
+import { LEAGUE_READ } from "../queries";
 import type { Scoreboard } from "../types";
 import styles from "./ScoreboardCard.module.css";
 
@@ -12,8 +13,7 @@ export function LiveSeriesSection({ view }: { view: Scoreboard }) {
   const query = useQuery({
     queryKey: ["live-member-series", view.season, view.source_snapshot_id],
     queryFn: ({ signal }) => loadLiveSeries(view, signal),
-    retry: false,
-    staleTime: 60_000,
+    ...LEAGUE_READ,
   });
   if (!query.data)
     return (

@@ -32,11 +32,11 @@ from squadopt.backtest import (
 )
 from squadopt.bayesopt import BayesianCandidate
 from squadopt.evaluation import score_realized_squad_points
-from squadopt.experiments.config import (
-    DEFAULT_DEVELOPMENT_SEASONS,
+from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )
+from squadopt.experiments.config import DEFAULT_DEVELOPMENT_SEASONS
 from squadopt.experiments.policy_objective import (
     EVALUATION_OBJECTIVE_VERSION,
     shrink_projections,

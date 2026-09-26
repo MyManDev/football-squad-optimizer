@@ -4,11 +4,18 @@ The installed entry point is `python -m squadopt.platform.weekly_operations`.
 `python -m scripts.run_week` preserves the existing flags and delegates to it. The
 domain planning, preflight, handoff, player evidence, rotation export and settled-outcome
 export live in `application`; HTTP capture, process pools, Git publication and execution
-journals live in `platform`. The installed runner does not import `scripts`: its `publish`
-stage hands `platform.weekly_publish` a typed builder for the site, league and scoreboard
-views. The manual `python -m scripts.publish_gameweek_site` path supplies no builder and
-still runs the `scripts.build_site`, `scripts.build_league_site` and
-`scripts.build_scoreboard` shells in a subprocess (`_legacy_build`).
+journals live in `platform`. Neither the installed runner nor `platform.weekly_publish`
+imports or runs `scripts`. The league, site and scoreboard stages build the preview in
+process; the `publish` stage hands `platform.weekly_publish` the builder
+`copy_preview_builder` returns, which copies the preview's `data/` tree into the
+publication worktree and reads it back file by file. The manual
+`python -m scripts.publish_gameweek_site --run-id <run id>` publishes an existing run's
+preview through the same builder and solves nothing. It reads the run's journal under the
+run's own lock and refuses a run that has not completed every stage before `publish`, a
+run whose preview outputs changed since, and a run that recorded no advice unless
+`--no-advice-record` is passed; it holds the publication base to the run's recorded source
+revision, as the `publish` stage does. A settled candidate names its revision with
+`--source-commit`.
 
 Use short Windows workspace and handoff roots on hosts with the legacy path limit.
 Retained content-addressed paths add directories and a 69-character filename; a

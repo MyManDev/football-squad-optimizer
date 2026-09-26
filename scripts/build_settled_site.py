@@ -1,15 +1,26 @@
 """Build a scratch GW5 outcome candidate while retaining the accepted decision bytes.
 
 All inputs are explicit. The ledger must already be settled; this command never
-executes a weekly operation. Post its changed-file list for review before a site PR.
+executes a weekly operation. Before the candidate is written it is held to the frozen
+schemas, the frozen root index, the outcome capture's fixture list and the league tree
+release check (whatever that finds in the candidate and not in the accepted tree); any
+finding refuses it. Post its changed-file list for review before a site PR.
 """
 
 import argparse
 import sys
 from pathlib import Path
 
+from scripts.check_league_tree import Tree, run_checks
+
 from squadopt.application.settled_publication import SettledPublicationRequest, publish_settled
 from squadopt.data.errors import DataError
+
+
+def league_tree_findings(data: Path) -> list[str]:
+    """``python -m scripts.check_league_tree <data>``, on the accepted tree and the candidate."""
+    print(f"League tree check on {data}:")
+    return run_checks(Tree(str(data)))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,18 +43,19 @@ def main(argv: list[str] | None = None) -> int:
                 out_dir=args.out,
                 season=args.season,
                 gameweek=args.gameweek,
-            )
+            ),
+            league_tree_check=league_tree_findings,
         )
     except (DataError, ValueError, OSError, KeyError, TypeError) as error:
         print(f"Settled publication refused: {error}", file=sys.stderr)
         return 1
     print(f"Scratch candidate: {result.out_dir}")
     print(f"Accepted outcome stamp: {result.generated_at_utc}")
+    print("Checked before the candidate was written:")
+    for check in result.checks:
+        print(f"  {check}")
     season_count = sum(name.startswith(f"data/{args.season}/") for name in result.changed_files)
     print(f"Changed file count: {len(result.changed_files)} ({season_count} season documents)")
-    print("Before a site PR, run the candidate check and report its result in #632:")
-    print(f'python -m scripts.check_league_tree "{result.out_dir / "data"}"')
-    print("Frozen season-schema and root-index consistency still need separate verification.")
     print("Changed files (post this list before a site PR):")
     for name in result.changed_files:
         print(name)

@@ -12,6 +12,7 @@ from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_football_development import football_fixture  # noqa: F401
 
 from squadopt.application.football_live import causal_training
+from squadopt.data.errors import InvalidValueError
 from squadopt.data.sources.football_history import normalize_history
 from squadopt.live.football_artifact import (
     ARTIFACT_CONTRACT,
@@ -38,9 +39,9 @@ def test_live_training_does_not_use_same_week_or_later_labels(football_fixture):
         before.loc[before.GW.le(10), list(BASE_FEATURES)],
         after.loc[after.GW.le(10), list(BASE_FEATURES)],
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidValueError):
         normalize_history(history.assign(expected_goals=float("inf")))
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidValueError):
         normalize_history(history.assign(expected_assists=-1))
 
 

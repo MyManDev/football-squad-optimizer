@@ -14,9 +14,9 @@ from typing import Final
 import pandas as pd
 
 from squadopt.data.sources.vaastav import build_fixture_panel, load_team_codes
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.season_chain import ChipWindowRule, SeasonChainResult
-from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
 DEFAULT_DEVELOPMENT_SEASONS: Final = ("2021-22", "2022-23", "2023-24", "2024-25")

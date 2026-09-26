@@ -14,6 +14,7 @@
 | Read the committed season summary | [2026-27 season ledger](../season_ledger_2026-27.md) |
 | Understand storage responsibilities | [Persistence boundaries](../architecture/decisions/0005-persistence-boundaries.md) |
 | Understand hosting responsibilities | [Backend hosting](../architecture/decisions/0006-backend-hosting.md) |
+| Compare where the advice backend could run instead of the owner's PC (proposed, undecided) | [Hosting options](../architecture/decisions/0009-advice-backend-hosting-options.md) |
 
 The complete member-publication week and `squadopt season tick` are different workflows.
 Use the weekly runbook to identify the operation required; installing a scheduler around

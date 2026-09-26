@@ -17,7 +17,7 @@ from typing import Final
 import pandas as pd
 
 from squadopt.backtest import realized_points_at, season_ranks, walk_forward_decision_points
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.features import build_feature_dataset
 from squadopt.optimization import optimize_squad

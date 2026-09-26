@@ -402,3 +402,33 @@ def inspect_run(
                 datetime.fromisoformat(result["completed_at_utc"].replace("Z", "+00:00")) > expected
             )
     return result
+
+
+@contextmanager
+def held_run(root: Path, run_id: str) -> Iterator[dict[str, Any]]:
+    """Own a run no process is running, and read its journal, for as long as the caller works.
+
+    The run's own lock is taken without waiting, as a resume takes it: a run another process
+    still owns is refused before its journal is read, and while the caller holds it no resume
+    of the same run can rewrite what the journal describes.
+    """
+
+    directory = _safe(root / _identifier(run_id))
+    path = directory / "run.json"
+    if not path.is_file():
+        raise WeeklyJournalError(f"No weekly run {run_id} is journalled under {root}.")
+    owned = False
+    try:
+        with QueueFileLock(directory / ".run.lock", timeout_seconds=0).hold():
+            owned = True
+            yield _read(path)
+    except QueueLockTimeout as error:
+        if owned:
+            raise
+        raise WeeklyJournalError(f"Another process owns weekly run {run_id}.") from error
+
+
+def verify_stage_outputs(stage: Mapping[str, Any]) -> None:
+    """Refuse a finished stage whose recorded outputs no longer hold the bytes it recorded."""
+
+    _verify(stage["outputs"])

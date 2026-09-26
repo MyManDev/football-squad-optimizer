@@ -54,6 +54,7 @@ from squadopt.data.sources.club_news_coding import CodingFixture
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.platform.club_news_acquire import main as acquire
+from squadopt.platform.club_news_fetch import CLUB_NEWS_SOURCES_CONTRACT_VERSION
 from squadopt.platform.club_news_provider import (
     KEY_ENVIRONMENT_VARIABLE,
     MODEL_ENVIRONMENT_VARIABLE,
@@ -157,9 +158,14 @@ def _registry(path: Path) -> Path:
     path.write_text(
         json.dumps(
             {
-                "contract_version": "club_news_sources_v1",
+                "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
                 "sources": [
-                    {"club": club, "url": url, "terms_record": "docs/club_news_sources.md"}
+                    {
+                        "club": club,
+                        "url": url,
+                        "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": "2026-09-01",
+                    }
                     for club, url in first.items()
                 ],
             }

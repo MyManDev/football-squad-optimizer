@@ -34,9 +34,9 @@ from squadopt.evaluation import (
     evaluate_component_oof,
     read_phase_c_component_handoff,
 )
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.phase_c_reporting import phase_c_component_evaluation_to_dict
-from squadopt.experiments.statistics import season_aware_moving_block_interval
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
     EQUAL_WEIGHTING,

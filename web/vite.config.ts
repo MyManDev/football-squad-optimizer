@@ -12,14 +12,10 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Only vendor code is grouped by hand. Application modules follow their lazy()
+        // routes, so index.html preloads the shell and vendor code and no page's chunk.
         manualChunks(id) {
           if (id.includes("node_modules")) return "vendor";
-          // Keep the two score views together: shared rendering compresses once.
-          if (
-            id.includes("/src/features/squad/") ||
-            id.endsWith("/src/features/league/pages/LeaguePage.tsx")
-          )
-            return "scores";
           return undefined;
         },
       },

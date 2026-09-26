@@ -16,7 +16,7 @@ from squadopt.evaluation import (
     PhaseCComponentEvaluation,
     evaluate_component_oof,
 )
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 
 PHASE_C_ABLATION_CONTRACT_VERSION: Final = "phase_c_evidence_ablation_v1"
 COMPONENT_BASE_ARM: Final = "component_base"
