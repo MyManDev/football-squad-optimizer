@@ -24,9 +24,6 @@ for (const language of ["en", "tr"] as const) {
       ...state,
     }));
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
-    await page.route("https://fonts.googleapis.com/**", (route) =>
-      route.fulfill({ body: "", contentType: "text/css" }),
-    );
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ json: publication }),
     );
