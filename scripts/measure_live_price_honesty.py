@@ -20,7 +20,12 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from scripts._experiment_cli import REPOSITORY_ROOT, write_json, write_text
+from scripts._experiment_cli import (
+    REPOSITORY_ROOT,
+    repository_provenance,
+    write_json,
+    write_text,
+)
 
 from squadopt.application.live_price_honesty import (
     LIVE_PRICE_HONESTY_CONTRACT_VERSION,
@@ -114,6 +119,8 @@ def measure(data_root: Path, season: str, through_gameweek: int | None) -> dict[
     return {
         "contract_version": LIVE_PRICE_HONESTY_CONTRACT_VERSION,
         "protocol": "docs/live_price_honesty_prereg.md",
+        # Which code wrote the record: a committed record has to be checkable against it.
+        "provenance": repository_provenance(),
         "season": season,
         "through_gameweek": through_gameweek,
         "members": len(entries),

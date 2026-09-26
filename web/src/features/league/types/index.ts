@@ -432,12 +432,16 @@ export interface EntryAdvice {
    */
   expected_points_cost?: number;
   /**
-   * The most that price can be. A price tag is a difference between two solved plans,
-   * and it is the cost itself only when both proofs finished; when one did not, the
-   * producer carries its solver's own bound onto the difference and publishes the
-   * result here. Equal to `expected_points_cost` under a proof, never below it, never
-   * below zero. Published on the rival strategies; absent on documents published before
-   * the producer carried it, and on the modes priced by the scenario menu.
+   * The most that price can be. A price tag is a difference between two solved plans:
+   * the member's pure-points plan it is measured against (the anchor) and the priced one.
+   * The producer publishes this only when the anchor was proven, and it is then the price
+   * itself; where only the priced plan's proof is missing, a better priced plan could only
+   * cost less, so it is the most the price can be. Published on the rival strategies, the
+   * manager's word and the Top 100 settings. Absent when the anchor was found without a
+   * proof (its solver's bound is on the planner's objective and bounds no price), on
+   * documents published before the producer carried it, and on the modes priced by the
+   * scenario menu. A document published before that rule may carry a figure above the
+   * price; the page prints no price for a document whose anchor is unproven.
    */
   expected_points_cost_ceiling?: number;
   /** The league neighbour the competitive modes were priced against; null for saf-puan. */
