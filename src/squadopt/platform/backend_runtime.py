@@ -42,7 +42,7 @@ from squadopt.application.advice_capabilities import (
     advice_capabilities,
     menu_capabilities,
 )
-from squadopt.application.advice_menu import held_member_chips
+from squadopt.application.advice_menu import held_member_chips, held_member_squad
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import SourceRevisionError
@@ -58,6 +58,7 @@ from squadopt.platform.advice_read import (
     AdviceReadStore,
     AdviceRequestContext,
     FileLeagueDirectory,
+    PreferencePlayers,
 )
 from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRateLimiter
 from squadopt.platform.advice_switches import (
@@ -356,6 +357,9 @@ class CaptureContextProvider:
         self._chip_identity: CaptureIdentity | None = None
         self._chip_source: tuple[CapturePicksProvider, SeasonRules] | None = None
         self._chip_members: dict[tuple[int, int], tuple[str, ...] | None] = {}
+        self._squad_identity: CaptureIdentity | None = None
+        self._squad_source: tuple[CapturePicksProvider, frozenset[int]] | None = None
+        self._squad_members: dict[tuple[int, int], frozenset[int] | None] = {}
 
     def identity(self) -> CaptureIdentity | None:
         """The current capture's identity, reading it only when the capture changed."""
@@ -594,6 +598,59 @@ class CaptureContextProvider:
                     )
             return {entry: self._chip_members[(league_id, entry)] for entry in entries}
 
+    def preference_players(
+        self, context: AdviceRequestContext, league_id: int, entry_id: int
+    ) -> PreferencePlayers | None:
+        """The member's captured fifteen and the capture's roster, without projecting.
+
+        Read once per identity and member, like the chips. ``None`` means this member's
+        squad cannot be read from the capture, which the worker would refuse as well.
+        """
+        identity = self.identity()
+        if identity is None or identity.context != context:
+            raise AdviceBackendNotReadyError("The capture context is no longer current.")
+        with self._lock:
+            if self._squad_identity is not identity:
+                self._squad_identity = identity
+                self._squad_source = None
+                self._squad_members = {}
+                try:
+                    self._squad_source = (
+                        CapturePicksProvider(identity.snapshot, identity.inputs.snapshot_id),
+                        frozenset(int(code) for code in identity.inputs.players["player_id"]),
+                    )
+                except Exception as error:
+                    self._report(
+                        "advice_member_squad_unreadable",
+                        snapshot_id=context.capture_snapshot_id,
+                        reason=str(error),
+                    )
+            if self._squad_source is None:
+                return None
+            provider, roster = self._squad_source
+            key = (league_id, entry_id)
+            if key not in self._squad_members:
+                try:
+                    self._squad_members[key] = frozenset(
+                        held_member_squad(
+                            AdviseEntryRequest(
+                                context.season, context.gameweek, league_id, entry_id
+                            ),
+                            provider=provider,
+                            inputs=identity.inputs,
+                        )
+                    )
+                except Exception as error:
+                    self._squad_members[key] = None
+                    self._report(
+                        "advice_member_squad_unreadable",
+                        snapshot_id=context.capture_snapshot_id,
+                        entry_id=entry_id,
+                        reason=str(error),
+                    )
+            squad = self._squad_members[key]
+            return None if squad is None else PreferencePlayers(squad=squad, roster=roster)
+
     def _report(self, event: str, **fields: object) -> None:
         key = event, str(fields.get("snapshot_id", ""))
         marker = str(fields.get("reason", ""))
@@ -739,6 +796,7 @@ def build_backend(
         capabilities=menu_capabilities(),
         switches=contexts,
         chip_availability=contexts.held_chips,
+        preference_players=contexts.preference_players,
     )
     submit = AdviceSubmitService(
         reader,

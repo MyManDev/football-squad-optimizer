@@ -806,6 +806,29 @@ def test_unreadable_chip_source_stays_not_ready_without_reloading_per_member(
     assert not backend.queue.jobs()
 
 
+def test_named_players_are_checked_against_the_capture_without_projecting(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This capture holds no picks for the member, so a kept player cannot be checked."""
+
+    backend = build_backend(deployment["config"])
+    provider = Mock(wraps=backend_runtime.CapturePicksProvider)
+    squad = Mock(wraps=backend_runtime.held_member_squad)
+    monkeypatch.setattr(backend_runtime, "CapturePicksProvider", provider)
+    monkeypatch.setattr(backend_runtime, "held_member_squad", squad)
+    client = TestClient(app_for_backend(backend))
+    for _ in range(2):
+        response = client.post(
+            f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+            json={"strategy": "saf-puan", "window": 1, "preferences": {"keep_players": [1001]}},
+        )
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert provider.call_count == squad.call_count == 1  # an unreadable squad is remembered
+    assert backend.contexts._context is None
+    assert not backend.queue.jobs()
+
+
 def test_chip_refusal_with_artifact_root_never_projects(deployment: dict[str, Any]) -> None:
     config = replace(deployment["config"], artifact_root=deployment["site_root"] / "artifacts")
     backend = build_backend(config)
