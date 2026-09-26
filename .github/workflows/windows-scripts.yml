@@ -12,6 +12,7 @@ on:
       - "tests/unit/test_release_recipe.py"
       - "tests/unit/test_powershell_repo_root.py"
       - "tests/unit/test_restart_backend_release.py"
+      - "docs/deployment_runbook.md"
       - ".github/workflows/windows-scripts.yml"
   push:
     branches: [develop, main]
@@ -24,6 +25,7 @@ on:
       - "tests/unit/test_release_recipe.py"
       - "tests/unit/test_powershell_repo_root.py"
       - "tests/unit/test_restart_backend_release.py"
+      - "docs/deployment_runbook.md"
       - ".github/workflows/windows-scripts.yml"
   workflow_dispatch:
 
