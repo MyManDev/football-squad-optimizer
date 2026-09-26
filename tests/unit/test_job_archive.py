@@ -58,7 +58,7 @@ def _finish(
     running = queue.claim(at_utc=at)
     assert running is not None and running.job_id == job_id
     if status == "completed":
-        return queue.complete(running, cache=cache, payload=b"answer", at_utc=at)
+        return queue.complete(running, cache=cache, payload=_valid_advice_document(), at_utc=at)
     failed = running.transition("failed", at_utc=at, error=JobError("ADVICE_FAILED", "fixture"))
     queue.store(failed)
     return failed
@@ -155,15 +155,15 @@ def test_an_interrupted_move_is_finished_by_the_next_call(
     queue = FileJobQueue(root)
     cache = FileAdviceCache(tmp_path / "cache")
     done = _finish(queue, cache, "old-done", _key(1), at=OLD, idempotency_key="client:1")
-    real_replace = os.replace
+    real_replace = file_advice_queue.replace_retrying
 
     def fail_into_the_archive(source: Any, target: Any) -> None:
         if Path(target).parent == root / "archive":
             raise OSError("the process died here")
-        real_replace(source, target)
+        real_replace(Path(source), Path(target))
 
     with monkeypatch.context() as patch:
-        patch.setattr(file_advice_queue.os, "replace", fail_into_the_archive)
+        patch.setattr(file_advice_queue, "replace_retrying", fail_into_the_archive)
         with pytest.raises(OSError, match="died"):
             queue.archive(now_utc=NOW)
 
@@ -298,7 +298,7 @@ def test_an_idle_worker_archives_at_most_once_per_interval(
     run_advice_worker(
         failing,
         cache,
-        lambda _job: b"x",
+        lambda _job: _valid_advice_document(),
         should_stop=_stop_after(10),
         now=lambda: now,
         sleep=lambda _seconds: None,
@@ -315,7 +315,7 @@ def test_an_idle_worker_archives_at_most_once_per_interval(
     run_advice_worker(
         once,
         cache,
-        lambda _job: b"x",
+        lambda _job: _valid_advice_document(),
         should_stop=_stop_after(10),
         now=lambda: now,
         sleep=lambda _seconds: None,
