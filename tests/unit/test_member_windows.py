@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 from tests.unit.test_league_views import _Provider
+from tests.unit.test_live_football_model import _forecast
 from tests.unit.test_live_horizon_planning import _inputs as _horizon_inputs
 from tests.unit.test_live_recommendation import (
     GW1_REPLAY_CAPTAIN,
@@ -30,11 +31,13 @@ from squadopt.application import advice as advice_module
 from squadopt.application.advice import (
     MEMBER_WINDOWS,
     NO_CHIP_LIMIT,
+    NO_DEFCON_LIMIT,
     ONE_WEEK_STATED_LIMITS,
     WINDOW_STATED_LIMITS,
     WINDOW_TOP100_LIMIT,
     AdviseEntryRequest,
     advise_entry,
+    forecast_stated_limits,
     member_horizon_builder,
     window_stated_limits,
 )
@@ -42,10 +45,16 @@ from squadopt.application.entries import EntryError, EntryPicks, EntryRegistrati
 from squadopt.application.league_views import build_league_views
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
 from squadopt.data.snapshots import read_snapshot
+from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
 from squadopt.live.recommendation import project
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
 from squadopt.optimization import SolverExecutionError, SolverStatus
 from squadopt.planning import CHIP_NAMES
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
 ENTRY = 101
 LEAGUE = 352490
@@ -470,3 +479,94 @@ def test_the_site_holds_the_producers_window_limit_sentences_verbatim() -> None:
     assert list(ONE_WEEK_STATED_LIMITS) == [NO_CHIP_LIMIT]
     assert _web_literal("NO_CHIP_STATED_LIMIT") == NO_CHIP_LIMIT
     assert NO_CHIP_LIMIT in WINDOW_STATED_LIMITS
+
+
+def _component_world(window_world: dict[str, Any], tmp_path: Path) -> dict[str, Any]:
+    """The same capture and member, projected by the current model's component version."""
+
+    snapshot = read_snapshot(tmp_path, str(window_world["inputs"].snapshot_id))
+    handoff = dataclasses.replace(
+        _in_season_handoff(snapshot),
+        model_version=COMPONENT_MODEL_VERSION,
+        feature_contract_version=COMPONENT_FEATURE_CONTRACT_VERSION,
+    )
+    return {
+        **window_world,
+        "projection": project(window_world["inputs"], in_season=handoff),
+        "builder": member_horizon_builder(snapshot, season=SEASON, in_season=handoff),
+    }
+
+
+def test_the_component_forecast_states_that_it_does_not_forecast_defcon(
+    window_world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The current model's component version was fitted on seasons with no DEFCON scoring.
+
+    The live game awards those points, so a plan built on that forecast says so beside
+    its other limits, in the one-week document and in every window, and the sentence is
+    read from the model version the projection records rather than assumed.
+    """
+
+    world = _component_world(window_world, tmp_path)
+    assert world["projection"].diagnostics["model_version"] == COMPONENT_MODEL_VERSION
+
+    one_week = _advise(world)
+    assert one_week["stated_limits"] == [NO_CHIP_LIMIT, NO_DEFCON_LIMIT]
+
+    window = _advise(world, window=3)
+    assert window["stated_limits"] == [
+        *(sentence for sentence in WINDOW_STATED_LIMITS if sentence != WINDOW_TOP100_LIMIT),
+        NO_DEFCON_LIMIT,
+    ]
+    assert window["stated_limits"] == window_stated_limits(world["projection"])
+
+
+def test_the_defcon_sentence_is_published_only_for_the_component_versions(
+    window_world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Where the sentence would not be true, it is not published.
+
+    The carry-over versions carry realized points forward, and those include DEFCON
+    wherever the game awarded it. The football model forecasts DEFCON per fixture. Only
+    the component model, and its Top-100 version on the same base, was fitted without it.
+    """
+
+    carry_over = window_world["projection"]
+    assert carry_over.diagnostics["model_version"] not in {
+        COMPONENT_MODEL_VERSION,
+        COMPONENT_ELITE_MODEL_VERSION,
+    }
+    assert forecast_stated_limits(carry_over) == []
+    assert NO_DEFCON_LIMIT not in window_stated_limits(carry_over)
+    assert NO_DEFCON_LIMIT not in _advise(window_world)["stated_limits"]
+
+    elite = dataclasses.replace(
+        carry_over,
+        diagnostics={
+            **dict(carry_over.diagnostics),
+            "model_version": COMPONENT_ELITE_MODEL_VERSION,
+        },
+    )
+    assert forecast_stated_limits(elite) == [NO_DEFCON_LIMIT]
+
+    # The football model, read through its own artifact reader, never carries it.
+    path = football_artifact_path(tmp_path / "artifacts", str(window_world["inputs"].snapshot_id))
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(_forecast(window_world["inputs"])), encoding="utf-8")
+    football = read_football_forecast(path, window_world["inputs"])
+    assert forecast_stated_limits(football.projection) == []
+    assert NO_DEFCON_LIMIT not in window_stated_limits(football.projection)
+    football_world = {
+        **window_world,
+        "projection": football.projection,
+        "builder": football.build_horizon,
+    }
+    for window in (1, 3):
+        payload = _advise(football_world, window=window)
+        assert NO_DEFCON_LIMIT not in payload["stated_limits"], window
+
+
+def test_the_site_holds_the_producers_defcon_sentence_verbatim() -> None:
+    """The page translates the sentence by exact lookup, so the two ends must agree."""
+
+    assert _web_literal("NO_DEFCON_STATED_LIMIT") == NO_DEFCON_LIMIT

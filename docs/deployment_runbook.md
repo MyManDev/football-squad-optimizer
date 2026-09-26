@@ -243,10 +243,25 @@ pull request reviewed, with no gate anywhere catching it. Recover with the secon
 
 ```
 sh scripts/release/deploy.sh <tag>
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]
 ```
 
-and, once the tag has been pushed, with a re-dispatch instead, which needs neither script and
-can be repeated:
+Run the second line only when the first has exited 0, and wait about 45 seconds between
+them. `deploy.sh` reports the workflow run, not the site, so the recovery is not done until
+`verify_live.py` prints `ALL GOOD`: it is the step `ship.sh` runs after `deploy.sh`, and
+without it the recovery path had no check of what the site serves. If it fails in the first
+minutes, run it once more a minute later, as `ship.sh` does. `deploy.sh` watches the
+earliest dispatch run created since a minute before its own dispatch (the minute is slack for
+clock skew), so an older release's finished run is not picked while this machine's clock is
+within a minute of GitHub's. It refuses a successful run whose production job does not name
+this tag. A failed run is reported as failed whatever tag it names: the production job takes
+its name from the tag the source check resolves, and a failed source check resolves none, so
+the name cannot tell this release's own failure from another run's. If another dispatch was
+made shortly before this one, check with `gh run list --workflow deploy-pages.yml` that the
+failed run is this release's before dispatching again.
+
+Once the tag has been pushed, recover with a re-dispatch instead, which needs neither script
+and can be repeated, and then run the same `verify_live.py` command once that run has finished:
 
 ```
 gh workflow run deploy-pages.yml --ref develop -f release_tag=<tag>
@@ -258,7 +273,7 @@ one. Previews spend from the same day and stop at eight; on a busy day the previ
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
 `deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
-retains the eleven smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
+retains the ten smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
 path. These are operator commands, not scheduled jobs; inspect their output and stop
@@ -354,22 +369,22 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **eleven** checks, and they are not all "must return 200". The list
+The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
-Eight are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
-`/league`, `/league/members/0`, `/analysis`, `/status`, `/fixtures`. The nested member path is there
+Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
+`/league`, `/league/members/0`, `/status`, `/fixtures`. The nested member path is there
 deliberately, because a path-scoped not-found rule would break a nested client-side route first
 and nothing else on the list would notice.
 
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and `/data/league/members.json`.
 
-**The eleventh is the opposite check, and reading it as a 200 inverts it.**
+**The tenth is the opposite check, and reading it as a 200 inverts it.**
 `/data/league/entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is eight route 200s, two JSON 200s, and one 404.
+rather than the application shell. A green smoke is seven route 200s, two JSON 200s, and one 404.
 
 Transient edge and propagation failures are retried for roughly one minute.
 

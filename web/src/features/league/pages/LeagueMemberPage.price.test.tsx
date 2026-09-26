@@ -2,10 +2,12 @@
  * What the price tag on a rival strategy is allowed to say.
  *
  * A price tag is the difference between two solved plans. Where both proofs finished it
- * is the cost, and the page says so in the words it always used. Where one did not, the
- * producer publishes the bound it measured — the most the strategy can cost — and the
- * page must state that instead, in both languages. And because a constrained plan can
- * never beat the unconstrained one, no figure the page prints may read as a giveaway.
+ * is the cost, and the page says so in the words it always used. Where only the priced
+ * plan's proof is missing, the producer publishes the price as a ceiling, the most the
+ * strategy can cost, and the page must state that instead, in both languages. Where the
+ * pure-points plan it is measured against is unproven, nothing bounds the price and the
+ * page prints none. And because a constrained plan can never beat the unconstrained one,
+ * no figure the page prints may read as a giveaway.
  */
 
 import { cleanup, render } from "@testing-library/react";
@@ -68,10 +70,52 @@ describe("a proven price reads as an exact cost", () => {
   });
 });
 
-describe("an unproven price reads as a ceiling", () => {
-  // The producer's shape: the control it was priced against was found, not proved, so
-  // the difference is 0.8 and the most it can cost is 0.8 + the control's bound.
-  const unproven = rivalAdvice({
+describe("a price whose own plan is unproven reads as a ceiling", () => {
+  // The producer's shape: the pure-points plan it was priced against was proved, the
+  // strategy's own plan was found, not proved, so the ceiling is the price itself and the
+  // page states it as the most the strategy can cost.
+  const found = rivalAdvice({
+    solver_status: "FEASIBLE",
+    optimality_gap: 1.1,
+    control_solver_status: "OPTIMAL",
+    control_optimality_gap: 0,
+    expected_points_cost: 2.3,
+    expected_points_cost_ceiling: 2.3,
+    alternative_plan: {
+      kind: "with_hits",
+      overlap_applied: 9,
+      transfer_hit_points: 8,
+      expected_points_cost: 7.9,
+      expected_points_cost_ceiling: 7.9,
+    },
+  });
+
+  it("states the most it can cost, in English", () => {
+    const text = renderText("en", found);
+    expect(text).toMatch(/gives up at most 2\.3 expected points against the pure-points pick/);
+    expect(text).not.toMatch(/gives up ~2\.3/);
+    // The plan itself, and the candidate beside it, both under the same bound.
+    expect(text).toMatch(/at most 7\.9 expected points against pure points/);
+  });
+
+  it("states the most it can cost, in Turkish", () => {
+    const text = renderText("tr", found);
+    expect(text).toMatch(/en fazla 2,3 beklenen puandan vazgeçiyor/);
+    expect(text).not.toMatch(/~2,3 beklenen puandan vazgeçiyor/);
+    expect(text).toMatch(/maliyet en fazla 7,9 beklenen puan/);
+  });
+
+  it("says the plan is the best one found rather than one shown to be best", () => {
+    expect(renderText("en", found)).toMatch(/This is the best plan the search found/);
+    expect(renderText("tr", found)).toMatch(/aramanın bulduğu en iyi plan/);
+  });
+});
+
+describe("a price against an unproven pure-points plan is not printed", () => {
+  // The control's bound is on the planner's objective, not on points, so no figure
+  // bounds the price. The producer publishes no ceiling; a document from before that
+  // rule carries one, and the page prints neither it nor the difference.
+  const older = rivalAdvice({
     control_solver_status: "FEASIBLE",
     control_optimality_gap: 1.5,
     expected_points_cost: 0.8,
@@ -85,35 +129,21 @@ describe("an unproven price reads as a ceiling", () => {
     },
   });
 
-  it("states the most it can cost, not the difference, in English", () => {
-    const text = renderText("en", unproven);
-    expect(text).toMatch(/gives up at most 2\.3 expected points against the pure-points pick/);
-    expect(text).not.toMatch(/gives up ~0\.8/);
-    // The plan itself, and the candidate beside it, both under the same bound.
-    expect(text).toMatch(/at most 7\.9 expected points against pure points/);
-    expect(text).not.toMatch(/, 6\.4 expected points against pure points/);
-    expect(text).toMatch(/published as a ceiling, the most this strategy can cost/);
+  it("prints no figure for the plan or the alternative, and says why, in English", () => {
+    const text = renderText("en", older);
+    expect(text).not.toMatch(/gives up/);
+    expect(text).not.toMatch(/expected points against pure points/);
+    expect(text).not.toMatch(/2\.3|7\.9|6\.4/);
+    expect(text).toMatch(/it bounds no price and no price is stated/);
     // The bound it rests on is named for what it bounds, the planner's objective.
     expect(text).toMatch(/planner objective .* which is not a points total/);
-    expect(text).not.toMatch(/gap ≤ 1\.5 pts/);
   });
 
-  it("states the most it can cost, not the difference, in Turkish", () => {
-    const text = renderText("tr", unproven);
-    expect(text).toMatch(/en fazla 2,3 beklenen puandan vazgeçiyor/);
-    expect(text).not.toMatch(/~0,8 beklenen puandan vazgeçiyor/);
-    expect(text).toMatch(/maliyet en fazla 7,9 beklenen puan/);
-    expect(text).toMatch(/tavan olarak yayımlanıyor/);
-  });
-
-  it("says the plan is the best one found rather than one shown to be best", () => {
-    const found = rivalAdvice({
-      solver_status: "FEASIBLE",
-      optimality_gap: 1.1,
-      expected_points_cost_ceiling: 0.8,
-    });
-    expect(renderText("en", found)).toMatch(/This is the best plan the search found/);
-    expect(renderText("tr", found)).toMatch(/aramanın bulduğu en iyi plan/);
+  it("prints no figure for the plan or the alternative, and says why, in Turkish", () => {
+    const text = renderText("tr", older);
+    expect(text).not.toMatch(/vazgeçiyor/);
+    expect(text).not.toMatch(/maliyet en fazla|2,3|7,9|6,4/);
+    expect(text).toMatch(/bu yüzden fiyat belirtilmiyor/);
   });
 });
 
@@ -153,6 +183,6 @@ describe("no price is ever rendered as a giveaway", () => {
       ?.expected_points_cost_ceiling;
     const text = renderText("en", legacy);
     expect(text).not.toMatch(/gives up/);
-    expect(text).toMatch(/published as a ceiling/);
+    expect(text).toMatch(/no price is stated/);
   });
 });
