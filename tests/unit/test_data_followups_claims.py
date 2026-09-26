@@ -355,15 +355,18 @@ def _module_name(path: Path) -> str:
 class _PanelBuilds:
     """How many panel builds one call of a function can reach, on its costliest path.
 
-    A call is followed when it names a module-level function of the package or of
-    `scripts/`: one defined in the same module, one imported by name (through re-exports),
-    or one reached through an imported module (`producer.build`). A branch counts its costlier
-    side, a `return` or `raise` ends its path, and a loop or comprehension whose body builds
-    the panel counts as more than once. Not followed: methods and nested functions, a call
-    through a dotted module path (`a.b.f()`), a builder passed in as an argument (`decide`'s
-    `panel_builder`), and a pool's initializer, which the test above covers. A module found
-    here can build the panel twice in one call; one not found may still do so only through
-    one of those routes.
+    Counted: every module-level function of the package and of `scripts/`, and every method
+    of a module-level class there, keyed `Class.method`. A call is followed when it names
+    one of those: a function defined in the same module, one imported by name (through
+    re-exports), one reached through an imported module (`producer.build`), or a method of
+    the caller's own class called through `self`. A branch counts its costlier side, a
+    `return` or `raise` ends its path, and a loop or comprehension whose body builds the
+    panel counts as more than once. Not followed: nested functions, an inherited method or
+    one called through anything but `self`, a call through a dotted module path
+    (`a.b.f()`), a function passed as an argument rather than called (`decide`'s
+    `panel_builder`, the weekly run's stages, which a test below sums), and a pool's
+    initializer, which the test above covers. A module found here can build the panel twice
+    in one call; one not found may still do so only through one of those routes.
     """
 
     def __init__(self) -> None:
@@ -372,15 +375,28 @@ class _PanelBuilds:
         self.functions: dict[str, dict[str, Function]] = {}
         self.imports: dict[str, dict[str, tuple[str, str | None]]] = {}
         for module, path in self.paths.items():
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            self.functions[module] = {
-                node.name: node
-                for node in tree.body
-                if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-            }
-            self.imports[module] = self._imports(module, path, tree)
+            self.add(module, path, ast.parse(path.read_text(encoding="utf-8")))
         self._counted: dict[Key, int] = {}
         self._open: set[Key] = set()
+        #: The class of each method being counted, innermost last (None for a function).
+        self._classes: list[str | None] = []
+
+    def add(self, module: str, path: Path, tree: ast.Module) -> None:
+        """Register one module's functions, its classes' methods and its imports."""
+
+        self.functions[module] = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        }
+        self.functions[module].update(
+            (f"{node.name}.{member.name}", member)
+            for node in tree.body
+            if isinstance(node, ast.ClassDef)
+            for member in node.body
+            if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef)
+        )
+        self.imports[module] = self._imports(module, path, tree)
 
     def _imports(
         self, module: str, path: Path, tree: ast.Module
@@ -418,6 +434,10 @@ class _PanelBuilds:
         if isinstance(call.func, ast.Name):
             return self._resolve(module, call.func.id)
         if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
+            within = self._classes[-1] if self._classes else None
+            if call.func.value.id == "self" and within is not None:
+                method = f"{within}.{call.func.attr}"
+                return (module, method) if method in self.functions[module] else None
             found = self.imports.get(module, {}).get(call.func.value.id)
             if found is not None and found[1] is None:
                 return self._resolve(found[0], call.func.attr)
@@ -431,7 +451,9 @@ class _PanelBuilds:
         if key in self._open:
             return 0
         self._open.add(key)
+        self._classes.append(key[1].rpartition(".")[0] or None)
         through, ended = self._block(key[0], self.functions[key[0]][key[1]].body)
+        self._classes.pop()
         self._open.discard(key)
         self._counted[key] = int(max(through, ended, 0))
         return self._counted[key]
@@ -509,11 +531,12 @@ class _PanelBuilds:
 
 
 def test_every_caller_that_can_build_the_panel_twice_in_one_run_is_named_in_item_7() -> None:
-    """Item 7 once said every caller loads the panel once at the top of a run; three do not.
+    """Item 7 once said every caller loads the panel once at the top of a run; not so.
 
-    A module is found when one of its module-level functions can reach two panel builds in
-    one call. Item 7 must cite each one, in the house form `_as_cited` gives. A new script
-    that builds the panel twice fails here until item 7 names it.
+    A module is found when one of its module-level functions, or a method of one of its
+    module-level classes, can reach two panel builds in one call. Item 7 must cite each one,
+    in the house form `_as_cited` gives. A new script that builds the panel twice fails here
+    until item 7 names it.
     """
 
     builds = _PanelBuilds()
@@ -523,11 +546,13 @@ def test_every_caller_that_can_build_the_panel_twice_in_one_run_is_named_in_item
         if any(builds.count((module, name)) > 1 for name in functions)
     )
     # The scan must find the callers this item names, each by a different rule (a call into
-    # another module, a call within the module, a build inside a loop), or it is looking
-    # nowhere. The last line follows a module alias and a re-export (`producer._component_table`
-    # in `scripts/_phase_e_live.py`), so a resolver that stopped following either fails here.
+    # another module, a call within the module, a build inside a loop, a method), or it is
+    # looking nowhere. The last line follows a module alias and a re-export
+    # (`producer._component_table` in `scripts/_phase_e_live.py`), so a resolver that stopped
+    # following either fails here.
     assert {
         "application/projection_handoff.py",
+        "platform/weekly_operations.py",
         "scripts/build_projection_handoff.py",
         "scripts/measure_participation_composition.py",
         "scripts/probe_phase_e_runtime.py",
@@ -537,3 +562,83 @@ def test_every_caller_that_can_build_the_panel_twice_in_one_run_is_named_in_item
     item = _item("7")
     missing = [cited for cited in found if f"`{cited}`" not in item]
     assert not missing, f"Item 7 does not name these callers that build the panel twice: {missing}."
+
+
+def test_the_weekly_run_builds_the_panel_in_the_stages_item_7_names() -> None:
+    """The weekly run's stages run one after another in one process, so their builds add up.
+
+    `WeeklyOperations.execute` hands each stage method to its journal as `operation=`, which
+    the scan above does not follow, so this sums the stages it hands over. The count is per
+    stage method on its costliest path: the league stage's workers are the pool test's, and
+    `decide`'s opening-gameweek build is reached through its `panel_builder`, which the
+    decide stage never takes (it always passes the handoff).
+    """
+
+    builds = _PanelBuilds()
+    module = "squadopt.platform.weekly_operations"
+    execute = builds.functions[module]["WeeklyOperations.execute"]
+    stages = [
+        keyword.value.attr
+        for node in ast.walk(execute)
+        if isinstance(node, ast.Call)
+        for keyword in node.keywords
+        if keyword.arg == "operation"
+        and isinstance(keyword.value, ast.Attribute)
+        and isinstance(keyword.value.value, ast.Name)
+        and keyword.value.value.id == "self"
+    ]
+    # Every stage the runbook lists, or the sum below is looking at part of the run.
+    assert {"_capture", "_handoff", "_decide", "_league", "_site", "_publish"} <= set(stages)
+
+    building = {
+        stage: count
+        for stage in stages
+        if (count := builds.count((module, f"WeeklyOperations.{stage}"))) > 0
+    }
+    assert building == {"_capture": 1, "_handoff": 2, "_league": 1}
+    assert sum(building.values()) == 4
+
+    item = _item("7")
+    for phrase in (
+        "(`platform/weekly_operations.py`) builds it up to four times in its own process",
+        "once in the capture stage",
+        "twice in the handoff stage",
+        "once in the league stage's parent",
+        "No other stage builds one",
+    ):
+        assert phrase in item, f"Item 7 must say how the weekly run builds the panel: {phrase!r}."
+
+
+def test_the_scan_counts_a_method_and_follows_self_within_its_class() -> None:
+    """The two rules the weekly run needs, on a module small enough to count by hand."""
+
+    builds = _PanelBuilds()
+    source = """
+from squadopt.data.sources.vaastav import build_panel
+
+
+class Run:
+    def one(self, root):
+        return build_panel(root)
+
+    def both(self, root):
+        self.one(root)
+        return self.one(root)
+
+
+class Other:
+    def through_another_instance(self, run, root):
+        return run.one(root) + run.one(root)
+
+
+def outside(run, root):
+    run.one(root)
+    return run.one(root)
+"""
+    builds.add("claims_synthetic", Path("claims_synthetic.py"), ast.parse(source))
+
+    assert builds.count(("claims_synthetic", "Run.one")) == 1
+    assert builds.count(("claims_synthetic", "Run.both")) == 2
+    # Only `self` within the method's own class is followed, as the docstring says.
+    assert builds.count(("claims_synthetic", "Other.through_another_instance")) == 0
+    assert builds.count(("claims_synthetic", "outside")) == 0

@@ -261,10 +261,27 @@ the six seasons. That is **26.6 %** of a `build_panel` call, which sounds materi
 ask how often the call happens.
 
 **How often it is built.** Most callers build the panel once and then work on the frame in
-memory: the `measure_*` and `export_*` scripts that read the archive, `recommend_current_squad`,
-the `experiments/` studies, and `fpl_capture`'s identity check. Three build it more than once
-in one run:
+memory: the `measure_*` and `export_*` scripts that read the archive (one exception below),
+`recommend_current_squad` and the `experiments/` studies. `fpl_capture`'s identity check
+builds it once for each capture taken with the archive at hand, so a run that captures and
+then reads the archive builds it again. These build it more than once in one run:
 
+
+- The weekly run (`platform/weekly_operations.py`) builds it up to four times in its own
+  process, its stages running one after another: once in the capture stage, through
+  `fpl_capture`'s identity check, when the run takes its own capture (not with
+  `--snapshot-id`); twice in the handoff stage, through `build` in
+  `application/projection_handoff.py` on the component path (below; once when the capture
+  lacks a history week's live payload, and not at all with a prebuilt `--handoff`); and once
+  in the league stage's parent (`application/league_publication.py`), whose workers build
+  their own on top (below). No other stage builds one: the decide stage hands `decide` the
+  handoff, so `decide`'s opening-gameweek build (next) does not run there.
+  `scripts/run_week.py` starts the same runner, and a resumed run does not rerun a stage it
+  finished.
+- The season tick (`squadopt season tick`, `platform/cli.py`) builds it twice when one tick
+  captures and then decides the opening gameweek: once in the capture's identity check and
+  once in `decide` (`application/commands.py`), which builds it for the opening gameweek
+  only.
 - `build_projection_handoff` (`scripts/build_projection_handoff.py`, over `build` in
   `application/projection_handoff.py`) builds it twice on the component path: once for the
   carried rates and the opening fallback, and once more in `_component_table` for the
@@ -289,7 +306,8 @@ Two callers build it in a process pool's initializer, once per worker process:
   which clean it at most once each and nowhere else; with one worker the script runs the
   same initializer in its own process, once.
 
-That is still about a second of cleaning per build, against a league stage the runbook
+That is still about a second of cleaning per build, and a weekly run makes at most four in
+its own process and one in each league worker, against a league stage the runbook
 measured at about thirty-six minutes for fifteen members with eight workers (GW4 rehearsal,
 [`weekly_runbook.md`](weekly_runbook.md)) and plans in hours once the Top-100 menu is on, so
 the answer below does not change. The other entry point, `build_canonical_dataset`, is
