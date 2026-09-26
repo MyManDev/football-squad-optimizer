@@ -247,10 +247,23 @@ a list of them here. A read of GitHub's tags on 25 September 2026
 dispatch was refused on 2026-09-17. `site-2026-27-gw01-ui`, which this paragraph used to
 name, is no longer on GitHub. The same read shows that deployed tags are missing too
 (`site-2026-27-gw05-fix1`, deployed on 2026-09-17, is one), so the tag list is not a
-complete record of what was deployed: the `Deploy Pages` run history is, because each
-production job is named after the tag it deployed.
+complete record of what was deployed.
 
-Check the list against the rules rather than trusting this section. Git does this on its own,
+The `Deploy Pages` run history is not one either. A production job there is named after the
+tag the source check resolved, before any of its own steps runs, so the name does not say
+that anything was deployed; the job's steps do. When `Deploy exact production artifact` was
+skipped, nothing was deployed: run 35287375625, job `production site-2026-27-gw05-fix5`,
+stopped at `Stop production at the hard daily cap` on 2026-09-17. When that step succeeded,
+the upload reached Cloudflare even if a later step failed the job: runs 32498508177,
+32560081186 and 32705262157 (the `gw01-decision`, `gw01-fix1` and `gw01-fix2` tags, in
+August) failed at `Verify production deployment identity` after it. The
+[manual fallback](../deployment_runbook.md#exact-artifact-manual-fallback) and a dashboard
+[rollback](../deployment_runbook.md#rollback) leave no run at all. An upload by the workflow
+or by the manual fallback appears in Cloudflare's own deployment list for the project
+(**Workers & Pages → project → Deployments**, where the runbook's rollback starts), and both
+give a production deployment `release:<tag>` as its commit message.
+
+Check the tag list against the rules rather than trusting this section. Git does this on its own,
 so the check runs the same in PowerShell as in a shell:
 
 ```console

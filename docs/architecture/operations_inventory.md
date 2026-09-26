@@ -8,7 +8,7 @@ shows it (checked 25 September 2026).
 | Read-only inspection | Finding |
 | --- | --- |
 | GitHub repository environments | Only `cloudflare-pages` returned. |
-| Repository variables | `CLOUDFLARE_PAGES_PROJECT=football-squad-optimizer`. |
+| Repository variables | `CLOUDFLARE_PAGES_PROJECT=football-squad-optimizer` on 9 September. Since 18 September also `ADVICE_API_ORIGIN=https://squadopt-api.mymandev.com` (`gh variable list`), which the site build in `.github/workflows/ci.yml` has passed as `VITE_ADVICE_API_ORIGIN` since #615 ([backend free hosting](../backend_free_hosting.md#3-tell-the-site-build-where-the-api-is)). |
 | Repository secret names (values not read) | Cloudflare account ID and API token; no backend or backup credential name returned. |
 | Recent GitHub scheduled runs | None on 9 September. Since #676 the `Backend uptime` workflow is scheduled (`*/15` in `.github/workflows/backend-uptime.yml`); `gh run list --event schedule` lists its runs, which land hours apart rather than every fifteen minutes (measured in [backend free hosting](../backend_free_hosting.md#recommendation)). |
 | Windows scheduled task names/actions matching squad, football or FPL | No matching task returned. This does not exclude an unrelatedly named task or another machine. |
