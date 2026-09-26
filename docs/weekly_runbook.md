@@ -192,10 +192,13 @@ net columns beside it.
   looking at it first. So the club-news fetch belongs in the same window as everything else,
   ahead of the capture rather than after it. The fetch and the model call are one step and it
   now exists: `python -m scripts.capture_club_news --roster-snapshot <capture>` reads the
-  registry, fetches the registered pages, codes them one club per call and prints the capture
-  id that `--rotation` then reads. It runs **before** the capture, for the reason above, and
+  registry, fetches the registered pages and up to ten article pages per host that they link
+  to on the same host, codes them one club per call and prints the capture id that
+  `--rotation` then reads. It runs **before** the capture, for the reason above, and
   its roster comes from a capture already on disk so its only network reach is the club hosts
-  the registry names.
+  the registry names. A host whose terms reading is more than 90 days old is refused before
+  any request and printed as refused with the reading's date; renew the reading as
+  `docs/club_news_sources.md` describes rather than editing the date alone.
 - **The club-news capture runs on the machine that publishes, not beside it.** `--rotation-capture`
   is resolved against the run's own `data/snapshots`, so a capture written into a different
   checkout is a capture the run cannot see. That machine is the one holding `data/entries`,
