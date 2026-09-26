@@ -38,6 +38,7 @@ from squadopt.platform.backend_runtime import (
     configuration_fingerprint,
 )
 from squadopt.platform.store_probe import StoreProbeResult
+from squadopt.platform.worker_heartbeat import WorkerHeartbeat
 
 SEASON = world_module.SEASON
 BOOTSTRAP_PAYLOAD = world_module.BOOTSTRAP_PAYLOAD
@@ -158,6 +159,8 @@ def _deployment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, An
         handoff_root=handoff_root,
         allowed_origins=SITE_ORIGINS,
     )
+    # A worker's loop has just turned: readiness asks for one, as a deployment's does.
+    WorkerHeartbeat(config.worker_root).beat()
     return {
         "config": config,
         "snapshot_id": snapshot_id,
@@ -379,6 +382,8 @@ def test_the_context_names_the_capture_and_its_handoff(deployment: dict[str, Any
         "league_tree": True,
         "cache_store": True,
         "league_tree_matches_capture": True,
+        "worker_heartbeat": True,
+        "queue_wait": True,
     }
 
 
@@ -453,6 +458,8 @@ def test_the_backend_follows_the_published_capture_without_a_restart(
             "league_tree": True,
             "cache_store": True,
             "league_tree_matches_capture": True,
+            "worker_heartbeat": True,
+            "queue_wait": True,
         },
     )
     _handoff(root, newer)
@@ -522,6 +529,8 @@ def test_a_capture_a_week_ahead_follows_the_tree_when_its_entries_name_a_capture
         "league_tree": True,
         "cache_store": True,
         "league_tree_matches_capture": False,
+        "worker_heartbeat": True,
+        "queue_wait": True,
     }
     refused = client.post(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",

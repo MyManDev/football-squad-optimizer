@@ -33,6 +33,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from squadopt.application.advice_record import AdviceRecordConflictError
+from squadopt.application.capture_entries import CapturePicksProvider as CapturePicksProvider
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     ModePathsSummary,
@@ -50,7 +51,6 @@ from squadopt.application.league_publication import (
     resolve_live_snapshot_id as resolve_live_snapshot_id,
 )
 from squadopt.data.errors import DataError
-from squadopt.platform.capture_context import CapturePicksProvider as CapturePicksProvider
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
 )

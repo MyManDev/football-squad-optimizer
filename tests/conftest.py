@@ -14,8 +14,9 @@ from tests.fixtures.synthetic_players import (
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Mark every test under tests/integration as ``integration``.
 
-    ``slow`` is applied by hand to the solver-heavy tests; the fast suite is
-    ``pytest -m "not slow"``, the full suite is plain ``pytest``.
+    ``slow`` is applied by hand to some solver-heavy tests. It does not define a fast
+    suite: the merge gate is the full suite run in parallel,
+    ``pytest -n auto --dist loadscope`` (docs/architecture/pr_discipline.md, "The gates").
     """
 
     for item in items:

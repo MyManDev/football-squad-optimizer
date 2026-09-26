@@ -30,11 +30,11 @@ from squadopt.backtest import (
 )
 from squadopt.bayesopt import BayesianCandidate
 from squadopt.evaluation import EvaluationConfig, EvaluationFold, evaluate_prepared_folds
-from squadopt.experiments.config import (
-    DEFAULT_DEVELOPMENT_SEASONS,
+from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )
+from squadopt.experiments.config import DEFAULT_DEVELOPMENT_SEASONS
 from squadopt.features import CrossSeasonConfig, build_feature_dataset
 from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import FormWindowMapping, build_projection_table

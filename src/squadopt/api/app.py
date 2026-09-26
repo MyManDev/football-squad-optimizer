@@ -639,8 +639,13 @@ def create_app(
         Without an injected probe the endpoint still looks before it answers: the
         read-only deployment serves the published tree, so an unreadable data root
         means not ready, whatever the process's own health says. Deployments with an
-        advice backend inject the full probe (context, cache, queue) and this default
-        never applies to them.
+        advice backend inject the full probe (context, cache, league tree, a live worker,
+        a queue that moves) and this default never applies to them.
+
+        The body is the verdict and one boolean per check, never a path, an age or a
+        count: it is served publicly, beside ``/health``. ``/health`` stays liveness only
+        and touches no dependency, because the container probes and the logon watcher act
+        on it.
         """
 
         if readiness is None:

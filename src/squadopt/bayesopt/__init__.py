@@ -15,19 +15,21 @@ from squadopt.bayesopt.models import (
     BAYESIAN_OPTIMIZATION_CONTRACT_VERSION,
     BayesianCandidate,
     BayesianEvaluation,
-    BayesianFactor,
     BayesianOptimizationConfig,
-    BayesianOptimizationConfigurationError,
-    BayesianOptimizationError,
     BayesianOptimizationExecutionError,
     BayesianOptimizationResult,
-    FactorKind,
     enumerate_candidates,
 )
 from squadopt.bayesopt.optimizer import (
     ObjectiveEvaluator,
     estimate_observation_noise,
     run_bayesian_optimization,
+)
+from squadopt.contracts.factors import (
+    BayesianFactor,
+    BayesianOptimizationConfigurationError,
+    BayesianOptimizationError,
+    FactorKind,
 )
 
 __all__ = [

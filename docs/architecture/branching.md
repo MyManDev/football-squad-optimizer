@@ -18,17 +18,24 @@ latest successful immutable `site-...` deployment tag, so production may deliber
 
 ## Protection
 
-Both branches are protected. Required checks on `develop` are `gates (py3.11)`,
-`gates (py3.13)` and `web (node 22)`, with strict up-to-date branches. Each Python context
-runs the five Python gates below; the web context protects the application shipped to Pages.
+Both branches are protected, with strict up-to-date branches. The required checks are
+not listed here, because a copy in a document goes stale when the setting moves: this
+section used to name three contexts for `develop` after the fourth had been added. Read
+them from GitHub:
 
-The backend container check becomes required after its workflow lands on `develop` and passes
-there. Do not require a check before the branch's workflow can emit it. Read the protection
-settings to verify that transition; a green optional check is not a protected merge gate.
+```console
+gh api repos/MyManDev/football-squad-optimizer/branches/develop/protection --jq .required_status_checks.contexts
+gh api repos/MyManDev/football-squad-optimizer/branches/main/protection --jq .required_status_checks.contexts
+```
+
+Each Python gate context runs the five Python gates below, the web context protects the
+application shipped to Pages, and the container context builds the backend image. Do not
+require a check before the branch's workflow can emit it, and read the protection settings to
+verify any change; a green optional check is not a protected merge gate.
 
 The required approving review count is zero, matching the team's check-then-squash workflow.
-Force-push and branch deletion are disabled. `main` requires the two Python contexts and
-normal changes reach it through a deliberate release pull request from `develop`.
+Force-push and branch deletion are disabled. Normal changes reach `main` through a
+deliberate release pull request from `develop`.
 
 `main` additionally allows no direct pushes at all: it moves by release merge only.
 
@@ -233,13 +240,30 @@ version and does not compare with one. It stays exactly where it is: the runbook
 a tag is never moved or reused, and quietly re-pointing history to tidy a naming mistake would
 be worse than the mistake. Nothing else will be named this way.
 
-There is also one tag that matches no namespace at all: **`site-2026-27-gw01-ui`**. It looks
-deployable and is not — `ui` is outside the suffix set the Pages workflow accepts, so the
-dispatch was refused by the tag guard and the release was re-cut as
-`site-2026-27-gw01-fix2`. The tag stays, inert, for the same reason `v2026-27.gw01` stays. If
-you find it in the list, it deployed nothing.
+A `site-*` tag whose suffix is outside the set the Pages workflow accepts looks deployable
+and is not: its dispatch is refused by the tag guard and it deployed nothing. Do not rely on
+a list of them here. A read of GitHub's tags on 25 September 2026
+(`git ls-remote --tags origin 'site-*'`) found one, `site-2026-27-gw04-settled-2`, whose
+dispatch was refused on 2026-09-17. `site-2026-27-gw01-ui`, which this paragraph used to
+name, is no longer on GitHub. The same read shows that deployed tags are missing too
+(`site-2026-27-gw05-fix1`, deployed on 2026-09-17, is one), so the tag list is not a
+complete record of what was deployed.
 
-Check the list against the rules rather than trusting this section. Git does this on its own,
+The `Deploy Pages` run history is not one either. A production job there is named after the
+tag the source check resolved, before any of its own steps runs, so the name does not say
+that anything was deployed; the job's steps do. When `Deploy exact production artifact` was
+skipped, nothing was deployed: run 35287375625, job `production site-2026-27-gw05-fix5`,
+stopped at `Stop production at the hard daily cap` on 2026-09-17. When that step succeeded,
+the upload reached Cloudflare even if a later step failed the job: runs 32498508177,
+32560081186 and 32705262157 (the `gw01-decision`, `gw01-fix1` and `gw01-fix2` tags, in
+August) failed at `Verify production deployment identity` after it. The
+[manual fallback](../deployment_runbook.md#exact-artifact-manual-fallback) and a dashboard
+[rollback](../deployment_runbook.md#rollback) leave no run at all. An upload by the workflow
+or by the manual fallback appears in Cloudflare's own deployment list for the project
+(**Workers & Pages → project → Deployments**, where the runbook's rollback starts), and both
+give a production deployment `release:<tag>` as its commit message.
+
+Check the tag list against the rules rather than trusting this section. Git does this on its own,
 so the check runs the same in PowerShell as in a shell:
 
 ```console

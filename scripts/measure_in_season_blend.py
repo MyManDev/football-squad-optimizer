@@ -66,8 +66,8 @@ from squadopt.evaluation import (
     EvaluationResult,
     evaluate_prepared_folds,
 )
-from squadopt.experiments.config import PromotionPolicy
-from squadopt.experiments.statistics import season_aware_moving_block_interval
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.features import CrossSeasonConfig, build_feature_dataset
 from squadopt.features.cross_season import carry_over_as_of
 from squadopt.prediction import FormWindowMapping, build_projection_table

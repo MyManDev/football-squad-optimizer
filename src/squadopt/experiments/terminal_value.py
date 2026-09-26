@@ -25,7 +25,10 @@ from sklearn.gaussian_process.kernels import (  # type: ignore[import-untyped]
     WhiteKernel,
 )
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 
 TERMINAL_VALUE_STUDY_CONTRACT_VERSION: Final = "terminal_value_gp_v1"
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"

@@ -179,7 +179,11 @@ def test_a_separate_worker_process_computes_what_the_api_accepted(
     body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
 
     ready = client.get("/ready")
-    assert ready.status_code == 200, ready.text
+    # No worker has run yet, and readiness says exactly that and nothing else.
+    assert ready.status_code == 503, ready.text
+    assert [name for name, held in ready.json()["checks"].items() if not held] == [
+        "worker_heartbeat"
+    ]
 
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
@@ -196,6 +200,9 @@ def test_a_separate_worker_process_computes_what_the_api_accepted(
         check=False,
     )
     assert finished.returncode == 0, finished.stderr
+    # The worker beat into the shared store, then took its document with it when it stopped.
+    assert config.worker_root.is_dir()
+    assert not list(config.worker_root.glob("worker-*.json"))
 
     view = client.get(f"/api/v1/advice-jobs/{job_id}").json()
     assert view["status"] == "completed", (view, finished.stderr)

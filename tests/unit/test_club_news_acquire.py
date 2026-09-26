@@ -11,7 +11,7 @@ was refused is indistinguishable from a club that only ever registered one.
 import json
 import urllib.error
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +29,7 @@ from squadopt.data.sources.club_news_capture import read_captured_coverage
 from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.platform.club_news_acquire import acquire_week, main
-from squadopt.platform.club_news_fetch import ClubSource
+from squadopt.platform.club_news_fetch import CLUB_NEWS_SOURCES_CONTRACT_VERSION, ClubSource
 from squadopt.platform.club_news_provider import (
     DEFAULT_PROVIDER,
     KEY_ENVIRONMENT_VARIABLE,
@@ -40,6 +40,7 @@ from squadopt.platform.club_news_provider import (
 )
 
 FETCHED_AT = datetime(2026, 9, 12, 14, 0, tzinfo=UTC)
+READ_ON = date(2026, 9, 1)
 CONFIG = CodingProviderConfig(
     provider=DEFAULT_PROVIDER, model_identifier=CODING_MODEL_IDENTIFIER, api_key="k"
 )
@@ -50,9 +51,9 @@ UNITED_INJURIES = "https://club.example/united/injuries"
 ARSENAL = "https://club.example/arsenal/team-news"
 
 SOURCES = (
-    ClubSource(club="Arsenal", url=ARSENAL),
-    ClubSource(club="Man Utd", url=UNITED_PRESS),
-    ClubSource(club="Man Utd", url=UNITED_INJURIES),
+    ClubSource(club="Arsenal", url=ARSENAL, terms_read_on=READ_ON),
+    ClubSource(club="Man Utd", url=UNITED_PRESS, terms_read_on=READ_ON),
+    ClubSource(club="Man Utd", url=UNITED_INJURIES, terms_read_on=READ_ON),
 )
 
 
@@ -194,6 +195,42 @@ def test_partly_covered_never_names_a_club_that_is_not_covered() -> None:
     assert set(week.clubs_partially_covered) <= set(week.clubs_covered)
 
 
+def test_articles_are_coded_with_their_club_and_a_missing_one_narrows_nothing() -> None:
+    """A followed article is a document of the registered page's club, not a registered page.
+
+    So it reaches the club's one call beside the index, and when one cannot be read the club
+    stays fully covered: partial coverage is about the pages the registry declared, and the
+    articles an index links to are a capped sample, never a list the week declared.
+    """
+
+    read = f"{ARSENAL}/saka-fit"
+    lost = f"{ARSENAL}/removed"
+    index = f"<a href='{read}'>Saka fit</a><a href='{lost}'>Removed</a>".encode()
+    base = _opener(missing=frozenset({lost}))
+    coded: list[list[str]] = []
+
+    def _open(request: Any, timeout: float) -> _Reply:
+        if request.full_url == ARSENAL:
+            return _Reply(ARSENAL, index)
+        return base(request, timeout)  # type: ignore[no-any-return]
+
+    class _Recording(_Provider):
+        def code(
+            self, documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]
+        ) -> ClaimResponse:
+            coded.append([document.requested_url for document in documents])
+            return super().code(documents, roster)
+
+    week = _acquire(sources=SOURCES[:1], opener=_open, provider=_Recording())
+
+    assert [document.requested_url for document in week.documents] == [ARSENAL, read]
+    assert coded == [[ARSENAL, read]]
+    assert week.clubs_covered == ("Arsenal",)
+    assert week.clubs_partially_covered == ()
+    assert [club for club, _reason in week.refused_pages] == ["Arsenal"]
+    assert week.refused_pages[0][1].startswith(f"An article linked from {ARSENAL}")
+
+
 # --- the command ------------------------------------------------------------
 
 
@@ -201,12 +238,13 @@ def _registry(path: Path, sources: Sequence[ClubSource]) -> Path:
     path.write_text(
         json.dumps(
             {
-                "contract_version": "club_news_sources_v1",
+                "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
                 "sources": [
                     {
                         "club": source.club,
                         "url": source.url,
                         "terms_record": "docs/club_news_sources.md",
+                        "terms_read_on": READ_ON.isoformat(),
                     }
                     for source in sources
                 ],
@@ -298,3 +336,51 @@ def test_the_command_prints_the_capture_id_the_next_step_needs(
     assert declared == ("Arsenal", "Man Utd")
     assert covered == ("Arsenal", "Man Utd")
     assert partial == ()
+
+
+def test_an_unlisted_model_refuses_the_command_before_any_page_is_fetched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The 9 October failure, caught at startup rather than one club at a time.
+
+    The real free adapter is selected with a model the provider shut down, a key is present,
+    and the opener counts every request. Nothing is fetched, no robots file is read, and the
+    refusal names the model and never the key.
+    """
+
+    requested: list[str] = []
+
+    def _counting(request: Any, timeout: float) -> _Reply:
+        requested.append(request.full_url)
+        return _opener()(request, timeout)  # type: ignore[no-any-return]
+
+    key = "sentinel-key-for-acquire"
+    registry = _registry(tmp_path / "sources.json", SOURCES)
+    snapshots = tmp_path / "snapshots"
+    roster_id = _roster_snapshot(snapshots)
+
+    code = main(
+        [
+            "--roster-snapshot",
+            roster_id,
+            "--registry",
+            str(registry),
+            "--snapshot-root",
+            str(snapshots),
+        ],
+        environ={
+            PROVIDER_ENVIRONMENT_VARIABLE: "gemini",
+            MODEL_ENVIRONMENT_VARIABLE: "gemini-2.0-flash",
+            KEY_ENVIRONMENT_VARIABLE: key,
+        },
+        opener=_counting,
+        now=lambda: FETCHED_AT,
+        sleeper=lambda _: None,
+    )
+
+    printed = capsys.readouterr().out
+    assert code == 1
+    assert printed.startswith("Refused:")
+    assert "'gemini-2.0-flash'" in printed
+    assert key not in printed
+    assert requested == []

@@ -6,6 +6,7 @@ citation and from nothing else; a source without its evidence (or the reverse) i
 """
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,8 @@ from squadopt.application.league_publication import (
     load_publication_manager_words,
 )
 from squadopt.application.manager_words import (
+    SOURCE_CHECK_CITED_DOCUMENTS_HELD,
+    SOURCE_CHECK_NOTHING_CITED,
     SOURCE_SYNTHETIC_FIXTURE,
     WORDS_UNRESOLVED,
     WORDS_WITHHELD_FIGURE,
@@ -369,6 +372,70 @@ def test_a_source_that_does_not_hold_the_cited_documents_is_refused(
             source_kind=kind,
             source_label=label,
         )
+
+
+def test_a_table_with_no_claims_is_reported_as_unchecked_and_logged_not_passed(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """With no claims the manifest cites no document, and every source holds all of none.
+
+    The guard used to return quietly there, so any fixture or any week's capture was accepted
+    as the source of a table it never fed. A quiet week is a real outcome and is still read,
+    but the guard now says it compared nothing, in the value it returns and in the log, and a
+    table that does cite documents reports that they were all held.
+    """
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    quiet = pd.DataFrame(
+        [
+            {
+                **dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA),
+                "season": "2026-27",
+                "target_gameweek": 6,
+                "player_id": 7,
+                "rotation_disposition": "not_addressed",
+            }
+        ],
+        columns=list(ROTATION_EVIDENCE_COLUMNS),
+    )
+    quiet.attrs["clubs_covered"] = ("Arsenal",)
+    quiet.attrs["document_sha256s"] = ()
+    quiet.attrs["claims_coded"] = 0
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: quiet)
+
+    with caplog.at_level(logging.WARNING, logger=module.__name__):
+        words = manager_words_from_artifact(
+            Path("rotation_evidence_quiet.csv"),
+            Path("rotation_evidence_quiet.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+    assert words.source_check == SOURCE_CHECK_NOTHING_CITED
+    assert words.exclusion() is None
+    (record,) = [r for r in caplog.records if r.name == module.__name__]
+    assert record.levelno == logging.WARNING
+    logged = record.getMessage()
+    assert "rotation_evidence_quiet.csv cites no document (claims coded: 0)" in logged
+    assert label in logged
+    assert SOURCE_CHECK_NOTHING_CITED in logged
+
+    caplog.clear()
+    cited = _cited_table(documents, b"Havertz will not travel.", "stated_expected_absent")
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: cited)
+
+    with caplog.at_level(logging.WARNING, logger=module.__name__):
+        checked = manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+    assert checked.source_check == SOURCE_CHECK_CITED_DOCUMENTS_HELD
+    assert [r for r in caplog.records if r.name == module.__name__] == []
 
 
 @pytest.mark.parametrize(

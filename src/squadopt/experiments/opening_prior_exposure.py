@@ -71,7 +71,10 @@ from squadopt.backtest.splits import (
     walk_forward_decision_points,
 )
 from squadopt.data.sources.vaastav import build_panel
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.features import CrossSeasonConfig, build_feature_dataset
 from squadopt.features.cross_season import carry_over_as_of
 from squadopt.prediction import FormWindowMapping, build_projection_table

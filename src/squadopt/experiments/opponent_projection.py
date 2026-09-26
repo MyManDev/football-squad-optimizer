@@ -43,7 +43,10 @@ import numpy as np
 import pandas as pd
 
 from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.control_residuals import build_control_residual_table
 from squadopt.experiments.policy_objective import PolicyObjectiveConfig
 from squadopt.experiments.team_rating import (

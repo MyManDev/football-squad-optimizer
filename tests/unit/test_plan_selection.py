@@ -11,7 +11,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.live.plan_selection import (
     MODES,
     CandidatePlan,
