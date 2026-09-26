@@ -135,11 +135,23 @@ There are two normal publications per gameweek from GW2 onward:
 2. **Settled:** after outcomes are settled, regenerate the public data and season summary,
    merge to `main`, tag it `...-settled`, dispatch, and require green smoke.
 
-For the GW5 scratch candidate produced by `python -m scripts.build_settled_site`, run
-`python -m scripts.check_league_tree <candidate>/data` and report its result, the complete
-changed-file list and the independent scoreboard cells before/after in #632 before a site-data
-PR. This checker does not replace verification of rebuilt season documents against the frozen
-schemas or of the frozen root index against the candidate's file list. The producer preserves
+`python -m scripts.build_settled_site` produces the GW5 scratch candidate, and it checks the
+candidate before writing it. A finding in any check refuses the whole candidate, names the
+finding, and leaves nothing on disk:
+
+- every rebuilt season document and `data/fixtures.json` against the schema the accepted tree
+  froze for its `contract_version` (`data/schema/`);
+- the frozen root index against the candidate: every file it names exists, every gameweek view
+  is named, and its weeks and latest view are the ones the candidate's season ledger holds;
+- `data/fixtures.json` against the outcome capture it must come from;
+- the league tree release check (`scripts.check_league_tree`) on the candidate's `data`. It
+  also runs on the accepted tree, and a finding the accepted tree already has is counted and
+  printed rather than refused: it sits in advice members read before the deadline, which this
+  publish cannot change.
+
+The command prints each check it passed. Report that output, the complete changed-file list and
+the independent scoreboard cells before/after in #632 before a site-data PR: that report asks
+for an approval, which no command can give. The producer preserves
 accepted member advice bytes and never re-solves them. If an accepted advice document was
 changed after its immutable record was written, even to add a payload reporting field, its hash
 can differ and publication refuses with "Recorded comparison does not match accepted advice".
@@ -148,7 +160,12 @@ That refusal is the evidence guard working, not a silent overwrite or a producer
 Stop and reconcile which accepted bytes and records belong together; do not bypass the guard.
 The GW5 outcome refresh also updates `data/fixtures.json` from the same completed capture;
 accepted advice and entry files remain byte-identical. Generate the complete contribution
-roster with `scripts.build_player_catalog` from that capture before the site-data PR.
+roster with `scripts.build_player_catalog` from that capture before the site-data PR. That one
+stays a step: it writes `data/players.json` into the site-data tree after the candidate exists,
+and adding that path to the publisher's approved list is a boundary change for the owner to
+approve. The page's own validators (`shippedTree.test.ts`) need no run by hand here either: the
+site PR's CI runs them on the committed tree, and the deploy workflow refuses a tag without a
+successful `main` push CI, which runs them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
@@ -174,7 +191,8 @@ deadline for those five and keep the capture lead time from `docs/weekly_runbook
 **The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
 settled only when the source says both `finished` and `data_checked`
 (`application/scoreboard.py`), so a Tuesday that arrives before the check publishes "not settled
-yet" rather than a wrong number. Confirm the week is checked before spending a run:
+yet" rather than a wrong number. The settled publisher refuses an outcome capture in which the
+week is not both. Confirm the week is checked before taking that capture or settling from it:
 
 ```bash
 curl -s https://fantasy.premierleague.com/api/bootstrap-static/ \
