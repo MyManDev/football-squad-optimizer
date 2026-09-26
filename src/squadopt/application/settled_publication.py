@@ -43,6 +43,7 @@ from squadopt.application.weekly_suggestion_eval import (
     publish_suggestion_histories,
     review_member_weeks,
 )
+from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -623,5 +624,5 @@ def publish_settled(
         checks = _check_candidate(candidate / "data", request, league_tree_check)
         if _files(request.accepted_dir) != accepted:
             raise DataError("The accepted tree changed during generation; no candidate published.")
-        candidate.rename(request.out_dir)
+        replace_retrying(candidate, request.out_dir)
     return SettledPublicationResult(request.out_dir, stamp, changed, checks)

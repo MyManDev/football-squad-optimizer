@@ -645,9 +645,14 @@
     gap: var(--space-2);
   }
 
+  /* The two armbands still spread to either end; the gap is only the least room between
+     them. At 32 px the real GW6 pair of Semenyo MCI 4,79 xP and Magalhães (310 px of
+     armbands) wrapped on a 360 px phone, whose line is 328 px wide. 12 px keeps it on one
+     line and stays wider than the 8 px inside an armband, so the two still read as two. */
   .captain {
     order: 1;
     min-height: 36px;
+    column-gap: var(--space-3);
   }
 
   .gainHead {

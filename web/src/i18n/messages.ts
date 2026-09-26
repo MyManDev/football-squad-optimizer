@@ -702,9 +702,11 @@ const en = {
         "Prices are held at the captured values; no price change is modelled.",
       "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
         "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.":
+        "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.",
     } as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
-      `The pure-points plan this price is measured against was not proven optimal: its planner objective (the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, which is not a points total) is within ${gap} of the best value the search could prove. The price is therefore published as a ceiling, the most this strategy can cost, and not as an exact figure.`,
+      `The pure-points plan a price would be measured against was not proven optimal: its planner objective (the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, which is not a points total) is within ${gap} of the best value the search could prove. That distance is on the objective, not on points, so it bounds no price and no price is stated.`,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
@@ -746,7 +748,7 @@ const en = {
     unprovenPlanGapUnknown:
       "The proof for this plan is incomplete. The bound on the planner's objective was not published.",
     controlGapUnknown:
-      "The pure-points control was not proven optimal and the bound on its planner objective was not published. Any stated price ceiling remains an upper bound.",
+      "The pure-points control was not proven optimal and the bound on its planner objective was not published, so no price is stated.",
     planWithinFreeUnknown: (cap: number, target: number) =>
       `The plan used a free-transfer limit of ${cap} and requested an overlap bound of ${target} players. The applied overlap bound was not published.`,
     hitPointsNotPublished: "an unpublished number of",
@@ -1821,9 +1823,11 @@ const tr: MessageSchema<typeof en> = {
         "Fiyatlar veri kesitindeki değerlerde tutulur; fiyat değişimi modellenmez.",
       "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
         "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.":
+        "Mevcut model, savunma katkısı (DEFCON) puanı verilmeyen sezonlarla eğitildi; bu yüzden bu puanları tahmin etmez.",
     },
     controlUnprovenBody: (gap: string) =>
-      `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı: planlayıcı amaç değeri (ilk on bir kaptan iki kat, artı yedeklerin onda biri, eksi transfer cezaları; bir puan toplamı değil) aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
+      `Bir fiyatın ölçüleceği saf puan planı en iyi diye kanıtlanamadı: planlayıcı amaç değeri (ilk on bir kaptan iki kat, artı yedeklerin onda biri, eksi transfer cezaları; bir puan toplamı değil) aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu uzaklık puan üzerinde değil amaç değeri üzerinde; bir fiyatı sınırlamaz, bu yüzden fiyat belirtilmiyor.`,
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
@@ -1864,7 +1868,7 @@ const tr: MessageSchema<typeof en> = {
     unprovenPlanGapUnknown:
       "Bu planın en iyi olduğu kanıtlanamadı. Planlayıcı amaç değeri için sınır yayımlanmamış.",
     controlGapUnknown:
-      "Saf puan planının en iyi olduğu kanıtlanamadı ve planlayıcı amaç değeri için sınır yayımlanmamış. Belirtilen maliyet tavanı bir üst sınırdır.",
+      "Saf puan planının en iyi olduğu kanıtlanamadı ve planlayıcı amaç değeri için sınır yayımlanmamış; bu yüzden fiyat belirtilmiyor.",
     planWithinFreeUnknown: (cap: number, target: number) =>
       `Planın serbest transfer sınırı ${cap}, ortak oyuncu sayısı için istenen sınır ${target}. Uygulanan ortak oyuncu sınırı yayımlanmamış.`,
     hitPointsNotPublished: "yayımlanmayan sayıda",

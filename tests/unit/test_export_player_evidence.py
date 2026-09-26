@@ -7,14 +7,17 @@ for Phase C, not how the writer arrives at it.
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
 import tests.unit.test_player_evidence as evidence_tests
 from scripts import export_player_evidence as export
 
+from squadopt.application.evidence_io import write_json
 from squadopt.data.errors import DataError, DataValidationError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.features.evidence import CONTRACT_VERSION, EVIDENCE_COLUMNS
@@ -209,6 +212,72 @@ def test_an_existing_different_artifact_is_never_overwritten(tmp_path: Path) -> 
     assert again.manifest["generated_at_utc"] == WHEN
     assert first.table_path.read_bytes() == original
     assert not list(tmp_path.glob(".*.tmp-*")), "no temporary file survives"
+
+
+def _absent(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    """Every existence check of ``name`` answers no, as it did for the loser of a race."""
+
+    real = Path.exists
+
+    def exists(self: Path, *args: Any, **kwargs: Any) -> bool:
+        return False if self.name == name else real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "exists", exists)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "refusal"),
+    [("csv", "never overwritten"), ("manifest.json", "describes a different artifact")],
+)
+def test_a_file_that_lands_after_the_check_is_kept_byte_for_byte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str, refusal: str
+) -> None:
+    """Two exports racing for one name: the second never replaces the first one's file.
+
+    A writer that looks for the file and then renames over it destroys a file that landed
+    between the two steps. Here every look answers "absent", as it did for that writer.
+    """
+
+    table = evidence_tests._build()
+    occupant = tmp_path / f"evidence.{suffix}"
+    if suffix == "csv":
+        occupant.write_bytes(b"another table\n")
+    else:
+        manifest = _read_manifest(_export(table, tmp_path).manifest_path)
+        occupant.write_text(json.dumps({**manifest, "row_count": 1}), encoding="utf-8")
+    kept = occupant.read_bytes()
+    _absent(monkeypatch, occupant.name)
+
+    with pytest.raises(DataError, match=refusal):
+        _export(table, tmp_path)
+
+    assert occupant.read_bytes() == kept
+    assert not list(tmp_path.glob(".*.tmp-*")), "no temporary file survives"
+
+
+def test_a_manifest_left_with_crlf_line_ends_is_a_replay(tmp_path: Path) -> None:
+    """On Windows the old writer went through text mode, so a manifest already on disk may
+    end its lines with CRLF. The same export again keeps that file and returns it."""
+
+    table = evidence_tests._build()
+    first = _export(table, tmp_path)
+    crlf = first.manifest_path.read_bytes().replace(b"\n", b"\r\n")
+    first.manifest_path.write_bytes(crlf)
+
+    again = _export(table, tmp_path, generated_at_utc="2026-09-02T13:00:00Z")
+
+    assert first.manifest_path.read_bytes() == crlf
+    assert again.manifest == first.manifest
+    assert again.manifest["generated_at_utc"] == WHEN
+
+
+def test_the_manifest_bytes_are_the_ones_the_old_writer_serialized(tmp_path: Path) -> None:
+    result = _export(evidence_tests._build(), tmp_path)
+    old = tmp_path / "old.json"
+    write_json(old, result.manifest)
+
+    # The same serialization; the old writer's text mode wrote the platform's line end.
+    assert result.manifest_path.read_bytes() == old.read_bytes().replace(os.linesep.encode(), b"\n")
 
 
 def _cli_arguments(tmp_path: Path) -> list[str]:
