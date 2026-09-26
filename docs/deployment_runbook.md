@@ -310,10 +310,11 @@ main checkout on `develop`. **First check the backend is answering**, with a sin
 reads the launcher registry and the loopback metrics before its own error handling begins, so
 against a backend that is not running it stops on a raw exception and prints none of its
 recovery guidance. It can only replace a running backend, never start one. If it is down,
-pull develop by hand and start the backend with `run_backend_local.ps1` instead, then carry
-on. The processes belong to the logon session and nothing restarts them, so a logoff or a
-reboot between the publish and this step leaves nothing to restart. Replace `<same-ISO>` with the accepted candidate timestamp
-used for `ship.sh`. First preview the restart:
+start it by hand from the released code, as [a stopped backend](#a-stopped-backend-starts-from-the-release)
+below describes, then carry on. The processes belong to the logon session and nothing restarts
+them, so a logoff or a reboot between the publish and this step leaves nothing to restart.
+Replace `<same-ISO>` with the accepted candidate timestamp used for `ship.sh`. First preview
+the restart:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO> -DryRun
@@ -325,7 +326,21 @@ Only for the intended restart, run the same command without `-DryRun`:
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO>
 ```
 
-The script verifies the public site, requires the public capture to match the fetched
+The script first names the live release: the newest `site-*` tag whose production deploy
+succeeded, read with GitHub CLI from the `production <tag>` job of the newest successful
+`deploy-pages.yml` dispatch, or the tag given with `-ReleaseTag <tag>`, which needs no GitHub
+CLI. It fetches that tag and refuses when the fetched `origin/develop` differs from the tag's
+commit in `src`, `scripts` or `docs/contracts`, and lists the files; after the pull it checks
+the pulled HEAD the same way, before stopping anything. Those paths are the code the backend
+imports, the launcher that starts it and the contracts it answers in, so a develop that has
+moved past the release there would run code no release reviewed. Changes anywhere else, such
+as `web/`, do not refuse. The main checkout stays on `develop`, so the answer to that refusal
+is to wait for the next release and restart after it, or to pass `-Force`, which runs
+develop's code anyway and prints `FORCED`. `-Force` is one switch: it also permits open work.
+This check needs no running backend and comes before the registry is read, so the dry run
+prints the release and its verdict even when the backend is down.
+
+The script then verifies the public site, requires the public capture to match the fetched
 `origin/develop` publication, refuses open work unless `-Force`, and pulls with
 `--ff-only` before stopping the recorded backend.
 It keeps the recorded port and worker count, requires `/ready` and its published-week
@@ -335,9 +350,9 @@ process is stopped. It imports both backend entry points from the pulled source 
 stopping. The launcher resolves its commit independently of any inherited override.
 It does not claim an API-reported commit and never touches the tunnel. Dry-run performs
 the read-only checks and prints inputs and `-Stop -WhatIf` targets without pulling or
-changing processes. It does run `git fetch origin develop` to check the current
-candidate publication and prints that remote-tracking state was updated; the working
-tree and backend files stay unchanged. Real execution fetches as well. The helper requires
+changing processes. It does run `git fetch origin develop` and fetch the release tag, to
+check the current candidate publication and code, and prints that only Git refs were
+updated; the working tree and backend files stay unchanged. Real execution fetches as well. The helper requires
 the launcher's creation-time-checked process walk and `-Stop -WhatIf` support. A failed
 start or readiness check exits nonzero with a backend up/down state, the exact start
 command retaining the recorded port and worker count, the log directory and the last
@@ -364,6 +379,112 @@ permits a restart; `-Force` is an explicit operator exception, not the normal co
 `/ready` alone does not prove capture-ID or code-commit equality: its published-tree
 check is season/gameweek. `ship.sh` publishes the site only and does not restart the
 backend or tunnel.
+
+### A stopped backend starts from the release
+
+The restart helper cannot start a stopped backend, and develop may carry code no release has
+reviewed. Take the tag of the live release: the one `ship.sh` or `deploy.sh` printed, or the
+`Release <tag>` line the restart dry run prints before it stops on the missing backend. Then
+compare develop with it from the clean main checkout:
+
+```powershell
+git fetch origin develop "refs/tags/<tag>:refs/tags/<tag>"
+git diff --stat <tag> origin/develop -- src scripts docs/contracts web/public/data
+```
+
+Those paths are the code the backend imports, the launcher that starts it, the contracts it
+answers in and the published tree it reads. If the diff prints nothing, start from develop. If
+it lists files, do not start from develop: start from a release worktree instead.
+
+#### Starting from develop
+
+Move the main checkout to exactly the develop the diff compared, then compare the files on disk
+with the tag. `git pull` is not used here: it fetches again and can bring a newer develop than
+the one compared. This diff must print nothing too. It can list files only when the checkout
+holds changes of its own, and then the release worktree is the way.
+
+```powershell
+git merge --ff-only origin/develop
+git diff --stat <tag> -- src scripts docs/contracts web/public/data
+```
+
+Then start the backend:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Workers <n>
+```
+
+As it starts, the launcher prints a `code` line naming the source it runs and that source's
+commit, and records that commit. Here it must name the main checkout's `src`. The commit is
+develop's, not the tag's, because the tag sits on main's release merge, whose tree is
+develop's. Put the commit from the `code` line in place of `<commit>` below; the diff must
+print nothing. Then check that the `/ready` line reads `HTTP 200`:
+
+```powershell
+git diff --stat <tag> <commit> -- src scripts docs/contracts web/public/data
+```
+
+#### Starting from a release worktree
+
+Start the release's own launcher on the release's code and published tree, from a worktree
+outside the main checkout, and keep the main checkout's store, captures and handoffs:
+
+```powershell
+git worktree add <release-worktree> <tag>
+powershell -ExecutionPolicy Bypass -File <release-worktree>\scripts\run_backend_local.ps1 -RepoRoot <main-checkout> -SourceRoot <release-worktree>\src -SiteDataRoot <release-worktree>\web\public\data -Workers <n>
+```
+
+Its `code` line must name `<release-worktree>\src` at the tag's own commit, the one
+`git rev-parse "<tag>^{commit}"` prints.
+
+#### Back to the main checkout after the next release
+
+The restart helper refuses a backend started from a release worktree, because its recorded
+source root is not the main checkout's `src`, and nothing in a release moves the main checkout:
+`ship.sh` builds each release in a worktree of its own. The main checkout still holds the
+develop it had when the backend went down, so starting the backend there as it stands would
+run that old code on that old published tree, not the next release's. After the next release,
+with the backend queue drained (`run_backend_local.ps1 -Status` shows it), take the new
+release's tag as `<tag>` and compare again from the main checkout:
+
+```powershell
+git fetch origin develop "refs/tags/<tag>:refs/tags/<tag>"
+git diff --stat <tag> origin/develop -- src scripts docs/contracts web/public/data
+```
+
+If it lists files, develop has moved past this release as well: stop the backend with the
+`-Stop` command below, start it from a new worktree of the new tag as above, and then remove the
+old worktree. If it prints nothing, move the main checkout and compare again, as when starting
+from develop. Nothing has been stopped yet, so if the merge refuses or this diff lists files,
+the backend is still running and a new worktree of the new tag is the way:
+
+```powershell
+git merge --ff-only origin/develop
+git diff --stat <tag> -- src scripts docs/contracts web/public/data
+```
+
+Only when the merge succeeded and that diff printed nothing, stop the worktree's backend and
+start it from the main checkout. `-Stop` run from the main checkout finds the worktree's
+processes, because the worktree start used the main checkout's store:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop
+powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Workers <n>
+```
+
+Check the start as when starting from develop: the `code` line names the main checkout's `src`,
+the `/ready` line reads `HTTP 200`, and this diff, with the `code` line's commit in place of
+`<commit>`, prints nothing:
+
+```powershell
+git diff --stat <tag> <commit> -- src scripts docs/contracts web/public/data
+```
+
+Then remove the worktree, which nothing runs from any more:
+
+```powershell
+git worktree remove <release-worktree>
+```
 
 ## Daily circuit breaker
 
