@@ -285,7 +285,8 @@ mechanical force:
   that nothing blocks the button, **not** that anyone approved it.
 - `required_pull_request_reviews.require_code_owner_reviews` — if this is `false`,
   `.github/CODEOWNERS` neither requests nor requires a review, so the shared-boundary rule
-  (one approval from each of the other two roles) is convention rather than a gate.
+  (an approval from each owner who did not write the change; from each of the other two roles
+  until 2026-09-25) is convention rather than a gate.
 
 While both hold, treat a shared-boundary merge as needing sign-off you have to go and ask for,
 and record it in the pull request so the agreement leaves a trace the settings do not.
