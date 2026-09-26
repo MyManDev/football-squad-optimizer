@@ -245,6 +245,7 @@ orchestration (that document's "Deliberately absent from v1" keeps the list).
 | `platform/advice_cache.py` | Immutable-key advice cache behind a protocol |
 | `platform/advice_worker.py`, `worker_metrics.py` | The worker process loop and its own Prometheus listener |
 | `platform/store_probe.py` | Proves the shared mount provides what the adapters were built on |
+| `platform/worker_heartbeat.py` | Each worker's heartbeat under the store, and the readiness checks that a worker is alive and the queue moves |
 | `deploy/compose.yaml` | Runs `uvicorn --factory squadopt.api.runtime:build_app` and `python -m squadopt.platform.advice_worker` as separate processes over one store |
 
 The order that governed the installed adapters still governs the missing ones:

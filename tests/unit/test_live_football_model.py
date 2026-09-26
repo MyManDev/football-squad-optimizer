@@ -10,10 +10,10 @@ from tests.fixtures.backend_app import app_for_capture
 from tests.unit.test_advice_worker import ENTRY_ID, LEAGUE_ID, _deployment, world_module
 from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_football_development import football_fixture  # noqa: F401
-from tests.unit.test_member_windows import _web_literal
 
 from squadopt.application.football_live import causal_training
 from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
+from squadopt.data.errors import InvalidValueError
 from squadopt.data.sources.football_history import normalize_history
 from squadopt.live.football_artifact import (
     ARTIFACT_CONTRACT,
@@ -41,9 +41,9 @@ def test_live_training_does_not_use_same_week_or_later_labels(football_fixture):
         before.loc[before.GW.le(10), list(BASE_FEATURES)],
         after.loc[after.GW.le(10), list(BASE_FEATURES)],
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidValueError):
         normalize_history(history.assign(expected_goals=float("inf")))
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidValueError):
         normalize_history(history.assign(expected_assists=-1))
 
 
@@ -137,6 +137,9 @@ def test_the_site_holds_the_share_limit_verbatim_and_it_passes_the_honesty_guard
 
     The sentence states a mechanism and no number: no committed measurement sizes the loss.
     """
+
+    # Imported here: test_member_windows imports this module at its top.
+    from tests.unit.test_member_windows import _web_literal
 
     assert _web_literal("FOOTBALL_SHARE_STATED_LIMIT") == SHARES_BEFORE_AVAILABILITY_LIMIT
     assert not FORBIDDEN_TEXT_PATTERN.search(SHARES_BEFORE_AVAILABILITY_LIMIT)

@@ -157,9 +157,11 @@ Three things to know before relying on it:
   once for the API and all workers; updating files under running processes does not update
   that identity. Publish from the intended release, drain open jobs, then have the owner
   run `powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop`,
-  then the start command from section 1 on that code revision. A release restart command
-  (#663) will replace this manual sequence when it lands. Verify `/ready` and the public health
-  endpoint before relying on compute. New requests address the new revision's cache;
+  then the start command from section 1 on that code revision, or run the release restart
+  helper that #663 added, `scripts/release/restart_backend.ps1`, whose steps and preconditions
+  are in the [deployment runbook](deployment_runbook.md). It replaces a running backend and
+  cannot start a stopped one. Verify `/ready` and the public health endpoint before relying
+  on compute. New requests address the new revision's cache;
   old entries remain on disk. A capture-only update is detected without restarting, but
   that does not make an old process a new-code deployment. See the
   [publishing recipe](../scripts/release/ship.sh), which publishes the site and does not
@@ -173,7 +175,8 @@ Then prove it locally:
 
 ### What `/ready` needs on this machine
 
-Four checks distinguish an alive process from a backend able to serve the published week.
+Six checks distinguish an alive process from a backend able to serve the published week
+and compute what it accepts.
 The API and workers use the same capture-selection code. They prefer the capture named
 consistently by the published human entry documents when it has a readable matching
 handoff. That handoff can be the gameweek file or an unambiguous retained projection under
@@ -186,6 +189,8 @@ newest live capture and log the reason. See [capture selection](backend_runbook.
 | `league_tree` | `web\public\data\league\members.json` is readable | `advice_read.py`, `FileLeagueDirectory.readable` |
 | `cache_store` | the store root exists and passes the probe | `store_probe.py` |
 | `league_tree_matches_capture` | the published tree's season and gameweek agree with the selected context | `advice_read.py`, `FileLeagueDirectory.matches` |
+| `worker_heartbeat` | some worker rewrote `workers\worker-<pid>.json` under the store in the last 120 s | `worker_heartbeat.py`, `WorkerLiveness.checks` |
+| `queue_wait` | no job has waited in the queue for more than 300 s | `worker_heartbeat.py`, `WorkerLiveness.checks` |
 
 `league_tree_matches_capture` compares season and gameweek, not capture IDs. Republishing
 the same gameweek from a newer capture can leave this check true.
@@ -548,7 +553,7 @@ implementations drifting.
 
 ## Recommendation
 
-The `Backend uptime` workflow asks for public `/health` on a `*/15` schedule, with a 10-second timeout and one retry after 20 seconds. **It does not run every fifteen minutes, and the gap is not small.** Measured over the workflow's whole life to 2026-09-24, 111.1 hours from its first run, 31 scheduled runs landed where `*/15` asks for 444: a rate of 7%. No interval came close to fifteen minutes. The shortest was 1 hour 55 minutes, the median 3 hours 33, and the longest 6 hours 52; 30 of the 30 intervals exceeded an hour and 18 of them exceeded three. GitHub deprioritises high-frequency `schedule` triggers on shared runners and drops what it cannot place, so the real time to detection is hours, and so is the time to notice a recovery. A failed check opens one `backend-down` issue; continuing failure is silent, and recovery comments on and closes that issue. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time and status, never a URL or response body. Scheduled Actions can be delayed and are not an exact uptime guarantee, which the numbers above put a size on rather than leaving as a caveat. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
+The `Backend uptime` workflow asks for public `/health` and `/ready` on a `*/15` schedule, each with a 10-second timeout, and repeats both once after 20 seconds. **It does not run every fifteen minutes, and the gap is not small.** Measured over the workflow's whole life to 2026-09-24, 111.1 hours from its first run, 31 scheduled runs landed where `*/15` asks for 444: a rate of 7%. No interval came close to fifteen minutes. The shortest was 1 hour 55 minutes, the median 3 hours 33, and the longest 6 hours 52; 30 of the 30 intervals exceeded an hour and 18 of them exceeded three. GitHub deprioritises high-frequency `schedule` triggers on shared runners and drops what it cannot place, so the real time to detection is hours, and so is the time to notice a recovery. A failed check (`/health` not 200, or `/ready` not 200 with `ready: true`) opens one `backend-down` issue naming which probe failed and which readiness checks were false; a continuing failure comments on that issue only when what failed changes, and recovery comments on and closes it. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time, status and the names of the false readiness checks, never a URL or a response body. Scheduled Actions can be delayed and are not an exact uptime guarantee, which the numbers above put a size on rather than leaving as a caveat. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
 
 **Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
 coordinate publication with the backend code revision. The existing tunnel hostname is

@@ -5,6 +5,11 @@ on:
     branches: [develop, main]
   push:
     branches: [develop, main]
+  # The merge queue on develop tests each group of pull requests as it would land, so the
+  # required checks must also run for merge_group events. Deploy Pages ignores these runs:
+  # it previews only pull_request runs and ships only pushes to main.
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 # One run per pull-request head (a newer push cancels the older run), but every push to
