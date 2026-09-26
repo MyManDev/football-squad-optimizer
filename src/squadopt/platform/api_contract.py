@@ -52,6 +52,20 @@ class BackendApiContractError(ValueError):
     """A value cannot be represented by ``backend_api_v1``."""
 
 
+def _member_menu() -> tuple[tuple[int, ...], tuple[str, ...]]:
+    """The windows and the prediction models ``league.advise`` accepts: the application's.
+
+    Imported when asked, not with this module: ``squadopt.platform`` imports this module on
+    every platform import, and the application package loads the solver, so a top-level
+    import would load it for all of them (measured 2026-09-26: ``import squadopt.platform``
+    went from 12 squadopt modules to 126, with ortools and sklearn).
+    """
+
+    from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
+
+    return MEMBER_WINDOWS, PREDICTION_MODELS
+
+
 def _require_pattern(value: object, *, label: str, pattern: re.Pattern[str]) -> str:
     if not isinstance(value, str) or not pattern.fullmatch(value):
         raise BackendApiContractError(f"{label} has an invalid format: {value!r}.")
@@ -166,6 +180,7 @@ class ApiCommandRequest:
     contract_version: str = BACKEND_API_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
+        windows, models = _member_menu()
         if not isinstance(self.preferences, DecisionPreferences):
             raise BackendApiContractError("Invalid preferences.")
         if self.preferences.active and self.operation != "league.advise":
@@ -235,7 +250,7 @@ class ApiCommandRequest:
             _optional_pattern(self.strategy, label="strategy", pattern=_NAME_PATTERN),
         )
         if self.window is not None and (
-            isinstance(self.window, bool) or self.window not in {1, 3, 5}
+            isinstance(self.window, bool) or self.window not in windows
         ):
             raise BackendApiContractError("window must be 1, 3, or 5.")
         object.__setattr__(
@@ -257,7 +272,7 @@ class ApiCommandRequest:
             )
         if not isinstance(self.managers_word, bool):
             raise BackendApiContractError("managers_word must be boolean.")
-        if self.model not in ("current", "football"):
+        if self.model not in models:
             raise BackendApiContractError("Unknown prediction model.")
         if self.operation != "league.advise" and self.model != "current":
             raise BackendApiContractError("Model selection is only supported for league.advise.")
@@ -705,6 +720,7 @@ def _object(properties: dict[str, Any], *, required: list[str] | None = None) ->
 def backend_api_schema() -> dict[str, Any]:
     """Return the strict JSON Schema for ``backend_api_v1`` wire documents."""
 
+    windows, models = _member_menu()
     identifier = {"type": "string", "pattern": _IDENTIFIER_PATTERN.pattern}
     nullable_identifier = _nullable(identifier)
     season = {"type": "string", "pattern": _SEASON_PATTERN.pattern}
@@ -751,7 +767,7 @@ def backend_api_schema() -> dict[str, Any]:
     # switches existed is still exactly one valid document.
     advise_switches = {
         "preferences": preferences_schema(),
-        "model": {"enum": ["current", "football"]},
+        "model": {"enum": list(models)},
         "top100_weight": {"type": "integer", "enum": list(ADVISE_TOP100_WEIGHTS)},
         "managers_word": {"type": "boolean"},
         "chip": {"enum": [None, *ADVISE_CHIPS]},
@@ -767,7 +783,7 @@ def backend_api_schema() -> dict[str, Any]:
             "league_id": {"type": "integer", "minimum": 1},
             "entry_id": {"type": "integer", "minimum": 1},
             "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
-            "window": {"type": "integer", "enum": [1, 3, 5]},
+            "window": {"type": "integer", "enum": list(windows)},
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
             "capture_snapshot_id": identifier,
             **advise_switches,
@@ -804,7 +820,7 @@ def backend_api_schema() -> dict[str, Any]:
     advise_body = _object(
         {
             "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
-            "window": {"type": "integer", "enum": [1, 3, 5]},
+            "window": {"type": "integer", "enum": list(windows)},
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
             **advise_switches,
         },

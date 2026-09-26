@@ -44,8 +44,8 @@ from squadopt.application.advice_capabilities import (
 )
 from squadopt.application.advice_menu import held_member_chips, held_member_squad
 from squadopt.application.capture_entries import CapturePicksProvider
-from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data.errors import SourceRevisionError
 from squadopt.data.source_revision import require_source_revision
 from squadopt.data.sources import FPL_LIVE_SOURCE

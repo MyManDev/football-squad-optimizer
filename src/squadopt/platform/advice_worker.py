@@ -47,7 +47,7 @@ from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
 
-from squadopt.application.advice_capabilities import menu_capabilities
+from squadopt.application.advice_capabilities import PREDICTION_MODELS, menu_capabilities
 from squadopt.application.advice_menu import (
     PLAN_NOT_FOUND_ERRORS,
     ChipUnavailable,
@@ -55,7 +55,7 @@ from squadopt.application.advice_menu import (
     MenuRequest,
     advise_menu_entry,
 )
-from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
@@ -159,7 +159,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     except (ValueError, TypeError) as error:
         raise AdviceComputeRefused("REQUEST_UNREADABLE", "Invalid preferences.") from error
     model = spec.switch(MODEL_SWITCH).get("name", "current")
-    if model not in ("current", "football"):
+    if model not in PREDICTION_MODELS:
         raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unknown prediction model.")
     top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
     weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
