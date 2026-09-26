@@ -257,9 +257,9 @@ class WorkerLiveness:
         ``stale_after_seconds`` old. A heartbeat directory that cannot be listed does not
         hold. ``queue_wait`` holds when no queued job has waited longer than
         ``queued_limit_seconds``. A queue that cannot be read (its lock stayed busy for the
-        whole bounded wait, or a file in it could not be read) does not hold. In both cases
-        a check that could not be made has not passed, and ``/ready`` answers 503 naming it
-        rather than failing.
+        whole bounded wait, or a file operation in its scan failed) does not hold. In both
+        cases a check that could not be made has not passed, and ``/ready`` answers 503
+        naming it rather than failing.
 
         A damaged queue record does not make ``queue_wait`` false. The queue's scan keeps a
         copy of its bytes under the queue's ``integrity`` directory (logging it the first
@@ -279,10 +279,10 @@ class WorkerLiveness:
             try:
                 wait = oldest_queued_wait(self._queue.jobs(), now=now)
             except (OSError, ValueError):
-                # A lock that stayed busy (QueueLockTimeout is an OSError) or a queue file
-                # that could not be read. A damaged record does not land here: the scan sets
-                # it aside under the queue's integrity directory and does not count it.
-                # ValueError is the queue contract's own error type (AdviceQueueError).
+                # A lock that stayed busy (QueueLockTimeout is an OSError) or a file
+                # operation in the scan that failed. A damaged record does not land here:
+                # the scan sets it aside under the queue's integrity directory and does not
+                # count it. ValueError is the queue contract's own error (AdviceQueueError).
                 queue_moving = False
             else:
                 queue_moving = wait is None or wait <= self._queued_limit

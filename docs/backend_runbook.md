@@ -175,7 +175,7 @@ publicly beside `/health`:
 | `league_tree_matches_capture` | `members.json` is for another season or gameweek than the one the current capture targets (or names no gameweek, or there is no context to compare with) |
 | `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
 | `worker_heartbeat` | no advice worker has rewritten its heartbeat under `workers/` in the store for 120 s (60 idle waits of 2 s), or `workers/` could not be listed |
-| `queue_wait` | a job has waited in the queue for more than 300 s (one claim lease) since it last entered it, or the queue could not be read (its lock stayed busy, or a file in it could not be read). A damaged job record does not count: the queue's scan keeps a copy under `jobs/integrity/` and skips it |
+| `queue_wait` | a job has waited in the queue for more than 300 s (one claim lease) since it last entered it, or the queue could not be read (its lock stayed busy, or a file operation in its scan failed). A damaged job record does not count: the queue's scan keeps a copy under `jobs/integrity/` and skips it |
 
 An unready backend answers advice routes with a coded 503 when one of the first four checks is
 false. It does not present an empty cache as a computed absence. The last two do not gate the
