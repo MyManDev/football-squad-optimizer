@@ -6,6 +6,7 @@ origin where a refusal has to be shown to come before any worktree or branch exi
 """
 
 import json
+import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -448,7 +449,9 @@ def test_the_manual_command_solves_nothing_and_takes_only_what_names_a_preview(
         assert stopped.value.code == 2, arguments
 
     assert _manual(monkeypatch, tmp_path, *settled, *candidate, "--source-commit", COMMIT) == 1
-    assert "python -m scripts.build_settled_site wrote with --out" in capsys.readouterr().out
+    assert "is not a directory. --preview names the settled candidate's" in (
+        capsys.readouterr().out
+    )
     assert _manual(monkeypatch, tmp_path, *settled, *candidate, "--source-commit", "c0ffee1") == 1
     assert "full 40-character revision" in capsys.readouterr().out
 
@@ -622,6 +625,80 @@ def test_a_settled_candidate_is_published_only_from_the_revision_it_names(
     assert f"source revision {head}, as --source-commit states it" in capsys.readouterr().out
     published = _published_tree(tmp_path, origin, "feature/gw05-settled-site")
     assert tree_digests(published) == tree_digests(candidate)
+
+
+def test_a_settled_candidate_that_would_delete_a_carried_entry_is_refused_before_a_worktree(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The settled publish used to run ``scripts.build_site`` inside the publication
+    worktree, over the tree it carries, so the members' ``league/`` tree stayed. The same
+    build run into an empty directory lacks it, and copying that candidate in would delete
+    it from the site: refused before any worktree exists, naming what is missing and the
+    recipe. The recipe's candidate (the carried tree with the settled views written over it)
+    ships byte for byte."""
+
+    tmp_path = tmp_path_factory.mktemp("carried")
+    checkout = tmp_path / "checkout"
+    carried = checkout / "web" / "public" / "data"
+    (carried / "league").mkdir(parents=True)
+    (carried / "2026-27" / "gw05").mkdir(parents=True)
+    (carried / "league" / "members.json").write_bytes(b'{"members": [101]}\n')
+    (carried / "2026-27" / "gw05" / "live.json").write_bytes(b'{"settled": false}\n')
+    (checkout / ".gitignore").write_text("/.codex-tmp/\n")
+    _git(checkout, "init", "-q")
+    _git(checkout, "config", "user.name", "Synthetic")
+    _git(checkout, "config", "user.email", "synthetic@example.invalid")
+    _git(checkout, "add", ".")
+    _git(checkout, "commit", "-qm", "fixture")
+    head = _git(checkout, "rev-parse", "HEAD")
+    origin = _origin_develop_at_head(checkout)
+    _fake_gh(monkeypatch, "https://example.invalid/pr/6")
+    commands = _recording_git(monkeypatch)
+    monkeypatch.chdir(checkout)
+    branch = "feature/gw05-settled-site"
+    commit = ("--source-commit", head)
+
+    season_only = tmp_path / "season-only" / "data"
+    (season_only / "2026-27" / "gw05").mkdir(parents=True)
+    (season_only / "2026-27" / "gw05" / "live.json").write_bytes(b'{"settled": true}\n')
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "x",
+            "--kind",
+            "settled",
+            "--gameweek",
+            "5",
+            "--preview",
+            str(season_only.parent),
+            *commit,
+        ],
+    )
+    assert weekly_publish.main() == 1
+
+    printed = capsys.readouterr().out
+    assert f"The settled candidate {season_only.resolve()} lacks league" in printed
+    assert "copy web/public/data to <dir>/data" in printed
+    assert "build_settled_site builds only the 2026-27 gameweek 5 candidate" in printed
+    assert not any(command[1:3] == ["worktree", "add"] for command in commands)
+    assert _git(checkout, "ls-remote", "--heads", str(origin), branch) == ""
+
+    recipe = tmp_path / "recipe" / "data"
+    shutil.copytree(carried, recipe)
+    (recipe / "2026-27" / "gw05" / "live.json").write_bytes(b'{"settled": true}\n')
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["x", "--kind", "settled", "--gameweek", "5", "--preview", str(recipe.parent), *commit],
+    )
+    assert weekly_publish.main() == 0
+
+    published = _published_tree(tmp_path, origin, branch)
+    assert tree_digests(published) == tree_digests(recipe)
+    assert (published / "league" / "members.json").read_bytes() == b'{"members": [101]}\n'
 
 
 def test_the_publish_worktree_anchors_to_the_checkout_whatever_the_working_directory(

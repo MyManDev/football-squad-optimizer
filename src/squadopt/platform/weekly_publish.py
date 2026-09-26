@@ -31,9 +31,19 @@ advice (one built without ``--publish`` or ``--record-advice``, or with
 ``--no-advice-record``) is refused unless ``--no-advice-record`` says to publish it
 unrecorded, and the publish then says so.
 
-A settled publish names the candidate ``python -m scripts.build_settled_site`` wrote and,
-with ``--source-commit``, the revision it was built from; that candidate records no revision
-of its own, so the base is checked against the operator's statement.
+A settled publish names a settled candidate by ``--preview`` and, with ``--source-commit``,
+the revision it was built from; a candidate records no revision of its own, so the base is
+checked against the operator's statement. For any gameweek the candidate is built in a clean
+checkout at ``origin/develop``::
+
+    mkdir <dir> && cp -r web/public/data <dir>/data
+    python -m scripts.build_site --season 2026-27 --out <dir>
+
+``scripts.build_site`` writes the settled season views over that copy and leaves the members'
+``league/`` tree and the rest as the site carries them, which is what the settled publish did
+when it ran that build inside the publication worktree. ``python -m scripts.build_settled_site``
+builds only the 2026-27 gameweek 5 candidate. A candidate that lacks a top-level entry of the
+carried tree is refused, because the copy would delete it from the site.
 """
 
 import argparse
@@ -56,6 +66,14 @@ WEEKLY_RUNS = Path("data/runtime/weekly")
 PREVIEW_STAGES = ("league", "site", "scoreboard")
 """The run's stages that write the preview; the league stage also writes the advice record."""
 _REVISION = re.compile(r"[0-9a-f]{40}")
+SETTLED_RECIPE = (
+    "A settled candidate for any gameweek is built in a clean checkout at origin/develop: copy "
+    "web/public/data to <dir>/data, then run python -m scripts.build_site --season <season> "
+    "--out <dir>, which writes the settled season views over that copy and leaves the rest "
+    "of it as the site carries it. python -m scripts.build_settled_site builds only the "
+    "2026-27 gameweek 5 candidate."
+)
+"""How a settled candidate is produced, named wherever a settled publish refuses one."""
 
 
 def repository_root() -> Path:
@@ -500,30 +518,64 @@ def _publish_candidate(
     force_branch: bool,
     dry_run: bool,
 ) -> int:
-    """Publish a settled candidate from the revision the operator says built it."""
+    """Publish a settled candidate from the revision the operator says built it.
+
+    A settled candidate is the carried tree with the settled views written over it, so it
+    holds every top-level entry the publication worktree carries. One that lacks any of them
+    (the members' ``league/`` tree above all, which a ``scripts.build_site`` run into an empty
+    directory never writes) is refused before a commit: the copy would delete it from the
+    site.
+    """
 
     if not _REVISION.fullmatch(source_commit):
         raise PublishError(
             "--source-commit must be the full 40-character revision the candidate was "
-            "built from (git rev-parse HEAD in the checkout that ran "
-            "python -m scripts.build_settled_site)."
+            "built from (git rev-parse HEAD in the checkout that built it)."
         )
     preview = candidate.resolve() / "data"
     if not preview.is_dir():
         raise PublishError(
-            f"{preview} is not a directory. --preview names the directory "
-            "python -m scripts.build_settled_site wrote with --out, the one holding data/."
+            f"{preview} is not a directory. --preview names the settled candidate's "
+            f"directory, the one holding data/. {SETTLED_RECIPE}"
         )
     print(
         f"Settled candidate {preview}; source revision {source_commit}, as --source-commit "
         "states it (the candidate records none of its own)."
     )
+    copy = copy_preview_builder(preview)
+
+    def refuse_what_it_would_delete(carried: list[str]) -> None:
+        lacking = sorted(name for name in carried if not (preview / name).exists())
+        if lacking:
+            raise PublishError(
+                f"The settled candidate {preview} lacks {', '.join(lacking)}, which the "
+                "publication carries from origin/develop; publishing it would delete them "
+                f"from the site. {SETTLED_RECIPE}"
+            )
+
+    # Checked before any worktree exists from the named revision, which the base must equal,
+    # when this checkout holds it; the build below checks the worktree's own tree again.
+    listed = _run(
+        ["git", "ls-tree", "--name-only", f"{source_commit}:web/public/data"],
+        cwd=root,
+        check=False,
+    )
+    if listed:
+        refuse_what_it_would_delete(listed.splitlines())
+
+    def build(out: Path) -> None:
+        carried = out / "data"
+        refuse_what_it_would_delete(
+            [entry.name for entry in carried.iterdir()] if carried.is_dir() else []
+        )
+        copy(out)
+
     return publish(
         names,
         force_branch=force_branch,
         dry_run=dry_run,
         workspace=root,
-        builder=copy_preview_builder(preview),
+        builder=build,
         expected_commit=source_commit,
     )
 
@@ -547,8 +599,9 @@ def main() -> int:
     parser.add_argument(
         "--preview",
         type=Path,
-        help="settled: the directory scripts.build_settled_site wrote with --out, the one "
-        "holding data/",
+        help="settled: the candidate directory holding data/: a copy of web/public/data "
+        "with scripts.build_site --out <dir> run over it (scripts.build_settled_site "
+        "builds only 2026-27 gameweek 5)",
     )
     parser.add_argument(
         "--source-commit",
