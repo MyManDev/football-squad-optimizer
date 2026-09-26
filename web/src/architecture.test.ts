@@ -115,7 +115,9 @@ const UPPER_ZONES = ["features/", "app/"];
 /**
  * Runtime validators this rule names: every `*Shape.ts` check, `adviceResponse.ts`
  * (`checkedAdvice`) and `adviceCapabilities.ts` (`checkedCapabilities`). A validator with
- * another file name is covered only once it is added here.
+ * another file name is covered only once it is added here. The set this selects, and the
+ * loader set below, are pinned file by file in the tests, so a rename cannot drop a module
+ * from the rule without a failure.
  */
 const NAMED_VALIDATORS = new Set([
   "features/league/advice/adviceResponse.ts",
@@ -173,18 +175,25 @@ describe("web architecture", () => {
   it("reads the production modules and resolves every relative import", () => {
     expect(PRODUCTION.length).toBeGreaterThan(100);
     expect(PRODUCTION).toContain("data/client.ts");
-    expect(PRODUCTION.filter(isLoader)).toEqual(
-      expect.arrayContaining(["data/client.ts", "features/league/data.ts"]),
-    );
-    expect(PRODUCTION.filter(isValidator)).toEqual(
-      expect.arrayContaining([
-        "features/league/advice/adviceCapabilities.ts",
-        "features/league/advice/adviceResponse.ts",
-        "features/league/advice/adviceShape.ts",
-        "features/league/publicationShape.ts",
-      ]),
-    );
     expect(UNRESOLVED).toEqual([]);
+  });
+
+  it("finds exactly the validators and loaders the validator rule is held for", () => {
+    // Both sets are pinned in full: a validator or loader that is renamed, removed or added
+    // fails here, instead of silently changing what the validator rule checks.
+    expect(PRODUCTION.filter(isValidator).sort()).toEqual([
+      "features/league/advice/adviceCapabilities.ts",
+      "features/league/advice/adviceResponse.ts",
+      "features/league/advice/adviceShape.ts",
+      "features/league/chipShape.ts",
+      "features/league/publicationShape.ts",
+    ]);
+    expect(PRODUCTION.filter(isLoader).sort()).toEqual([
+      "data/client.ts",
+      "features/analysis/data.ts",
+      "features/fixtures/data.ts",
+      "features/league/data.ts",
+    ]);
   });
 
   it("keeps the lower zones free of features and the app shell", () => {
