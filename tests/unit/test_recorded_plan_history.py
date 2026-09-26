@@ -148,6 +148,7 @@ def test_invalid_record_degrades_one_member_without_aborting_history_publication
         league_id=352490,
         entry_ids=(101, 202),
         out_dir=tmp_path / "site",
+        published={(101, 4): "capture-a", (202, 4): "capture-a"},
     )
     histories = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     assert histories[0]["payload"]["weeks"][0]["status"] == "available"

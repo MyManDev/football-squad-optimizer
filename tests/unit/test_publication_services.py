@@ -12,8 +12,11 @@ import scripts.build_scoreboard as scoreboard_cli
 import tests.unit.test_advice_worker as member_fixture
 import tests.unit.test_backend_runtime as handoff_fixture
 import tests.unit.test_source_vaastav as archive_fixture
+from tests.unit.test_weekly_suggestion_eval import recorded
 
 from squadopt.application import league_publication, league_views, scoreboard
+from squadopt.application import weekly_suggestion_eval as review
+from squadopt.application.advice_record import record_member_advice
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     prepare_league_publication,
@@ -242,6 +245,57 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
             parallel.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
         ).read_bytes()
     )
+
+
+def test_the_history_counts_only_the_captures_the_published_trees_carried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    request = publication_world(tmp_path)
+    assert request.season == "2026-27" and request.record_root is not None
+    entry_id = member_fixture.ENTRY_ID
+    bootstrap = json.loads(
+        read_snapshot(request.snapshot_root, request.snapshot_id).payloads["bootstrap-static.json"]
+    )
+    deadline_utc = next(event["deadline_time"] for event in bootstrap["events"] if event["id"] == 1)
+    deadline = datetime.fromisoformat(deadline_utc.replace("Z", "+00:00"))
+
+    def before(hours: int) -> str:
+        return (deadline - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Two gameweek 1 records, both before its deadline: the tree this publication replaces
+    # carried the earlier one, and a later run recorded the other and never published it.
+    for name, hours in (("published-gw1", 48), ("unpublished-gw1", 24)):
+        record_member_advice(
+            request.record_root,
+            recorded(
+                gameweek=1,
+                entry_id=entry_id,
+                captured=before(hours),
+                published=before(hours - 1),
+                name=name,
+            ),
+        )
+    unproven = review.select_record(
+        request.record_root,
+        season=request.season,
+        gameweek=1,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+    )
+    assert unproven is not None and unproven["capture"]["snapshot_id"] == "unpublished-gw1"
+    league = request.out_dir / "data/league"
+    page = {"payload": {"gameweek": 1, "source_snapshot_id": "published-gw1"}}
+    (league / "entries").mkdir(parents=True)
+    (league / "entries" / f"{entry_id}.json").write_text(json.dumps(page), encoding="utf-8")
+
+    publish_league(request)
+
+    history = json.loads((league / "history" / f"{entry_id}.json").read_text(encoding="utf-8"))
+    weeks = {row["gameweek"]: row for row in history["payload"]["weeks"]}
+    # This publication's own page names this week, the replaced tree's page the week before.
+    assert weeks[2]["advice_snapshot_id"] == request.snapshot_id
+    assert weeks[1]["advice_snapshot_id"] == "published-gw1"
 
 
 def test_scoreboard_service_uses_the_named_capture_and_returns_the_written_path(

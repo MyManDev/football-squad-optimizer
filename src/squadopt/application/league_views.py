@@ -1278,10 +1278,11 @@ def build_league_views(
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
     shortly before the deadline each write their own and neither refuses the other. A
     re-publish of *one* capture is a replay and keeps the record it already wrote: the
-    envelopes below are stamped with ``generated``, which moves whenever ``now`` is not
-    passed — and no caller here passes it — so the same advice re-published is never the
-    same bytes. What is still refused is a rebuild of one capture that produces different
-    *advice*: the handoff, switch artifacts, settings and code also affect that advice.
+    envelopes below are stamped with ``generated``, taken after the members are solved and
+    before the first file is written, which moves whenever ``now`` is not passed (and no
+    caller here passes it), so the same advice re-published is never the same bytes. What
+    is still refused is a rebuild of one capture that produces different *advice*: the
+    handoff, switch artifacts, settings and code also affect that advice.
     The immutable address still raises ``AdviceRecordConflictError`` naming the difference.
 
     The records are written after every member's files are on disk, so a refusal can never
@@ -1353,7 +1354,6 @@ def build_league_views(
             "data_quality": quality,
         }
 
-    generated = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     season = inputs.season
     gameweek = int(inputs.deadline.gameweek)
     out = Path(out_dir)
@@ -1453,6 +1453,11 @@ def build_league_views(
             tasks,
         )
     }
+    # Stamped here, once every member is solved and before the first file is written: the
+    # envelopes and each member's record carry it, and the member history shows it as the
+    # advice's build time. Taken before the solves, it was earlier than every file it
+    # stamped by the length of the whole batch.
+    generated = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     stale_removed: list[str] = []
 

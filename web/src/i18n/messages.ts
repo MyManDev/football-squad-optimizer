@@ -26,7 +26,8 @@ const en = {
     back: "Back to member",
     week: "Recorded week",
     gameweek: (week: number) => `Gameweek ${week}`,
-    scope: "League 352490 · Last recorded pre-deadline pure-points suggestion for one gameweek.",
+    scope:
+      "League 352490 · The one-gameweek pure-points suggestion the site published, recorded before the deadline.",
     method:
       "We score the recorded squad with settled player results, captain and automatic substitution rules. Past suggestions are never solved again. The difference is a comparison, not proof that you followed the suggestion or would have gained these points.",
     empty: "No record",
@@ -37,6 +38,8 @@ const en = {
     unsettled: "Result not final",
     unavailable: "Comparison unavailable",
     noEligible: "No suggestion was recorded before the deadline.",
+    notPublished:
+      "No suggestion recorded for this week is one the site is known to have published.",
     missingOutcomes: "The week is final, but its captured player results are missing.",
     invalid: "The saved data does not support a verified comparison.",
     pending: "Points remain hidden until the week is finished and its results are checked.",
@@ -68,7 +71,7 @@ const en = {
     playerNote:
       "Expected and actual are each player's unmultiplied points. The captain label shows the applied multiplier.",
     evidence: "Record details",
-    published: "Recorded publication",
+    generated: "Advice build time",
     deadline: "Deadline",
     captured: "Advice data captured",
     settledAt: "Results captured",
@@ -1177,7 +1180,8 @@ const tr: MessageSchema<typeof en> = {
     back: "Üyeye dön",
     week: "Kayıtlı hafta",
     gameweek: (week) => `Oyun haftası ${week}`,
-    scope: "Lig 352490 · Son tarihten önce kaydedilmiş son bir haftalık saf puan önerisi.",
+    scope:
+      "Lig 352490 · Sitede yayımlanan, son tarihten önce kaydedilmiş bir haftalık saf puan önerisi.",
     method:
       "Kayıtlı kadroyu kesinleşmiş oyuncu sonuçları, kaptan ve otomatik yedek kurallarıyla puanlıyoruz. Geçmiş önerileri yeniden hesaplatmıyoruz. Puan farkı bir karşılaştırmadır; öneriyi uyguladığınızı veya bu puanı kazanacağınızı kanıtlamaz.",
     empty: "Kayıt yok",
@@ -1187,6 +1191,7 @@ const tr: MessageSchema<typeof en> = {
     unsettled: "Sonuç kesinleşmedi",
     unavailable: "Karşılaştırma yapılamıyor",
     noEligible: "Son tarihten önce kaydedilmiş öneri yok.",
+    notPublished: "Bu hafta için, sitede yayımlandığı bilinen kayıtlı bir öneri yok.",
     missingOutcomes: "Hafta kesinleşmiş ancak oyuncu sonuçlarının kaydı bulunmuyor.",
     invalid: "Kayıtlı veriler doğrulanmış bir karşılaştırma için yeterli değil.",
     pending: "Hafta tamamlanıp sonuçlar kontrol edilene kadar puanlar gösterilmez.",
@@ -1217,7 +1222,7 @@ const tr: MessageSchema<typeof en> = {
     playerNote:
       "Beklenen ve gerçekleşen değerler oyuncunun çarpansız puanıdır. Uygulanan çarpan kaptan etiketinde gösterilir.",
     evidence: "Kayıt ayrıntıları",
-    published: "Kayıtlı yayın",
+    generated: "Önerinin üretim zamanı",
     deadline: "Son tarih",
     captured: "Öneri verisinin alındığı an",
     settledAt: "Sonuçların alındığı an",
