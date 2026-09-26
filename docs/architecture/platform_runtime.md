@@ -84,7 +84,8 @@ The platform consumes this implementation; it does not rewrite it. In particular
 Changes to an application contract consumed by the platform need both the core-architecture
 owner and the platform/backend owner. Implementation details behind an unchanged contract
 remain with the application owner until the handover recorded in
-[ownership](ownership.md) takes place.
+[ownership](ownership.md) takes place. Since 2026-09-25 both roles are the owner's, so that is
+one approval; the separate application PR still comes first.
 
 ## Platform modules and their responsibilities
 
