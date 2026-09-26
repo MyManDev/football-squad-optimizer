@@ -718,18 +718,9 @@ def check_word(tree: Tree) -> list[str]:
     return problems
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
-    args = parser.parse_args(argv)
-    tree = Tree(args.root)
-    if not tree.live and not (Path(tree.root) / "league" / "members.json").is_file():
-        print(
-            f"Missing {Path(tree.root) / 'league' / 'members.json'}; "
-            "pass the directory containing league/, such as <preview>/data."
-        )
-        return 1
-    findings = []
+def run_checks(tree: Tree) -> list[str]:
+    """Run the three checks on ``tree`` and return every finding; an empty list passes."""
+    findings: list[str] = []
     checks: tuple[tuple[str, Callable[[], list[str]]], ...] = (
         ("variants", lambda: check_variants(tree.read)),
         ("top100", lambda: check_top100(tree.read)),
@@ -742,7 +733,21 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as error:
             findings.append(f"{name}: unreadable tree: {error}")
             print(findings[-1])
-    return 1 if findings else 0
+    return findings
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
+    args = parser.parse_args(argv)
+    tree = Tree(args.root)
+    if not tree.live and not (Path(tree.root) / "league" / "members.json").is_file():
+        print(
+            f"Missing {Path(tree.root) / 'league' / 'members.json'}; "
+            "pass the directory containing league/, such as <preview>/data."
+        )
+        return 1
+    return 1 if run_checks(tree) else 0
 
 
 if __name__ == "__main__":

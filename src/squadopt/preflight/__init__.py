@@ -1,5 +1,6 @@
 """Pre-run validation of residual-export handoff and measurement artifacts."""
 
+from squadopt.data.checksums import compute_table_sha256
 from squadopt.preflight.measurement import (
     MEASUREMENT_KINDS,
     MEASUREMENT_PREFLIGHT_CONTRACT_VERSION,
@@ -28,7 +29,6 @@ from squadopt.preflight.validator import (
     check_residual_manifest,
     check_residual_table,
     check_table_matches_manifest,
-    compute_table_sha256,
     run_export_pair_preflight,
     run_residual_export_preflight,
 )

@@ -79,11 +79,12 @@ reproducibility, and would have disagreed with any Linux run. The claim "stable 
 commits and two machines" in the acceptance record is true and was never a claim about two
 *operating systems*. It became load-bearing when CI started running on `ubuntu-latest`.
 
-Exports are now written through `write_export_table`
-(`src/squadopt/backtest/export_precision.py`), which sets the terminator explicitly, and
-the four writers that produce recorded tables call it — the candidate and control residual
-exports, the projection horizon table, and the horizon-decay residuals. A pinned digest in
-`tests/unit/test_export_precision.py` holds the bytes to a known value on every platform.
+Exports are now written through `squadopt.data.tables.write_export_table`
+(`src/squadopt/data/tables.py`, moved from `backtest/export_precision.py` on 2026-09-10),
+which sets the terminator explicitly, and the four writers that produce recorded tables
+call it — the candidate and control residual exports, the projection horizon table, and
+the horizon-decay residuals. A pinned digest in `tests/unit/test_export_precision.py`
+holds the bytes to a known value on every platform.
 
 Note what a test can and cannot prove here: on Linux the default and the explicit
 terminator are the same bytes, so a regression fails on Windows and passes on Linux. The

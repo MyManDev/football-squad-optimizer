@@ -38,7 +38,6 @@ from squadopt.backtest.candidate_residuals import (
     candidate_residual_manifest,
     round_for_export,
 )
-from squadopt.backtest.export_precision import write_export_table
 from squadopt.backtest.learned_candidate import (
     LEARNED_RATE_TRAINING_CONTRACT_VERSION,
     make_learned_rate_projection_builder,
@@ -51,6 +50,7 @@ from squadopt.data.sources.vaastav import (
     build_panel,
     load_team_codes,
 )
+from squadopt.data.tables import write_export_table
 from squadopt.experiments import (
     ExperimentError,
     PolicyObjectiveConfig,

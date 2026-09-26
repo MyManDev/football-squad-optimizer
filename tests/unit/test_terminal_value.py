@@ -10,7 +10,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.terminal_value import (
     CHIP_NAMES,
     HOLDING_VALUE_POINTS,

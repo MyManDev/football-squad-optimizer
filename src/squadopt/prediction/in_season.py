@@ -47,6 +47,7 @@ numbers so that measurement has a recorded starting point to move.
 """
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
@@ -70,6 +71,13 @@ IN_SEASON_FEATURE_CONTRACT_VERSION: Final = "in-season-carry-over-features-v1"
 IN_SEASON_BLEND_CONTRACT_VERSION: Final = "in_season_blend_v1"
 
 _ROSTER_COLUMNS: Final = ("player_id", "name", "team_id", "position", "price_tenths")
+
+# What season-total minutes were divided by to give minutes per gameweek. The calendar
+# count is the same number for everyone; the listed count is each player's own number of
+# played gameweeks whose live document names him, so a player registered in gameweek three
+# is not charged two gameweeks he could not have played.
+MINUTES_OVER_GAMEWEEKS_PLAYED: Final = "gameweeks_played"
+MINUTES_OVER_GAMEWEEKS_LISTED: Final = "gameweeks_listed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,12 +135,17 @@ class InSeasonBlend:
     players_from_carry_over_only: int
     players_priced_from_the_prior: int
     contract_version: str = IN_SEASON_BLEND_CONTRACT_VERSION
+    minutes_denominator: str = MINUTES_OVER_GAMEWEEKS_PLAYED
+    # Counted only on the listed basis; on the calendar basis nobody was counted, which is
+    # not the same as counting nobody, so these stay None there.
+    players_listed_in_fewer_gameweeks: int | None = None
+    players_listed_in_no_gameweek: int | None = None
 
     @property
     def diagnostics(self) -> dict[str, object]:
         """What a weekly report should be able to say about this projection."""
 
-        return {
+        diagnostics: dict[str, object] = {
             "in_season_blend_contract_version": self.contract_version,
             "gameweeks_played": self.gameweeks_played,
             "in_season_weight": round(self.in_season_weight, 6),
@@ -143,7 +156,15 @@ class InSeasonBlend:
             "players_shrunk_against_the_price_prior": (self.players_shrunk_against_the_price_prior),
             "players_from_carry_over_only": self.players_from_carry_over_only,
             "players_priced_from_the_prior": self.players_priced_from_the_prior,
+            "in_season_minutes_denominator": self.minutes_denominator,
         }
+        if self.players_listed_in_fewer_gameweeks is not None:
+            diagnostics["players_listed_in_fewer_gameweeks"] = (
+                self.players_listed_in_fewer_gameweeks
+            )
+        if self.players_listed_in_no_gameweek is not None:
+            diagnostics["players_listed_in_no_gameweek"] = self.players_listed_in_no_gameweek
+        return diagnostics
 
 
 def in_season_weight(gameweeks_played: int, config: InSeasonBlendConfig | None = None) -> float:
@@ -205,6 +226,7 @@ def blend_in_season_projection(
     fallback: pd.DataFrame,
     *,
     gameweeks_played: int,
+    gameweeks_listed: Mapping[int, int] | None = None,
     config: InSeasonBlendConfig | None = None,
 ) -> InSeasonBlend:
     """Project every rostered player for a gameweek in a season already under way.
@@ -215,6 +237,14 @@ def blend_in_season_projection(
     players with neither record -- normally the opening control's own output, so the two
     paths price a player with no history identically by construction rather than by two
     copies of one rule agreeing.
+
+    ``gameweeks_listed`` maps a player code to how many of the played gameweeks list him in
+    their live document. Season-total minutes are then divided by that count rather than by
+    ``gameweeks_played``: a player registered in gameweek three has had three gameweeks in
+    which to play, not five, and dividing by five invents two zero-minute weeks for him. A
+    player the mapping lists in no gameweek has no in-season record at all, because absent
+    is not zero. ``None`` keeps the calendar count for everyone, which is the only basis
+    available to a caller without every played week's live document.
 
     Every rostered player gets a number. A handoff that omits a player does not fail
     downstream; the live path reads a missing code as zero expected points, so the player
@@ -271,6 +301,16 @@ def blend_in_season_projection(
 
     played_minutes = merged["minutes"].astype("float64")
     played_points = merged["total_points"].astype("float64")
+    listed = _listed_denominator(
+        merged["player_id"], played_minutes, gameweeks_listed, gameweeks_played
+    )
+    if listed is None:
+        denominator = pd.Series(float(gameweeks_played), index=merged.index, dtype="float64")
+    else:
+        denominator = listed
+        # Listed in no played gameweek: no in-season record, rather than a record of zero.
+        played_minutes = played_minutes.where(listed.notna())
+        played_points = played_points.where(listed.notna())
     has_minutes = played_minutes.notna() & (played_minutes > 0.0)
 
     # A rate needs minutes to divide by; a player who has not played has no in-season
@@ -278,7 +318,8 @@ def blend_in_season_projection(
     current_rate = (played_points * MINUTES_PER_FULL_MATCH / played_minutes).where(has_minutes)
     # Minutes per gameweek is an observation for everyone whose counters are present,
     # including a zero: not playing is information about playing time, unlike scoring.
-    current_minutes = (played_minutes / float(gameweeks_played)).where(played_minutes.notna())
+    # The gameweeks are the ones the player could have played in, not the calendar's.
+    current_minutes = (played_minutes / denominator).where(played_minutes.notna())
 
     # Each stage is shrunk in the unit its own sample is measured in: the rate by minutes
     # played, the playing time by gameweeks elapsed.
@@ -335,4 +376,56 @@ def blend_in_season_projection(
         players_shrunk_against_the_price_prior=shrunk_against_price,
         players_from_carry_over_only=len(table) - with_minutes - from_prior,
         players_priced_from_the_prior=from_prior,
+        minutes_denominator=(
+            MINUTES_OVER_GAMEWEEKS_PLAYED if listed is None else MINUTES_OVER_GAMEWEEKS_LISTED
+        ),
+        players_listed_in_fewer_gameweeks=(
+            None if listed is None else int(listed.lt(float(gameweeks_played)).sum())
+        ),
+        players_listed_in_no_gameweek=None if listed is None else int(listed.isna().sum()),
     )
+
+
+def _listed_denominator(
+    codes: pd.Series,
+    played_minutes: pd.Series,
+    gameweeks_listed: Mapping[int, int] | None,
+    gameweeks_played: int,
+) -> pd.Series | None:
+    """Each player's listed gameweeks as a float series, missing where he was never listed.
+
+    ``None`` when no mapping was given. A count outside ``[0, gameweeks_played]`` cannot
+    come from the played weeks' documents and is refused, and so is a player with season
+    minutes who is listed in no played gameweek: the counters and the live documents then
+    describe different seasons, and dropping his minutes quietly would hide that.
+    """
+
+    if gameweeks_listed is None:
+        return None
+    if not isinstance(gameweeks_listed, Mapping):
+        raise PredictionConfigurationError("gameweeks_listed must be a mapping of code to count.")
+    invalid = [
+        (code, count)
+        for code, count in gameweeks_listed.items()
+        if isinstance(code, bool)
+        or not isinstance(code, int)
+        or isinstance(count, bool)
+        or not isinstance(count, int)
+        or not 0 <= count <= gameweeks_played
+    ]
+    if invalid:
+        raise PredictionConfigurationError(
+            "gameweeks_listed must map integer codes to integer counts from 0 to "
+            f"{gameweeks_played}; got {format_examples(invalid)}."
+        )
+    counts = {int(code): float(count) for code, count in gameweeks_listed.items()}
+    listed = codes.map(counts).astype("float64")
+    listed = listed.where(listed > 0.0)
+    contradicted = listed.isna() & played_minutes.gt(0.0)
+    if contradicted.any():
+        raise PredictionConfigurationError(
+            "Season minutes for players no played gameweek lists: "
+            f"{format_examples(codes.loc[contradicted].tolist())}. The counters and the live "
+            "documents describe different seasons."
+        )
+    return listed

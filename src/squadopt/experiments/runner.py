@@ -21,10 +21,10 @@ from squadopt.evaluation import (
     FoldEvaluationResult,
     evaluate_prepared_folds,
 )
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.config import (
     SCREENING_EXPERIMENT_CONTRACT_VERSION,
     ExperimentCandidate,
-    ExperimentExecutionError,
     FrozenCandidateError,
     ScreeningExperimentConfig,
 )

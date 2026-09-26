@@ -32,7 +32,7 @@ request's capture ID, archive and handoff paths, season and target gameweek. It 
 refuses to substitute `render_member` for an arbitrary callable.
 
 The offline element-to-code translation and `CapturePicksProvider` now live in
-`application.capture_entries`. `platform.capture_context` re-exports the same objects;
+`application.capture_entries`, and callers import them from there;
 the HTTP context still composes its own backend identity and handoff requirements above
 that shared adapter.
 

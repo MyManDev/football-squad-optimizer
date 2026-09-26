@@ -54,6 +54,7 @@ from squadopt.evaluation import (
     ScoringPolicy,
     evaluate_prepared_folds,
 )
+from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.evaluation.rotation_ceiling import (
     ROTATION_CEILING_CONTRACT_VERSION,
     FoldDecisionDetail,
@@ -67,9 +68,8 @@ from squadopt.evaluation.rotation_ceiling import (
     fold_decision_details,
     fold_key,
 )
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.shadow_report import ShadowReportError, write_document_once
-from squadopt.experiments.statistics import season_aware_moving_block_interval
 from squadopt.features import CrossSeasonConfig
 
 #: The seasons this run loads. Passed to the loader rather than cut from a fuller panel:

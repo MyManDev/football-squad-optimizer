@@ -58,7 +58,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_capture_season_phase.py` | measurement runner | `docs/capture_season_phase.json` | 2026-09-08 |
 | `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json` | 2026-09-07 |
-| `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-16 |
+| `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-25 |
 | `measure_export_precision.py` | measurement runner | `docs/export_precision.json` | 2026-08-16 |
 | `measure_in_season_blend.py` | measurement runner | `docs/in_season_blend_benchmark.json` | 2026-08-23 |
 | `measure_mode_plan_selection.py` | measurement runner | `docs/mode_plan_selection.json` | 2026-09-10 |
@@ -112,6 +112,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | --- | --- | --- | --- |
 | `compare_component_oof_development.py` | artifact-only runner | `--output-dir` (`comparison.json`, `comparison.md`) | 2026-09-07 |
 | `export_component_oof.py` | artifact-only runner | `artifacts/phase_c/` | 2026-09-07 |
+| `export_decided_appearance.py` | artifact-only runner | `artifacts/double_reduction/`; the `--fitted` input of `measure_double_reduction.py` | 2026-09-25 |
 | `measure_instrument.py` | artifact-only runner | caller-selected `--output`; replay in `docs/measurement_instrument.md` | 2026-09-13 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
 | `probe_phase_e_runtime.py` | artifact-only runner | checkpoints via `_phase_e_checkpoints`; prereg `docs/phase_e_candidate_selection_prereg.md` | 2026-09-07 |
@@ -143,7 +144,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
-| `_experiment_cli.py` | helper | imported by 74 runners: provenance metadata, `write_json`, `write_text` | 2026-09-09 |
+| `_experiment_cli.py` | helper | imported by every runner that `git grep -l "from scripts._experiment_cli import" -- 'scripts/*.py' \| wc -l` counts: provenance metadata, `write_json`, `write_text` | 2026-09-09 |
 | `_phase_e_checkpoints.py` | helper | imported by `probe_phase_e_runtime` | 2026-09-07 |
 | `_phase_e_development.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_evaluation` | 2026-09-07 |
 | `_phase_e_evaluation.py` | helper | imported by `run_phase_e_shadow` | 2026-09-07 |

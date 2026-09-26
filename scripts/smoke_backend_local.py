@@ -9,7 +9,7 @@ window-1 request, the job polled to a terminal state, and the stored answer read
 prints the solver status and the seconds between the POST and the completed job.
 
 Exit code 0 only when every step held. A backend that is not ready is a failure here and
-the three checks are printed, because which one is false is the whole diagnosis
+its checks are printed, because which one is false is the whole diagnosis
 (``docs/backend_runbook.md``, "Readiness").
 
 Standard library only, on purpose: it has to run on a machine that has Python and nothing
