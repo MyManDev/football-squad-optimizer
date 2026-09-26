@@ -366,3 +366,96 @@ def test_the_diagnostics_report_both_weights() -> None:
     assert diagnostics["in_season_weight"] == pytest.approx(1 / 7)
     assert diagnostics["carry_over_weight"] == pytest.approx(6 / 7)
     assert diagnostics["gameweeks_played"] == 1
+
+
+# --- minutes per gameweek counts the weeks a player was listed in -----------
+
+
+def test_a_player_first_listed_in_gameweek_three_is_divided_by_his_three_weeks() -> None:
+    """The regression behind audit M2.
+
+    Five gameweeks played; the player was registered for gameweek three and has played
+    every minute since, 270 minutes for 18 points. His playing time is 90 a gameweek. The
+    calendar count read it as 54, charging him two zero-minute weeks from before he existed
+    in the game, and the direct-control route priced him with exactly that number.
+    """
+
+    arguments = (
+        _roster(1),
+        _carried({1: (80.0, 5.0)}),
+        _history({1: (270, 18)}),
+        _fallback({1: 2.0}),
+    )
+    listed = blend_in_season_projection(*arguments, gameweeks_played=5, gameweeks_listed={1: 3})
+    calendar = blend_in_season_projection(*arguments, gameweeks_played=5)
+
+    weight = 5 / 11
+    rate = 0.5 * 6.0 + 0.5 * 5.0  # 270 minutes earn half the rate weight against 270
+    assert _points(listed, 1) == pytest.approx(rate * (weight * 90.0 + (1 - weight) * 80.0) / 90)
+    assert _points(calendar, 1) == pytest.approx(rate * (weight * 54.0 + (1 - weight) * 80.0) / 90)
+    assert listed.diagnostics["in_season_minutes_denominator"] == "gameweeks_listed"
+    assert listed.diagnostics["players_listed_in_fewer_gameweeks"] == 1
+    assert calendar.diagnostics["in_season_minutes_denominator"] == "gameweeks_played"
+    assert "players_listed_in_fewer_gameweeks" not in calendar.diagnostics
+
+
+def test_a_player_listed_in_no_played_gameweek_has_no_in_season_record() -> None:
+    """Absent is not zero. His carried record answers alone, undiluted by invented weeks."""
+
+    blend = blend_in_season_projection(
+        _roster(1, 2),
+        _carried({1: (80.0, 5.0), 2: (80.0, 5.0)}),
+        _history({1: (0, 0), 2: (0, 0)}),
+        _fallback({1: 2.0, 2: 2.0}),
+        gameweeks_played=5,
+        gameweeks_listed={1: 0, 2: 5},
+    )
+
+    assert _points(blend, 1) == pytest.approx(80.0 * 5.0 / 90.0)
+    # Listed every week, the zero is an observation about playing time and lowers it.
+    assert _points(blend, 2) < _points(blend, 1)
+    assert blend.players_listed_in_no_gameweek == 1
+    assert blend.players_listed_in_fewer_gameweeks == 0
+
+
+def test_players_listed_in_every_played_gameweek_are_unchanged() -> None:
+    arguments = (
+        _roster(1, 2, 3),
+        _carried({1: (80.0, 5.0), 3: (40.0, 3.0)}),
+        _history({1: (400, 20), 2: (200, 9), 3: (0, 0)}),
+        _fallback({1: 2.0, 2: 2.0, 3: 2.0}),
+    )
+
+    listed = blend_in_season_projection(
+        *arguments, gameweeks_played=5, gameweeks_listed={1: 5, 2: 5, 3: 5}
+    )
+    calendar = blend_in_season_projection(*arguments, gameweeks_played=5)
+
+    pd.testing.assert_frame_equal(listed.table, calendar.table)
+
+
+@pytest.mark.parametrize("count", [6, -1, 2.0, True])
+def test_a_listed_count_the_played_weeks_cannot_produce_is_refused(count: object) -> None:
+    with pytest.raises(PredictionConfigurationError, match="integer counts from 0 to 5"):
+        blend_in_season_projection(
+            _roster(1),
+            _carried({}),
+            _history({1: (90, 5)}),
+            _fallback({1: 2.0}),
+            gameweeks_played=5,
+            gameweeks_listed={1: count},  # type: ignore[dict-item]
+        )
+
+
+def test_season_minutes_for_a_player_no_played_week_lists_are_refused() -> None:
+    """The counters and the live documents would then describe different seasons."""
+
+    with pytest.raises(PredictionConfigurationError, match="no played gameweek lists"):
+        blend_in_season_projection(
+            _roster(1),
+            _carried({}),
+            _history({1: (90, 5)}),
+            _fallback({1: 2.0}),
+            gameweeks_played=5,
+            gameweeks_listed={},
+        )

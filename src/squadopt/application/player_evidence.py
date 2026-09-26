@@ -31,9 +31,10 @@ from typing import Final
 
 import pandas as pd
 
-from squadopt.application.evidence_io import write_json
+from squadopt.data.atomic import REPLAY, write_bytes_once, write_document_once
 from squadopt.data.checksums import compute_table_sha256
 from squadopt.data.errors import (
+    ConflictingBytesError,
     DataError,
     DataValidationError,
     DuplicateRecordsError,
@@ -215,19 +216,27 @@ def _temporary(final: Path) -> Path:
 
 
 def _publish(temporary: Path, final: Path) -> None:
-    """Create-once: an identical artifact is kept, a different one is never overwritten."""
+    """Create-once: an identical artifact is kept, a different one is never overwritten.
 
-    if final.exists():
-        if final.read_bytes() == temporary.read_bytes():
-            return
+    The bytes land through a no-overwrite hard link. Looking for the file and then renaming
+    over it let a second export destroy a file that landed between the two steps.
+    """
+
+    try:
+        write_bytes_once(temporary.read_bytes(), final)
+    except ConflictingBytesError as error:
         raise DataError(
             f"{final} already exists with different content; an artifact is never "
             "overwritten in place. Choose another name or remove it deliberately."
-        )
-    os.replace(temporary, final)
+        ) from error
 
 
-def _canonical(manifest: Mapping[str, object]) -> dict[str, object]:
+def _canonical(manifest: object) -> object:
+    """A manifest's identity: every field but the clock. A document that is not a manifest
+    is its own identity, so it never matches one."""
+
+    if not isinstance(manifest, Mapping):
+        return manifest
     return {key: value for key, value in manifest.items() if key != "generated_at_utc"}
 
 
@@ -280,22 +289,16 @@ def write_evidence_artifact(
         "ownership_snapshot_id": summary.ownership_snapshot_id,
         "source_snapshot_ids": list(summary.source_snapshot_ids),
     }
-    if manifest_path.exists():
-        existing = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(existing, dict) or _canonical(existing) != _canonical(manifest):
-            raise DataError(
-                f"{manifest_path} already exists and describes a different artifact; "
-                "refusing to overwrite it."
-            )
+    try:
+        outcome = write_document_once(manifest, manifest_path, replay_identity=_canonical)
+    except ConflictingBytesError as error:
+        raise DataError(
+            f"{manifest_path} already exists and describes a different artifact; "
+            "refusing to overwrite it."
+        ) from error
+    if outcome == REPLAY:
         # The artifact on disk is the record; its manifest, timestamp included, is returned.
-        manifest = existing
-    else:
-        temporary_manifest = _temporary(manifest_path)
-        try:
-            write_json(temporary_manifest, manifest)
-            os.replace(temporary_manifest, manifest_path)
-        finally:
-            temporary_manifest.unlink(missing_ok=True)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     return ExportResult(
         table_path=table_path,
         manifest_path=manifest_path,

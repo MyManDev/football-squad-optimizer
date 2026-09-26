@@ -1,0 +1,11 @@
+# The workflows pin every action to a full commit SHA with its version as a trailing
+# comment. Dependabot reads that comment and proposes the next SHA, so the pins do not
+# go stale silently.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
