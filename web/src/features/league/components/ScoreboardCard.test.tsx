@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { textByNode } from "../../../testSupport/textByNode";
 import type { LeagueViewEnvelope, Scoreboard } from "../types";
 import { ScoreboardCard, ScoreboardSection } from "./ScoreboardCard";
 
@@ -122,6 +123,51 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
   },
 };
 
+/**
+ * The pipeline's own English words, as whole words. The snapshot id is provenance and is
+ * taken out before this is applied (its `fpl-live-` prefix would match on its own).
+ */
+const PIPELINE_WORDS = /\b(capture|ledger|live|replay|bench|snapshot|GW)\b/i;
+
+/** The same capture with every note switched on: a gross Top-100, a provisional week, a comparison. */
+function everyNote(): LeagueViewEnvelope<Scoreboard> {
+  const value = structuredClone(scoreboard);
+  const top100 = value.payload.gameweeks[2].top100!;
+  top100.basis = "gross";
+  top100.hit_points = null;
+  top100.picks_snapshot_id = null;
+  value.payload.gameweeks[2].data_checked = false;
+  value.payload.gameweeks[0].comparisons = [
+    {
+      kind: "system",
+      net: 26,
+      scoring_basis: "named_eleven_no_autosubs",
+      source_snapshot_id: value.payload.source_snapshot_id,
+      diagnostics: {
+        zero_minute_starters: 0,
+        minutes_shortfall: -12,
+        captain_shortfall: 2.5,
+        autosub_recovery: 3,
+      },
+    },
+  ];
+  return value;
+}
+
+/** The mode badge in each "ours" cell of a scoreboard table, as the reader sees it. */
+function badgesIn(table: HTMLElement): string[] {
+  return [...table.querySelectorAll("tbody td:first-of-type > span")].map(
+    (badge) => badge.textContent ?? "",
+  );
+}
+
+/** The first column header of each table on screen: the scoreboard's, then the comparisons'. */
+function weekHeaders(): string[] {
+  return screen
+    .getAllByRole("table")
+    .map((table) => within(table).getAllByRole("columnheader")[0]!.textContent ?? "");
+}
+
 function renderCard(envelope: LeagueViewEnvelope<Scoreboard>, language: Language = "en") {
   return render(
     <LanguageProvider initialLanguage={language}>
@@ -215,19 +261,75 @@ describe("scoreboard card", () => {
     expect(container.textContent).not.toMatch(FORBIDDEN);
   });
 
-  it("labels our row with the mode it was decided in and withholds an unsettled net", () => {
-    renderCard(scoreboard);
-    const rows = screen.getAllByRole("row");
-    const gw1 = rows[1].querySelectorAll("td");
-    expect(gw1[0].textContent).toContain("26");
-    expect(gw1[0].textContent).toContain("live");
-    const gw2 = rows[2].querySelectorAll("td");
-    expect(gw2[0].textContent).toContain("—");
-    expect(gw2[0].textContent).toContain("replay");
-    expect(gw2[0].textContent).toContain(MESSAGES.en.leagueScoreboard.notSettled);
-    // No ledger entry at all: a dash, no badge.
-    const gw3 = rows[3].querySelectorAll("td");
-    expect(gw3[0].textContent).toBe("—");
+  it.each([
+    ["en", "live", "replay"],
+    ["tr", "canlı", "sonradan kayıt"],
+  ] as const)(
+    "labels our row with the mode it was decided in and withholds an unsettled net in %s",
+    (language, live, replay) => {
+      const copy = MESSAGES[language].leagueScoreboard;
+      expect(copy.modes).toEqual({ live, replay });
+      renderCard(scoreboard, language);
+      const rows = screen.getAllByRole("row");
+      const gw1 = rows[1].querySelectorAll("td");
+      expect(gw1[0].textContent).toContain("26");
+      expect(gw1[0].textContent).toContain(live);
+      const gw2 = rows[2].querySelectorAll("td");
+      expect(gw2[0].textContent).toContain("—");
+      expect(gw2[0].textContent).toContain(replay);
+      expect(gw2[0].textContent).toContain(copy.notSettled);
+      // No ledger entry at all: a dash, no badge.
+      const gw3 = rows[3].querySelectorAll("td");
+      expect(gw3[0].textContent).toBe("—");
+    },
+  );
+
+  it("speaks Turkish to a Turkish reader and keeps only the snapshot id as provenance", () => {
+    const { container } = renderCard(everyNote(), "tr");
+    const copy = MESSAGES.tr.leagueScoreboard;
+    // The notes a card with finished weeks carries are on screen: the gross Top-100 and
+    // provisional notes, which need their weeks, and the mode note. The empty-table line is
+    // not: it shows only when no week has finished, so the empty-card test below reads it.
+    for (const note of [copy.grossNote, copy.provisionalNote, copy.modeNote])
+      expect(screen.getByText(note)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: MESSAGES.tr.scoreboardComparisons.title }),
+    ).toBeInTheDocument();
+    const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
+    expect(container.textContent).toContain(`veri çekimi ${shown}…`);
+    // The badges themselves, one per row with a ledger entry, in the reader's words.
+    const table = screen.getByRole("table", { name: copy.caption });
+    expect(badgesIn(table)).toEqual(["canlı", "sonradan kayıt"]);
+    // The comparison table heads its week column as the scoreboard table does.
+    expect(weekHeaders()).toEqual(["OH", "OH"]);
+    // The snapshot id stays as it is; every other text node, the hidden caption included,
+    // is Turkish. Read node by node: textContent glues a badge or a header cell to the next
+    // element's text ("liveAdı", "GWKarar") and a whole-word check cannot see it there.
+    expect(textByNode(container).replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
+  });
+
+  it.each(["en", "tr"] as const)(
+    "heads the comparison table's week column as the scoreboard table does in %s",
+    (language) => {
+      renderCard(everyNote(), language);
+      const [scoreboardWeek, comparisonsWeek] = weekHeaders();
+      expect(comparisonsWeek).toBe(scoreboardWeek);
+      expect(scoreboardWeek).toBe(language === "en" ? "GW" : "OH");
+    },
+  );
+
+  it("keeps the English card's pipeline words as they were", () => {
+    const { container } = renderCard(everyNote(), "en");
+    const copy = MESSAGES.en.leagueScoreboard;
+    const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
+    expect(container.textContent).toContain(`capture ${shown}…`);
+    expect(badgesIn(screen.getByRole("table", { name: copy.caption }))).toEqual(["live", "replay"]);
+    expect(screen.getByText(copy.modeNote)).toBeInTheDocument();
+    expect(copy.modeNote.startsWith("live: decided before the deadline, from a capture")).toBe(
+      true,
+    );
+    expect(container.querySelector("caption")?.textContent).toContain("our paper ledger");
+    expect(copy.noGameweek).toBe("No gameweek has finished in this capture yet.");
   });
 
   it("shows the members' mean net, the Top-100 mean for its own week, the average and the highest", () => {
@@ -347,32 +449,49 @@ describe("scoreboard card", () => {
       // again when the decision was recorded past the deadline. A note giving only the
       // second is false about a row decided before its deadline from a reused capture.
       renderCard(scoreboard, language);
-      const note = MESSAGES[language].leagueScoreboard.modeNote;
+      const copy = MESSAGES[language].leagueScoreboard;
+      const note = copy.modeNote;
       expect(screen.getByText(note)).toBeInTheDocument();
-      expect(note).toContain("capture");
-      expect(note.split("replay")[1]).toContain(language === "en" ? " or " : " ya da ");
+      expect(note).toContain(language === "en" ? "capture" : "veri çekimi");
+      // The note names each mode by the word its badge carries.
+      expect(note.startsWith(`${copy.modes.live}: `)).toBe(true);
+      expect(note.split(`${copy.modes.replay}: `)).toHaveLength(2);
+      expect(note.split(`${copy.modes.replay}: `)[1]).toContain(
+        language === "en" ? " or " : " ya da ",
+      );
     },
   );
 
-  it("says when no gameweek has finished instead of drawing an empty table", () => {
-    const empty = structuredClone(scoreboard);
-    empty.payload.gameweeks = empty.payload.gameweeks.map((week) => ({ ...week, finished: false }));
-    empty.payload.cumulative = {
-      through_gameweek: null,
-      gameweeks: [],
-      ours_net: null,
-      ours_gameweeks: [],
-      ours_basis: null,
-      ours_excluded_gameweeks: [],
-      members_mean_total_points: null,
-      members_gameweeks: [],
-      members_counted: 0,
-      average_entry_score: null,
-    };
-    renderCard(empty);
-    expect(screen.getByText(MESSAGES.en.leagueScoreboard.noGameweek)).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  });
+  it.each(["en", "tr"] as const)(
+    "says when no gameweek has finished instead of drawing an empty table, in %s",
+    (language) => {
+      const empty = structuredClone(scoreboard);
+      empty.payload.gameweeks = empty.payload.gameweeks.map((week) => ({
+        ...week,
+        finished: false,
+      }));
+      empty.payload.cumulative = {
+        through_gameweek: null,
+        gameweeks: [],
+        ours_net: null,
+        ours_gameweeks: [],
+        ours_basis: null,
+        ours_excluded_gameweeks: [],
+        members_mean_total_points: null,
+        members_gameweeks: [],
+        members_counted: 0,
+        average_entry_score: null,
+      };
+      const { container } = renderCard(empty, language);
+      expect(screen.getByText(MESSAGES[language].leagueScoreboard.noGameweek)).toBeInTheDocument();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      if (language === "tr") {
+        // The empty card, its line included, is Turkish; only the snapshot id stays as it is.
+        const shown = scoreboard.payload.source_snapshot_id.slice(0, 24);
+        expect(textByNode(container).replaceAll(shown, "")).not.toMatch(PIPELINE_WORDS);
+      }
+    },
+  );
 
   it.each(["tr", "en"] as const)(
     "does not call a settled week unsettled when it is left out for its basis, in %s",

@@ -224,12 +224,17 @@ def readiness_report(
     league_tree_readable: bool,
     cache_writable: bool,
     league_tree_matches_capture: bool | None = None,
+    worker_heartbeat: bool | None = None,
+    queue_wait: bool | None = None,
 ) -> tuple[bool, Mapping[str, bool]]:
     """One place decides what "ready" means, so the endpoint cannot drift from it.
 
     ``league_tree_matches_capture`` is whether the published tree is for the week the
-    capture targets. A caller that does not ask leaves it out and the report is the three
-    checks it always was: a check nobody made is absent, not passed.
+    capture targets. ``worker_heartbeat`` is whether some advice worker's loop has turned
+    recently, and ``queue_wait`` whether no queued job has waited too long for one (the
+    ``squadopt.platform.worker_heartbeat`` module states both bounds). A caller that does
+    not ask leaves a check out and the report is the checks it always was: a check nobody
+    made is absent, not passed.
     """
 
     checks = {
@@ -239,4 +244,8 @@ def readiness_report(
     }
     if league_tree_matches_capture is not None:
         checks["league_tree_matches_capture"] = league_tree_matches_capture
+    if worker_heartbeat is not None:
+        checks["worker_heartbeat"] = worker_heartbeat
+    if queue_wait is not None:
+        checks["queue_wait"] = queue_wait
     return all(checks.values()), checks

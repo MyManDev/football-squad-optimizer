@@ -76,6 +76,7 @@ from squadopt.platform.capture_context import (
     load_capture_identity,
 )
 from squadopt.platform.store_probe import StoreProbeResult, probe_store
+from squadopt.platform.worker_heartbeat import WORKER_DIRECTORY, WorkerLiveness
 
 __all__ = [
     "CANONICAL_SITE_ORIGIN",
@@ -230,6 +231,12 @@ class BackendConfig:
     @property
     def spec_root(self) -> Path:
         return self.store_root / "specs"
+
+    @property
+    def worker_root(self) -> Path:
+        """Where each advice worker's heartbeat lives: beside the queue, never inside it."""
+
+        return self.store_root / WORKER_DIRECTORY
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> BackendConfig:
@@ -720,6 +727,7 @@ class AdviceBackend:
     probe: StoreProbeGate
     metrics: AdviceMetrics
     log: AdviceLog
+    liveness: WorkerLiveness
 
     def queue_depth(self) -> int:
         """Open work, not history: a terminal job is not something a member waits for."""
@@ -734,16 +742,23 @@ class AdviceBackend:
         return counts
 
     def readiness(self) -> tuple[bool, Mapping[str, bool]]:
-        """Ready means this process can actually answer, checked rather than assumed."""
+        """Ready means this process can actually answer, checked rather than assumed.
+
+        Answering includes somebody computing what the api queues: without a live worker a
+        POST still files a job, and the member waits for an answer that never comes.
+        """
 
         context = self.contexts.current()
         directory = FileLeagueDirectory(self.config.site_data_root)
+        worker_heartbeat, queue_wait = self.liveness.checks()
         return readiness_report(
             context_loaded=context is not None,
             league_tree_readable=directory.readable(),
             cache_writable=self.probe.passed(),
             # Season and gameweek are already in the context; nothing is projected for it.
             league_tree_matches_capture=directory.matches(context),
+            worker_heartbeat=worker_heartbeat,
+            queue_wait=queue_wait,
         )
 
 
@@ -805,6 +820,7 @@ def build_backend(
         probe=gate,
         metrics=metrics,
         log=component_log,
+        liveness=WorkerLiveness(config.worker_root, queue),
     )
 
 

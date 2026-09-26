@@ -191,7 +191,7 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
             {ours.mode !== null && (
               <>
                 {" "}
-                <Badge tone={ours.mode === "live" ? "good" : "warn"}>{ours.mode}</Badge>
+                <Badge tone={ours.mode === "live" ? "good" : "warn"}>{copy.modes[ours.mode]}</Badge>
               </>
             )}
             {ours.net === null && <div className={styles.sub}>{copy.notSettled}</div>}
