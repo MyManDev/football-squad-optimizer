@@ -278,6 +278,7 @@ def test_the_get_and_the_post_refuse_a_selection_with_one_answer(
         ),
         ({"rival_entry_id": 0}, {"rival": 0}, "rival_entry_id must be null or a positive integer."),
         ({"window": "x"}, {"window": "x"}, "window must be 1, 3, or 5."),
+        ({"managers_word": "x"}, {"managers_word": "x"}, "managers_word must be true or false."),
     ],
 )
 def test_the_get_query_declarations_refuse_some_values_before_the_parser(

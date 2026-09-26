@@ -122,8 +122,9 @@ def parse_advice_selection(fields: Mapping[str, Any]) -> AdviceSelection:
 
     The POST passes its JSON body and the GET its query values under the body's names, so
     a value both routes hand to this parser is refused with the same message. The GET's
-    query declarations still act first: a strategy outside the pattern, a rival below 1,
-    or a window, top100_weight or rival that is not an integer is refused there with the
+    query declarations still act first: a strategy outside the pattern, a rival below 1, a
+    window, top100_weight or rival that is not an integer, a managers_word that is not a
+    boolean, or a preferences string over 1500 characters is refused there with the
     framework's contract message ("The request did not match the API contract."). Exactly the
     declared keys (additionalProperties: false), a string strategy, a window the member
     menu offers with bool explicitly refused, and a rival that is null or a positive
