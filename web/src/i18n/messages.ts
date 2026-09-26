@@ -691,6 +691,8 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
+        "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
         "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
@@ -1813,6 +1815,8 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
+        "Futbol modeli her kulübün tahmin edilen gol ve asistlerini, oynayabilirlik uygulanmadan önce kulübün bütün oyuncuları arasında paylaştırır. Oynayabilirliğin, veri kesitinde oynayamaz ya da şüpheli görünen bir oyuncudan düşürdüğü kısım takım arkadaşlarına aktarılmaz; bu yüzden eksik oyuncusu olan bir kulüpte oyunculara toplamda, modelin kulüp için tahmin ettiğinden daha az gol ve asist yazılır.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
         "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için veri kesitindeki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
