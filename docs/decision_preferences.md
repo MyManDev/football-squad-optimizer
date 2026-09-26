@@ -12,6 +12,8 @@ real FPL transfers require a new capture.
 Keep and avoid each accept up to fifteen unique positive persistent player codes.
 Overlaps, malformed IDs, unknown fields and chip/save conflicts are refused.
 Keep requires a currently held player; avoid requires a forecast roster player.
+The api checks both against the member's captured squad and the capture's roster before
+a job exists, so an id the capture does not have is refused and never queued.
 The first version deliberately refuses rival strategies and manager-news combinations.
 An infeasible set of constraints is reported as no plan, never relaxed silently.
 Automatic chip opportunity rebuilds obey the same human constraints as the final plan.

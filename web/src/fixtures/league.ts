@@ -418,6 +418,14 @@ export const NO_CHIP_STATED_LIMIT =
   "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.";
 
 /**
+ * The limit the producer adds when the plan stands on the current model's component
+ * forecast (`NO_DEFCON_LIMIT` in the application layer): it was fitted on seasons with no
+ * defensive-contribution scoring. No mock document carries it; the page test publishes it.
+ */
+export const NO_DEFCON_STATED_LIMIT =
+  "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.";
+
+/**
  * The producer's limit sentences for a three- or five-week window, as its payload
  * carries them (`WINDOW_STATED_LIMITS` in the application layer). The site's Turkish
  * copy is keyed by these exact strings, and a test pins that every one is known there.

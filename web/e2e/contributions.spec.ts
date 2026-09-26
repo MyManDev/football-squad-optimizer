@@ -7,9 +7,6 @@ for (const language of ["tr", "en"] as const) {
     let posts = 0;
     await page.setViewportSize({ width: 375, height: 812 });
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    // External font availability is unrelated to the contribution contract.
-    await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
-    await page.route("https://fonts.gstatic.com/**", (route) => route.abort());
     await page.route("**/api/v1/contributions**", async (route) => {
       const request = route.request();
       if (request.method() === "POST") {

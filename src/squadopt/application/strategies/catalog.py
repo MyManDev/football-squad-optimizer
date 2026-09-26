@@ -66,11 +66,11 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "expected_gain_vs_hold",
         "expected_gap_vs_rival",
         "expected_points_cost",
-        # The most that price can be, from the solver's own bound on the control it is
-        # measured against. A deterministic ceiling on a difference of two solved plans
-        # — not a spread, not an interval around an estimate: under a proof it *is* the
-        # price, and without one it is the only end of the range that can be stated
-        # without reading as a confidence claim.
+        # The most that price can be: the price itself, published only when the control
+        # it is measured against was proven, and absent (never zero) when it was not,
+        # since that control's bound gap is on the planner's objective and bounds no
+        # price. A deterministic ceiling on a difference of two solved plans, not a
+        # spread and not an interval around an estimate.
         "expected_points_cost_ceiling",
         "overlap_count",
         "captain_agreement",
