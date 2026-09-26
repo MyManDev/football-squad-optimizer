@@ -7,8 +7,8 @@ import stat
 import tempfile
 from pathlib import Path
 
+from squadopt.data._long_paths import addressable
 from squadopt.live import InSeasonProjection, read_projection_handoff, write_projection_handoff
-from squadopt.platform._long_paths import addressable
 
 
 class ProjectionRetentionError(ValueError):

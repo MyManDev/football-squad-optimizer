@@ -48,6 +48,7 @@ whether a correction is applied twice; what to do about it is a separate decisio
 """
 
 import argparse
+import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -56,7 +57,12 @@ from pathlib import Path
 from typing import Final
 
 import pandas as pd
-from scripts._experiment_cli import REPOSITORY_ROOT, write_json, write_text
+from scripts._experiment_cli import (
+    REPOSITORY_ROOT,
+    repository_provenance,
+    write_json,
+    write_text,
+)
 
 from squadopt.data.errors import DataSourceError
 from squadopt.features.settled_outcomes import read_settled_outcomes_artifact
@@ -124,9 +130,11 @@ def _bucket_reading(frame: pd.DataFrame) -> dict[str, object]:
         reading["read"] = False
         reading["reason"] = f"fewer than {MINIMUM_BUCKET_ROWS} rows"
         return reading
-    fitted = float(frame["fitted_appearance_probability"].mean())
+    per_player_fitted = frame["fitted_appearance_probability"].astype("float64")
+    per_player_multiplier = frame["pre_deadline_availability_multiplier"].astype("float64")
+    fitted = float(per_player_fitted.mean())
     realised = float(frame["appearance"].astype("float64").mean())
-    multiplier = float(frame["pre_deadline_availability_multiplier"].mean())
+    multiplier = float(per_player_multiplier.mean())
     reading.update(
         {
             "read": True,
@@ -136,9 +144,18 @@ def _bucket_reading(frame: pd.DataFrame) -> dict[str, object]:
             # is the condition under which the multiplier is a second cut of one risk.
             "calibration_gap": fitted - realised,
             "availability_multiplier": multiplier,
-            # What the multiplier removes on top, in probability units. It is double counting
-            # to the extent the gap above is zero.
-            "further_reduction": fitted * (1.0 - multiplier),
+            # What the multiplier removes on top, in probability units, averaged over the
+            # players: each player's fitted probability times one minus his own multiplier.
+            # Not the bucket's mean fitted times one minus its mean multiplier, because the
+            # two covary (the players the capture cuts hardest are not a random draw), and
+            # the product of the means then misstates what happened to these players. It is
+            # double counting to the extent the gap above is zero.
+            "further_reduction": float((per_player_fitted * (1.0 - per_player_multiplier)).mean()),
+            # What is left after both cuts, per player and averaged, so it can be read beside
+            # the realised appearance rate.
+            "after_multiplier_appearance_probability": float(
+                (per_player_fitted * per_player_multiplier).mean()
+            ),
         }
     )
     return reading
@@ -163,17 +180,21 @@ def measure_double_reduction(weeks: Sequence[WeekInputs]) -> dict[str, object]:
         frame["recent_weeks_missed"] = frame["player_id"].map(absences)
         frame["recent_weeks_held"] = min(len(history), RECENCY_WINDOW)
         history.append(week.outcomes)
-        priced = frame.loc[
-            frame["pre_deadline_availability_multiplier"].notna()
-            & (frame["pre_deadline_availability_multiplier"] < FULL_AVAILABILITY)
-            & frame["fitted_appearance_probability"].notna()
-        ]
+        below_full = frame["pre_deadline_availability_multiplier"].notna() & (
+            frame["pre_deadline_availability_multiplier"] < FULL_AVAILABILITY
+        )
+        priced = frame.loc[below_full & frame["fitted_appearance_probability"].notna()]
         settled.append(
             {
                 "season": week.season,
                 "gameweek": week.gameweek,
                 "rows": len(frame),
                 "priced_below_full": len(priced),
+                # Priced below full with no fitted probability (a player the component route
+                # did not model): counted here and left out, never read as a zero.
+                "below_full_without_fitted_probability": int(
+                    (below_full & frame["fitted_appearance_probability"].isna()).sum()
+                ),
                 "recent_weeks_held": int(min(len(history) - 1, RECENCY_WINDOW)),
                 "fitted_source": week.fitted_source,
             }
@@ -254,25 +275,49 @@ def _summary(record: Mapping[str, object]) -> str:
         "",
         f"**What this much record supports.** {record['supports']}",
         "",
+        "| Settled week | Rows | Priced below full, read | Below full, no fitted value "
+        "| Earlier weeks held | Fitted source |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    settled = record["settled_weeks"]
+    assert isinstance(settled, list)
+    for week in settled:
+        assert isinstance(week, dict)
+        lines.append(
+            f"| {week['season']} GW{int(week['gameweek']):02d} | {week['rows']} | "
+            f"{week['priced_below_full']} | "
+            f"{week.get('below_full_without_fitted_probability', 'n/a')} | "
+            f"{week['recent_weeks_held']} | `{week['fitted_source']}` |"
+        )
+    lines += [
+        "",
         "| Recent weeks missed | Rows | Fitted P(appearance) | Realised rate | Gap "
-        "| Multiplier | Further reduction |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Multiplier | Further reduction | Left after the multiplier |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     buckets = record["by_recent_weeks_missed"]
     assert isinstance(buckets, dict)
     for name, value in buckets.items():
         assert isinstance(value, dict)
         if not value.get("read"):
-            lines.append(f"| {name} | {value['rows']} | not read: {value['reason']} | | | | |")
+            lines.append(f"| {name} | {value['rows']} | not read: {value['reason']} | | | | | |")
             continue
         lines.append(
             f"| {name} | {value['rows']} | {float(value['fitted_appearance_probability']):.4f} | "
             f"{float(value['realised_appearance_rate']):.4f} | "
             f"{float(value['calibration_gap']):+.4f} | "
             f"{float(value['availability_multiplier']):.4f} | "
-            f"{float(value['further_reduction']):.4f} |"
+            f"{float(value['further_reduction']):.4f} | "
+            f"{float(value['after_multiplier_appearance_probability']):.4f} |"
         )
     lines += [
+        "",
+        "Fitted, realised, gap and multiplier are bucket means. Further reduction is the mean "
+        "over the bucket's players of each one's fitted probability times one minus his own "
+        "multiplier, and the last column is the mean of fitted times multiplier: what the "
+        "projection carried after both cuts, to read beside the realised rate. Neither is the "
+        "product of the bucket means, because the players the capture cuts hardest do not "
+        "carry the bucket's average fitted probability.",
         "",
         "A gap near zero means the fitted probability has already absorbed the absence, and "
         "whatever the multiplier removes on top of it is removed twice. A gap that is large "
@@ -355,7 +400,9 @@ def main(argv: list[str] | None = None) -> int:
 
     record = measure_double_reduction(weeks)
     print(json.dumps(record["supports"])[1:-1])
-    for name, value in record["by_recent_weeks_missed"].items():  # type: ignore[union-attr]
+    buckets = record["by_recent_weeks_missed"]
+    assert isinstance(buckets, dict)
+    for name, value in buckets.items():
         assert isinstance(value, dict)
         if value.get("read"):
             print(
@@ -369,6 +416,10 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.dry_run:
         print("Dry run: nothing written.")
         return 0
+    # Which code wrote the record, and which bytes of the declared input it read: the file
+    # name alone does not say whether the probabilities were the week's own.
+    record["provenance"] = repository_provenance()
+    record["fitted_sha256"] = hashlib.sha256(arguments.fitted.read_bytes()).hexdigest()
     write_json(arguments.json_output, record)
     write_text(arguments.markdown_output, _summary(record))
     print(f"Wrote {arguments.json_output} and {arguments.markdown_output}")

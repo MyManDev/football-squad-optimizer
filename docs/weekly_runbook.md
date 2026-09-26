@@ -192,16 +192,51 @@ net columns beside it.
   looking at it first. So the club-news fetch belongs in the same window as everything else,
   ahead of the capture rather than after it. The fetch and the model call are one step and it
   now exists: `python -m scripts.capture_club_news --roster-snapshot <capture>` reads the
-  registry, fetches the registered pages, codes them one club per call and prints the capture
-  id that `--rotation` then reads. It runs **before** the capture, for the reason above, and
+  registry, fetches the registered pages and up to ten article pages per host that they link
+  to on the same host, codes them one club per call and prints the capture id that
+  `--rotation` then reads. It runs **before** the capture, for the reason above, and
   its roster comes from a capture already on disk so its only network reach is the club hosts
-  the registry names.
+  the registry names. A host whose terms reading is more than 90 days old is refused before
+  any request and printed as refused with the reading's date; renew the reading as
+  `docs/club_news_sources.md` describes rather than editing the date alone.
 - **The club-news capture runs on the machine that publishes, not beside it.** `--rotation-capture`
   is resolved against the run's own `data/snapshots`, so a capture written into a different
   checkout is a capture the run cannot see. That machine is the one holding `data/entries`,
   `data/ledger`, `data/handoffs` and `data/advice_records`, which the league and publish stages
   read and which are gitignored and local; a clone without them can capture club news and export
   rotation evidence, and can do nothing else in this list.
+- **Which model codes the club news is three environment variables. Before anything is
+  fetched the command checks, for every adapter, that the provider is one it knows and that a
+  key is set; it checks the model name only for the `gemini` adapter.** For the free adapter,
+  in the shell that runs `capture_club_news`:
+
+  ```powershell
+  $env:SQUADOPT_LLM_PROVIDER = "gemini"
+  $env:SQUADOPT_LLM_API_KEY = "<the key>"      # or GEMINI_API_KEY; never committed or echoed
+  $env:SQUADOPT_LLM_MODEL = "gemini-3.6-flash" # optional: this is the default
+  ```
+
+  With `SQUADOPT_LLM_PROVIDER` unset the command asks the `anthropic` adapter. That adapter
+  reads `SQUADOPT_LLM_API_KEY` first and `ANTHROPIC_API_KEY` only when the first is unset, and
+  its model name is not checked against any list. So the lines above with the provider line
+  left out send the Gemini key to the other vendor, together with the Gemini model name when
+  the model line is set. Unless the `anthropic` package is missing (the `dev` and `llm` extras
+  both install it), nothing refuses that at startup: every page is read first, and the key
+  goes out with the first club's call. Set the provider line in the same shell as the key. A
+  mistyped provider name is different: it is refused before anything is fetched, and the
+  refusal lists the registered ones.
+
+  With `SQUADOPT_LLM_MODEL` unset the `gemini` adapter asks `gemini-3.6-flash`, the model the
+  first real run (#621, 22 September) was answered by. The earlier default,
+  `gemini-2.5-flash`, answers a new key with a 404: the provider now limits the 2.5 models to
+  keys that used them before. A name outside the `gemini` adapter's list
+  (`DOCUMENTED_MODELS` in `src/squadopt/platform/club_news_gemini.py`, read from the provider's
+  models page on 25 September 2026) stops the command with `Refused:` before a single page is
+  read, and the refusal lists the names it accepts. `gemini-3.8-flash` and
+  `gemini-3.5-flash-lite` are on that list and are the two the provider points new projects to,
+  but neither has answered this adapter yet, so a switch to one of them is something to try on
+  a quiet evening rather than on the deadline day. The capture records the model and the prompt
+  digest, so a week coded by one model stays distinguishable from a week coded by another.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.

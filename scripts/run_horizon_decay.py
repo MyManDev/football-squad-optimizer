@@ -33,7 +33,6 @@ from scripts._experiment_cli import (
     write_text,
 )
 
-from squadopt.backtest.export_precision import write_export_table
 from squadopt.backtest.horizon_decay import (
     FIXTURE_GROUPS,
     MEASURED_FIXTURE_SCALING_RULE_VERSION,
@@ -46,6 +45,7 @@ from squadopt.data.sources.vaastav import (
     build_panel,
     load_team_codes,
 )
+from squadopt.data.tables import write_export_table
 
 HISTORY_SEASON = "2020-21"
 DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")

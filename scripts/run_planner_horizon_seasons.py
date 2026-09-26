@@ -39,6 +39,8 @@ from scripts._experiment_cli import (
 )
 
 from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments import (
     NAIVE_PROJECTION_RULE,
     ExperimentError,
@@ -46,8 +48,6 @@ from squadopt.experiments import (
     MultiGwRehearsalConfig,
     RehearsalWindowResult,
 )
-from squadopt.experiments.config import PromotionPolicy
-from squadopt.experiments.statistics import season_aware_moving_block_interval
 from squadopt.planning import TransferPlanningConfig
 
 LOGGER = logging.getLogger(__name__)

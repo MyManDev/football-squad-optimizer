@@ -13,8 +13,7 @@ ledger name them by **code**, the identifier that survives a transfer window. Ha
 element ids to a consumer that means codes does not fail loudly; it silently finds none
 of the squad, which is exactly how this surfaced when the league site first rendered
 (fifteen members, "no current price", zero rendered). ``scripts/build_league_site.py``
-owned this class privately; application.capture_entries now owns the offline adapter,
-and this module re-exports the same object for existing callers.
+owned this class privately; application.capture_entries now owns the offline adapter.
 
 Serving advice needs a **projection handoff**. The opening gameweek's archive-panel route
 exists in the decision path and is deliberately not offered here: a backend that answered
@@ -29,12 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from squadopt.application.advice import HorizonBuilder, member_horizon_builder
-from squadopt.application.capture_entries import (
-    CapturePicksProvider as CapturePicksProvider,
-)
-from squadopt.application.capture_entries import (
-    capture_element_codes as capture_element_codes,
-)
+from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import ForecastSource, forecast_source
 from squadopt.application.manager_words import ManagerWords
 from squadopt.application.top100_weight import Top100Counts
@@ -59,8 +53,6 @@ from squadopt.platform.advice_switches import AdviceSwitchInputs
 __all__ = [
     "AdviceCaptureContext",
     "CaptureIdentity",
-    "CapturePicksProvider",
-    "capture_element_codes",
     "handoff_fingerprint_for",
     "latest_snapshot_id",
     "load_capture_context",

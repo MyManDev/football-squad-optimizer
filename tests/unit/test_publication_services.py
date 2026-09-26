@@ -13,7 +13,7 @@ import tests.unit.test_advice_worker as member_fixture
 import tests.unit.test_backend_runtime as handoff_fixture
 import tests.unit.test_source_vaastav as archive_fixture
 
-from squadopt.application import capture_entries, league_publication, league_views, scoreboard
+from squadopt.application import league_publication, league_views, scoreboard
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     prepare_league_publication,
@@ -23,7 +23,6 @@ from squadopt.application.site_publication import SitePublicationRequest, publis
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.vaastav import SUPPORTED_SEASONS
-from squadopt.platform import capture_context
 from squadopt.platform.publication_workers import league_mapper
 
 NOW = datetime(2026, 8, 27, 10, tzinfo=UTC)
@@ -118,8 +117,6 @@ def test_old_helpers_reexport_the_installed_owners() -> None:
     assert scoreboard_cli.scoreboard_payload is scoreboard.scoreboard_payload
     assert scoreboard_cli.CohortCapture is scoreboard.CohortCapture
     assert scoreboard_cli.CohortPicks is scoreboard.CohortPicks
-    assert capture_context.CapturePicksProvider is capture_entries.CapturePicksProvider
-    assert capture_context.capture_element_codes is capture_entries.capture_element_codes
 
 
 def test_preparing_a_named_capture_neither_solves_nor_writes(tmp_path: Path) -> None:

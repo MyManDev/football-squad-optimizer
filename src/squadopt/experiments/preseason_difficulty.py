@@ -37,7 +37,10 @@ from squadopt.data.sources.fpl_live import (
     fixture_snapshot,
     gameweek_deadlines,
 )
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 
 PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION: Final = "preseason_difficulty_record_v1"
 

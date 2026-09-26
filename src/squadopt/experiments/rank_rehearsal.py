@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from squadopt.evaluation import score_realized_squad_points
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.scenario_policy_objective import ScenarioPolicyObjective
 from squadopt.optimization import OptimizationConfig, optimize_squad
 from squadopt.prediction import (

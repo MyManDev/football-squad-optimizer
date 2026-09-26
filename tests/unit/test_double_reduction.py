@@ -12,6 +12,7 @@ from scripts.measure_double_reduction import (
     MINIMUM_BUCKET_ROWS,
     RECENCY_WINDOW,
     WeekInputs,
+    _summary,
     measure_double_reduction,
     recent_absences,
 )
@@ -113,6 +114,64 @@ def test_a_thick_bucket_is_read_and_carries_the_gap_the_question_asks_for() -> N
     # rather than a second cut -- and the sign of the gap is what says which.
     assert read["calibration_gap"] == pytest.approx(-0.70)
     assert read["further_reduction"] == pytest.approx(0.15)
+
+
+def test_the_further_reduction_is_what_the_multiplier_took_from_each_player() -> None:
+    """Averaged over players, not the product of the bucket's means.
+
+    The capture cuts hardest the players it has news about, and those do not carry the
+    bucket's average fitted probability. Here half the bucket is fitted at 0.1 and priced at
+    a multiplier of zero, which takes all of it, and the other half is fitted at 0.5 and
+    halved. The product of the means reads 0.3 * (1 - 0.25) = 0.225; what the multiplier
+    actually took is (0.1 * 1 + 0.5 * 0.5) / 2 = 0.175, and 0.125 is left.
+    """
+
+    absent = [_player(index, appearance=False) for index in range(1, 41)]
+    priced = [
+        _player(index, appearance=False, multiplier=0.0 if index <= 20 else 0.5)
+        for index in range(1, 41)
+    ]
+    fitted = {index: 0.1 if index <= 20 else 0.5 for index in range(1, 41)}
+
+    record = measure_double_reduction(
+        [
+            _inputs(4, _week(4, absent), fitted),
+            _inputs(5, _week(5, priced), fitted),
+        ]
+    )
+
+    buckets = record["by_recent_weeks_missed"]
+    assert isinstance(buckets, dict)
+    read = buckets["1"]
+    assert read["fitted_appearance_probability"] == pytest.approx(0.30)
+    assert read["availability_multiplier"] == pytest.approx(0.25)
+    assert read["further_reduction"] == pytest.approx(0.175)
+    assert read["after_multiplier_appearance_probability"] == pytest.approx(0.125)
+    # The two halves of the fitted probability account for all of it, player by player.
+    assert read["further_reduction"] + read["after_multiplier_appearance_probability"] == (
+        pytest.approx(read["fitted_appearance_probability"])
+    )
+
+
+def test_every_row_of_the_bucket_table_has_the_header_s_cells() -> None:
+    absent = [_player(index, appearance=False) for index in range(1, 41)]
+    fitted = dict.fromkeys(range(1, 41), 0.30)
+    record = measure_double_reduction(
+        [_inputs(4, _week(4, absent), fitted), _inputs(5, _week(5, absent), fitted)]
+    )
+
+    table = [
+        line
+        for line in _summary(record).splitlines()
+        if line.startswith("| ") and not line.startswith("| Settled week")
+    ]
+    header = next(line for line in table if line.startswith("| Recent weeks missed"))
+    bucket_rows = table[table.index(header) :]
+
+    assert "Left after the multiplier" in header
+    assert {row.count("|") for row in bucket_rows} == {header.count("|")}
+    assert any(" not read: " in row for row in bucket_rows)
+    assert any(row.startswith("| 1 | 40 | 0.3000 |") for row in bucket_rows)
 
 
 def test_the_population_is_the_players_the_capture_priced_below_full() -> None:

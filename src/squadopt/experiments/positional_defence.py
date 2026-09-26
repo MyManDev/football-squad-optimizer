@@ -39,7 +39,7 @@ from typing import Any, Final
 import pandas as pd
 
 from squadopt.data.sources.vaastav import load_team_codes
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 
 #: Identifies this reading in a record. It moves when the candidate's meaning moves.
 POSITIONAL_DEFENCE_CONTRACT_VERSION: Final = "positional_defence_v1"

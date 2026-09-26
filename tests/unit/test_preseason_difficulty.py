@@ -12,7 +12,10 @@ import pytest
 
 from squadopt.data.errors import SnapshotIntegrityError
 from squadopt.data.snapshots import write_snapshot
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.preseason_difficulty import (
     PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION,
     TEAM_STRENGTH_FIELDS,
