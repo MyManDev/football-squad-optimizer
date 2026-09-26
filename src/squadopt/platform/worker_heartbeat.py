@@ -184,6 +184,9 @@ def freshest_heartbeat_age(root: Path, *, now: datetime) -> float | None:
     moved back after it was written. A live worker rewrites its document on its next
     round, so a document that stays far ahead belongs to a worker that stopped before the
     clock moved, and must not read as fresh.
+
+    A directory that cannot be listed raises ``OSError``; ``WorkerLiveness`` reads that
+    as no worker seen.
     """
 
     if not root.is_dir():
@@ -251,22 +254,35 @@ class WorkerLiveness:
         """``(worker_heartbeat, queue_wait)``, held for ``recheck_seconds``.
 
         ``worker_heartbeat`` holds when some worker's document is at most
-        ``stale_after_seconds`` old. ``queue_wait`` holds when no queued job has waited
-        longer than ``queued_limit_seconds``; a queue that cannot be read (its lock stayed
-        busy for the whole bounded wait, or a record is damaged) does not hold, because a
-        check that could not be made has not passed.
+        ``stale_after_seconds`` old. A heartbeat directory that cannot be listed does not
+        hold. ``queue_wait`` holds when no queued job has waited longer than
+        ``queued_limit_seconds``. A queue that cannot be read (its lock stayed busy for the
+        whole bounded wait, or a file in it could not be read) does not hold. In both cases
+        a check that could not be made has not passed, and ``/ready`` answers 503 naming it
+        rather than failing.
+
+        A damaged queue record does not make ``queue_wait`` false. The queue's scan keeps a
+        copy of its bytes under the queue's ``integrity`` directory (logging it the first
+        time) and skips it, so it is neither a waiting job nor a failed look.
         """
 
         with self._lock:
             if self._held is not None and self._monotonic() - self._held_at < self._recheck:
                 return self._held
             now = self._clock()
-            age = freshest_heartbeat_age(self._root, now=now)
+            try:
+                age = freshest_heartbeat_age(self._root, now=now)
+            except OSError:
+                # The directory could not be listed (or checked), so no worker was seen.
+                age = None
             worker_alive = age is not None and age <= self._stale_after
             try:
                 wait = oldest_queued_wait(self._queue.jobs(), now=now)
             except (OSError, ValueError):
-                # QueueLockTimeout is an OSError; AdviceQueueError is a ValueError.
+                # A lock that stayed busy (QueueLockTimeout is an OSError) or a queue file
+                # that could not be read. A damaged record does not land here: the scan sets
+                # it aside under the queue's integrity directory and does not count it.
+                # ValueError is the queue contract's own error type (AdviceQueueError).
                 queue_moving = False
             else:
                 queue_moving = wait is None or wait <= self._queued_limit

@@ -9,13 +9,14 @@ while ``/health`` still asks nothing of anybody.
 
 from __future__ import annotations
 
+import errno
 import inspect
 import json
 import os
 import signal
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -310,6 +311,52 @@ def test_a_queue_that_cannot_be_read_is_not_a_queue_that_moves(tmp_path: Path) -
     assert liveness.checks() == (True, False)
 
 
+def test_a_damaged_queue_record_is_set_aside_by_the_scan_and_not_counted(
+    tmp_path: Path,
+) -> None:
+    """The scan keeps the record's bytes as evidence and skips it; the look still succeeds."""
+
+    root = tmp_path / "workers"
+    WorkerHeartbeat(root, pid=1, clock=_at(0)).beat()
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_queued("advice-waiting-1", waited=QUEUED_JOB_LIMIT_SECONDS))
+    (tmp_path / "jobs" / "advice-damaged-1.json").write_text("not json", encoding="utf-8")
+    liveness = WorkerLiveness(root, queue, clock=lambda: NOW, recheck_seconds=0.0)
+
+    assert liveness.checks() == (True, True)
+    assert len(queue.integrity_issues()) == 1
+
+
+@pytest.mark.parametrize("fails", ["at_the_call", "partway"])
+def test_a_heartbeat_directory_that_cannot_be_listed_is_not_a_live_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fails: str
+) -> None:
+    """A listing that raises is a check that could not be made, not an error for ``/ready``."""
+
+    root = tmp_path / "workers"
+    WorkerHeartbeat(root, pid=1, clock=_at(0)).beat()
+    WorkerHeartbeat(root, pid=2, clock=_at(0)).beat()
+    listing = Path.iterdir
+
+    def refuse(self: Path) -> Iterator[Path]:
+        if self != root:
+            return listing(self)
+        if fails == "at_the_call":
+            raise OSError(errno.EIO, "The heartbeat directory cannot be read")
+
+        def first_then_fail() -> Iterator[Path]:
+            yield next(iter(listing(self)))
+            raise OSError(errno.EIO, "The heartbeat directory cannot be read")
+
+        return first_then_fail()
+
+    monkeypatch.setattr(Path, "iterdir", refuse)
+    liveness = WorkerLiveness(
+        root, FileJobQueue(tmp_path / "jobs"), clock=lambda: NOW, recheck_seconds=0.0
+    )
+    assert liveness.checks() == (False, True)
+
+
 def test_one_look_answers_readiness_for_the_recheck_interval(tmp_path: Path) -> None:
     """``/ready`` is public, so a burst of probes costs one queue scan, not one each."""
 
@@ -518,6 +565,29 @@ def test_ready_answers_503_naming_the_queue_check_when_a_job_waits_too_long(
         "ready": False,
         "checks": {**dict.fromkeys(CHECKS, True), "queue_wait": False},
     }
+
+
+def test_ready_answers_503_naming_the_worker_check_when_the_heartbeats_cannot_be_listed(
+    deployment: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = deployment["config"]
+    _only_live_heartbeat(config, seconds_ago=1)
+    client, _backend = _client(deployment)
+    listing = Path.iterdir
+
+    def refuse(self: Path) -> Iterator[Path]:
+        if self == config.worker_root:
+            raise OSError(errno.EIO, "The heartbeat directory cannot be read")
+        return listing(self)
+
+    monkeypatch.setattr(Path, "iterdir", refuse)
+    response = client.get("/ready")
+    assert response.status_code == 503
+    assert response.json() == {
+        "ready": False,
+        "checks": {**dict.fromkeys(CHECKS, True), "worker_heartbeat": False},
+    }
+    assert "/" not in response.text and "\\" not in response.text
 
 
 def test_health_stays_liveness_and_asks_no_dependency(
