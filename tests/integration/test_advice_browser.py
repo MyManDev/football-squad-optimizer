@@ -410,17 +410,6 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         environment,
         api_log,
     ) as api:
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline and api.poll() is None:
-            try:
-                with urlopen(f"{api_origin}/ready", timeout=1) as response:
-                    if response.status == 200:
-                        break
-            except (URLError, TimeoutError):
-                time.sleep(0.1)
-        else:
-            pytest.fail(f"API did not become ready:\n{api_log.read_text(encoding='utf-8')}")
-
         browser_context = json.loads(environment["SQUADOPT_BROWSER_CONTEXT"])
         browser_context["apiPid"] = api.pid
         environment["SQUADOPT_BROWSER_CONTEXT"] = json.dumps(browser_context)
@@ -429,6 +418,20 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
             environment,
             worker_log,
         ) as worker:
+            # Ready includes a live worker's heartbeat, so the worker starts before the wait.
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline and api.poll() is None and worker.poll() is None:
+                try:
+                    with urlopen(f"{api_origin}/ready", timeout=1) as response:
+                        if response.status == 200:
+                            break
+                except (URLError, TimeoutError):
+                    time.sleep(0.1)
+            else:
+                pytest.fail(
+                    f"API did not become ready:\n{api_log.read_text(encoding='utf-8')}\n"
+                    f"Worker:\n{worker_log.read_text(encoding='utf-8')}"
+                )
             with _process(
                 [node, str(playwright), "test", "--config", "playwright.backend.config.ts"],
                 environment,
