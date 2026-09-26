@@ -18,6 +18,10 @@ records contradict:
 - "The last outage issue" named one that a later issue, opened and closed the same day, had
   already replaced.
 
+A second review found a fifth: the roadmap said model-read club news reaches members as the
+manager's word. Every published member index that ever carried the word named the committed
+synthetic fixture as its source (GW5), and GW6 carries none.
+
 Each test below reads the record and holds the roadmap to it. The records are the authority;
 what a test needs from the roadmap's wording is kept to one phrase or one list, so a line that
 stops agreeing with its record fails here before a reader finds it.
@@ -29,12 +33,14 @@ import json
 import re
 from pathlib import Path
 
+from squadopt.application.manager_words import SOURCE_CLUB_NEWS_CAPTURE
 from squadopt.application.strategies.rule import STRATEGY_RULE_ID
 from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ROADMAP = REPOSITORY_ROOT / "docs" / "product" / "roadmap.md"
 SEASON_DATA = REPOSITORY_ROOT / "web" / "public" / "data" / "2026-27"
+MEMBER_ADVICE = REPOSITORY_ROOT / "web" / "public" / "data" / "league" / "advice"
 TOP100_PROTOCOL = REPOSITORY_ROOT / "docs" / "top100_effect_prereg.md"
 BENCHMARK_PROTOCOL = REPOSITORY_ROOT / "docs" / "benchmark_v2_prereg.md"
 UPTIME_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "backend-uptime.yml"
@@ -48,6 +54,11 @@ PAIRED_WEEKS_REQUIRED = 8
 
 #: The Top-100 protocol's words for a gameweek whose deciding handoff carried the uplift.
 DECIDED_ON_THE_UPLIFT = "the handoff that decided carried the uplift"
+
+#: The phrases that put a real club's news in front of members.
+REAL_CLUB_NEWS_CLAIMS = re.compile(
+    r"\breach(?:es|ed)? (?:the )?members\b|\bevidence in the product\b", flags=re.I
+)
 
 
 def _flat(text: str) -> str:
@@ -211,3 +222,38 @@ def test_the_outage_record_is_the_label_listing_not_a_latest_issue() -> None:
         if re.search(r"\b(?:last|latest|most recent)\b[^.]*\boutage", sentence, flags=re.I)
     ]
     assert not recency, "\n".join(["these name a latest outage, which goes stale:", *recency])
+
+
+def test_the_managers_word_is_not_said_to_carry_club_news_no_published_week_read() -> None:
+    """A member index says where its manager's word came from, and so far none read a club.
+
+    Each published member index names the source of the words it carries
+    (`evidence.source_kind`); only a club-news capture is a real club's page, and the
+    committed fixture is example data. The published tree holds the latest week only, so this
+    reads what it holds: while no index in it carries a real read, no sentence about the
+    manager's word or club news may say it reaches members or is evidence in the product,
+    and the roadmap has to say the switch has run on example data.
+    """
+
+    indexes = sorted(MEMBER_ADVICE.glob("*/index.json"))
+    assert indexes, "the published tree holds no member index, so this test checks nothing"
+    sources = set()
+    for index in indexes:
+        evidence = json.loads(index.read_text(encoding="utf-8"))["payload"].get("evidence")
+        if isinstance(evidence, dict) and evidence.get("available") is True:
+            sources.add(str(evidence.get("source_kind")))
+    if SOURCE_CLUB_NEWS_CAPTURE in sources:
+        return
+
+    about_the_word = [
+        sentence
+        for sentence in _sentences(ROADMAP.read_text(encoding="utf-8"))
+        if re.search(r"manager's word|club[ -]news", sentence, flags=re.I)
+    ]
+    claims = [sentence for sentence in about_the_word if REAL_CLUB_NEWS_CLAIMS.search(sentence)]
+    assert not claims, "\n".join(
+        ["these put club news in front of members, which no published index shows:", *claims]
+    )
+    assert any("example data" in sentence for sentence in about_the_word), (
+        "the roadmap never says the manager's word has run on example data"
+    )

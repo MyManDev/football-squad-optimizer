@@ -7,9 +7,10 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 
 ## Current position
 
-Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026; the five
-commits after it on `develop` up to `a5ba8d86` (#811, #812, #813, #815, #817) were read on
-26 September 2026 for anything they change here. Each line names the code or the record it
+Read from `develop` at `0f49ba8d` and from the published tree on 25 September 2026; the ten
+commits after it on `develop` up to `ea2f0840` (#811 to #820) were read on 26 September 2026
+for anything they change here, and the manager's word lines were checked that day against
+every version of the published member indexes. Each line names the code or the record it
 can be checked against, and `tests/unit/test_roadmap_current_position.py` checks several of
 them against those records. The phase sections below keep their goals; this section is what
 exists today.
@@ -18,8 +19,9 @@ exists today.
 
 League `352490` only. The site is the direction D design (#798: light green page, a left
 sidebar, transfers drawn as substitution boards, the squad on a pitch, fixtures beside the
-decision), released to `main` in #805 and deployed as `site-2026-27-gw06-fix1` on
-2026-09-25.
+decision), released to `main` in #805 and first deployed as `site-2026-27-gw06-fix1` on
+2026-09-25. On 26 September 2026 production was `site-2026-27-gw06-fix2` (#852, deploy run
+36201155016), whose tree is `develop` at `ea2f0840`, with the published data unchanged.
 
 **Published with the week**, for every member, in the static tree
 (`web/public/data/league/advice/<entry>/index.json`; the GW6 decision was built from
@@ -56,12 +58,21 @@ capture can answer (the capabilities document in `platform/advice_read.py`):
   many Top 100 teams started each player last week, at every window and on the rival
   strategies (#594, #599). The plan is chosen on the weighted points and every number shown
   is on the base model (`application/top100_weight.py`). It is offered only when that
-  capture's Top 100 export passed its gate.
-- The manager's word: model-coded club news entered as a constraint the member switches on,
-  with its price, on the one-week pure-points plan (#581, `application/manager_words.py`).
-  Two real clubs are registered, Liverpool and Newcastle
-  (`data/sources/club_news_sources.json`). It is offered only when a rotation table with the
-  club news exists for that capture.
+  capture's Top 100 export passed its gate. GW5's publication carried it for every member;
+  every GW6 index says `no_top100_this_run`.
+- The manager's word: coded club news entered as a constraint the member switches on, with
+  its price, on the one-week pure-points plan (#581, `application/manager_words.py`). It is
+  built and switchable, and so far it has run on example data only. GW5 is the one week
+  whose publications carried it, and every GW5 member index names the committed synthetic
+  fixture (`evidence.source_kind` `synthetic_fixture`, from `club_news_v1.fixture.json`,
+  clubs Arsenal and Man Utd), which the page labelled example data. No real club's coded
+  news has entered a published plan, and GW6 carries none (every GW6 index:
+  `evidence.available` false, `no_evidence_this_run`). Liverpool and Newcastle are
+  registered for reading (`data/sources/club_news_sources.json`), but the weekly runbook
+  still names the committed fixture as the only club-news source wired up. The backend
+  offers the switch only when a club-news source is configured and a rotation table exists
+  for its capture, and `scripts/run_backend_local.ps1` sets that source to the same fixture
+  unless it is given another.
 - A chip the member names, forced into the plan at one, three or five weeks (#646, #769,
   `application/advice_chip_strategy.py`). The automatic chip choice is refused until it can
   value holding a chip past the window (#802).
@@ -111,9 +122,10 @@ What a strategy may publish is a closed list with no probability and no spread i
   cannot be one, since the protocol gives GW1 no cohort and its capture is gone from the
   operational `data/snapshots`. GW4's ledger decision is a replay. GW5 is the first
   candidate, a live decision with an overall Top-100 cohort captured before its deadline
-  (`fpl-top100-20260918T122433Z-ce78d1e94c1e`), and it has not been scored into a record. If
-  every week from GW6 on is decided live with its cohort captured before the deadline, GW12
-  is the eighth. The GW3 cohort was lost before it could be settled (see Phase A below).
+  (`fpl-top100-20260918T122433Z-ce78d1e94c1e`), and it has not been scored as a paired
+  gameweek (`docs/benchmark_v2.md` has no GW5 entry). If every week from GW6 on is decided
+  live with its cohort captured before the deadline, GW12 is the eighth. The GW3 cohort was
+  lost before it could be settled (see Phase A below).
 - **Phase B: complete.**
 - **Phase C: the component base is the live default; members have had it bare since GW5.**
   GW4's member advice (`site-2026-27-gw04-decision`, #499 and #500) was solved on the
@@ -135,8 +147,10 @@ What a strategy may publish is a closed list with no probability and no spread i
   beaten the rolling one-week control; the capped rolling three-week planner is level with
   it (`docs/transfer_discipline_note.md`).
 - **Phase G: searched, nothing promoted.** The 2025-26 holdout is spent (see Phase G).
-- **Phase H: one item started.** The manager's word is the first model-read evidence in the
-  product, entered as a priced constraint.
+- **Phase H: one item built, run on example data only.** The manager's word is built and
+  switchable as a priced constraint. So far it has run on example data only (GW5, labelled
+  example data on the page); no real club's coded news has entered a published plan, and GW6
+  carries none.
 
 See the [backend boundary](../architecture/backend.md) for the API and worker contracts.
 
@@ -439,8 +453,10 @@ Exit criteria:
 
 ## Phase H — Advanced methods and product scaling
 
-**Status: future, with one item started.** Model-read club news reaches members as the
-manager's word, a priced constraint the member switches on (see Current position).
+**Status: future, with one item built.** The manager's word is built and switchable as a
+priced constraint (see Current position). So far it has run on example data only (GW5,
+labelled example data on the page); no real club's coded news has entered a published plan,
+and GW6 carries none.
 
 Goal: introduce more complex methods only when simpler calibrated baselines leave a measured
 gap.
