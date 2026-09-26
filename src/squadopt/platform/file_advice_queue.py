@@ -20,6 +20,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from squadopt.data.atomic import replace_retrying
 from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_observability import AdviceLog
@@ -360,7 +361,7 @@ class FileJobQueue:
             if create:
                 os.link(temporary, path)
             else:
-                os.replace(temporary, path)
+                replace_retrying(Path(temporary), path)
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)

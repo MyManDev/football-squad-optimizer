@@ -1,8 +1,10 @@
 """The queue and the worker loop: claims are exclusive, failures become records."""
 
+import errno
 import functools
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -476,3 +478,32 @@ def test_contention_at_completion_is_never_stored_as_a_failure(
     assert cache.get(CACHE_KEY) == b'{"advice": 1}'
     events = [json.loads(record.getMessage())["event"] for record in caplog.records]
     assert "advice_job_failed" not in events
+
+
+def test_a_queue_record_refused_twice_while_a_reader_holds_it_lands_on_a_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows refuses the rename (WinError 5) while a reader outside the lock holds it."""
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+    real_replace = os.replace
+    refused: list[str] = []
+
+    def held(source: str | Path, destination: str | Path) -> None:
+        if str(destination).endswith("job-0001.json") and len(refused) < 2:
+            refused.append(str(destination))
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr("squadopt.data.atomic.os.replace", held)
+    monkeypatch.setattr("squadopt.data.atomic.time.sleep", lambda _seconds: None)
+    done = run_advice_worker_once(
+        queue, cache, lambda job: b'{"advice": 1}', at_utc="2026-08-27T12:00:30Z"
+    )
+
+    assert len(refused) == 2
+    assert done is not None and done.status == "completed"
+    assert queue.load("job-0001") == done
+    assert not list((tmp_path / "jobs").glob("*.tmp"))

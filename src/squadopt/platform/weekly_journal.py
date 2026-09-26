@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from squadopt.data.atomic import replace_retrying
 from squadopt.platform._queue_lock import QueueFileLock, QueueLockTimeout
 
 SCHEMA_VERSION = "weekly_run_v1"
@@ -139,7 +140,9 @@ def _replace(path: Path, raw: bytes) -> None:
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        # Status readers take the metadata lock; a reader that does not (an editor, a
+        # scanner) makes Windows refuse this rename while it holds run.json open.
+        replace_retrying(Path(temporary), path)
     finally:
         Path(temporary).unlink(missing_ok=True)
 
