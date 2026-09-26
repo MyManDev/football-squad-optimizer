@@ -559,6 +559,53 @@ def test_republishing_one_capture_at_a_later_minute_is_still_a_no_op(
     assert [child.name for child in sorted(week.iterdir()) if child.is_dir()] == [world["gw2_id"]]
 
 
+def test_the_stamp_is_taken_when_the_files_are_written_not_when_the_build_starts(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every member is solved before the clock is read, and the files and records share it.
+
+    The stamp used to be taken before any member was solved, so the record and every
+    envelope carried a time earlier than the files it described by the whole batch, and the
+    member history showed that time beside the advice. The clock here reads the build's
+    start until the solves have returned and ninety minutes later after that.
+    """
+
+    solved: list[bool] = []
+
+    class Clock(datetime.datetime):
+        @classmethod
+        def now(cls, tz: datetime.tzinfo | None = None) -> "Clock":
+            reading = WHEN + datetime.timedelta(minutes=90) if solved else WHEN
+            return cls.fromtimestamp(reading.timestamp(), tz)
+
+    def solve_every_member_then_mark(function: Any, tasks: Any) -> list[Any]:
+        renders = list(map(function, tasks))
+        solved.append(True)
+        return renders
+
+    monkeypatch.setattr(league_views, "datetime", Clock)
+    inputs, projection, rules = _world_context(world)
+    out, records = tmp_path / "out", tmp_path / "records"
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, _legal_squad())}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=out,
+        mapper=solve_every_member_then_mark,
+        advice_record_root=records,
+    )
+    assert solved == [True]
+    record = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])
+    assert record["generated_at_utc"] == "2026-08-23T13:30:00Z"
+    for published in ("advice/101/saf-puan/1.json", "entries/101.json", "members.json"):
+        envelope = json.loads((out / published).read_text(encoding="utf-8"))
+        assert envelope["generated_at_utc"] == record["generated_at_utc"], published
+
+
 def test_a_replay_forgives_the_publication_clock_and_nothing_else(
     world: dict[str, Any], tmp_path: Path
 ) -> None:

@@ -216,9 +216,11 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
   const reason =
     week.reason === "no_pre_deadline_record" || week.reason === "missing_advice"
       ? copy.noEligible
-      : week.reason === "missing_outcomes"
-        ? copy.missingOutcomes
-        : copy.invalid;
+      : week.reason === "not_published"
+        ? copy.notPublished
+        : week.reason === "missing_outcomes"
+          ? copy.missingOutcomes
+          : copy.invalid;
   const chip =
     suggested?.chip === "3xc" ? copy.triple : suggested?.chip ? copy[suggested.chip] : copy.noChip;
   return (
@@ -345,7 +347,7 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
         <dl className={styles.facts}>
           {(
             [
-              [copy.published, week.advice_generated_at_utc],
+              [copy.generated, week.advice_generated_at_utc],
               [copy.deadline, week.deadline_utc],
               [copy.captured, week.advice_captured_at_utc],
               [copy.settledAt, week.outcome_captured_at_utc],

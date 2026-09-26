@@ -152,7 +152,11 @@ def world(
                     "payload": {"gameweek": 5, "entry_id": entry_id, "fixture_variant": variant},
                 },
             )
-        write(accepted / f"data/league/entries/{entry_id}.json", {"payload": {"gameweek": 5}})
+        # The page names the capture its advice came from; the history counts that record.
+        write(
+            accepted / f"data/league/entries/{entry_id}.json",
+            {"payload": {"gameweek": 5, "source_snapshot_id": "capture-a"}},
+        )
         record_member_advice(
             tmp_path / "records",
             recorded(
@@ -464,6 +468,32 @@ def test_other_record_cannot_score_accepted_advice(
         {"payload": {"gameweek": 5, "different": True}},
     )
     assert_early_refusal(request, monkeypatch, "does not match accepted advice")
+
+
+def test_a_later_record_from_a_run_that_never_published_does_not_displace_the_accepted_one(
+    tmp_path: Path,
+) -> None:
+    request = world(tmp_path)
+    # Recorded after the accepted advice and before the deadline by a run the accepted tree
+    # does not carry. The latest stamp alone would score it, and the check against the
+    # accepted advice would then refuse the whole outcome publish.
+    record_member_advice(
+        request.record_root,
+        recorded(
+            gameweek=5,
+            entry_id=101,
+            captured="2026-09-18T09:00:00Z",
+            published="2026-09-18T10:00:00Z",
+            name="unpublished-run",
+            digest="b" * 64,
+        ),
+    )
+    publication.publish_settled(request)
+    history = json.loads(
+        (request.out_dir / "data/league/history/101.json").read_text(encoding="utf-8")
+    )
+    week = next(row for row in history["payload"]["weeks"] if row["gameweek"] == 5)
+    assert (week["status"], week["advice_snapshot_id"]) == ("available", "capture-a")
 
 
 def test_failure_after_generation_does_not_expose_half_candidate(

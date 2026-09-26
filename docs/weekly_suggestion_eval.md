@@ -7,9 +7,22 @@ on `feat/weekly-suggestion-eval`, based on enterprise review commit `4b55253f`.
 ## Evidence and selection
 
 - Read existing member advice through the manifest-verifying archive reader.
-- Select `saf-puan`, window `1`, without a rival. Order eligible records by their
-  recorded publication time, not capture time. Both clocks must precede the deadline;
-  equality with the deadline is too late. Publication cannot precede capture.
+- Select `saf-puan`, window `1`, without a rival. Count only the record whose capture
+  the published tree names for that member and week. A member's page
+  (`entries/{id}.json`, `source_snapshot_id`) names its own week, and the history the
+  tree already carries (`advice_snapshot_id`) names each earlier week. A publication
+  reads the tree it replaces before rewriting it, then adds its own pages. A run that
+  recorded advice and never published it is never shown as what the member was told:
+  when no record of the week is the published one, the week reads `not_published`.
+- Both the capture and the record's stamp must precede the deadline; equality with the
+  deadline is too late. The stamp cannot precede the capture.
+- The record's `generated_at_utc` is its build's clock, not a publication time. Records
+  written from this change on take it after every member is solved, just before the
+  files are written; older records carry the build's start. The page labels it as the
+  advice's build time.
+- The measurement readers (`scripts/measure_live_price_honesty.py`,
+  `scripts/measure_top100_effect.py`) hold no published tree and still take the latest
+  record by its stamp. No member-facing document is built that way.
 - Reject ambiguous or corrupt evidence instead of substituting an older result.
 - Show only weeks with an actual member record directory. An empty archive is an
   empty history; no earlier recommendations are reconstructed or solved again.
@@ -104,8 +117,8 @@ and GW14 is unfinished. This fixture is used only by tests and a clearly labelle
 separate local mock preview. It is not imported by the production UI.
 
 `generated_at_utc` in this derived contract denotes the input capture cutoff for
-outcomes, shown as the result-data date. The original advice publication timestamp
-remains separate and can be later than its input capture.
+outcomes, shown as the result-data date. The advice's build time remains separate and
+can be later than its input capture.
 
 ## Verification and current data
 

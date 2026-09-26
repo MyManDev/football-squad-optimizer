@@ -30,6 +30,8 @@ from squadopt.application.top100_weight import (
 from squadopt.application.weekly_suggestion_eval import (
     SUPPORTED_LEAGUE_ID,
     publish_suggestion_histories,
+    published_advice_captures,
+    published_page_captures,
 )
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
@@ -317,6 +319,12 @@ def publish_prepared_league(
             f"{int(inputs.deadline.gameweek)}. Refused before any member is solved."
         )
     top100_counts, top100_reason, top100_note = load_publication_top100(request, inputs, projection)
+    history_root = request.history_record_root or request.record_root
+    if request.league_id != SUPPORTED_LEAGUE_ID:
+        history_root = None
+    # Read before the build below rewrites the tree: the tree this publication replaces is
+    # the only place that says which capture each earlier week showed each member.
+    shown = published_advice_captures(out_dir) if history_root is not None else {}
     report = build_league_views(
         CapturePicksProvider(snapshot, request.snapshot_id),
         prepared.registrations,
@@ -347,8 +355,9 @@ def publish_prepared_league(
         chip_forecast_source=forecast_source(snapshot),
     )
     outputs = [out_dir / name for name in report.files]
-    history_root = request.history_record_root or request.record_root
-    if history_root is not None and request.league_id == SUPPORTED_LEAGUE_ID:
+    if history_root is not None:
+        # This publication's own member pages name this week's capture.
+        shown.update(published_page_captures(out_dir))
         outputs.extend(
             publish_suggestion_histories(
                 record_root=history_root,
@@ -358,6 +367,7 @@ def publish_prepared_league(
                 league_id=request.league_id,
                 entry_ids=[entry.entry_id for entry in prepared.registrations],
                 out_dir=out_dir,
+                published=shown,
             )
         )
     if request.record_root is not None:

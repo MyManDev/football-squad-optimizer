@@ -28,6 +28,7 @@ from squadopt.application.scoreboard import scoreboard_payload
 from squadopt.application.site import build_site
 from squadopt.application.weekly_suggestion_eval import (
     publish_suggestion_histories,
+    published_advice_captures,
     review_member_weeks,
 )
 from squadopt.data.atomic import replace_retrying
@@ -204,6 +205,7 @@ def _preflight(
         season=request.season,
         league_id=request.league_id,
         entry_ids=ids,
+        published=published_advice_captures(request.accepted_dir / "data" / "league"),
     )
     for entry_id, reviewed_weeks in reviews.items():
         if any(week.gameweek > request.gameweek for week in reviewed_weeks):
@@ -387,6 +389,7 @@ def publish_settled(request: SettledPublicationRequest) -> SettledPublicationRes
             league_id=request.league_id,
             entry_ids=tuple(scores),
             out_dir=candidate / "data" / "league",
+            published=published_advice_captures(request.accepted_dir / "data" / "league"),
         )
         members["generated_at_utc"] = stamp
         members["payload"]["scored_gameweek"] = request.gameweek

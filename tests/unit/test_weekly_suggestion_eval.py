@@ -222,6 +222,168 @@ def test_no_records_and_only_late_record_are_honest(tmp_path: Path) -> None:
     assert result.reason == "no_pre_deadline_record" and result.suggested is None
 
 
+def shown_by_tree(root: Path, tree: dict[tuple[int, int], str]) -> dict[str, Any] | None:
+    return review.select_record(
+        root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE, published=tree
+    )
+
+
+def test_a_record_from_a_run_that_never_published_is_not_what_the_member_was_told(
+    tmp_path: Path,
+) -> None:
+    # The gameweek 6 shape: one run recorded capture-b and never published it, and the site
+    # carried capture-a. Both are before the deadline and the unpublished one is later, so
+    # the latest stamp alone would take it.
+    records = tmp_path / "records"
+    shown = recorded()
+    unpublished = recorded(
+        captured="2026-09-10T09:00:00Z",
+        published="2026-09-10T10:00:00Z",
+        name="capture-b",
+        digest="b" * 64,
+    )
+    record_member_advice(records, shown)
+    record_member_advice(records, unpublished)
+    assert choose(records) == unpublished
+    tree = {(101, 4): "capture-a"}
+    assert shown_by_tree(records, tree) == shown
+    week = review.evaluate_week(
+        records,
+        season=SEASON,
+        gameweek=4,
+        entry_id=101,
+        deadline_utc=DEADLINE,
+        captures=[snapshot(tmp_path / "snapshots")],
+        published=tree,
+    )
+    assert week.status == "available"
+    assert (week.advice_snapshot_id, week.advice_sha256) == ("capture-a", "a" * 64)
+    # Had the site carried the later capture instead, that record would be the one.
+    assert shown_by_tree(records, {(101, 4): "capture-b"}) == unpublished
+
+
+@pytest.mark.parametrize(
+    "tree",
+    [{}, {(101, 4): "capture-elsewhere"}, {(202, 4): "capture-a"}, {(101, 3): "capture-a"}],
+)
+def test_a_week_whose_records_the_published_tree_does_not_name_is_refused_not_scored(
+    tmp_path: Path, tree: dict[tuple[int, int], str]
+) -> None:
+    record_member_advice(tmp_path, recorded())
+    with pytest.raises(review.SuggestionEvaluationError, match="not_published"):
+        shown_by_tree(tmp_path, tree)
+    result = review.evaluate_week(
+        tmp_path,
+        season=SEASON,
+        gameweek=4,
+        entry_id=101,
+        deadline_utc=DEADLINE,
+        captures=[],
+        published=tree,
+    )
+    assert (result.status, result.reason) == ("unavailable", "not_published")
+    assert result.advice_snapshot_id is None and result.suggested is None
+
+
+def test_a_published_capture_whose_record_came_too_late_does_not_promote_another(
+    tmp_path: Path,
+) -> None:
+    record_member_advice(tmp_path, recorded())
+    record_member_advice(
+        tmp_path, recorded(captured="2026-09-10T09:00:00Z", published=DEADLINE, name="capture-b")
+    )
+    with pytest.raises(review.SuggestionEvaluationError, match="not_published"):
+        shown_by_tree(tmp_path, {(101, 4): "capture-b"})
+    late_only = tmp_path / "late-only"
+    record_member_advice(late_only, recorded(published=DEADLINE))
+    assert shown_by_tree(late_only, {(101, 4): "capture-a"}) is None
+
+
+def put(path: Path, document: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def test_the_published_tree_names_each_member_week_and_the_page_outranks_the_history(
+    tmp_path: Path,
+) -> None:
+    league = tmp_path / "league"
+    put(
+        league / "history/101.json",
+        {
+            "payload": {
+                "entry_id": 101,
+                "weeks": [
+                    {"gameweek": 4, "advice_snapshot_id": "tuesday"},
+                    {"gameweek": 3, "advice_snapshot_id": "gw3"},
+                    {"gameweek": 2, "advice_snapshot_id": None},
+                ],
+            }
+        },
+    )
+    # A later publish of the same week: the page names Friday's capture.
+    put(league / "entries/101.json", {"payload": {"gameweek": 4, "source_snapshot_id": "friday"}})
+    # A history filed under one member that names another is not evidence for either.
+    put(
+        league / "history/202.json",
+        {"payload": {"entry_id": 303, "weeks": [{"gameweek": 3, "advice_snapshot_id": "x"}]}},
+    )
+    put(league / "entries/202.json", {"payload": {"gameweek": 4, "source_snapshot_id": None}})
+    put(league / "entries/index.json", {"payload": {"gameweek": 4, "source_snapshot_id": "x"}})
+    (league / "entries/303.json").write_text("{not json", encoding="utf-8")
+    assert review.published_page_captures(league) == {(101, 4): "friday"}
+    assert review.published_advice_captures(league) == {(101, 4): "friday", (101, 3): "gw3"}
+    assert review.published_advice_captures(tmp_path / "no-tree") == {}
+
+
+def test_the_history_shows_the_published_record_and_no_record_the_site_never_carried(
+    tmp_path: Path,
+) -> None:
+    records, league = tmp_path / "records", tmp_path / "out"
+    record_member_advice(records, recorded())
+    record_member_advice(
+        records,
+        recorded(
+            captured="2026-09-10T09:00:00Z",
+            published="2026-09-10T10:00:00Z",
+            name="capture-b",
+            digest="b" * 64,
+        ),
+    )
+    record_member_advice(records, recorded(entry_id=202, name="capture-c"))
+    # The site carried capture-a for 101, and for 202 a capture this archive holds no record of.
+    for entry_id, capture in ((101, "capture-a"), (202, "capture-d")):
+        page = {"payload": {"gameweek": 4, "source_snapshot_id": capture}}
+        put(league / "entries" / f"{entry_id}.json", page)
+    written = review.publish_suggestion_histories(
+        record_root=records,
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=snapshot(tmp_path / "snapshots"),
+        season=SEASON,
+        league_id=352490,
+        entry_ids=[101, 202],
+        out_dir=league,
+        published=review.published_advice_captures(league),
+    )
+    weeks = {
+        path.stem: json.loads(path.read_text(encoding="utf-8"))["payload"]["weeks"]
+        for path in written
+        if path.parent.name == "history"
+    }
+    told = weeks["101"][0]
+    assert (told["status"], told["advice_snapshot_id"], told["advice_sha256"]) == (
+        "available",
+        "capture-a",
+        "a" * 64,
+    )
+    never = weeks["202"][0]
+    assert (never["status"], never["reason"], never["advice_snapshot_id"]) == (
+        "unavailable",
+        "not_published",
+        None,
+    )
+
+
 @pytest.mark.parametrize(
     ("chip", "hits", "gross"),
     [
@@ -359,6 +521,7 @@ def test_publication_is_bounded_by_capture_and_never_mutates_inputs(tmp_path: Pa
         league_id=352490,
         entry_ids=[101, 202],
         out_dir=tmp_path / "out",
+        published={(101, 4): "capture-a"},
     )
     member = json.loads(written[0].read_text())
     assert member["payload"]["weeks"][0]["status"] == "unsettled"
@@ -378,6 +541,7 @@ def test_other_leagues_are_rejected(tmp_path: Path) -> None:
             league_id=123,
             entry_ids=[101],
             out_dir=tmp_path / "out",
+            published={},
         )
 
 
@@ -489,6 +653,13 @@ def publish_for(
             digest=digest,
         ),
     )
+
+
+def shown_everywhere(
+    entry_ids: Sequence[int], gameweeks: Sequence[int], name: str = "capture-a"
+) -> dict[tuple[int, int], str]:
+    """A published tree that carried capture ``name`` for every one of these member-weeks."""
+    return {(entry_id, week): name for entry_id in entry_ids for week in gameweeks}
 
 
 def capture_with(
@@ -651,6 +822,7 @@ def test_the_published_document_is_the_reviews_it_serializes(tmp_path: Path) -> 
         league_id=352490,
         entry_ids=[101, 202],
         out_dir=tmp_path / "out",
+        published=shown_everywhere((101, 202), (3, 4)),
     )
     assert [path.name for path in written] == ["101.json", "202.json", "series-horizon.json"]
     assert [week.gameweek for week in reviews[101]] == [4, 3]  # Newest week first.
@@ -761,7 +933,9 @@ def horizon_document(reading: object, **stated: object) -> dict[str, Any] | None
     return review.series_horizon_document(cast(LiveSeriesReading, reading), **arguments)
 
 
-def published(tmp_path: Path, anchor: CapturedSnapshot) -> tuple[Path, ...]:
+def published(
+    tmp_path: Path, anchor: CapturedSnapshot, shown: dict[tuple[int, int], str] | None = None
+) -> tuple[Path, ...]:
     return review.publish_suggestion_histories(
         record_root=tmp_path / "records",
         snapshot_root=tmp_path / "snapshots",
@@ -770,6 +944,7 @@ def published(tmp_path: Path, anchor: CapturedSnapshot) -> tuple[Path, ...]:
         league_id=352490,
         entry_ids=[101, 202],
         out_dir=tmp_path / "out",
+        published=shown_everywhere((101, 202), (3, 4)) if shown is None else shown,
     )
 
 
@@ -835,6 +1010,7 @@ def test_an_unsupportable_record_publishes_no_horizon_and_clears_a_stale_one(
         league_id=352490,
         entry_ids=entry_ids,
         out_dir=out_dir,
+        published=shown_everywhere(entry_ids, (4,)),
     )
     # Publishing nothing is the true statement, and the page already renders "not yet" for an
     # absent document. A target measured on a record that no longer stands does not stay put.
@@ -873,7 +1049,8 @@ def test_a_later_advice_for_one_week_moves_that_key_and_no_other(tmp_path: Path)
         name="capture-b",
         published_hour="08",
     )
-    after = json.loads(published(tmp_path, anchor)[-1].read_text(encoding="utf-8"))
+    shown = {**shown_everywhere((101, 202), (3, 4)), (101, 4): "capture-b"}
+    after = json.loads(published(tmp_path, anchor, shown)[-1].read_text(encoding="utf-8"))
     moved = set(before["member_week_keys"]) ^ set(after["member_week_keys"])
     assert {tuple(key.split(":", 2)[:2]) for key in moved} == {("101", "4")}
     assert sorted(after["member_week_keys"]) == reader_keys(
