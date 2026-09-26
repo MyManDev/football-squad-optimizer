@@ -33,7 +33,7 @@ The working agreements live under [`docs/architecture/`](docs/architecture/). St
    Run the full suite in parallel, the way CI does: 121 s against 453 s serial. `-m "not slow"`
    deselects 9 of 2,563 tests and now saves nothing worth having, because the parallel full
    suite is faster than the serial subset.
-4. Stay in your zone; shared boundaries need all three owners.
+4. Stay in your zone; shared boundaries need both owners (all three until 2026-09-25).
 5. Live-path changes carry the replay check and respect the deadline freeze window.
 
 ## Setup

@@ -1,5 +1,5 @@
 import type { Language } from "../../../i18n/messages";
-import type { WindowSize } from "../../moves/modePrices";
+import type { WindowSize } from "../../../lib/decisionVocabulary";
 
 /**
  * The compute service's copy, in both languages.

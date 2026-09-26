@@ -1,5 +1,5 @@
 import type { PlayerView } from "../../../data/schema";
-import type { PlayMode, WindowSize } from "../../moves/modePrices";
+import type { PlayMode, WindowSize } from "../../../lib/decisionVocabulary";
 
 /**
  * The strategies the producer computes for a league member: the catalogue's computable

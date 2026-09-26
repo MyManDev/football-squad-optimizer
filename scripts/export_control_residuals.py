@@ -28,8 +28,8 @@ from scripts._experiment_cli import (
     write_text,
 )
 
-from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, build_panel
+from squadopt.data.tables import write_export_table
 from squadopt.experiments import (
     ExperimentError,
     PolicyObjectiveConfig,

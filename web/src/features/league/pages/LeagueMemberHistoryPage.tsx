@@ -17,7 +17,7 @@ import { summarizeHistory } from "../history/historySummary";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { publishedPrice } from "../advice/publishedPrice";
-import { loadLeagueMembers } from "../data";
+import { LEAGUE_READ, useLeagueMembers } from "../queries";
 import type { EntryView } from "../types";
 
 /** The modes the scenario menu prices (`build_league_site.py --mode-residuals`). */
@@ -29,16 +29,12 @@ export function LeagueMemberHistoryPage() {
   const parameter = useParams().entryId ?? "";
   const entryId = Number(parameter);
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
-  const members = useQuery({
-    queryKey: ["provisional-league-members"],
-    queryFn: loadLeagueMembers,
-    enabled: valid,
-    staleTime: 60_000,
-  });
+  const members = useLeagueMembers(valid);
   const query = useQuery({
     queryKey: ["suggestion-history", entryId],
     queryFn: ({ signal }) => loadSuggestionHistory(entryId, { signal }),
     enabled: valid,
+    ...LEAGUE_READ,
   });
   if (!valid) return <EmptyState title={messages.leagueMembers.invalidEntry} />;
   if (query.isPending) return <EmptyState title={messages.common.loading} />;
@@ -216,9 +212,11 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
   const reason =
     week.reason === "no_pre_deadline_record" || week.reason === "missing_advice"
       ? copy.noEligible
-      : week.reason === "missing_outcomes"
-        ? copy.missingOutcomes
-        : copy.invalid;
+      : week.reason === "not_published"
+        ? copy.notPublished
+        : week.reason === "missing_outcomes"
+          ? copy.missingOutcomes
+          : copy.invalid;
   const chip =
     suggested?.chip === "3xc" ? copy.triple : suggested?.chip ? copy[suggested.chip] : copy.noChip;
   return (
@@ -345,7 +343,7 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
         <dl className={styles.facts}>
           {(
             [
-              [copy.published, week.advice_generated_at_utc],
+              [copy.generated, week.advice_generated_at_utc],
               [copy.deadline, week.deadline_utc],
               [copy.captured, week.advice_captured_at_utc],
               [copy.settledAt, week.outcome_captured_at_utc],

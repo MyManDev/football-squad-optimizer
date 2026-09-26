@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import quotes from "../../../docs/contracts/quote_withheld_corpus.json" with { type: "json" };
 import words from "../../../docs/contracts/honesty_words.json" with { type: "json" };
+import { QUOTE_WITHHELD } from "../features/league/advice/evidenceCopy";
 import { AS_A_CHANCE } from "./honesty";
 
 describe("the shared product-copy honesty guard", () => {
@@ -112,4 +114,18 @@ describe("the shared product-copy honesty guard", () => {
       expect(copy).not.toMatch(AS_A_CHANCE);
     },
   );
+});
+
+// A quote is a third party's sentence, so the page holds it to its own wider list,
+// `QUOTE_WITHHELD`, which the producer applies first as `QUOTE_WITHHELD_PATTERN`
+// (src/squadopt/application/manager_words.py). Each side writes its pattern by hand;
+// tests/unit/test_honesty_words.py holds the producer's to this same corpus.
+describe("the quote rule, on the corpus the producer's test reads too", () => {
+  it.each(quotes.withheld)("withholds %s", (quote) => {
+    expect(quote).toMatch(QUOTE_WITHHELD);
+  });
+
+  it.each(quotes.shown)("shows %s", (quote) => {
+    expect(quote).not.toMatch(QUOTE_WITHHELD);
+  });
 });

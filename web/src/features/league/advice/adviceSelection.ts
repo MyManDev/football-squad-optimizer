@@ -1,7 +1,7 @@
 /** Raw URL parsing and the single index-authoritative member advice resolver. */
 
 import { preferencesFromUrl, preferencesKey } from "./decisionPreferences";
-import { isPlayMode, type WindowSize } from "../../moves/modePrices";
+import { isPlayMode, type WindowSize } from "../../../lib/decisionVocabulary";
 import {
   MEMBER_STRATEGIES,
   isMemberStrategy,

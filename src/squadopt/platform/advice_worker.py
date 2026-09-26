@@ -21,7 +21,8 @@ worker by design and a replica scales by replication (ADR 0006). An empty queue 
 rather than spins. A shutdown signal is honoured *after* the job in hand finishes, so a
 member never loses a solve to a deployment. Abandoned work is walked back periodically
 rather than on every tick, and a job that has been retried past the limit is failed with a
-code instead of crash-looping forever.
+code instead of crash-looping forever. An idle worker also archives finished jobs older than
+the retention window, at most once per interval, so the queue's records stay the recent ones.
 
 The claim is kept alive while the computation runs. One member's plan is not one solve —
 a rival strategy runs the control plan, the banded plan and the payload's own plan — so the
@@ -34,8 +35,10 @@ be needed.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import signal
+import threading
 import time
 import traceback
 from collections.abc import Callable, Sequence
@@ -44,7 +47,7 @@ from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
 
-from squadopt.application.advice_capabilities import menu_capabilities
+from squadopt.application.advice_capabilities import PREDICTION_MODELS, menu_capabilities
 from squadopt.application.advice_menu import (
     PLAN_NOT_FOUND_ERRORS,
     ChipUnavailable,
@@ -52,8 +55,9 @@ from squadopt.application.advice_menu import (
     MenuRequest,
     advise_menu_entry,
 )
-from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
@@ -84,10 +88,18 @@ from squadopt.platform.backend_runtime import (
 )
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.queue_contracts import QueueLockTimeout
+from squadopt.platform.queue_contracts import DEFAULT_ARCHIVE_AFTER_SECONDS, QueueLockTimeout
+from squadopt.platform.worker_heartbeat import (
+    IDLE_WAIT_SECONDS,
+    PULSE_SECONDS,
+    WorkerHeartbeat,
+    prune_stale_heartbeats,
+)
 from squadopt.platform.worker_metrics import serve_worker_metrics
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 
 __all__ = [
+    "DEFAULT_ARCHIVE_EVERY_SECONDS",
     "DEFAULT_HEARTBEAT_SECONDS",
     "DEFAULT_IDLE_SECONDS",
     "DEFAULT_MAX_ATTEMPTS",
@@ -98,9 +110,11 @@ __all__ = [
     "run_advice_worker",
 ]
 
-DEFAULT_IDLE_SECONDS: Final = 2.0
+DEFAULT_IDLE_SECONDS: Final = IDLE_WAIT_SECONDS
 DEFAULT_POLL_SECONDS: Final = 0.25
 DEFAULT_RECOVER_EVERY_SECONDS: Final = 30.0
+#: How often one idle worker asks the queue to archive old finished jobs.
+DEFAULT_ARCHIVE_EVERY_SECONDS: Final = 600.0
 # A third of the lease: two refreshes may be missed before a live claim looks stale.
 DEFAULT_HEARTBEAT_SECONDS: Final = DEFAULT_LEASE_SECONDS / 3.0
 DEFAULT_MAX_ATTEMPTS: Final = 3
@@ -145,7 +159,7 @@ def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuReq
     except (ValueError, TypeError) as error:
         raise AdviceComputeRefused("REQUEST_UNREADABLE", "Invalid preferences.") from error
     model = spec.switch(MODEL_SWITCH).get("name", "current")
-    if model not in ("current", "football"):
+    if model not in PREDICTION_MODELS:
         raise AdviceComputeRefused("REQUEST_UNREADABLE", "Unknown prediction model.")
     top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
     weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
@@ -338,6 +352,12 @@ def build_advice_compute(
             advice["stated_limits"] = [
                 *(existing_limits if isinstance(existing_limits, list) else []),
                 "Experimental football model; independent predictive superiority is unverified.",
+                # Only the version that splits attacking shares before availability.
+                *(
+                    [SHARES_BEFORE_AVAILABILITY_LIMIT]
+                    if football.horizon.model_version == FOOTBALL_MODEL_VERSION
+                    else []
+                ),
             ]
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
@@ -373,12 +393,16 @@ def run_advice_worker(
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
     heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
     max_backoff_seconds: float = DEFAULT_MAX_BACKOFF_SECONDS,
+    archive_every_seconds: float = DEFAULT_ARCHIVE_EVERY_SECONDS,
+    archive_after_seconds: float = DEFAULT_ARCHIVE_AFTER_SECONDS,
     store_ready: Callable[[], bool] | None = None,
     contexts: CaptureContextProvider | None = None,
     max_jobs: int | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
     job_log_fields: dict[str, object] | None = None,
+    heartbeat: Callable[[], None] | None = None,
+    pulse_seconds: float = PULSE_SECONDS,
 ) -> int:
     """Claim and compute until told to stop; return how many jobs reached a terminal state.
 
@@ -399,13 +423,26 @@ def run_advice_worker(
     while the api kept accepting jobs. Whatever job that round held stays with the queue,
     and recovery walks it back after its lease. ``KeyboardInterrupt`` and ``SystemExit``
     are not caught.
+
+    A round that finds no work archives finished jobs whose last update is at least
+    ``archive_after_seconds`` old: the first idle round, then no more often than
+    ``archive_every_seconds``. Each call is bounded by the queue. A call that fails is
+    logged and waits for the next interval; it changes nothing about claiming.
+
+    ``heartbeat`` is called at the top of every round the store lets begin and, while a
+    round holds a job, every ``pulse_seconds`` from its first compute call until the round
+    ends, so readiness can tell a busy worker from one that has stopped. A heartbeat that
+    cannot be written is logged when it starts failing and when it works again; it never
+    ends a round.
     """
 
     processed = 0
     recovered_at = 0.0
+    archived_at: float | None = None
     waiting_on_store = False
     warmed = None
     failed_rounds = 0
+    heartbeat_failing = False
     while not should_stop():
         if store_ready is not None and not store_ready():
             if not waiting_on_store and log is not None:
@@ -420,6 +457,8 @@ def run_advice_worker(
             waiting_on_store = False
             if log is not None:
                 log.event("advice_worker_store_recovered")
+        if heartbeat is not None:
+            heartbeat_failing = _beat(heartbeat, log, failing=heartbeat_failing)
         elapsed = time.monotonic()
         if contexts is not None:
             context = None
@@ -445,6 +484,7 @@ def run_advice_worker(
                         reason=str(error),
                         snapshot_id=None if context is None else context.capture_snapshot_id,
                     )
+        pulse = None if heartbeat is None else _Pulse(heartbeat, pulse_seconds)
         try:
             if elapsed - recovered_at >= recover_every_seconds:
                 recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
@@ -454,7 +494,7 @@ def run_advice_worker(
             job = run_advice_worker_once(
                 queue,
                 cache,
-                compute,
+                compute if pulse is None else pulse.around(compute),
                 claim_at_utc=lambda: _stamp(now()),
                 terminal_at_utc=lambda: _stamp(now()),
                 heartbeat_seconds=heartbeat_seconds,
@@ -489,14 +529,101 @@ def run_advice_worker(
                 )
             _wait(sleep, should_stop, backoff, poll_seconds)
             continue
+        finally:
+            if pulse is not None:
+                pulse.stop()
         failed_rounds = 0
         if job is not None:
             processed += 1
             if max_jobs is not None and processed >= max_jobs:
                 return processed
             continue
+        if archived_at is None or elapsed - archived_at >= archive_every_seconds:
+            archived_at = elapsed
+            _archive_finished_jobs(queue, now=now, after_seconds=archive_after_seconds, log=log)
         _wait(sleep, should_stop, idle_seconds, poll_seconds)
     return processed
+
+
+def _archive_finished_jobs(
+    queue: JobQueue,
+    *,
+    now: Callable[[], datetime],
+    after_seconds: float,
+    log: AdviceLog | None,
+) -> None:
+    """One archive call from an idle round; housekeeping, so a failure is only logged."""
+
+    try:
+        archived = queue.archive(now_utc=_stamp(now()), retention_seconds=after_seconds)
+    except Exception as error:
+        if log is not None:
+            log.event(
+                "advice_jobs_archive_failed",
+                error_type=type(error).__name__,
+                detail=str(error) or None,
+            )
+        return
+    if archived and log is not None:
+        log.event("advice_jobs_archived", count=len(archived))
+
+
+def _beat(heartbeat: Callable[[], None], log: AdviceLog | None, *, failing: bool) -> bool:
+    """Write the heartbeat; return whether it is failing, logging only the changes."""
+
+    try:
+        heartbeat()
+    except Exception as error:
+        if not failing and log is not None:
+            log.event(
+                "advice_worker_heartbeat_failed",
+                error_type=type(error).__name__,
+                detail=str(error) or None,
+            )
+        return True
+    if failing and log is not None:
+        log.event("advice_worker_heartbeat_recovered")
+    return False
+
+
+class _Pulse:
+    """Keeps a round's heartbeat going while it holds a job.
+
+    Started by the first compute call, so an empty queue costs no thread, and stopped when
+    the round ends, so the completion's own lock waits are covered too. The claim's lease
+    heartbeat is a separate thing and stays in ``run_advice_worker_once``.
+    """
+
+    def __init__(self, heartbeat: Callable[[], None], every_seconds: float) -> None:
+        self._heartbeat = heartbeat
+        self._every = every_seconds
+        self._stopped = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def around(self, compute: Callable[[AdviceJob], bytes]) -> Callable[[AdviceJob], bytes]:
+        def pulsed(job: AdviceJob) -> bytes:
+            self._start()
+            return compute(job)
+
+        return pulsed
+
+    def _start(self) -> None:
+        if self._thread is not None or self._every <= 0.0:
+            return
+
+        def run() -> None:
+            while not self._stopped.wait(self._every):
+                # The round's own beat reports failures; a pulse only keeps trying.
+                with contextlib.suppress(Exception):
+                    self._heartbeat()
+
+        self._thread = threading.Thread(target=run, name="advice-worker-pulse", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stopped.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
 
 
 def _wait(
@@ -588,7 +715,17 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
         if handled is not None:
             signal.signal(handled, flag.request)
     running.log.event("advice_worker_started", store=str(running.config.store_root))
+    heartbeat = WorkerHeartbeat(running.config.worker_root)
+    try:
+        pruned = prune_stale_heartbeats(running.config.worker_root)
+    except OSError:
+        pruned = 0  # housekeeping only; the first round's beat reports a store problem
+    if pruned:
+        running.log.event("advice_worker_heartbeats_pruned", count=pruned)
     with ExitStack() as stack:
+        # A stopped worker stops counting at once rather than when its document ages out;
+        # a worker whose process is ended from outside leaves the document to age out.
+        stack.callback(heartbeat.clear)
         if arguments.metrics_port is not None:
             server = stack.enter_context(
                 serve_worker_metrics(
@@ -620,6 +757,7 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
             metrics=running.metrics,
             log=running.log,
             job_log_fields=job_log_fields,
+            heartbeat=heartbeat.beat,
         )
     running.log.event("advice_worker_stopped", processed=processed)
     return 0

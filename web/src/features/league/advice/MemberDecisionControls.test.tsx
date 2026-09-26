@@ -221,10 +221,32 @@ describe("member decision controls", () => {
     // The rule marks; the URL still chooses. Nothing was selected on the member's behalf.
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
     expect(screen.getByText(/A declared rule marks one option/)).toBeInTheDocument();
-    // The two inputs the rule read are on the page, so the member can check it.
-    expect(screen.getByText(/\(-140\)/)).toBeInTheDocument();
+    // The two inputs the rule read are on the page, so the member can check it. The gap
+    // is printed like every other signed figure on the site: one decimal and a real minus.
+    expect(screen.getByText(/\(−140\.0\)/)).toBeInTheDocument();
     expect(screen.getByText(/37 gameweeks still to play/)).toBeInTheDocument();
   });
+
+  it.each([
+    ["tr", 1.5, "+1,5"],
+    ["tr", -1.54, "−1,5"],
+    ["tr", 0.04, "0,0"],
+    ["en", 1.5, "+1.5"],
+  ] as const)(
+    "prints the gap to the rival in the page's language (%s, %s)",
+    (language, gap, shown) => {
+      const base = mockEntryAdviceIndex(ENTRY).payload;
+      const index: EntryAdviceIndex = {
+        ...base,
+        suggested_strategy: { ...base.suggested_strategy!, points_ahead_of_rival: gap },
+      };
+      const { container } = renderControls(`/league/members/${ENTRY}`, index, language);
+      const note = [...container.querySelectorAll("p")].find((line) =>
+        line.textContent?.startsWith(language === "tr" ? "Tanımlı bir kural" : "A declared rule"),
+      );
+      expect(note?.textContent).toContain(`(${shown})`);
+    },
+  );
 
   it("says the rule is declared rather than measured, in both languages", () => {
     const claims = [
@@ -264,9 +286,7 @@ describe("member decision controls", () => {
         const text = container.textContent ?? "";
         // The rule's label is on the page for this sweep, not merely available to it.
         expect(text).toMatch(/rule's pick|Kuralın seçimi/i);
-        expect(text).not.toMatch(
-          /%|probabilit|olasılık|olasılığ|\bP\(|chance|likelihood|quantile|spread|percentage|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım/i,
-        );
+        expect(text).not.toMatch(AS_A_CHANCE);
         expect(text).not.toMatch(/chance of falling behind|geride kalma ihtimalini/i);
         unmount();
       }

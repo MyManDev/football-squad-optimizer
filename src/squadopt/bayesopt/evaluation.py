@@ -19,9 +19,9 @@ from typing import Final, Protocol
 
 from squadopt.bayesopt.models import (
     BayesianCandidate,
-    BayesianOptimizationConfigurationError,
     BayesianOptimizationExecutionError,
 )
+from squadopt.contracts.factors import BayesianOptimizationConfigurationError
 
 POLICY_EVALUATION_CONTRACT_VERSION: Final = "deterministic_policy_evaluation_v1"
 EVALUATION_OBJECTIVE_VERSION: Final = "single_gameweek_realized_squad_points_v1"

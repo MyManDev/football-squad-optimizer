@@ -24,7 +24,10 @@ import pytest
 from scripts import measure_in_season_blend as benchmark
 from scripts import measure_opening_prior_exposure as runner
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.opening_prior_exposure import (
     OpeningPriorExposureConfig,
     _fold_totals,

@@ -32,7 +32,10 @@ from squadopt.data.sources.vaastav import (
     attach_player_code,
     season_directory,
 )
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 
 RESIDUAL_SIGNAL_SCAN_CONTRACT_VERSION: Final = "residual_signal_scan_v1"
 QUARTILE_LABELS: Final = ("Q1", "Q2", "Q3", "Q4")

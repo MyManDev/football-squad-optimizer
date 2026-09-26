@@ -3,7 +3,7 @@ import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import { chipPath, isMemberChip } from "./advice/chipChoice";
 import { isTop100Weight, top100TargetPath, type Top100Target } from "./advice/top100";
-import type { WindowSize } from "../moves/modePrices";
+import type { WindowSize } from "../../lib/decisionVocabulary";
 import type {
   EntryAdvice,
   EntrySquad,

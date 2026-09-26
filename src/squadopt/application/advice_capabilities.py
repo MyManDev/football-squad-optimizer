@@ -19,6 +19,9 @@ from squadopt.live.rules import CHIP_NAMES
 COMPUTED_MODE = "saf-puan"
 COMPUTED_WINDOW = 1
 MEMBER_WINDOWS: tuple[int, ...] = (1, 3, 5)
+#: The projection models a member may ask for; ``"current"`` is the default. The HTTP
+#: adapter, the worker and the served schemas read this tuple rather than restating it.
+PREDICTION_MODELS: tuple[str, ...] = ("current", "football")
 
 #: The Top 100 settings a member may choose; zero is off. ``application/top100_weight.py``
 #: owns the rule and re-exports this tuple, so the transport and the producer read one list.

@@ -916,13 +916,44 @@ def test_a_request_in_a_new_context_does_not_join_the_old_contexts_open_job(
     assert first_key in keys
 
 
+class _HeartbeatWitness:
+    """The real queue, with a signal for the first heartbeat that starts after ``arm``.
+
+    A heartbeat already in flight when the test arms the witness may have touched the claim
+    before the test backdated it, so only a call that begins after ``arm`` counts: its touch
+    lands after the backdate by construction.
+    """
+
+    def __init__(self, inner: FileJobQueue) -> None:
+        self._inner = inner
+        self._armed = threading.Event()
+        self.refreshed = threading.Event()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def arm(self) -> None:
+        self._armed.set()
+
+    def heartbeat(self, job_id: str, *, attempt: int) -> None:
+        counts = self._armed.is_set()
+        self._inner.heartbeat(job_id, attempt=attempt)
+        if counts:
+            self.refreshed.set()
+
+
+@pytest.mark.parametrize("beating", [True, False], ids=["heartbeat", "no-heartbeat"])
 def test_the_claim_stays_alive_while_a_long_computation_runs(
-    running: dict[str, Any],
+    running: dict[str, Any], beating: bool
 ) -> None:
     """A live worker's claim must not look abandoned to a second worker.
 
-    Driven with a short lease rather than a slow solve, so the test states the property
-    without waiting five minutes for it.
+    The computation stands still and the claim is made to look an hour old, which is what
+    a solve longer than the lease looks like to a recovery sweep. Nothing depends on how
+    fast a thread is scheduled: the sweep runs only after a heartbeat that started after the
+    backdate has finished, and it uses the production lease (300 s against an hour). Without
+    a heartbeat the same sweep walks the claim back, and the worker notices the lost lease
+    and publishes nothing.
     """
 
     backend = running["backend"]
@@ -931,24 +962,40 @@ def test_the_claim_stays_alive_while_a_long_computation_runs(
         f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
         json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
     )
+    queue = _HeartbeatWitness(backend.queue)
     stolen: list[str] = []
+    refreshed: list[bool] = []
 
-    def slow(job: AdviceJob) -> bytes:
+    def long_solve(job: AdviceJob) -> bytes:
+        claim = backend.config.queue_root / f"{job.job_id}.claim"
+        an_hour_ago = time.time() - 3600.0
+        os.utime(claim, (an_hour_ago, an_hour_ago))
+        queue.arm()
+        if beating:
+            # A generous bound: it is reached only when no heartbeat runs at all.
+            refreshed.append(queue.refreshed.wait(timeout=30.0))
         # While this "solve" runs, a second worker's recovery sweep looks at the queue.
-        time.sleep(0.35)
-        recovered = backend.queue.recover(at_utc=_now_stamp(), lease_seconds=0.2)
+        recovered = backend.queue.recover(at_utc=_now_stamp())
         stolen.extend(one.job_id for one in recovered)
         return b'{"contract_version":"x"}'
 
     processed = run_advice_worker_once(
-        backend.queue,
+        queue,
         backend.cache,
-        slow,
+        long_solve,
         at_utc=_now_stamp(),
-        heartbeat_seconds=0.05,
+        heartbeat_seconds=0.01 if beating else None,
     )
-    assert processed is not None and processed.status == "completed"
-    assert stolen == [], "a heartbeat-refreshed claim was recovered from under its owner"
+    if beating:
+        assert refreshed == [True], "no heartbeat refreshed the claim during the computation"
+        assert stolen == [], "a heartbeat-refreshed claim was recovered from under its owner"
+        assert processed is not None and processed.status == "completed"
+    else:
+        assert len(stolen) == 1, "a claim an hour old was not recovered"
+        assert processed is None, "an attempt that lost its lease still recorded an outcome"
+        (job,) = backend.queue.jobs()
+        assert job.status == "queued"
+        assert backend.cache.get(job.cache_key) is None
 
 
 def test_an_idempotency_key_replayed_in_a_new_context_is_a_conflict(
@@ -1022,8 +1069,8 @@ def test_two_concurrent_contexts_get_two_job_ids_rather_than_a_collision(
         def __getattr__(self, name: str) -> Any:
             return getattr(self._inner, name)
 
-        def jobs(self) -> Any:
-            history = self._inner.jobs()
+        def history(self, **kwargs: Any) -> Any:
+            history = self._inner.history(**kwargs)
             barrier.wait(timeout=10.0)
             return history
 

@@ -13,8 +13,8 @@
  * manager's word on the one-week pure-points plan only.
  */
 
-import type { WindowSize } from "../../moves/modePrices";
-import { LeagueDataError } from "../data";
+import type { WindowSize } from "../../../lib/decisionVocabulary";
+import { LeagueDataError } from "../dataErrors";
 import { isMemberChip, type MemberChip } from "./chipChoice";
 import { isTop100Weight, type Top100Weight } from "./top100";
 

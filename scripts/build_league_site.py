@@ -33,6 +33,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from squadopt.application.advice_record import AdviceRecordConflictError
+from squadopt.application.capture_entries import CapturePicksProvider as CapturePicksProvider
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     ModePathsSummary,
@@ -50,7 +51,6 @@ from squadopt.application.league_publication import (
     resolve_live_snapshot_id as resolve_live_snapshot_id,
 )
 from squadopt.data.errors import DataError
-from squadopt.platform.capture_context import CapturePicksProvider as CapturePicksProvider
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
 )
@@ -237,7 +237,7 @@ def main() -> int:
             "Both are accepted. Check the capture, rotation table, Top 100 export and code "
             "revision for changes before "
             "the deadline. If the deadline will not wait, re-run with --no-advice-record "
-            "(scripts.publish_gameweek_site takes the same flag and passes it through): the "
+            "(scripts.run_week takes the same flag beside --publish): the "
             "recorded capture is kept as it stands and the difference above is what to "
             "reconcile afterwards.",
             file=sys.stderr,

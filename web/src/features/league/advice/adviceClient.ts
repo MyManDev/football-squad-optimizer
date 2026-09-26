@@ -17,7 +17,7 @@ import {
   withRequestDeadline,
   type RequestOptions,
 } from "../../../data/request";
-import type { WindowSize } from "../../moves/modePrices";
+import type { WindowSize } from "../../../lib/decisionVocabulary";
 import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
 import type { AdviceStrategy, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { checkedCapabilities, type AdviceCapabilities } from "./adviceCapabilities";

@@ -72,7 +72,7 @@ candidates are remeasured together under the same deterministic solver-work cont
    Both fingerprints are checked against `issue43_candidate_declaration.json` before any
    season is loaded; a mismatch refuses the run, because a run whose fingerprints disagree
    with the frozen ones is not the formal run. `--confirm-frozen` is the operator's
-   assertion that step 1 is complete — a script cannot read whether three owners reviewed
+   assertion that step 1 is complete: a script cannot read whether the owners reviewed
    anything.
 
 4. Serialize the result; the report includes both fingerprints and the declared change.

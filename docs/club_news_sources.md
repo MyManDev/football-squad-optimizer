@@ -10,19 +10,36 @@ This is a judgement, not a computation. The reading below is a person's, dated a
 and nothing in the code decides it. What the code does is narrower and worth stating so the
 two are not confused:
 
-- It refuses a URL that is not in the registry.
+- It never contacts a host that is not in the registry, by a link or by a redirect. On a
+  registered host it requests the host's `robots.txt`, the registered pages, the article
+  links described below and the same-origin addresses those redirect to, and nothing else.
+- It refuses a host whose reading below is more than 90 days old, or undated, before any
+  request to it, `robots.txt` included. See [When a reading ages](#when-a-reading-ages).
 - It reads the host's `robots.txt` through the same reader as the document and refuses a
   disallowed path, recording that club as **not covered** rather than reading it anyway.
-- It asks that question of the origin the registry names, so it **refuses a redirect that is
-  answered by a different origin** rather than following it. One host's `robots.txt` is not
-  the other's, and neither is the reading signed in the table below. The request has already
-  gone by the time the serving host is known, so what the refusal buys is that the bytes are
-  not read and the club is recorded as not covered; the fix is to register the origin that
-  answers and sign its reading, after which there is no redirect left.
+- It asks that question of the origin the registry names, so it **refuses a redirect to a
+  different origin before following it**: the other host is sent no request, and the page is
+  recorded as not read (for a registered page, its club as not covered). One host's
+  `robots.txt` is not the other's, and neither is the reading signed in the table below. A
+  redirect within the same scheme, host and port is followed. A `robots.txt` that redirects to
+  another origin counts as one that could not be read, so that host is refused. The fix is to
+  register the origin that answers and sign its reading, after which there is no redirect left.
 - It treats a `robots.txt` that cannot be read as an unanswered question, not as consent.
   "We could not ask" is not "they said yes".
-- It sends one identity (`squadopt/1.0`), reads only registered paths — a club may have more
-  than one, in the order the registry declares them — and follows no links.
+- It sends one identity (`squadopt/1.0`) and reads registered paths, in the order the
+  registry declares them; a club may have more than one.
+- From a registered HTML page it follows **article links, and no others**: a link on the same
+  origin, under the registered page's own path (`/news` leads to `/news/...`), in the order
+  the page lists them, at most ten per host per run. The path is the registered one even when
+  a same-origin redirect served the page somewhere else, so a page that is served at another
+  path should be registered where it is served. A link whose printed or resolved path has a
+  `.` or `..` segment, written out or percent-encoded, is skipped rather than resolved. Each
+  article is asked of the same `robots.txt`, waits the same interval and meets the same
+  refusals as a registered page, and is stored as its own document with its own readable
+  text. A link to another host is never requested, an article's own links are not followed,
+  and a feed's item links are not followed because the feed already carries the items'
+  words. An article that fails costs that article: the club's coverage rests on its
+  registered page.
 - It asks a host for its `robots.txt` **once per run**, however many registered paths that
   host serves, and decides each path against the one file it read. One club with three pages
   is one question, not three.
@@ -113,6 +130,36 @@ terms say.
   A host that allows `*` but disallows a path we want is a refusal for that path.
 - **Read by / Date** — a name and a date, because a reading ages. A host can change its
   terms without telling anyone, and a row from last season is evidence about last season.
+  Copy the date into the registry entry's `terms_read_on` for every page of that host.
+
+## When a reading ages
+
+**A reading is relied on for 90 days after the date in its row, and not after.** On day 91
+the reader refuses the host before any request, `robots.txt` included, and records its club
+as not covered with a refusal that names the reading's date and says what to do. The number
+is `TERMS_READING_VALID_DAYS` in `src/squadopt/platform/club_news_fetch.py`; it is the
+owner's to change and it is declared, not measured. It is short enough that a season sees
+each host read three or four times, which is the point: the failure it guards against is a
+club publishing website terms after our reading, and nothing tells us when that happens.
+
+The rule reads a date, so the registry carries one. Every entry in
+`data/sources/club_news_sources.json` names `terms_read_on`, the Date from the host's row
+above, and `tests/unit/test_club_news_fetch.py` holds the two equal, so a row re-signed
+here without the registry moving (or the other way round) fails before it reaches a run.
+Every page of one host carries the same date, because a reading is of a host. The
+placeholder carries `null`, because nobody read it, and an undated host is refused exactly
+as a stale one is. A date more than a day after the fetch is refused too: it is a typo or a
+wrong clock, and a typo in the year would stretch a permission by a year.
+
+The reading covers the host, so it covers the article pages the reader follows there. The
+`robots.txt` column above records the verdict for the registered path; each article's path
+is asked of `robots.txt` again at run time, and a disallowed one is not requested.
+
+**To renew a reading**, read the host's terms and `robots.txt` again as the row describes,
+update the row's "What the terms say", verdict, "Read by" and "Date", and set the same date
+as `terms_read_on` on every registry entry for that host, in one pull request. If the terms
+now restrict automated reading, remove the entries instead. As of the rows above, Liverpool's
+reading is relied on through 2026-12-21 and Newcastle's through 2026-12-22.
 
 ## What is deliberately not automated
 

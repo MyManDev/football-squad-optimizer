@@ -12,7 +12,7 @@
  * never know which one they were handed — the plan's stated design for this step.
  */
 
-import type { WindowSize } from "../../moves/modePrices";
+import type { WindowSize } from "../../../lib/decisionVocabulary";
 import { MEMBER_STRATEGIES, type AdviceStrategy, type MemberStrategy } from "../types";
 
 const STORAGE_KEY = "squadopt.templates";

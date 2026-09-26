@@ -9,6 +9,10 @@ from itertools import pairwise
 import pandas as pd
 import pytest
 
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 from squadopt.experiments.chip_threshold import (
     BLANK_GAMEWEEK,
     CHIP_VALUE_FIELDS,
@@ -22,7 +26,6 @@ from squadopt.experiments.chip_threshold import (
     leave_one_season_out_thresholds,
     window_thresholds,
 )
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
 from squadopt.experiments.season_chain import ChipWindowRule
 
 SENTINEL = 1000.0

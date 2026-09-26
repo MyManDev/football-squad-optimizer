@@ -214,6 +214,40 @@ it("switches only between recorded weeks and hides unsettled scores", async () =
   expect(screen.queryByText(copy.unsettled)).not.toBeInTheDocument();
 });
 
+it.each<Language>(["tr", "en"])(
+  "says a week has no suggestion the site is known to have published in %s",
+  async (language) => {
+    // Records exist for the week, but none is the capture the published tree carried: the
+    // page must not say nothing was recorded, and must not call a record what was told.
+    const value = history();
+    value.payload.weeks.unshift({
+      ...value.payload.weeks[0],
+      gameweek: 5,
+      status: "unavailable",
+      reason: "not_published",
+      advice_snapshot_id: null,
+      advice_captured_at_utc: null,
+      advice_generated_at_utc: null,
+      advice_sha256: null,
+      outcome_snapshot_id: null,
+      outcome_captured_at_utc: null,
+      expected_own_points: null,
+      suggested: null,
+      actual: null,
+      actual_reason: null,
+      net_difference: null,
+      players: [],
+    });
+    show(value, language);
+    const copy = MESSAGES[language].suggestionHistory;
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: copy.week }), "5");
+    expect(screen.getByText(copy.notPublished)).toBeInTheDocument();
+    expect(screen.queryByText(copy.noEligible)).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText(copy.generated)).toBeInTheDocument();
+  },
+);
+
 it("opens all recorded weeks by default, shows totals, and returns from a selected week", async () => {
   show(mockSuggestionOverview());
   const overview = screen.getByRole("region", { name: "Genel bakış" });

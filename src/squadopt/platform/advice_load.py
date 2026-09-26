@@ -92,6 +92,10 @@ def run_burst(
             requests[index % len(requests)] if scenario == "cache-hit" else requests[0]
             for index in range(users)
         ]
+    # Loaded before any row starts its clock: the validator's import pulls in the application
+    # (seconds in a fresh process), and every worker blocked on its import lock would count it.
+    from squadopt.platform.advice_documents import validate_advice_document
+
     barrier = threading.Barrier(users)
     started = time.monotonic()
     deadline = started + deadline_seconds
@@ -152,8 +156,6 @@ def run_burst(
                     time.sleep(min(poll_seconds, max(0, deadline - time.monotonic())))
             if status != 200:
                 raise ValueError(f"Advice returned HTTP {status}.")
-            from squadopt.platform.advice_documents import validate_advice_document
-
             validate_advice_document(raw)
             payload = json.loads(raw)["payload"]
             if (

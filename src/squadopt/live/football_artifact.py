@@ -21,6 +21,22 @@ MODEL_CHOICES = ("current", FOOTBALL_CHOICE)
 ARTIFACT_CONTRACT = "live_football_forecast_v1"
 FEATURE_CONTRACT = "causal_football_fixture_features_v1"
 
+#: What ``football_team_share_v1`` does with a player the capture marks unavailable or
+#: doubtful, stated beside every answer that forecast decided. Its producer splits each
+#: club-fixture's goals and assists over the club's players with no availability input
+#: (``FixtureFootballModel.predict``), and ``read_football_forecast`` scales each player's
+#: weekly total by the capture's availability afterwards, so what that scaling removes is
+#: not handed to his teammates. The contextual version applies availability before the
+#: split (``before_team_shares_v1``) and does not carry the sentence. No number is in it
+#: because no committed measurement sizes the loss.
+SHARES_BEFORE_AVAILABILITY_LIMIT: str = (
+    "The football model divides each club's forecast goals and assists among all of its "
+    "players before availability is applied. What availability then removes from a player "
+    "the capture marks as unavailable or doubtful is not passed to his teammates, so at a "
+    "club with absentees its players together are credited with fewer goals and assists "
+    "than the model forecasts for the club."
+)
+
 
 def football_artifact_path(root: Path, snapshot_id: str) -> Path:
     if not snapshot_id or any(

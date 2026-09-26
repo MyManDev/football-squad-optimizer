@@ -65,9 +65,11 @@ from squadopt.platform.weekly_journal import (
     read_run_request,
 )
 from squadopt.platform.weekly_publish import (
+    WEEKLY_RUNS,
     PublishError,
     PublishNames,
     check_publication_base,
+    copy_preview_builder,
     publish,
 )
 
@@ -101,8 +103,8 @@ class WeeklyPaths:
             root / "data/ledger",
             root / "artifacts/phase_b",
             root / "artifacts/rotation",
-            out or root / "data/runtime/weekly/preview",
-            root / "data/runtime/weekly",
+            out or root / WEEKLY_RUNS / "preview",
+            root / WEEKLY_RUNS,
             root / LOG_ROOT_NAME,
             root / "data/advice_records",
             root / "data/sample/club_news_v1.fixture.json",
@@ -119,16 +121,6 @@ def package_fingerprint() -> str:
         digest.update(b"\0")
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
-
-
-def tree_digests(root: Path) -> dict[str, str]:
-    """Every file under ``root`` by its relative path, with the SHA-256 of its bytes."""
-
-    return {
-        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    }
 
 
 def recorded_capture_directories(root: Path, season: str) -> list[Path]:
@@ -254,7 +246,7 @@ class WeeklyOperations:
     def records_advice(self) -> bool:
         """Whether the league stage writes the advice record: publication or explicit
         recording asks for it, and ``--no-advice-record`` turns it off for a publication,
-        as the hand publish's switch of the same name does."""
+        as the league build's switch of the same name does."""
 
         return (self.request.publish or self.record_advice) and not self.no_advice_record
 
@@ -754,30 +746,12 @@ class WeeklyOperations:
         proof: dict[str, object] = {}
         preview = self.paths.out / "data"
         copied: dict[str, object] = {}
-
-        def build(out: Path) -> None:
-            # The preview is the publication. The tree the worktree carries from
-            # origin/develop goes first, so nothing under it outlives the preview, and the
-            # copy is then read back against the preview before a commit can name it.
-            target = out / "data"
-            if target.exists():
-                shutil.rmtree(target)
-            shutil.copytree(preview, target)
-            expected, actual = tree_digests(preview), tree_digests(target)
-            names = expected.keys() | actual.keys()
-            differing = sorted(name for name in names if expected.get(name) != actual.get(name))
-            if differing:
-                raise WeekError(
-                    "The publication copy differs from the preview: " + ", ".join(differing[:12])
-                )
-            copied["published_files"] = len(actual)
-
         exit_code = publish(
             self.publish_names,
             force_branch=False,
             dry_run=False,
             workspace=self.paths.workspace,
-            builder=build,
+            builder=copy_preview_builder(preview, copied),
             expected_commit=self.repository_commit,
             on_published=lambda value: proof.update(value),
         )
@@ -986,7 +960,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-advice-record",
         action="store_true",
-        help="Publish without recording the advice, as the hand publish's switch of the same "
+        help="Publish without recording the advice, as the league build's switch of the same "
         "name does. The escape when the reused capture already holds records from another "
         "commit and the deadline will not wait; the existing records are kept.",
     )

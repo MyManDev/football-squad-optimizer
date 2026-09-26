@@ -27,13 +27,15 @@ from squadopt.application.advice_capabilities import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     MEMBER_WINDOWS,
+    PREDICTION_MODELS,
     TOP100_WEIGHTS,
     AdviceCapability,
     validate_advice_selection,
 )
 from squadopt.application.entries import EntryError
-from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
+from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import (
     LEAGUE_CAPABILITIES_CONTRACT_VERSION,
@@ -468,8 +470,8 @@ class AdviceReadStore:
             "preferences": {"available": True},
             "chips": {
                 "strategy": {
-                    "version": "model_opportunity_reservation_v1",
-                    "windows": [1, 3, 5],
+                    "version": CHIP_STRATEGY_VERSION,
+                    "windows": list(MEMBER_WINDOWS),
                 },
                 "held_by_entry": {
                     str(entry): list(held) for entry, held in chips.items() if held is not None
@@ -477,7 +479,7 @@ class AdviceReadStore:
             },
         }
         if inputs.football is not None:
-            document["models"] = ["current", "football"]
+            document["models"] = list(PREDICTION_MODELS)
         validate_league_capabilities(document)
         return document
 
@@ -506,7 +508,7 @@ class AdviceReadStore:
             preferences.validate_selection(strategy, managers_word, chip)
         except ValueError as error:
             raise UnsupportedAdviceRequestError(str(error)) from error
-        if model not in ("current", "football"):
+        if model not in PREDICTION_MODELS:
             raise UnsupportedAdviceRequestError("Unknown prediction model.")
         if strategy not in self._strategies:
             raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")

@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from squadopt.data._long_paths import addressable
 from squadopt.live import InSeasonProjection, read_projection_handoff, write_projection_handoff
 from squadopt.platform import projection_retention as retention
-from squadopt.platform._long_paths import addressable
 
 
 def _projection(capture: str = "fpl-live-test-a") -> InSeasonProjection:

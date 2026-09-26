@@ -35,7 +35,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts._experiment_cli import REPOSITORY_ROOT, write_json
+from scripts._provenance import REPOSITORY_ROOT, write_json
 
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION, EntryRegistry
 from squadopt.data.errors import DataError

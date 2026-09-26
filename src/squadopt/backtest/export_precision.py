@@ -40,13 +40,6 @@ import pandas as pd
 
 from squadopt.backtest.splits import BacktestConfigurationError
 
-# Compatibility re-export, 2026-09-10: `write_export_table` and `EXPORT_LINE_TERMINATOR`
-# moved to `squadopt.data.tables` so the product can write a table without importing the
-# laboratory. Kept for one release (docs/architecture/dependency_rules.md, rule 2); remove
-# in the release after 1.0.0.
-from squadopt.data.tables import EXPORT_LINE_TERMINATOR as EXPORT_LINE_TERMINATOR
-from squadopt.data.tables import write_export_table as write_export_table
-
 EXPORT_PRECISION_CONTRACT_VERSION: Final = "export_precision_v1"
 
 # Double precision carries about 2.2e-16 of relative resolution, so a last-bit difference

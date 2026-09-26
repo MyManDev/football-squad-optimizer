@@ -7,7 +7,7 @@ import {
   mockLeagueMembersEnvelope,
 } from "../src/fixtures/league";
 import type { AdviceStrategy } from "../src/features/league/types";
-import type { WindowSize } from "../src/features/moves/modePrices";
+import type { WindowSize } from "../src/lib/decisionVocabulary";
 
 const STRATEGIES: readonly AdviceStrategy[] = [
   "saf-puan",

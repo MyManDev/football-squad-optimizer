@@ -78,8 +78,8 @@ unattributable. One of the two is now closed.
 Blocked on people, not code. Both fingerprints reproduce, the candidate is implemented, the
 leakage guards now match the frozen builder's, and
 `python -m scripts.run_candidate_gate --confirm-frozen` is the one command that produces the
-verdict. What is missing is the architecture/CI side's Stage A review; the freeze needs all
-three owners (`issue43_handoff_acceptance.md:45`).
+verdict. What is missing is the Stage A review the architecture/CI side owed (the owner's since
+2026-09-25); the freeze needs both owners, not the three in `issue43_handoff_acceptance.md:45`.
 
 When it runs, the record must name the executing machine — `fit_learned_rate` solves a ridge
 system through LAPACK, which is not bit-identical across machines.
@@ -166,6 +166,6 @@ work and the optimization side's stop being separable.
 ## What this side does not decide
 
 Promotion. Clearing a development gate makes a candidate eligible for the locked-holdout
-protocol and nothing more, and spending the 2025-26 holdout is a three-owner decision
-(`fw10_holdout_plan.md:36`). The deterministic baseline remains the operational control until
-something beats it under a declaration that was frozen first.
+protocol and nothing more, and spending the 2025-26 holdout is a decision for both owners
+(three when `fw10_holdout_plan.md:36` was written). The deterministic baseline remains the
+operational control until something beats it under a declaration that was frozen first.

@@ -1,4 +1,4 @@
-import { ContractMismatchError, type Loaded, type ViewEnvelope } from "./client";
+import { ContractMismatchError, type Loaded, type ViewEnvelope } from "./envelope";
 
 export interface LiveScoreView {
   season: string;

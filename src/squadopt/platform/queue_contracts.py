@@ -9,6 +9,10 @@ from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.jobs_contract import AdviceJob
 
 DEFAULT_LEASE_SECONDS: Final = 300.0
+#: How long a finished job (completed or failed) stays among the queue's records before it
+#: is archived: seven days after its last update. A member's page stops polling a job after
+#: at most 600 s, and an archived job is still found by its id and its idempotency key.
+DEFAULT_ARCHIVE_AFTER_SECONDS: Final = 7 * 24 * 3600.0
 
 
 class AdviceQueueError(ValueError):
@@ -51,6 +55,8 @@ class JobQueue(Protocol):
 
     def jobs(self) -> tuple[AdviceJob, ...]: ...
 
+    def history(self, *, idempotency_key: str | None, cache_key: str) -> tuple[AdviceJob, ...]: ...
+
     def heartbeat(self, job_id: str, *, attempt: int) -> None: ...
 
     def recover(
@@ -59,4 +65,8 @@ class JobQueue(Protocol):
         at_utc: str | None = None,
         clock: Callable[[], str] | None = None,
         lease_seconds: float = DEFAULT_LEASE_SECONDS,
+    ) -> tuple[AdviceJob, ...]: ...
+
+    def archive(
+        self, *, now_utc: str, retention_seconds: float = DEFAULT_ARCHIVE_AFTER_SECONDS
     ) -> tuple[AdviceJob, ...]: ...

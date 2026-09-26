@@ -4,10 +4,11 @@ import { useNavigate } from "react-router";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { loadLeagueMembers } from "../../league/data";
+import { WINDOWS } from "../../../lib/decisionVocabulary";
+import { loadLeagueMembers } from "../../league";
 import { useDecisionSelection } from "../decisionSelection";
 import { readHorizonEvidence } from "../horizonEvidence";
-import { MODE_PRICE_FOLDS, WINDOWS, getPlayModes } from "../modePrices";
+import { MODE_PRICE_FOLDS, getPlayModes } from "../modePrices";
 import styles from "./DecisionControls.module.css";
 
 /** A plain number, or the id inside an FPL league URL (…/leagues/352490/standings/c). */

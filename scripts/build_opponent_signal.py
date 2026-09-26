@@ -38,7 +38,10 @@ from pathlib import Path
 import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, REPOSITORY_ROOT, write_json, write_text
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentError,
+)
 from squadopt.experiments.team_rating import (
     LOCKED_HOLDOUT_SEASON,
     DixonColesConfig,

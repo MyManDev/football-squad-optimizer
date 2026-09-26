@@ -45,7 +45,10 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError,
+    ExperimentExecutionError,
+)
 
 TEAM_RATING_STUDY_CONTRACT_VERSION: Final = "team_rating_study_v1"
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"

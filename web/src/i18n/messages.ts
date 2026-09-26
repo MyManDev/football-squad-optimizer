@@ -26,7 +26,8 @@ const en = {
     back: "Back to member",
     week: "Recorded week",
     gameweek: (week: number) => `Gameweek ${week}`,
-    scope: "League 352490 · Last recorded pre-deadline pure-points suggestion for one gameweek.",
+    scope:
+      "League 352490 · The one-gameweek pure-points suggestion the site published, recorded before the deadline.",
     method:
       "We score the recorded squad with settled player results, captain and automatic substitution rules. Past suggestions are never solved again. The difference is a comparison, not proof that you followed the suggestion or would have gained these points.",
     empty: "No record",
@@ -37,6 +38,8 @@ const en = {
     unsettled: "Result not final",
     unavailable: "Comparison unavailable",
     noEligible: "No suggestion was recorded before the deadline.",
+    notPublished:
+      "No suggestion recorded for this week is one the site is known to have published.",
     missingOutcomes: "The week is final, but its captured player results are missing.",
     invalid: "The saved data does not support a verified comparison.",
     pending: "Points remain hidden until the week is finished and its results are checked.",
@@ -68,7 +71,7 @@ const en = {
     playerNote:
       "Expected and actual are each player's unmultiplied points. The captain label shows the applied multiplier.",
     evidence: "Record details",
-    published: "Recorded publication",
+    generated: "Advice build time",
     deadline: "Deadline",
     captured: "Advice data captured",
     settledAt: "Results captured",
@@ -511,6 +514,7 @@ const en = {
       "A gameweek marked provisional has finished but has not been data-checked in this capture: bonus points land fixture by fixture, so its scores can still move.",
     modeNote:
       "live: decided before the deadline, from a capture that run took. replay: recorded after that deadline, or from a capture the run did not take but named.",
+    modes: { live: "live", replay: "replay" },
   },
   leagueEntry: {
     title: "Find your league",
@@ -690,6 +694,8 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
+        "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
         "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
@@ -1109,36 +1115,6 @@ const en = {
     newest: "newest first",
     noLog: "No run log yet; the tick has not run on this machine.",
   },
-  analysis: {
-    types: {
-      passed: "gate passed",
-      negative: "clean negative",
-      descriptive: "descriptive",
-      prereg: "prereg",
-    },
-    noDate: "date not recorded",
-    notFoundTitle: "Measurement not found.",
-    notFoundBody: "The index has no artifact with this identifier.",
-    loadingDocument: "Loading measurement…",
-    documentError: "The measurement could not be opened.",
-    back: "← Analysis Center",
-    loadingIndex: "Loading measurement index…",
-    indexError: "The Analysis Center could not be opened.",
-    kicker: "evidence beside the decision",
-    title: "Analysis Center",
-    lede: "Clean negatives stay here alongside passed gates. The content is an unchanged copy of the English source documents.",
-    viewLabel: "Measurement View",
-    all: "All Measurements",
-    negatives: "Negatives",
-    filters: "Measurement Filters",
-    type: "Type",
-    phase: "Phase",
-    allOption: "All",
-    from: "Start Date",
-    to: "End Date",
-    count: (shown: number, total: number) => `${shown} / ${total} measurements shown`,
-    empty: "No measurements match these filters.",
-  },
 } as const;
 
 type MessageSchema<T> = {
@@ -1174,7 +1150,8 @@ const tr: MessageSchema<typeof en> = {
     back: "Üyeye dön",
     week: "Kayıtlı hafta",
     gameweek: (week) => `Oyun haftası ${week}`,
-    scope: "Lig 352490 · Son tarihten önce kaydedilmiş son bir haftalık saf puan önerisi.",
+    scope:
+      "Lig 352490 · Sitede yayımlanan, son tarihten önce kaydedilmiş bir haftalık saf puan önerisi.",
     method:
       "Kayıtlı kadroyu kesinleşmiş oyuncu sonuçları, kaptan ve otomatik yedek kurallarıyla puanlıyoruz. Geçmiş önerileri yeniden hesaplatmıyoruz. Puan farkı bir karşılaştırmadır; öneriyi uyguladığınızı veya bu puanı kazanacağınızı kanıtlamaz.",
     empty: "Kayıt yok",
@@ -1184,6 +1161,7 @@ const tr: MessageSchema<typeof en> = {
     unsettled: "Sonuç kesinleşmedi",
     unavailable: "Karşılaştırma yapılamıyor",
     noEligible: "Son tarihten önce kaydedilmiş öneri yok.",
+    notPublished: "Bu hafta için, sitede yayımlandığı bilinen kayıtlı bir öneri yok.",
     missingOutcomes: "Hafta kesinleşmiş ancak oyuncu sonuçlarının kaydı bulunmuyor.",
     invalid: "Kayıtlı veriler doğrulanmış bir karşılaştırma için yeterli değil.",
     pending: "Hafta tamamlanıp sonuçlar kontrol edilene kadar puanlar gösterilmez.",
@@ -1214,7 +1192,7 @@ const tr: MessageSchema<typeof en> = {
     playerNote:
       "Beklenen ve gerçekleşen değerler oyuncunun çarpansız puanıdır. Uygulanan çarpan kaptan etiketinde gösterilir.",
     evidence: "Kayıt ayrıntıları",
-    published: "Kayıtlı yayın",
+    generated: "Önerinin üretim zamanı",
     deadline: "Son tarih",
     captured: "Öneri verisinin alındığı an",
     settledAt: "Sonuçların alındığı an",
@@ -1584,7 +1562,7 @@ const tr: MessageSchema<typeof en> = {
   },
   scoreboardComparisons: {
     title: "Haftalık karşılaştırma ve hata ayrıştırması",
-    week: "GW",
+    week: "OH",
     name: "Karar",
     net: "Puan",
     zero: "Sıfır dakikalı ilk 11",
@@ -1615,13 +1593,13 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueScoreboard: {
     title: "Haftalık skor tablosu",
-    aside: (snapshot) => `capture ${snapshot.slice(0, 24)}…`,
+    aside: (snapshot) => `veri çekimi ${snapshot.slice(0, 24)}…`,
     loading: "Skor tablosu yükleniyor…",
     notPublished:
       "Skor tablosu henüz yayımlanmadı. Onu yazan ilk haftalık çalıştırmadan sonra görünür.",
     notAvailable: "Skor tablosu okunamadı.",
     caption:
-      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan, sıfır dakikalı ilk 11, dakika açığı, kaptan açığı ve otomatik değişiklik getirisi",
+      "Biten her oyun haftası için: kâğıt kadromuzun neti, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan, sıfır dakikalı ilk 11, dakika açığı, kaptan açığı ve otomatik değişiklik getirisi",
     gameweek: "OH",
     ours: "SquadOpt · net",
     members: "Lig üyeleri · ortalama net",
@@ -1634,7 +1612,7 @@ const tr: MessageSchema<typeof en> = {
     highest: "En yüksek",
     notSettled: "kararlaştırıldı, sonuçlanmadı",
     provisional: "geçici",
-    noGameweek: "Bu capture'da henüz biten oyun haftası yok.",
+    noGameweek: "Bu veri çekiminde henüz biten oyun haftası yok.",
     cumulative: (gameweek) => `OH${gameweek} sonuna kadar kümülatif`,
     oursCovers: (gameweeks) => `yalnız OH ${gameweeks}`,
     oursNone: "sonuçlanmış hafta yok",
@@ -1642,13 +1620,14 @@ const tr: MessageSchema<typeof en> = {
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
     membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:
-      "Kadromuz kâğıt üstünde izlenen bir kadrodur. Karşılaştırma tablosu her satırın puanlama temelini gösterir. Eski kararlarda dondurulmuş bench sırası ve yardımcı kaptan olmadığı için yalnızca adı konan ilk 11 puanlanır. Yeni kararlar ikisini de kaydeder ve resmi otomatik değişikliklerle puanlanabilir. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
+      "Kadromuz kâğıt üstünde izlenen bir kadrodur. Karşılaştırma tablosu her satırın puanlama temelini gösterir. Eski kararlarda dondurulmuş yedek sırası ve yardımcı kaptan olmadığı için yalnızca adı konan ilk 11 puanlanır. Yeni kararlar ikisini de kaydeder ve resmi otomatik değişikliklerle puanlanabilir. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
     grossNote:
-      "Bu capture'daki Top-100 ortalaması transfer cezaları düşülmeden hesaplanmıştır: kohortun kendi sıralama tablosundaki haftalık toplamdır ve cezalar çıkarılmamıştır; yanındaki net sütunlarla aynı ölçüde değildir, ikisi karşılaştırılamaz. Ancak haftanın elite-picks capture'ı yüz üyenin hepsini kapsadığında netlenir.",
+      "Bu veri çekimindeki Top-100 ortalaması transfer cezaları düşülmeden hesaplanmıştır: kohortun kendi sıralama tablosundaki haftalık toplamdır ve cezalar çıkarılmamıştır; yanındaki net sütunlarla aynı ölçüde değildir, ikisi karşılaştırılamaz. Ancak haftanın ilk 100 kadrosunu okuyan veri çekimi yüz üyenin hepsini kapsadığında netlenir.",
     provisionalNote:
-      "Geçici işaretli bir oyun haftası bitmiştir ama bu capture'da veri denetimi tamamlanmamıştır: bonus puanlar maç maç işlendiği için puanları hâlâ değişebilir.",
+      "Geçici işaretli bir oyun haftası bitmiştir ama bu veri çekiminde verisi henüz denetlenmemiştir: bonus puanlar maç maç işlendiği için puanları hâlâ değişebilir.",
     modeNote:
-      "live: son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı. replay: son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı.",
+      "canlı: son tarihten önce, o çalıştırmanın kendi yaptığı veri çekiminden kararlaştırıldı. sonradan kayıt: son tarihten sonra kaydedildi ya da çalıştırmanın kendisinin yapmadığı, adıyla verilen bir veri çekiminden kararlaştırıldı.",
+    modes: { live: "canlı", replay: "sonradan kayıt" },
   },
   leagueEntry: {
     title: "Ligini bul",
@@ -1811,6 +1790,8 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
+        "Futbol modeli her kulübün tahmin edilen gol ve asistlerini, oynayabilirlik uygulanmadan önce kulübün bütün oyuncuları arasında paylaştırır. Oynayabilirliğin, veri kesitinde oynayamaz ya da şüpheli görünen bir oyuncudan düşürdüğü kısım takım arkadaşlarına aktarılmaz; bu yüzden eksik oyuncusu olan bir kulüpte oyunculara toplamda, modelin kulüp için tahmin ettiğinden daha az gol ve asist yazılır.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
         "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için veri kesitindeki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
@@ -2205,36 +2186,6 @@ const tr: MessageSchema<typeof en> = {
     recent: "Son çalışma günlüğü",
     newest: "en yeni önce",
     noLog: "Henüz çalışma günlüğü yok; tick bu makinede çalışmadı.",
-  },
-  analysis: {
-    types: {
-      passed: "kapı geçti",
-      negative: "temiz negatif",
-      descriptive: "betimleyici",
-      prereg: "prereg",
-    },
-    noDate: "tarih kaydı yok",
-    notFoundTitle: "Ölçüm bulunamadı.",
-    notFoundBody: "İndekste bu kimlikle bir artefakt yok.",
-    loadingDocument: "Ölçüm yükleniyor…",
-    documentError: "Ölçüm açılamadı.",
-    back: "← Analiz Merkezi",
-    loadingIndex: "Ölçüm indeksi yükleniyor…",
-    indexError: "Analiz Merkezi açılamadı.",
-    kicker: "kanıt, kararın yanında",
-    title: "Analiz Merkezi",
-    lede: "Geçen kapılar kadar temiz negatifler de burada kalır. İçerikler İngilizce kaynak belgelerin değişmeden sunulan kopyalarıdır.",
-    viewLabel: "Ölçüm görünümü",
-    all: "Tüm Ölçümler",
-    negatives: "Negatifler",
-    filters: "Ölçüm filtreleri",
-    type: "Tür",
-    phase: "Faz",
-    allOption: "Tümü",
-    from: "Başlangıç Tarihi",
-    to: "Bitiş Tarihi",
-    count: (shown, total) => `${shown} / ${total} ölçüm gösteriliyor`,
-    empty: "Bu filtrelerle ölçüm yok.",
   },
 };
 

@@ -1,61 +1,90 @@
-"""Publish one gameweek's site view: worktree, build, commit, push, PR — one command.
+r"""Publish one gameweek's site view: worktree, copy, commit, push, PR, in one command.
 
-    python -m scripts.publish_gameweek_site --kind decision --gameweek 2
-    python -m scripts.publish_gameweek_site --kind settled  --gameweek 1
+    python -m scripts.publish_gameweek_site --kind decision --gameweek 2 --run-id <run>
+    python -m scripts.publish_gameweek_site --kind settled  --gameweek 1 \
+        --preview <dir> --source-commit <revision>
 
 The Friday decision publish and the Monday settled publish share one shape, and every
 step of it used to be typed by hand under deadline pressure. This wraps the *local and
-repository* half — a fresh worktree from ``origin/develop``, ``build_site`` into it, the
-commit, the push, the pull request — and then prints, rather than performs, the
+repository* half (a fresh worktree from ``origin/develop``, the preview copied into it, the
+commit, the push, the pull request) and then prints, rather than performs, the
 deliberate outward half: the merge, the develop-to-main release, the immutable
 ``site-...`` tag, and the Pages dispatch. Those stay human on purpose: no cron, no
 auto-release, a person reads before production changes.
 
 Idempotent by construction: an existing worktree directory is refused with the command
-to remove it; an existing branch is reused only with ``--force-branch``; a build that
+to remove it; an existing branch is reused only with ``--force-branch``; a copy that
 changes nothing stops before creating an empty commit; a PR that already exists is
-reported, not duplicated. Nothing here touches ``data/ledger`` — settle itself is
+reported, not duplicated. Nothing here touches ``data/ledger``: settle itself is
 ``squadopt gameweek settle`` and stays a separate, deliberate act.
 
-The one thing this does write outside the worktree is the immutable advice record: the
-rebuild is the process that emits the bytes that ship, so it is the process that records
-them, into *this* checkout's ``data/advice_records`` rather than into the worktree it is
-about to delete. The record is keyed by the capture, so publishing a week twice — mid-week,
-then again before the deadline from a fresher capture — records both. What is refused is a
-rebuild of *one* capture that disagrees with its own record, with the difference named;
-``--no-advice-record`` is the deadline escape.
+Nothing is solved or built here, and a tree is copied only through
+:func:`copy_preview_builder`, the builder the weekly run's own ``publish`` stage uses.
 
-The source-checkout build path shells out to ``scripts.*`` with ``cwd`` set to the fresh
-worktree, which puts ``scripts`` in the worktree but leaves ``squadopt`` wherever the
-interpreter's install points it -- an editable install pins the main checkout's ``src``, so
-the two halves can come from two different revisions and neither says so. That split is
-checked before any build runs and refused by default; ``--allow-split-build`` is the
-deadline escape, and it prints both paths so the published tree can be attributed later.
+A decision publish names a weekly run by ``--run-id`` (``python -m scripts.run_week`` prints
+it as ``Weekly run:``) and ships that run's preview only after the checks the run's own
+``publish`` stage stands on, read from the run's journal: every stage before ``publish``
+completed and the league, site and scoreboard outputs still hold the bytes the run recorded;
+the publication base ``origin/develop`` is the run's source revision; and the run's league
+stage wrote the immutable advice record from the solve that ships. A run that recorded no
+advice (one built without ``--publish`` or ``--record-advice``, or with
+``--no-advice-record``) is refused unless ``--no-advice-record`` says to publish it
+unrecorded, and the publish then says so.
+
+A settled publish names a settled candidate by ``--preview`` and, with ``--source-commit``,
+the revision it was built from; a candidate records no revision of its own, so the base is
+checked against the operator's statement. For any gameweek the candidate is built in a clean
+checkout at ``origin/develop``::
+
+    mkdir <dir> && cp -r web/public/data <dir>/data
+    python -m scripts.build_site --season 2026-27 --out <dir>
+
+``scripts.build_site`` writes the settled season views over that copy and leaves the members'
+``league/`` tree and the rest as the site carries them, which is what the settled publish did
+when it ran that build inside the publication worktree. ``python -m scripts.build_settled_site``
+builds only the 2026-27 gameweek 5 candidate. A candidate that lacks a top-level entry of the
+carried tree is refused, because the copy would delete it from the site.
 """
 
 import argparse
+import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from squadopt.contracts.run_logs import LOG_ROOT_NAME
+from squadopt.platform.weekly_journal import WeeklyJournalError, held_run, verify_stage_outputs
 
 KINDS = ("decision", "settled")
+WEEKLY_RUNS = Path("data/runtime/weekly")
+"""Where a weekly run journals itself under its workspace; its default preview sits beside."""
+PREVIEW_STAGES = ("league", "site", "scoreboard")
+"""The run's stages that write the preview; the league stage also writes the advice record."""
+_REVISION = re.compile(r"[0-9a-f]{40}")
+SETTLED_RECIPE = (
+    "A settled candidate for any gameweek is built in a clean checkout at origin/develop: copy "
+    "web/public/data to <dir>/data, then run python -m scripts.build_site --season <season> "
+    "--out <dir>, which writes the settled season views over that copy and leaves the rest "
+    "of it as the site carries it. python -m scripts.build_settled_site builds only the "
+    "2026-27 gameweek 5 candidate."
+)
+"""How a settled candidate is produced, named wherever a settled publish refuses one."""
 
 
 def repository_root() -> Path:
-    """The checkout the legacy publish reads its data from and writes its record into.
+    """The checkout a manual publish creates its publication worktree from.
 
-    Resolved when it is asked for -- at the construction of a :class:`LeaguePublish` or at
-    the publish itself -- never at import. A default bound to the working directory at
-    import time anchored every root under whatever subdirectory the operator started from
-    (measured: ``docs/data/snapshots`` and its four siblings), while the Git commands, run
-    from the same place, found the checkout on their own. The Git top level is the
-    checkout; outside any checkout, the working directory is all there is.
+    Resolved when it is asked for, at the publish itself, never at import. A default bound
+    to the working directory at import time anchored every root under whatever subdirectory
+    the operator started from (measured: ``docs/data/snapshots`` and its four siblings),
+    while the Git commands, run from the same place, found the checkout on their own. The
+    Git top level is the checkout; outside any checkout, the working directory is all there
+    is.
     """
 
     try:
@@ -67,136 +96,6 @@ def repository_root() -> Path:
     if completed.returncode != 0:
         return Path.cwd().resolve()
     return Path(completed.stdout.strip()).resolve()
-
-
-def _data(*parts: str) -> Path:
-    return repository_root().joinpath("data", *parts)
-
-
-@dataclass(frozen=True, slots=True)
-class LeaguePublish:
-    """The league tree beside the season views: which capture, which projection, how many
-    solver processes. Paths are absolute because the build runs in a fresh worktree that
-    holds no data of its own; the defaults are resolved at construction, from the checkout,
-    not from the working directory this module was imported in."""
-
-    league_id: int
-    snapshot_id: str
-    in_season_projection: Path | None
-    workers: int = 1
-    cohort_snapshot: str | None = None
-    elite_snapshot: str | None = None
-    snapshot_root: Path = field(default_factory=lambda: _data("snapshots"))
-    registry: Path = field(default_factory=lambda: _data("entries", "registry.json"))
-    archive_root: Path = field(default_factory=lambda: _data("raw", "vaastav-fpl"))
-    ledger_root: Path = field(default_factory=lambda: _data("ledger"))
-    #: Where the rebuild's immutable advice record lands. Absolute and rooted in *this*
-    #: checkout for the same reason as the roots above: the build runs in a throwaway
-    #: worktree, so a record left at the build's own default would be deleted with it.
-    advice_record_root: Path = field(default_factory=lambda: _data("advice_records"))
-    #: False passes ``--no-advice-record`` through: the escape when a rebuild of the same
-    #: capture differs from that capture's record and the deadline will not wait for the
-    #: difference to be reconciled. The first record is kept; this publish adds none.
-    record_advice: bool = True
-    #: The week's rotation evidence and the club-news source it was coded from, both or
-    #: neither, passed through to the league build as the manager's word.
-    rotation_evidence: Path | None = None
-    club_news_source: Path | None = None
-    #: The week's Top 100 evidence export, passed through as the Top 100 menu.
-    top100_evidence: Path | None = None
-
-    def __post_init__(self) -> None:
-        if self.league_id < 1:
-            raise PublishError(f"league_id must be positive, got {self.league_id!r}.")
-        if not self.snapshot_id.startswith("fpl-live-"):
-            raise PublishError(
-                f"The league tree is built from a live capture; got {self.snapshot_id!r}."
-            )
-        if self.workers < 1:
-            raise PublishError(f"workers must be at least 1, got {self.workers!r}.")
-        if self.cohort_snapshot is not None and not self.cohort_snapshot.startswith("fpl-top100-"):
-            raise PublishError(
-                f"The Top-100 mean is read from an fpl-top100 capture; got "
-                f"{self.cohort_snapshot!r}."
-            )
-        if self.elite_snapshot is not None and not self.elite_snapshot.startswith(
-            "fpl-elite-picks-"
-        ):
-            raise PublishError(
-                f"The Top-100 mean is netted from an fpl-elite-picks capture; got "
-                f"{self.elite_snapshot!r}."
-            )
-        if self.elite_snapshot is not None and self.cohort_snapshot is None:
-            raise PublishError(
-                "An elite-picks capture nets a cohort; pass --cohort-snapshot with it."
-            )
-
-    def scoreboard_arguments(self, out: Path, season: str) -> list[str]:
-        """The scoreboard beside the league tree: same capture, same season, the ledger.
-
-        The season is the one the rest of the publish resolves, not one inferred again
-        from the capture: the committed copy must name the same season as the views it
-        is committed beside.
-        """
-
-        arguments = [
-            sys.executable,
-            "-m",
-            "scripts.build_scoreboard",
-            "--league",
-            str(self.league_id),
-            "--snapshot-id",
-            self.snapshot_id,
-            "--snapshot-root",
-            str(self.snapshot_root),
-            "--registry",
-            str(self.registry),
-            "--ledger-root",
-            str(self.ledger_root),
-            "--season",
-            season,
-            "--out",
-            str(out),
-        ]
-        if self.cohort_snapshot is not None:
-            arguments += ["--cohort-snapshot", self.cohort_snapshot]
-        if self.elite_snapshot is not None:
-            arguments += ["--elite-snapshot", self.elite_snapshot]
-        return arguments
-
-    def build_arguments(self, out: Path) -> list[str]:
-        arguments = [
-            sys.executable,
-            "-m",
-            "scripts.build_league_site",
-            "--league",
-            str(self.league_id),
-            "--snapshot-id",
-            self.snapshot_id,
-            "--snapshot-root",
-            str(self.snapshot_root),
-            "--registry",
-            str(self.registry),
-            "--archive-root",
-            str(self.archive_root),
-            "--advice-record-root",
-            str(self.advice_record_root),
-            "--out",
-            str(out),
-            "--workers",
-            str(self.workers),
-        ]
-        if self.in_season_projection is not None:
-            arguments += ["--in-season-projection", str(self.in_season_projection)]
-        if not self.record_advice:
-            arguments.append("--no-advice-record")
-        if self.rotation_evidence is not None:
-            arguments += ["--rotation-evidence", str(self.rotation_evidence)]
-        if self.club_news_source is not None:
-            arguments += ["--club-news-source", str(self.club_news_source)]
-        if self.top100_evidence is not None:
-            arguments += ["--top100-evidence", str(self.top100_evidence)]
-        return arguments
 
 
 class PublishError(RuntimeError):
@@ -279,63 +178,135 @@ def check_publication_base(root: Path, expected_commit: str) -> None:
         )
 
 
-def resolved_squadopt_root(worktree: Path) -> Path:
-    """Where ``squadopt`` resolves for the interpreter the build subprocesses will use.
+def tree_digests(root: Path) -> dict[str, str]:
+    """Every file under ``root`` by its relative path, with the SHA-256 of its bytes."""
 
-    Asked of that interpreter, from the directory it will be launched in, rather than read
-    off *this* process: the publish may have been started from anywhere, and an inherited
-    ``PYTHONPATH`` or a console entry point can put this process on a different copy of the
-    package than a plain ``python -m scripts.build_site`` in the worktree would get.
+    return {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def copy_preview_builder(
+    preview: Path, receipt: dict[str, object] | None = None
+) -> Callable[[Path], None]:
+    """The builder that publishes an existing preview's ``data/`` tree, and nothing else.
+
+    The weekly run's ``publish`` stage and the manual command both hand :func:`publish` this
+    builder, so both copy a preview and read it back the same way. What decides whether a
+    preview may ship at all (its run finished, its source revision is the base, its advice
+    was recorded) is checked before this builder is asked for: by the run's own stages, or
+    by :func:`run_preview` for a manual publish. ``receipt``, when given, receives the number
+    of files copied under ``published_files``.
     """
 
-    completed = subprocess.run(
-        [sys.executable, "-c", "import squadopt; print(squadopt.__file__)"],
-        cwd=worktree,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode != 0 or not completed.stdout.strip():
+    def build(out: Path) -> None:
+        # The preview is the publication. The tree the worktree carries from
+        # origin/develop goes first, so nothing under it outlives the preview, and the
+        # copy is then read back against the preview before a commit can name it.
+        target = out / "data"
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(preview, target)
+        expected, actual = tree_digests(preview), tree_digests(target)
+        names = expected.keys() | actual.keys()
+        differing = sorted(name for name in names if expected.get(name) != actual.get(name))
+        if differing:
+            raise PublishError(
+                "The publication copy differs from the preview: " + ", ".join(differing[:12])
+            )
+        if receipt is not None:
+            receipt["published_files"] = len(actual)
+
+    return build
+
+
+@dataclass(frozen=True, slots=True)
+class RunPreview:
+    """What a weekly run's journal says about the preview it built."""
+
+    preview: Path
+    """The run's ``<out>/data`` tree: what ships."""
+    source_commit: str
+    """The revision the run was declared under; the publication base must be the same."""
+    advice_recorded: bool
+    """Whether the run's league stage wrote the advice record from the solve that ships."""
+    records: Path
+    """Where that record lives: the run's advice record root."""
+    no_advice_record: bool
+    """Whether the run itself was told ``--no-advice-record``."""
+
+
+def run_preview(document: Mapping[str, Any], run_id: str, names: PublishNames) -> RunPreview:
+    """Refuse a run whose preview the run itself would not have published.
+
+    The run's ``publish`` stage starts only after every earlier stage completed, publishes
+    only from the run's own source revision, and follows a league stage that recorded the
+    advice unless the run was told ``--no-advice-record``. The first is checked here against
+    the run's journal: every stage before
+    ``publish`` completed, and the league, site and scoreboard outputs (the league stage's
+    include the advice record files) still hold the bytes the run recorded. The revision and
+    whether the advice was recorded are returned for the manual publish to hold itself to.
+    """
+
+    if document.get("status") == "validation_failed":
         raise PublishError(
-            f"{sys.executable} cannot import squadopt from {worktree}, so the build scripts "
-            f"it is about to run cannot either:\n{completed.stdout}{completed.stderr}"
+            f"Run {run_id}'s journal refused its own resume: "
+            f"{document.get('validation_error', 'no reason recorded')}. Its preview is not "
+            "published; start a new run."
         )
-    return Path(completed.stdout.strip()).resolve().parent
-
-
-def check_build_resolves_in_the_worktree(worktree: Path, *, allow_split: bool) -> None:
-    """Refuse a source-checkout build whose ``squadopt`` comes from outside the worktree.
-
-    ``scripts`` resolves from ``cwd``, so it is the worktree's copy; ``squadopt`` resolves
-    from the interpreter's install, and the editable install used here is a path file naming
-    the main checkout's ``src``. Measured: from a worktree ahead of that checkout, importing
-    the worktree's ``scripts.build_site`` raised an ``ImportError`` for a name the worktree's
-    ``squadopt`` has and the checkout's does not.
-
-    A hard failure is the lucky case. When the two revisions merely differ the build
-    succeeds and publishes a tree assembled from two versions of the code, with nothing in
-    the commit, the PR or the advice record saying which. That is unattributable after the
-    fact, so it is refused here rather than discovered later.
-    """
-
-    resolved = resolved_squadopt_root(worktree)
-    if worktree in resolved.parents:
-        return
-    split = (
-        f"The build would run this worktree's scripts against another checkout's squadopt:\n"
-        f"  scripts:  {worktree}\n"
-        f"  squadopt: {resolved}\n"
-    )
-    if allow_split:
-        print(f"--allow-split-build: publishing a split build on purpose.\n{split}")
-        return
-    raise PublishError(
-        f"{split}"
-        "A published tree built from two revisions cannot be attributed to either. "
-        "Recovery: bring the checkout that squadopt resolves from up to origin/develop "
-        "(git fetch origin && git switch develop && git pull --ff-only) so both halves are "
-        "the same revision, then re-run; or run the installed weekly publish, which builds "
-        "in process and never splits. If the deadline will not wait and the difference is "
-        "understood, pass --allow-split-build to publish anyway."
+    declaration = document["request"]
+    request = declaration.get("request") or {}
+    if (request.get("season"), request.get("gameweek")) != (names.season, names.gameweek):
+        raise PublishError(
+            f"Run {run_id} built {request.get('season')} gameweek {request.get('gameweek')}, "
+            f"not {names.season} gameweek {names.gameweek}."
+        )
+    stages = list(document["stages"])
+    planned = [stage["name"] for stage in stages]
+    absent = [name for name in PREVIEW_STAGES if name not in planned]
+    if absent:
+        raise PublishError(f"Run {run_id} plans no {', '.join(absent)} stage.")
+    before = stages[: planned.index("publish")] if "publish" in planned else stages
+    unfinished = [
+        f"{stage['name']} ({stage['status']})"
+        for stage in before
+        if stage["status"] not in {"completed", "skipped"}
+    ]
+    if unfinished:
+        raise PublishError(
+            f"Run {run_id} has not finished every stage before publish: "
+            f"{', '.join(unfinished)}. A preview ships only once its run has built all of it, "
+            "or the files an unfinished stage would have rewritten ship as the tree that "
+            "seeded it left them. Recovery: resume the run (python -m scripts.run_week with "
+            f"its arguments and --run-id {run_id} --resume) and publish once it completes."
+        )
+    for stage in before:
+        if stage["name"] in PREVIEW_STAGES:
+            try:
+                verify_stage_outputs(stage)
+            except (OSError, WeeklyJournalError) as error:
+                raise PublishError(
+                    f"Run {run_id}'s {stage['name']} stage outputs no longer hold the bytes "
+                    f"the run recorded ({error}). Its preview is not published; start a new "
+                    "run."
+                ) from error
+    commit = declaration.get("repository_commit")
+    paths = declaration.get("paths") or {}
+    if not isinstance(commit, str) or not commit or "out" not in paths or "records" not in paths:
+        raise PublishError(
+            f"Run {run_id}'s journal names no source revision or preview; it cannot be "
+            "published by hand."
+        )
+    league = stages[planned.index("league")]
+    options = declaration.get("publication_options") or {}
+    return RunPreview(
+        preview=Path(paths["out"]) / "data",
+        source_commit=commit,
+        advice_recorded=league["value"].get("advice_recorded") is True,
+        records=Path(paths["records"]),
+        no_advice_record=options.get("no_advice_record") is True,
     )
 
 
@@ -369,12 +340,10 @@ def publish(
     *,
     force_branch: bool,
     dry_run: bool,
-    league: LeaguePublish | None = None,
     workspace: Path | None = None,
     builder: Callable[[Path], None] | None = None,
     expected_commit: str | None = None,
     on_published: Callable[[Mapping[str, object]], None] | None = None,
-    allow_split_build: bool = False,
 ) -> int:
     root = (workspace or repository_root()).resolve()
     worktree = (root / names.worktree_directory).resolve()
@@ -408,6 +377,11 @@ def publish(
         print(f"dry run: would create {names.branch} in {worktree}, build, commit, push, PR.")
         print(next_steps(names, ""))
         return 0
+    if builder is None:
+        raise PublishError(
+            "A publish copies an existing preview; pass the builder copy_preview_builder "
+            "returns for it."
+        )
 
     branch_flag = "-B" if branch_exists else "-b"
     _run(
@@ -415,10 +389,7 @@ def publish(
         cwd=root,
     )
     try:
-        if builder is not None:
-            builder(worktree / "web" / "public")
-        else:
-            _legacy_build(worktree, root, names, league, allow_split_build=allow_split_build)
+        builder(worktree / "web" / "public")
         _run(["git", "add", "web/public/data"], cwd=worktree)
         if _run(["git", "status", "--porcelain"], cwd=worktree) == "":
             print("The build changed nothing; there is nothing to publish.")
@@ -484,52 +455,129 @@ def publish(
     return 0
 
 
-def _legacy_build(
-    worktree: Path,
-    root: Path,
+def _publish_run(
     names: PublishNames,
-    league: LeaguePublish | None,
+    root: Path,
+    run_id: str,
     *,
-    allow_split_build: bool = False,
-) -> None:
-    """Source-checkout compatibility; installed weekly runs supply typed service builders."""
+    no_advice_record: bool,
+    force_branch: bool,
+    dry_run: bool,
+) -> int:
+    """Publish a weekly run's preview, held to what the run's own publish stage holds it to.
 
-    # Every build below is a subprocess with cwd in the worktree, which settles `scripts`
-    # and leaves `squadopt` to the interpreter's install. Settle that too, before the first
-    # of them runs and spends a solve on a tree nobody could attribute afterwards.
-    check_build_resolves_in_the_worktree(worktree, allow_split=allow_split_build)
-    build = _run(
-        [
-            sys.executable,
-            "-m",
-            "scripts.build_site",
-            "--season",
-            names.season,
-            "--ledger-root",
-            str(root / "data" / "ledger"),
-            "--snapshot-root",
-            str(root / "data" / "snapshots"),
-            "--log-root",
-            str(root / LOG_ROOT_NAME),
-            "--out",
-            str(worktree / "web" / "public"),
-        ],
-        cwd=worktree,
-    )
-    print(build)
-    if league is not None:
-        # The members' tree beside the season views, from the same capture and the
-        # same projection the decision reads. Solved in this worktree's `scripts`; the
-        # `squadopt` under them is whatever the interpreter's install resolves, which the
-        # check above is what makes the same tree rather than a second revision.
-        print(_run(league.build_arguments(worktree / "web" / "public"), cwd=worktree))
-        # The scoreboard reads the ledger, so it follows the site views and the tree.
-        print(
-            _run(
-                league.scoreboard_arguments(worktree / "web" / "public", names.season),
-                cwd=worktree,
+    The run stays owned while it is published, so no resume of it rewrites the preview
+    mid-copy, and the base is checked against the run's recorded source revision, the check
+    whose recovery is to start a new run.
+    """
+
+    with held_run(root / WEEKLY_RUNS, run_id) as document:
+        found = run_preview(document, run_id, names)
+        if not found.advice_recorded and not no_advice_record:
+            built = (
+                "it was built with --no-advice-record"
+                if found.no_advice_record
+                else "it was built without --publish or --record-advice"
             )
+            raise PublishError(
+                f"Run {run_id} recorded no advice: {built}. A publication with no record "
+                "of what each member was told cannot be reviewed later. Recovery: rebuild "
+                "the week with python -m scripts.run_week --record-advice (or --publish) "
+                "under a new run ID and publish that run; or pass --no-advice-record to "
+                "publish this one without a record."
+            )
+        if not found.preview.is_dir():
+            raise PublishError(f"Run {run_id}'s preview {found.preview} is not a directory.")
+        print(
+            f"Run {run_id}: every stage before publish completed; source revision "
+            f"{found.source_commit}; preview {found.preview}."
         )
+        if found.advice_recorded:
+            print(f"Advice record: written by run {run_id}'s league stage under {found.records}.")
+        else:
+            print(
+                f"Advice record: none. Run {run_id} recorded no advice, and this publish "
+                "records none (--no-advice-record)."
+            )
+        return publish(
+            names,
+            force_branch=force_branch,
+            dry_run=dry_run,
+            workspace=root,
+            builder=copy_preview_builder(found.preview),
+            expected_commit=found.source_commit,
+        )
+
+
+def _publish_candidate(
+    names: PublishNames,
+    root: Path,
+    candidate: Path,
+    source_commit: str,
+    *,
+    force_branch: bool,
+    dry_run: bool,
+) -> int:
+    """Publish a settled candidate from the revision the operator says built it.
+
+    A settled candidate is the carried tree with the settled views written over it, so it
+    holds every top-level entry the publication worktree carries. One that lacks any of them
+    (the members' ``league/`` tree above all, which a ``scripts.build_site`` run into an empty
+    directory never writes) is refused before a commit: the copy would delete it from the
+    site.
+    """
+
+    if not _REVISION.fullmatch(source_commit):
+        raise PublishError(
+            "--source-commit must be the full 40-character revision the candidate was "
+            "built from (git rev-parse HEAD in the checkout that built it)."
+        )
+    preview = candidate.resolve() / "data"
+    if not preview.is_dir():
+        raise PublishError(
+            f"{preview} is not a directory. --preview names the settled candidate's "
+            f"directory, the one holding data/. {SETTLED_RECIPE}"
+        )
+    print(
+        f"Settled candidate {preview}; source revision {source_commit}, as --source-commit "
+        "states it (the candidate records none of its own)."
+    )
+    copy = copy_preview_builder(preview)
+
+    def refuse_what_it_would_delete(carried: list[str]) -> None:
+        lacking = sorted(name for name in carried if not (preview / name).exists())
+        if lacking:
+            raise PublishError(
+                f"The settled candidate {preview} lacks {', '.join(lacking)}, which the "
+                "publication carries from origin/develop; publishing it would delete them "
+                f"from the site. {SETTLED_RECIPE}"
+            )
+
+    # Checked before any worktree exists from the named revision, which the base must equal,
+    # when this checkout holds it; the build below checks the worktree's own tree again.
+    listed = _run(
+        ["git", "ls-tree", "--name-only", f"{source_commit}:web/public/data"],
+        cwd=root,
+        check=False,
+    )
+    if listed:
+        refuse_what_it_would_delete(listed.splitlines())
+
+    def build(out: Path) -> None:
+        carried = out / "data"
+        refuse_what_it_would_delete(
+            [entry.name for entry in carried.iterdir()] if carried.is_dir() else []
+        )
+        copy(out)
+
+    return publish(
+        names,
+        force_branch=force_branch,
+        dry_run=dry_run,
+        workspace=root,
+        builder=build,
+        expected_commit=source_commit,
+    )
 
 
 def main() -> int:
@@ -537,98 +585,67 @@ def main() -> int:
     parser.add_argument("--kind", choices=KINDS, required=True)
     parser.add_argument("--gameweek", type=int, required=True)
     parser.add_argument("--season", default="2026-27")
-    parser.add_argument("--force-branch", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--league", type=int, help="also build this league's member tree")
-    parser.add_argument("--snapshot-id", help="the live capture the league tree reads")
-    parser.add_argument("--in-season-projection", type=Path, help="the handoff it projects with")
-    parser.add_argument("--workers", type=int, default=1, help="league tree solver processes")
     parser.add_argument(
-        "--cohort-snapshot", help="the fpl-top100 capture the scoreboard's Top-100 mean reads"
-    )
-    parser.add_argument(
-        "--elite-snapshot",
-        help="the fpl-elite-picks capture that nets that cohort's week; without it the "
-        "Top-100 mean is published gross of transfer costs and labelled gross",
-    )
-    parser.add_argument(
-        "--rotation-evidence",
-        type=Path,
-        help="the week's rotation evidence table; with --club-news-source, the "
-        "manager's word is built for every member",
-    )
-    parser.add_argument(
-        "--club-news-source",
-        type=Path,
-        help="the fixture file or club-news capture the evidence was coded from",
-    )
-    parser.add_argument(
-        "--top100-evidence",
-        type=Path,
-        help="the week's Top 100 evidence export (csv, manifest beside it); every member "
-        "then gets the Top 100 influence menu",
+        "--run-id",
+        help="decision: the weekly run whose preview ships, as scripts.run_week printed it "
+        "after Weekly run:; its journal names the preview, the source revision and whether "
+        "the advice was recorded",
     )
     parser.add_argument(
         "--no-advice-record",
         action="store_true",
-        help="publish without recording what was published; the escape when a rebuild of "
-        "an already recorded capture is refused and the deadline will not wait — the first "
-        "record is kept and the difference stays to be reconciled afterwards",
+        help="decision: publish a run that recorded no advice; the publish says it records none",
     )
     parser.add_argument(
-        "--allow-split-build",
-        action="store_true",
-        help="build even though squadopt resolves outside the publication worktree; the "
-        "escape when the deadline will not wait for the two revisions to be brought "
-        "together. Both paths are printed so the published tree can be attributed",
+        "--preview",
+        type=Path,
+        help="settled: the candidate directory holding data/: a copy of web/public/data "
+        "with scripts.build_site --out <dir> run over it (scripts.build_settled_site "
+        "builds only 2026-27 gameweek 5)",
     )
+    parser.add_argument(
+        "--source-commit",
+        help="settled: the full revision the candidate was built from; origin/develop must "
+        "be at it",
+    )
+    parser.add_argument("--force-branch", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
     arguments = parser.parse_args()
+    run_id: str | None = arguments.run_id
+    candidate: Path | None = arguments.preview
+    source_commit: str | None = arguments.source_commit
+    # A usage error exits 2 through argparse before anything is read; only a refusal of what
+    # was named is caught below.
     try:
-        names = PublishNames(
-            season=arguments.season, gameweek=arguments.gameweek, kind=arguments.kind
-        )
-        league: LeaguePublish | None = None
-        if arguments.league is not None:
-            if not arguments.snapshot_id:
-                raise PublishError("--league needs --snapshot-id (the live capture to read).")
-            league = LeaguePublish(
-                league_id=arguments.league,
-                snapshot_id=arguments.snapshot_id,
-                # Resolved here: the build runs with its working directory inside the
-                # publication worktree, where a relative path names nothing.
-                in_season_projection=(
-                    arguments.in_season_projection.resolve()
-                    if arguments.in_season_projection is not None
-                    else None
-                ),
-                workers=arguments.workers,
-                cohort_snapshot=arguments.cohort_snapshot,
-                elite_snapshot=arguments.elite_snapshot,
-                record_advice=not arguments.no_advice_record,
-                rotation_evidence=(
-                    arguments.rotation_evidence.resolve()
-                    if arguments.rotation_evidence is not None
-                    else None
-                ),
-                club_news_source=(
-                    arguments.club_news_source.resolve()
-                    if arguments.club_news_source is not None
-                    else None
-                ),
-                top100_evidence=(
-                    arguments.top100_evidence.resolve()
-                    if arguments.top100_evidence is not None
-                    else None
-                ),
+        if arguments.kind == "decision":
+            if run_id is None:
+                parser.error("--kind decision needs --run-id, the weekly run whose preview ships")
+            if candidate is not None or source_commit is not None:
+                parser.error(
+                    "--kind decision reads its preview and source revision from the run's "
+                    "journal; --preview and --source-commit are for --kind settled"
+                )
+            return _publish_run(
+                PublishNames(season=arguments.season, gameweek=arguments.gameweek, kind="decision"),
+                repository_root(),
+                run_id,
+                no_advice_record=arguments.no_advice_record,
+                force_branch=arguments.force_branch,
+                dry_run=arguments.dry_run,
             )
-        return publish(
-            names,
+        if candidate is None or source_commit is None:
+            parser.error("--kind settled needs --preview and --source-commit")
+        if run_id is not None or arguments.no_advice_record:
+            parser.error("--run-id and --no-advice-record are for --kind decision")
+        return _publish_candidate(
+            PublishNames(season=arguments.season, gameweek=arguments.gameweek, kind="settled"),
+            repository_root(),
+            candidate,
+            source_commit,
             force_branch=arguments.force_branch,
             dry_run=arguments.dry_run,
-            league=league,
-            allow_split_build=arguments.allow_split_build,
         )
-    except PublishError as error:
+    except (PublishError, WeeklyJournalError) as error:
         print(f"Refused: {error}")
         return 1
 
