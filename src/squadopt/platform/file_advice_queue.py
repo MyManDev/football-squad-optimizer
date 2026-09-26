@@ -29,6 +29,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
+from squadopt.data.atomic import replace_retrying
 from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_observability import AdviceLog
@@ -564,7 +565,7 @@ class FileJobQueue:
             source.unlink()
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(source, target)
+            replace_retrying(source, target)
         self._finished.pop(source.name, None)
         self._settled.discard(current.job_id)
 

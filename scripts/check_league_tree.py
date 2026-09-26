@@ -107,6 +107,27 @@ def walk(node: object, where: str, problems: list[str]) -> None:
         problems.append(f"{where}: forbidden text {node[:80]!r}")
 
 
+def price_problem(payload: dict[str, Any]) -> str | None:
+    """What is wrong with a priced document's price and ceiling, or None.
+
+    The price is never negative. Its ceiling is the price itself when the pure-points plan
+    it is measured against was proven, and absent when that plan was found without a
+    proof: the solver's bound is on its objective and bounds no price. A document with no
+    control of its own (the manager's word that binds nobody) is its own anchor.
+    """
+
+    cost = payload.get("expected_points_cost")
+    ceiling = payload.get("expected_points_cost_ceiling")
+    if not isinstance(cost, (int, float)) or cost < 0:
+        return f"cost {cost} ceiling {ceiling}"
+    anchor = payload.get("control_solver_status") or payload.get("solver_status")
+    if anchor == "FEASIBLE":
+        return None if ceiling is None else f"ceiling {ceiling} over an unproven control"
+    if not isinstance(ceiling, (int, float)) or abs(ceiling - cost) > 1e-9:
+        return f"cost {cost} ceiling {ceiling}"
+    return None
+
+
 def _number(value: object) -> bool:
     """A JSON number: ``typeof value === "number"`` on the page."""
 
@@ -439,10 +460,11 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
                 weight,
             ):
                 problems.append(f"{entry}: {path} identity mismatch")
-            cost, ceiling = p.get("expected_points_cost"), p.get("expected_points_cost_ceiling")
-            if cost is None or ceiling is None or cost < 0 or ceiling < cost - 1e-9:
-                problems.append(f"{entry}: {path} cost {cost} ceiling {ceiling}")
-            else:
+            ceiling = p.get("expected_points_cost_ceiling")
+            price = price_problem(p)
+            if price is not None:
+                problems.append(f"{entry}: {path} {price}")
+            elif ceiling is not None:
                 ceilings.setdefault(window, []).append(ceiling)
             if window > 1 and len(p.get("plan_weeks") or []) != window:
                 problems.append(f"{entry}: {path} plan_weeks")
@@ -548,14 +570,9 @@ def check_top100(read: Callable[[str], Any]) -> list[str]:
                 if ("evidence" in payload) != word:
                     problems.append(f"{entry}: {path} evidence presence wrong")
                 cost = payload.get("expected_points_cost")
-                ceiling = payload.get("expected_points_cost_ceiling")
-                if (
-                    not isinstance(cost, (int, float))
-                    or cost < 0
-                    or ceiling is None
-                    or ceiling < cost - 1e-9
-                ):
-                    problems.append(f"{entry}: {path} cost {cost} ceiling {ceiling}")
+                price = price_problem(payload)
+                if price is not None:
+                    problems.append(f"{entry}: {path} {price}")
                 limits = payload.get("stated_limits") or []
                 limit = LIMIT.match(limits[-1]) if limits else None
                 if limit is None or limit.group(1) != weight:
@@ -645,8 +662,8 @@ def check_word(tree: Tree) -> list[str]:
             f"{entry}: applied count agrees",
         )
         cost = float(doc.get("expected_points_cost", -1))
-        ceiling = float(doc.get("expected_points_cost_ceiling", -1))
-        check(cost >= 0 and ceiling >= cost, f"{entry}: price {cost:.2f} <= ceiling {ceiling:.2f}")
+        price = price_problem(doc)
+        check(price is None, f"{entry}: price {cost:.2f} ({price or 'ceiling agrees'})")
         if ev.get("binding"):
             binding += 1
             check(len(ev.get("applied", [])) > 0, f"{entry}: binding word shows its statements")
@@ -701,18 +718,9 @@ def check_word(tree: Tree) -> list[str]:
     return problems
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
-    args = parser.parse_args(argv)
-    tree = Tree(args.root)
-    if not tree.live and not (Path(tree.root) / "league" / "members.json").is_file():
-        print(
-            f"Missing {Path(tree.root) / 'league' / 'members.json'}; "
-            "pass the directory containing league/, such as <preview>/data."
-        )
-        return 1
-    findings = []
+def run_checks(tree: Tree) -> list[str]:
+    """Run the three checks on ``tree`` and return every finding; an empty list passes."""
+    findings: list[str] = []
     checks: tuple[tuple[str, Callable[[], list[str]]], ...] = (
         ("variants", lambda: check_variants(tree.read)),
         ("top100", lambda: check_top100(tree.read)),
@@ -725,7 +733,21 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as error:
             findings.append(f"{name}: unreadable tree: {error}")
             print(findings[-1])
-    return 1 if findings else 0
+    return findings
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
+    args = parser.parse_args(argv)
+    tree = Tree(args.root)
+    if not tree.live and not (Path(tree.root) / "league" / "members.json").is_file():
+        print(
+            f"Missing {Path(tree.root) / 'league' / 'members.json'}; "
+            "pass the directory containing league/, such as <preview>/data."
+        )
+        return 1
+    return 1 if run_checks(tree) else 0
 
 
 if __name__ == "__main__":

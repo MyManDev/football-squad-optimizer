@@ -40,7 +40,9 @@ from typing import Final
 import pandas as pd
 
 from squadopt.application.evidence_io import write_json, write_text
+from squadopt.data.atomic import REPLAY, write_bytes_once, write_document_once
 from squadopt.data.checksums import compute_table_sha256
+from squadopt.data.errors import ConflictingBytesError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
@@ -295,18 +297,21 @@ def _temporary(final: Path) -> Path:
 
 
 def _publish(temporary: Path, final: Path) -> None:
-    """Create-once: an identical artifact is kept, a different one is never overwritten."""
+    """Create-once: an identical artifact is kept, a different one is never overwritten.
 
-    if final.exists():
-        if final.read_bytes() == temporary.read_bytes():
-            return
+    The bytes land through a no-overwrite hard link. Looking for the file and then renaming
+    over it let a second run destroy a file that landed between the two steps.
+    """
+
+    try:
+        write_bytes_once(temporary.read_bytes(), final)
+    except ConflictingBytesError as error:
         raise SettledOutcomeExportError(
             f"{final} already exists with different content; an artifact is never "
             f"overwritten in place. On disk: sha256 {compute_table_sha256(final)}; this run: "
             f"sha256 {compute_table_sha256(temporary)}. Remove it deliberately, or name "
             "another output."
-        )
-    os.replace(temporary, final)
+        ) from error
 
 
 #: The manifest fields that say who wrote the artifact and when, not what it is.
@@ -326,6 +331,12 @@ def _canonical(manifest: Mapping[str, object]) -> dict[str, object]:
     """The manifest's identity: every field except the provenance ones."""
 
     return {key: value for key, value in manifest.items() if key not in _PROVENANCE_FIELDS}
+
+
+def _replay_identity(document: object) -> object:
+    """What a second write must agree on; a document that is not a manifest agrees with none."""
+
+    return _canonical(document) if isinstance(document, Mapping) else document
 
 
 def _differences(existing: Mapping[str, object], incoming: Mapping[str, object]) -> list[str]:
@@ -366,9 +377,8 @@ def write_artifact(
 ) -> dict[str, object]:
     """Write ``<name>.csv`` and ``<name>.manifest.json``, create-once, and return the manifest.
 
-    Mirrors the write path `scripts/export_player_evidence.py` established rather than
-    sharing it: that script is Phase B's frozen `player_evidence_v1` export and this lane
-    may not touch it. A shared helper is the right move once a third artifact needs one.
+    Both files land through ``squadopt.data.atomic``, the create-once writer the player
+    evidence export uses too.
     """
 
     output_dir = Path(output_dir)
@@ -404,29 +414,26 @@ def write_artifact(
         "starts": int(table["start"].sum()),
         "players_without_pre_deadline_availability": int(table["pre_deadline_status"].isna().sum()),
     }
-    if manifest_path.exists():
+    try:
+        outcome = write_document_once(manifest, manifest_path, replay_identity=_replay_identity)
+    except ConflictingBytesError as error:
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
         if not isinstance(existing, dict):
             raise SettledOutcomeExportError(
                 f"{manifest_path} already exists and is not a manifest; refusing to overwrite it."
-            )
+            ) from error
         differences = _differences(_canonical(existing), _canonical(manifest))
-        if differences:
-            raise SettledOutcomeExportError(
-                f"{manifest_path} already exists and describes a different artifact; "
-                "refusing to overwrite it. The fields that differ (the clock and the commit "
-                "are provenance and are not compared):\n"
-                + "\n".join(f"  {line}" for line in differences)
-            )
+        raise SettledOutcomeExportError(
+            f"{manifest_path} already exists and describes a different artifact; "
+            "refusing to overwrite it. The fields that differ (the clock and the commit "
+            "are provenance and are not compared):\n"
+            + "\n".join(f"  {line}" for line in differences)
+        ) from error
+    if outcome == REPLAY:
         # The first manifest stands, its clock and its commit included: the same bytes
         # written again at a later minute from a later revision are a replay of it.
-        return existing
-    temporary_manifest = _temporary(manifest_path)
-    try:
-        write_json(temporary_manifest, manifest)
-        os.replace(temporary_manifest, manifest_path)
-    finally:
-        temporary_manifest.unlink(missing_ok=True)
+        existing_manifest: dict[str, object] = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return existing_manifest
     return manifest
 
 

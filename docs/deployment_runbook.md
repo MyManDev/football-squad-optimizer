@@ -3,8 +3,11 @@
 Cloudflare Pages publishes only the static `web/dist` artifact produced by the successful
 `web (node 22)` CI job. The deployment workflow downloads those already-tested bytes and never
 rebuilds them. It does **not** host the FastAPI application in `src/squadopt/api`; the backend
-is hosted beside Pages, not inside it ([ADR 0006](architecture/decisions/0006-backend-hosting.md),
-`deploy/compose.yaml`), and has its own runbook, [backend_runbook.md](backend_runbook.md).
+runs beside Pages, not inside it. Today it runs on the owner's Windows PC behind the
+`squadopt-api` Cloudflare Tunnel ([backend_free_hosting.md](backend_free_hosting.md)). The
+hosted topology [ADR 0006](architecture/decisions/0006-backend-hosting.md) chose and the
+`deploy/compose.yaml` startup describe a host that is not in use. The backend has its own
+runbook, [backend_runbook.md](backend_runbook.md).
 
 The current site fits the Cloudflare Pages Free plan. Static asset requests are free and
 unlimited; the operating budget assumes 500 deployments per month, 20,000 files per site, and
@@ -132,11 +135,23 @@ There are two normal publications per gameweek from GW2 onward:
 2. **Settled:** after outcomes are settled, regenerate the public data and season summary,
    merge to `main`, tag it `...-settled`, dispatch, and require green smoke.
 
-For the GW5 scratch candidate produced by `python -m scripts.build_settled_site`, run
-`python -m scripts.check_league_tree <candidate>/data` and report its result, the complete
-changed-file list and the independent scoreboard cells before/after in #632 before a site-data
-PR. This checker does not replace verification of rebuilt season documents against the frozen
-schemas or of the frozen root index against the candidate's file list. The producer preserves
+`python -m scripts.build_settled_site` produces the GW5 scratch candidate, and it checks the
+candidate before writing it. A finding in any check refuses the whole candidate, names the
+finding, and leaves nothing on disk:
+
+- every rebuilt season document and `data/fixtures.json` against the schema the accepted tree
+  froze for its `contract_version` (`data/schema/`);
+- the frozen root index against the candidate: every file it names exists, every gameweek view
+  is named, and its weeks and latest view are the ones the candidate's season ledger holds;
+- `data/fixtures.json` against the outcome capture it must come from;
+- the league tree release check (`scripts.check_league_tree`) on the candidate's `data`. It
+  also runs on the accepted tree, and a finding the accepted tree already has is counted and
+  printed rather than refused: it sits in advice members read before the deadline, which this
+  publish cannot change.
+
+The command prints each check it passed. Report that output, the complete changed-file list and
+the independent scoreboard cells before/after in #632 before a site-data PR: that report asks
+for an approval, which no command can give. The producer preserves
 accepted member advice bytes and never re-solves them. If an accepted advice document was
 changed after its immutable record was written, even to add a payload reporting field, its hash
 can differ and publication refuses with "Recorded comparison does not match accepted advice".
@@ -145,7 +160,12 @@ That refusal is the evidence guard working, not a silent overwrite or a producer
 Stop and reconcile which accepted bytes and records belong together; do not bypass the guard.
 The GW5 outcome refresh also updates `data/fixtures.json` from the same completed capture;
 accepted advice and entry files remain byte-identical. Generate the complete contribution
-roster with `scripts.build_player_catalog` from that capture before the site-data PR.
+roster with `scripts.build_player_catalog` from that capture before the site-data PR. That one
+stays a step: it writes `data/players.json` into the site-data tree after the candidate exists,
+and adding that path to the publisher's approved list is a boundary change for the owner to
+approve. The page's own validators (`shippedTree.test.ts`) need no run by hand here either: the
+site PR's CI runs them on the committed tree, and the deploy workflow refuses a tag without a
+successful `main` push CI, which runs them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
@@ -171,7 +191,8 @@ deadline for those five and keep the capture lead time from `docs/weekly_runbook
 **The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
 settled only when the source says both `finished` and `data_checked`
 (`application/scoreboard.py`), so a Tuesday that arrives before the check publishes "not settled
-yet" rather than a wrong number. Confirm the week is checked before spending a run:
+yet" rather than a wrong number. The settled publisher refuses an outcome capture in which the
+week is not both. Confirm the week is checked before taking that capture or settling from it:
 
 ```bash
 curl -s https://fantasy.premierleague.com/api/bootstrap-static/ \
@@ -240,10 +261,25 @@ pull request reviewed, with no gate anywhere catching it. Recover with the secon
 
 ```
 sh scripts/release/deploy.sh <tag>
+python scripts/release/verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]
 ```
 
-and, once the tag has been pushed, with a re-dispatch instead, which needs neither script and
-can be repeated:
+Run the second line only when the first has exited 0, and wait about 45 seconds between
+them. `deploy.sh` reports the workflow run, not the site, so the recovery is not done until
+`verify_live.py` prints `ALL GOOD`: it is the step `ship.sh` runs after `deploy.sh`, and
+without it the recovery path had no check of what the site serves. If it fails in the first
+minutes, run it once more a minute later, as `ship.sh` does. `deploy.sh` watches the
+earliest dispatch run created since a minute before its own dispatch (the minute is slack for
+clock skew), so an older release's finished run is not picked while this machine's clock is
+within a minute of GitHub's. It refuses a successful run whose production job does not name
+this tag. A failed run is reported as failed whatever tag it names: the production job takes
+its name from the tag the source check resolves, and a failed source check resolves none, so
+the name cannot tell this release's own failure from another run's. If another dispatch was
+made shortly before this one, check with `gh run list --workflow deploy-pages.yml` that the
+failed run is this release's before dispatching again.
+
+Once the tag has been pushed, recover with a re-dispatch instead, which needs neither script
+and can be repeated, and then run the same `verify_live.py` command once that run has finished:
 
 ```
 gh workflow run deploy-pages.yml --ref develop -f release_tag=<tag>
@@ -255,7 +291,7 @@ one. Previews spend from the same day and stop at eight; on a busy day the previ
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
 `deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
-retains the eleven smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
+retains the ten smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
 path. These are operator commands, not scheduled jobs; inspect their output and stop
@@ -351,22 +387,22 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **eleven** checks, and they are not all "must return 200". The list
+The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
-Eight are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
-`/league`, `/league/members/0`, `/analysis`, `/status`, `/fixtures`. The nested member path is there
+Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
+`/league`, `/league/members/0`, `/status`, `/fixtures`. The nested member path is there
 deliberately, because a path-scoped not-found rule would break a nested client-side route first
 and nothing else on the list would notice.
 
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and `/data/league/members.json`.
 
-**The eleventh is the opposite check, and reading it as a 200 inverts it.**
+**The tenth is the opposite check, and reading it as a 200 inverts it.**
 `/data/league/entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is eight route 200s, two JSON 200s, and one 404.
+rather than the application shell. A green smoke is seven route 200s, two JSON 200s, and one 404.
 
 Transient edge and propagation failures are retried for roughly one minute.
 

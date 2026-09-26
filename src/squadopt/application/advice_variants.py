@@ -11,9 +11,11 @@ request reaches each of them, against any rival, through ``advice_menu.advise_me
 The rules are the ones the one-week menu already keeps (``advise_with_top100``). The
 setting moves the points a plan is *chosen* on and nothing else; every number published is
 the base model's; and the price is the base-model difference against the member's own
-pure-points plan for the same window at setting 0, floored at zero, with that control's
-own bound slack as the ceiling. A window's solves are found rather than proven, so their
-price is nearly always read from the ceiling, and the page says "at most".
+pure-points plan for the same window at setting 0, floored at zero. The ceiling beside it
+is the price itself when that control is proven, which the page reads as "at most" when
+the priced window's own proof is missing; when the control is not proven, no ceiling is
+published and the page prints no price, because the control's bound gap is on the
+planner's objective and bounds no price (``publish_price_ceiling``).
 
 The Top 100 counts are the previous gameweek's. A window repeats them over its later weeks
 exactly as it repeats the first week's projection, and says so; they are read again when
@@ -43,8 +45,8 @@ from squadopt.application.advice import (
     _requested_picks,
     _setting_rows,
     _solve_within_free_transfers,
+    publish_price_ceiling,
     solve_window_plan,
-    unproven_bench_allowance,
     window_horizon,
     window_payload,
     window_stated_limits,
@@ -139,38 +141,8 @@ def _window_total(weeks: tuple[PlanningWeekResult, ...]) -> float:
     return total
 
 
-def _control_bench_bound(control_payload: Mapping[str, object], base: ProjectionHorizon) -> float:
-    """No less than the bench points the pure-points window carries, from what it published.
-
-    The payload names the first week's fifteen and every week's transfers, so each week's
-    fifteen is known; its eleven is not, beyond the first. A week's bench is the fifteen
-    less the eleven, and the eleven scores its published total less the captain's double,
-    who is at most the fifteen's best player: so the fifteen's points, less that total,
-    plus the best player's, is never below the bench. A bound, used only to keep an
-    unproven ceiling honest.
-    """
-
-    by_week = _points_by_week(base)
-    squad = {
-        int(str(player["player_id"]))
-        for key in ("starting_xi", "bench")
-        for player in _players(control_payload, key)
-    }
-    bound = 0.0
-    rows = control_payload.get("plan_weeks")
-    for index, row in enumerate(rows if isinstance(rows, list) else []):
-        if index:
-            squad -= {int(str(p["player_id"])) for p in row.get("transfers_out", [])}
-            squad |= {int(str(p["player_id"])) for p in row.get("transfers_in", [])}
-        points = by_week.get(int(str(row["gameweek"])), {})
-        held = [points.get(player, 0.0) for player in squad]
-        if held:
-            bound += max(0.0, math.fsum(held) - float(str(row["expected_points"])) + max(held))
-    return bound
-
-
-def _control_reading(control_payload: Mapping[str, object]) -> tuple[float, float]:
-    """The pure-points window's own total and bound slack, read from what it published."""
+def _control_reading(control_payload: Mapping[str, object]) -> tuple[float, bool]:
+    """The pure-points window's own total, and whether it was proven, from what it published."""
 
     rows = control_payload.get("plan_weeks")
     if not isinstance(rows, list) or not rows:
@@ -182,15 +154,7 @@ def _control_reading(control_payload: Mapping[str, object]) -> tuple[float, floa
         for row in rows
         if isinstance(row, Mapping)
     )
-    if control_payload.get("solver_status") == "OPTIMAL":
-        return total, 0.0
-    gap = control_payload.get("optimality_gap")
-    if gap is None:
-        raise EntryError(
-            "The pure-points window is unproven and carries no measured bound gap; its "
-            "distance from the best plan may not be read as zero."
-        )
-    return total, max(0.0, float(str(gap)))
+    return total, control_payload.get("solver_status") == "OPTIMAL"
 
 
 def _signature(payload: Mapping[str, object]) -> tuple[object, ...]:
@@ -249,17 +213,15 @@ def _price(
     *,
     control_payload: Mapping[str, object],
     selected_total: float,
-    base: ProjectionHorizon,
 ) -> str:
     """Price a window document against the pure-points window; returns an operator note."""
 
-    control_total, slack = _control_reading(control_payload)
-    allowance = unproven_bench_allowance(slack, _control_bench_bound(control_payload, base))
+    control_total, control_proven = _control_reading(control_payload)
     cost = max(control_total, selected_total) - selected_total
     payload["expected_points_cost"] = cost
-    payload["expected_points_cost_ceiling"] = max(
-        cost, control_total + slack + allowance - selected_total
-    )
+    # A document restated from another window may carry that window's ceiling; this one
+    # sets its own or removes it.
+    publish_price_ceiling(payload, cost, anchor_proven=control_proven)
     payload["control_solver_status"] = control_payload.get("solver_status")
     payload["control_optimality_gap"] = control_payload.get("optimality_gap")
     if selected_total > control_total:
@@ -339,9 +301,7 @@ def advise_window_with_top100(
         choice_points=base_points(weighted_projection(projection, counts.counts, weight)),
     )
     _limits(payload, TOP100_LIMIT.format(weight=weight), TOP100_WINDOW_LIMIT)
-    note = _price(
-        payload, control_payload=control_payload, selected_total=_window_total(weeks), base=base
-    )
+    note = _price(payload, control_payload=control_payload, selected_total=_window_total(weeks))
     _relabel_moves(payload, control_payload, kept="window_value")
     payload["top100"] = _top100_block(
         weight, _signature(payload) != _signature(control_payload), counts
@@ -570,9 +530,7 @@ def advise_rival_window(
         )
         selected_total = _window_total(weeks)
     _limits(payload, RIVAL_WINDOW_LIMIT)
-    note = _price(
-        payload, control_payload=control_payload, selected_total=selected_total, base=base
-    )
+    note = _price(payload, control_payload=control_payload, selected_total=selected_total)
     eleven = sorted(int(str(player["player_id"])) for player in _players(payload, "starting_xi"))
     captain_row = payload.get("captain")
     if len(eleven) != 11 or not isinstance(captain_row, Mapping):
