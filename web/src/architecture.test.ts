@@ -190,7 +190,6 @@ describe("web architecture", () => {
     ]);
     expect(PRODUCTION.filter(isLoader).sort()).toEqual([
       "data/client.ts",
-      "features/analysis/data.ts",
       "features/fixtures/data.ts",
       "features/league/data.ts",
     ]);
