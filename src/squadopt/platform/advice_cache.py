@@ -14,7 +14,8 @@ Two design rules carry everything here:
   a no-op (the disposable worker's retry), and writing *different* bytes to an
   existing key is an error, because under a complete key that can only mean a
   determinism defect — the one thing a cache must never paper over. Writes go through
-  a temporary file and an atomic replace, so a killed worker leaves no torn entry.
+  a temporary file, fsynced, and an atomic create, so neither a killed worker nor a power
+  loss leaves a torn entry; one left before the fsync is moved aside and computed again.
 
 The protocol keeps the store an attached resource: the file implementation is the
 first adapter, and the ADR 0005 trigger moving this to Postgres/Redis is an adapter
@@ -32,6 +33,13 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final, Protocol
+
+from squadopt.platform._damaged_entry import (
+    PUBLISH_ATTEMPTS,
+    is_damaged,
+    quarantine,
+    read_entry,
+)
 
 ADVICE_CACHE_CONTRACT_VERSION: Final = "advice_cache_v1"
 
@@ -146,7 +154,12 @@ class AdviceCacheRepository(Protocol):
 
 
 class FileAdviceCache:
-    """The file-backed adapter: one file per key, sharded, written atomically."""
+    """The file-backed adapter: one file per key, sharded, written atomically.
+
+    It holds JSON documents only. The worker validates every answer as an advice document
+    before publishing it, so bytes that are not JSON at a key were never written as an
+    answer: they are what a crash left, and they are moved aside rather than served.
+    """
 
     def __init__(self, root: Path | str) -> None:
         self._root = Path(root)
@@ -157,11 +170,23 @@ class FileAdviceCache:
         return self._root / key[:2] / f"{key}.json"
 
     def get(self, key: str) -> bytes | None:
+        """The bytes at ``key``, or ``None``; an entry that is not JSON is moved aside.
+
+        Such an entry is what a crash left before this store fsynced its writes. Returned,
+        it answered 500 to every read and refused every new computation of the same key,
+        until the next capture or deploy. Moved aside, the key is a miss and is computed
+        again. An entry that parses but fails validation is still returned as it is. A
+        read refused while another caller moves the entry aside is retried for a moment.
+        """
+
         path = self._path(key)
-        try:
-            return path.read_bytes()
-        except FileNotFoundError:
+        raw = read_entry(path)
+        if raw is None:
             return None
+        if is_damaged(raw):
+            quarantine(path, raw, component="cache")
+            return None
+        return raw
 
     def put(self, key: str, payload: bytes) -> None:
         """Write once. Identical bytes again: a no-op. Different bytes: a conflict.
@@ -172,13 +197,19 @@ class FileAdviceCache:
         either lands (the reviewed race: both observed the miss, the last replace won
         silently). The loser of creation reads the winner and accepts only
         byte-identical content; different bytes raise ``AdviceCacheConflictError``,
-        because under a complete key that can only be a determinism defect. A killed
-        writer leaves no torn entry: the final name only ever appears complete.
+        because under a complete key that can only be a determinism defect. A winner that
+        is gone before it can be read was moved aside for a moment by a reader that read
+        damage at this key earlier, so the link is tried again. A killed
+        writer leaves no torn entry: the final name only ever appears complete, and the
+        bytes are fsynced before the link, so a power loss cannot leave the name pointing
+        at bytes that never reached the disk.
         """
 
         if not isinstance(payload, bytes) or not payload:
             raise AdviceCacheError("payload must be non-empty bytes.")
         path = self._path(key)
+        if is_damaged(payload):
+            raise AdviceCacheError("payload must be a JSON document.")
         existing = self.get(key)
         if existing is not None:
             self._require_identical(key, existing, payload)
@@ -188,15 +219,20 @@ class FileAdviceCache:
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 handle.write(payload)
-            try:
-                os.link(temporary, path)  # atomic create; fails if the key exists
-            except FileExistsError:
-                winner = self.get(key)
-                if winner is None:
-                    raise AdviceCacheError(
-                        f"Key {key[:12]}… exists but cannot be read back."
-                    ) from None
-                self._require_identical(key, winner, payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            for _attempt in range(PUBLISH_ATTEMPTS):
+                try:
+                    os.link(temporary, path)  # atomic create; fails if the key exists
+                    return
+                except FileExistsError:
+                    winner = self.get(key)
+                if winner is not None:
+                    self._require_identical(key, winner, payload)
+                    return
+                # Gone before it could be read: a reader that read the damage before this
+                # key was written again moved the entry aside, and is linking it back.
+            raise AdviceCacheError(f"Key {key[:12]}… exists but cannot be read back.")
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
