@@ -3,8 +3,11 @@
 Cloudflare Pages publishes only the static `web/dist` artifact produced by the successful
 `web (node 22)` CI job. The deployment workflow downloads those already-tested bytes and never
 rebuilds them. It does **not** host the FastAPI application in `src/squadopt/api`; the backend
-is hosted beside Pages, not inside it ([ADR 0006](architecture/decisions/0006-backend-hosting.md),
-`deploy/compose.yaml`), and has its own runbook, [backend_runbook.md](backend_runbook.md).
+runs beside Pages, not inside it. Today it runs on the owner's Windows PC behind the
+`squadopt-api` Cloudflare Tunnel ([backend_free_hosting.md](backend_free_hosting.md)). The
+hosted topology [ADR 0006](architecture/decisions/0006-backend-hosting.md) chose and the
+`deploy/compose.yaml` startup describe a host that is not in use. The backend has its own
+runbook, [backend_runbook.md](backend_runbook.md).
 
 The current site fits the Cloudflare Pages Free plan. Static asset requests are free and
 unlimited; the operating budget assumes 500 deployments per month, 20,000 files per site, and
