@@ -34,6 +34,18 @@ passes `0.0.0.0` and `9091` so the check can reach it from inside the container)
 SIGTERM or SIGINT **after** the job in hand finishes, so a container stop costs nobody their
 solve.
 
+An idle worker also archives finished jobs. A completed or failed job whose last update is
+seven days old moves, unchanged, from `jobs/` to `jobs/archive/`, with two small indexes
+beside it: `archive/idempotency/` (named by a hash of the idempotency key) and
+`archive/answers/` (named by cache key). `GET /api/v1/advice-jobs/{job_id}` still answers for
+it, a POST that repeats its `Idempotency-Key` still finds it, and its id is never given to
+another job. Each worker does this on its first idle round and then at most every 10 minutes,
+moving at most 100 jobs per call and starting no new one after about one second under the
+queue lock. It logs `advice_jobs_archived` with a count, or `advice_jobs_archive_failed` with
+the error and carries on. Queued and running jobs are never moved. The `advice_jobs` gauge
+counts what is still in `jobs/`, so a finished job leaves it after seven days. Nothing deletes
+the archive.
+
 ## Configuration
 
 Every value is server-side. A request names a league, a member, a strategy and a window; it

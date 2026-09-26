@@ -396,16 +396,16 @@ def test_admission_does_not_add_another_full_history_scan(
 ) -> None:
     client, _cache, queue = _world(tmp_path)
     assert client.post(ADVICE_URL, json=BODY).status_code == 202
-    original = queue.jobs
+    original = queue.history
     calls = 0
 
-    def history():
+    def history(*, idempotency_key: str | None, cache_key: str) -> tuple[AdviceJob, ...]:
         nonlocal calls
         calls += 1
         assert calls == 1  # Only the existing idempotency/attempt history lookup.
-        return original()
+        return original(idempotency_key=idempotency_key, cache_key=cache_key)
 
-    monkeypatch.setattr(queue, "jobs", history)
+    monkeypatch.setattr(queue, "history", history)
     assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
     assert calls == 1
 
@@ -975,14 +975,14 @@ def test_completion_after_a_cache_miss_does_not_enqueue_another_job(
 
         monkeypatch.setattr(AdviceReadStore, "cached", stale_miss)
     else:
-        original_jobs = queue.jobs
+        original_history = queue.history
 
-        def stale_history() -> tuple[AdviceJob, ...]:
-            history = original_jobs()
+        def stale_history(*, idempotency_key: str | None, cache_key: str) -> tuple[AdviceJob, ...]:
+            history = original_history(idempotency_key=idempotency_key, cache_key=cache_key)
             finish()
             return history
 
-        monkeypatch.setattr(queue, "jobs", stale_history)
+        monkeypatch.setattr(queue, "history", stale_history)
 
     headers = {} if retry_key is None else {"Idempotency-Key": retry_key}
     replay = client.post(ADVICE_URL, json=BODY, headers=headers)

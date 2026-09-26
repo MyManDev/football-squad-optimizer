@@ -21,7 +21,8 @@ worker by design and a replica scales by replication (ADR 0006). An empty queue 
 rather than spins. A shutdown signal is honoured *after* the job in hand finishes, so a
 member never loses a solve to a deployment. Abandoned work is walked back periodically
 rather than on every tick, and a job that has been retried past the limit is failed with a
-code instead of crash-looping forever.
+code instead of crash-looping forever. An idle worker also archives finished jobs older than
+the retention window, at most once per interval, so the queue's records stay the recent ones.
 
 The claim is kept alive while the computation runs. One member's plan is not one solve —
 a rival strategy runs the control plan, the banded plan and the payload's own plan — so the
@@ -86,7 +87,7 @@ from squadopt.platform.backend_runtime import (
 )
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.queue_contracts import QueueLockTimeout
+from squadopt.platform.queue_contracts import DEFAULT_ARCHIVE_AFTER_SECONDS, QueueLockTimeout
 from squadopt.platform.worker_heartbeat import (
     IDLE_WAIT_SECONDS,
     PULSE_SECONDS,
@@ -96,6 +97,7 @@ from squadopt.platform.worker_heartbeat import (
 from squadopt.platform.worker_metrics import serve_worker_metrics
 
 __all__ = [
+    "DEFAULT_ARCHIVE_EVERY_SECONDS",
     "DEFAULT_HEARTBEAT_SECONDS",
     "DEFAULT_IDLE_SECONDS",
     "DEFAULT_MAX_ATTEMPTS",
@@ -109,6 +111,8 @@ __all__ = [
 DEFAULT_IDLE_SECONDS: Final = IDLE_WAIT_SECONDS
 DEFAULT_POLL_SECONDS: Final = 0.25
 DEFAULT_RECOVER_EVERY_SECONDS: Final = 30.0
+#: How often one idle worker asks the queue to archive old finished jobs.
+DEFAULT_ARCHIVE_EVERY_SECONDS: Final = 600.0
 # A third of the lease: two refreshes may be missed before a live claim looks stale.
 DEFAULT_HEARTBEAT_SECONDS: Final = DEFAULT_LEASE_SECONDS / 3.0
 DEFAULT_MAX_ATTEMPTS: Final = 3
@@ -381,6 +385,8 @@ def run_advice_worker(
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
     heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
     max_backoff_seconds: float = DEFAULT_MAX_BACKOFF_SECONDS,
+    archive_every_seconds: float = DEFAULT_ARCHIVE_EVERY_SECONDS,
+    archive_after_seconds: float = DEFAULT_ARCHIVE_AFTER_SECONDS,
     store_ready: Callable[[], bool] | None = None,
     contexts: CaptureContextProvider | None = None,
     max_jobs: int | None = None,
@@ -410,6 +416,11 @@ def run_advice_worker(
     and recovery walks it back after its lease. ``KeyboardInterrupt`` and ``SystemExit``
     are not caught.
 
+    A round that finds no work archives finished jobs whose last update is at least
+    ``archive_after_seconds`` old: the first idle round, then no more often than
+    ``archive_every_seconds``. Each call is bounded by the queue. A call that fails is
+    logged and waits for the next interval; it changes nothing about claiming.
+
     ``heartbeat`` is called at the top of every round the store lets begin and, while a
     round holds a job, every ``pulse_seconds`` from its first compute call until the round
     ends, so readiness can tell a busy worker from one that has stopped. A heartbeat that
@@ -419,6 +430,7 @@ def run_advice_worker(
 
     processed = 0
     recovered_at = 0.0
+    archived_at: float | None = None
     waiting_on_store = False
     warmed = None
     failed_rounds = 0
@@ -518,8 +530,34 @@ def run_advice_worker(
             if max_jobs is not None and processed >= max_jobs:
                 return processed
             continue
+        if archived_at is None or elapsed - archived_at >= archive_every_seconds:
+            archived_at = elapsed
+            _archive_finished_jobs(queue, now=now, after_seconds=archive_after_seconds, log=log)
         _wait(sleep, should_stop, idle_seconds, poll_seconds)
     return processed
+
+
+def _archive_finished_jobs(
+    queue: JobQueue,
+    *,
+    now: Callable[[], datetime],
+    after_seconds: float,
+    log: AdviceLog | None,
+) -> None:
+    """One archive call from an idle round; housekeeping, so a failure is only logged."""
+
+    try:
+        archived = queue.archive(now_utc=_stamp(now()), retention_seconds=after_seconds)
+    except Exception as error:
+        if log is not None:
+            log.event(
+                "advice_jobs_archive_failed",
+                error_type=type(error).__name__,
+                detail=str(error) or None,
+            )
+        return
+    if archived and log is not None:
+        log.event("advice_jobs_archived", count=len(archived))
 
 
 def _beat(heartbeat: Callable[[], None], log: AdviceLog | None, *, failing: bool) -> bool:

@@ -5,6 +5,13 @@ job, claim, running state, immutable cache, terminal state, cleanup. Every prefi
 reconciled under the same process-shared lock. Computation runs outside that lock.
 Existing job documents keep backend_jobs_v1; legacy id-only indexes remain readable.
 Drain old workers before upgrade: processes unaware of fencing must not share this store.
+
+A finished record (completed or failed) never changes again. A scan remembers the ones it
+has read, by file name, modification time and size, and does not read them again, so after
+a process's first scan claim, recover and the job listing read only open or changed records.
+Once a finished record is older than the retention window, ``archive`` moves it unchanged
+into ``archive/`` beside two small indexes (by idempotency key and by cache key). ``load``
+and ``history`` still find it there, and its id is never given to another job.
 """
 
 from __future__ import annotations
@@ -18,18 +25,34 @@ import re
 import tempfile
 import time
 from collections.abc import Callable
+from datetime import timedelta
 from pathlib import Path
+from typing import Final
 
+from squadopt.data.atomic import replace_retrying
 from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_observability import AdviceLog
-from squadopt.platform.jobs_contract import _JOB_ID_PATTERN, AdviceJob, BackendJobsContractError
+from squadopt.platform.jobs_contract import (
+    _JOB_ID_PATTERN,
+    AdviceJob,
+    BackendJobsContractError,
+    _instant,
+    _utc,
+)
 from squadopt.platform.queue_contracts import (
+    DEFAULT_ARCHIVE_AFTER_SECONDS,
     DEFAULT_LEASE_SECONDS,
     AdviceLeaseLostError,
     AdviceQueueError,
     AdviceQueueIntegrityError,
 )
+
+#: At most this many records move per ``archive`` call, and the call stops early once it
+#: has held the lock for ``DEFAULT_ARCHIVE_BUDGET_SECONDS``: every other queue transaction
+#: waits on the same lock for at most 5 s.
+DEFAULT_ARCHIVE_BATCH: Final = 100
+DEFAULT_ARCHIVE_BUDGET_SECONDS: Final = 1.0
 
 
 def _serialize(job: AdviceJob) -> bytes:
@@ -52,6 +75,11 @@ class FileJobQueue:
     def __init__(self, root: Path | str) -> None:
         self._root = Path(root)
         self._lock = QueueFileLock(self._root / ".queue.lock")
+        # Finished records this process has read, by file name, with the (mtime_ns, size)
+        # they were read at. Only touched under the lock.
+        self._finished: dict[str, tuple[tuple[int, int], AdviceJob]] = {}
+        # Finished jobs whose claim marker and open reservation this process has removed.
+        self._settled: set[str] = set()
 
     @staticmethod
     def _valid_id(job_id: str) -> str:
@@ -61,6 +89,19 @@ class FileJobQueue:
 
     def _path(self, job_id: str) -> Path:
         return self._root / f"{self._valid_id(job_id)}.json"
+
+    def _archived_path(self, job_id: str) -> Path:
+        return self._root / "archive" / f"{self._valid_id(job_id)}.json"
+
+    def _key_index(self, idempotency_key: str) -> Path:
+        # Hashed: an idempotency key may hold characters a file name cannot.
+        digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+        return self._root / "archive" / "idempotency" / f"{digest}.json"
+
+    def _answer_index(self, cache_key: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{64}", cache_key):
+            raise AdviceQueueError("cache_key must be a lowercase SHA-256 digest.")
+        return self._root / "archive" / "answers" / f"{cache_key}.json"
 
     def _claim_marker(self, job_id: str) -> Path:
         return self._root / f"{self._valid_id(job_id)}.claim"
@@ -99,6 +140,8 @@ class FileJobQueue:
         return tuple(sorted(p.name for p in (self._root / "integrity").glob("*.bin")))
 
     def load(self, job_id: str) -> AdviceJob | None:
+        """The job's record, from ``jobs/`` or, once it has been archived, from the archive."""
+
         path = self._path(job_id)
         # A Windows reader's open handle can deny a concurrent atomic replacement.
         # Polls share the same short transaction as writers; nested queue reads use
@@ -107,7 +150,23 @@ class FileJobQueue:
             try:
                 raw = path.read_bytes()
             except FileNotFoundError:
+                try:
+                    raw = self._archived_path(job_id).read_bytes()
+                except FileNotFoundError:
+                    return None
+        return self._parse(raw, job_id)
+
+    def _load_live(self, job_id: str) -> AdviceJob | None:
+        path = self._path(job_id)
+        with self._lock.hold():
+            try:
+                raw = path.read_bytes()
+            except FileNotFoundError:
                 return None
+        return self._parse(raw, job_id)
+
+    @staticmethod
+    def _parse(raw: bytes, job_id: str) -> AdviceJob:
         try:
             job = AdviceJob.from_payload(json.loads(raw))
             if job.job_id != job_id:
@@ -117,22 +176,108 @@ class FileJobQueue:
             raise AdviceQueueIntegrityError(f"Unreadable queue record: {job_id}.") from error
 
     def _scan(self) -> tuple[AdviceJob, ...]:
+        """Every record in ``jobs/``, reading a finished one only the first time it is seen.
+
+        Callers hold the lock, so no conforming writer changes a file during the scan. A
+        finished record is never rewritten; the stamp check still rereads one that was.
+        """
+
+        try:
+            entries = sorted(os.scandir(self._root), key=lambda entry: entry.name)
+        except FileNotFoundError:
+            entries = []
         found = []
-        for path in sorted(self._root.glob("*.json")):
+        finished: dict[str, tuple[tuple[int, int], AdviceJob]] = {}
+        for entry in entries:
+            if not entry.name.endswith(".json"):
+                continue
             try:
-                job = self.load(path.stem)
+                info = entry.stat()
+            except FileNotFoundError:
+                continue
+            stamp = (info.st_mtime_ns, info.st_size)
+            held = self._finished.get(entry.name)
+            if held is not None and held[0] == stamp:
+                finished[entry.name] = held
+                found.append(held[1])
+                continue
+            path = Path(entry.path)
+            try:
+                job = self._load_live(path.stem)
             except AdviceQueueError:
                 self._retain_issue(path)
                 continue
-            if job is not None:
-                found.append(job)
+            if job is None:
+                continue
+            if job.is_terminal:
+                finished[entry.name] = (stamp, job)
+            found.append(job)
+        self._finished = finished
+        self._settled &= {job.job_id for _stamp, job in finished.values()}
         return tuple(sorted(found, key=lambda j: (j.created_at_utc, j.job_id)))
 
     def jobs(self) -> tuple[AdviceJob, ...]:
+        """The records in ``jobs/``: open work, and finished work not yet archived."""
+
         if not self._root.exists():
             return ()
         with self._lock.hold():
             return self._scan()
+
+    def history(self, *, idempotency_key: str | None, cache_key: str) -> tuple[AdviceJob, ...]:
+        """``jobs()``, plus the archived jobs that used this idempotency key or this answer.
+
+        What a submission decides from: whether its idempotency key was already used for a
+        different request, and how many jobs this answer's address has had (the next job's
+        id counts them). The archive is read through its two indexes, never listed.
+        """
+
+        if not self._root.exists():
+            return ()
+        with self._lock.hold():
+            live = self._scan()
+            names = set(self._archived_ids(self._answer_index(cache_key), "cache_key", cache_key))
+            if idempotency_key is not None:
+                names.update(
+                    self._archived_ids(
+                        self._key_index(idempotency_key), "idempotency_key", idempotency_key
+                    )
+                )
+            # A record the indexes name that has not moved yet is already in ``live``.
+            names -= {job.job_id for job in live}
+            archived = []
+            for name in sorted(names):
+                job = self.load(name)
+                if job is None:
+                    raise AdviceQueueIntegrityError(f"Archived job {name!r} is missing.")
+                archived.append(job)
+        return tuple(sorted((*live, *archived), key=lambda j: (j.created_at_utc, j.job_id)))
+
+    def _archived_ids(self, index: Path, field: str, value: str) -> tuple[str, ...]:
+        try:
+            raw = index.read_bytes()
+        except FileNotFoundError:
+            return ()
+        try:
+            document = json.loads(raw)
+            if not isinstance(document, dict) or document.get(field) != value:
+                raise AdviceQueueIntegrityError("Archive index names a different key.")
+            ids = document.get("job_ids")
+            if not isinstance(ids, list) or not ids:
+                raise AdviceQueueIntegrityError("Archive index holds no job ids.")
+            return tuple(self._valid_id(name) for name in ids)
+        except (ValueError, UnicodeError, TypeError) as error:
+            self._retain_issue(index)
+            raise AdviceQueueIntegrityError("Unreadable archive index.") from error
+
+    def _add_to_archive_index(self, index: Path, field: str, value: str, job_id: str) -> None:
+        held = self._archived_ids(index, field, value)
+        if job_id in held:
+            return
+        document = {field: value, "job_ids": sorted({*held, job_id})}
+        self._publish(
+            index, (json.dumps(document, sort_keys=True) + "\n").encode("utf-8"), create=False
+        )
 
     def _index_job(self, index: Path, *, repair: bool) -> AdviceJob | None:
         try:
@@ -218,7 +363,7 @@ class FileJobQueue:
                     return winner, False
                 self._cleanup(winner)
             # Reject duplicate ids before publishing an intent pointing to another key.
-            if self._path(job.job_id).exists():
+            if self._path(job.job_id).exists() or self._archived_path(job.job_id).exists():
                 raise AdviceQueueError(f"Job {job.job_id!r} already exists; submit is not upsert.")
             self._publish(index, _serialize(job), create=True)
             self.submit(job)
@@ -228,6 +373,9 @@ class FileJobQueue:
         if job.status != "queued":
             raise AdviceQueueError("Only a queued job can be submitted.")
         with self._lock.hold():
+            # An archived id stays taken: its record is still served under it.
+            if self._archived_path(job.job_id).exists():
+                raise AdviceQueueError(f"Job {job.job_id!r} already exists; submit is not upsert.")
             try:
                 self._publish(self._path(job.job_id), _serialize(job), create=True)
             except FileExistsError:
@@ -262,6 +410,7 @@ class FileJobQueue:
                 raise AdviceQueueError("Terminal record does not match its transition.")
             self._write(self._path(job.job_id), job)
             self._cleanup(job)
+            self._settled.add(job.job_id)
 
     def complete(
         self, job: AdviceJob, *, cache: AdviceCacheRepository, payload: bytes, at_utc: str
@@ -323,10 +472,16 @@ class FileJobQueue:
             for job in self._scan():
                 marker = self._claim_marker(job.job_id)
                 if job.is_terminal:
+                    # Once removed, a finished job's marker and reservation never return:
+                    # a claim marks only queued work, and a newer job's reservation for the
+                    # same key names that job.
+                    if job.job_id in self._settled:
+                        continue
                     try:
                         self._cleanup(job)
                     except AdviceQueueIntegrityError:
                         continue
+                    self._settled.add(job.job_id)
                     continue
                 if job.status == "queued":
                     # A claim marker with no running state is an interrupted claim.
@@ -344,6 +499,75 @@ class FileJobQueue:
                 marker.unlink(missing_ok=True)
                 recovered.append(requeued)
         return tuple(recovered)
+
+    def archive(
+        self,
+        *,
+        now_utc: str,
+        retention_seconds: float = DEFAULT_ARCHIVE_AFTER_SECONDS,
+        max_records: int = DEFAULT_ARCHIVE_BATCH,
+        budget_seconds: float = DEFAULT_ARCHIVE_BUDGET_SECONDS,
+    ) -> tuple[AdviceJob, ...]:
+        """Move finished records last updated ``retention_seconds`` before now into the archive.
+
+        Oldest first, at most ``max_records`` of them, and no new one once the lock has been
+        held for ``budget_seconds``; what is left waits for the next call. Open work is never
+        moved, and neither is a finished record whose reservation cannot be read.
+        """
+
+        if not math.isfinite(retention_seconds) or retention_seconds < 0:
+            raise AdviceQueueError("retention_seconds must be finite and non-negative.")
+        if max_records < 1:
+            raise AdviceQueueError("max_records must be at least one.")
+        cutoff = _instant(_utc(now_utc, label="now_utc")) - timedelta(seconds=retention_seconds)
+        if not self._root.exists():
+            return ()
+        moved: list[AdviceJob] = []
+        with self._lock.hold():
+            deadline = time.monotonic() + budget_seconds
+            for job in self._scan():
+                if len(moved) >= max_records or time.monotonic() >= deadline:
+                    break
+                if not job.is_terminal or _instant(job.updated_at_utc) > cutoff:
+                    continue
+                try:
+                    self._archive_one(job)
+                except AdviceQueueIntegrityError:
+                    continue
+                moved.append(job)
+        return tuple(moved)
+
+    def _archive_one(self, job: AdviceJob) -> None:
+        # Read again rather than trusting the scan's copy: only a finished record moves.
+        current = self._load_live(job.job_id)
+        if current is None or current != job or not current.is_terminal:
+            raise AdviceQueueIntegrityError(f"Job {job.job_id!r} changed before archiving.")
+        # Its claim marker and a reservation still naming it go first: once the record has
+        # left jobs/, recovery's scan no longer sees it to remove them.
+        self._cleanup(current)
+        # The indexes first: a crash before the move leaves the record where it was, and
+        # the next call adds nothing twice.
+        if current.idempotency_key is not None:
+            self._add_to_archive_index(
+                self._key_index(current.idempotency_key),
+                "idempotency_key",
+                current.idempotency_key,
+                current.job_id,
+            )
+        self._add_to_archive_index(
+            self._answer_index(current.cache_key), "cache_key", current.cache_key, current.job_id
+        )
+        source, target = self._path(current.job_id), self._archived_path(current.job_id)
+        if target.exists():
+            if target.read_bytes() != source.read_bytes():
+                self._retain_issue(source)
+                raise AdviceQueueIntegrityError(f"Archived job {job.job_id!r} differs.")
+            source.unlink()
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            replace_retrying(source, target)
+        self._finished.pop(source.name, None)
+        self._settled.discard(current.job_id)
 
     def _write(self, path: Path, job: AdviceJob) -> None:
         self._publish(path, _serialize(job), create=False)

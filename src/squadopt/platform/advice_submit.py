@@ -348,7 +348,7 @@ class AdviceSubmitService:
         # One lock per process holds the read through the write; resolving, the cache read
         # and the rate limit stay outside it. Separate api processes are not serialized.
         with self._admission:
-            history = self._queue.jobs()
+            history = self._queue.history(idempotency_key=idempotency_key, cache_key=cache_key)
             if idempotency_key is not None:
                 # Idempotency history survives terminal state: a key reused for a
                 # different request is a conflict whether or not the first job finished.
