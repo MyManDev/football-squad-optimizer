@@ -74,9 +74,12 @@ over the repository, and the format gate reports 77 files there. Ruff's `src` se
 `src` and `tests`, but that controls first-party *import resolution*, not which files are
 checked. For measurement scripts, the two gates that still stop at the package boundary are:
 
-- **mypy**: the configured file set covers `src/squadopt` and four operator scripts
-  (`backend_status.py`, `release/verify_live.py`, `check_league_tree.py`,
-  `release/clean_body.py`); CI runs `python -m mypy` so it checks that complete set.
+- **mypy**: the configured file set (`[tool.mypy] files` in `pyproject.toml`) covers
+  `src/squadopt`, four operator scripts (`backend_status.py`, `release/verify_live.py`,
+  `check_league_tree.py`, `release/clean_body.py`) and the three shells that write the
+  published trees (`build_site.py`, `build_league_site.py`, `build_scoreboard.py`); CI runs
+  `python -m mypy` so it checks that complete set, and
+  `tests/unit/test_mypy_file_set_is_described.py` fails when this list and that set differ.
   The 19 September scan of all 121 scripts, using `--explicit-package-bases` to resolve
   duplicate-module discovery, found 125 errors in 26 files; measurement runners remain
   outside this task;
@@ -139,8 +142,9 @@ Zones are in [ownership](ownership.md). In practice:
 
 - Stay in your zone. A change that needs someone else's zone is a conversation first, not a
   larger PR.
-- Shared boundaries — `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` —
-  need one approving review from each of the other two roles.
+- Shared boundaries (`contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`,
+  `backtest/`) need an approving review from each owner who did not write the change. Until
+  2026-09-25 they needed one from each of the other two roles.
 - If two people must work in the same area at once, split by file, not by function, and say so
   before starting.
 

@@ -90,7 +90,7 @@ no GW2+ residuals are relabeled; which issues stay open and on what condition. -
 ## What this template must never be used for
 
 - Justifying a silent fallback to GW2+ residuals for a GW1 target.
-- Closing #45 without either real GW1 evidence or a completed report agreed by the
-  three owners.
+- Closing #45 without either real GW1 evidence or a completed report agreed by both
+  owners (three until 2026-09-25).
 - Recording a reconstruction as "good enough" — if section 4 has an entry, the
   reconstruction is out.
