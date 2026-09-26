@@ -20,7 +20,7 @@ twice that cap has stopped.
 
 ``QUEUED_JOB_LIMIT_SECONDS`` is the 300 s claim lease. An idle worker claims a queued job
 within one idle wait. A job waits longer only while every worker is busy, and the longest
-job in the live worker logs to 2026-09-25 took 245.5 s (31 completed jobs). A job still
+job in the live worker logs to 2026-09-25 took 245.5 s (32 completed jobs). A job still
 queued after a whole lease is not being picked up. The wait is counted from the moment the
 job last entered the queue (``updated_at_utc`` of a queued job): a job walked back by
 recovery starts waiting again then, and the question is whether the queue moves now.
