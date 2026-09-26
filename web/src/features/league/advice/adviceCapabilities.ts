@@ -14,7 +14,7 @@
  */
 
 import type { WindowSize } from "../../moves/modePrices";
-import { LeagueDataError } from "../data";
+import { LeagueDataError } from "../dataErrors";
 import { isMemberChip, type MemberChip } from "./chipChoice";
 import { isTop100Weight, type Top100Weight } from "./top100";
 
