@@ -1,0 +1,4322 @@
+{
+  "contract_version": "live_price_honesty_v1",
+  "criterion_evaluated": false,
+  "inputs": {
+    "4": {
+      "advice_captures": [
+        "fpl-live-20260912T100000Z-24613792ef57"
+      ],
+      "outcome_captures": [
+        "fpl-live-20260922T214539Z-364991a4f832"
+      ]
+    },
+    "5": {
+      "advice_captures": [
+        "fpl-live-20260918T122516Z-cd5c04029774"
+      ],
+      "outcome_captures": [
+        "fpl-live-20260922T214539Z-364991a4f832"
+      ]
+    }
+  },
+  "left_out": {
+    "listed_twice": 60,
+    "window_or_chip": 60
+  },
+  "member_weeks_not_read": {},
+  "members": 15,
+  "minimum_gameweeks_for_interval": 6,
+  "pairs": [
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.8041283263608392
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 2.435287582029119
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.0255915611163573
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.5904771937298108
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.8769433254135919
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.4411789799557937
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.1076778315095197
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 1.7585969497861385
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.4913318503565591
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.1587877075731825
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.335401135250251
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.7408139855540838
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.7092816117450838
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.826124525666927
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "fark-yarat/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.3327760396928454
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 2.0,
+      "setting": "fark-yarat/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.1314760852992265
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 3.0,
+      "setting": "fark-yarat/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.12080041521080886
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 1.9718209336011938
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 2.3106034219621208
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.0797164898229923
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.2076253657542964
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 2.337548051255993
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 15.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.9013472665176252
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.9505454447554698
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 2.026516592340677
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 16.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.8516927306794102
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.4583885198048421
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5032615529113613
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 2.051139409881138
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.0036390318223525
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 13.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.6964762171764747
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 28.0,
+      "setting": "fark-yarat/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 1.0853125839251518
+    },
+    {
+      "binding": true,
+      "entry_id": 313686,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "fark-yarat/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.23498466803474116
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.5669117998694873
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.51981454766306
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.33479566168304586
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.33479566168304586
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -3.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5216488337853207
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.2102895235547919
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.561044431546577
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987681
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "fark-yarat/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.0644578849895936
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "fark-yarat/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.0644578849895936
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "fark-yarat/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.0644578849895936
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.7627109215761152
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.5707856806430129
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.5707856806430129
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.7541305561930045
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.8004215206651679
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.9102387419312947
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.8657991666232476
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -22.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.975585794942603
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.8715170847191445
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -6.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.8786542924633807
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.36539109476548504
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.9579727687433177
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.8346156601608925
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.8746290343581933
+    },
+    {
+      "binding": true,
+      "entry_id": 2199732,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -14.0,
+      "setting": "fark-yarat/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.034194139495724585
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.4890338313864504
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.41721443535246294
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.41721443535246294
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.8584392624885169
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.6783372761009474
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987823
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.4890338313864504
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.4890338313864504
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987823
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.6829605523987823
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "fark-yarat/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.41721443535246294
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "fark-yarat/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.41721443535246294
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "fark-yarat/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.09026250406341774
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.4479558301934645
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.4479558301934645
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.4479558301934645
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.19891662665966692
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.4479558301934645
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.23553540882784318
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.23553540882784318
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.23553540882784318
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.6998922107188861
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.29821269731117184
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.358927071360597
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.19233524351314202
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.23553540882784318
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.44393057208827713
+    },
+    {
+      "binding": true,
+      "entry_id": 2281624,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "fark-yarat/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.23553540882784318
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.9626784304638534
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 1.9626784304638534
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 13.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 4.371414394008873
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.9799724114668322
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 3.5591733337044076
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 2.226000887353379
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 4.477346560747719
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -22.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 1.5507931058074718
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 5.3706688847491435
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.9389936832277783
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -17.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 5.6349336865555415
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 4.638202344542741
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -18.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 5.82778839397335
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 17.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.8841462761328813
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.6350774297769846
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -19.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.901300141140652
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -19.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.901300141140652
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 2.4301590847121446
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.9617501592485382
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -12.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 2.7943414901543164
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.6766411814248272
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 2.101822458183321
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 2.5071724480572684
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -10.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.6784960489875118
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -19.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.7445663991175167
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -17.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 2.3924247880500147
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -24.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.8238848753974608
+    },
+    {
+      "binding": true,
+      "entry_id": 3832237,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.6121772242056878
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.03730259756959242
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.03730259756959242
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.9089468701033638
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.5607819793876274
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.5607819793876274
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.37477277858512537
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.03730259756959242
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.44690841035065887
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.43039965291802673
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.37477277858512537
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5150363865713103
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.03730259756959242
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.3931202657191193
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.5143536403657833
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -10.0,
+      "setting": "fark-yarat/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.29044420269417515
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.6485798236131046
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 1.608190042128598
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 1.514930287220551
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -3.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 2.3759227448459654
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 14.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 2.4083866937567535
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 15.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 2.6851481774592116
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 15.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 3.007964368397097
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -21.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 2.0126238788353987
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 18.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.3497638226330082
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.5822986360962972
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -6.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.4617590115215222
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 1.588845323463346
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -10.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.3663376221493024
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.3588402595556914
+    },
+    {
+      "binding": true,
+      "entry_id": 4287206,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 20.0,
+      "setting": "fark-yarat/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.4097709554158797
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.38623649967745166
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.38623649967745166
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 1.3495377621463405
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 2.5621565969280624
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.8480947891837332
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.1482490454583
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.5276526438670146
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -6.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 1.1597127665506264
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.7387708603428393
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.8651228248825475
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.4714538829985315
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.38623649967745166
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.9138067118101247
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.7421190025581978
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.9375373220698009
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.05348069295706637
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.05348069295706637
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.1701585839863498
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.19891662665966692
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.2919538476714507
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.2919538476714507
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.2919538476714507
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.6998922107188719
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.30658799984431084
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.2919538476714507
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -1.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.1923352435131278
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.2919538476714507
+    },
+    {
+      "binding": true,
+      "entry_id": 5081114,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -13.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.2919538476714507
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 1.325413978831989
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.9064885822653679
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.325413978831989
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.709281611745098
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.5519377119588142
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.9450347673072486
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.325413978831989
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5216488337853207
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.709281611745098
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.7524108108659249
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.8994746674446077
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.8794378201761788
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -11.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.8794378201761788
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.8994746674446077
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.9284358217700657
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -3.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.3487609420363782
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.1979520066873306
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -22.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 1.343201489746221
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.9188744945892751
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.9188744945892751
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -7.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.7425140600382178
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -6.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.7807746252309613
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -8.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.2333842684800942
+    },
+    {
+      "binding": true,
+      "entry_id": 5349883,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.0379209587230065
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655368318
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655368318
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.972808582606568
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.0872637133430558
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 12.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.5872378721103857
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 12.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.5872378721103857
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.0062322703219309
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655368318
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -3.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.0618591446548322
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 12.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.9271503282646805
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5216488337853136
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655368318
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.7092816117450838
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.7524108108659178
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.3738498035651574
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 1.1091118005369012
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 1.0881327233597702
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 15.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.3408147626343236
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 2.450823329658334
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 17.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.9734765976574735
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 14.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.5862062161019352
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -7.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 2.267298835231685
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 16.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.7065581601737208
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.563779987686999
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.2745363724257146
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 1.043416632265611
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.9729758969205591
+    },
+    {
+      "binding": true,
+      "entry_id": 5662073,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 24.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.5555876062177845
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 13.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.2048865983563815
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.810976114824328
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 14.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.9068593708864512
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.3140944688222618
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.2334160003045156
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.1772381868572666
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 17.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.4226859752706957
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.5109341718285663
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.4059048988903413
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.1432663795510365
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.5242065193716172
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.6890599939721369
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.718192646960901
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.4092530411056998
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 1.1485833726283232
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.7336312540084577
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.7330557599883321
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.5707856806430129
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.8790671877110725
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.7765965804083947
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.5936371766706543
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.837730160030162
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.7330557599883321
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.7330557599883321
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.30004404175416255
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.8724858045645334
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.8004215206651679
+    },
+    {
+      "binding": true,
+      "entry_id": 6654210,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.1485833726283232
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -14.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.9860415016585122
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -14.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.9860415016585122
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 1.1363591621275404
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -17.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.5722569705859115
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -10.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.2388769534642776
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -17.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.5722569705859115
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.2582752829797315
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.3051540125780079
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.7768384937115798
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.2582752829797315
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.7330557599883392
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -3.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.769706675043814
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.7330557599883392
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.5482734354760126
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.031053846746381453
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.4217670660780044
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.7013576683207461
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.031053846746381453
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.6066914477958321
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.396804335804724
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.6926145530713583
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.031053846746381453
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.9244428039127257
+    },
+    {
+      "binding": true,
+      "entry_id": 6879786,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 9.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.5685036179508955
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655361213
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655361213
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 2.159112135603806
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.0872637133430487
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.4661041647182884
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.7092816117450838
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.4890338313864504
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.6687620893063979
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655361213
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.9755052459723146
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5216488337853207
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655361213
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.7092816117450838
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.7524108108659107
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -16.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.3394530612882818
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -10.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.09098690383841301
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -10.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.09098690383841301
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.23642283754102777
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.2058108997653818
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.6006052429831925
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.5059390224582785
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -16.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.3394530612882818
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.3007314040761315
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.28278949686742294
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.22984145439448866
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.22963584002215498
+    },
+    {
+      "binding": true,
+      "entry_id": 6880255,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.2023545132087321
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.9868951049477062
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.9868951049477062
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 1.2476823707631723
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.0014928317736036
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.2397305567534715
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.0353933309102104
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.3695984916153634
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -3.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 1.523076166012757
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.9868951049477062
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.5650450204970525
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.6649701279066562
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -4.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.9868951049477062
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.1809660928786485
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 14.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.8062582666862284
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.050610958101771075
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.050610958101771075
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.050610958101771075
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.050610958101771075
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.493606749981538
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.493606749981538
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.2731509155417484
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.493606749981538
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.493606749981538
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.493606749981538
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.2731509155417484
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.050610958101771075
+    },
+    {
+      "binding": true,
+      "entry_id": 7018833,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.2731509155417484
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -10.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.9172695437410852
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -15.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.3473848511814026
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.12554722637464977
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -15.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.3473848511814026
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.0575305475785086
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.12554722637464977
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -16.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.0425269348466628
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.12554722637464977
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.12554722637464977
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -15.0,
+      "setting": "fark-yarat/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.24285404176271186
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -9.0,
+      "setting": "fark-yarat/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.12554722637464977
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.20260844486570306
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.20260844486570306
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.20260844486570306
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.5838049403413095
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.5458937275036675
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 13.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 2.1624462073291113
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.5869572855228995
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -9.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 1.5838049403413095
+    },
+    {
+      "binding": true,
+      "entry_id": 7252721,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.5458937275036675
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.6050525512069385
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.2245921838771352
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 14.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 2.3305899109121526
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.943970616629045
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 24.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 1.1941781663823008
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 16.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.664944478200482
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 19.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.4154886229535464
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 2.062616184810537
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 2.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 1.3785288180801132
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 20.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.957586911872312
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.4329590646248818
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 18.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 1.1009286231748519
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.6050525512069385
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 19.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 1.8184464642136788
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 12.0,
+      "setting": "fark-yarat/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.5074603933555579
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.01678971026476006
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.01678971026476006
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.01678971026476006
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.01678971026476006
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 12.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.2347568126794215
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.7765965804083947
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.42776574489272434
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.42776574489272434
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 11.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.5042729975966864
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.47984330114761065
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.3424281858640654
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.30004404175416255
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 1.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.01678971026476006
+    },
+    {
+      "binding": true,
+      "entry_id": 8548384,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-8883467",
+      "stated_ceiling": null,
+      "stated_cost": 0.47984330114761065
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.3987713273230469
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 1.087263713343063
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.3987713273230469
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 0.709281611745098
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 0.3987713273230469
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.3987713273230469
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 6.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 0.9755052459723288
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 0.3987713273230469
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 4.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.5216488337853207
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": -5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.016067940655375423
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 5,
+      "realized_cost": 7.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.3987713273230469
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 17.0,
+      "setting": "ortak-koru/rival-313686",
+      "stated_ceiling": null,
+      "stated_cost": 0.86072334947103
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-2199732",
+      "stated_ceiling": null,
+      "stated_cost": 0.8985346437602715
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": -2.0,
+      "setting": "ortak-koru/rival-2281624",
+      "stated_ceiling": null,
+      "stated_cost": 0.8985346437602715
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 16.0,
+      "setting": "ortak-koru/rival-3832237",
+      "stated_ceiling": null,
+      "stated_cost": 0.720012098095907
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-4287206",
+      "stated_ceiling": null,
+      "stated_cost": 0.34671170043749555
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 17.0,
+      "setting": "ortak-koru/rival-5081114",
+      "stated_ceiling": null,
+      "stated_cost": 1.2630636632734848
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 17.0,
+      "setting": "ortak-koru/rival-5349883",
+      "stated_ceiling": null,
+      "stated_cost": 1.0832633069110074
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 10.0,
+      "setting": "ortak-koru/rival-5662073",
+      "stated_ceiling": null,
+      "stated_cost": 0.34671170043749555
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 0.0,
+      "setting": "ortak-koru/rival-6654210",
+      "stated_ceiling": null,
+      "stated_cost": 1.0594651593841746
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 19.0,
+      "setting": "ortak-koru/rival-6879786",
+      "stated_ceiling": null,
+      "stated_cost": 1.3341592273274614
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 14.0,
+      "setting": "ortak-koru/rival-6880255",
+      "stated_ceiling": null,
+      "stated_cost": 1.4716274360486068
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 8.0,
+      "setting": "ortak-koru/rival-7018833",
+      "stated_ceiling": null,
+      "stated_cost": 0.7983234080827657
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 5.0,
+      "setting": "ortak-koru/rival-7252721",
+      "stated_ceiling": null,
+      "stated_cost": 0.31555878692191186
+    },
+    {
+      "binding": true,
+      "entry_id": 8883467,
+      "family": "rival_strategy",
+      "gameweek": 4,
+      "realized_cost": 3.0,
+      "setting": "ortak-koru/rival-8548384",
+      "stated_ceiling": null,
+      "stated_cost": 0.9729758969205591
+    }
+  ],
+  "protocol": "docs/live_price_honesty_prereg.md",
+  "provenance": {
+    "repository_commit": "b2e36267b68fbb403b30495758e96139df2145b7",
+    "working_tree_dirty": false
+  },
+  "reading": {
+    "by_family": {
+      "rival_strategy": {
+        "binding_pairs": 422,
+        "gameweeks": [
+          4,
+          5
+        ],
+        "interval": null,
+        "mean_realized_cost": 1.037914691943128,
+        "mean_realized_minus_stated": 0.12018921840425004,
+        "mean_stated_cost": 0.9177254735388782,
+        "pairs": 840,
+        "pairs_with_ceiling": 0,
+        "realized_above_ceiling": 0,
+        "realized_above_stated": 226
+      }
+    },
+    "by_gameweek": {
+      "4": {
+        "binding_pairs": 208,
+        "gameweeks": [
+          4
+        ],
+        "interval": null,
+        "mean_realized_cost": -0.14423076923076922,
+        "mean_realized_minus_stated": -1.0306188293815584,
+        "mean_stated_cost": 0.886388060150789,
+        "pairs": 420,
+        "pairs_with_ceiling": 0,
+        "realized_above_ceiling": 0,
+        "realized_above_stated": 95
+      },
+      "5": {
+        "binding_pairs": 214,
+        "gameweeks": [
+          5
+        ],
+        "interval": null,
+        "mean_realized_cost": 2.1869158878504673,
+        "mean_realized_minus_stated": 1.2387316199904554,
+        "mean_stated_cost": 0.9481842678600116,
+        "pairs": 420,
+        "pairs_with_ceiling": 0,
+        "realized_above_ceiling": 0,
+        "realized_above_stated": 131
+      }
+    },
+    "pooled": {
+      "binding_pairs": 422,
+      "gameweeks": [
+        4,
+        5
+      ],
+      "interval": null,
+      "mean_realized_cost": 1.037914691943128,
+      "mean_realized_minus_stated": 0.12018921840425004,
+      "mean_stated_cost": 0.9177254735388782,
+      "pairs": 840,
+      "pairs_with_ceiling": 0,
+      "realized_above_ceiling": 0,
+      "realized_above_stated": 226
+    }
+  },
+  "season": "2026-27",
+  "through_gameweek": 5
+}

@@ -10,17 +10,30 @@ It never removes evidence a previous publication carried.
 Only the explicitly approved outcome documents may change. Every other accepted
 byte, including entries and advice, survives. A new required path must be approved
 before it can be added to the boundary below.
+
+The checks an operator used to run by hand on the finished candidate run here, before
+the candidate is written: the rebuilt season documents against the schemas the accepted
+tree froze, the frozen root index against the candidate's files, the fixture list against
+the outcome capture, and (from the command line) the league tree release check, which
+refuses what it finds in the candidate and not in the accepted tree. A candidate that
+fails any of them is refused and never appears on disk.
 """
 
 import hashlib
 import json
+import re
 import shutil
 import stat
+from collections import Counter
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from typing import Any
+
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import best_match
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import MemberStanding, _rank_movement
@@ -30,6 +43,7 @@ from squadopt.application.weekly_suggestion_eval import (
     publish_suggestion_histories,
     review_member_weeks,
 )
+from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -73,6 +87,16 @@ class SettledPublicationResult:
     out_dir: Path
     generated_at_utc: str
     changed_files: tuple[str, ...]
+    #: What was checked on the candidate before it was written, one line per check.
+    checks: tuple[str, ...] = ()
+
+
+#: The league tree release check of a ``data`` directory, returning its findings. It runs
+#: on the accepted tree and on the candidate before the candidate is written; a finding
+#: the candidate has and the accepted tree does not refuses the candidate.
+LeagueTreeCheck = Callable[[Path], Sequence[str]]
+
+_CONTRACT_VERSION = re.compile(r"[a-z0-9_]+")
 
 
 def _files(root: Path) -> dict[str, bytes]:
@@ -333,8 +357,193 @@ def _publish_scoreboard(
     )
 
 
-def publish_settled(request: SettledPublicationRequest) -> SettledPublicationResult:
-    """Build a complete scratch candidate, or expose no candidate at all on refusal."""
+def _envelope(data: Path, relative: str) -> dict[str, Any]:
+    name = f"data/{relative}"
+    path = data / relative
+    if not path.is_file():
+        raise DataError(f"The candidate has no {name}.")
+    return _document(path.read_bytes(), name)
+
+
+def _check_frozen_schemas(data: Path, season: str) -> str:
+    """Hold every rebuilt season document and the fixture list to the frozen schemas.
+
+    The builder writes its own copy of each schema, and that copy is deliberately not
+    carried (``_SEASON_AUXILIARIES``): the schemas the site serves are the ones the accepted
+    tree froze. A rebuilt document is therefore checked against those, chosen by the
+    ``contract_version`` it names, so a view whose shape moved since the accepted publish
+    is refused here rather than served beside a schema it no longer matches.
+    """
+
+    relatives = [
+        path.relative_to(data).as_posix() for path in sorted((data / season).rglob("*.json"))
+    ] + ["fixtures.json"]
+    validators: dict[str, Draft202012Validator] = {}
+    for relative in relatives:
+        document = _envelope(data, relative)
+        version = document.get("contract_version")
+        if not isinstance(version, str) or not _CONTRACT_VERSION.fullmatch(version):
+            raise DataError(
+                f"data/{relative} names no contract version a frozen schema could check: "
+                f"{version!r}."
+            )
+        schema_name = f"data/schema/{version}.schema.json"
+        if version not in validators:
+            schema_path = data / "schema" / f"{version}.schema.json"
+            if not schema_path.is_file():
+                raise DataError(
+                    f"data/{relative} is {version}, and the accepted tree froze no "
+                    f"{schema_name} to check it against."
+                )
+            validators[version] = Draft202012Validator(json.loads(schema_path.read_bytes()))
+        error = best_match(validators[version].iter_errors(document))
+        if error is not None:
+            raise DataError(
+                f"data/{relative} does not match the frozen {schema_name} at "
+                f"{error.json_path}: {error.message}"
+            )
+    return f"{len(relatives)} rebuilt documents match the frozen schemas"
+
+
+def _check_fixtures_source(data: Path, snapshot_id: str) -> str:
+    """The fixture list must be the outcome capture's, or its scores are an older week's.
+
+    ``build_site`` skips the fixture list, with a printed line and nothing else, when the
+    capture's fixtures cannot be read; the accepted tree's copy then stays in the candidate
+    and would ship the decision capture's scores beside the settled outcomes.
+    """
+
+    payload = _envelope(data, "fixtures.json")["payload"]
+    source = payload.get("source_snapshot_id")
+    if source != snapshot_id:
+        raise DataError(
+            f"data/fixtures.json comes from {source!r}, not the outcome capture "
+            f"{snapshot_id!r}: the capture's fixture list was not published, so the fixture "
+            "scores would be an older capture's."
+        )
+    return f"data/fixtures.json comes from {snapshot_id}"
+
+
+def _check_root_index(data: Path, season: str) -> str:
+    """Hold the frozen root index to the candidate it will be served beside.
+
+    The index is carried from the accepted tree and never rebuilt, so nothing else ties
+    it to what the settled publish wrote: every file it names must be in the candidate,
+    every gameweek view in the candidate must be named, and its weeks and latest view
+    must be the ones the candidate's season ledger holds.
+    """
+
+    payload = _envelope(data, "index.json")["payload"]
+    files = payload.get("files")
+    if not isinstance(files, list) or not all(isinstance(name, str) for name in files):
+        raise DataError("The frozen data/index.json names no list of files.")
+    for name in files:
+        parts = PurePosixPath(name).parts
+        if not parts or PurePosixPath(name).is_absolute() or ".." in parts:
+            raise DataError(f"The frozen data/index.json names a path outside data/: {name!r}.")
+    missing = sorted(name for name in files if not (data / name).is_file())
+    if missing:
+        raise DataError(
+            f"The frozen data/index.json names {len(missing)} file(s) the candidate lacks: "
+            f"{missing[:5]}."
+        )
+    views = {path.relative_to(data).as_posix() for path in (data / season).glob("gw*/*.json")}
+    unnamed = sorted(views - set(files))
+    if unnamed:
+        raise DataError(
+            f"The candidate carries {len(unnamed)} gameweek view(s) the frozen "
+            f"data/index.json does not name: {unnamed[:5]}."
+        )
+    rows = _envelope(data, f"{season}/ledger.json")["payload"].get("rows")
+    if not isinstance(rows, list):
+        raise DataError(f"data/{season}/ledger.json has no rows.")
+    weeks: list[int] = []
+    for row in rows:
+        week = row.get("gameweek") if isinstance(row, dict) else None
+        if type(week) is not int:
+            raise DataError(f"data/{season}/ledger.json has a row without a gameweek number.")
+        weeks.append(week)
+    weeks.sort()
+    gameweeks = payload.get("gameweeks")
+    indexed = gameweeks.get(season) if isinstance(gameweeks, dict) else None
+    if (
+        not isinstance(indexed, list)
+        or not all(type(week) is int for week in indexed)
+        or sorted(indexed) != weeks
+    ):
+        raise DataError(
+            f"The frozen data/index.json lists {season} gameweeks {indexed}, and the "
+            f"candidate's data/{season}/ledger.json holds {weeks}."
+        )
+    expected = (
+        {
+            "season": season,
+            "gameweek": weeks[-1],
+            "path": f"{season}/gw{weeks[-1]:02d}/recommendation.json",
+        }
+        if weeks
+        else None
+    )
+    if payload.get("latest") != expected:
+        raise DataError(
+            f"The frozen data/index.json names {payload.get('latest')} as the latest view, "
+            f"and the candidate's ledger ends at {expected}."
+        )
+    return f"the frozen data/index.json names the candidate's {len(files)} files and weeks"
+
+
+def _check_league_tree(
+    data: Path, request: SettledPublicationRequest, league_tree_check: LeagueTreeCheck
+) -> str:
+    """Refuse what the league tree check finds in the candidate and not in the accepted tree.
+
+    The check reads mostly advice, and this publish can change none of it: a finding the
+    accepted tree already has is in bytes members read before the deadline, which only a
+    new decision publish could replace. Refusing on it would leave the week unpublishable
+    whenever the checker grew stricter after the decision shipped (measured on 2026-09-25: a
+    stricter price rule proposed for the checker finds 600 problems in the shipped GW5
+    advice). So those are counted and reported, and only a finding this publish introduced
+    refuses.
+    """
+
+    accepted = Counter(league_tree_check(request.accepted_dir / "data"))
+    introduced = list((Counter(league_tree_check(data)) - accepted).elements())
+    if introduced:
+        raise DataError(
+            f"The candidate fails the league tree check with {len(introduced)} finding(s) "
+            f"the accepted tree does not have; the first: {introduced[0]}"
+        )
+    carried = sum(accepted.values())
+    if carried:
+        return (
+            f"the league tree check found nothing new ({carried} finding(s) the accepted "
+            "tree already had)"
+        )
+    return "the league tree check found nothing"
+
+
+def _check_candidate(
+    data: Path, request: SettledPublicationRequest, league_tree_check: LeagueTreeCheck | None
+) -> tuple[str, ...]:
+    checks = [
+        _check_frozen_schemas(data, request.season),
+        _check_fixtures_source(data, request.snapshot_id),
+        _check_root_index(data, request.season),
+    ]
+    if league_tree_check is not None:
+        checks.append(_check_league_tree(data, request, league_tree_check))
+    return tuple(checks)
+
+
+def publish_settled(
+    request: SettledPublicationRequest, *, league_tree_check: LeagueTreeCheck | None = None
+) -> SettledPublicationResult:
+    """Build a complete scratch candidate, or expose no candidate at all on refusal.
+
+    ``league_tree_check`` runs with the other checks, on the accepted tree and on the
+    candidate, before the candidate is written. The command line passes
+    ``scripts.check_league_tree``, which this package cannot import.
+    """
     accepted, members, snapshot, scores = _preflight(request)
     stamp = snapshot.metadata.captured_at_utc
     with TemporaryDirectory(prefix="settled-", dir=request.out_dir.parent) as temporary:
@@ -412,7 +621,8 @@ def publish_settled(request: SettledPublicationRequest) -> SettledPublicationRes
         for path in changed:
             if not _allowed(path, request):
                 raise DataError(f"Publisher changed a path outside the approved list: {path}")
+        checks = _check_candidate(candidate / "data", request, league_tree_check)
         if _files(request.accepted_dir) != accepted:
             raise DataError("The accepted tree changed during generation; no candidate published.")
-        candidate.rename(request.out_dir)
-    return SettledPublicationResult(request.out_dir, stamp, changed)
+        replace_retrying(candidate, request.out_dir)
+    return SettledPublicationResult(request.out_dir, stamp, changed, checks)

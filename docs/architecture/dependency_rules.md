@@ -121,7 +121,8 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.
 
-`contracts` is a shared boundary in [ownership](ownership.md): changes need all three owners.
+`contracts` is a shared boundary in [ownership](ownership.md): changes need both owners (all
+three until the team change of 2026-09-25).
 That is deliberate friction. A module every layer depends on is the one place where a casual
 edit is most expensive, and it is the natural dumping ground for anything that is awkward to
 place. If a symbol is not vocabulary that at least two layers need, it does not go here.
@@ -130,7 +131,7 @@ place. If a symbol is not vocabulary that at least two layers need, it does not 
 
 1. **The baseline may only shrink.** A PR that adds a violating import is rejected, not
    baselined. If the import is genuinely necessary, the order is wrong and this document
-   changes first, in its own PR, with all three owners agreeing.
+   changes first, in its own PR, with both owners agreeing.
 2. **Re-exports live exactly one release.** When a symbol moves, the old location keeps
    re-exporting it so no import breaks in the same PR that moves it. The re-export is removed
    in a later, separate PR. This is what makes each migration step reviewable in isolation.
