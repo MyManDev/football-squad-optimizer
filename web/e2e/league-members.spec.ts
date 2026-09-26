@@ -7,9 +7,6 @@ import { MESSAGES } from "../src/i18n/messages";
 
 test.beforeEach(async ({ page }) => {
   await installLeagueMocks(page);
-  await page.route("https://fonts.googleapis.com/**", (route) =>
-    route.fulfill({ contentType: "text/css", body: "" }),
-  );
 });
 
 test("member list links to point-labelled advice and preserves its URL state", async ({ page }) => {

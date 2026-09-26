@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT
+from scripts._provenance import DEFAULT_ARCHIVE_ROOT
 
 from squadopt.application.projection_handoff import (
     COMPONENT_FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,

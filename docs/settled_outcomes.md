@@ -10,6 +10,7 @@ reader needs to check the record without them.
 | gw | rows | appeared | started | pre-deadline lead | no availability |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 4 | 659 | 307 | 220 | 2.5 h | 3 |
+| 5 | 667 | 302 | 220 | 5.08 h | 8 |
 
 A player the pre-deadline capture never listed has **no** availability rather than
 a zero one: he was not in the squad that week, and filling in a multiplier would
@@ -20,6 +21,7 @@ turn an absence into a statement.
 | gw | multiplier exactly 1.0 | did not start | did not appear |
 | ---: | ---: | ---: | ---: |
 | 4 | 474 | 255 | 171 |
+| 5 | 464 | 249 | 169 |
 
 Counts, and nothing more. The availability rule is applied once from the capture and
 makes no distinction among the players it prices at one; how many of them then did
@@ -33,7 +35,7 @@ Nothing. No gate is evaluated, no model is promoted, no operational control move
 and no probability is published. The locked holdout is not read: every row comes
 from a capture we took ourselves, this season, after the gameweek it describes.
 
-Gameweeks accumulated: 1. Skipped: 3.
+Gameweeks accumulated: 2. Skipped: 3.
 
 Skipped, with reasons:
 
