@@ -1,9 +1,12 @@
 """A capacity report must preserve failures instead of counting accepted jobs as success."""
 
+import importlib
 import json
+import sys
 
 import pytest
 
+import squadopt.platform
 from squadopt.platform import advice_load
 
 REQUEST = {"league_id": 352490, "entry_id": 101, "strategy": "saf-puan", "window": 1}
@@ -52,3 +55,24 @@ def test_distinct_probe_refuses_duplicate_coordinates_before_network(monkeypatch
         advice_load.run_burst(
             "http://example.invalid", [REQUEST, REQUEST], scenario="distinct", users=2
         )
+
+
+def test_the_validator_is_loaded_before_any_timed_request(monkeypatch) -> None:
+    """A fresh process imports the validator once, before the rows start their clocks."""
+
+    name = "squadopt.platform.advice_documents"
+    module = importlib.import_module(name)
+    monkeypatch.setattr(squadopt.platform, "advice_documents", module)
+    monkeypatch.delitem(sys.modules, name)
+    loaded_at_request = []
+
+    def http(url, *, body, timeout):
+        if url.endswith("/metrics"):
+            return 200, b"advice_queue_depth 0\n"
+        loaded_at_request.append(name in sys.modules)
+        return 429, b"{}"
+
+    monkeypatch.setattr(advice_load, "_http", http)
+    advice_load.run_burst("http://example.invalid", [REQUEST], scenario="cache-hit", users=3)
+
+    assert loaded_at_request == [True, True, True]
