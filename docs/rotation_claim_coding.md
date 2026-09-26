@@ -225,6 +225,7 @@ Nothing under `data/sample/` is any club's captured bytes. Real captures stay un
   still asks once. `code(documents, roster)` is already club-agnostic, so calling it per club
   is a change in the caller and none here: what the caller needs is documents that know their
   own club, and the fetch adapter that assigns one is where that comes from.
-- **The runbook does not yet mention the key.** `docs/weekly_runbook.md` is shared, so the
-  operator-facing note about `ANTHROPIC_API_KEY` and the `llm` extra is left for whoever owns
-  that page rather than added unilaterally.
+- **The runbook names the variables now.** `docs/weekly_runbook.md` (Timing, beside the
+  club-news capture) says which three variables select the provider, the model and the key,
+  and what happens when the model is not one the adapter has checked. The `llm` extra is still
+  described only here.
