@@ -76,9 +76,11 @@ jobs:
 
   # The image the deployment runs, built and exercised once per commit. Not folded into the
   # matrix above: the artifact does not vary by the interpreter CI happens to install, and a
-  # second copy of a four-minute build would buy nothing. Not a required check yet either —
-  # branch protection lists only the two gate contexts, so adding this one there is a
-  # separate, deliberate change.
+  # second copy of a four-minute build would buy nothing. Branch protection on develop requires
+  # this context by name, so renaming the job holds every pull request until the setting
+  # follows. Read the required contexts rather than a copy of them:
+  #   gh api repos/MyManDev/football-squad-optimizer/branches/develop/protection \
+  #     --jq .required_status_checks.contexts
   container:
     name: container (linux/amd64)
     runs-on: ubuntu-24.04
