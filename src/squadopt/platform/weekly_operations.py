@@ -65,6 +65,7 @@ from squadopt.platform.weekly_journal import (
     read_run_request,
 )
 from squadopt.platform.weekly_publish import (
+    WEEKLY_RUNS,
     PublishError,
     PublishNames,
     check_publication_base,
@@ -102,8 +103,8 @@ class WeeklyPaths:
             root / "data/ledger",
             root / "artifacts/phase_b",
             root / "artifacts/rotation",
-            out or root / "data/runtime/weekly/preview",
-            root / "data/runtime/weekly",
+            out or root / WEEKLY_RUNS / "preview",
+            root / WEEKLY_RUNS,
             root / LOG_ROOT_NAME,
             root / "data/advice_records",
             root / "data/sample/club_news_v1.fixture.json",

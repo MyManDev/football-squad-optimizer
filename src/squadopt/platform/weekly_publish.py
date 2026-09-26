@@ -1,7 +1,8 @@
-"""Publish one gameweek's site view: worktree, copy, commit, push, PR, in one command.
+r"""Publish one gameweek's site view: worktree, copy, commit, push, PR, in one command.
 
-    python -m scripts.publish_gameweek_site --kind decision --gameweek 2 --preview <dir>
-    python -m scripts.publish_gameweek_site --kind settled  --gameweek 1 --preview <dir>
+    python -m scripts.publish_gameweek_site --kind decision --gameweek 2 --run-id <run>
+    python -m scripts.publish_gameweek_site --kind settled  --gameweek 1 \
+        --preview <dir> --source-commit <revision>
 
 The Friday decision publish and the Monday settled publish share one shape, and every
 step of it used to be typed by hand under deadline pressure. This wraps the *local and
@@ -17,11 +18,22 @@ changes nothing stops before creating an empty commit; a PR that already exists 
 reported, not duplicated. Nothing here touches ``data/ledger``: settle itself is
 ``squadopt gameweek settle`` and stays a separate, deliberate act.
 
-Nothing is solved or built here. ``--preview`` names a preview a weekly run already built
-(``python -m scripts.run_week`` prints it as ``Preview:``), and its ``data/`` tree is
-published by :func:`copy_preview_builder`, the builder the weekly run's own ``publish``
-stage uses. A week is rebuilt with ``python -m scripts.run_week`` and its resumable stages;
-its league stage writes the immutable advice record from the solve that ships.
+Nothing is solved or built here, and a tree is copied only through
+:func:`copy_preview_builder`, the builder the weekly run's own ``publish`` stage uses.
+
+A decision publish names a weekly run by ``--run-id`` (``python -m scripts.run_week`` prints
+it as ``Weekly run:``) and ships that run's preview only after the checks the run's own
+``publish`` stage stands on, read from the run's journal: every stage before ``publish``
+completed and the league, site and scoreboard outputs still hold the bytes the run recorded;
+the publication base ``origin/develop`` is the run's source revision; and the run's league
+stage wrote the immutable advice record from the solve that ships. A run that recorded no
+advice (one built without ``--publish`` or ``--record-advice``, or with
+``--no-advice-record``) is refused unless ``--no-advice-record`` says to publish it
+unrecorded, and the publish then says so.
+
+A settled publish names the candidate ``python -m scripts.build_settled_site`` wrote and,
+with ``--source-commit``, the revision it was built from; that candidate records no revision
+of its own, so the base is checked against the operator's statement.
 """
 
 import argparse
@@ -34,8 +46,16 @@ import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from squadopt.platform.weekly_journal import WeeklyJournalError, held_run, verify_stage_outputs
 
 KINDS = ("decision", "settled")
+WEEKLY_RUNS = Path("data/runtime/weekly")
+"""Where a weekly run journals itself under its workspace; its default preview sits beside."""
+PREVIEW_STAGES = ("league", "site", "scoreboard")
+"""The run's stages that write the preview; the league stage also writes the advice record."""
+_REVISION = re.compile(r"[0-9a-f]{40}")
 
 
 def repository_root() -> Path:
@@ -156,8 +176,11 @@ def copy_preview_builder(
     """The builder that publishes an existing preview's ``data/`` tree, and nothing else.
 
     The weekly run's ``publish`` stage and the manual command both hand :func:`publish` this
-    builder, so a manual publish ships a preview exactly as the run would have. ``receipt``,
-    when given, receives the number of files copied under ``published_files``.
+    builder, so both copy a preview and read it back the same way. What decides whether a
+    preview may ship at all (its run finished, its source revision is the base, its advice
+    was recorded) is checked before this builder is asked for: by the run's own stages, or
+    by :func:`run_preview` for a manual publish. ``receipt``, when given, receives the number
+    of files copied under ``published_files``.
     """
 
     def build(out: Path) -> None:
@@ -179,6 +202,94 @@ def copy_preview_builder(
             receipt["published_files"] = len(actual)
 
     return build
+
+
+@dataclass(frozen=True, slots=True)
+class RunPreview:
+    """What a weekly run's journal says about the preview it built."""
+
+    preview: Path
+    """The run's ``<out>/data`` tree: what ships."""
+    source_commit: str
+    """The revision the run was declared under; the publication base must be the same."""
+    advice_recorded: bool
+    """Whether the run's league stage wrote the advice record from the solve that ships."""
+    records: Path
+    """Where that record lives: the run's advice record root."""
+    no_advice_record: bool
+    """Whether the run itself was told ``--no-advice-record``."""
+
+
+def run_preview(document: Mapping[str, Any], run_id: str, names: PublishNames) -> RunPreview:
+    """Refuse a run whose preview the run itself would not have published.
+
+    The run's ``publish`` stage starts only after every earlier stage completed, publishes
+    only from the run's own source revision, and follows a league stage that recorded the
+    advice unless the run was told ``--no-advice-record``. The first is checked here against
+    the run's journal: every stage before
+    ``publish`` completed, and the league, site and scoreboard outputs (the league stage's
+    include the advice record files) still hold the bytes the run recorded. The revision and
+    whether the advice was recorded are returned for the manual publish to hold itself to.
+    """
+
+    if document.get("status") == "validation_failed":
+        raise PublishError(
+            f"Run {run_id}'s journal refused its own resume: "
+            f"{document.get('validation_error', 'no reason recorded')}. Its preview is not "
+            "published; start a new run."
+        )
+    declaration = document["request"]
+    request = declaration.get("request") or {}
+    if (request.get("season"), request.get("gameweek")) != (names.season, names.gameweek):
+        raise PublishError(
+            f"Run {run_id} built {request.get('season')} gameweek {request.get('gameweek')}, "
+            f"not {names.season} gameweek {names.gameweek}."
+        )
+    stages = list(document["stages"])
+    planned = [stage["name"] for stage in stages]
+    absent = [name for name in PREVIEW_STAGES if name not in planned]
+    if absent:
+        raise PublishError(f"Run {run_id} plans no {', '.join(absent)} stage.")
+    before = stages[: planned.index("publish")] if "publish" in planned else stages
+    unfinished = [
+        f"{stage['name']} ({stage['status']})"
+        for stage in before
+        if stage["status"] not in {"completed", "skipped"}
+    ]
+    if unfinished:
+        raise PublishError(
+            f"Run {run_id} has not finished every stage before publish: "
+            f"{', '.join(unfinished)}. A preview ships only once its run has built all of it, "
+            "or the files an unfinished stage would have rewritten ship as the tree that "
+            "seeded it left them. Recovery: resume the run (python -m scripts.run_week with "
+            f"its arguments and --run-id {run_id} --resume) and publish once it completes."
+        )
+    for stage in before:
+        if stage["name"] in PREVIEW_STAGES:
+            try:
+                verify_stage_outputs(stage)
+            except (OSError, WeeklyJournalError) as error:
+                raise PublishError(
+                    f"Run {run_id}'s {stage['name']} stage outputs no longer hold the bytes "
+                    f"the run recorded ({error}). Its preview is not published; start a new "
+                    "run."
+                ) from error
+    commit = declaration.get("repository_commit")
+    paths = declaration.get("paths") or {}
+    if not isinstance(commit, str) or not commit or "out" not in paths or "records" not in paths:
+        raise PublishError(
+            f"Run {run_id}'s journal names no source revision or preview; it cannot be "
+            "published by hand."
+        )
+    league = stages[planned.index("league")]
+    options = declaration.get("publication_options") or {}
+    return RunPreview(
+        preview=Path(paths["out"]) / "data",
+        source_commit=commit,
+        advice_recorded=league["value"].get("advice_recorded") is True,
+        records=Path(paths["records"]),
+        no_advice_record=options.get("no_advice_record") is True,
+    )
 
 
 def next_steps(names: PublishNames, pr_url: str) -> str:
@@ -326,39 +437,162 @@ def publish(
     return 0
 
 
+def _publish_run(
+    names: PublishNames,
+    root: Path,
+    run_id: str,
+    *,
+    no_advice_record: bool,
+    force_branch: bool,
+    dry_run: bool,
+) -> int:
+    """Publish a weekly run's preview, held to what the run's own publish stage holds it to.
+
+    The run stays owned while it is published, so no resume of it rewrites the preview
+    mid-copy, and the base is checked against the run's recorded source revision, the check
+    whose recovery is to start a new run.
+    """
+
+    with held_run(root / WEEKLY_RUNS, run_id) as document:
+        found = run_preview(document, run_id, names)
+        if not found.advice_recorded and not no_advice_record:
+            built = (
+                "it was built with --no-advice-record"
+                if found.no_advice_record
+                else "it was built without --publish or --record-advice"
+            )
+            raise PublishError(
+                f"Run {run_id} recorded no advice: {built}. A publication with no record "
+                "of what each member was told cannot be reviewed later. Recovery: rebuild "
+                "the week with python -m scripts.run_week --record-advice (or --publish) "
+                "under a new run ID and publish that run; or pass --no-advice-record to "
+                "publish this one without a record."
+            )
+        if not found.preview.is_dir():
+            raise PublishError(f"Run {run_id}'s preview {found.preview} is not a directory.")
+        print(
+            f"Run {run_id}: every stage before publish completed; source revision "
+            f"{found.source_commit}; preview {found.preview}."
+        )
+        if found.advice_recorded:
+            print(f"Advice record: written by run {run_id}'s league stage under {found.records}.")
+        else:
+            print(
+                f"Advice record: none. Run {run_id} recorded no advice, and this publish "
+                "records none (--no-advice-record)."
+            )
+        return publish(
+            names,
+            force_branch=force_branch,
+            dry_run=dry_run,
+            workspace=root,
+            builder=copy_preview_builder(found.preview),
+            expected_commit=found.source_commit,
+        )
+
+
+def _publish_candidate(
+    names: PublishNames,
+    root: Path,
+    candidate: Path,
+    source_commit: str,
+    *,
+    force_branch: bool,
+    dry_run: bool,
+) -> int:
+    """Publish a settled candidate from the revision the operator says built it."""
+
+    if not _REVISION.fullmatch(source_commit):
+        raise PublishError(
+            "--source-commit must be the full 40-character revision the candidate was "
+            "built from (git rev-parse HEAD in the checkout that ran "
+            "python -m scripts.build_settled_site)."
+        )
+    preview = candidate.resolve() / "data"
+    if not preview.is_dir():
+        raise PublishError(
+            f"{preview} is not a directory. --preview names the directory "
+            "python -m scripts.build_settled_site wrote with --out, the one holding data/."
+        )
+    print(
+        f"Settled candidate {preview}; source revision {source_commit}, as --source-commit "
+        "states it (the candidate records none of its own)."
+    )
+    return publish(
+        names,
+        force_branch=force_branch,
+        dry_run=dry_run,
+        workspace=root,
+        builder=copy_preview_builder(preview),
+        expected_commit=source_commit,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", choices=KINDS, required=True)
     parser.add_argument("--gameweek", type=int, required=True)
     parser.add_argument("--season", default="2026-27")
     parser.add_argument(
+        "--run-id",
+        help="decision: the weekly run whose preview ships, as scripts.run_week printed it "
+        "after Weekly run:; its journal names the preview, the source revision and whether "
+        "the advice was recorded",
+    )
+    parser.add_argument(
+        "--no-advice-record",
+        action="store_true",
+        help="decision: publish a run that recorded no advice; the publish says it records none",
+    )
+    parser.add_argument(
         "--preview",
         type=Path,
-        required=True,
-        help="the preview a weekly run built, as scripts.run_week prints it after Preview:; "
-        "its data/ tree is what ships",
+        help="settled: the directory scripts.build_settled_site wrote with --out, the one "
+        "holding data/",
+    )
+    parser.add_argument(
+        "--source-commit",
+        help="settled: the full revision the candidate was built from; origin/develop must "
+        "be at it",
     )
     parser.add_argument("--force-branch", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     arguments = parser.parse_args()
+    run_id: str | None = arguments.run_id
+    candidate: Path | None = arguments.preview
+    source_commit: str | None = arguments.source_commit
+    # A usage error exits 2 through argparse before anything is read; only a refusal of what
+    # was named is caught below.
     try:
-        names = PublishNames(
-            season=arguments.season, gameweek=arguments.gameweek, kind=arguments.kind
-        )
-        preview = arguments.preview.resolve() / "data"
-        if not preview.is_dir():
-            raise PublishError(
-                f"{preview} is not a directory. --preview names the directory a weekly run "
-                "printed after Preview:, the one holding data/. A week is built with "
-                "python -m scripts.run_week."
+        if arguments.kind == "decision":
+            if run_id is None:
+                parser.error("--kind decision needs --run-id, the weekly run whose preview ships")
+            if candidate is not None or source_commit is not None:
+                parser.error(
+                    "--kind decision reads its preview and source revision from the run's "
+                    "journal; --preview and --source-commit are for --kind settled"
+                )
+            return _publish_run(
+                PublishNames(season=arguments.season, gameweek=arguments.gameweek, kind="decision"),
+                repository_root(),
+                run_id,
+                no_advice_record=arguments.no_advice_record,
+                force_branch=arguments.force_branch,
+                dry_run=arguments.dry_run,
             )
-        return publish(
-            names,
+        if candidate is None or source_commit is None:
+            parser.error("--kind settled needs --preview and --source-commit")
+        if run_id is not None or arguments.no_advice_record:
+            parser.error("--run-id and --no-advice-record are for --kind decision")
+        return _publish_candidate(
+            PublishNames(season=arguments.season, gameweek=arguments.gameweek, kind="settled"),
+            repository_root(),
+            candidate,
+            source_commit,
             force_branch=arguments.force_branch,
             dry_run=arguments.dry_run,
-            builder=copy_preview_builder(preview),
         )
-    except PublishError as error:
+    except (PublishError, WeeklyJournalError) as error:
         print(f"Refused: {error}")
         return 1
 

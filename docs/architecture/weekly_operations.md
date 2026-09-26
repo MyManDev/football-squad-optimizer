@@ -9,8 +9,13 @@ imports or runs `scripts`. The league, site and scoreboard stages build the prev
 process; the `publish` stage hands `platform.weekly_publish` the builder
 `copy_preview_builder` returns, which copies the preview's `data/` tree into the
 publication worktree and reads it back file by file. The manual
-`python -m scripts.publish_gameweek_site --preview <preview>` publishes an existing preview
-through the same builder and solves nothing.
+`python -m scripts.publish_gameweek_site --run-id <run id>` publishes an existing run's
+preview through the same builder and solves nothing. It reads the run's journal under the
+run's own lock and refuses a run that has not completed every stage before `publish`, a
+run whose preview outputs changed since, and a run that recorded no advice unless
+`--no-advice-record` is passed; it holds the publication base to the run's recorded source
+revision, as the `publish` stage does. A settled candidate names its revision with
+`--source-commit`.
 
 Use short Windows workspace and handoff roots on hosts with the legacy path limit.
 Retained content-addressed paths add directories and a 69-character filename; a
