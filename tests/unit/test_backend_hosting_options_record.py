@@ -9,8 +9,8 @@ hour before the sleep began", reading only the hibernate leg of a sleep that had
 earlier.
 
 These checks read the record as the operator would and hold its steps to the script's actual
-switches, mutex and timing, and its #821 facts to its own outage table. A failure names the
-paragraph to rewrite.
+switches, mutex and timing, its #821 facts to its own outage table, and option B's Compose
+step to the deploy files it describes. A failure names the paragraph to rewrite.
 """
 
 from __future__ import annotations
@@ -160,6 +160,25 @@ def test_the_move_waits_out_a_missed_watcher_and_states_its_timing() -> None:
     assert "Stop the PC's connector" in _steps(tunnel)[int(wait.group(2)) - 1]
     # The slowest restart: each miss is a full interval plus a health probe that times out.
     assert WORDS[wait.group(1)] * 60 > threshold * (interval + probe)
+
+
+def test_the_compose_gap_cites_the_file_that_states_it() -> None:
+    """Option B's Compose step says the file mounts neither optional input and names where that
+    is written down. `deploy/compose.yaml` carries no comment about them;
+    `deploy/backend.env.example` does."""
+
+    steps = _steps(_bullet(_option("B"), "Migration steps"))
+    step = next(_flat(step) for step in steps if "Change `deploy/compose.yaml`" in step)
+    inputs = ("SQUADOPT_BACKEND_ARTIFACT_ROOT", "SQUADOPT_BACKEND_CLUB_NEWS_SOURCE")
+    assert f"mounts neither `{inputs[0]}` nor `{inputs[1]}`" in step
+
+    compose = (REPOSITORY_ROOT / "deploy/compose.yaml").read_text(encoding="utf-8")
+    example = (REPOSITORY_ROOT / "deploy/backend.env.example").read_text(encoding="utf-8")
+    assert not any(name in compose for name in inputs), "Compose now mounts an optional input"
+    assert "the Compose file does not mount these" in example
+    assert all(f"# {name}=" in example for name in inputs)
+    assert "Its own comment" not in step
+    assert "as `deploy/backend.env.example` says" in step
 
 
 @pytest.mark.parametrize(

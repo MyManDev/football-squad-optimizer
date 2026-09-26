@@ -223,8 +223,8 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
      - The worker publishes host port `127.0.0.1:9091`, so `--scale worker=6` would collide
        on it. Drop the host port for scaled workers or give them a range.
      - It mounts neither `SQUADOPT_BACKEND_ARTIFACT_ROOT` nor
-       `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE`. Its own comment says so. Until they are mounted,
-       the Top 100 settings and the manager's word are refused by name.
+       `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE`, as `deploy/backend.env.example` says. Until they
+       are mounted, the Top 100 settings and the manager's word are refused by name.
      - With cloudflared on the host, the peer the api sees inside its container is not
        loopback, even though the host port is (with Docker's default port publishing it is
        normally the network's gateway address; verify it). Set `FORWARDED_ALLOW_IPS` to that
