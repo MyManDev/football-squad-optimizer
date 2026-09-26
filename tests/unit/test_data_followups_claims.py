@@ -2,16 +2,18 @@
 
 The file is a list of deferred data work, and its sentences about which module reads which
 column, or how often the panel is built, are prose constants: nothing re-derives them, so a
-wrong one survives every other check. Three did. The difficulty summaries were said not to be
+wrong one survives every other check. Four did. The difficulty summaries were said not to be
 computed on the development folds, the two-stage model was said to read both fixture counts,
-and the member-publication workers were said to be the one caller that builds the panel once
-per worker process. Each test below pins the code fact and the sentence that states it, so the
-next change to either one fails here instead of misleading a reader.
+the member-publication workers were said to be the one caller that builds the panel once per
+worker process, and every other caller was said to build it once per run. Each test below pins
+the code fact and the sentence that states it, so the next change to either one fails here
+instead of misleading a reader.
 """
 
 from __future__ import annotations
 
 import ast
+import math
 import re
 from pathlib import Path
 
@@ -329,3 +331,209 @@ def test_the_league_stage_duration_item_7_quotes_is_the_one_the_runbook_measured
     assert measured is not None, "docs/weekly_runbook.md no longer states the league stage."
 
     assert measured.group(1) in _item("7")
+
+
+# --- item 7: who builds the panel more than once in one run ------------------
+
+SCRIPTS = REPOSITORY_ROOT / "scripts"
+PANEL_BUILD = ("squadopt.data.sources.vaastav", "build_panel")
+#: A loop or comprehension whose body builds the panel can build it more than once.
+REPEATED = 2.0
+#: The count of a path that has ended (a `return` or `raise`), so nothing after it runs.
+ENDED = -math.inf
+
+Function = ast.FunctionDef | ast.AsyncFunctionDef
+Key = tuple[str, str]
+
+
+def _module_name(path: Path) -> str:
+    base = REPOSITORY_ROOT / "src" if path.is_relative_to(PACKAGE) else REPOSITORY_ROOT
+    parts = path.relative_to(base).with_suffix("").parts
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+class _PanelBuilds:
+    """How many panel builds one call of a function can reach, on its costliest path.
+
+    A call is followed when it names a module-level function of the package or of
+    `scripts/`: one defined in the same module, one imported by name (through re-exports),
+    or one reached through an imported module (`producer.build`). A branch counts its costlier
+    side, a `return` or `raise` ends its path, and a loop or comprehension whose body builds
+    the panel counts as more than once. Not followed: methods and nested functions, a call
+    through a dotted module path (`a.b.f()`), a builder passed in as an argument (`decide`'s
+    `panel_builder`), and a pool's initializer, which the test above covers. A module found
+    here can build the panel twice in one call; one not found may still do so only through
+    one of those routes.
+    """
+
+    def __init__(self) -> None:
+        sources = [*PACKAGE.rglob("*.py"), *SCRIPTS.glob("*.py")]
+        self.paths = {_module_name(path): path for path in sources}
+        self.functions: dict[str, dict[str, Function]] = {}
+        self.imports: dict[str, dict[str, tuple[str, str | None]]] = {}
+        for module, path in self.paths.items():
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            self.functions[module] = {
+                node.name: node
+                for node in tree.body
+                if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+            }
+            self.imports[module] = self._imports(module, path, tree)
+        self._counted: dict[Key, int] = {}
+        self._open: set[Key] = set()
+
+    def _imports(
+        self, module: str, path: Path, tree: ast.Module
+    ) -> dict[str, tuple[str, str | None]]:
+        """Each imported name: a module (second item None) or a name inside one."""
+
+        package = module if path.name == "__init__.py" else module.rpartition(".")[0]
+        bound: dict[str, tuple[str, str | None]] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.asname is not None:
+                        bound[alias.asname] = (alias.name, None)
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    anchor = package.split(".")[: len(package.split(".")) - node.level + 1]
+                    base = ".".join([*anchor, base] if base else anchor)
+                for alias in node.names:
+                    full = f"{base}.{alias.name}"
+                    bound[alias.asname or alias.name] = (
+                        (full, None) if full in self.paths else (base, alias.name)
+                    )
+        return bound
+
+    def _resolve(self, module: str, name: str, depth: int = 0) -> Key | None:
+        if (module, name) == PANEL_BUILD or name in self.functions.get(module, {}):
+            return (module, name)
+        found = self.imports.get(module, {}).get(name)
+        if found is None or found[1] is None or depth > 10:
+            return None
+        return self._resolve(found[0], found[1], depth + 1)
+
+    def _callee(self, module: str, call: ast.Call) -> Key | None:
+        if isinstance(call.func, ast.Name):
+            return self._resolve(module, call.func.id)
+        if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
+            found = self.imports.get(module, {}).get(call.func.value.id)
+            if found is not None and found[1] is None:
+                return self._resolve(found[0], call.func.attr)
+        return None
+
+    def count(self, key: Key) -> int:
+        if key == PANEL_BUILD:
+            return 1
+        if key in self._counted:
+            return self._counted[key]
+        if key in self._open:
+            return 0
+        self._open.add(key)
+        through, ended = self._block(key[0], self.functions[key[0]][key[1]].body)
+        self._open.discard(key)
+        self._counted[key] = int(max(through, ended, 0))
+        return self._counted[key]
+
+    def _block(self, module: str, statements: list[ast.stmt]) -> tuple[float, float]:
+        """The costliest path that runs through the block, and the costliest that ends in it."""
+
+        through, ended = 0.0, ENDED
+        for statement in statements:
+            passes, stops = self._statement(module, statement)
+            ended = max(ended, through + stops)
+            through += passes
+        return through, ended
+
+    def _statement(self, module: str, node: ast.stmt) -> tuple[float, float]:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            return 0.0, ENDED
+        if isinstance(node, ast.Return | ast.Raise):
+            value = node.value if isinstance(node, ast.Return) else node.exc
+            return ENDED, (self._expression(module, value) if value is not None else 0.0)
+        if isinstance(node, ast.If):
+            test = self._expression(module, node.test)
+            body, orelse = self._block(module, node.body), self._block(module, node.orelse)
+            return test + max(body[0], orelse[0]), test + max(body[1], orelse[1])
+        if isinstance(node, ast.For | ast.AsyncFor | ast.While):
+            head = self._expression(module, node.test if isinstance(node, ast.While) else node.iter)
+            body, orelse = self._block(module, node.body), self._block(module, node.orelse)
+            repeated = REPEATED if max(*body, *orelse) > 0 else 0.0
+            can_end = max(body[1], orelse[1]) > ENDED
+            return head + repeated, (head + repeated if can_end else ENDED)
+        if isinstance(node, ast.Try | ast.TryStar):
+            body, orelse = self._block(module, node.body), self._block(module, node.orelse)
+            final = self._block(module, node.finalbody)[0]
+            handlers = [self._block(module, handler.body) for handler in node.handlers]
+            through = max([body[0] + orelse[0], *(body[0] + h[0] for h in handlers)])
+            ended = max([body[1], body[0] + orelse[1], *(body[0] + h[1] for h in handlers)])
+            return through + final, ended + final
+        if isinstance(node, ast.With | ast.AsyncWith):
+            head = sum(self._expression(module, item.context_expr) for item in node.items)
+            body = self._block(module, node.body)
+            return head + body[0], head + body[1]
+        if isinstance(node, ast.Match):
+            subject = self._expression(module, node.subject)
+            cases = [self._block(module, case.body) for case in node.cases]
+            through = max([0.0, *(case[0] for case in cases)])
+            return subject + through, subject + max([ENDED, *(case[1] for case in cases)])
+        cost = 0.0
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.expr):
+                cost += self._expression(module, child)
+        return cost, ENDED
+
+    def _expression(self, module: str, node: ast.expr) -> float:
+        if isinstance(node, ast.IfExp):
+            branches = (self._expression(module, node.body), self._expression(module, node.orelse))
+            return self._expression(module, node.test) + max(branches)
+        if isinstance(node, ast.Lambda):
+            return 0.0
+        cost = 0.0
+        if isinstance(node, ast.Call):
+            key = self._callee(module, node)
+            if key is not None:
+                cost += self.count(key)
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.expr):
+                cost += self._expression(module, child)
+            elif isinstance(child, ast.keyword):
+                cost += self._expression(module, child.value)
+            elif isinstance(child, ast.comprehension):
+                cost += sum(self._expression(module, part) for part in (child.iter, *child.ifs))
+        comprehension = ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp
+        if isinstance(node, comprehension) and cost > 0:
+            return max(cost, REPEATED)
+        return cost
+
+
+def test_every_caller_that_can_build_the_panel_twice_in_one_run_is_named_in_item_7() -> None:
+    """Item 7 once said every caller loads the panel once at the top of a run; three do not.
+
+    A module is found when one of its module-level functions can reach two panel builds in
+    one call. Item 7 must cite each one, in the house form `_as_cited` gives. A new script
+    that builds the panel twice fails here until item 7 names it.
+    """
+
+    builds = _PanelBuilds()
+    found = sorted(
+        _as_cited(builds.paths[module])
+        for module, functions in builds.functions.items()
+        if any(builds.count((module, name)) > 1 for name in functions)
+    )
+    # The scan must find the callers this item names, each by a different rule (a call into
+    # another module, a call within the module, a build inside a loop), or it is looking
+    # nowhere. The last line follows a module alias and a re-export (`producer._component_table`
+    # in `scripts/_phase_e_live.py`), so a resolver that stopped following either fails here.
+    assert {
+        "application/projection_handoff.py",
+        "scripts/build_projection_handoff.py",
+        "scripts/measure_participation_composition.py",
+        "scripts/probe_phase_e_runtime.py",
+    } <= set(found)
+    assert builds.count(("scripts._phase_e_live", "live_component_decision")) == 1
+
+    item = _item("7")
+    missing = [cited for cited in found if f"`{cited}`" not in item]
+    assert not missing, f"Item 7 does not name these callers that build the panel twice: {missing}."

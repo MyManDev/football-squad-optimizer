@@ -260,12 +260,25 @@ columns the archive adapter produces, or 0.007 s per thousand rows, scaling line
 the six seasons. That is **26.6 %** of a `build_panel` call, which sounds material until you
 ask how often the call happens.
 
-**Once per run, or once per process.** Every caller loads the panel at the top and then
-iterates folds over the frame in memory: the `measure_*` and `export_*` scripts,
-`recommend_current_squad`, the four `experiments/` studies, and `fpl_capture`'s identity
-check. `build_projection_handoff` builds it twice, once for the carried rates and the opening
-fallback, and once more in `_component_table` for the component model's four training
-seasons. Two callers build it in a process pool's initializer, once per worker process:
+**How often it is built.** Most callers build the panel once and then work on the frame in
+memory: the `measure_*` and `export_*` scripts that read the archive, `recommend_current_squad`,
+the `experiments/` studies, and `fpl_capture`'s identity check. Three build it more than once
+in one run:
+
+- `build_projection_handoff` (`scripts/build_projection_handoff.py`, over `build` in
+  `application/projection_handoff.py`) builds it twice on the component path: once for the
+  carried rates and the opening fallback, and once more in `_component_table` for the
+  component model's four training seasons. With `--control-only`, or when the capture lacks a
+  history week's live payload, `_component_table` is not reached and it builds it once.
+- `scripts/measure_participation_composition.py` builds it twice in a full run: over 2023-24
+  and 2024-25 for its modelling frame (`modelling_frame`, called from `arm_forecasts`), then
+  over the five decision-history seasons in `main`. With `--points-only` it stops after the
+  first.
+- `scripts/probe_phase_e_runtime.py` builds it once when it probes folds and, with
+  `--live-components`, once more for each `--live-decision`, through the same
+  `_component_table`.
+
+Two callers build it in a process pool's initializer, once per worker process:
 
 - the member-publication workers (`platform/publication_workers.py`), beside the parent's
   own build (`application/league_publication.py`). A league stage run with N workers above
@@ -288,13 +301,14 @@ walk-forward benchmarks measured in hours. Against that, the change would edit t
 whose own docstring exists to justify being the single place types change ("so a coercion
 bug has exactly one home"), and would trade an actionable per-record message for a
 column-wide one on the path that reports bad source data. Paying real risk in the coercion
-layer to save a second once is the wrong trade in the opposite direction from the one this
-item worried about.
+layer to save about a second a build is the wrong trade in the opposite direction from the
+one this item worried about.
 
 **What would change the answer**, so this does not need re-measuring from scratch: cleaning
-moving onto a per-fold or per-request path rather than a once-per-run one, or a source
-arriving with an order of magnitude more rows *and* substantially more canonical columns
-than the archive's nine. Either makes the ceiling worth having; neither is true today.
+moving onto a per-fold or per-request path rather than the handful of builds a run or a
+worker process makes today, or a source arriving with an order of magnitude more rows *and*
+substantially more canonical columns than the archive's nine. Either makes the ceiling worth
+having; neither is true today.
 
 ### 8. A versioned feature-generation contract
 
