@@ -17,7 +17,6 @@ export default defineConfig({
     // Vite substitutes the API origin during the build. Keep this test bundle
     // separate from dist, which may subsequently be published as the static site.
     command:
-      "npm run build:analysis && " +
       `npx vite build --outDir ${output} && ` +
       `npx vite preview --outDir ${output} ` +
       `--host 127.0.0.1 --port ${context.webPort} --strictPort`,
