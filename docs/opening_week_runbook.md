@@ -28,17 +28,27 @@ The installed weekly runner (`python -m squadopt.platform.weekly_operations`, se
 [weekly runbook](weekly_runbook.md)) captures in-process as its `capture` stage, and the
 scheduled path is `squadopt season tick`. The manual capture shell was removed when its window
 ended with 1.0.0 ([platform runtime](architecture/platform_runtime.md)), so a manual capture is
-a tick. It captures when the next deadline is inside its capture window (3 hours by default)
-and can also decide and settle what is due, so look at what is due first:
+a tick. It captures when the next deadline is inside its capture window (3 hours by default),
+and for the opening gameweek the same run then re-plans and records the GW1 decision. Look at
+what is due first:
 
 ```console
 squadopt season tick --dry-run
 squadopt season tick
 ```
 
-- The capture is immutable and checksummed; note the `captured <snapshot_id>` line.
-- Capture early enough to leave time for a re-capture if the source hiccups; a later
-  capture simply supersedes the earlier one (both are retained).
+- `--dry-run` prints only the first plan. When no capture from inside the window is held, that
+  plan shows `-> capture` and no `-> decide`: the decide is planned only once that capture
+  exists, so the dry run does not show it.
+- The real run prints `captured <snapshot_id>`, then `re-planned after capture:` with
+  `-> decide GW1`, applies every check of the decide phase below, and on success prints
+  `Recorded decision at .../gw01`. The capture is immutable and checksummed; note its
+  `snapshot_id`.
+- Run the decide step below only when the tick did not print `Recorded decision at`. Once the
+  GW1 entry exists, `squadopt gameweek decide` refuses it: `Ledger entry ... already exists;
+  recorded decisions are immutable.`
+- Capture early enough to leave time for a re-capture if the source hiccups; until the decision
+  is recorded, a later capture supersedes the earlier one (both are retained).
 
 ### After capture: decide (recommend + machine verification + ledger)
 
