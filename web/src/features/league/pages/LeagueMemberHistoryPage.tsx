@@ -20,6 +20,9 @@ import { publishedPrice } from "../advice/publishedPrice";
 import { loadLeagueMembers } from "../data";
 import type { EntryView } from "../types";
 
+/** The modes the scenario menu prices (`build_league_site.py --mode-residuals`). */
+const SCENARIO_MODES: ReadonlySet<string> = new Set(["garantici", "agresif", "asiri-agresif"]);
+
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
   const copy = messages.suggestionHistory;
@@ -391,36 +394,36 @@ function RecordedPlans({ week, members }: { week: WeekReview; members: EntryView
       <p>{copy.recordedPlansNote}</p>
       <ul>
         {week.recorded_plans.map((plan) => {
-          const price = publishedPrice({
-            ...plan,
-            word: plan.managers_word === true,
-            top100: plan.top100_weight !== undefined,
-          });
-          const capped =
-            plan.expected_points_cost_ceiling !== undefined &&
-            plan.expected_points_cost_ceiling !== plan.expected_points_cost;
+          // A scenario-menu mode is priced as the difference between two scenario means,
+          // not against a solved plan, and never carries a ceiling; its recorded cost is
+          // printed as it was. Every other record keeps the price and its ceiling, not the
+          // proofs behind them. A ceiling is published only where the plan the price is
+          // measured against was proven, and it is then the price itself. Such a record
+          // with no ceiling, or (from before that rule) one that differs from its price,
+          // does not show that its price was measured against a proven plan, so no price
+          // is printed for it.
+          const price =
+            SCENARIO_MODES.has(plan.strategy) ||
+            (plan.expected_points_cost_ceiling !== undefined &&
+              plan.expected_points_cost_ceiling === plan.expected_points_cost)
+              ? publishedPrice({
+                  ...plan,
+                  word: plan.managers_word === true,
+                  top100: plan.top100_weight !== undefined,
+                })
+              : undefined;
           const top100Copy = TOP100_COPY[language];
           const evidenceCopy = EVIDENCE_COPY[language];
           const priceText =
             plan.top100_weight !== undefined
               ? plan.strategy !== "saf-puan"
-                ? capped
-                  ? top100Copy.strategyCostAtMost
-                  : top100Copy.strategyCost
+                ? top100Copy.strategyCost
                 : plan.managers_word
-                  ? capped
-                    ? top100Copy.combinedCostAtMost
-                    : top100Copy.combinedCost
-                  : capped
-                    ? top100Copy.costAtMost
-                    : top100Copy.cost
+                  ? top100Copy.combinedCost
+                  : top100Copy.cost
               : plan.managers_word
-                ? capped
-                  ? evidenceCopy.costAtMost
-                  : evidenceCopy.cost
-                : capped
-                  ? messages.leagueMembers.planCostAtMost
-                  : messages.leagueMembers.planCost;
+                ? evidenceCopy.cost
+                : messages.leagueMembers.planCost;
           const rival = members.find(
             (member) => member.member_kind === "human" && member.entry_id === plan.rival_entry_id,
           );
