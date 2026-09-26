@@ -100,9 +100,10 @@ If the artifact has expired, recover that exact tagged tree or stop for an owner
 regeneration. This
 new-PC artifact recovery is **never exercised**. The readiness check must confirm that
 the restored publication and capture agree before the machine serves requests.
-All four checks must pass: `capture_context` (the published capture under `data/snapshots`
-with its matching handoff under `data/handoffs`), `league_tree`, `cache_store`, and
-`league_tree_matches_capture`.
+All six checks must pass: `capture_context` (the published capture under `data/snapshots`
+with its matching handoff under `data/handoffs`), `league_tree`, `cache_store`,
+`league_tree_matches_capture`, and the two that need the workers running, `worker_heartbeat`
+and `queue_wait`.
 
 This recovery checkout has a detached HEAD and a replaced tracked `web/public/data` tree.
 `scripts/release/restart_backend.ps1` requires a clean checkout on `develop` and refuses

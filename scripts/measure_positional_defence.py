@@ -50,6 +50,7 @@ from squadopt.evaluation import (
 )
 from squadopt.evaluation.component_handoff import HANDOFF_KEY, LOCKED_HOLDOUT_SEASON
 from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.positional_defence import (
     DEFENCE_POSITIONS,
     FIRST_TARGET_GAMEWEEK,
@@ -71,7 +72,6 @@ from squadopt.experiments.positional_defence import (
     training_row_counts,
     within_position_rank,
 )
-from squadopt.experiments.statistics import season_aware_moving_block_interval
 from squadopt.experiments.team_rating import (
     calibrated_clean_sheet,
     fit_clean_sheet_calibration,

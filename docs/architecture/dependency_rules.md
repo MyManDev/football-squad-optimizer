@@ -76,9 +76,22 @@ read meaning into it, and do not "fix" it:
 - `preflight` imports only `data`.
 - `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
   `scenarios` but is otherwise unconstrained.
-- `scenarios` does not import `uncertainty`, and `planning` imports only `optimization`.
+- `scenarios` does not import `uncertainty`, so the two could trade places. The import itself
+  is refused all the same: `uncertainty` is laboratory, and the contract `Product does not
+  import the laboratory` lists `scenarios` among its sources.
+- `planning` imports only `optimization` and `contracts` (`DecisionPreferences` from
+  `contracts.preferences`, in `planning/chip_strategy.py:14` and `planning/optimizer.py:14`).
 
 If a future import makes one of these positions load-bearing, say so here at the same time.
+
+Each line above is read from the import graph, not remembered. This prints the `squadopt`
+packages that one package imports directly (here `planning`; `grimp` is the graph library
+`import-linter` installs). Run it for the names in the list before changing it, and where a
+line here and the output disagree, the output is right:
+
+```console
+python -c "import sys, grimp; p = sys.argv[1]; g = grimp.build_graph('squadopt'); m = {'squadopt.' + p} | g.find_descendants('squadopt.' + p); print(sorted({i.split('.')[1] for x in m for i in g.find_modules_directly_imported_by(x) if i.startswith('squadopt.')} - {p}))" planning
+```
 
 ## No baseline exceptions
 
@@ -89,8 +102,8 @@ are resolved by these shared owners:
 | --- | --- | --- |
 | `data.schema` to `optimization.config` / `optimization.validation` | `contracts.players`: `Position`, `POSITIONS`, `REQUIRED_COLUMNS` | Original optimization locations and `data.schema` still expose the same objects. |
 | `prediction.integration` to `optimization.coefficients` | `contracts.players.sort_players_by_id` | `optimization.coefficients.sort_players_by_id` re-exports the same function. |
-| `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | Original experiment locations re-export the policy and bootstrap helpers. |
-| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: `experiments` sits below `live`, so a re-export there would invert the layers contract (rule 1 outranks rule 2). The laboratory callers (barrel, `scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); `experiments.config` re-exports the execution error like the other two. |
+| `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | None since 2026-09-26: the one-release re-exports in `experiments.config` and `experiments.statistics` are removed; the `experiments` barrel still lists the policy, the errors and the interval as part of its interface. |
+| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: `experiments` sits below `live`, so a re-export there would invert the layers contract (rule 1 outranks rule 2). The laboratory callers (barrel, `scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); the error is imported from `evaluation.promotion`. |
 
 The policy's two exception base classes also live in `evaluation.promotion`, keeping their
 existing `ExperimentError` / `ExperimentConfigurationError` names and inheritance so callers
@@ -116,7 +129,7 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
 - `BayesianFactor` and `FactorKind` in `contracts/factors.py`: the bounded-knob grid a
   strategy declares and DoE/BO read. It is vocabulary two layers share (the product's
   strategy catalogue and the laboratory), which is why it lives here and not in
-  `bayesopt`; `bayesopt.models` re-exports the names for one release.
+  `bayesopt`; the one-release re-export in `bayesopt.models` was removed on 2026-09-26.
 - Identity and fingerprint primitives and the contract-version registry remain future
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.
@@ -201,7 +214,7 @@ packages fall into five groups, each importing only groups below it:
 | adapters | `api` |
 | runtime | `platform` |
 | use cases | `application` |
-| domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `uncertainty`, `risk`, `prediction`, `features` |
+| domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `prediction`, `features` |
 | data | `data`, `contracts` |
 
 The measurement **laboratory** — `experiments`, `backtest`, `bayesopt`, `recalibration`,

@@ -12,11 +12,6 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
-# Compatibility re-export, 2026-09-10: `compute_table_sha256` moved to
-# `squadopt.data.checksums` so the product can digest a table without importing the
-# laboratory. Kept for one release (docs/architecture/dependency_rules.md, rule 2); remove
-# in the release after 1.0.0.
-from squadopt.data.checksums import compute_table_sha256 as compute_table_sha256
 from squadopt.data.errors import format_examples
 from squadopt.preflight.models import (
     ALLOWED_POSITIONS,

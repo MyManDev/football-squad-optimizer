@@ -111,7 +111,7 @@ kaldırma. Eski script'ler yalnız test kolaylığı değildir: bazıları gerç
 | `scripts.capture_top100_cohort`, `capture_elite_picks` | `platform.cohort_capture`, `platform.elite_capture` | Ağ işi platformda, eski komut girişleri korunur. |
 | `scripts.run_week`, `publish_gameweek_site` | `application.weekly_plan`; `platform.weekly_operations`, `weekly_journal`, `weekly_publish` | Haftalık planın domain kontrolleri application'da; yürütme/kayıt/Git platformdadır. Varsayılan önizleme artık özel run klasörüdür. |
 | `scripts.build_league_site`, `build_scoreboard`, `build_site` | `application.league_publication`, `scoreboard`, `site_publication` | Tipli request/result ve `output_paths`; eski CLI bayrakları devam eder. Yayın geç hata verirse kısmi dosya yazılmış olabilir. |
-| Capture picks sağlayıcısı | `application.capture_entries` | `platform.capture_context` aynı nesneleri dışa aktarır. Havuz oluşturma `platform.publication_workers` içindedir. |
+| Capture picks sağlayıcısı | `application.capture_entries` | Çağıranlar bu modülden import eder. Havuz oluşturma `platform.publication_workers` içindedir. |
 | Kuyruğun tek büyük modülü | `platform.queue_contracts`, `file_advice_queue`, `advice_queue` | Arayüz, depolama ve hesap çağırma ayrıdır; eski `advice_queue` importları uyumludur. |
 | Büyük üye sayfası | `LeagueMemberPage`, `useLeagueMemberData`, `LeagueMemberView`, `useMemberAdviceView`, `MemberAdviceCard` | Route/sorgu/seçim/gösterim ayrıdır; eski view/type importları korunur. Doğrulama `publicationShape`, ortak hata sınıfları `dataErrors` içindedir. |
 

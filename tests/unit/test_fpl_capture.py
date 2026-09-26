@@ -398,7 +398,7 @@ def test_a_gw7_capture_builds_the_football_history(
             if name != "event-gw01-live.json"
         },
     )
-    with pytest.raises(ValueError, match="Missing captured football history GW1"):
+    with pytest.raises(DataSourceError, match="Missing captured football history GW1"):
         captured_history(without_gw01, season="2026-27", gameweek=7)
 
 

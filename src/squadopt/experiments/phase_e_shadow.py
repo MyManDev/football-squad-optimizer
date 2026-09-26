@@ -15,17 +15,17 @@ import pandas as pd
 from scipy.stats import spearmanr
 
 from squadopt.evaluation.component_handoff import DEVELOPMENT_OOF_CONTRACT_VERSION
+from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.evaluation.scoring import (
     complete_optimization_decision,
     score_frozen_squad_decision,
 )
-from squadopt.experiments.component_squad_calibration import COMPONENT_SQUAD_CALIBRATION_STATUSES
-from squadopt.experiments.config import PromotionPolicy
-from squadopt.experiments.statistics import (
+from squadopt.evaluation.statistics import (
     _percentile,
     season_aware_moving_block_indices,
     season_aware_moving_block_interval,
 )
+from squadopt.experiments.component_squad_calibration import COMPONENT_SQUAD_CALIBRATION_STATUSES
 from squadopt.optimization import OptimizationResult, SolverStatus
 from squadopt.scenarios.components import ComponentScenarioDraw
 from squadopt.scenarios.decision_scoring import score_component_scenario_decision

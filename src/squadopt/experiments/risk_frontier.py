@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from squadopt.bayesopt import BayesianCandidate
-from squadopt.experiments.config import ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentExecutionError
 from squadopt.experiments.scenario_policy_objective import ScenarioPolicyObjective
 
 RISK_FRONTIER_CONTRACT_VERSION: Final = "risk_frontier_v1"

@@ -5,9 +5,10 @@ Everything about the backend's composition is already proven in-process, and
 can say anything about the artifact a deployment actually runs. This module is the narrow
 gate for the layer they cannot reach: the image installs and imports the pinned scientific
 stack on linux/amd64, both documented commands run from that one image, a job the api
-container writes is computed by the worker container through a shared volume, the answer
-survives the api container being replaced, and a forgotten volume is refused rather than
-served from ephemeral disk.
+container writes is computed by the worker container through a shared volume, the worker's
+heartbeat reaches the api's readiness the same way and leaves with the worker's clean stop,
+the answer survives the api container being replaced, and a forgotten volume is refused
+rather than served from ephemeral disk.
 
 It deliberately does **not** restate the process-level tests at container cost. The store
 probe's primitives, the gate's TTL, the 503 shape and the worker's honouring of a shutdown
@@ -273,6 +274,71 @@ def _get(url: str, deadline: float, state: dict[str, Any], *, expect: int = 200)
     pytest.fail(f"{url} never answered {expect} within {deadline}s (last: {last})\n{_logs(state)}")
 
 
+def _readiness(
+    origin: str, deadline: float, state: dict[str, Any], *, failing: Sequence[str] = ()
+) -> Any:
+    """Poll ``/ready`` until exactly the ``failing`` checks are false, and return its body.
+
+    Readiness also answers for the workers, so an api with no live worker beside it is 503
+    by design. ``_get`` cannot wait for that: a 503 arrives as an exception. And "some 503"
+    would hide a data check that broke, so the wait names which checks may be false: none
+    means 200, any means 503 with exactly those false.
+    """
+
+    expected_status = 503 if failing else 200
+    expected_false = sorted(failing)
+    url = f"{origin}/ready"
+    limit = time.monotonic() + deadline
+    last = ""
+    while time.monotonic() < limit:
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                status, raw = response.status, response.read()
+        except urllib.error.HTTPError as error:
+            status, raw = error.code, error.read()
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            last = repr(error)
+            time.sleep(0.25)
+            continue
+        text = raw.decode("utf-8", "replace")
+        last = f"HTTP {status}: {text[:300]}"
+        try:
+            body = json.loads(text)
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and isinstance(body.get("checks"), dict):
+            false_checks = sorted(name for name, held in body["checks"].items() if held is not True)
+            if status == expected_status and false_checks == expected_false:
+                return body
+        time.sleep(0.25)
+    pytest.fail(
+        f"{url} never answered {expected_status} with false checks {expected_false} within "
+        f"{deadline}s (last: {last})\n{_logs(state)}"
+    )
+
+
+def _heartbeat_documents(state: dict[str, Any]) -> list[str]:
+    """The worker heartbeat documents on the shared store, read as root like ``_spec_context``."""
+
+    listing = _docker(
+        "run",
+        "--rm",
+        "--user",
+        "0:0",
+        "--volume",
+        f"{state['volume']}:{MOUNT}",
+        IMAGE,
+        "python",
+        "-c",
+        "import glob,json,os;"
+        "print(json.dumps(sorted(os.path.basename(p) for p in "
+        f"glob.glob('{STORE_ROOT}/workers/worker-*.json'))))",
+    )
+    names = json.loads(listing)
+    assert isinstance(names, list), listing
+    return [str(name) for name in names]
+
+
 def _post(
     origin: str, state: dict[str, Any], *, expected_error: int | None = None
 ) -> tuple[int, Any]:
@@ -379,7 +445,9 @@ def test_a_worker_without_its_volume_refuses_to_start() -> None:
 def test_production_factory_refuses_a_closed_gameweek(deployment: dict[str, Any]) -> None:
     api = _start(deployment, "api", API_COMMAND, "--publish", "127.0.0.1::8000")
     origin = _origin(api)
-    _get(f"{origin}/ready", READY_DEADLINE, deployment)
+    # No worker runs beside this api, and readiness says so and nothing else: every data
+    # check holds. The refusal below is the api's own answer and needs no worker.
+    _readiness(origin, READY_DEADLINE, deployment, failing=("worker_heartbeat",))
     status, refused = _post(origin, deployment, expected_error=422)
     assert status == 422, (status, refused)
     assert refused["error"]["code"] == "DEADLINE_PASSED"
@@ -399,12 +467,15 @@ def test_two_containers_from_one_image_answer_through_the_shared_volume(
     origin = _origin(api)
     worker = _start(deployment, "worker", WORKER_COMMAND)
 
+    # The worker's heartbeat reaches the api through the shared volume, like its answers do.
     ready = _get(f"{origin}/ready", READY_DEADLINE, deployment)
     assert ready["checks"] == {
         "capture_context": True,
         "league_tree": True,
         "cache_store": True,
         "league_tree_matches_capture": True,
+        "worker_heartbeat": True,
+        "queue_wait": True,
     }, ready
 
     status, accepted = _post(origin, deployment)
@@ -445,19 +516,23 @@ def test_two_containers_from_one_image_answer_through_the_shared_volume(
     # The worker container reports what it did. An empty log here is a deployment nobody can
     # diagnose, which is what this used to be.
     assert "advice_worker_started" in _docker("logs", worker, timeout=60.0)
+    assert len(_heartbeat_documents(deployment)) == 1
 
     # A stop the host would issue. `--time` well above the measured 3.0-29.6 s solve, because
     # docker's ten-second default would SIGKILL a busy worker and prove the opposite of the
-    # intended claim: exit 0 means the handler ran.
+    # intended claim: exit 0 means the handler ran, and the handler's clean exit takes the
+    # worker's heartbeat document off the shared store with it.
     _docker("stop", "--time", str(STOP_GRACE), worker, timeout=STOP_GRACE + 60)
     assert _docker("inspect", "--format", "{{.State.ExitCode}}", worker) == "0"
+    assert _heartbeat_documents(deployment) == []
 
     # Replace the api container against the same volume: the completed job and the cached
-    # answer are on the store, not in the process that accepted them.
+    # answer are on the store, not in the process that accepted them. No worker runs now, so
+    # the replacement is ready in every data check and 503 on the worker heartbeat alone.
     _docker("rm", "--force", api, timeout=90.0)
     replacement = _start_fixture_api(deployment)
     new_origin = _origin(replacement)
-    _get(f"{new_origin}/ready", READY_DEADLINE, deployment)
+    _readiness(new_origin, READY_DEADLINE, deployment, failing=("worker_heartbeat",))
     assert _get(f"{new_origin}/api/v1/advice-jobs/{job_id}", 30.0, deployment)["status"] == (
         "completed"
     )

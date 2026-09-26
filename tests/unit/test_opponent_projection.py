@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from squadopt.experiments.config import ExperimentConfigurationError
+from squadopt.evaluation.promotion import ExperimentConfigurationError
 from squadopt.experiments.opponent_projection import (
     CANDIDATES,
     CandidateOutcome,
