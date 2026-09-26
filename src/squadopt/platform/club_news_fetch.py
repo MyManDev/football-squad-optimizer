@@ -52,6 +52,7 @@ three clocks.
 """
 
 import html.parser
+import http.client
 import json
 import time
 import urllib.error
@@ -413,12 +414,43 @@ def _transport_publication_claim(raw: str | None) -> str | None:
         return None
 
 
+def _declared_length(response: Any) -> int | None:
+    """The body length a response declared, or ``None`` where no declaration binds it.
+
+    Read as ``http.client`` reads it: a chunked body carries its own framing and any
+    Content-Length beside it is ignored, and a header that is not a whole number of at
+    least zero is treated as absent.
+    """
+
+    if getattr(response, "chunked", False):
+        return None
+    raw = response.headers.get("Content-Length")
+    if raw is None:
+        return None
+    try:
+        declared = int(raw)
+    except ValueError:
+        return None
+    return declared if declared >= 0 else None
+
+
 def _read_once(url: str, *, opener: Opener) -> _Read:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with opener(request, float(REQUEST_TIMEOUT_SECONDS)) as response:
         # One byte past the ceiling, so "too large" is detected rather than truncated into
         # a document that looks complete and hashes to something nobody can reproduce.
         content = bytes(response.read(MAXIMUM_DOCUMENT_BYTES + 1))
+        # The same holds for a body that ended early, and http.client does not report one
+        # sent with a Content-Length: a read with an amount returns the bytes that arrived
+        # and raises nothing (its own comment says it ought to, and does not for
+        # compatibility). With an amount, only a chunked body raises `IncompleteRead`. So the
+        # declared length is checked here, up to the ceiling, and a shortfall is raised as
+        # the error http.client would have raised; `read_url` retries it. Unchecked, a page
+        # cut short would be stored and coded as the whole page, and a robots.txt cut before
+        # its Disallow line would be read as consent.
+        declared = _declared_length(response)
+        if declared is not None and len(content) < min(declared, MAXIMUM_DOCUMENT_BYTES + 1):
+            raise http.client.IncompleteRead(content, declared - len(content))
         headers: Mapping[str, str] = response.headers
         return _Read(
             final_url=str(response.geturl()),
@@ -440,11 +472,15 @@ def read_url(
 
     The retry rule is ``fpl_capture.fetch``'s and for the same reason: 429 and 5xx say
     "later" and are retried with a bounded backoff, while every other 4xx says "never" and
-    is raised at once. The loop is here rather than shared because that function returns
-    bytes alone, and this adapter needs the final URL, the status, the content type and the
-    publication header as well. A third caller that needs a response should be the one to
-    extract the shared helper, rather than this becoming the second copy that outlives its
-    excuse.
+    is raised at once. A timeout, a dropped connection or a short body while the response
+    is read is retried the same way, and reported as this module's error. A short body is
+    one that ended before its chunked framing did, or before the length its Content-Length
+    declared (``_read_once`` checks that one, because http.client does not); a body with
+    neither ends when the connection does, and a cut there cannot be told from the end.
+    The loop is here rather than shared because that function returns bytes alone, and
+    this adapter needs the final URL, the status, the content type and the publication
+    header as well. A third caller that needs a response should be the one to extract the
+    shared helper, rather than this becoming the second copy that outlives its excuse.
     """
 
     delay = RETRY_INITIAL_SECONDS
@@ -462,6 +498,21 @@ def read_url(
             if attempt == attempts:
                 raise ClubNewsFetchError(
                     f"{url} could not be reached on {attempts} attempts: {error.reason}"
+                ) from error
+        except (OSError, http.client.HTTPException) as error:
+            # urllib wraps only the sending of the request in URLError. The response is
+            # read afterwards, so a read that times out, a host that hangs up and a body cut
+            # short arrive raw (TimeoutError, RemoteDisconnected, IncompleteRead, the last
+            # from http.client for a chunked body and from `_read_once` otherwise). Left raw,
+            # one slow host escaped `fetch_registered_documents` and cost every other club's
+            # page that week. They say "later", as a 503 does, so they get its retries.
+            if attempt == attempts:
+                # The error is named by its type only. Its text can carry digits (a byte
+                # count, an errno, a line of the TLS library), and `robots_allows` still
+                # reads "404" in a refusal's text as a host with no robots file.
+                raise ClubNewsFetchError(
+                    f"{url} was not read on {attempts} attempts: the response failed after "
+                    f"the request was sent ({type(error).__name__})."
                 ) from error
         sleeper(delay)
         delay = min(delay * 2, RETRY_MAX_SECONDS)
