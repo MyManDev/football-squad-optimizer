@@ -9,15 +9,17 @@ or ``shutil.move``.
 
 ``Path.rename(target)`` and ``Path.replace(target)`` are the same call, so a one-argument
 ``.rename``/``.replace`` is refused too, in the packages where that shape is a path:
-``api``, ``platform``, ``application`` and ``live``. Elsewhere it is also a pandas call
-(``experiments/positional_defence.py`` and ``prediction/baseline.py`` rename columns), so
-the rule does not reach there.
+``api``, ``platform``, ``application`` and ``live``. Elsewhere the same shape is also a
+pandas Series call (``Series.replace`` swaps values in ``experiments/positional_defence.py``
+and ``Series.rename`` names the result in ``prediction/baseline.py``), so the rule does
+not reach there.
 
 ``os.link`` is not counted. It is the create-once primitive, and the sites that use it
 refuse to overwrite on purpose.
 """
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -87,6 +89,20 @@ def test_the_scan_sees_the_one_rename_there_is() -> None:
 
     calls = rename_calls(PRIMITIVE.read_text(encoding="utf-8"), path_methods=True)
     assert [call.split(": ")[1] for call in calls] == ["os.replace"]
+
+
+def test_the_pandas_calls_named_above_are_the_calls_in_those_files() -> None:
+    """The reason the one-argument rule stops at four packages names real calls."""
+
+    prose = " ".join((__doc__ or "").split())
+    named = re.findall(r"``Series\.(rename|replace)`` [a-z ]+ ``([\w/]+\.py)``", prose)
+    assert named, "The module docstring names no pandas Series call."
+    for method, relative in named:
+        assert relative.split("/")[0] not in PATH_PACKAGES, relative
+        calls = rename_calls((PACKAGE / relative).read_text(encoding="utf-8"), path_methods=True)
+        assert f".{method}() with one argument" in [call.split(": ")[1] for call in calls], (
+            f"{relative} has no one-argument .{method}() call."
+        )
 
 
 @pytest.mark.parametrize(
