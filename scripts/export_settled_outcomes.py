@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from scripts._experiment_cli import _git_revision, write_json, write_text
+from scripts._provenance import _git_revision, write_json, write_text
 
 from squadopt.application.settled_outcomes import (
     DEFAULT_OUTPUT_DIR as DEFAULT_OUTPUT_DIR,
