@@ -17,7 +17,7 @@ import { summarizeHistory } from "../history/historySummary";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { publishedPrice } from "../advice/publishedPrice";
-import { loadLeagueMembers } from "../data";
+import { LEAGUE_READ, useLeagueMembers } from "../queries";
 import type { EntryView } from "../types";
 
 /** The modes the scenario menu prices (`build_league_site.py --mode-residuals`). */
@@ -29,16 +29,12 @@ export function LeagueMemberHistoryPage() {
   const parameter = useParams().entryId ?? "";
   const entryId = Number(parameter);
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
-  const members = useQuery({
-    queryKey: ["provisional-league-members"],
-    queryFn: loadLeagueMembers,
-    enabled: valid,
-    staleTime: 60_000,
-  });
+  const members = useLeagueMembers(valid);
   const query = useQuery({
     queryKey: ["suggestion-history", entryId],
     queryFn: ({ signal }) => loadSuggestionHistory(entryId, { signal }),
     enabled: valid,
+    ...LEAGUE_READ,
   });
   if (!valid) return <EmptyState title={messages.leagueMembers.invalidEntry} />;
   if (query.isPending) return <EmptyState title={messages.common.loading} />;
