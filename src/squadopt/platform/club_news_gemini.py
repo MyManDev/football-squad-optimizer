@@ -26,16 +26,24 @@ records the wrong one of them is worse than a week that records nothing.
 the response schema as the contract writes it, the effort setting and the model identifier. Of
 those, this adapter sends the prompt and the model; it does not send an effort setting, and the
 schema it sends is the translated one. Four settings it does send are outside the digest
-altogether: the temperature, the thinking budget, the output ceiling and the endpoint version.
+altogether: the temperature, the thinking setting, the output ceiling and the endpoint version.
 So two weeks coded by different models are distinguishable, which is what the digest exists
-for, and two weeks coded by this adapter under different values of those four are not. Changing
-any of them is therefore a change to the instrument that the digest will not announce, and the
-place to announce it is the coding contract version.
+for, and two weeks coded by this adapter under different values of those four are not. The
+thinking setting is looked up by model in :data:`DOCUMENTED_MODELS`, so it follows the model
+identifier the digest does cover; editing a model's row there is still a change the digest will
+not announce. Changing any of the four is therefore a change to the instrument, and the place
+to announce it is the coding contract version.
+
+**The models it may ask are a list with a date on it.** A name outside
+:data:`DOCUMENTED_MODELS` is refused when the adapter is built, which is before the acquisition
+command fetches a single page. The alternative was finding out at the first call, one club at
+a time, after every page of the week had already been read.
 """
 
 import json
 import re
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, Final, Protocol
 
 from squadopt.data.sources.club_news import (
@@ -54,11 +62,70 @@ from squadopt.platform.club_news_model import MAX_OUTPUT_TOKENS, REQUEST_TIMEOUT
 #: The provider name this adapter is selected by, through ``SQUADOPT_LLM_PROVIDER``.
 GEMINI_PROVIDER: Final = "gemini"
 
-#: What an unconfigured run asks for. Flash is the model the free tier is generous with, and
-#: naming a default here is what lets ``SQUADOPT_LLM_MODEL`` stay optional. A name this API
-#: does not serve fails at the first call with its own 404 rather than quietly answering as
-#: something else, so a wrong default is loud.
-DEFAULT_GEMINI_MODEL: Final = "gemini-2.5-flash"
+#: The day the lists below were read from the provider's documentation. No call was made to
+#: build them: they are what the pages said, and they age from this date.
+DOCUMENTATION_READ_ON: Final = "2026-09-25"
+
+#: The provider's own list of models, the source of :data:`DOCUMENTED_MODELS`. Read on
+#: :data:`DOCUMENTATION_READ_ON`; the page said it was last updated 2026-09-24 UTC.
+MODELS_PAGE: Final = "https://ai.google.dev/gemini-api/docs/models"
+
+#: Every model this adapter may ask, with the thinking setting it sends that model.
+#:
+#: The names are the stable Flash text models on :data:`MODELS_PAGE`, less 3.1 Flash-Lite,
+#: whose thinking levels the thinking page does not list, so there is no setting to cite for
+#: it. Preview models are left out because the deprecations page
+#: (https://ai.google.dev/gemini-api/docs/deprecations, last updated 2026-09-24 UTC) shows
+#: previews shut down within months (``gemini-3-pro-preview``, ``gemini-3.1-flash-lite-preview``).
+#: Of the 2.5 models only ``gemini-2.5-flash`` stays, because it was this adapter's default and a
+#: key that has used it can still ask it: the models page limits the 2.5 models "to users who
+#: have actively used them in the past", which is why it is no longer the default.
+#:
+#: The settings, one parameter per row because the Gemini 3 guide
+#: (https://ai.google.dev/gemini-api/docs/gemini-3, last updated 2026-09-23 UTC) says a request
+#: carrying both returns a 400:
+#:
+#: - ``thinkingBudget: 0`` where it is known to be accepted. For 2.5 Flash the legacy
+#:   generateContent page (https://ai.google.dev/gemini-api/docs/generate-content/thinking,
+#:   last updated 2026-09-09 UTC) gives it as the way to turn thinking off. For 3.6 Flash it is
+#:   measured: the first real run (#621, 2026-09-22, capture
+#:   ``club-news-20260922T205429Z-53c25163a00a``) sent it and both clubs were answered. Both rows
+#:   send exactly the request this adapter sent before the list existed.
+#: - Otherwise the lowest level in the "Levels Supported" column of
+#:   https://ai.google.dev/gemini-api/docs/thinking (last updated 2026-09-23 UTC). None of these
+#:   models has answered this adapter yet, and the legacy page says Gemini 3 Flash and Flash-Lite
+#:   do not support full thinking-off, so a budget of zero is not a setting to send them unseen.
+#:
+#: The lowest setting, because thinking tokens count against ``maxOutputTokens`` on these models:
+#: a level above the floor spends the ceiling the claims need and turns a good answer into a
+#: truncation refusal.
+DOCUMENTED_MODELS: Final[Mapping[str, Mapping[str, object]]] = MappingProxyType(
+    {
+        "gemini-3.8-flash": MappingProxyType({"thinkingLevel": "low"}),
+        "gemini-3.7-flash": MappingProxyType({"thinkingLevel": "low"}),
+        "gemini-3.6-flash": MappingProxyType({"thinkingBudget": 0}),
+        "gemini-3.5-flash": MappingProxyType({"thinkingLevel": "minimal"}),
+        "gemini-3.5-flash-lite": MappingProxyType({"thinkingLevel": "minimal"}),
+        "gemini-2.5-flash": MappingProxyType({"thinkingBudget": 0}),
+    }
+)
+
+#: What an unconfigured run asks for; naming one here is what lets ``SQUADOPT_LLM_MODEL`` stay
+#: optional.
+#:
+#: 3.6 Flash, because it is the one model that has answered this adapter's request: the first
+#: real run asked it after the old default was refused with a 404, and the service's own refusal
+#: named it as the model to use instead. The provider's pages agree with that choice. The models
+#: page lists it as stable, the pricing page (https://ai.google.dev/gemini-api/docs/pricing,
+#: last updated 2026-09-24 UTC) lists its standard input and output as free of charge on the free
+#: tier, and the deprecations page announces no shutdown date for it and names it as the
+#: replacement for ``gemini-2.0-flash``. That run asked this model under the prompt the code
+#: still holds, so an unconfigured week now carries the prompt digest of the one real week coded
+#: so far rather than a new one.
+#:
+#: The models page steers new projects to 3.5 Flash-Lite or 3.8 Flash. Both are in the list and
+#: one variable away, but neither has answered this adapter yet.
+DEFAULT_GEMINI_MODEL: Final = "gemini-3.6-flash"
 
 #: The key travels in a header rather than a query parameter so it cannot reach a server log
 #: or a proxy's access line as part of the URL.
@@ -85,16 +152,11 @@ _ENDPOINT: Final = "https://generativelanguage.googleapis.com/v1beta/models/{mod
 #: Deterministic decoding. Two runs over one capture should ask the same question and, as far
 #: as the service allows, get the same answer; the claims are then replayable from the stored
 #: bytes rather than from a second call that may differ.
-_TEMPERATURE: Final = 0.0
-
-#: Thinking off, and stated rather than left to the server.
 #:
-#: Two reasons. The setting is part of what produced an answer, and a default that the vendor
-#: can change underneath us is a setting this repository did not choose; naming it means a
-#: week coded today and a week coded in March were asked the same way. And on these models
-#: thinking tokens count against ``maxOutputTokens``, so an unstated budget spends the ceiling
-#: that the claims need and turns a good answer into a truncation refusal.
-_THINKING_BUDGET: Final = 0
+#: The Gemini 3 guide recommends leaving temperature at its default of 1.0 for that series and
+#: says lower values may loop. The first real run was answered at 0.0 by 3.6 Flash. Moving the
+#: value is a change to the instrument, announced through the contract version if it is made.
+_TEMPERATURE: Final = 0.0
 
 #: Finish reasons that mean the model declined rather than answered. A declined request has no
 #: claims in it and must not be recorded as a week in which nobody was mentioned.
@@ -236,6 +298,18 @@ class GeminiClubNewsProvider:
                 "into the request path, and one this client cannot build would escape as a "
                 "traceback rather than as a refused club."
             )
+        if model_identifier not in DOCUMENTED_MODELS:
+            # Refused here, where the acquisition command builds the provider, and so before
+            # a single page is fetched. Left to the service, a name it no longer serves costs
+            # the whole week one club at a time, after every page has already been read.
+            raise ClubNewsGeminiError(
+                f"{model_identifier!r} is not in the provider's model list as this adapter "
+                f"read it ({MODELS_PAGE}, read on {DOCUMENTATION_READ_ON}). Name one of: "
+                f"{', '.join(DOCUMENTED_MODELS)} in SQUADOPT_LLM_MODEL, or leave it unset "
+                f"for {DEFAULT_GEMINI_MODEL}. A model the page adds later joins the list in "
+                "club_news_gemini.DOCUMENTED_MODELS together with the thinking setting its "
+                "documentation gives, so that what it is sent is a setting somebody cited."
+            )
         self._model_identifier = model_identifier
         self._timeout = timeout
         self._api_key = "" if api_key is None else _checked_key(api_key)
@@ -303,7 +377,10 @@ class GeminiClubNewsProvider:
                 "responseSchema": gemini_schema(response_schema()),
                 "maxOutputTokens": MAX_OUTPUT_TOKENS,
                 "temperature": _TEMPERATURE,
-                "thinkingConfig": {"thinkingBudget": _THINKING_BUDGET},
+                # Stated rather than left to the server: the setting is part of what produced
+                # an answer, and a default the vendor can change underneath us is a setting
+                # this repository did not choose.
+                "thinkingConfig": dict(DOCUMENTED_MODELS[self._model_identifier]),
             },
         }
         try:
@@ -470,8 +547,11 @@ def _claim_response(reply: Reply, *, asked_for: str) -> ClaimResponse:
 
 __all__ = [
     "DEFAULT_GEMINI_MODEL",
+    "DOCUMENTATION_READ_ON",
+    "DOCUMENTED_MODELS",
     "GEMINI_PROVIDER",
     "KEY_HEADER",
+    "MODELS_PAGE",
     "ClubNewsGeminiError",
     "GeminiClubNewsProvider",
     "Reply",

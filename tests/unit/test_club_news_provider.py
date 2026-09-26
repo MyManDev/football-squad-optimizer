@@ -6,7 +6,10 @@ would not be an offline test, and this whole lane's point is that the offline pa
 path are the same code with different bytes.
 """
 
+import re
 from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -17,6 +20,12 @@ from squadopt.data.sources.club_news import (
     RosterPlayer,
 )
 from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER, coding_prompt_sha256
+from squadopt.platform.club_news_gemini import (
+    GEMINI_PROVIDER,
+    ClubNewsGeminiError,
+    GeminiClubNewsProvider,
+)
+from squadopt.platform.club_news_model import AnthropicClubNewsProvider
 from squadopt.platform.club_news_provider import (
     DEFAULT_PROVIDER,
     KEY_ENVIRONMENT_VARIABLE,
@@ -189,6 +198,101 @@ def test_the_environment_is_not_read_when_a_mapping_is_given() -> None:
 
     with pytest.raises(ClubNewsProviderError):
         resolve_provider_config(empty)
+
+
+# --- what the runbook tells the operator ------------------------------------
+
+RUNBOOK = Path(__file__).resolve().parents[2] / "docs" / "weekly_runbook.md"
+
+
+def _runbook_bullet_on_the_three_variables() -> str:
+    """The runbook's bullet on the coding model, from its bold heading to the next bullet."""
+
+    text = RUNBOOK.read_text(encoding="utf-8")
+    start = text.index("- **Which model codes the club news")
+    return text[start : text.index("\n- ", start + 1)]
+
+
+def _runbook_snippet(bullet: str) -> dict[str, str]:
+    """The ``$env:NAME = "value"`` lines an operator pastes, as the mapping they produce."""
+
+    return dict(re.findall(r'^\s*\$env:(\w+) = "([^"]*)"', bullet, flags=re.MULTILINE))
+
+
+class _SilentClient:
+    """Satisfies ``CodingClient`` and fails if anything is asked of it."""
+
+    @property
+    def messages(self) -> "_SilentClient":
+        return self
+
+    def create(self, **kwargs: Any) -> Any:  # pragma: no cover - never called here
+        raise AssertionError("nothing is asked while an adapter is only being built")
+
+
+def test_the_runbook_names_the_key_the_default_adapter_reads_when_the_provider_line_is_out() -> (
+    None
+):
+    """The runbook's own lines, minus the provider line, hand the free key to the default adapter.
+
+    The snippet is read out of the runbook rather than copied here, so this follows what an
+    operator would paste. Without its provider line, the generic key and the free adapter's
+    model name both reach the default adapter and nothing at configuration refuses them. The
+    runbook's sentence about that path once said the default adapter's key is the vendor
+    variable, which reads as though a forgotten provider line fails for want of that key. It has
+    to name the generic variable, and name it as the one read first.
+    """
+
+    bullet = _runbook_bullet_on_the_three_variables()
+    snippet = _runbook_snippet(bullet)
+    assert snippet.keys() == {
+        PROVIDER_ENVIRONMENT_VARIABLE,
+        KEY_ENVIRONMENT_VARIABLE,
+        MODEL_ENVIRONMENT_VARIABLE,
+    }
+    assert snippet[PROVIDER_ENVIRONMENT_VARIABLE] == GEMINI_PROVIDER
+
+    del snippet[PROVIDER_ENVIRONMENT_VARIABLE]
+    config = resolve_provider_config(snippet)
+
+    assert config.provider == DEFAULT_PROVIDER
+    assert config.api_key == snippet[KEY_ENVIRONMENT_VARIABLE]
+    assert config.model_identifier == snippet[MODEL_ENVIRONMENT_VARIABLE]
+
+    unset_provider = bullet[
+        bullet.index(f"With `{PROVIDER_ENVIRONMENT_VARIABLE}` unset") : bullet.index(
+            f"With `{MODEL_ENVIRONMENT_VARIABLE}` unset"
+        )
+    ]
+    generic, vendor = f"`{KEY_ENVIRONMENT_VARIABLE}`", f"`{VENDOR_VARIABLE}`"
+    assert generic in unset_provider
+    assert vendor in unset_provider
+    assert unset_provider.index(generic) < unset_provider.index(vendor)
+
+
+def test_the_runbook_heading_claims_a_model_check_only_for_the_adapter_that_makes_one() -> None:
+    """The default adapter is built with any model name; only the free adapter refuses one.
+
+    So a heading saying all three variables are checked before anything is fetched overclaims
+    for the default adapter: its provider name and its key are checked at configuration, and its
+    model is not checked anywhere. The heading has to confine the model check to the adapter
+    whose constructor makes it.
+    """
+
+    unlisted = "a-model-no-list-holds"
+
+    config = resolve_provider_config(
+        {KEY_ENVIRONMENT_VARIABLE: "k", MODEL_ENVIRONMENT_VARIABLE: unlisted}
+    )
+    built = AnthropicClubNewsProvider(client=_SilentClient(), model_identifier=unlisted)
+    with pytest.raises(ClubNewsGeminiError, match="not in the provider's model list"):
+        GeminiClubNewsProvider(api_key="k", model_identifier=unlisted)
+
+    assert config.provider == DEFAULT_PROVIDER
+    assert config.model_identifier == unlisted
+    assert built is not None
+    heading = _runbook_bullet_on_the_three_variables().split("**")[1]
+    assert f"`{GEMINI_PROVIDER}`" in heading
 
 
 # --- the request unit -------------------------------------------------------
