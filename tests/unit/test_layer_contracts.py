@@ -200,3 +200,23 @@ def test_nothing_imports_a_moved_name_from_its_old_module() -> None:
                     found.append(f"{path.relative_to(_REPOSITORY)}:{node.lineno}")
 
     assert found == []
+
+
+def _old_module_spellings(module: str) -> tuple[str, str]:
+    return module, f"src/{module.replace('.', '/')}.py"
+
+
+def test_no_doc_sends_a_reader_to_a_moved_name_at_its_old_module() -> None:
+    """A paragraph naming a moved name beside its old module would give an ImportError."""
+    found: list[str] = []
+    for path in sorted((_REPOSITORY / "docs").rglob("*.md")):
+        paragraphs = path.read_text(encoding="utf-8").split("\n\n")
+        for paragraph in paragraphs:
+            for module, names in _REMOVED_RE_EXPORTS.items():
+                if not any(spelling in paragraph for spelling in _old_module_spellings(module)):
+                    continue
+                named = sorted(name for name in names if f"`{name}`" in paragraph)
+                if named:
+                    found.append(f"{path.relative_to(_REPOSITORY).as_posix()}: {module} {named}")
+
+    assert found == []
