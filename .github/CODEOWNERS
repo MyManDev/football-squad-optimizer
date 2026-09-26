@@ -1,10 +1,25 @@
-# Review authority per zone — derived from docs/architecture/ownership.md (PR #111).
-# Ownership means who must approve a change, not exclusive access. Shared boundaries
-# need one approving review from each of the other two roles. Later rules win, so the
-# shared surfaces come last. @SpeedyV5 leads data and backend implementation;
-# @ErtugrulS32175 leads optimization, core CI and application/web integration.
-# @tunayaslan retains architecture and backend review authority. Backend entries
-# list alternative reviewers, not the all-three approval rule for shared boundaries.
+# Review authority per zone, derived from docs/architecture/ownership.md (PR #111).
+#
+# Two people review this repository, and every rule below names only their two accounts:
+# the owner, @ErtugrulS32175 (optimization, evaluation, live, planning, application, api,
+# platform, CI, deploy, web and architecture), and @SpeedyV5 (data, features, prediction,
+# club news and the LLM adapter). The zones and their reasons are in ownership.md.
+#
+# The two-person review rule. Ownership means who must approve a change, not exclusive
+# access. A change inside one owner's zone needs that owner's approval unless that owner
+# wrote it. A change to a shared boundary (the last block) needs both owners: an approving
+# review from each owner who did not write it. Outside that block, a line that lists both
+# accounts names alternative reviewers and either approval is enough; listing both does not
+# make a path a shared boundary. Later rules win, so the shared surfaces come last.
+#
+# As read on 2026-09-25, branch protection does not require code-owner review, so this file
+# requests reviews and does not block a merge; the two owners keep the rule, not the
+# settings. docs/architecture/branching.md says how to re-read the settings.
+#
+# Changed on 2026-09-25: Tunay (tunayaslan) left the team. Every entry that listed him lists
+# @ErtugrulS32175 in his place, and the backend and shared entries keep @SpeedyV5 where they
+# already had him. Until that date a shared boundary needed one approving review from each
+# of the other two roles.
 
 # --- data / data mining
 /src/squadopt/data/                @SpeedyV5
@@ -25,16 +40,16 @@
 /src/squadopt/live/                @ErtugrulS32175
 
 # --- core architecture / CI
-/.github/                          @tunayaslan @ErtugrulS32175
-/pyproject.toml                    @tunayaslan @ErtugrulS32175
-/constraints.txt                   @tunayaslan @ErtugrulS32175
-/src/squadopt/__init__.py          @tunayaslan @ErtugrulS32175
-/src/squadopt/integration.py       @tunayaslan @ErtugrulS32175
-/src/squadopt/application/         @tunayaslan @ErtugrulS32175
+/.github/                          @ErtugrulS32175
+/pyproject.toml                    @ErtugrulS32175
+/constraints.txt                   @ErtugrulS32175
+/src/squadopt/__init__.py          @ErtugrulS32175
+/src/squadopt/integration.py       @ErtugrulS32175
+/src/squadopt/application/         @ErtugrulS32175
 # Thin CLI over application/site_publication.py; owned with the module it delegates to.
-/scripts/build_site.py             @tunayaslan @ErtugrulS32175
-/scripts/_experiment_cli.py        @tunayaslan @ErtugrulS32175
-/docs/architecture/                @tunayaslan @ErtugrulS32175
+/scripts/build_site.py             @ErtugrulS32175
+/scripts/_experiment_cli.py        @ErtugrulS32175
+/docs/architecture/                @ErtugrulS32175
 /web/                              @ErtugrulS32175
 
 # --- the weekly run path: whoever owns the path writes what it refuses
@@ -47,7 +62,8 @@
 #   src/squadopt/platform/weekly_publish.py
 #   src/squadopt/application/weekly_plan.py
 #
-# Ownership below is unchanged and deliberately so: a change here still needs all three roles,
+# Ownership below is unchanged by this rule and deliberately so: a change here needs the
+# approvals its lines ask for and nothing extra (until 2026-09-25 that was all three roles),
 # and the point is not to keep anyone out. Crossing into these files is often exactly right.
 # Issue #551 asked SpeedyV5 to teach the runner a new flag and that was the correct call.
 #
@@ -65,20 +81,24 @@
 # CODEOWNERS cannot enforce this; it decides approvals, not contents. It is written here
 # because this is the file a reviewer of these paths already opens.
 
-# --- platform / backend: implementation and integration review
-/src/squadopt/platform/            @SpeedyV5 @tunayaslan @ErtugrulS32175
-/src/squadopt/api/                 @SpeedyV5 @tunayaslan @ErtugrulS32175
-/Dockerfile                        @SpeedyV5 @tunayaslan @ErtugrulS32175
-/.dockerignore                     @SpeedyV5 @tunayaslan @ErtugrulS32175
-/docs/backend_runbook.md            @SpeedyV5 @tunayaslan @ErtugrulS32175
-/deploy/                            @SpeedyV5 @tunayaslan @ErtugrulS32175
+# --- platform / backend: the owner's zone, with @SpeedyV5 as an alternative reviewer
+#
+# @SpeedyV5 stays listed on these paths: he was their named implementation lead until
+# 2026-09-25, and his club news lane, the LLM adapter included, lives under platform/ as
+# src/squadopt/platform/club_news_*.py. Either account's approval is enough here.
+/src/squadopt/platform/            @SpeedyV5 @ErtugrulS32175
+/src/squadopt/api/                 @SpeedyV5 @ErtugrulS32175
+/Dockerfile                        @SpeedyV5 @ErtugrulS32175
+/.dockerignore                     @SpeedyV5 @ErtugrulS32175
+/docs/backend_runbook.md            @SpeedyV5 @ErtugrulS32175
+/deploy/                            @SpeedyV5 @ErtugrulS32175
 # The operational handover is complete; other live/ files retain their owner above.
-/src/squadopt/live/ledger.py        @SpeedyV5 @tunayaslan @ErtugrulS32175
-/src/squadopt/live/tick.py          @SpeedyV5 @tunayaslan @ErtugrulS32175
-/src/squadopt/live/recommendation.py  @SpeedyV5 @tunayaslan @ErtugrulS32175
+/src/squadopt/live/ledger.py        @SpeedyV5 @ErtugrulS32175
+/src/squadopt/live/tick.py          @SpeedyV5 @ErtugrulS32175
+/src/squadopt/live/recommendation.py  @SpeedyV5 @ErtugrulS32175
 
-# --- shared boundaries: all three roles
-/src/squadopt/contracts/           @SpeedyV5 @ErtugrulS32175 @tunayaslan
-/src/squadopt/data/schema.py       @SpeedyV5 @ErtugrulS32175 @tunayaslan
-/src/squadopt/optimization/config.py  @SpeedyV5 @ErtugrulS32175 @tunayaslan
-/src/squadopt/backtest/            @SpeedyV5 @ErtugrulS32175 @tunayaslan
+# --- shared boundaries: both owners
+/src/squadopt/contracts/           @SpeedyV5 @ErtugrulS32175
+/src/squadopt/data/schema.py       @SpeedyV5 @ErtugrulS32175
+/src/squadopt/optimization/config.py  @SpeedyV5 @ErtugrulS32175
+/src/squadopt/backtest/            @SpeedyV5 @ErtugrulS32175
