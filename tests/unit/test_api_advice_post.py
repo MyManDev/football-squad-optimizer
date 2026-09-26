@@ -254,7 +254,7 @@ def test_the_whole_story_get_404_post_202_worker_poll_second_post_200(
 def test_the_get_and_the_post_refuse_a_selection_with_one_answer(
     tmp_path: Path, change: dict[str, object], message: str
 ) -> None:
-    """One parser reads both routes, so a value one refuses the other refuses the same way."""
+    """One parser reads both routes, so a value both hand to it is refused the same way."""
 
     client, _cache, _queue = _world(tmp_path)
     selection = {**BODY, **change}
@@ -266,6 +266,43 @@ def test_the_get_and_the_post_refuse_a_selection_with_one_answer(
         assert response.status_code == 422
         error = response.json()["error"]
         assert (error["code"], error["message"]) == ("VALIDATION_FAILED", message)
+
+
+@pytest.mark.parametrize(
+    ("change", "get_params", "post_message"),
+    [
+        (
+            {"strategy": "Bad!"},
+            {"strategy": "Bad!"},
+            "strategy must be a lowercase slug of at most 64 letters, digits, '.', '_' or '-'.",
+        ),
+        ({"rival_entry_id": 0}, {"rival": 0}, "rival_entry_id must be null or a positive integer."),
+        ({"window": "x"}, {"window": "x"}, "window must be 1, 3, or 5."),
+    ],
+)
+def test_the_get_query_declarations_refuse_some_values_before_the_parser(
+    tmp_path: Path, change: dict[str, object], get_params: dict[str, object], post_message: str
+) -> None:
+    """The limit of the shared parser: the GET's query types refuse these values first.
+
+    Status and code agree across the routes; the GET's message is the framework's contract
+    message because the value never reaches ``parse_advice_selection``.
+    """
+
+    client, _cache, _queue = _world(tmp_path)
+
+    post = client.post(ADVICE_URL, json={**BODY, **change})
+    get = client.get(ADVICE_URL, params={**BODY, **get_params})
+
+    assert post.status_code == get.status_code == 422
+    assert (post.json()["error"]["code"], post.json()["error"]["message"]) == (
+        "VALIDATION_FAILED",
+        post_message,
+    )
+    assert (get.json()["error"]["code"], get.json()["error"]["message"]) == (
+        "VALIDATION_FAILED",
+        "The request did not match the API contract.",
+    )
 
 
 def test_one_open_job_per_normalized_request(tmp_path: Path) -> None:
