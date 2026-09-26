@@ -157,9 +157,11 @@ Three things to know before relying on it:
   once for the API and all workers; updating files under running processes does not update
   that identity. Publish from the intended release, drain open jobs, then have the owner
   run `powershell -ExecutionPolicy Bypass -File scripts\run_backend_local.ps1 -Stop`,
-  then the start command from section 1 on that code revision. A release restart command
-  (#663) will replace this manual sequence when it lands. Verify `/ready` and the public health
-  endpoint before relying on compute. New requests address the new revision's cache;
+  then the start command from section 1 on that code revision, or run the release restart
+  helper that #663 added, `scripts/release/restart_backend.ps1`, whose steps and preconditions
+  are in the [deployment runbook](deployment_runbook.md). It replaces a running backend and
+  cannot start a stopped one. Verify `/ready` and the public health endpoint before relying
+  on compute. New requests address the new revision's cache;
   old entries remain on disk. A capture-only update is detected without restarting, but
   that does not make an old process a new-code deployment. See the
   [publishing recipe](../scripts/release/ship.sh), which publishes the site and does not
