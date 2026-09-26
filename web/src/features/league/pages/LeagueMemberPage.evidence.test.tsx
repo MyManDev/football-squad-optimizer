@@ -147,6 +147,57 @@ describe("the manager's word on the advice card", () => {
     expect(container.textContent).toContain(EVIDENCE_COPY.en.cost("0.0"));
   });
 
+  it("prints no price for a word that binds nobody when the plan it keeps is unproven", () => {
+    // Binding nobody, the document is the pure-points plan itself at a price of 0, and 0
+    // is exact only under that plan's proof. A document from before that rule carries the
+    // plan's objective gap as a ceiling, which bounds no price, so neither is printed.
+    const advice = switchedOn([item({ role: "not_starting" })], {
+      solver_status: "FEASIBLE",
+      optimality_gap: 1.5,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 1.5,
+    });
+    delete advice.payload.control_solver_status;
+    advice.payload.evidence = { ...advice.payload.evidence!, binding: false };
+    for (const [language, zero, gap] of [
+      ["en", "0.0", "1.5"],
+      ["tr", "0,0", "1,5"],
+    ] as const) {
+      const { container, unmount } = renderPage(language, advice);
+      const text = container.textContent ?? "";
+      expect(sectionText(container)).toContain(EVIDENCE_COPY[language].unchanged);
+      expect(text).not.toContain(EVIDENCE_COPY[language].cost(zero));
+      expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(gap));
+      expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(zero));
+      unmount();
+    }
+  });
+
+  it("does not point at a price it does not print when the word changed the plan", () => {
+    // A binding word priced against a pure-points plan found without a proof carries no
+    // ceiling, so no price is printed above, and the section may not say one is.
+    const advice = switchedOn([item()], {
+      control_solver_status: "FEASIBLE",
+      control_optimality_gap: 2.5,
+      expected_points_cost: 1.5,
+    });
+    delete advice.payload.expected_points_cost_ceiling;
+    for (const [language, price, gap] of [
+      ["en", "1.5", "2.5"],
+      ["tr", "1,5", "2,5"],
+    ] as const) {
+      const { container, unmount } = renderPage(language, advice);
+      const section = sectionText(container);
+      const text = container.textContent ?? "";
+      expect(section).toContain(EVIDENCE_COPY[language].changedNoPrice);
+      expect(section).not.toContain(EVIDENCE_COPY[language].changed);
+      expect(text).not.toContain(EVIDENCE_COPY[language].cost(price));
+      expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(price));
+      expect(text).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+      unmount();
+    }
+  });
+
   it("withholds a quote the producer withheld, and says why", () => {
     const withheld = item({ words: null, words_status: "withheld_figure", role: "not_captain" });
     const { container } = renderPage("tr", switchedOn([withheld]));
