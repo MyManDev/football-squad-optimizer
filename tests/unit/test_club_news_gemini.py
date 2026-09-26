@@ -24,14 +24,18 @@ from squadopt.data.sources.club_news_coding import (
 )
 from squadopt.platform.club_news_gemini import (
     DEFAULT_GEMINI_MODEL,
+    DOCUMENTATION_READ_ON,
+    DOCUMENTED_MODELS,
     GEMINI_PROVIDER,
     KEY_HEADER,
+    MODELS_PAGE,
     ClubNewsGeminiError,
     GeminiClubNewsProvider,
     gemini_schema,
 )
 from squadopt.platform.club_news_provider import (
     KEY_ENVIRONMENT_VARIABLE,
+    MODEL_ENVIRONMENT_VARIABLE,
     PROVIDER_ENVIRONMENT_VARIABLE,
     CodingProviderConfig,
     build_coding_provider,
@@ -520,3 +524,97 @@ def test_the_configuration_does_not_print_the_key() -> None:
 
     assert SENTINEL_KEY not in repr(config)
     assert config.api_key == SENTINEL_KEY
+
+
+# --- which models, and what each is sent --------------------------------------
+
+
+def test_the_default_is_a_model_a_new_key_can_ask() -> None:
+    """The first real run found the old default refused with a 404 for a new key.
+
+    The provider's models page limits the 2.5 models to keys that used them before, so a
+    default from that family is a default the 9 October run could not use. The default has to
+    be in the checked list too, or an unconfigured run would refuse itself.
+    """
+
+    assert DEFAULT_GEMINI_MODEL in DOCUMENTED_MODELS
+    assert not DEFAULT_GEMINI_MODEL.startswith("gemini-2.")
+
+
+def test_each_model_is_sent_the_thinking_setting_its_row_names_and_only_one() -> None:
+    """Pinned, because a row edited here changes the instrument without changing the digest.
+
+    3.6 Flash and 2.5 Flash keep the budget of zero this adapter always sent: the first is the
+    model the first real run was answered by with exactly that request, the second is where the
+    provider documents a zero budget as thinking off. The rest have never been asked by this
+    adapter and get the lowest level their documentation lists. Never both parameters in one
+    request: the provider answers that with a 400.
+    """
+
+    assert {name: dict(setting) for name, setting in DOCUMENTED_MODELS.items()} == {
+        "gemini-3.8-flash": {"thinkingLevel": "low"},
+        "gemini-3.7-flash": {"thinkingLevel": "low"},
+        "gemini-3.6-flash": {"thinkingBudget": 0},
+        "gemini-3.5-flash": {"thinkingLevel": "minimal"},
+        "gemini-3.5-flash-lite": {"thinkingLevel": "minimal"},
+        "gemini-2.5-flash": {"thinkingBudget": 0},
+    }
+    for model, setting in DOCUMENTED_MODELS.items():
+        transport = _Transport(_answered())
+        provider = GeminiClubNewsProvider(
+            api_key=SENTINEL_KEY, model_identifier=model, transport=transport
+        )
+
+        provider.code(DOCUMENTS, ROSTER)
+
+        assert f"/models/{model}:generateContent" in transport.url
+        thinking = transport.body["generationConfig"]["thinkingConfig"]
+        assert thinking == dict(setting)
+        assert len(thinking) == 1
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        # Shut down on 1 June 2026 by the deprecations page.
+        "gemini-2.0-flash",
+        # A preview the same page shut down on 9 March 2026.
+        "gemini-3-pro-preview",
+        # A plausible typing slip: no such model is listed.
+        "gemini-3.6-flash-lite",
+        # The other adapter's model, put in the wrong variable.
+        CODING_MODEL_IDENTIFIER,
+    ],
+)
+def test_a_model_outside_the_documented_list_is_refused_before_any_request(model: str) -> None:
+    """Refused when the adapter is built, so no club is ever sent to a name nobody checked.
+
+    The refusal says where the list came from and when it was read, and names the models it
+    would accept, because the remedy is one environment variable.
+    """
+
+    transport = _Transport(_answered())
+
+    with pytest.raises(ClubNewsGeminiError) as refusal:
+        GeminiClubNewsProvider(api_key=SENTINEL_KEY, model_identifier=model, transport=transport)
+
+    message = str(refusal.value)
+    assert repr(model) in message
+    assert MODELS_PAGE in message and DOCUMENTATION_READ_ON in message
+    assert DEFAULT_GEMINI_MODEL in message
+    assert "SQUADOPT_LLM_MODEL" in message
+    assert SENTINEL_KEY not in message
+    assert transport.url == ""
+
+
+def test_an_unlisted_model_named_by_the_environment_refuses_the_whole_configuration() -> None:
+    """The variable the runbook tells the operator to set is the one that is checked."""
+
+    with pytest.raises(ClubNewsError, match="not in the provider's model list"):
+        build_coding_provider(
+            {
+                PROVIDER_ENVIRONMENT_VARIABLE: GEMINI_PROVIDER,
+                MODEL_ENVIRONMENT_VARIABLE: "gemini-2.0-flash",
+                KEY_ENVIRONMENT_VARIABLE: SENTINEL_KEY,
+            }
+        )

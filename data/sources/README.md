@@ -65,7 +65,7 @@ needs.
 
 ## `club_news_sources.json`
 
-Which club pages the rotation lane may read, one entry per club, and where the terms
+Which club pages the rotation lane may read, one entry per page, and where the terms
 reading for each host was written down. Like the manifest beside it, this file names a
 third-party source and redistributes none of it: the bytes a fetch returns go to
 `data/snapshots/`, which is gitignored.
@@ -77,4 +77,10 @@ be a permission nobody granted. `club` is spelled as the capture spells it (the 
 payload's `teams[].name`, so `Man Utd` rather than `Manchester United`), because a claim
 is joined against the capture and not against a tidier name.
 
-No real host is registered yet. The one entry is a placeholder.
+`terms_read_on` is required too, as the date in that host's reading row or `null` for a
+host nobody read. A reading is relied on for 90 days, so a host whose date is older, or
+`null`, is not contacted; [the terms reading](../../docs/club_news_sources.md#when-a-reading-ages)
+states the rule and how to renew a reading.
+
+Two real hosts are registered, Liverpool and Newcastle, each read and signed in that
+document. The `club.example` entry is a placeholder that no request is ever made for.
