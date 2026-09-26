@@ -56,6 +56,7 @@ from squadopt.application.views import (
     ViewEnvelope,
     utc_now_iso,
 )
+from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live.ledger import LedgerEntry, load_ledger
@@ -88,7 +89,7 @@ def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
     try:
         temporary.write_bytes(text.encode("utf-8"))
-        os.replace(temporary, path)
+        replace_retrying(temporary, path)
     finally:
         with contextlib.suppress(FileNotFoundError):
             temporary.unlink()

@@ -9,6 +9,17 @@ import { installLeagueMocks, openCalendar } from "./leagueMocks";
 const ENTRY = 35249001;
 const copy = MESSAGES.tr;
 
+/** The faces the page is drawn in, as src/design/fonts.css declares them. */
+const FACES = [
+  "Barlow Semi Condensed 700",
+  "Barlow Semi Condensed 800",
+  "IBM Plex Sans 400",
+  "IBM Plex Sans 500",
+  "IBM Plex Sans 600",
+  "IBM Plex Mono 500",
+  "IBM Plex Mono 600",
+];
+
 /** The mocked member's one-week plan, as the page receives it. */
 const PLAN = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
 
@@ -107,11 +118,17 @@ async function open(page: Page, width: number, height: number, plan = PLAN, live
   await expect(page.locator('[data-mark="rail-xi"]')).toBeAttached();
   // Ask for every face the stylesheet declares rather than only those already requested:
   // on a slow runner `fonts.ready` can settle before a face starts loading, and a reading
-  // taken in the fallback face moves text by a line.
-  await page.evaluate(async () => {
-    await Promise.all([...document.fonts].map((face) => face.load().catch(() => undefined)));
+  // taken in the fallback face moves text by a line. The site serves these files itself, so
+  // a face that is missing or fails to load is a broken build: name it instead of measuring
+  // the fallback.
+  const loaded = await page.evaluate(async () => {
+    await Promise.allSettled([...document.fonts].map((face) => face.load()));
     await document.fonts.ready;
+    return [...document.fonts]
+      .filter((face) => face.status === "loaded")
+      .map((face) => `${face.family.replace(/["']/g, "")} ${face.weight}`);
   });
+  for (const face of FACES) expect(loaded, `the ${face} face loads`).toContain(face);
 }
 
 type Box = { x: number; y: number; width: number; height: number };

@@ -30,7 +30,7 @@ Nothing is fetched. The capture is already on disk.
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Final
 
@@ -47,6 +47,7 @@ from squadopt.data.sources.fpl_live import (
     fixture_snapshot,
     gameweek_deadlines,
     in_season_totals,
+    live_event_outcomes,
     live_payload,
     next_open_deadline,
     player_snapshot,
@@ -296,6 +297,28 @@ def _component_table(
     return table, diagnostics
 
 
+def _listed_gameweeks(
+    payloads: Mapping[str, bytes], bootstrap: bytes, played: int
+) -> dict[int, int] | None:
+    """How many of the played gameweeks' live documents list each player, by code.
+
+    A player registered after the season began is absent from the documents of the weeks
+    before he was, and those weeks are not zero-minute weeks for him. ``None`` when the
+    capture lacks any played week's document: an older capture cannot say who was listed,
+    and the blend then keeps the calendar count it has always used.
+    """
+
+    names = {week: live_payload(week) for week in range(1, played + 1)}
+    if any(name not in payloads for name in names.values()):
+        return None
+    counts: dict[int, int] = {}
+    for week, name in names.items():
+        outcomes = live_event_outcomes(payloads[name], bootstrap, gameweek=week)
+        for code in outcomes["player_id"].astype("int64").tolist():
+            counts[int(code)] = counts.get(int(code), 0) + 1
+    return counts
+
+
 def _appearance(projected: pd.DataFrame) -> dict[int, float] | None:
     """The appearance chances this projection states, for the players it states them for.
 
@@ -401,8 +424,17 @@ def build(
     # construction rather than by two copies of one rule agreeing.
     fallback = build_opening_projection_from_snapshot(panel, roster, season=season)
 
+    # Season minutes are divided by the weeks each player was listed in, not by `played`:
+    # the direct-control route prices a late registration with exactly this number, and
+    # the calendar count would charge him the weeks before he existed in the game.
     blend = blend_in_season_projection(
-        roster, carried, history, fallback, gameweeks_played=played, config=config
+        roster,
+        carried,
+        history,
+        fallback,
+        gameweeks_played=played,
+        gameweeks_listed=_listed_gameweeks(snapshot.payloads, bootstrap, played),
+        config=config,
     )
 
     if (evidence_table_path is None) != (evidence_manifest_path is None):

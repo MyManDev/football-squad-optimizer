@@ -8,6 +8,7 @@ presses a button for.
 
 import json
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -408,6 +409,100 @@ def test_one_address_may_only_ever_mean_one_question(tmp_path: Path) -> None:
     store.put(key, _spec())  # the same meaning again is a no-op
     with pytest.raises(AdviceJobSpecConflictError):
         store.put(key, _spec(entry_id=ENTRY_ID + 1))
+
+
+def test_a_spec_is_fsynced_whole_before_it_is_linked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, int]] = []
+    fsync, link = os.fsync, os.link
+
+    def spy_fsync(descriptor: int) -> None:
+        calls.append(("fsync", os.fstat(descriptor).st_size))
+        fsync(descriptor)
+
+    def spy_link(source: str, destination: str) -> None:
+        calls.append(("link", Path(source).stat().st_size))
+        link(source, destination)
+
+    monkeypatch.setattr(os, "fsync", spy_fsync)
+    monkeypatch.setattr(os, "link", spy_link)
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    store.put("e" * 64, _spec())
+    size = len(json.dumps(_spec().as_payload(), sort_keys=True, separators=(",", ":")))
+    assert calls == [("fsync", size), ("link", size)]
+
+
+def test_a_torn_spec_is_moved_aside_and_the_address_written_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        AdviceLog, "event", lambda _self, name, **fields: events.append((name, fields))
+    )
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "d" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    path.parent.mkdir(parents=True)
+    torn = b'{"contract_version":"advice_job_'  # what a crash can leave of a spec
+    path.write_bytes(torn)
+
+    store.put(key, _spec())  # used to raise AdviceJobSpecConflictError, for good
+    assert store.get(key) == _spec()
+    [aside] = [p for p in path.parent.iterdir() if p != path]
+    assert aside.name.startswith(f"{path.name}.damaged-")
+    assert aside.read_bytes() == torn
+    assert [(name, fields["source"]) for name, fields in events] == [
+        ("advice_damaged_entry_quarantined", path.name)
+    ]
+
+
+def test_a_spec_that_parses_but_differs_is_still_a_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        AdviceLog, "event", lambda _self, name, **fields: events.append((name, fields))
+    )
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "f" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    path.parent.mkdir(parents=True)
+    other = b'{"contract_version":"advice_job_spec_v1","league_id":1}'
+    path.write_bytes(other)
+
+    with pytest.raises(AdviceJobSpecConflictError):
+        store.put(key, _spec())
+    assert path.read_bytes() == other
+    assert [p.name for p in path.parent.iterdir()] == [path.name]
+    assert events == []
+
+
+def test_a_spec_moved_aside_for_a_moment_is_linked_over_not_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = FileAdviceJobSpecStore(tmp_path / "specs")
+    key = "c" * 64
+    path = tmp_path / "specs" / key[:2] / f"{key}.json"
+    payload = json.dumps(_spec().as_payload(), sort_keys=True, separators=(",", ":")).encode()
+    read = FileAdviceJobSpecStore._read
+    calls: list[Path] = []
+
+    def racing_read(inner: Path) -> bytes | None:
+        calls.append(inner)
+        if len(calls) == 1:  # this request's miss; another request files the spec right after
+            missed = read(inner)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+            return missed
+        if len(calls) == 2:  # a request that read damage earlier moves the spec aside
+            os.replace(path, path.with_name(f"{path.name}.damaged-other"))
+        return read(inner)
+
+    monkeypatch.setattr(store, "_read", racing_read)
+    store.put(key, _spec())  # used to raise "exists but cannot be read back"
+    assert path.read_bytes() == payload
+    assert len(calls) == 2
 
 
 def test_a_missing_spec_is_a_named_refusal_not_a_crash(tmp_path: Path) -> None:
@@ -1443,6 +1538,14 @@ def test_preferences_round_trip_through_http_worker_cache(running):
         route, json={**body, "preferences": {"keep_players": [1], "avoid_players": [1]}}
     )
     assert invalid.status_code == 422
+    # Ids the capture does not have for this member are refused before a job exists:
+    # 1002 is on the roster but not in the fifteen, 1025 is not on the roster at all.
+    jobs_before = backend.queue.jobs()
+    for unknown in ({"keep_players": [1002]}, {"avoid_players": [1025]}):
+        refused = client.post(route, json={**body, "preferences": unknown})
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert backend.queue.jobs() == jobs_before
     for malformed in (None, "", []):
         invalid = client.post(route, json={**body, "preferences": malformed})
         assert invalid.status_code == 422
