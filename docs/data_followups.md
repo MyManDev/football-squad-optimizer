@@ -291,6 +291,10 @@ then reads the archive builds it again. These build it more than once in one run
   and 2024-25 for its modelling frame (`modelling_frame`, called from `arm_forecasts`), then
   over the five decision-history seasons in `main`. With `--points-only` it stops after the
   first.
+- `scripts/measure_listed_minutes.py` (#851) builds it through `projection_handoff.build`,
+  twice on the component path and once on the fallback, then once more in each of its two
+  `_solve` calls; with `--workers` above one, each started worker of the member-publication
+  pool that `league_mapper` opens in a `_solve` builds its own.
 - `scripts/probe_phase_e_runtime.py` builds it once when it probes folds and, with
   `--live-components`, once more for each `--live-decision`, through the same
   `_component_table`.
