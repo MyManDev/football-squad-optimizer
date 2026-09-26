@@ -85,11 +85,22 @@ longer. A window-5 solve that took 208.5 s on the PC would pass the page's 600 s
 core up to about 2.9 times slower, before any queueing. How fast a given host's vCPU is on
 this workload has not been measured anywhere.
 
-**The ortools wheels are not the obstacle on Arm.** Checked against PyPI on 2026-09-25 at
-20:04Z: `ortools==9.15.6755` publishes `cp313` `manylinux_2_28` wheels for both `x86_64` and
-`aarch64`, and so does every other compiled runtime pin in `constraints.txt` (`numpy`,
-`pandas`, `scipy`, `scikit-learn`, `pydantic-core`, `rpds-py`). Packaging does not require
-x86-64. Three other things do tie the backend to it today:
+**The ortools wheels are not the obstacle on Arm.** Read from PyPI on 2026-09-26 at 01:37Z.
+Eight pins in `constraints.txt` ship compiled code and are installed in the image, whose
+`Dockerfile` installs `.[api]`. Each one publishes a Linux wheel for `x86_64` and one for
+`aarch64` that CPython 3.13 installs, but not all with the same tags:
+
+- `ortools==9.15.6755`, `numpy`, `pandas`, `scipy` and `scikit-learn`: `cp313` wheels tagged
+  `manylinux_2_28`.
+- `pydantic-core` and `rpds-py`: `cp313` wheels tagged `manylinux2014` (`manylinux_2_17`),
+  with no `manylinux_2_28` tag.
+- `protobuf`, which `ortools` requires: a `cp39-abi3` wheel tagged `manylinux2014`. It is
+  built against the stable ABI, so it is not a `cp313` wheel, and CPython 3.13 installs it.
+
+The image installs no other compiled pin: `grimp`, `jiter`, `mypy`, `psutil` and `ruff`, and
+the research-bo group at the end of `constraints.txt`, come only through the `dev`,
+`capacity`, `llm` and `research-bo` extras. Packaging does not require x86-64. Three other
+things do tie the backend to it today:
 
 1. ADR 0006 admits aarch64 only after its solver parity has been measured.
 2. The `Dockerfile` (`FROM --platform=linux/amd64`) and `deploy/compose.yaml`
@@ -455,7 +466,8 @@ The web pages, the price API and the price-list files were read on 2026-09-25 be
 and 20:25 UTC. The pricing pages that render prices in the browser (Hetzner, Oracle, Azure)
 were read after rendering; the API and price-list files were read as JSON. The PC facts were
 read the same evening; the watcher, its mutex, its log and the sleep entries were re-read
-between 21:30Z and 21:40Z.
+between 21:30Z and 21:40Z. PyPI's wheel listings were read again on 2026-09-26 at 01:37Z, and
+the wheel paragraph under Context quotes that reading.
 
 | What | Where |
 | --- | --- |
@@ -481,7 +493,7 @@ between 21:30Z and 21:40Z.
 | Tunnel limits: 25 active replicas per tunnel | <https://developers.cloudflare.com/cloudflare-one/account-limits/> |
 | cloudflared as a Linux service | <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/as-a-service/linux/> |
 | cloudflared release assets (linux-amd64, linux-arm64) | <https://github.com/cloudflare/cloudflared/releases/tag/2026.9.3> |
-| ortools and the other compiled pins, wheel tags | `https://pypi.org/pypi/<name>/<version>/json` for every pin in `constraints.txt` |
+| ortools and the other compiled pins, wheel tags | `https://pypi.org/pypi/<name>/<version>/json` for every pin in `constraints.txt` outside its optional research-bo group, read on 2026-09-26 at 01:37Z |
 | Outage issues | #747, #787, #795, #821 |
 | PC facts: CPU, memory, Startup shortcut, boot and logon times, process start times, the watcher's log and mutex, sleep log, store and input sizes | read-only queries on the owner's PC; no process was touched |
 | The watcher's behaviour: `-Unregister`, the 60 s checks, three misses before a restart, the mutex | `scripts/start_backend_at_logon.ps1` |

@@ -8,9 +8,13 @@ put two connectors in front of two stores. The same draft placed #821's failed c
 hour before the sleep began", reading only the hibernate leg of a sleep that had started hours
 earlier.
 
+A later draft listed the compiled pins with Linux wheels for both architectures and left out
+`protobuf`, which the image installs because `ortools` requires it.
+
 These checks read the record as the operator would and hold its steps to the script's actual
-switches, mutex and timing, its #821 facts to its own outage table, and option B's Compose
-step to the deploy files it describes. A failure names the paragraph to rewrite.
+switches, mutex and timing, its #821 facts to its own outage table, option B's Compose step
+to the deploy files it describes, and its list of compiled pins to what the image installs.
+A failure names the paragraph to rewrite.
 """
 
 from __future__ import annotations
@@ -19,16 +23,21 @@ import re
 import shutil
 import subprocess
 import textwrap
+import tomllib
 import zlib
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ADR = REPOSITORY_ROOT / "docs/architecture/decisions/0009-advice-backend-hosting-options.md"
 WATCHER = REPOSITORY_ROOT / "scripts/start_backend_at_logon.ps1"
 POWERSHELL = shutil.which("powershell.exe")
+WHEEL_PARAGRAPH = "**The ortools wheels are not the obstacle on Arm.**"
 
 WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "ten": 10}
 NUMBER_WORDS = {value: word for word, value in WORDS.items()}
@@ -179,6 +188,91 @@ def test_the_compose_gap_cites_the_file_that_states_it() -> None:
     assert all(f"# {name}=" in example for name in inputs)
     assert "Its own comment" not in step
     assert "as `deploy/backend.env.example` says" in step
+
+
+def _pins() -> dict[str, str]:
+    """`constraints.txt`'s pins, by normalized name."""
+
+    pins: dict[str, str] = {}
+    for line in (REPOSITORY_ROOT / "constraints.txt").read_text(encoding="utf-8").splitlines():
+        if "==" in line and not line.lstrip().startswith("#"):
+            name, version = line.strip().split("==", 1)
+            pins[canonicalize_name(name)] = version
+    return pins
+
+
+def _image_installs() -> set[str]:
+    """What the Dockerfile's `pip install ".[api]"` installs on Linux, by normalized name.
+
+    Walked from the installed distributions' own requirements, so a new transitive dependency
+    shows up without this list being edited.
+    """
+
+    project = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    linux = {"sys_platform": "linux", "platform_system": "Linux", "os_name": "posix"}
+    pending = [
+        Requirement(spec)
+        for spec in project["project"]["dependencies"]
+        + project["project"]["optional-dependencies"]["api"]
+    ]
+    installs: set[str] = set()
+    while pending:
+        requirement = pending.pop()
+        name = canonicalize_name(requirement.name)
+        if name in installs:
+            continue
+        installs.add(name)
+        try:
+            requires = distribution(name).requires or []
+        except PackageNotFoundError:
+            pytest.skip(f"{name} is not installed, so the image's closure cannot be walked")
+        for spec in requires:
+            nested = Requirement(spec)
+            if nested.marker is None or nested.marker.evaluate(linux):
+                pending.append(nested)
+    return installs
+
+
+def _compiled(name: str) -> bool:
+    return "Root-Is-Purelib: false" in (distribution(name).read_text("WHEEL") or "")
+
+
+def test_the_arm_wheel_paragraph_names_every_compiled_pin_the_image_installs() -> None:
+    """Option C rests on this paragraph: it lists the compiled pins the image installs and the
+    Linux wheel each one publishes for both architectures. An omitted pin is a wheel nobody
+    checked, which is how `protobuf` was missed."""
+
+    record = _flat(_record())
+    start = record.index(WHEEL_PARAGRAPH)
+    paragraph = record[start : record.index("Packaging does not require x86-64.", start)]
+    listed, _, others = paragraph.partition("The image installs no other compiled pin")
+
+    pins = _pins()
+
+    def named(text: str) -> dict[str, str | None]:
+        """Backticked pin names, with the version where the text writes `name==version`."""
+
+        found: dict[str, str | None] = {}
+        for token in re.findall(r"`([^`]+)`", text):
+            name, _, version = token.partition("==")
+            if canonicalize_name(name) in pins:
+                found[canonicalize_name(name)] = version or None
+        return found
+
+    image = _image_installs()
+    compiled = {name for name in image & set(pins) if _compiled(name)}
+    assert set(named(listed)) == compiled, "rewrite the wheel list to match the image"
+    for name, version in named(listed).items():
+        assert version in (None, pins[name]), f"{name} is pinned at {pins[name]}"
+
+    requires = distribution("ortools").requires or []
+    assert "protobuf" in {canonicalize_name(Requirement(spec).name) for spec in requires}
+    protobuf = listed[listed.index("- `protobuf`") :]
+    assert "which `ortools` requires" in protobuf
+    assert "`cp39-abi3`" in protobuf and "not a `cp313` wheel" in protobuf
+
+    assert named(others), "the paragraph must say which compiled pins the image leaves out"
+    assert not set(named(others)) & image
 
 
 @pytest.mark.parametrize(
