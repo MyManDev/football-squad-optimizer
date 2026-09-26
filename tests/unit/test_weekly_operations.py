@@ -17,6 +17,7 @@ from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.platform import weekly_operations as weekly
 from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths, inspect_run
+from squadopt.platform.weekly_publish import tree_digests
 
 
 def world(tmp_path: Path, *, rotation: bool = False) -> weekly.WeeklyOperations:
@@ -574,7 +575,7 @@ def test_the_publication_is_the_preview_byte_for_byte(
         str(origin),
         str(published),
     )
-    assert weekly.tree_digests(published / "web/public/data") == weekly.tree_digests(preview)
+    assert tree_digests(published / "web/public/data") == tree_digests(preview)
     history = json.loads((preview / "league/history/101.json").read_bytes())
     assert [week["gameweek"] for week in history["payload"]["weeks"]] == [2]
     assert (published / "web/public/data/league/history/101.json").read_bytes() == (
@@ -587,7 +588,7 @@ def test_the_publication_is_the_preview_byte_for_byte(
     assert stages["league"]["value"]["advice_recorded"] is True
     assert [row["path"] for row in stages["publish"]["inputs"]] == [str(preview)]
     assert stages["publish"]["value"]["status"] == "pr_open"
-    assert stages["publish"]["value"]["published_files"] == len(weekly.tree_digests(preview))
+    assert stages["publish"]["value"]["published_files"] == len(tree_digests(preview))
     assert not (checkout / names.worktree_directory).exists()
     with pytest.raises(weekly.PublishError, match="already exists on origin"):
         weekly.publish(names, workspace=checkout, force_branch=False, dry_run=True)

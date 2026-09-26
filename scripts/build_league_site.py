@@ -237,7 +237,7 @@ def main() -> int:
             "Both are accepted. Check the capture, rotation table, Top 100 export and code "
             "revision for changes before "
             "the deadline. If the deadline will not wait, re-run with --no-advice-record "
-            "(scripts.publish_gameweek_site takes the same flag and passes it through): the "
+            "(scripts.run_week takes the same flag beside --publish): the "
             "recorded capture is kept as it stands and the difference above is what to "
             "reconcile afterwards.",
             file=sys.stderr,

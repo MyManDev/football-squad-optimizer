@@ -174,4 +174,4 @@ def test_a_refused_advice_record_names_the_escape_a_deadline_needs(
     printed = capsys.readouterr().err
     assert "published_sha256 moved" in printed
     assert "--no-advice-record" in printed
-    assert "publish_gameweek_site" in printed
+    assert "scripts.run_week" in printed
