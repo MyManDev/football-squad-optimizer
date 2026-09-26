@@ -298,3 +298,51 @@ def test_the_command_prints_the_capture_id_the_next_step_needs(
     assert declared == ("Arsenal", "Man Utd")
     assert covered == ("Arsenal", "Man Utd")
     assert partial == ()
+
+
+def test_an_unlisted_model_refuses_the_command_before_any_page_is_fetched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The 9 October failure, caught at startup rather than one club at a time.
+
+    The real free adapter is selected with a model the provider shut down, a key is present,
+    and the opener counts every request. Nothing is fetched, no robots file is read, and the
+    refusal names the model and never the key.
+    """
+
+    requested: list[str] = []
+
+    def _counting(request: Any, timeout: float) -> _Reply:
+        requested.append(request.full_url)
+        return _opener()(request, timeout)  # type: ignore[no-any-return]
+
+    key = "sentinel-key-for-acquire"
+    registry = _registry(tmp_path / "sources.json", SOURCES)
+    snapshots = tmp_path / "snapshots"
+    roster_id = _roster_snapshot(snapshots)
+
+    code = main(
+        [
+            "--roster-snapshot",
+            roster_id,
+            "--registry",
+            str(registry),
+            "--snapshot-root",
+            str(snapshots),
+        ],
+        environ={
+            PROVIDER_ENVIRONMENT_VARIABLE: "gemini",
+            MODEL_ENVIRONMENT_VARIABLE: "gemini-2.0-flash",
+            KEY_ENVIRONMENT_VARIABLE: key,
+        },
+        opener=_counting,
+        now=lambda: FETCHED_AT,
+        sleeper=lambda _: None,
+    )
+
+    printed = capsys.readouterr().out
+    assert code == 1
+    assert printed.startswith("Refused:")
+    assert "'gemini-2.0-flash'" in printed
+    assert key not in printed
+    assert requested == []
