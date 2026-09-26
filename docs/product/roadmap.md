@@ -58,16 +58,21 @@ capture can answer (the capabilities document in `platform/advice_read.py`):
   many Top 100 teams started each player last week, at every window and on the rival
   strategies (#594, #599). The plan is chosen on the weighted points and every number shown
   is on the base model (`application/top100_weight.py`). It is offered only when that
-  capture's Top 100 export passed its gate. GW5's publication carried it for every member;
-  every GW6 index says `no_top100_this_run`.
+  capture's Top 100 export passed its gate. The GW5 member indexes carried it from #595 on
+  17 September 2026: all 15 at `site-2026-27-gw05-decision` and `site-2026-27-gw05-settled`,
+  none at the two earlier GW5 publications (`site-2026-27-gw04-settled` and
+  `site-2026-27-gw04-settled-2`). Every GW6 index says `no_top100_this_run`.
 - The manager's word: coded club news entered as a constraint the member switches on, with
   its price, on the one-week pure-points plan (#581, `application/manager_words.py`). It is
-  built and switchable, and so far it has run on example data only. GW5 is the one week
-  whose publications carried it, and every GW5 member index names the committed synthetic
-  fixture (`evidence.source_kind` `synthetic_fixture`, from `club_news_v1.fixture.json`,
-  clubs Arsenal and Man Utd), which the page labelled example data. No real club's coded
-  news has entered a published plan, and GW6 carries none (every GW6 index:
-  `evidence.available` false, `no_evidence_this_run`). Liverpool and Newcastle are
+  built and switchable, and so far it has run on example data only. GW5 is the only week
+  whose publications carried it. The first GW5 publication (#572, deployed on 16 September
+  2026 as `site-2026-27-gw04-settled`) carried none: its 15 member indexes have no
+  `evidence` key. Every GW5 member index published from 17 September 2026 on (all 15 at
+  `site-2026-27-gw04-settled-2`, `site-2026-27-gw05-decision` and `site-2026-27-gw05-settled`)
+  names the committed synthetic fixture (`evidence.source_kind` `synthetic_fixture`, from
+  `club_news_v1.fixture.json`, clubs Arsenal and Man Utd), which the page labelled example
+  data. No real club's coded news has entered a published plan, and GW6 carries none (every
+  GW6 index: `evidence.available` false, `no_evidence_this_run`). Liverpool and Newcastle are
   registered for reading (`data/sources/club_news_sources.json`); one real read of both,
   made outside any publication for #621 on 22 September 2026, coded zero claims and entered
   no plan. The weekly runbook still names the committed fixture as the only club-news
