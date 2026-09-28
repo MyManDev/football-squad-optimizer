@@ -448,7 +448,9 @@ data a promotion is judged on.
 - Evaluate multiple objectives through explicit trade-offs or Pareto frontiers.
 - Declare an untouched evaluation set before a promotion decision. The 2025-26 holdout was
   spent once as a final test (`fw10_holdout`) and has since been walked as development data,
-  so no locked holdout remains (`docs/measurements_index.md`, opening section).
+  so it is no longer an unused final test. Per-path access restrictions remain: the
+  v1 path still refuses it, while separately declared v2 and
+  [football development](../research/football_defcon_development_scope.md) scopes may use it.
 
 Exit criteria:
 

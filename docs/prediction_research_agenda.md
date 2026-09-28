@@ -15,6 +15,10 @@ it, derive labels, or reinterpret it as additional development data. A DEFCON st
 an explicit new data/target/scoring declaration and owner authorization. Existing separately
 authorized v2 studies do not grant that permission to this programme's v1 candidates.
 
+The separately identified [football development scope](research/football_defcon_development_scope.md)
+was approved on 28 September 2026. It does not unlock this v1 programme or backdate
+the earlier football reads.
+
 This limitation narrows the applicability of existing verdicts without changing their
 historical measurements, original gates or operational model. See the
 [measurements index](measurements_index.md) and [review scope](prediction_e2e_review_scope.md).
