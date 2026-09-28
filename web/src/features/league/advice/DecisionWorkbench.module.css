@@ -13,7 +13,8 @@
 .plan {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
-  padding: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -94,4 +95,78 @@
     line-height: 20px;
     cursor: pointer;
   }
+}
+
+/* Keep the member's choice distinct from any claim about model performance. */
+.planHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.planHeader h3 {
+  margin: 0;
+  font-size: var(--step-2);
+}
+
+.preferred {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.primaryMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block: 1px solid var(--color-line);
+}
+
+.primaryMetrics > div {
+  min-width: 0;
+}
+
+.primaryMetrics dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.primaryMetrics dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--step-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.primaryMetrics .mainScore {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mainScore dd {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: var(--step-3);
+}
+
+.metricsDetails > summary {
+  padding-block: var(--space-3);
+  border-block: 1px solid var(--color-line);
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.comparisonNote {
+  max-width: var(--measure);
+  color: var(--color-text-muted);
 }

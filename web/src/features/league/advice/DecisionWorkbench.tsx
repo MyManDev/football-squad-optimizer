@@ -93,6 +93,11 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
       {board.candidates.length === 3 && (
         <p>{tr ? "Yeni plan için önce birini kaldır." : "Remove a plan before adding another."}</p>
       )}
+      <p className={styles.comparisonNote}>
+        {tr
+          ? "Net puan transfer cezası düşülmüş beklentidir. Farklı modellerin veya farklı uzunluktaki pencerelerin yüksek puanı, daha iyi plan olduğunu kanıtlamaz. Eksik ölçüm — ile gösterilir."
+          : "Net points subtract transfer hits. Higher scores from different models or different horizons do not prove a better plan. Missing measurements are shown as —."}
+      </p>
       <div className={styles.grid}>
         {board.candidates.map((c, i) => {
           const p = c.envelope.payload;
@@ -109,7 +114,12 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
             }[p.mode as "garantici" | "agresif" | "asiri-agresif"];
           return (
             <section className={styles.plan} key={c.id} aria-label={`Plan ${label}`}>
-              <h3>Plan {label}</h3>
+              <div className={styles.planHeader}>
+                <h3>Plan {label}</h3>
+                {board.preferred === c.id && (
+                  <span className={styles.preferred}>{tr ? "Tercihim" : "My choice"}</span>
+                )}
+              </div>
               <p>
                 {p.prediction_model
                   ? tr
@@ -143,30 +153,49 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                   {c.request.preferences.save_chips ? (tr ? "Evet" : "Yes") : tr ? "Hayır" : "No"}
                 </p>
               )}
+              <dl className={styles.primaryMetrics}>
+                <div className={styles.mainScore}>
+                  <dt>{tr ? "İlk hafta net beklenen puan" : "First-week net expected points"}</dt>
+                  <dd>{number(m.net)}</dd>
+                </div>
+                <div>
+                  <dt>
+                    {tr ? "İlk hafta tutmaya göre net fark" : "First-week net gain over hold"}
+                  </dt>
+                  <dd>{number(m.gain)}</dd>
+                </div>
+                <div>
+                  <dt>{tr ? "Pencere net beklenen puanı" : "Horizon net expected points"}</dt>
+                  <dd>{number(m.horizonNet)}</dd>
+                </div>
+              </dl>
               <dl className={styles.metrics}>
-                <dt>{tr ? "İlk hafta net beklenen puan" : "First-week net expected points"}</dt>
-                <dd>{number(m.net)}</dd>
-                <dt>{tr ? "İlk hafta tutmaya göre net fark" : "First-week net gain over hold"}</dt>
-                <dd>{number(m.gain)}</dd>
-                <dt>{tr ? "Pencere net beklenen puanı" : "Horizon net expected points"}</dt>
-                <dd>{number(m.horizonNet)}</dd>
-                <dt>{tr ? "Pencere transfer cezası" : "Horizon transfer hits"}</dt>
-                <dd>{m.horizonHits ?? "—"}</dd>
-                <dt>{tr ? "Pencere sonunda serbest transfer" : "Free transfers at horizon end"}</dt>
-                <dd>{m.remainingTransfers ?? "—"}</dd>
                 <dt>{tr ? "İlk hafta kaptanı" : "First-week captain"}</dt>
                 <dd>{p.captain?.name}</dd>
                 <dt>{tr ? "İlk hafta çipi" : "First-week chip"}</dt>
                 <dd>{chipName(p.chip)}</dd>
-                <dt>{tr ? "Çözücü" : "Solver"}</dt>
-                <dd>
-                  {tr
-                    ? (SOLVER_STATUS_TR[p.solver_status ?? ""] ?? p.solver_status)
-                    : p.solver_status}
-                </dd>
-                <dt>{tr ? "Kanıtın açık bıraktığı fark" : "Objective bound gap"}</dt>
-                <dd>{number(p.optimality_gap)}</dd>
               </dl>
+              <details className={styles.metricsDetails}>
+                <summary className={styles.summary}>
+                  {tr ? "Maliyet ve çözüm ayrıntıları" : "Costs and solution details"}
+                </summary>
+                <dl className={styles.metrics}>
+                  <dt>{tr ? "Pencere transfer cezası" : "Horizon transfer hits"}</dt>
+                  <dd>{m.horizonHits ?? "—"}</dd>
+                  <dt>
+                    {tr ? "Pencere sonunda serbest transfer" : "Free transfers at horizon end"}
+                  </dt>
+                  <dd>{m.remainingTransfers ?? "—"}</dd>
+                  <dt>{tr ? "Çözücü" : "Solver"}</dt>
+                  <dd>
+                    {tr
+                      ? (SOLVER_STATUS_TR[p.solver_status ?? ""] ?? p.solver_status)
+                      : p.solver_status}
+                  </dd>
+                  <dt>{tr ? "Kanıtın açık bıraktığı fark" : "Objective bound gap"}</dt>
+                  <dd>{number(p.optimality_gap)}</dd>
+                </dl>
+              </details>
               <p>
                 {p.solver_status === "FEASIBLE"
                   ? tr
@@ -262,11 +291,6 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
             : "Tab storage is unavailable. Your choice remains on screen but may be lost on reload."}
         </p>
       )}
-      <p>
-        {tr
-          ? "Net puan transfer cezası düşülmüş beklentidir. Farklı modellerin veya farklı uzunluktaki pencerelerin yüksek puanı, daha iyi plan olduğunu kanıtlamaz. Eksik ölçüm — ile gösterilir."
-          : "Net points subtract transfer hits. Higher scores from different models or different horizons do not prove a better plan. Missing measurements are shown as —."}
-      </p>
       <details>
         <summary className={styles.summary}>
           {tr ? "Karar vermeden önce" : "Before deciding"}
