@@ -206,8 +206,9 @@ net columns beside it.
   read and which are gitignored and local; a clone without them can capture club news and export
   rotation evidence, and can do nothing else in this list.
 - **Which model codes the club news is three environment variables. Before anything is
-  fetched the command checks, for every adapter, that the provider is one it knows and that a
-  key is set; it checks the model name only for the `gemini` adapter.** For the free adapter,
+  fetched the command checks, for every adapter, that the provider is one it knows, that a
+  key is set, and that a generic key is not left to a provider nobody named; it checks the
+  model name only for the `gemini` adapter.** For the free adapter,
   in the shell that runs `capture_club_news`:
 
   ```powershell
@@ -216,15 +217,17 @@ net columns beside it.
   $env:SQUADOPT_LLM_MODEL = "gemini-3.6-flash" # optional: this is the default
   ```
 
-  With `SQUADOPT_LLM_PROVIDER` unset the command asks the `anthropic` adapter. That adapter
-  reads `SQUADOPT_LLM_API_KEY` first and `ANTHROPIC_API_KEY` only when the first is unset, and
-  its model name is not checked against any list. So the lines above with the provider line
-  left out send the Gemini key to the other vendor, together with the Gemini model name when
-  the model line is set. Unless the `anthropic` package is missing (the `dev` and `llm` extras
-  both install it), nothing refuses that at startup: every page is read first, and the key
-  goes out with the first club's call. Set the provider line in the same shell as the key. A
-  mistyped provider name is different: it is refused before anything is fetched, and the
-  refusal lists the registered ones.
+  With `SQUADOPT_LLM_PROVIDER` unset and `SQUADOPT_LLM_API_KEY` set, the command now refuses
+  before it fetches anything, and the refusal names both variables. The reason is that the
+  generic key names no vendor: with no provider line the provider would be `anthropic`, that
+  adapter reads `SQUADOPT_LLM_API_KEY` first and `ANTHROPIC_API_KEY` only when the first is
+  unset, its model name is not checked against any list, and the key would leave with the
+  first club's call. A key that reached the wrong vendor has left this machine, and no later
+  refusal can call it back, which is why this one happens at configuration rather than at the
+  first request. Set the provider line in the same shell as the key. Exporting
+  `ANTHROPIC_API_KEY` alone still needs no provider line, because that name says whose key it
+  is. A mistyped provider name is different again: it is refused before anything is fetched,
+  and the refusal lists the registered ones.
 
   With `SQUADOPT_LLM_MODEL` unset the `gemini` adapter asks `gemini-3.6-flash`, the model the
   first real run (#621, 22 September) was answered by. The earlier default,
