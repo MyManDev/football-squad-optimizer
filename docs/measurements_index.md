@@ -279,3 +279,5 @@ was written.
 `gw1_blocker_report_template.md` · `fw10_holdout_plan.md` · `opening_week_runbook.md` ·
 `artifact_preflight_spec.md` · `projection_horizon_contract.md` ·
 `rotation_evidence_prereg.md` · `football_prospective_prereg.md`
+
+- [Frozen football window totals](research/football_window_totals.md): paired 1/3/5-week player sums from saved development forecasts; no model promotion.
