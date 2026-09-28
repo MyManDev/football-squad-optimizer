@@ -26,8 +26,8 @@ Where each number comes from, and what it is:
   after that deadline, or from a capture the run did not take but named). Its
   ``scoring_basis`` remains ``named_eleven_no_autosubs`` for legacy decisions.
   Frozen bench order and vice-captain permit ``official_autosub_captain_v2`` from
-  finished, checked event-live captures. Settlement is computed in memory; ledger
-  files remain unchanged. Missing decision-time inputs yield null diagnostics.
+  finished, checked event-live captures at settlement time. Both publication paths
+  render the persisted outcome without re-scoring. Missing inputs yield null diagnostics.
   When the local ledger is empty, already published rows are retained as before,
   unless a retained row states a score without a basis, which is dropped instead.
   A row that is not settled carries ``net`` and ``scoring_basis`` both null: the basis
@@ -66,8 +66,6 @@ from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.scoreboard_baselines import human_baseline_rows
-from squadopt.application.scoreboard_diagnostics import empty_diagnostics
-from squadopt.application.scoreboard_history import settled_scoreboard_entries
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -88,6 +86,7 @@ from squadopt.live import (
     load_ledger,
     season_from_bootstrap,
 )
+from squadopt.live.settlement import empty_diagnostics
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 
 SCOREBOARD_FILE: Final = "scoreboard.json"
@@ -758,16 +757,9 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         else ()
     )
     snapshot_ids = list_snapshot_ids(request.snapshot_root, source=FPL_LIVE_SOURCE)
-    settled_entries = settled_scoreboard_entries(
-        (*ledger, *controls),
-        (
-            snapshot if name == snapshot_id else read_snapshot(request.snapshot_root, name)
-            for name in snapshot_ids
-        ),
-        season=season,
-        as_of_utc=snapshot.metadata.captured_at_utc,
-    )
-    entries, baseline_entries = settled_entries[: len(ledger)], settled_entries[len(ledger) :]
+    # Publication reads the same persisted outcome as settled_publication.
+    # A later capture must never silently change a recorded score or its basis.
+    entries, baseline_entries = ledger, controls
     # Retain only decision and selected outcome captures, not the entire archive.
     needed_ids = {
         str(identifier)

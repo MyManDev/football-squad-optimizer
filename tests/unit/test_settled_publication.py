@@ -15,7 +15,7 @@ from tests.unit.test_check_league_tree import _tree as clean_league_tree
 from tests.unit.test_scoreboard_diagnostics import decision_inputs
 from tests.unit.test_weekly_suggestion_eval import recorded
 
-from squadopt.application import league_publication, scoreboard, site
+from squadopt.application import league_publication, scoreboard_history, site
 from squadopt.application import settled_publication as publication
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.contract import ui_view_schema
@@ -299,7 +299,7 @@ def no_solving(monkeypatch: pytest.MonkeyPatch) -> Iterator[Mock]:
     forbidden = Mock(side_effect=AssertionError("Settled publication must never solve"))
     monkeypatch.setattr(league_publication, "build_league_views", forbidden)
     monkeypatch.setattr(league_publication, "project", forbidden)
-    monkeypatch.setattr(scoreboard, "settled_scoreboard_entries", forbidden)
+    monkeypatch.setattr(scoreboard_history, "settled_scoreboard_entries", forbidden)
     yield forbidden
     forbidden.assert_not_called()
 

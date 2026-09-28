@@ -5,8 +5,8 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from squadopt.application.scoreboard_diagnostics import score_recorded_decision
 from squadopt.data.errors import DataError
+from squadopt.live.settlement import score_recorded_decision
 
 
 def decision_inputs() -> tuple[dict[str, Any], pd.DataFrame, pd.DataFrame]:
