@@ -303,6 +303,13 @@ The record follows ADR 0003 (`architecture/decisions/0003-measurement-artifacts.
 
 ## Reproduction
 
+The outcome-free check permitted between readings is implemented in
+`scripts/check_football_prospective_inputs.py`. See
+[the input-check guide](football_prospective_input_check.md) for its explicit offline
+inventory, refusal rules and provenance limits. It does not replace the scoring
+runner below or change either reading date.
+
+
 `python -m scripts.measure_football_prospective --season 2026-27 --through-gameweek 20
 --data-root <checkout>/data --artifact-root <checkout>/artifacts` (and `38`), to be added in
 its own pull request before the interim reading. Its arithmetic is to be tested on synthetic
