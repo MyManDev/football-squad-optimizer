@@ -98,6 +98,12 @@ for (const language of ["en", "tr"] as const) {
     await card.screenshot({ path: testInfo.outputPath("series-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
     const scrollRegion = page.getByRole("region", { name: copy.leagueScoreboard.caption });
+    // Resizing returns before the responsive layout and focus scrolling settle.
+    await scrollRegion.scrollIntoViewIfNeeded();
+    await expect(scrollRegion).toBeInViewport();
+    await expect
+      .poll(() => scrollRegion.evaluate((region) => region.scrollWidth - region.clientWidth))
+      .toBeGreaterThan(0);
     await scrollRegion.focus();
     await expect(scrollRegion).toBeFocused();
     await page.keyboard.press("ArrowRight");
