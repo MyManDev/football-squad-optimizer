@@ -35,7 +35,7 @@ The scenario authoring time is the actual analysis time, after the old capture. 
 
 No BoTorch search was run: this ablation changes candidate generation without fitting parameters. Optimizing a new parameter against these same authored forecasts would not identify future policy quality. Existing negative terminal-value evidence and the future evaluation boundary are preserved.
 
-The new explicit-lookahead service separately passes synthetic 3/5-week resource-retention counterexamples. This matrix does not measure that service. The captured artifact contains only five weeks, so a five-week decision window has no supplied tail. No missing forecasts or sale-price paths were fabricated.
+The new explicit-lookahead service separately passes synthetic 3/5-week resource-retention counterexamples. Additional exact five-player examples retain the normal weekly free-transfer accrual, five-transfer cap and four-point hit cost: short-window churn creates later hits, while explicit lookahead preserves resources. These are mathematical counterexamples with authored points, not full-roster or realized-return measurements. This matrix does not measure that service. The captured artifact contains only five weeks, so a five-week decision window has no supplied tail. No missing forecasts or sale-price paths were fabricated.
 
 The service is an opt-in offline application path. Website defaults, published advice, production prediction identities and backend processes are unchanged. A broader information process, path-dependent purchase lots beyond the first transition and independent future outcomes remain necessary before claiming better season decisions.
 
