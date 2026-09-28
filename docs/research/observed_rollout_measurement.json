@@ -1,0 +1,2057 @@
+{
+  "protocol": {
+    "snapshot": "fpl-live-20260922T214539Z-364991a4f832",
+    "analysis_issued_at": "2026-09-28T22:50:19.151157+00:00",
+    "historical_decision_replay": false,
+    "authored_after_capture": true,
+    "forecast_fingerprint": "4cae851a0f588b9e9e41fee0bb283953e6ec7be42f60454c5e6a755259d33406",
+    "forecast_sha256": "8ab27fdc615f3e7e9ed706f0fc3b7fe0c52999ec0d130a3c062fa149314c4b0c",
+    "states_sha256": "270194cfde2206779065098f62a95944c89681dacc2c225e00141fb2d286983a",
+    "top100": {
+      "cohort_snapshot_id": "fpl-top100-20260922T195733Z-26aebf278a20",
+      "picks_snapshot_id": "fpl-elite-picks-20260922T195812Z-60f75054b4d2",
+      "table_sha256": "1af075e0820d2550d8d4b48847d4924c48a0bcae68d072f2d1b5df40e20db36c",
+      "picks_gameweek": 5
+    },
+    "top100_manifest_sha256": "8c4aa64e8dd8f600ebe700eb4e1a965746c35d7a97948621ac57fcfea5febaab",
+    "sources": {
+      "scripts\\measure_observed_rollout.py": "4cb7d5613433c30b7f4dee3e34cfb9b82dba6d070ac177f3204660296cd0cc1a",
+      "scripts\\measure_shortlist_matrix.py": "66586221c7be35e429855ba3f54d7ca37a7cb79302169dff879796fb505d8057",
+      "src\\squadopt\\application\\planner_review.py": "1924fcf7a53b31f6f6b461a8ca6b2b623d06584df46f365a64ee0056dd65e250",
+      "src\\squadopt\\application\\advice_variants.py": "59e0d4cd7a0c0cd4233f51de81c3edb26ab2ac0b8811f6c902357d97ab24524c",
+      "src\\squadopt\\application\\top100_weight.py": "b931b5076deda9a05f57a05652c2b65413cf58d45dc061937a47a5744bedb56e",
+      "src\\squadopt\\planning\\__init__.py": "4041194c7a4b49819151179bef746db28a54cc4671a2c34f08620937cda882cb",
+      "src\\squadopt\\planning\\chip_strategy.py": "09a6e1affee3a4e42eaff92caf705bd6bc7242abedc16769bb7f0e36888c0a2f",
+      "src\\squadopt\\planning\\horizon.py": "c07a50ed5c30fa61ad815a23784ca618464462b6ec15d60ace9afadbbcc385a4",
+      "src\\squadopt\\planning\\lookahead.py": "81ef6e0b63e8cc93d3c7a07070fa368a19ec838dcba815824e3dc3267d1dea1e",
+      "src\\squadopt\\planning\\models.py": "a601ef242b6503f2c4392ed2fd39da1e007a94a869875329e9374845e561d969",
+      "src\\squadopt\\planning\\optimizer.py": "99a214413b852101b9a2761a4023b6548b6d5cafe326d3fbc252ff878eeb118d",
+      "src\\squadopt\\planning\\pricing.py": "882b8f17fe92da02cd374b046951768039e4b6668404c653fbdcb92d08c1e94e",
+      "src\\squadopt\\planning\\recourse.py": "c43f1da78d22fb866a4890408338e4efa0f1077d9ec7e629810931082cb45b26",
+      "src\\squadopt\\planning\\recourse_chips.py": "3a604707dd17a2cd4f6b1aef88599c46461f0f82173a9645786b94e855f9bb20"
+    },
+    "cases": [
+      [
+        1000,
+        3,
+        0,
+        false
+      ],
+      [
+        1000,
+        3,
+        20,
+        false
+      ],
+      [
+        1000,
+        3,
+        50,
+        false
+      ],
+      [
+        1000,
+        5,
+        0,
+        false
+      ],
+      [
+        1000,
+        5,
+        20,
+        false
+      ],
+      [
+        1000,
+        5,
+        50,
+        false
+      ],
+      [
+        900,
+        3,
+        0,
+        false
+      ],
+      [
+        900,
+        3,
+        20,
+        false
+      ],
+      [
+        900,
+        3,
+        50,
+        false
+      ],
+      [
+        900,
+        5,
+        0,
+        false
+      ],
+      [
+        900,
+        5,
+        20,
+        false
+      ],
+      [
+        900,
+        5,
+        50,
+        false
+      ],
+      [
+        1000,
+        5,
+        20,
+        true
+      ],
+      [
+        900,
+        5,
+        20,
+        true
+      ]
+    ],
+    "candidate_count": 1,
+    "pool": "full universe",
+    "observation": "0.5/0.5 +/-30% future points for highest current projected held non-GK, ties by ID",
+    "preferences": "Optional keep that held player, no hits and save chips; no available chips",
+    "solver": {
+      "wall_seconds": 120,
+      "deterministic": 60,
+      "hold_probe_wall": 30,
+      "hold_probe_deterministic": 1
+    },
+    "comparison": "Baseline-plus-hold subset versus expanded menu, EXACT same continuation solves",
+    "metric": "Paired weighted and raw forecast-net value; minimum node and expected hit costs",
+    "scope": "Single-capture constructed-squad sensitivity; not calibrated probabilities or realized returns",
+    "tuning": false,
+    "promotion": false,
+    "outcomes_read": false
+  },
+  "summary": {
+    "cases": 14,
+    "failures": 0,
+    "promotion": false,
+    "positive_weighted_cases": 1,
+    "raw_forecast_regressions": 1,
+    "choices_outside_baseline_menu": 1,
+    "realized_returns_measured": false,
+    "calibration_verified": false
+  },
+  "files_sha256": {
+    "protocol.json": "1819a2798d03a5a3dc628deafb1994f43a4274e8ef8eff279fca2308f79f9e21",
+    "results.json": "84ac5b22f4e7d7481178cb4964d874d79b9a0bce2a196169040bb961788f13f6",
+    "summary.json": "753a93b32d407933248b9a4cbe44c8967ad89f1c398fbfa0320dd49f820c781d"
+  },
+  "cases": [
+    {
+      "profile": 1000,
+      "window": 3,
+      "weight": 0,
+      "constrained": false,
+      "status": "OPTIMAL_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 161.408357269816,
+          "base_net": 161.408357269816,
+          "minimum_node_base_net": 157.21417492088048,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 103.416,
+                "scaled_model_objective_value": 103.416,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 99.864,
+                  "selected": false,
+                  "deterministic_time": 0.0016805190000000001,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 103.41408512146323,
+              "base_net_points": 103.41408512146323,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 111.804,
+                "scaled_model_objective_value": 111.804,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 109.343,
+                  "selected": false,
+                  "deterministic_time": 0.001684321,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 111.80244981933429,
+              "base_net_points": 111.80244981933429,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 141.63736240006983
+    },
+    {
+      "profile": 1000,
+      "window": 3,
+      "weight": 20,
+      "constrained": false,
+      "status": "OPTIMAL_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 1,
+      "chosen_index": 1,
+      "baseline_indices": [
+        0,
+        1
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 168.45231539213998,
+          "base_net": 160.0446833294302,
+          "minimum_node_base_net": 155.38181644210127,
+          "expected_hits": 2.0,
+          "first_squad": [
+            17761,
+            40383,
+            60307,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [
+            60307
+          ],
+          "first_out": [
+            430871
+          ],
+          "first_captain": 141746,
+          "first_bank": 21,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 109.427,
+                "scaled_model_objective_value": 109.427,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 104.577,
+                  "selected": false,
+                  "deterministic_time": 0.0016849680000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 109.42810146412788,
+              "base_net_points": 101.93511451528111,
+              "hit_points": 4.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 116.34,
+                "scaled_model_objective_value": 116.34,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 114.302,
+                  "selected": false,
+                  "deterministic_time": 0.001705381,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 116.34090775426245,
+              "base_net_points": 111.26084828993898,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        },
+        {
+          "weighted_net": 168.60152813730113,
+          "base_net": 160.57365245440337,
+          "minimum_node_base_net": 156.08636681945052,
+          "expected_hits": 2.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 109.88,
+                "scaled_model_objective_value": 109.88,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 103.053,
+                  "selected": false,
+                  "deterministic_time": 0.0016843280000000001,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 109.88108606041483,
+              "base_net_points": 102.28627702003327,
+              "hit_points": 4.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 116.34,
+                "scaled_model_objective_value": 116.34,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 112.85,
+                  "selected": false,
+                  "deterministic_time": 0.001704901,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 116.34090775426245,
+              "base_net_points": 111.26084828993898,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 173.35500369989313
+    },
+    {
+      "profile": 1000,
+      "window": 3,
+      "weight": 50,
+      "constrained": false,
+      "status": "OPTIMAL_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 2,
+      "chosen_index": 1,
+      "baseline_indices": [
+        0,
+        2
+      ],
+      "weighted_delta": 0.34004571522598326,
+      "base_delta": -0.1729881379739595,
+      "candidates": [
+        {
+          "weighted_net": 179.92094000425175,
+          "base_net": 151.27838288635002,
+          "minimum_node_base_net": 150.18793609459863,
+          "expected_hits": 8.0,
+          "first_squad": [
+            17761,
+            40383,
+            60307,
+            60689,
+            75115,
+            115556,
+            154561,
+            223094,
+            223340,
+            430871,
+            446008,
+            465642,
+            477424,
+            483067,
+            484420
+          ],
+          "first_in": [
+            60307,
+            223094,
+            477424
+          ],
+          "first_out": [
+            141746,
+            226597,
+            502500
+          ],
+          "first_captain": 223094,
+          "first_bank": 6,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 127.057,
+                "scaled_model_objective_value": 127.057,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 124.457,
+                  "selected": false,
+                  "deterministic_time": 0.0016831060000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 127.05758358534679,
+              "base_net_points": 106.39854894631358,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 127.512,
+                "scaled_model_objective_value": 127.512,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 124.457,
+                  "selected": false,
+                  "deterministic_time": 0.0016831060000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 127.5117832508793,
+              "base_net_points": 108.57944252981638,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        },
+        {
+          "weighted_net": 181.14413959553562,
+          "base_net": 159.68870234243096,
+          "minimum_node_base_net": 155.38181644210127,
+          "expected_hits": 2.0,
+          "first_squad": [
+            17761,
+            40383,
+            60307,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [
+            60307
+          ],
+          "first_out": [
+            430871
+          ],
+          "first_captain": 141746,
+          "first_bank": 21,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 120.668,
+                "scaled_model_objective_value": 120.668,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 110.973,
+                  "selected": false,
+                  "deterministic_time": 0.0016816090000000001,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 120.66758188739801,
+              "base_net_points": 101.93511451528111,
+              "hit_points": 4.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 124.121,
+                "scaled_model_objective_value": 124.121,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 121.001,
+                  "selected": false,
+                  "deterministic_time": 0.001682532,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 124.12174916940954,
+              "base_net_points": 110.54888631594054,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        },
+        {
+          "weighted_net": 180.80409388030964,
+          "base_net": 159.86169048040492,
+          "minimum_node_base_net": 155.37440484545206,
+          "expected_hits": 2.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 121.434,
+                "scaled_model_objective_value": 121.434,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 107.833,
+                  "selected": false,
+                  "deterministic_time": 0.001680552,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 121.43405183964903,
+              "base_net_points": 101.57431504603483,
+              "hit_points": 4.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 124.121,
+                "scaled_model_objective_value": 124.121,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 118.11,
+                  "selected": false,
+                  "deterministic_time": 0.0016811290000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 124.12174916940954,
+              "base_net_points": 110.54888631594054,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 205.80391989997588
+    },
+    {
+      "profile": 1000,
+      "window": 5,
+      "weight": 0,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 272.55758905171473,
+          "base_net": 272.55758905171473,
+          "minimum_node_base_net": 264.81029885243555,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 4.175999999999988,
+                "relative_optimality_gap": 0.019790343677136786,
+                "best_objective_bound": 215.188,
+                "scaled_model_objective_value": 211.012,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 205.02,
+                  "selected": false,
+                  "deterministic_time": 0.0033851690000000004,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 211.01020905301831,
+              "base_net_points": 211.01020905301831,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 4.641999999999996,
+                "relative_optimality_gap": 0.020493938350418954,
+                "best_objective_bound": 231.148,
+                "scaled_model_objective_value": 226.506,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 224.828,
+                  "selected": false,
+                  "deterministic_time": 0.0033890049999999996,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 226.50478945157658,
+              "base_net_points": 226.50478945157658,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 227.57988840003964
+    },
+    {
+      "profile": 1000,
+      "window": 5,
+      "weight": 20,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 286.7878241129641,
+          "base_net": 273.6437826344757,
+          "minimum_node_base_net": 265.4190732288188,
+          "expected_hits": 2.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 224.901,
+                "scaled_model_objective_value": 224.901,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 211.285,
+                  "selected": false,
+                  "deterministic_time": 0.0033674860000000003,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 224.9037004880306,
+              "base_net_points": 211.6189834294015,
+              "hit_points": 4.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 3.328000000000003,
+                "relative_optimality_gap": 0.014001548248123604,
+                "best_objective_bound": 241.016,
+                "scaled_model_objective_value": 237.688,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 232.076,
+                  "selected": false,
+                  "deterministic_time": 0.003389222,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 237.6908852779726,
+              "base_net_points": 228.06840224071544,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 202.99012980004773
+    },
+    {
+      "profile": 1000,
+      "window": 5,
+      "weight": 50,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 1,
+      "chosen_index": 1,
+      "baseline_indices": [
+        0,
+        1
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 306.1883574815045,
+          "base_net": 259.00384346378695,
+          "minimum_node_base_net": 255.32476734863965,
+          "expected_hits": 10.0,
+          "first_squad": [
+            17761,
+            40383,
+            60307,
+            60689,
+            75115,
+            115556,
+            154561,
+            223094,
+            223340,
+            430871,
+            446008,
+            465642,
+            477424,
+            483067,
+            484420
+          ],
+          "first_in": [
+            60307,
+            223094,
+            477424
+          ],
+          "first_out": [
+            141746,
+            226597,
+            502500
+          ],
+          "first_captain": 223094,
+          "first_bank": 6,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 252.428,
+                "scaled_model_objective_value": 252.428,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 247.163,
+                  "selected": false,
+                  "deterministic_time": 0.003365471,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 252.4271485821125,
+              "base_net_points": 211.5353802003546,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 6.192000000000007,
+                "relative_optimality_gap": 0.024313245064317045,
+                "best_objective_bound": 260.868,
+                "scaled_model_objective_value": 254.676,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 247.163,
+                  "selected": false,
+                  "deterministic_time": 0.003365471,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 254.67705320861916,
+              "base_net_points": 218.8935324306493,
+              "hit_points": 4.0,
+              "valid": true
+            }
+          ]
+        },
+        {
+          "weighted_net": 306.9917160914422,
+          "base_net": 269.231550399965,
+          "minimum_node_base_net": 262.4238613844858,
+          "expected_hits": 2.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 246.816,
+                "scaled_model_objective_value": 246.816,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 220.787,
+                  "selected": false,
+                  "deterministic_time": 0.0033614210000000007,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 246.81394492155252,
+              "base_net_points": 208.62377158506857,
+              "hit_points": 4.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 8.631999999999977,
+                "relative_optimality_gap": 0.034374141343347084,
+                "best_objective_bound": 259.751,
+                "scaled_model_objective_value": 251.119,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 242.95,
+                  "selected": false,
+                  "deterministic_time": 0.003362786,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 251.11710050977112,
+              "base_net_points": 222.23914961602694,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 311.1180632999167
+    },
+    {
+      "profile": 900,
+      "window": 3,
+      "weight": 0,
+      "constrained": false,
+      "status": "OPTIMAL_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 157.42044455579162,
+          "base_net": 157.42044455579162,
+          "minimum_node_base_net": 152.84766990610865,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 100.217,
+                "scaled_model_objective_value": 100.217,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 97.799,
+                  "selected": false,
+                  "deterministic_time": 0.001679148,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 100.21438826765254,
+              "base_net_points": 100.21438826765254,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 109.361,
+                "scaled_model_objective_value": 109.361,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 107.278,
+                  "selected": false,
+                  "deterministic_time": 0.0016799610000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 109.35993756701848,
+              "base_net_points": 109.35993756701848,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 103.32631619996391
+    },
+    {
+      "profile": 900,
+      "window": 3,
+      "weight": 20,
+      "constrained": false,
+      "status": "OPTIMAL_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 162.75722112537838,
+          "base_net": 157.39753946573612,
+          "minimum_node_base_net": 152.80185972599764,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 104.069,
+                "scaled_model_objective_value": 104.069,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 100.829,
+                  "selected": false,
+                  "deterministic_time": 0.0016832510000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 104.06887525512994,
+              "base_net_points": 100.1685780875415,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 112.961,
+                "scaled_model_objective_value": 112.961,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 110.626,
+                  "selected": false,
+                  "deterministic_time": 0.001684114,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 112.96278389931658,
+              "base_net_points": 109.35993756701848,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 104.86617510009091
+    },
+    {
+      "profile": 900,
+      "window": 3,
+      "weight": 50,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 172.02546267280007,
+          "base_net": 154.71878688522065,
+          "minimum_node_base_net": 147.44435456496666,
+          "expected_hits": 4.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 112.378,
+                "scaled_model_objective_value": 112.378,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 105.377,
+                  "selected": false,
+                  "deterministic_time": 0.001681002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 112.3767591224293,
+              "base_net_points": 94.81107292651055,
+              "hit_points": 8.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 118.367,
+                "scaled_model_objective_value": 118.367,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 115.654,
+                  "selected": false,
+                  "deterministic_time": 0.0016817390000000002,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 118.36705339776374,
+              "base_net_points": 109.35993756701848,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 118.31594949995633
+    },
+    {
+      "profile": 900,
+      "window": 5,
+      "weight": 0,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 268.25546655227527,
+          "base_net": 268.25546655227527,
+          "minimum_node_base_net": 259.0698287990492,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 1.6920000000000073,
+                "relative_optimality_gap": 0.008196165434658384,
+                "best_objective_bound": 208.13,
+                "scaled_model_objective_value": 206.438,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 200.211,
+                  "selected": false,
+                  "deterministic_time": 0.00336298,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 206.43654716059308,
+              "base_net_points": 206.43654716059308,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 0.8009999999999877,
+                "relative_optimality_gap": 0.00356300876295533,
+                "best_objective_bound": 225.611,
+                "scaled_model_objective_value": 224.81,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 220.019,
+                  "selected": false,
+                  "deterministic_time": 0.0033645869999999996,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 224.80782266704517,
+              "base_net_points": 224.80782266704517,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "OPTIMAL",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 206.6092458999483
+    },
+    {
+      "profile": 900,
+      "window": 5,
+      "weight": 20,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 277.17674928984115,
+          "base_net": 268.0140068122003,
+          "minimum_node_base_net": 258.6137478557921,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 3.8360000000000127,
+                "relative_optimality_gap": 0.0179747903097325,
+                "best_objective_bound": 217.246,
+                "scaled_model_objective_value": 213.41,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 206.161,
+                  "selected": false,
+                  "deterministic_time": 0.0033651920000000004,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 213.40978095210505,
+              "base_net_points": 205.98046621733596,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 232.46,
+                "scaled_model_objective_value": 232.46,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 226.952,
+                  "selected": false,
+                  "deterministic_time": 0.003366918,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 232.4609345312671,
+              "base_net_points": 224.78098413015238,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 210.4341156000737
+    },
+    {
+      "profile": 900,
+      "window": 5,
+      "weight": 50,
+      "constrained": false,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 293.9562361366383,
+          "base_net": 260.7543268645884,
+          "minimum_node_base_net": 250.42420361340987,
+          "expected_hits": 4.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 2.8569999999999993,
+                "relative_optimality_gap": 0.012378897381237108,
+                "best_objective_bound": 233.653,
+                "scaled_model_objective_value": 230.796,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 215.195,
+                  "selected": false,
+                  "deterministic_time": 0.003361841,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 230.79213664110156,
+              "base_net_points": 197.79092197495376,
+              "hit_points": 8.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 2.6270000000000095,
+                "relative_optimality_gap": 0.010774562680721078,
+                "best_objective_bound": 246.442,
+                "scaled_model_objective_value": 243.815,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 237.358,
+                  "selected": false,
+                  "deterministic_time": 0.0033633660000000004,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 243.813222806768,
+              "base_net_points": 218.4511684773108,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 203.2464938000776
+    },
+    {
+      "profile": 1000,
+      "window": 5,
+      "weight": 20,
+      "constrained": true,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0,
+        1
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 283.9059447347735,
+          "base_net": 272.5443720280313,
+          "minimum_node_base_net": 262.9751397402759,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            60307,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [
+            60307
+          ],
+          "first_out": [
+            430871
+          ],
+          "first_captain": 141746,
+          "first_bank": 21,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 218.217,
+                "scaled_model_objective_value": 218.217,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 212.724,
+                  "selected": false,
+                  "deterministic_time": 0.0033687600000000006,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 218.21836398848347,
+              "base_net_points": 209.52843781345572,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 0.921999999999997,
+                "relative_optimality_gap": 0.003866541416445789,
+                "best_objective_bound": 239.378,
+                "scaled_model_objective_value": 238.456,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 233.443,
+                  "selected": false,
+                  "deterministic_time": 0.0033900010000000006,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 238.45790391517397,
+              "base_net_points": 228.66690238896666,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        },
+        {
+          "weighted_net": 283.8286651817912,
+          "base_net": 272.89775990062844,
+          "minimum_node_base_net": 263.32852761287296,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            60689,
+            75115,
+            115556,
+            141746,
+            154561,
+            223340,
+            226597,
+            430871,
+            446008,
+            465642,
+            483067,
+            484420,
+            502500
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 2,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "OPTIMAL",
+              "diagnostics": {
+                "solver_status_name": "OPTIMAL",
+                "absolute_optimality_gap": 0.0,
+                "relative_optimality_gap": 0.0,
+                "best_objective_bound": 218.217,
+                "scaled_model_objective_value": 218.217,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 211.285,
+                  "selected": false,
+                  "deterministic_time": 0.003367576000000001,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 218.21836398848347,
+              "base_net_points": 209.52843781345572,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 1.4780000000000086,
+                "relative_optimality_gap": 0.006198208474519445,
+                "best_objective_bound": 239.934,
+                "scaled_model_objective_value": 238.456,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 232.076,
+                  "selected": false,
+                  "deterministic_time": 0.0033893120000000007,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 238.45790391517397,
+              "base_net_points": 228.66690238896666,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE",
+        "FEASIBLE"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 267.85445459990297
+    },
+    {
+      "profile": 900,
+      "window": 5,
+      "weight": 20,
+      "constrained": true,
+      "status": "FEASIBLE_RESTRICTED_MENU",
+      "star": 141746,
+      "control_index": 0,
+      "chosen_index": 0,
+      "baseline_indices": [
+        0
+      ],
+      "weighted_delta": 0.0,
+      "base_delta": 0.0,
+      "candidates": [
+        {
+          "weighted_net": 273.6143437207616,
+          "base_net": 265.2352564826107,
+          "minimum_node_base_net": 254.2195351646247,
+          "expected_hits": 0.0,
+          "first_squad": [
+            17761,
+            40383,
+            95658,
+            101282,
+            141746,
+            154561,
+            169432,
+            220237,
+            223340,
+            446008,
+            465642,
+            483067,
+            484420,
+            490145,
+            500058
+          ],
+          "first_in": [],
+          "first_out": [],
+          "first_captain": 141746,
+          "first_bank": 0,
+          "first_ft_next": 1,
+          "branches": [
+            {
+              "observation": "low",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 4.1699999999999875,
+                "relative_optimality_gap": 0.020073844791150118,
+                "best_objective_bound": 211.903,
+                "scaled_model_objective_value": 207.733,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 206.161,
+                  "selected": false,
+                  "deterministic_time": 0.0033652820000000003,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 207.73332603430805,
+              "base_net_points": 201.58625352616855,
+              "hit_points": 0.0,
+              "valid": true
+            },
+            {
+              "observation": "high",
+              "probability": 0.5,
+              "status": "FEASIBLE",
+              "diagnostics": {
+                "solver_status_name": "FEASIBLE",
+                "absolute_optimality_gap": 1.6539999999999964,
+                "relative_optimality_gap": 0.007159801222447303,
+                "best_objective_bound": 232.666,
+                "scaled_model_objective_value": 231.012,
+                "expected_points_scale": 1000,
+                "hold_protection": {
+                  "version": "feasible_hold_v1",
+                  "status": "OPTIMAL",
+                  "objective_value": 226.952,
+                  "selected": false,
+                  "deterministic_time": 0.0033670080000000008,
+                  "deterministic_time_limit": 1.0
+                }
+              },
+              "weighted_net_points": 231.012578310905,
+              "base_net_points": 223.6176961621406,
+              "hit_points": 0.0,
+              "valid": true
+            }
+          ]
+        }
+      ],
+      "proposal_statuses": [
+        "OPTIMAL",
+        "FEASIBLE",
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "hold_feasible": true,
+      "wall_seconds": 212.89163600001484
+    }
+  ],
+  "full_local_results_sha256": "84ac5b22f4e7d7481178cb4964d874d79b9a0bce2a196169040bb961788f13f6",
+  "branch_detail_scope": "Compact record retains totals, statuses and decisions; full diagnostics retained locally by hash."
+}
