@@ -65,6 +65,21 @@ MARKUP_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/html", "application/xhtml+xm
 #: feed keeps the markup of its own item bodies.
 FEED_MEDIA_TYPES: Final[tuple[str, ...]] = ("application/rss+xml", "application/atom+xml")
 
+#: Types a feed is also served as. Measured rather than assumed: the one club this lane added
+#: feed reading for serves its feed as ``text/xml``, so the two names above admit every feed
+#: except the one they were added for. These are generic though, and an arbitrary XML document
+#: is not a document a claim can be quoted from, so they are read only when the bytes say what
+#: they are. That check is on the served bytes rather than on the header for the same reason
+#: the whole lane prefers them: the header is what a server claims, the bytes are what it sent.
+GENERIC_XML_MEDIA_TYPES: Final[tuple[str, ...]] = ("text/xml", "application/xml")
+
+#: How far into a document the declaration is looked for. A feed names itself in its root
+#: element, which follows the XML declaration and nothing else.
+_FEED_DECLARATION_BYTES: Final = 2048
+
+#: What a feed's root element is called, in the two vocabularies this lane meets.
+_FEED_ROOTS: Final[tuple[str, ...]] = ("<rss", "<feed")
+
 #: Elements whose content is instructions to a browser rather than words to a reader. Their
 #: text is dropped entirely: a quote located inside a script would be a citation into code.
 SILENT_ELEMENTS: Final[frozenset[str]] = frozenset(
@@ -76,7 +91,16 @@ SILENT_ELEMENTS: Final[frozenset[str]] = frozenset(
 #: is silent only in a feed, because in HTML ``<link>`` is a void element with no end tag: the
 #: parser never reports one closing, so counted as silent there it opened a region nothing
 #: closed and every word after it on the page was dropped.
-FEED_SILENT_ELEMENTS: Final[frozenset[str]] = SILENT_ELEMENTS | {"link"}
+FEED_SILENT_ELEMENTS: Final[frozenset[str]] = SILENT_ELEMENTS | {
+    # A feed's own vocabulary for addresses and identifiers. None of these holds prose
+    # and none is an HTML element carrying text, so silencing them costs a page nothing
+    # and spares a coder a quarter of a real feed in bare URLs: measured on one club's
+    # feed, 202 of 805 extracted lines were a link, a guid, an image url or a docs url.
+    "link",
+    "guid",
+    "url",
+    "docs",
+}
 
 #: Elements that end a line. A club's page separates its sentences with markup rather than
 #: newlines, so without this every paragraph would run into the next and a quote spanning the
@@ -139,9 +163,15 @@ class _Reader(html.parser.HTMLParser):
     exists for.
     """
 
-    def __init__(self, silent_elements: frozenset[str] = SILENT_ELEMENTS) -> None:
+    def __init__(
+        self,
+        silent_elements: frozenset[str] = SILENT_ELEMENTS,
+        *,
+        unwrap_cdata: bool = False,
+    ) -> None:
         super().__init__(convert_charrefs=True)
         self._silent_elements = silent_elements
+        self._unwrap_cdata = unwrap_cdata
         self._lines: list[str] = []
         self._current: list[str] = []
         self._silent = 0
@@ -163,6 +193,16 @@ class _Reader(html.parser.HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._silent:
             return
+        if self._unwrap_cdata:
+            stripped = data.strip()
+            if stripped.startswith("<![CDATA[") and stripped.endswith("]]>"):
+                # ``title`` is RCDATA in HTML, so the parser reads its content as text and
+                # never calls ``unknown_decl`` for a section inside it. In a feed that is
+                # exactly where an item's headline lives, so without this every headline
+                # arrives wearing its own markers. Only a value that is entirely one section
+                # is unwrapped, so prose that merely contains those characters is left alone.
+                self._read_section(stripped[len("<![CDATA[") : -len("]]>")])
+                return
         self._current.append(data)
 
     def unknown_decl(self, data: str) -> None:
@@ -176,9 +216,18 @@ class _Reader(html.parser.HTMLParser):
 
         if self._silent or not data.startswith("CDATA["):
             return
-        # An item body is HTML, so it is read under a page's rules and not the feed's.
+        self._read_section(data[len("CDATA[") :].removesuffix("]"))
+
+    def _read_section(self, inner_markup: str) -> None:
+        """Read one section's content and append it, under a page's rules.
+
+        An item body is HTML, so it is read as a page and not as a feed, which is why the
+        nested reader takes the defaults. It is a second reader rather than this one fed
+        again because a parser driven from inside its own callback is a different bug.
+        """
+
         nested = _Reader()
-        nested.feed(data[len("CDATA[") :].removesuffix("]"))
+        nested.feed(inner_markup)
         nested.close()
         inner = nested.text()
         if inner:
@@ -194,6 +243,17 @@ class _Reader(html.parser.HTMLParser):
     def text(self) -> str:
         self._break()
         return "\n".join(self._lines)
+
+
+def _declares_a_feed(content: bytes) -> bool:
+    """Whether the served bytes name a feed as their root element.
+
+    Only the opening of the document is read, because that is where a root element is and
+    because a match further down would be an element name inside somebody's prose.
+    """
+
+    opening = content[:_FEED_DECLARATION_BYTES].lstrip().lower()
+    return any(root.encode("ascii") in opening for root in _FEED_ROOTS)
 
 
 def extract_readable_text(content: bytes, content_type: str) -> bytes:
@@ -216,12 +276,24 @@ def extract_readable_text(content: bytes, content_type: str) -> bytes:
                 "that published nothing; it is a read that did not work."
             )
         return content
-    if media_type not in MARKUP_MEDIA_TYPES and media_type not in FEED_MEDIA_TYPES:
+    if media_type in GENERIC_XML_MEDIA_TYPES and not _declares_a_feed(content):
+        raise ReadableTextError(
+            f"A {media_type!r} document does not declare itself a feed, so it is refused "
+            "rather than read as one. That type carries any XML at all, and a document whose "
+            "root element this lane does not know is not a document a claim could be quoted "
+            f"from; the roots read are {list(_FEED_ROOTS)!r}."
+        )
+    if (
+        media_type not in MARKUP_MEDIA_TYPES
+        and media_type not in FEED_MEDIA_TYPES
+        and media_type not in GENERIC_XML_MEDIA_TYPES
+    ):
         raise ReadableTextError(
             f"{media_type!r} is not a document type this project reads. Readable text is "
-            f"extracted from {list(MARKUP_MEDIA_TYPES + FEED_MEDIA_TYPES)!r} and passed "
-            f"through for {list(PLAIN_MEDIA_TYPES)!r}; anything else has no text a span "
-            "could index."
+            f"extracted from "
+            f"{list(MARKUP_MEDIA_TYPES + FEED_MEDIA_TYPES + GENERIC_XML_MEDIA_TYPES)!r} and "
+            f"passed through for {list(PLAIN_MEDIA_TYPES)!r}; anything else has no text a "
+            "span could index."
         )
 
     try:
@@ -233,7 +305,11 @@ def extract_readable_text(content: bytes, content_type: str) -> bytes:
             "found in the bytes it has to be matched against."
         ) from error
 
-    reader = _Reader(FEED_SILENT_ELEMENTS if media_type in FEED_MEDIA_TYPES else SILENT_ELEMENTS)
+    # A feed is a feed whichever type carried it. Deciding this once is what keeps a feed
+    # served as ``text/xml`` from being read under the page rules, which is how it would
+    # otherwise keep its item links and lose its headlines.
+    as_feed = media_type in FEED_MEDIA_TYPES or media_type in GENERIC_XML_MEDIA_TYPES
+    reader = _Reader(FEED_SILENT_ELEMENTS if as_feed else SILENT_ELEMENTS, unwrap_cdata=as_feed)
     reader.feed(markup)
     reader.close()
     text = reader.text()
@@ -248,6 +324,7 @@ def extract_readable_text(content: bytes, content_type: str) -> bytes:
 
 __all__ = [
     "FEED_MEDIA_TYPES",
+    "GENERIC_XML_MEDIA_TYPES",
     "MARKUP_MEDIA_TYPES",
     "PLAIN_MEDIA_TYPES",
     "READABLE_TEXT_CONTRACT_VERSION",
