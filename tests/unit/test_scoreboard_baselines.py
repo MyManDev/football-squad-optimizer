@@ -237,6 +237,18 @@ def publication_world(baseline_world, tmp_path):
     (ledger / "decision.json").write_text(json.dumps(decision, default=int), encoding="utf-8")
     pool.to_csv(ledger / "projections.csv", index=False)
     write_manifest(ledger)
+    from squadopt.application import SettleRequest, settle
+
+    settle(
+        SettleRequest(
+            snapshot_root=root,
+            snapshot_id=captured[1].snapshot_id,
+            ledger_root=tmp_path / "ledger",
+            gameweek=2,
+            season=entry.season,
+            summary_root=tmp_path / "summaries",
+        )
+    )
     registry = tmp_path / "registry.json"
     registry.write_text(
         json.dumps(

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from squadopt.application.scoreboard_diagnostics import score_recorded_decision
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import (
@@ -23,6 +22,7 @@ from squadopt.evaluation.benchmarks import build_constrained_ownership_template
 from squadopt.evaluation.models import EvaluationValidationError
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.live import LedgerEntry, infer_season
+from squadopt.live.settlement import score_recorded_decision
 
 
 def baseline_score(

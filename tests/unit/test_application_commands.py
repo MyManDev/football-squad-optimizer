@@ -182,6 +182,10 @@ def test_settle_returns_the_outcome_and_regenerated_summary(world: dict[str, Any
     assert result.outcome_path.is_file()
     assert result.summary_path == world["summary"]
     assert "Settled gameweeks: 1" in result.summary
+    recorded = json.loads(result.outcome_path.read_text(encoding="utf-8"))
+    assert recorded["scoring_basis"] == "official_autosub_captain_v2"
+    assert recorded["diagnostics"]["autosub_recovery"] == 0
+    assert recorded["diagnostics"]["minutes_shortfall"] is None
 
 
 def _capture_after_the_next_deadline(world: dict[str, Any], *, holds_week_one: bool) -> str:

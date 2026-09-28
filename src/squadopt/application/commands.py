@@ -18,7 +18,7 @@ import pandas as pd
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, live_event_outcomes, live_payload
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     CONTROL_MODEL_NAME,
@@ -498,6 +498,8 @@ def settle(request: SettleRequest) -> SettleResult:
 
     snapshot_id, snapshot = _resolve_snapshot(request.snapshot_root, request.snapshot_id)
     season = request.season or infer_season(snapshot)
+    if season != infer_season(snapshot):
+        raise DataError("Settlement capture belongs to another season.")
     points = extract_event_points(snapshot, gameweek=request.gameweek)
     outcome_path = record_outcome(
         request.ledger_root,
@@ -505,6 +507,11 @@ def settle(request: SettleRequest) -> SettleResult:
         request.gameweek,
         points,
         source_snapshot_id=snapshot_id,
+        event_outcomes=live_event_outcomes(
+            snapshot.payloads[live_payload(request.gameweek)],
+            snapshot.payloads[BOOTSTRAP_PAYLOAD],
+            gameweek=request.gameweek,
+        ),
     )
     summary_path = request.summary_output or request.summary_root / f"season_ledger_{season}.md"
     summary = summary_markdown(request.ledger_root, season)
