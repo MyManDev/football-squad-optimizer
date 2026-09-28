@@ -122,7 +122,8 @@ class WeeklyRequest:
     workers: int = 8
     publish: bool = False
     #: A club-news capture to export the rotation evidence from. ``None`` keeps the committed
-    #: synthetic fixture, which is what every run did before an acquisition command existed.
+    #: synthetic fixture, which is what every run did before an acquisition command existed,
+    #: and is still what ``--rotation`` alone reads even though real hosts are now registered.
     rotation_capture: str | None = None
 
     def plan(self) -> WeekPlan:
@@ -281,8 +282,8 @@ def plan_week(
         steps.append("rotation")
     else:
         reasons["rotation"] = (
-            "pass --rotation to export this week's club-news evidence; the only source "
-            "today is the committed synthetic fixture"
+            "pass --rotation to export this week's club-news evidence, from the committed "
+            "synthetic fixture or, with --rotation-capture <id>, from a real club-news capture"
         )
     steps.append("handoff")
     if decide:
