@@ -1,0 +1,956 @@
+{
+  "protocol": {
+    "source_capture": "fpl-live-20260922T110843Z-4b6ef29af6cd",
+    "windows": [
+      3,
+      5
+    ],
+    "methods": [
+      "hold",
+      "unprotected",
+      "protected",
+      "recourse"
+    ],
+    "forecast": "Frozen control table, identical to the previous study.",
+    "holdings": "Same constructed squad and bank/FT, not owner holdings.",
+    "observation": "equal-probability +/-30% future expected points of highest projected held player; stress sensitivity, not calibrated",
+    "chips": "none",
+    "wall_seconds_per_solve": 120,
+    "deterministic_limit_per_solve": 60,
+    "protection_extra_budget": "Hold probe: up to 30 wall seconds / 1 deterministic unit.",
+    "recourse": "One action plus hold; proved subproblems; extra FT diagnostic.",
+    "method_total_costs_equal": false,
+    "tuning": false,
+    "promotion": false,
+    "realized_policy_returns": false,
+    "calibrated_observation_probabilities": false
+  },
+  "results": [
+    {
+      "window": 3,
+      "method": "hold",
+      "horizon_fingerprint": "da53c7de40421a16e27e833893f9934a44037522ceb8de98b1aa404fd313c113",
+      "status": "OPTIMAL",
+      "expected_net_points": 162.93258713469064,
+      "hit_points": 0.0,
+      "diagnostics": {
+        "solver_backend": "ortools-cp-sat",
+        "solver_status_name": "OPTIMAL",
+        "solve_time_seconds": 0.014817100018262863,
+        "best_objective_bound": 162.934,
+        "absolute_optimality_gap": 0.0,
+        "relative_optimality_gap": 0.0,
+        "contract_version": "deterministic_transfer_planning_v3",
+        "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+        "horizon_contract_version": "planning_horizon_v1",
+        "horizon_fingerprint": "914863ec315abe9fe8f29d1abf37b284eca0597f69562a40a13b28c5e07ffc80",
+        "gameweeks": [
+          6,
+          7,
+          8
+        ],
+        "horizon_length": 3,
+        "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+        "first_week_overlap": null,
+        "first_week_transfer_cap": null,
+        "first_week_exclusion": null,
+        "chips_available": {},
+        "expected_points_scale": 1000,
+        "objective_weight_scale": 1000,
+        "discount_weights": [
+          1000,
+          1000,
+          1000
+        ],
+        "horizon_discount_factor": 1.0,
+        "transfer_hit_cost_points": 4.0,
+        "hit_points_charged": 4.0,
+        "hit_cost_scaled": 4000,
+        "max_free_transfers": 5,
+        "free_transfer_accrual": 1,
+        "budget_policy": "stateful_bank_accounting",
+        "rounding_mode": "ROUND_HALF_UP",
+        "deterministic_seed": 0,
+        "num_search_workers": 1,
+        "solver_time_limit_seconds": 120.0,
+        "wall_time_limit_seconds": 120.0,
+        "deterministic_budget_source": "caller",
+        "solver_deterministic_time_limit": 60.0,
+        "primary_deterministic_time": 0.00018128,
+        "tiebreak_deterministic_time_limit": 59.99981872,
+        "tiebreak_deterministic_time": 0.0011987884999999994,
+        "deterministic_time_used": 0.0013800684999999994,
+        "deterministic_time_budget_exhausted": false,
+        "tiebreak_attempted": true,
+        "tiebreak_status": "OPTIMAL",
+        "tiebreak_completed": true,
+        "linearization_level": 2,
+        "scaled_model_objective_value": 162.934,
+        "chips_played": {},
+        "terminal_banked_transfer_value": 0.0,
+        "terminal_chip_holding_value": 0.0
+      },
+      "weeks": [
+        {
+          "gameweek": 6,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 7,
+          "chip": null,
+          "captain": 223094,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 8,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        }
+      ],
+      "wall_seconds": 0.043813399970531464
+    },
+    {
+      "window": 3,
+      "method": "unprotected",
+      "horizon_fingerprint": "da53c7de40421a16e27e833893f9934a44037522ceb8de98b1aa404fd313c113",
+      "status": "OPTIMAL",
+      "expected_net_points": 165.83666016723524,
+      "hit_points": 0.0,
+      "diagnostics": {
+        "solver_backend": "ortools-cp-sat",
+        "solver_status_name": "OPTIMAL",
+        "solve_time_seconds": 39.48270189994946,
+        "best_objective_bound": 165.837,
+        "absolute_optimality_gap": 0.0,
+        "relative_optimality_gap": 0.0,
+        "contract_version": "deterministic_transfer_planning_v3",
+        "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+        "horizon_contract_version": "planning_horizon_v1",
+        "horizon_fingerprint": "da53c7de40421a16e27e833893f9934a44037522ceb8de98b1aa404fd313c113",
+        "gameweeks": [
+          6,
+          7,
+          8
+        ],
+        "horizon_length": 3,
+        "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+        "first_week_overlap": null,
+        "first_week_transfer_cap": null,
+        "first_week_exclusion": null,
+        "chips_available": {},
+        "expected_points_scale": 1000,
+        "objective_weight_scale": 1000,
+        "discount_weights": [
+          1000,
+          1000,
+          1000
+        ],
+        "horizon_discount_factor": 1.0,
+        "transfer_hit_cost_points": 4.0,
+        "hit_points_charged": 4.0,
+        "hit_cost_scaled": 4000,
+        "max_free_transfers": 5,
+        "free_transfer_accrual": 1,
+        "budget_policy": "stateful_bank_accounting",
+        "rounding_mode": "ROUND_HALF_UP",
+        "deterministic_seed": 0,
+        "num_search_workers": 1,
+        "solver_time_limit_seconds": 120.0,
+        "wall_time_limit_seconds": 120.0,
+        "deterministic_budget_source": "caller",
+        "solver_deterministic_time_limit": 60.0,
+        "primary_deterministic_time": 28.039136444509975,
+        "tiebreak_deterministic_time_limit": 31.960863555490025,
+        "tiebreak_deterministic_time": 21.293539067313272,
+        "deterministic_time_used": 49.33267551182325,
+        "deterministic_time_budget_exhausted": false,
+        "tiebreak_attempted": true,
+        "tiebreak_status": "OPTIMAL",
+        "tiebreak_completed": true,
+        "linearization_level": 2,
+        "scaled_model_objective_value": 165.837,
+        "chips_played": {},
+        "terminal_banked_transfer_value": 0.0,
+        "terminal_chip_holding_value": 0.0
+      },
+      "weeks": [
+        {
+          "gameweek": 6,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 7,
+          "chip": null,
+          "captain": 223094,
+          "transfers_in": [
+            465730,
+            514254
+          ],
+          "transfers_out": [
+            80178,
+            201666
+          ],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 8,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            223827
+          ],
+          "transfers_out": [
+            483067
+          ],
+          "hit_points": 0.0
+        }
+      ],
+      "wall_seconds": 39.716915199998766
+    },
+    {
+      "window": 3,
+      "method": "protected",
+      "horizon_fingerprint": "da53c7de40421a16e27e833893f9934a44037522ceb8de98b1aa404fd313c113",
+      "status": "OPTIMAL",
+      "expected_net_points": 165.83666016723524,
+      "hit_points": 0.0,
+      "diagnostics": {
+        "solver_backend": "ortools-cp-sat",
+        "solver_status_name": "OPTIMAL",
+        "solve_time_seconds": 20.778233699966222,
+        "best_objective_bound": 165.837,
+        "absolute_optimality_gap": 0.0,
+        "relative_optimality_gap": 0.0,
+        "contract_version": "deterministic_transfer_planning_v3",
+        "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+        "horizon_contract_version": "planning_horizon_v1",
+        "horizon_fingerprint": "da53c7de40421a16e27e833893f9934a44037522ceb8de98b1aa404fd313c113",
+        "gameweeks": [
+          6,
+          7,
+          8
+        ],
+        "horizon_length": 3,
+        "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+        "first_week_overlap": null,
+        "first_week_transfer_cap": null,
+        "first_week_exclusion": null,
+        "chips_available": {},
+        "expected_points_scale": 1000,
+        "objective_weight_scale": 1000,
+        "discount_weights": [
+          1000,
+          1000,
+          1000
+        ],
+        "horizon_discount_factor": 1.0,
+        "transfer_hit_cost_points": 4.0,
+        "hit_points_charged": 4.0,
+        "hit_cost_scaled": 4000,
+        "max_free_transfers": 5,
+        "free_transfer_accrual": 1,
+        "budget_policy": "stateful_bank_accounting",
+        "rounding_mode": "ROUND_HALF_UP",
+        "deterministic_seed": 0,
+        "num_search_workers": 1,
+        "solver_time_limit_seconds": 120.0,
+        "wall_time_limit_seconds": 120.0,
+        "deterministic_budget_source": "caller",
+        "solver_deterministic_time_limit": 60.0,
+        "primary_deterministic_time": 7.147547957708464,
+        "tiebreak_deterministic_time_limit": 52.85245204229154,
+        "tiebreak_deterministic_time": 13.654326559933478,
+        "deterministic_time_used": 20.80187451764194,
+        "deterministic_time_budget_exhausted": false,
+        "tiebreak_attempted": true,
+        "tiebreak_status": "OPTIMAL",
+        "tiebreak_completed": true,
+        "hold_protection": {
+          "version": "feasible_hold_v1",
+          "status": "OPTIMAL",
+          "objective_value": 162.934,
+          "selected": false,
+          "deterministic_time": 0.0025280299999999997,
+          "deterministic_time_limit": 1.0
+        },
+        "linearization_level": 2,
+        "scaled_model_objective_value": 165.837,
+        "chips_played": {},
+        "terminal_banked_transfer_value": 0.0,
+        "terminal_chip_holding_value": 0.0
+      },
+      "weeks": [
+        {
+          "gameweek": 6,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 7,
+          "chip": null,
+          "captain": 223094,
+          "transfers_in": [
+            465730,
+            514254
+          ],
+          "transfers_out": [
+            80178,
+            201666
+          ],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 8,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            223827
+          ],
+          "transfers_out": [
+            483067
+          ],
+          "hit_points": 0.0
+        }
+      ],
+      "wall_seconds": 21.00255630002357
+    },
+    {
+      "window": 3,
+      "method": "recourse",
+      "horizon_fingerprint": "da53c7de40421a16e27e833893f9934a44037522ceb8de98b1aa404fd313c113",
+      "status": "OPTIMAL_RESTRICTED_MENU",
+      "expected_net_points": 167.86007041411563,
+      "first_transfers_in": [],
+      "candidates": 1,
+      "hold_feasible": true,
+      "continuations": [
+        {
+          "observation": "low",
+          "extra_free_transfer_value": 0.6670064159348073,
+          "status": "OPTIMAL",
+          "expected_net_points": 109.5076647604404,
+          "hit_points": 0.0,
+          "diagnostics": {
+            "solver_backend": "ortools-cp-sat",
+            "solver_status_name": "OPTIMAL",
+            "solve_time_seconds": 2.521873199963011,
+            "best_objective_bound": 109.507,
+            "absolute_optimality_gap": 0.0,
+            "relative_optimality_gap": 0.0,
+            "contract_version": "deterministic_transfer_planning_v3",
+            "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+            "horizon_contract_version": "planning_horizon_v1",
+            "horizon_fingerprint": "10f14981d0460b55f84da61c83c5cdb8e939d2e08a7e9a4439f955d12fb215ae",
+            "gameweeks": [
+              7,
+              8
+            ],
+            "horizon_length": 2,
+            "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+            "first_week_overlap": null,
+            "first_week_transfer_cap": null,
+            "first_week_exclusion": null,
+            "chips_available": {},
+            "expected_points_scale": 1000,
+            "objective_weight_scale": 1000,
+            "discount_weights": [
+              1000,
+              1000
+            ],
+            "horizon_discount_factor": 1.0,
+            "transfer_hit_cost_points": 4.0,
+            "hit_points_charged": 4.0,
+            "hit_cost_scaled": 4000,
+            "max_free_transfers": 5,
+            "free_transfer_accrual": 1,
+            "budget_policy": "stateful_bank_accounting",
+            "rounding_mode": "ROUND_HALF_UP",
+            "deterministic_seed": 0,
+            "num_search_workers": 1,
+            "solver_time_limit_seconds": 120.0,
+            "wall_time_limit_seconds": 120.0,
+            "deterministic_budget_source": "caller",
+            "solver_deterministic_time_limit": 60.0,
+            "primary_deterministic_time": 1.0712889890366555,
+            "tiebreak_deterministic_time_limit": 58.92871101096335,
+            "tiebreak_deterministic_time": 1.2498293297287801,
+            "deterministic_time_used": 2.3211183187654356,
+            "deterministic_time_budget_exhausted": false,
+            "tiebreak_attempted": true,
+            "tiebreak_status": "OPTIMAL",
+            "tiebreak_completed": true,
+            "linearization_level": 2,
+            "scaled_model_objective_value": 109.507,
+            "chips_played": {},
+            "terminal_banked_transfer_value": 0.0,
+            "terminal_chip_holding_value": 0.0
+          },
+          "weeks": [
+            {
+              "gameweek": 7,
+              "chip": null,
+              "captain": 223094,
+              "transfers_in": [
+                60307,
+                465730
+              ],
+              "transfers_out": [
+                80178,
+                141746
+              ],
+              "hit_points": 0.0
+            },
+            {
+              "gameweek": 8,
+              "chip": null,
+              "captain": 223094,
+              "transfers_in": [
+                226597
+              ],
+              "transfers_out": [
+                483067
+              ],
+              "hit_points": 0.0
+            }
+          ]
+        },
+        {
+          "observation": "high",
+          "extra_free_transfer_value": 0.8014219695814546,
+          "status": "OPTIMAL",
+          "expected_net_points": 116.15230054624831,
+          "hit_points": 0.0,
+          "diagnostics": {
+            "solver_backend": "ortools-cp-sat",
+            "solver_status_name": "OPTIMAL",
+            "solve_time_seconds": 7.592907899990678,
+            "best_objective_bound": 116.151,
+            "absolute_optimality_gap": 0.0,
+            "relative_optimality_gap": 0.0,
+            "contract_version": "deterministic_transfer_planning_v3",
+            "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+            "horizon_contract_version": "planning_horizon_v1",
+            "horizon_fingerprint": "384ae664152d2949c50758d1087e5f4890f1cd56c48f49295969215463668e62",
+            "gameweeks": [
+              7,
+              8
+            ],
+            "horizon_length": 2,
+            "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+            "first_week_overlap": null,
+            "first_week_transfer_cap": null,
+            "first_week_exclusion": null,
+            "chips_available": {},
+            "expected_points_scale": 1000,
+            "objective_weight_scale": 1000,
+            "discount_weights": [
+              1000,
+              1000
+            ],
+            "horizon_discount_factor": 1.0,
+            "transfer_hit_cost_points": 4.0,
+            "hit_points_charged": 4.0,
+            "hit_cost_scaled": 4000,
+            "max_free_transfers": 5,
+            "free_transfer_accrual": 1,
+            "budget_policy": "stateful_bank_accounting",
+            "rounding_mode": "ROUND_HALF_UP",
+            "deterministic_seed": 0,
+            "num_search_workers": 1,
+            "solver_time_limit_seconds": 120.0,
+            "wall_time_limit_seconds": 120.0,
+            "deterministic_budget_source": "caller",
+            "solver_deterministic_time_limit": 60.0,
+            "primary_deterministic_time": 4.453858095092922,
+            "tiebreak_deterministic_time_limit": 55.546141904907074,
+            "tiebreak_deterministic_time": 3.5296653120890165,
+            "deterministic_time_used": 7.983523407181939,
+            "deterministic_time_budget_exhausted": false,
+            "tiebreak_attempted": true,
+            "tiebreak_status": "OPTIMAL",
+            "tiebreak_completed": true,
+            "linearization_level": 2,
+            "scaled_model_objective_value": 116.151,
+            "chips_played": {},
+            "terminal_banked_transfer_value": 0.0,
+            "terminal_chip_holding_value": 0.0
+          },
+          "weeks": [
+            {
+              "gameweek": 7,
+              "chip": null,
+              "captain": 141746,
+              "transfers_in": [
+                465730,
+                514254
+              ],
+              "transfers_out": [
+                80178,
+                201666
+              ],
+              "hit_points": 0.0
+            },
+            {
+              "gameweek": 8,
+              "chip": null,
+              "captain": 141746,
+              "transfers_in": [
+                223827
+              ],
+              "transfers_out": [
+                483067
+              ],
+              "hit_points": 0.0
+            }
+          ]
+        }
+      ],
+      "wall_seconds": 67.12238680000883
+    },
+    {
+      "window": 5,
+      "method": "hold",
+      "horizon_fingerprint": "84462e0fb4ccf1905f257d500762da946f355de094a6f227790df153bab0d453",
+      "status": "OPTIMAL",
+      "expected_net_points": 273.9033039222375,
+      "hit_points": 0.0,
+      "diagnostics": {
+        "solver_backend": "ortools-cp-sat",
+        "solver_status_name": "OPTIMAL",
+        "solve_time_seconds": 0.02077219996135682,
+        "best_objective_bound": 273.907,
+        "absolute_optimality_gap": 0.0,
+        "relative_optimality_gap": 0.0,
+        "contract_version": "deterministic_transfer_planning_v3",
+        "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+        "horizon_contract_version": "planning_horizon_v1",
+        "horizon_fingerprint": "f8e74da0222b29ff637dc316839089dbd8fecce3e901d35e4e72a652da817868",
+        "gameweeks": [
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "horizon_length": 5,
+        "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+        "first_week_overlap": null,
+        "first_week_transfer_cap": null,
+        "first_week_exclusion": null,
+        "chips_available": {},
+        "expected_points_scale": 1000,
+        "objective_weight_scale": 1000,
+        "discount_weights": [
+          1000,
+          1000,
+          1000,
+          1000,
+          1000
+        ],
+        "horizon_discount_factor": 1.0,
+        "transfer_hit_cost_points": 4.0,
+        "hit_points_charged": 4.0,
+        "hit_cost_scaled": 4000,
+        "max_free_transfers": 5,
+        "free_transfer_accrual": 1,
+        "budget_policy": "stateful_bank_accounting",
+        "rounding_mode": "ROUND_HALF_UP",
+        "deterministic_seed": 0,
+        "num_search_workers": 1,
+        "solver_time_limit_seconds": 120.0,
+        "wall_time_limit_seconds": 120.0,
+        "deterministic_budget_source": "caller",
+        "solver_deterministic_time_limit": 60.0,
+        "primary_deterministic_time": 0.00032311799999999995,
+        "tiebreak_deterministic_time_limit": 59.999676882,
+        "tiebreak_deterministic_time": 0.003539567199999885,
+        "deterministic_time_used": 0.003862685199999885,
+        "deterministic_time_budget_exhausted": false,
+        "tiebreak_attempted": true,
+        "tiebreak_status": "OPTIMAL",
+        "tiebreak_completed": true,
+        "linearization_level": 2,
+        "scaled_model_objective_value": 273.907,
+        "chips_played": {},
+        "terminal_banked_transfer_value": 0.0,
+        "terminal_chip_holding_value": 0.0
+      },
+      "weeks": [
+        {
+          "gameweek": 6,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 7,
+          "chip": null,
+          "captain": 223094,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 8,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 9,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 10,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        }
+      ],
+      "wall_seconds": 0.06398780003655702
+    },
+    {
+      "window": 5,
+      "method": "unprotected",
+      "horizon_fingerprint": "84462e0fb4ccf1905f257d500762da946f355de094a6f227790df153bab0d453",
+      "status": "FEASIBLE",
+      "expected_net_points": 248.4006602029674,
+      "hit_points": 28.0,
+      "diagnostics": {
+        "solver_backend": "ortools-cp-sat",
+        "solver_status_name": "FEASIBLE",
+        "solve_time_seconds": 41.024538600002415,
+        "best_objective_bound": 281.996,
+        "absolute_optimality_gap": 33.59299999999999,
+        "relative_optimality_gap": 0.13523588684516688,
+        "contract_version": "deterministic_transfer_planning_v3",
+        "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+        "horizon_contract_version": "planning_horizon_v1",
+        "horizon_fingerprint": "84462e0fb4ccf1905f257d500762da946f355de094a6f227790df153bab0d453",
+        "gameweeks": [
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "horizon_length": 5,
+        "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+        "first_week_overlap": null,
+        "first_week_transfer_cap": null,
+        "first_week_exclusion": null,
+        "chips_available": {},
+        "expected_points_scale": 1000,
+        "objective_weight_scale": 1000,
+        "discount_weights": [
+          1000,
+          1000,
+          1000,
+          1000,
+          1000
+        ],
+        "horizon_discount_factor": 1.0,
+        "transfer_hit_cost_points": 4.0,
+        "hit_points_charged": 4.0,
+        "hit_cost_scaled": 4000,
+        "max_free_transfers": 5,
+        "free_transfer_accrual": 1,
+        "budget_policy": "stateful_bank_accounting",
+        "rounding_mode": "ROUND_HALF_UP",
+        "deterministic_seed": 0,
+        "num_search_workers": 1,
+        "solver_time_limit_seconds": 120.0,
+        "wall_time_limit_seconds": 120.0,
+        "deterministic_budget_source": "caller",
+        "solver_deterministic_time_limit": 60.0,
+        "primary_deterministic_time": 60.003908576862685,
+        "tiebreak_deterministic_time_limit": null,
+        "tiebreak_deterministic_time": null,
+        "deterministic_time_used": 60.003908576862685,
+        "deterministic_time_budget_exhausted": true,
+        "tiebreak_attempted": false,
+        "tiebreak_status": null,
+        "tiebreak_completed": false,
+        "linearization_level": 2,
+        "scaled_model_objective_value": 248.403,
+        "chips_played": {},
+        "terminal_banked_transfer_value": 0.0,
+        "terminal_chip_holding_value": 0.0
+      },
+      "weeks": [
+        {
+          "gameweek": 6,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            465730,
+            477547
+          ],
+          "transfers_out": [
+            80178,
+            465642
+          ],
+          "hit_points": 4.0
+        },
+        {
+          "gameweek": 7,
+          "chip": null,
+          "captain": 223094,
+          "transfers_in": [
+            60307
+          ],
+          "transfers_out": [
+            201666
+          ],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 8,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            169432,
+            223827
+          ],
+          "transfers_out": [
+            17761,
+            490145
+          ],
+          "hit_points": 4.0
+        },
+        {
+          "gameweek": 9,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            86873,
+            200834,
+            499726
+          ],
+          "transfers_out": [
+            21205,
+            60307,
+            477547
+          ],
+          "hit_points": 8.0
+        },
+        {
+          "gameweek": 10,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            17761,
+            108413,
+            226597,
+            519913
+          ],
+          "transfers_out": [
+            446008,
+            465730,
+            483067,
+            499726
+          ],
+          "hit_points": 12.0
+        }
+      ],
+      "wall_seconds": 41.37692420009989
+    },
+    {
+      "window": 5,
+      "method": "protected",
+      "horizon_fingerprint": "84462e0fb4ccf1905f257d500762da946f355de094a6f227790df153bab0d453",
+      "status": "FEASIBLE",
+      "expected_net_points": 274.3336566699099,
+      "hit_points": 0.0,
+      "diagnostics": {
+        "solver_backend": "ortools-cp-sat",
+        "solver_status_name": "FEASIBLE",
+        "solve_time_seconds": 36.45011900004465,
+        "best_objective_bound": 280.999,
+        "absolute_optimality_gap": 6.662000000000035,
+        "relative_optimality_gap": 0.02428400106438444,
+        "contract_version": "deterministic_transfer_planning_v3",
+        "configuration_fingerprint": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+        "horizon_contract_version": "planning_horizon_v1",
+        "horizon_fingerprint": "84462e0fb4ccf1905f257d500762da946f355de094a6f227790df153bab0d453",
+        "gameweeks": [
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "horizon_length": 5,
+        "chip_availability_fingerprint": "eca861fb57950596b1369109a54d7ca1c51fa337bada43f8172e944901b1da51",
+        "first_week_overlap": null,
+        "first_week_transfer_cap": null,
+        "first_week_exclusion": null,
+        "chips_available": {},
+        "expected_points_scale": 1000,
+        "objective_weight_scale": 1000,
+        "discount_weights": [
+          1000,
+          1000,
+          1000,
+          1000,
+          1000
+        ],
+        "horizon_discount_factor": 1.0,
+        "transfer_hit_cost_points": 4.0,
+        "hit_points_charged": 4.0,
+        "hit_cost_scaled": 4000,
+        "max_free_transfers": 5,
+        "free_transfer_accrual": 1,
+        "budget_policy": "stateful_bank_accounting",
+        "rounding_mode": "ROUND_HALF_UP",
+        "deterministic_seed": 0,
+        "num_search_workers": 1,
+        "solver_time_limit_seconds": 120.0,
+        "wall_time_limit_seconds": 120.0,
+        "deterministic_budget_source": "caller",
+        "solver_deterministic_time_limit": 60.0,
+        "primary_deterministic_time": 60.06841168943934,
+        "tiebreak_deterministic_time_limit": null,
+        "tiebreak_deterministic_time": null,
+        "deterministic_time_used": 60.06841168943934,
+        "deterministic_time_budget_exhausted": true,
+        "tiebreak_attempted": false,
+        "tiebreak_status": null,
+        "tiebreak_completed": false,
+        "hold_protection": {
+          "version": "feasible_hold_v1",
+          "status": "OPTIMAL",
+          "objective_value": 273.907,
+          "selected": false,
+          "deterministic_time": 0.004233828,
+          "deterministic_time_limit": 1.0
+        },
+        "linearization_level": 2,
+        "scaled_model_objective_value": 274.337,
+        "chips_played": {},
+        "terminal_banked_transfer_value": 0.0,
+        "terminal_chip_holding_value": 0.0
+      },
+      "weeks": [
+        {
+          "gameweek": 6,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 7,
+          "chip": null,
+          "captain": 223094,
+          "transfers_in": [],
+          "transfers_out": [],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 8,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            465730
+          ],
+          "transfers_out": [
+            483067
+          ],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 9,
+          "chip": null,
+          "captain": 141746,
+          "transfers_in": [
+            483067
+          ],
+          "transfers_out": [
+            465730
+          ],
+          "hit_points": 0.0
+        },
+        {
+          "gameweek": 10,
+          "chip": null,
+          "captain": 446008,
+          "transfers_in": [
+            60307,
+            223827,
+            586309
+          ],
+          "transfers_out": [
+            80178,
+            141746,
+            500058
+          ],
+          "hit_points": 0.0
+        }
+      ],
+      "wall_seconds": 36.80366169998888
+    },
+    {
+      "window": 5,
+      "method": "recourse",
+      "horizon_fingerprint": "84462e0fb4ccf1905f257d500762da946f355de094a6f227790df153bab0d453",
+      "status": "FAILED",
+      "error": "Recourse comparison requires proved feasible plans.",
+      "wall_seconds": 41.47229140007403
+    }
+  ],
+  "summary": {
+    "cases": 8,
+    "failed": 1,
+    "unproved": 3,
+    "promotion": false,
+    "realized_policy_returns": false
+  },
+  "source-hashes": {
+    "scripts\\replay_football_planning.py": "93a5451f50649a4c77942ee91b3a0d872b204b63983f3186d0b8a7d50882141c",
+    "src\\squadopt\\planning\\__init__.py": "4041194c7a4b49819151179bef746db28a54cc4671a2c34f08620937cda882cb",
+    "src\\squadopt\\planning\\chip_strategy.py": "09a6e1affee3a4e42eaff92caf705bd6bc7242abedc16769bb7f0e36888c0a2f",
+    "src\\squadopt\\planning\\horizon.py": "c07a50ed5c30fa61ad815a23784ca618464462b6ec15d60ace9afadbbcc385a4",
+    "src\\squadopt\\planning\\models.py": "a601ef242b6503f2c4392ed2fd39da1e007a94a869875329e9374845e561d969",
+    "src\\squadopt\\planning\\optimizer.py": "99a214413b852101b9a2761a4023b6548b6d5cafe326d3fbc252ff878eeb118d",
+    "src\\squadopt\\planning\\pricing.py": "882b8f17fe92da02cd374b046951768039e4b6668404c653fbdcb92d08c1e94e",
+    "src\\squadopt\\planning\\recourse.py": "8d653dc9d66958018b77d75b40c3746b36aef3b576f7910ce65cc558698eb8e4",
+    "src\\squadopt\\planning\\recourse_chips.py": "3a604707dd17a2cd4f6b1aef88599c46461f0f82173a9645786b94e855f9bb20"
+  },
+  "input-hashes": {
+    "protocol.json": "b37c1f9d485bff143ccd59be0f0ed401cc9ee5dd6649f12e02d18009c0677adb",
+    "results.json": "da324e51ea3a699c2a3ccaa1c425bbfe5fe6fe938c92a227d503451cec8be0f0",
+    "control-projections.csv": "34c43433b2d0260ca2aa691ce930d554091ab643ba5e576d6ba65346118823af"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "ortools": "9.15.6755"
+  }
+}

@@ -304,3 +304,9 @@ Local evidence directories: `.codex-tmp/football-components-study02` and
   intervals, main effects and interactions exactly, and also reports the appeared stratum.
 
 After these gates, only report text was completed. No executable behavior was changed.
+
+## 28 September replay
+
+The [frozen planning replay](football_planning_replay.md) validates the now-existing
+feasible-hold guard on the troublesome five-week control table. It preserves the
+remaining proof failure and does not revise the original measurement.
