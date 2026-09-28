@@ -244,3 +244,67 @@ def test_the_extraction_declares_a_version() -> None:
     assert "text/html" in MARKUP_MEDIA_TYPES
     assert "text/plain" in PLAIN_MEDIA_TYPES
     assert "application/rss+xml" in FEED_MEDIA_TYPES
+
+
+GENERIC_XML_FEED = b"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title><![CDATA[Club news]]></title>
+<link>https://club.example</link>
+<item><title><![CDATA[Smith back in training]]></title>
+<guid>https://club.example/news/1</guid>
+<link>https://club.example/news/1</link>
+<description><![CDATA[<p>The manager said <strong>Smith</strong> is fit for \
+Saturday&rsquo;s game.</p>]]></description></item>
+</channel></rss>"""
+
+
+def test_a_feed_served_as_generic_xml_is_still_a_feed() -> None:
+    """Measured rather than assumed: the club this reader was added for serves ``text/xml``.
+
+    The two feed media types were taken from the specification, and between them they
+    admitted every feed except the one the work was done for. The type a server puts on a
+    feed is its own choice; whether the bytes are a feed is not.
+    """
+
+    readable = extract_readable_text(GENERIC_XML_FEED, "text/xml").decode("utf-8")
+
+    assert "The manager said Smith is fit for Saturday\u2019s game." in readable
+    assert "Smith back in training" in readable
+
+
+def test_generic_xml_that_does_not_declare_a_feed_is_refused() -> None:
+    """That type carries any XML at all, so the bytes have to say what they are.
+
+    A sitemap read as a feed would hand a coder a list of addresses as though they were a
+    club's words, and every one of them would be quotable.
+    """
+
+    sitemap = b'<?xml version="1.0"?><urlset><url><loc>https://club.example/a</loc></url></urlset>'
+
+    with pytest.raises(ReadableTextError, match="does not declare itself a feed"):
+        extract_readable_text(sitemap, "text/xml")
+
+
+def test_a_headline_in_cdata_loses_its_markers() -> None:
+    """``title`` is RCDATA in HTML, and a feed keeps its headline there.
+
+    The parser reads an RCDATA element's content as text and never reports a section inside
+    it, so a headline arrived wearing ``<![CDATA[`` and ``]]>``. A quote of the headline
+    would then have to include the markers to be found, which is not a quote of the club.
+    """
+
+    readable = extract_readable_text(GENERIC_XML_FEED, "text/xml").decode("utf-8")
+
+    assert "CDATA" not in readable
+    assert "Smith back in training" in readable
+
+
+def test_a_feeds_addresses_are_silent_and_a_pages_are_untouched() -> None:
+    """A guid and a link are addresses, not words, and no quote should be able to land in one."""
+
+    readable = extract_readable_text(GENERIC_XML_FEED, "text/xml").decode("utf-8")
+    assert "https://club.example" not in readable
+
+    # The same element names in a page are left exactly as they were: `guid` and `url` are
+    # not HTML, and `link` is void in HTML, which is the regression #799 repaired.
+    page = b"<html><head><link rel=x href=y></head><body><p>He is fit</p></body></html>"
+    assert extract_readable_text(page, "text/html") == b"He is fit\n"
