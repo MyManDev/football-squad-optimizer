@@ -134,10 +134,46 @@ def test_the_generic_variable_wins_where_both_are_set() -> None:
     """The contract is the generic one; the vendor one is the courtesy."""
 
     config = resolve_provider_config(
-        {KEY_ENVIRONMENT_VARIABLE: "generic-key", VENDOR_VARIABLE: "vendor-key"}
+        {
+            PROVIDER_ENVIRONMENT_VARIABLE: DEFAULT_PROVIDER,
+            KEY_ENVIRONMENT_VARIABLE: "generic-key",
+            VENDOR_VARIABLE: "vendor-key",
+        }
     )
 
     assert config.api_key == "generic-key"
+
+
+def test_a_generic_key_without_a_provider_is_refused_before_anything_is_sent() -> None:
+    """The one configuration where the default provider decides whose key this is.
+
+    ``SQUADOPT_LLM_API_KEY`` carries no vendor. With no provider line the default picks one,
+    and the key goes to that vendor with the first club's call. A key that reached the wrong
+    vendor has left the machine, and no later refusal can call it back, so this one has to
+    happen at configuration rather than at the first request.
+    """
+
+    with pytest.raises(ClubNewsProviderError) as refusal:
+        resolve_provider_config({KEY_ENVIRONMENT_VARIABLE: "a-key-for-some-vendor"})
+
+    named = str(refusal.value)
+    assert KEY_ENVIRONMENT_VARIABLE in named
+    assert PROVIDER_ENVIRONMENT_VARIABLE in named
+    assert "a-key-for-some-vendor" not in named
+
+
+def test_a_vendor_key_without_a_provider_still_works_because_it_names_its_vendor() -> None:
+    """The compatibility path is not ambiguous, so it is not refused.
+
+    ``ANTHROPIC_API_KEY`` says whose key it is in its own name. The default adapter is then
+    not a guess about the key, and an operator who exported that name years ago is not asked
+    to add a line to keep it working.
+    """
+
+    config = resolve_provider_config({VENDOR_VARIABLE: "vendor-key"})
+
+    assert config.provider == DEFAULT_PROVIDER
+    assert config.api_key == "vendor-key"
 
 
 def test_a_refusal_names_both_variables_when_a_vendor_path_exists() -> None:
@@ -233,14 +269,14 @@ class _SilentClient:
 def test_the_runbook_names_the_key_the_default_adapter_reads_when_the_provider_line_is_out() -> (
     None
 ):
-    """The runbook's own lines, minus the provider line, hand the free key to the default adapter.
+    """The runbook's own lines, minus the provider line, are refused before anything is sent.
 
     The snippet is read out of the runbook rather than copied here, so this follows what an
-    operator would paste. Without its provider line, the generic key and the free adapter's
-    model name both reach the default adapter and nothing at configuration refuses them. The
-    runbook's sentence about that path once said the default adapter's key is the vendor
-    variable, which reads as though a forgotten provider line fails for want of that key. It has
-    to name the generic variable, and name it as the one read first.
+    operator would paste. Without its provider line the generic key names no vendor, and the
+    default would decide whose key it is by guessing. A key that reaches the wrong vendor has
+    left the machine before any refusal can reach it, so the refusal has to come at
+    configuration. The runbook's sentence about that path still has to name the generic
+    variable first, because that is the one the default adapter reads first.
     """
 
     bullet = _runbook_bullet_on_the_three_variables()
@@ -253,11 +289,14 @@ def test_the_runbook_names_the_key_the_default_adapter_reads_when_the_provider_l
     assert snippet[PROVIDER_ENVIRONMENT_VARIABLE] == GEMINI_PROVIDER
 
     del snippet[PROVIDER_ENVIRONMENT_VARIABLE]
-    config = resolve_provider_config(snippet)
+    with pytest.raises(ClubNewsProviderError) as refusal:
+        resolve_provider_config(snippet)
 
-    assert config.provider == DEFAULT_PROVIDER
-    assert config.api_key == snippet[KEY_ENVIRONMENT_VARIABLE]
-    assert config.model_identifier == snippet[MODEL_ENVIRONMENT_VARIABLE]
+    named = str(refusal.value)
+    assert KEY_ENVIRONMENT_VARIABLE in named
+    assert PROVIDER_ENVIRONMENT_VARIABLE in named
+    # The key itself is what must not travel, so it is not echoed back either.
+    assert snippet[KEY_ENVIRONMENT_VARIABLE] not in named
 
     unset_provider = bullet[
         bullet.index(f"With `{PROVIDER_ENVIRONMENT_VARIABLE}` unset") : bullet.index(
@@ -282,7 +321,11 @@ def test_the_runbook_heading_claims_a_model_check_only_for_the_adapter_that_make
     unlisted = "a-model-no-list-holds"
 
     config = resolve_provider_config(
-        {KEY_ENVIRONMENT_VARIABLE: "k", MODEL_ENVIRONMENT_VARIABLE: unlisted}
+        {
+            PROVIDER_ENVIRONMENT_VARIABLE: DEFAULT_PROVIDER,
+            KEY_ENVIRONMENT_VARIABLE: "k",
+            MODEL_ENVIRONMENT_VARIABLE: unlisted,
+        }
     )
     built = AnthropicClubNewsProvider(client=_SilentClient(), model_identifier=unlisted)
     with pytest.raises(ClubNewsGeminiError, match="not in the provider's model list"):
