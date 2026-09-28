@@ -45,7 +45,35 @@ for (const language of ["tr", "en"] as const) {
     await expect(pin).toBeEnabled();
     await pin.click();
     const first = page.getByRole("region", { name: "Plan A", exact: true });
+    // Main comparisons and uncertainty stay visible while secondary costs are folded.
+    await expect(first.getByRole("radio")).not.toBeChecked();
+    await expect(
+      first.getByText(tr ? "İlk hafta net beklenen puan" : "First-week net expected points"),
+    ).toBeVisible();
+    await expect(
+      first.getByText(tr ? "Pencere net beklenen puanı" : "Horizon net expected points"),
+    ).toBeVisible();
+    await expect(
+      first.getByText(
+        tr
+          ? "Geçerli plan bulundu; en iyi çözüm olduğu kanıtlanmadı."
+          : "A feasible plan was found; optimality is not proved.",
+      ),
+    ).toBeVisible();
+    const costs = first.getByText(tr ? "Pencere transfer cezası" : "Horizon transfer hits", {
+      exact: true,
+    });
+    await expect(costs).not.toBeVisible();
+    const disclosure = first
+      .locator("summary")
+      .filter({ hasText: tr ? "Maliyet ve çözüm ayrıntıları" : "Costs and solution details" });
+    await disclosure.focus();
+    await page.keyboard.press("Enter");
+    await expect(costs).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(costs).not.toBeVisible();
     await first.getByRole("radio").check();
+    await expect(first.getByText(tr ? "Tercihim" : "My choice", { exact: true })).toBeVisible();
     const note = page.getByRole("textbox", {
       name: tr ? "Bu planı neden tercih ettim?" : "Why do I prefer this plan?",
     });
