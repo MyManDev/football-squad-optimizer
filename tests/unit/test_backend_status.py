@@ -59,7 +59,14 @@ def test_canned_metrics_and_actual_log_shapes_are_reported_without_invented_valu
         "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=transport
     )
     assert code == 0
-    assert len(requests) == 3
+    # Loopback ready, loopback metrics, public health, and the incident record. The list is
+    # pinned rather than counted loosely: this script reads four named things and nothing else.
+    assert requests == [
+        "http://127.0.0.1:18764/ready",
+        "http://127.0.0.1:18764/metrics",
+        "https://public.test/health",
+        status.OUTAGES_URL,
+    ]
     assert "Queue depth (API): 2" in report
     assert "hits=7; misses=3" in report
     assert "reason=DataError: 1" in report
@@ -297,3 +304,109 @@ def test_latest_startup_trust_reports_only_declared_fields(tmp_path: Path) -> No
     assert "192.0.2.20" not in report
     assert 'source="uvicorn commandline"' in report
     assert "198.51.100.9" not in report
+
+
+# --- the recorded outages ---------------------------------------------------
+
+
+def _incident(number: int, opened: str, closed: str | None) -> dict[str, object]:
+    return {"number": number, "created_at": opened, "closed_at": closed}
+
+
+def test_the_outage_record_totals_only_what_the_rows_state() -> None:
+    """Two closed rows and one still open, which contributes to neither total.
+
+    Adding "until this moment" to the open one would make the number grow while nothing was
+    learned, so it is reported as open and left out of the arithmetic.
+    """
+
+    record = status.read_outages(
+        json.dumps(
+            [
+                _incident(3, "2026-09-27T15:00:00Z", "2026-09-27T19:00:00Z"),
+                _incident(2, "2026-09-26T00:00:00Z", "2026-09-26T01:30:00Z"),
+                _incident(1, "2026-09-28T06:00:00Z", None),
+            ]
+        )
+    )
+
+    assert record.rows == 3
+    assert record.closed == 2
+    assert record.observed_seconds == pytest.approx(5.5 * 3600)
+    assert record.longest_seconds == pytest.approx(4 * 3600)
+    assert record.open_since == "2026-09-28T06:00:00Z"
+    assert record.earliest == "2026-09-26T00:00:00Z"
+    assert record.latest == "2026-09-28T06:00:00Z"
+
+
+def test_an_unreadable_incident_record_is_unknown_and_never_zero_outages() -> None:
+    """The script's own rule, applied to one more source: missing is not zero.
+
+    Reporting "0 outages" for a document that could not be read would be the strongest
+    possible claim made from the least possible evidence.
+    """
+
+    for body in ("not json at all", json.dumps({"message": "Not Found"})):
+        record = status.read_outages(body)
+        assert record.unreadable
+        assert record.rows == 0
+
+
+def test_rows_that_are_not_incidents_or_carry_no_instant_are_dropped() -> None:
+    """A pull request is an issue to that API, and a row with no parseable open is not one."""
+
+    record = status.read_outages(
+        json.dumps(
+            [
+                {"number": 9, "created_at": "2026-09-27T15:00:00Z", "pull_request": {"url": "x"}},
+                _incident(8, "not-a-time", None),
+                _incident(7, "2026-09-27T15:00:00Z", "2026-09-27T16:00:00Z"),
+            ]
+        )
+    )
+
+    assert record.rows == 1
+    assert record.observed_seconds == pytest.approx(3600)
+
+
+def test_the_report_names_the_outage_record_as_a_floor(tmp_path: Path) -> None:
+    """The count is a floor and the durations are coarse, and the line has to say so.
+
+    Both ends of every row are instants a scheduled check ran at, and that schedule fires a
+    fraction of the time it asks for, so an outage between two checks leaves no row at all.
+    A reader who takes the total as the record would be reading the observer, not the backend.
+    """
+
+    def transport(url: str) -> tuple[int, str]:
+        if url.startswith(status.OUTAGES_URL[:40]):
+            return 200, json.dumps([_incident(1, "2026-09-27T15:00:00Z", "2026-09-27T19:00:00Z")])
+        if url.endswith("/ready"):
+            return 200, json.dumps({"ready": True, "checks": {"capture_context": True}})
+        return 200, METRICS
+
+    _, report = status.status_report(
+        "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=transport
+    )
+
+    assert "Recorded outages: 1 recorded, 1 closed, 4.0h observed" in report
+    assert "Outage open now: none" in report
+    assert "floor" in report and "detection instants" in report
+
+
+def test_an_unreachable_incident_record_does_not_fail_the_other_sources(tmp_path: Path) -> None:
+    """One source being unreadable is not the backend being unhealthy."""
+
+    def transport(url: str) -> tuple[int, str]:
+        if url.startswith(status.OUTAGES_URL[:40]):
+            raise urllib.error.URLError("no route")
+        if url.endswith("/ready"):
+            return 200, json.dumps({"ready": True, "checks": {"capture_context": True}})
+        return 200, METRICS
+
+    code, report = status.status_report(
+        "http://127.0.0.1:18764", "https://public.test", tmp_path, transport=transport
+    )
+
+    assert code == 0
+    assert "Recorded outages: unavailable" in report
+    assert "Logs:" in report

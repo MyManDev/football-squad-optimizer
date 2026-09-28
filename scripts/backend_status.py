@@ -19,10 +19,21 @@ import urllib.request
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 USER_AGENT = "squadopt-backend-status/1"
 UNAVAILABLE = "unavailable: not exposed"
+
+#: The recorded outages, read unauthenticated because the repository is public. Both ends of
+#: every row are *detection* instants, not the outage's own, so what this yields is a floor on
+#: how many there were and a poor estimate of how long each lasted. It is reported anyway, with
+#: that said out loud, because the alternative is an operator counting issues by hand and
+#: reading them as the record.
+OUTAGES_URL = (
+    "https://api.github.com/repos/MyManDev/football-squad-optimizer/issues"
+    "?labels=backend-down&state=all&per_page=100"
+)
 DEFAULT_LOG_DIR = Path(__file__).resolve().parents[1] / "data/runtime/backend/logs"
 Transport = Callable[[str], tuple[int, str]]
 Metric = tuple[str, dict[str, str], float]
@@ -70,6 +81,74 @@ def _labelled(samples: list[Metric], name: str) -> str:
         if metric == name and labels
     ]
     return "; ".join(values) or _metric(samples, name)
+
+
+@dataclass
+class OutageRecord:
+    """What the incident issues say, and what they cannot say.
+
+    ``observed_seconds`` is the sum over closed rows of close minus open. Both instants come
+    from a scheduled check, so an outage is recorded as starting later and ending later than
+    it did. The two errors do not cancel in any known ratio, which is why this is printed
+    beside the detection gap rather than on its own.
+    """
+
+    rows: int = 0
+    closed: int = 0
+    open_since: str = ""
+    observed_seconds: float = 0.0
+    longest_seconds: float = 0.0
+    earliest: str = ""
+    latest: str = ""
+    unreadable: bool = False
+
+
+def _instant(value: object) -> float | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def read_outages(body: str) -> OutageRecord:
+    """Read the incident issues, counting only what they actually state.
+
+    A row with no close is the outage running now and contributes to neither total: adding
+    "until this moment" would make the number grow while nothing was learned. A row this
+    cannot parse is dropped rather than guessed at, and an unreadable document reports
+    itself unreadable rather than as zero outages, because those are different facts.
+    """
+
+    record = OutageRecord()
+    try:
+        rows = json.loads(body)
+    except json.JSONDecodeError:
+        record.unreadable = True
+        return record
+    if not isinstance(rows, list):
+        record.unreadable = True
+        return record
+    for row in rows:
+        if not isinstance(row, dict) or row.get("pull_request") is not None:
+            continue
+        opened = _instant(row.get("created_at"))
+        if opened is None:
+            continue
+        record.rows += 1
+        stamp = str(row.get("created_at"))
+        record.earliest = min(record.earliest or stamp, stamp)
+        record.latest = max(record.latest, stamp)
+        closed = _instant(row.get("closed_at"))
+        if closed is None:
+            record.open_since = stamp
+            continue
+        record.closed += 1
+        lasted = max(0.0, closed - opened)
+        record.observed_seconds += lasted
+        record.longest_seconds = max(record.longest_seconds, lasted)
+    return record
 
 
 @dataclass
@@ -250,6 +329,30 @@ def status_report(
         + (f"{logs.capture[1]} at {logs.capture[0]}" if logs.capture else UNAVAILABLE)
     )
     lines.append("Published capture ID: " + UNAVAILABLE)
+    try:
+        code, body = transport(OUTAGES_URL)
+        outages = read_outages(body) if code == 200 else OutageRecord(unreadable=True)
+    except (urllib.error.URLError, http.client.HTTPException, OSError):
+        outages = OutageRecord(unreadable=True)
+    if outages.unreadable:
+        lines.append("Recorded outages: unavailable: the incident record could not be read")
+    else:
+        lines.append(
+            f"Recorded outages: {outages.rows} recorded, {outages.closed} closed, "
+            f"{outages.observed_seconds / 3600:.1f}h observed in total, "
+            f"longest {outages.longest_seconds / 3600:.1f}h, "
+            f"{outages.earliest or 'unknown'} to {outages.latest or 'unknown'}"
+        )
+        lines.append(
+            "Outage open now: " + (f"since {outages.open_since}" if outages.open_since else "none")
+        )
+        # The number an operator actually needs, and the one no issue states. Both ends of
+        # every row above are instants a scheduled check happened to run at, so an outage
+        # shorter than the gap between two checks is never recorded at all.
+        lines.append(
+            "Read those as a floor: both ends of every row are detection instants, so an "
+            "outage between two checks leaves no row and every duration is coarse"
+        )
     for window in (1, 3, 5):
         values = logs.window_seconds.get(window, [])
         summary = (
