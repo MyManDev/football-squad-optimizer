@@ -92,6 +92,10 @@ READABLE_CONTENT_TYPES: Final[tuple[str, ...]] = (
     # is often the same words with the shell taken off.
     "application/rss+xml",
     "application/atom+xml",
+    # A feed served under a generic XML type. The reader refuses one whose bytes do not
+    # declare a feed, so accepting the type here does not accept arbitrary XML.
+    "text/xml",
+    "application/xml",
 )
 
 #: Ceiling for one document. A team-news page is tens of kilobytes; this is room for a

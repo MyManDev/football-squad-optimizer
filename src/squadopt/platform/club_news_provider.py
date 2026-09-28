@@ -164,7 +164,22 @@ def resolve_provider_config(
     """
 
     source = os.environ if environ is None else environ
-    provider = source.get(PROVIDER_ENVIRONMENT_VARIABLE, "").strip() or DEFAULT_PROVIDER
+    declared = source.get(PROVIDER_ENVIRONMENT_VARIABLE, "").strip()
+    # The generic key carries no vendor, so with no provider line the default is a guess
+    # about whose key this is, and the guess is acted on by sending the key to that vendor.
+    # A key that reaches the wrong vendor has left this machine before anything can refuse
+    # it, and no later check can call it back. The vendor's own variable is a different
+    # case: it names its vendor, so the default stays safe and is left alone.
+    if not declared and source.get(KEY_ENVIRONMENT_VARIABLE, "").strip():
+        raise ClubNewsProviderError(
+            f"{KEY_ENVIRONMENT_VARIABLE} is set and {PROVIDER_ENVIRONMENT_VARIABLE} is not, "
+            f"so which adapter this key belongs to would be a guess. Unset, the provider is "
+            f"{DEFAULT_PROVIDER!r}, and a key sent to the wrong vendor leaves this machine "
+            f"before any refusal can reach it. Name the provider in the same shell as the "
+            f"key; registered providers: {list(registered_providers())!r}. A vendor's own "
+            f"key variable names its vendor and needs no provider line."
+        )
+    provider = declared or DEFAULT_PROVIDER
     if provider not in _FACTORIES:
         raise ClubNewsProviderError(
             f"{PROVIDER_ENVIRONMENT_VARIABLE} names {provider!r}, which is not registered. "

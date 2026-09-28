@@ -26,12 +26,13 @@ which rule completed a decision and a ledger that refused an unknown one would t
 later rule into a migration. Older records without these fields remain valid and are never
 backfilled on read: absence means the completion was not recorded, not that the original
 bench order was the declared substitution order.
-Named-eleven outcome scoring is unchanged; recording completion does not apply autosubs.
+Settlement applies official autosubs only when frozen completion and event minutes exist.
 
 An outcome states the ``scoring_basis`` that produced its numbers, because the rule is
 not recoverable from the number and two numbers on different rules are different
-measurements. ``record_outcome`` writes ``named_eleven_no_autosubs``, which is what the
-scorer it calls does. Reading refuses a settled outcome that states no basis rather than
+measurements. ``record_outcome`` uses the shared official scorer when event outcomes are supplied;
+points-only callers retain explicitly named-eleven scoring. Reading refuses a settled outcome
+that states no basis rather than
 supplying one, except where the decision's own shape entails it: see ``_stated_basis``.
 
 Writes are crash-safe. A decision is assembled in a hidden staging directory next to
@@ -75,6 +76,8 @@ from squadopt.live.errors import LedgerError as LedgerError
 from squadopt.live.free_hit import FREE_HIT_CHIP, free_hit_basis_gameweek
 from squadopt.live.recommendation import Projection
 from squadopt.live.report import Recommendation
+from squadopt.live.settlement import score_named_eleven as score_named_eleven
+from squadopt.live.settlement import score_recorded_decision
 from squadopt.live.transfers import (
     FREE_TRANSFERS_AFTER_OPENING,
     LEDGER_TRANSFERS_CONTRACT_VERSION,
@@ -702,41 +705,6 @@ def extract_event_points(snapshot: CapturedSnapshot, *, gameweek: int) -> dict[i
     }
 
 
-def score_named_eleven(decision: Mapping[str, Any], event_points: Mapping[int, float]) -> float:
-    """Score the eleven a decision named, under its chip, from one set of player points.
-
-    Starters plus the captain again; a bench boost counts the bench, a triple captain
-    counts the captain once more. Automatic substitutions are not applied: this scores the
-    eleven that were **named**, which is what the projection was for.
-
-    Public, and separate from ``record_outcome``, because two callers need the identical
-    rule. One is the settled outcome below. The other is any provisional score built while
-    a gameweek is still being played, which exists precisely to be compared against the
-    projection and later against the settled figure -- a second copy of this arithmetic
-    would drift, and the comparison is the whole point of having both numbers.
-
-    Scoring is all this does. It reads no ledger and writes nothing, so a provisional
-    caller cannot reach the immutable outcome path through it.
-    """
-
-    starters = [int(value) for value in decision["starting_xi_player_ids"]]
-    bench = [int(value) for value in decision["bench_player_ids"]]
-    captain = int(decision["captain_player_id"])
-    selected = [int(value) for value in decision["squad_player_ids"]]
-    missing = [player for player in {*selected, captain} if player not in event_points]
-    if missing:
-        raise LedgerError(
-            f"Realized points do not cover every selected player; missing {sorted(missing)[:10]!r}."
-        )
-    chip = _decision_chip(decision)
-    score = sum(float(event_points[player]) for player in starters) + float(event_points[captain])
-    if chip == "bboost":
-        score += sum(float(event_points[player]) for player in bench)
-    elif chip == "3xc":
-        score += float(event_points[captain])
-    return score
-
-
 def _decision_chip(decision: Mapping[str, Any]) -> object | None:
     transfers = decision.get("transfers")
     return transfers.get("chip") if isinstance(transfers, dict) else None
@@ -754,6 +722,7 @@ def record_outcome(
     event_points: Mapping[int, float],
     *,
     source_snapshot_id: str,
+    event_outcomes: pd.DataFrame | None = None,
 ) -> Path:
     """Attach the realized outcome to an already-frozen decision, exactly once."""
 
@@ -793,6 +762,15 @@ def record_outcome(
     chip = _decision_chip(decision)
     hit_points = _decision_hit_points(decision)
     realized_xi = score_named_eleven(decision, event_points)
+    scored = None
+    if event_outcomes is not None:
+        scored = score_recorded_decision(
+            decision, pd.read_csv(directory / _PROJECTIONS_FILE), event_outcomes
+        )
+        supplied = event_outcomes.set_index("player_id")["total_points"]
+        if any(float(supplied.loc[player]) != float(event_points[player]) for player in selected):
+            raise LedgerError("Settlement points disagree with the supplied event outcomes.")
+        realized_xi = float(str(scored["xi"]))
     outcome = {
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
         "season": season,
@@ -804,16 +782,18 @@ def record_outcome(
         "realized_xi_score": realized_xi,
         "transfer_hit_points": hit_points,
         "realized_net_score": realized_xi - hit_points,
-        # What produced the two numbers above, recorded beside them because the rule is
-        # not recoverable from the numbers themselves. This is a statement of fact about
-        # the line that computed them -- ``score_named_eleven`` -- and not a default: a
-        # reader is never asked to supply it, and a record that does not carry it is
-        # refused by ``load_entry`` rather than assigned one.
-        "scoring_basis": str(ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS),
+        # Preserve the actual scorer basis; never infer an official score on read.
+        "scoring_basis": (
+            str(ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS)
+            if scored is None
+            else scored["scoring_basis"]
+        ),
         "chip": chip,
         "projected_score": float(decision["projected_score"]),
         "projection_error": realized_xi - float(decision["projected_score"]),
     }
+    if scored is not None:
+        outcome["diagnostics"] = scored["diagnostics"]
     with _gameweek_lock(directory):
         if outcome_path.exists():
             raise LedgerError(

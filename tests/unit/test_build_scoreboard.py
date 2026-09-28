@@ -755,8 +755,19 @@ def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failu
         _comparison_validator().validate(week)
 
 
-def _settlement_world(tmp_path: Path) -> tuple[ScoreboardPublicationRequest, Path]:
+def _settlement_world(
+    tmp_path: Path, *, settled: bool = True
+) -> tuple[ScoreboardPublicationRequest, Path]:
     source = capture("checked", "2026-08-24T12:00:00Z")
+    source = replace(
+        source,
+        payloads={
+            **source.payloads,
+            "entry-11-history.json": _history(
+                [{"event": 1, "points": 64, "total_points": 64, "event_transfers_cost": 0}]
+            ),
+        },
+    )
     snapshots = tmp_path / "snapshots"
     metadata = write_snapshot(
         snapshots,
@@ -787,6 +798,19 @@ def _settlement_world(tmp_path: Path) -> tuple[ScoreboardPublicationRequest, Pat
     )
     (ledger / "decision.json").write_text(json.dumps(decision), encoding="utf-8")
     write_manifest(ledger)
+    if settled:
+        from squadopt.application import SettleRequest, settle
+
+        settle(
+            SettleRequest(
+                snapshot_root=snapshots,
+                snapshot_id=metadata.snapshot_id,
+                ledger_root=tmp_path / "ledger",
+                gameweek=1,
+                season=SEASON,
+                summary_root=tmp_path / "summaries",
+            )
+        )
     return ScoreboardPublicationRequest(
         snapshot_root=snapshots,
         snapshot_id=metadata.snapshot_id,
@@ -798,7 +822,9 @@ def _settlement_world(tmp_path: Path) -> tuple[ScoreboardPublicationRequest, Pat
     ), ledger
 
 
-def test_publication_settles_verified_inputs_without_writing_the_ledger(tmp_path: Path) -> None:
+def test_publication_reads_official_persisted_outcome_without_writing_the_ledger(
+    tmp_path: Path,
+) -> None:
     request, ledger = _settlement_world(tmp_path)
     before = {p.name: p.read_bytes() for p in ledger.iterdir()}
     result = publish_scoreboard(request)
@@ -814,18 +840,13 @@ def test_publication_settles_verified_inputs_without_writing_the_ledger(tmp_path
     assert retained.document["payload"]["gameweeks"][0]["comparisons"][0] == week["comparisons"][0]
 
 
-@pytest.mark.parametrize("corrupt_digest", [False, True])
-def test_invalid_settlement_preserves_the_last_publication(
-    tmp_path: Path, corrupt_digest: bool
-) -> None:
+def test_invalid_settlement_preserves_the_last_publication(tmp_path: Path) -> None:
     request, ledger = _settlement_world(tmp_path)
     target = publish_scoreboard(request).target
     before = target.read_bytes()
     path = ledger / "projections.csv"
     projections = path.read_text(encoding="utf-8").replace("GK", "INVALID")
     path.write_text(projections, encoding="utf-8")
-    if not corrupt_digest:
-        write_manifest(ledger)
     with pytest.raises((DataError, LedgerError)):
         publish_scoreboard(request)
     assert target.read_bytes() == before
@@ -879,7 +900,7 @@ def test_base_comparison_requires_a_paired_component_decision(mismatch: str | No
 
 @pytest.mark.parametrize("settled", [True, False])
 def test_human_comparisons_keep_provenance_and_wait_for_checked_results(settled: bool) -> None:
-    from squadopt.application.scoreboard_diagnostics import empty_diagnostics
+    from squadopt.live.settlement import empty_diagnostics
 
     human = {
         "net": 0.0,
@@ -903,3 +924,64 @@ def test_human_comparisons_keep_provenance_and_wait_for_checked_results(settled:
         else:
             assert "construction" not in row
     _comparison_validator().validate(week)
+
+
+def test_publication_does_not_settle_an_unrecorded_outcome(tmp_path: Path) -> None:
+    request, ledger = _settlement_world(tmp_path, settled=False)
+    result = publish_scoreboard(request)
+    assert result.document["payload"]["gameweeks"][0]["ours"]["net"] is None
+    assert not (ledger / "outcome.json").exists()
+
+
+def test_later_capture_cannot_change_recorded_score_or_basis(tmp_path: Path) -> None:
+    request, ledger = _settlement_world(tmp_path)
+    before = {p.name: p.read_bytes() for p in ledger.iterdir()}
+    original = publish_scoreboard(request).document["payload"]
+    source = capture("later", "2026-08-25T12:00:00Z", bonus=10)
+    later = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=source.metadata.captured_at_utc,
+        payloads=source.payloads,
+    )
+    updated = publish_scoreboard(replace(request, snapshot_id=later.snapshot_id)).document[
+        "payload"
+    ]
+    assert updated["gameweeks"][0]["ours"] == original["gameweeks"][0]["ours"]
+    assert {p.name: p.read_bytes() for p in ledger.iterdir()} == before
+
+
+def test_both_publishers_render_the_same_persisted_score(tmp_path: Path) -> None:
+    from squadopt.application.settled_publication import (
+        SettledPublicationRequest,
+        _publish_scoreboard,
+    )
+    from squadopt.data.snapshots import read_snapshot
+
+    request, ledger = _settlement_world(tmp_path)
+    ordinary = publish_scoreboard(request).document["payload"]["gameweeks"][0]
+    candidate = tmp_path / "settled-site"
+    (candidate / "data/league").mkdir(parents=True)
+    settled_request = SettledPublicationRequest(
+        accepted_dir=tmp_path / "accepted",
+        snapshot_root=request.snapshot_root,
+        snapshot_id=request.snapshot_id,
+        registry_path=request.registry_path,
+        record_root=tmp_path / "records",
+        ledger_root=request.ledger_root,
+        out_dir=candidate,
+        season=SEASON,
+        gameweek=1,
+    )
+    before = {p.name: p.read_bytes() for p in ledger.iterdir()}
+    _publish_scoreboard(
+        settled_request, read_snapshot(request.snapshot_root, request.snapshot_id), candidate, (11,)
+    )
+    persisted = json.loads((candidate / "data/league/scoreboard.json").read_text())["payload"][
+        "gameweeks"
+    ][0]
+    assert persisted["ours"] == ordinary["ours"]
+    assert persisted["comparisons"][0] == ordinary["comparisons"][0]
+    assert persisted["ours"]["scoring_basis"] == "official_autosub_captain_v2"
+    assert persisted["ours"]["net"] == 96
+    assert {p.name: p.read_bytes() for p in ledger.iterdir()} == before

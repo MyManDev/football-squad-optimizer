@@ -30,11 +30,11 @@ from squadopt.application.scoreboard import (
     _published_ours,
     single_basis,
 )
-from squadopt.application.scoreboard_diagnostics import score_recorded_decision
 from squadopt.application.scoreboard_history import settled_scoreboard_entries
 from squadopt.data.errors import DataError
 from squadopt.evaluation.models import ScoringBasis, ScoringPolicy
 from squadopt.live import LedgerEntry
+from squadopt.live.settlement import score_recorded_decision
 
 LEGACY = str(ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS)
 

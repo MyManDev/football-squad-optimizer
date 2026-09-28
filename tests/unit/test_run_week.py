@@ -177,15 +177,21 @@ def test_deciding_our_squad_sits_between_the_handoff_and_the_league_tree() -> No
 def test_the_rotation_step_is_planned_only_when_it_is_asked_for() -> None:
     """Opt-in, and the reason is safety rather than taste.
 
-    The only club-news source today is a committed *synthetic* fixture. A step that ran by
+    ``--rotation`` alone reads a committed *synthetic* fixture, and a step that ran by
     default would write fixture-derived claims into a real week's artifact, which is why this
-    one is the mirror image of ``top100`` — asked for rather than skipped.
+    one is the mirror image of ``top100``: asked for rather than skipped. Real hosts being
+    registered does not change that, because reading one takes a second flag.
     """
 
     assert "rotation" not in _plan().steps
-    assert "synthetic fixture" in _plan().reasons["rotation"]
     assert "rotation" in _plan(rotation=True).steps
     assert "rotation" not in _plan(rotation=True).reasons
+    # The reason an operator reads names both sources. It said the fixture was the only one
+    # for two days after the first hosts were registered, which is how a true sentence
+    # becomes a false one without anybody editing it.
+    reason = _plan().reasons["rotation"]
+    assert "synthetic fixture" in reason
+    assert "--rotation-capture" in reason
 
 
 def test_the_rotation_step_runs_after_the_capture_and_before_the_handoff() -> None:

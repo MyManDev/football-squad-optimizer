@@ -34,8 +34,10 @@ This document is that rule. A live gameweek read without it is evidence spent.
   this question and are not scored here.
 - **Gameweek 6 onwards**: no match played.
 
-`measurements_index.md` has one football row, the development record. Nothing in it compares
-the football model with the current one on live gameweeks.
+At writing on 25 September, `measurements_index.md` had one football row, the
+development record. The 28 September index correction adds previously missing
+development evidence; none supplies an independent prospective comparison under
+this protocol. Its candidates, scoring rules and eligible weeks remain unchanged.
 
 ## What is on disk, as of 2026-09-25
 

@@ -336,9 +336,8 @@ def _publish_scoreboard(
     candidate: Path,
     ids: tuple[int, ...],
 ) -> None:
-    # The ordinary scoreboard service re-settles ledger entries in memory. This
-    # command is explicitly forbidden to do that: render the persisted outcomes
-    # through its existing pure document builder instead.
+    # Both publication paths render persisted outcomes. Settlement is an explicit
+    # write-once operation, never a side effect of building the scoreboard.
     document = scoreboard_payload(
         season=request.season,
         league_id=request.league_id,
