@@ -36,11 +36,9 @@ for (const language of ["tr", "en"] as const) {
     });
     await expect(pin).toBeEnabled();
     await pin.click();
-    // On a phone the plan's window is in the drawer.
-    await page.getByRole("button", { name: MESSAGES[language].shell.openMenu }).click();
+    // Plan settings stay on the page, without opening the navigation drawer.
     await page.getByRole("radio", { name: /^5 / }).click();
     await expect(page).toHaveURL(/window=5/);
-    await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(pin).toBeEnabled();
     await pin.click();

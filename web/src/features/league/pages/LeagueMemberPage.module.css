@@ -1,8 +1,8 @@
 /*
  * The member page in direction D: a top bar pinned at the top of the main column, the
  * decision (heading row, boards, gain strip, captain line), the squad on the pitch, the
- * two honesty lines, and the secondary tools as closed sections. The plan and Hesapla
- * render in the sidebar; the fixture rail is a column of its own from 1180 px.
+ * two honesty lines, and the secondary tools as closed sections. The plan settings and Hesapla
+ * share a visible card above the decision; the fixture rail is a column of its own from 1180 px.
  */
 
 .page,
@@ -349,22 +349,22 @@
   }
 }
 
-/* ---- Hesapla under the plan; pinned to the bottom of the phone and tablet drawer ---- */
+/* One visible settings section on phones and desktops, in document/tab order. */
+.planSettings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-top: 3px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  scroll-margin-top: var(--space-4);
+}
 
 .computeDock {
   margin-top: var(--space-2);
-}
-
-:global(#sidebar[data-mode="drawer"]) .computeDock {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  max-height: 45dvh;
-  overflow-y: auto;
-  margin: var(--space-3) calc(-1 * var(--space-4)) 0;
-  padding: var(--space-3) var(--space-4) calc(12px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface-2);
 }
 
 /* ---- Notices that change how the page reads ---- */
