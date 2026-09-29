@@ -17,13 +17,6 @@ async function blocking(page: Page) {
   return results.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? ""));
 }
 
-/** Opens the phone drawer and waits until it has finished sliding in. */
-async function openDrawer(page: Page, language: "tr" | "en") {
-  await page.getByRole("button", { name: MESSAGES[language].shell.openMenu }).click();
-  await expect(page.locator("#sidebar")).toHaveCSS("transform", "none");
-  return page.getByRole("dialog", { name: MESSAGES[language].shell.menu });
-}
-
 const ENTRY = 35249001;
 
 /**
@@ -87,7 +80,7 @@ function calendar() {
 }
 
 for (const language of ["tr", "en"] as const) {
-  test(`member page fits a phone, with the plan and Compute in the drawer, in ${language}`, async ({
+  test(`member page fits a phone, with all primary plan settings on the page, in ${language}`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -160,38 +153,23 @@ for (const language of ["tr", "en"] as const) {
     expect(await noSidewaysScroll(page)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`member-window-${language}.png`) });
 
-    // Nothing is pinned to the bottom of the phone page: the plan and Compute are in the
-    // drawer, so no bottom scroll padding is left to make room for them.
-    const compute = page.getByRole("button", { name: members.computeButton, exact: true });
-    await expect(compute).toBeHidden();
-    expect(
-      await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom),
-    ).toBe("auto");
-    expect(await blocking(page)).toEqual([]);
-
-    const drawer = await openDrawer(page, language);
-    await expect(drawer.getByRole("radio", { name: /^3 / })).toBeChecked();
-    await expect(drawer.getByRole("heading", { name: members.planTitle })).toBeVisible();
-    await expect(drawer.locator("[data-compute-dock]")).toContainText(members.computeButton);
+    const settings = page.getByRole("region", { name: members.planTitle });
+    const compute = settings.getByRole("button", { name: members.computeButton, exact: true });
+    await expect(settings.getByRole("radio", { name: /^3 / })).toBeChecked();
+    await expect(settings.getByRole("group", { name: /Top 100/ })).toBeVisible();
+    await compute.scrollIntoViewIfNeeded();
     await expect(compute).toBeInViewport({ ratio: 1 });
-    const dock = (await page.locator("[data-compute-dock]").boundingBox())!;
-    expect(dock.y + dock.height).toBeLessThanOrEqual(812 + 1);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(await blocking(page)).toEqual([]);
-    await page.screenshot({ path: testInfo.outputPath(`member-drawer-${language}.png`) });
-
-    await page.keyboard.press("Escape");
-    await expect(drawer).toHaveCount(0);
-    await expect(compute).toBeHidden();
     expect(await noSidewaysScroll(page)).toBe(true);
-    await page.screenshot({
-      path: testInfo.outputPath(`member-mobile-${language}.png`),
-      fullPage: true,
-    });
+    await page.screenshot({ path: testInfo.outputPath(`member-settings-${language}.png`) });
 
-    // On a wide screen the plan and Compute are in the sidebar, and every section still
-    // waits closed.
+    // Resizing preserves the same controls and selection without a second instance.
     await page.setViewportSize({ width: 1280, height: 900 });
-    await expect(compute).toBeVisible();
+    await expect(settings.getByRole("radio", { name: /^3 / })).toBeChecked();
+    await expect(
+      page.getByRole("button", { name: members.computeButton, exact: true }),
+    ).toHaveCount(1);
     for (const title of closedSections) {
       await expect(
         page.locator("main details").filter({ has: page.locator("summary", { hasText: title }) }),
@@ -199,42 +177,30 @@ for (const language of ["tr", "en"] as const) {
     }
   });
 
-  test(`Compute stays pinned at the foot of a short phone's drawer in ${language}`, async ({
+  test(`a short phone can reach and operate settings without a drawer in ${language}`, async ({
     page,
   }) => {
-    // iPhone SE with Safari's bars shown: the drawer's plan is taller than the screen.
     await page.setViewportSize({ width: 375, height: 548 });
     await installLeagueMocks(page);
-    await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.goto("/league/members/35249001?mode=saf-puan&window=3");
-    await openDrawer(page, language);
-    const compute = page.getByRole("button", {
-      name: MESSAGES[language].leagueMembers.computeButton,
-      exact: true,
-    });
-    const body = page.locator("#sidebar [class*='body']").first();
-    // Read once the drawer has settled: on a loaded runner the first reading can land while
-    // the drawer is still sliding in and its body has not taken its final height.
-    await expect
-      .poll(() => body.evaluate((element) => element.scrollHeight > element.clientHeight))
-      .toBe(true);
-    for (const to of ["top", "bottom"] as const) {
-      await body.evaluate((element, where) => {
-        element.scrollTop = where === "top" ? 0 : element.scrollHeight;
-      }, to);
-      await expect(compute).toBeInViewport({ ratio: 1 });
-    }
-    await body.evaluate((element) => {
-      element.scrollTop = 0;
-    });
-    // Scrolled to the top, the block with Compute sits on the drawer's bottom edge.
-    await expect
-      .poll(async () => {
-        const box = await page.locator("[data-compute-dock]").boundingBox();
-        return box ? Math.abs(box.y + box.height - 548) : 999;
-      })
-      .toBeLessThanOrEqual(1);
+    const copy = MESSAGES[language].leagueMembers;
+    const settings = page.getByRole("region", { name: copy.planTitle });
+    const window = settings.getByRole("radio", { name: /^3 / });
+    await window.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(settings.getByRole("radio", { name: /^5 / })).toBeChecked();
+    await expect(page).toHaveURL(/window=5/);
+    const compute = settings.getByRole("button", { name: copy.computeButton, exact: true });
+    await compute.scrollIntoViewIfNeeded();
+    await expect(compute).toBeInViewport({ ratio: 1 });
+    expect(
+      await compute.evaluate((button) => {
+        const b = button.getBoundingClientRect();
+        return button.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2));
+      }),
+    ).toBe(true);
+    expect(await noSidewaysScroll(page)).toBe(true);
     expect(await blocking(page)).toEqual([]);
   });
 
@@ -248,6 +214,7 @@ for (const language of ["tr", "en"] as const) {
     await page.setViewportSize({ width: 375, height: 667 });
     await installLeagueMocks(page);
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    const submissions: unknown[] = [];
     const squad = mockEntrySquadEnvelopes[35249001]!.payload;
     await page.route("**/api/v1/**", async (route) => {
       const headers = {
@@ -259,6 +226,7 @@ for (const language of ["tr", "en"] as const) {
         await route.fulfill({ status: 204, headers });
         return;
       }
+      if (route.request().method() === "POST") submissions.push(route.request().postDataJSON());
       const url = route.request().url();
       const [status, body] = url.endsWith("/capabilities")
         ? [
@@ -286,21 +254,29 @@ for (const language of ["tr", "en"] as const) {
         body: JSON.stringify(body),
       });
     });
-    await page.goto("/league/members/35249001?window=3&top100=20");
+    await page.goto("/league/members/35249001?window=3");
     const copy = MESSAGES[language].leagueMembers;
-    const drawer = await openDrawer(page, language);
-    await drawer.getByRole("button", { name: copy.computeButton, exact: true }).click();
+    const settings = page.getByRole("region", { name: copy.planTitle });
+    await settings.getByRole("radio", { name: /^5 / }).click();
+    await settings.getByRole("radio", { name: "20", exact: true }).click();
+    await expect(settings.getByRole("radio", { name: /^5 / })).toBeChecked();
+    await expect(settings.getByRole("radio", { name: "20", exact: true })).toBeChecked();
+    await expect(page).toHaveURL(/window=5.*top100=20/);
+    expect(submissions).toEqual([]);
+    await settings.getByRole("button", { name: copy.computeButton, exact: true }).click();
     const dock = page.locator("[data-compute-dock]");
     await expect(dock.getByText(copy.computeRunning, { exact: true })).toBeVisible();
     await expect(dock.getByText(copy.computeWaitingWithFallback, { exact: false })).toBeVisible();
+    expect(submissions).toEqual([expect.objectContaining({ window: 5, top100_weight: 20 })]);
+    await settings.screenshot({
+      path: testInfo.outputPath(`member-selected-settings-${language}.png`),
+    });
     const box = (await dock.boundingBox())!;
     expect(box.height).toBeLessThanOrEqual(667 * 0.45 + 1);
-    expect(box.y + box.height).toBeLessThanOrEqual(667 + 1);
+    await dock.scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`member-waiting-${language}.png`) });
 
-    // Once the drawer closes, the page still says a computation is running.
-    await page.keyboard.press("Escape");
-    await expect(drawer).toHaveCount(0);
+    // The result heading also retains the running state when settings scroll away.
     await expect(
       page.locator("main").getByText(copy.computeEcho(copy.computeEchoStates.running), {
         exact: true,
