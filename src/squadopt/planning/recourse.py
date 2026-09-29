@@ -69,7 +69,9 @@ def _proved(result: TransferPlanResult) -> None:
         raise TransferPlanningValidationError("Recourse comparison requires proved feasible plans.")
 
 
-def _continuation_horizon(node: ObservationNode, week: PlanningWeekResult) -> PlanningHorizon:
+def _continuation_horizon(
+    node: ObservationNode, week: PlanningWeekResult, *, sell_on_fee: float = 0.5
+) -> PlanningHorizon:
     table = node.horizon.validated_copy().table.copy()
     bought = (
         {}
@@ -81,7 +83,9 @@ def _continuation_horizon(node: ObservationNode, week: PlanningWeekResult) -> Pl
     for index, row in table.iterrows():
         if row.player_id in bought:
             table.at[index, "sell_price_tenths"] = sell_price_tenths(
-                current_tenths=int(row.buy_price_tenths), purchase_tenths=int(bought[row.player_id])
+                current_tenths=int(row.buy_price_tenths),
+                purchase_tenths=int(bought[row.player_id]),
+                sell_on_fee=sell_on_fee,
             )
     return PlanningHorizon(table)
 
@@ -271,7 +275,15 @@ def optimize_observed_recourse(
         value = net_week_points(week)
         remaining = remaining_chips(rights, week)
         for node in nodes:
-            horizon = _continuation_horizon(node, week)
+            horizon = _continuation_horizon(
+                node,
+                week,
+                sell_on_fee=(
+                    0.5
+                    if transfer.acquisition_sell_on_fee is None
+                    else transfer.acquisition_sell_on_fee
+                ),
+            )
             plan = optimize_transfer_plan(
                 horizon,
                 state,
