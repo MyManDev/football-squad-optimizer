@@ -57,8 +57,8 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 
 /**
  * The state of a request for this page's plan as one quiet line, for the decision heading:
- * on a phone the plan and Hesapla live in the drawer, and this is what is left in view once
- * the drawer closes. Nothing while no request was made.
+ * it stays beside the result when the member scrolls past the settings. Nothing while
+ * no request was made.
  */
 function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null {
   const states = copy.computeEchoStates;
@@ -303,7 +303,11 @@ function LeagueMemberContent({
           </p>
         ) : null}
 
-        <ShellPortal slot="plan">
+        <section
+          id="plan-settings"
+          aria-labelledby="plan-settings-title"
+          className={styles.planSettings}
+        >
           <MemberDecisionControls
             entryId={entryId}
             members={members}
@@ -311,6 +315,33 @@ function LeagueMemberContent({
             capabilities={capabilities}
             part="plan"
           />
+          <MemberDecisionControls
+            entryId={entryId}
+            members={members}
+            index={selection.status === "index-error" ? null : index}
+            capabilities={capabilities}
+            part="top100"
+          />
+          <Tool title={copy.advancedSettings}>
+            <MemberDecisionControls
+              entryId={entryId}
+              members={members}
+              index={selection.status === "index-error" ? null : index}
+              capabilities={capabilities}
+              part="advanced"
+            />
+            <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
+            <TemplatePicker
+              canApply={(params) => {
+                const offered = resolve(params);
+                return (
+                  !adviceLoading &&
+                  indexReadable &&
+                  (offered.status === "ready" || offered.computable?.selection === true)
+                );
+              }}
+            />
+          </Tool>
           <AdviceRequestPanel
             dockClassName={styles.computeDock}
             request={request}
@@ -353,7 +384,7 @@ function LeagueMemberContent({
             capabilities={capabilities}
             part="notes"
           />
-        </ShellPortal>
+        </section>
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
@@ -456,27 +487,7 @@ function LeagueMemberContent({
               <HeldSquad squad={view} codes={codes} />
             </Tool>
           ) : null}
-          <Tool title={copy.advancedSettings}>
-            <MemberDecisionControls
-              entryId={entryId}
-              members={members}
-              index={selection.status === "index-error" ? null : index}
-              capabilities={capabilities}
-              part="advanced"
-            />
-            <TemplatePicker
-              canApply={(params) => {
-                const offered = resolve(params);
-                return (
-                  !adviceLoading &&
-                  indexReadable &&
-                  (offered.status === "ready" || offered.computable?.selection === true)
-                );
-              }}
-            />
-          </Tool>
           <Tool title={copy.decisionTools}>
-            <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
             <DecisionWorkbench
               request={{
                 ...request,

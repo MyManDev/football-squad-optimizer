@@ -315,7 +315,7 @@ for (const [width, height] of [
   });
 }
 
-test("a two-move week fits the owner's laptop: the decision above 640, the pitch, bench and honesty above 900", async ({
+test("the plan link reveals the decision, pitch and honesty together on a laptop", async ({
   page,
 }, testInfo) => {
   await open(page, 1440, 900, twoMoves());
@@ -325,7 +325,8 @@ test("a two-move week fits the owner's laptop: the decision above 640, the pitch
     const box = (await locator.boundingBox())!;
     return box.y + box.height;
   };
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page.getByRole("link", { name: copy.leagueMembers.viewPlan, exact: true }).click();
+  await expect(page).toHaveURL(/#entry-advice-title$/);
   expect(await bottom(decision)).toBeLessThanOrEqual(640);
   for (const mark of ["pitch", "bench", "honesty"])
     expect(await bottom(page.locator(`[data-mark="${mark}"]`)), mark).toBeLessThanOrEqual(900);
@@ -345,10 +346,11 @@ test("a two-move week fits the owner's laptop: the decision above 640, the pitch
 
   // A small laptop keeps the whole decision above its 640 px line.
   await page.setViewportSize({ width: 1366, height: 768 });
+  await page.getByRole("link", { name: copy.leagueMembers.viewPlan, exact: true }).click();
   await expect.poll(async () => bottom(decision)).toBeLessThanOrEqual(640);
 });
 
-test("a two-move week keeps the decision in a phone's first screen, the stamp beside the transfer facts", async ({
+test("the plan link reveals a compact phone decision with its stamp beside the transfer facts", async ({
   page,
 }, testInfo) => {
   await open(page, 390, 844, twoMoves(), true);
@@ -360,9 +362,9 @@ test("a two-move week keeps the decision in a phone's first screen, the stamp be
     const { y, height } = await box(locator);
     return y + height;
   };
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  // D-Phone-Bu-Hafta's lines: the boards and the captain above 548, the gain with its
-  // stamp above 664 and the two honesty lines above 844, the whole first screen.
+  await page.getByRole("link", { name: copy.leagueMembers.viewPlan, exact: true }).click();
+  await expect(page).toHaveURL(/#entry-advice-title$/);
+  // After the explicit jump, transfer facts and caveats still fit one phone viewport.
   expect(await bottom(boards.nth(1))).toBeLessThanOrEqual(548);
   // The captain line is the paragraph that names the vice-captain too (the gain's caption
   // also says 'kaptan').
@@ -410,10 +412,10 @@ for (const [width, height] of [
   [1366, 768],
   [1280, 720],
 ] as const)
-  test(`the sidebar's foot never covers Hesapla at ${width}x${height}`, async ({ page }) => {
+  test(`the settings keep Hesapla unobscured at ${width}x${height}`, async ({ page }) => {
     await open(page, width, height, twoMoves());
     const compute = page
-      .locator("#sidebar")
+      .locator("#plan-settings")
       .getByRole("button", { name: copy.leagueMembers.computeButton, exact: true });
     await compute.scrollIntoViewIfNeeded();
     await expect(compute).toBeInViewport({ ratio: 1 });

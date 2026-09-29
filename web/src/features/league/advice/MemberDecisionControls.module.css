@@ -1,9 +1,4 @@
-/*
- * The plan part sits in the sidebar (surface-2): labels are ink2, never ink3, which is
- * 4.36:1 there. Rows are 28 px on a desktop, so Hesapla stays above a small laptop's fold
- * with every strategy and both models listed, and 44 px targets below 1180 px, where the
- * sidebar is a drawer over the page. The inputs are real radios, drawn to D's look.
- */
+/* Primary settings share the visible page surface and keep touch-sized targets. */
 
 .plan {
   display: flex;
@@ -68,7 +63,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 28px;
+  min-height: 44px;
   font-size: var(--step-0);
   line-height: 20px;
   cursor: pointer;
@@ -149,7 +144,7 @@
 
 .rivalField select {
   width: 100%;
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 8px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
@@ -173,7 +168,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
+  min-height: 44px;
   font-size: var(--step-0);
   line-height: 20px;
   white-space: nowrap;
@@ -228,7 +223,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 28px;
+  min-height: 44px;
   list-style: none;
   color: var(--color-text-muted);
   font-size: var(--step--2);
@@ -331,7 +326,7 @@
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
-  min-height: 28px;
+  min-height: 44px;
 }
 
 .windowOption:has(input:disabled) {
@@ -343,7 +338,7 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  min-height: 28px;
+  min-height: 44px;
 }
 
 @media (max-width: 1179.98px) {
@@ -351,4 +346,23 @@
   .option {
     min-height: 44px;
   }
+}
+
+@media (min-width: 720px) {
+  .plan {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+
+  .planHead {
+    grid-column: 1 / -1;
+  }
+}
+
+.viewPlan {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--step--1);
 }

@@ -37,14 +37,9 @@
  * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`, `chip`), the same
  * parameters the templates set and the compute panel reads, so the whole state stays shareable.
  *
- * The controls come in two parts. The plan part (strategy, the rival where one is needed,
- * the window and the model) is what the member changes every week; the page renders it in
- * the sidebar above Hesapla. The advanced part (the manager's word, the Top 100 weight and
- * the chip) sits on the page under a closed disclosure. `part` picks one; without it both
- * render, one after the other, so every input is on the page exactly once either way. The
- * notes that explain the options (what each strategy asks for, the declared rule, what a
- * longer window assumes) are a third part, a closed "About these options" with no input in
- * it: the sidebar puts it under Hesapla, so it never pushes the button down.
+ * Plan and Top 100 controls are visible together on the member page. Secondary chip
+ * and news controls can be folded within the same settings section. Each part renders
+ * once and shares the URL selection; changing layout never resets the user's choices.
  */
 
 import { useSearchParams } from "react-router";
@@ -72,7 +67,7 @@ import { TOP100_COPY, top100Unavailable } from "./top100Copy";
 import styles from "./MemberDecisionControls.module.css";
 
 /** Which part of the controls to render; all of them, in turn, when none is named. */
-export type DecisionControlsPart = "plan" | "notes" | "advanced";
+export type DecisionControlsPart = "plan" | "notes" | "top100" | "advanced";
 
 export function MemberDecisionControls({
   entryId,
@@ -256,8 +251,13 @@ export function MemberDecisionControls({
   const plan = (
     <div className={styles.plan}>
       <div className={styles.planHead}>
-        <h2 className={styles.planTitle}>{copy.planTitle}</h2>
+        <h2 id="plan-settings-title" className={styles.planTitle}>
+          {copy.planTitle}
+        </h2>
         <span className={styles.planNow}>{copy.planNow(now)}</span>
+        <a href="#entry-advice-title" className={styles.viewPlan}>
+          {copy.viewPlan}
+        </a>
       </div>
       <fieldset className={styles.field}>
         <legend>{copy.strategyLegend}</legend>
@@ -417,6 +417,36 @@ export function MemberDecisionControls({
     </details>
   );
 
+  const top100Controls = (
+    <fieldset className={styles.fieldset}>
+      <legend>{top100Copy.legend}</legend>
+      <div className={styles.windows}>
+        {TOP100_WEIGHTS.map((weight) => (
+          <label className={styles.windowOption} key={weight}>
+            <input
+              type="radio"
+              name={TOP100_PARAMETER}
+              value={weight}
+              checked={top100.weight === weight}
+              disabled={!weightSelectable(weight) || (chipChosen && weight !== 0 && !chipStrategy)}
+              onChange={() => update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })}
+              // Zero reads as checked while the link carries a setting the page cannot
+              // show; a click on it still has to clear that setting from the link.
+              onClick={() => {
+                if (weight === 0 && searchParams.has(TOP100_PARAMETER)) {
+                  update({ [TOP100_PARAMETER]: null });
+                }
+              }}
+            />
+            <span>{weight === 0 ? top100Copy.zero : weight}</span>
+          </label>
+        ))}
+      </div>
+      <p className={styles.note}>{top100Note}</p>
+      {top100Applies || top100Computable ? <p className={styles.note}>{top100Copy.help}</p> : null}
+    </fieldset>
+  );
+
   const advanced = (
     <div className={styles.controls}>
       <fieldset className={styles.fieldset}>
@@ -449,40 +479,6 @@ export function MemberDecisionControls({
                     ? evidenceCopy.sourceCapture
                     : evidenceCopy.sourceExample}
         </p>
-      </fieldset>
-
-      <fieldset className={styles.fieldset}>
-        <legend>{top100Copy.legend}</legend>
-        <div className={styles.windows}>
-          {TOP100_WEIGHTS.map((weight) => (
-            <label className={styles.windowOption} key={weight}>
-              <input
-                type="radio"
-                name={TOP100_PARAMETER}
-                value={weight}
-                checked={top100.weight === weight}
-                disabled={
-                  !weightSelectable(weight) || (chipChosen && weight !== 0 && !chipStrategy)
-                }
-                onChange={() =>
-                  update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
-                }
-                // Zero reads as checked while the link carries a setting the page cannot
-                // show; a click on it still has to clear that setting from the link.
-                onClick={() => {
-                  if (weight === 0 && searchParams.has(TOP100_PARAMETER)) {
-                    update({ [TOP100_PARAMETER]: null });
-                  }
-                }}
-              />
-              <span>{weight === 0 ? top100Copy.zero : weight}</span>
-            </label>
-          ))}
-        </div>
-        <p className={styles.note}>{top100Note}</p>
-        {top100Applies || top100Computable ? (
-          <p className={styles.note}>{top100Copy.help}</p>
-        ) : null}
       </fieldset>
 
       <fieldset className={styles.fieldset}>
@@ -542,10 +538,12 @@ export function MemberDecisionControls({
 
   if (part === "plan") return plan;
   if (part === "notes") return notes;
+  if (part === "top100") return top100Controls;
   if (part === "advanced") return advanced;
   return (
     <>
       {plan}
+      {top100Controls}
       {notes}
       {advanced}
     </>

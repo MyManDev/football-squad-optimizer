@@ -510,10 +510,16 @@ describe("honesty and the tools", () => {
       expect(screen.getByText(title).closest("details")).not.toHaveAttribute("open");
     }
     const advanced = screen.getByText(copy.advancedSettings).closest("details")!;
-    for (const name of ["llm", "top100", "chip"]) {
+    for (const name of ["llm", "chip"]) {
       expect(advanced.querySelectorAll(`input[name="${name}"]`).length).toBeGreaterThan(0);
     }
     expect(within(advanced).getByText(copy.templatesTitle)).toBeInTheDocument();
+    const settings = screen.getByRole("region", { name: copy.planTitle });
+    expect(within(settings).getByRole("group", { name: "Top 100 etkisi" })).toBeVisible();
+    expect(within(settings).getByRole("group", { name: "Pencere" })).toBeVisible();
+    expect(within(settings).getByRole("button", { name: "Hesapla" })).toBeVisible();
+    expect(settings).toContainElement(advanced);
+    expect(advanced.querySelector('input[name="top100"]')).toBeNull();
     // The plan's own inputs are not in the advanced section, and each is on the page once.
     expect(advanced.querySelector('input[name="strategy"], input[name="window"]')).toBeNull();
     expect(container.querySelectorAll('input[name="window"]')).toHaveLength(3);

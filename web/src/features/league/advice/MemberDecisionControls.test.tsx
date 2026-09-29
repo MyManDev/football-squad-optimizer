@@ -352,7 +352,7 @@ describe("member decision controls", () => {
     expect(screen.getByRole("combobox", { name: "Karşısında oynadığın üye" })).toBeInTheDocument();
     for (const name of ["llm", "top100", "chip"]) expect(count(plan.container, name)).toBe(0);
     // The plan names the choice it shows, and the chosen strategy in one short line.
-    expect(screen.getByRole("heading", { name: "Plan" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Plan ayarları" })).toBeInTheDocument();
     expect(screen.getByText("şu an: Fark yarat · 1 hafta")).toBeInTheDocument();
     expect(
       screen.getByText(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].short),
@@ -393,7 +393,7 @@ describe("member decision controls", () => {
         </MemoryRouter>
       </LanguageProvider>,
     );
-    for (const name of ["llm", "top100", "chip"]) {
+    for (const name of ["llm", "chip"]) {
       expect(count(advanced.container, name)).toBe(every[name]);
     }
     for (const name of ["strategy", "window"]) expect(count(advanced.container, name)).toBe(0);
