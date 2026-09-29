@@ -66,3 +66,8 @@ their deterministic limits and remained FEASIBLE. Widening the neighborhood does
 not imply solving it. A future separately declared experiment could investigate
 carrying the known incumbent as a solver hint; this run only retains it as fallback.
 Neither a causal explanation for every loss nor a gain from hints is established.
+
+Measured source content is preserved in `cb3d740f`. Source hashes were captured
+from the Windows checkout: thirteen files used CRLF and one used LF. Each hash
+was verified against that Git revision with the corresponding newline convention.
+Git path lookup uses forward slashes for the recorded Windows-relative paths.
