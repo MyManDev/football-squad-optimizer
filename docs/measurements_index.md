@@ -214,6 +214,7 @@ identified below rather than being silently pooled with v1 evidence.
 | [planning_shortlist_matrix](research/planning_shortlist_matrix.md) ([record](research/planning_shortlist_matrix.json)) | Forty valid paired cases; median solve-time ratio 0.2569, two Free Hit losses exceed 0.1 points. Engineering screen failed; no promotion. | - |
 | `observed_rollout_measurement` ([record](research/observed_rollout_measurement.md), [JSON](research/observed_rollout_measurement.json)) | Full-universe 3/5-week observed rollout, 14 cases, 0 failures, 1 positive weighted menu deltas; authored sensitivity, no realized-return or promotion claim. | - |
 | `temporal_refinement_measurement` ([report](research/temporal_refinement_measurement.md), [JSON](research/temporal_refinement_measurement.json)) | Sixteen valid full-pool paired cases; 3 weighted gains, 5 losses over 0.1, 8 unchanged. Two five-week raw forecast gains; acceptance screen failed. Offline opt-in, no promotion. | - |
+| `triple_refinement_measurement` ([report](research/triple_refinement_measurement.md), [JSON](research/triple_refinement_measurement.json)) | Sixteen legal paired cases; 2 weighted gains, 5 losses over 0.1, 9 ties. One raw forecast gain; screen failed. Three-week neighborhoods remain offline opt-in. | - |
 
 ## Evidence handoffs
 
