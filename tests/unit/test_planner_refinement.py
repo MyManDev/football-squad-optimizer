@@ -82,8 +82,9 @@ def test_rejects_invalid_fixed_squads(known_optimum_players, small_config, bad):
 
 
 @pytest.mark.parametrize("window", [3, 5])
+@pytest.mark.parametrize("width", [2, 3])
 def test_refinement_keeps_preferences_and_does_not_upgrade_restricted_proofs(
-    known_optimum_players, small_config, monkeypatch, window
+    known_optimum_players, small_config, monkeypatch, window, width
 ):
     args = problem(known_optimum_players, small_config, window)
     ids = {p: i + 1 for i, p in enumerate(known_optimum_players.player_id)}
@@ -105,9 +106,11 @@ def test_refinement_keeps_preferences_and_does_not_upgrade_restricted_proofs(
         keep_players=(7,), avoid_players=(6,), no_hits=True, save_chips=True
     )
     chips = ChipAvailability(available={c: frozenset(args[0].gameweeks) for c in ("3xc", "bboost")})
-    result = module.optimize_refined_plan(*args, preferences=preferences, chips=chips)
+    result = module.optimize_refined_plan(
+        *args, neighborhood_width=width, preferences=preferences, chips=chips
+    )
     assert result.proof_status == "FEASIBLE_REFINED_HORIZON"
-    assert len(result.steps) == window - 1
+    assert len(result.steps) == window - width + 1
     assert all(c["preferences"] == preferences for c in calls)
     assert all(s.objective_after >= s.objective_before for s in result.steps)
     for week in result.chosen.weeks:
@@ -117,8 +120,9 @@ def test_refinement_keeps_preferences_and_does_not_upgrade_restricted_proofs(
 
 
 @pytest.mark.parametrize("status", [SolverStatus.UNKNOWN, SolverStatus.INFEASIBLE])
+@pytest.mark.parametrize("width", [2, 3])
 def test_unknown_retains_incumbent_but_contradiction_is_an_error(
-    known_optimum_players, small_config, monkeypatch, status
+    known_optimum_players, small_config, monkeypatch, status, width
 ):
     args = problem(known_optimum_players, small_config, 3)
     baseline = replace(optimize_transfer_plan(*args), solver_status=SolverStatus.FEASIBLE)
@@ -138,9 +142,9 @@ def test_unknown_retains_incumbent_but_contradiction_is_an_error(
     )
     if status is SolverStatus.INFEASIBLE:
         with pytest.raises(TransferPlanningValidationError, match="contradicts"):
-            module.optimize_refined_plan(*args)
+            module.optimize_refined_plan(*args, neighborhood_width=width)
     else:
-        result = module.optimize_refined_plan(*args)
+        result = module.optimize_refined_plan(*args, neighborhood_width=width)
         assert result.chosen is baseline
         assert all(not s.accepted for s in result.steps)
 
@@ -153,8 +157,9 @@ def test_a_proved_baseline_needs_no_restricted_search(known_optimum_players, sma
 
 
 @pytest.mark.parametrize("window", [3, 5])
+@pytest.mark.parametrize("width", [2, 3])
 def test_repair_improves_a_legal_hold_incumbent_without_resetting_resources(
-    known_optimum_players, small_config, monkeypatch, window
+    known_optimum_players, small_config, monkeypatch, window, width
 ):
     args = problem(known_optimum_players, small_config, window)
     solve = module.optimize_transfer_plan
@@ -168,7 +173,7 @@ def test_repair_improves_a_legal_hold_incumbent_without_resetting_resources(
         return hold if calls == 1 else solve(*a, **kw)
 
     monkeypatch.setattr(module, "optimize_transfer_plan", seeded)
-    result = module.optimize_refined_plan(*args)
+    result = module.optimize_refined_plan(*args, neighborhood_width=width)
     assert result.chosen.objective_value > hold.objective_value
     assert result.chosen.solver_status is SolverStatus.FEASIBLE
     assert result.chosen.diagnostics["best_objective_bound"] is None
@@ -181,3 +186,52 @@ def test_repair_improves_a_legal_hold_incumbent_without_resetting_resources(
         for i in range(1, window)
     )
     assert result.chosen.total_transfer_hit_points == 0
+
+
+@pytest.mark.parametrize("bad", [True, 1, 4, 2.5])
+def test_neighborhood_width_is_bounded(known_optimum_players, small_config, bad):
+    with pytest.raises(ValueError, match="width"):
+        module.optimize_refined_plan(
+            *problem(known_optimum_players, small_config, 3), neighborhood_width=bad
+        )
+
+
+def test_triple_escapes_pair_trap_from_an_early_affordable_purchase(
+    known_optimum_players, small_config, monkeypatch
+):
+    ids = ("GK_A", "DEF_A", "MID_A", "FWD_A")
+    players = known_optimum_players.loc[known_optimum_players.player_id.isin((*ids, "FWD_B"))]
+    parts = []
+    for week in (1, 2, 3):
+        frame = players.assign(
+            gameweek=week, buy_price_tenths=50, sell_price_tenths=50, expected_points=0.0
+        )
+        frame.loc[frame.player_id.eq("FWD_A"), "expected_points"] = 10.0
+        frame.loc[frame.player_id.eq("FWD_B"), "expected_points"] = 30.0 if week == 3 else 5.0
+        frame.loc[frame.player_id.eq("FWD_B"), "buy_price_tenths"] = 50 if week == 1 else 60
+        # The held early purchase realizes only half of the subsequent rise.
+        frame.loc[frame.player_id.eq("FWD_B"), "sell_price_tenths"] = 50 if week == 1 else 55
+        parts.append(frame)
+    args = (
+        PlanningHorizon(pd.concat(parts, ignore_index=True)),
+        InitialSquadState(ids, 0, 1),
+        replace(small_config, bench_weight=0),
+    )
+    solve = module.optimize_transfer_plan
+    hold = replace(
+        solve(*args, fixed_week_squads={w: ids for w in (1, 2, 3)}),
+        solver_status=SolverStatus.FEASIBLE,
+    )
+    monkeypatch.setattr(
+        module,
+        "optimize_transfer_plan",
+        lambda *a, **kw: solve(*a, **kw) if "fixed_week_squads" in kw else hold,
+    )
+    pair = module.optimize_refined_plan(*args)
+    triple = module.optimize_refined_plan(*args, neighborhood_width=3)
+    assert pair.chosen.objective_value == pytest.approx(60.0)
+    assert triple.chosen.objective_value == pytest.approx(80.0)
+    assert all("FWD_B" in set(w.selected_squad.player_id) for w in triple.chosen.weeks)
+    assert triple.chosen.total_transfer_hit_points == 0
+    assert triple.steps[0].free_gameweeks == (1, 2, 3)
+    assert triple.proof_status == "FEASIBLE_REFINED_HORIZON"

@@ -32,7 +32,14 @@ def run(
     evidence: Path,
     states: Path,
     output: Path,
+    neighborhood_width: int = 2,
 ) -> None:
+    if (
+        isinstance(neighborhood_width, bool)
+        or not isinstance(neighborhood_width, int)
+        or neighborhood_width not in (2, 3)
+    ):
+        raise ValueError("Neighborhood width must be 2 or 3.")
     output.mkdir(parents=True, exist_ok=False)
 
     def write(name: str, value: Any) -> None:
@@ -76,15 +83,18 @@ def run(
                 for p in sources
             },
             "cases": cases,
+            "neighborhood_width": neighborhood_width,
             "pool": "full universe",
             "outcomes_read": False,
             "tuning": False,
             "repair": (
-                "One forward sweep, free each adjacent pair; fix other squads to incumbent; "
+                f"One forward sweep, free each adjacent {neighborhood_width}-week block; "
+                "fix other squads to incumbent; "
                 "full-horizon constraints; retain better complete incumbent"
             ),
             "caps": (
-                "Baseline120wall/60det plus each repair30wall/15det. "
+                "Baseline120wall/60det plus total repair30*(w-1)wall/15*(w-1)det, "
+                "divided equally across w-width+1 blocks. "
                 "Control120+30*(w-1)wall/60+15*(w-1)det. Both initial solves add existing "
                 "hold30wall/1det; repairs no hold. Wall ceilings may apply separately to tie "
                 "phase; actual diagnostics recorded."
@@ -152,14 +162,25 @@ def run(
                     )
                 else:
                     result = optimize_refined_plan(
-                        weighted, state, config, chips=chips, preferences=preferences
+                        weighted,
+                        state,
+                        config,
+                        chips=chips,
+                        preferences=preferences,
+                        neighborhood_width=neighborhood_width,
+                        repair_time_limit_seconds=30
+                        * (window - 1)
+                        / (window - neighborhood_width + 1),
+                        repair_deterministic_time_limit=15
+                        * (window - 1)
+                        / (window - neighborhood_width + 1),
                     )
                     plan = result.chosen
                     baseline = audit_plan(result.baseline, base, weighted, preferences, chips)
                     history = []
                     for step in result.steps:
                         info = dict(
-                            pair=step.free_gameweeks,
+                            free_gameweeks=step.free_gameweeks,
                             accepted=step.accepted,
                             before=step.objective_before,
                             after=step.objective_after,
@@ -222,4 +243,5 @@ if __name__ == "__main__":
     for name in ("snapshot-root", "artifact-root", "evidence", "states", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--snapshot-id", required=True)
+    parser.add_argument("--neighborhood-width", type=int, choices=(2, 3), default=2)
     run(**vars(parser.parse_args()))

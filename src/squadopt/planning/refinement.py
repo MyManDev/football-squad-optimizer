@@ -1,7 +1,6 @@
 """Opt-in temporal neighborhoods with full-horizon state constraints and incumbent retention."""
 
 from dataclasses import dataclass, replace
-from itertools import pairwise
 
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import OptimizationConfig, SolverStatus
@@ -18,7 +17,7 @@ from squadopt.planning.optimizer import optimize_transfer_plan
 
 @dataclass(frozen=True)
 class RefinementStep:
-    free_gameweeks: tuple[int, int]
+    free_gameweeks: tuple[int, ...]
     candidate: TransferPlanResult
     accepted: bool
     objective_before: float
@@ -49,12 +48,13 @@ def optimize_refined_plan(
     *,
     chips: ChipAvailability | None = None,
     preferences: DecisionPreferences | None = None,
+    neighborhood_width: int = 2,
     repair_time_limit_seconds: float = 30,
     repair_deterministic_time_limit: float = 15,
 ) -> RefinedPlan:
-    """Free each adjacent pair once; keep a complete incumbent on a failed/worse search.
+    """Free each adjacent pair or triple once; keep a complete incumbent on a failed/worse search.
 
-    Only squad membership outside the pair is fixed. XI, captain, transfers, bank,
+    Only squad membership outside the neighborhood is fixed. XI, captain, transfers, bank,
     free transfers and chips are solved together across the ORIGINAL full horizon.
     No bank/FT reset, fabricated terminal value, shortened player pool or learned
     parameter is introduced. This is deterministic forecast optimization, not an MDP
@@ -63,6 +63,12 @@ def optimize_refined_plan(
     forecast = horizon.validated_copy()
     if len(forecast.gameweeks) not in (3, 5):
         raise ValueError("Temporal refinement requires three or five forecast weeks.")
+    if (
+        isinstance(neighborhood_width, bool)
+        or not isinstance(neighborhood_width, int)
+        or neighborhood_width not in (2, 3)
+    ):
+        raise ValueError("Neighborhood width must be 2 or 3.")
     repair = replace(
         optimization,
         solver_time_limit_seconds=repair_time_limit_seconds,
@@ -84,11 +90,12 @@ def optimize_refined_plan(
         return RefinedPlan(baseline, baseline, ())
     incumbent = baseline
     steps = []
-    for pair in pairwise(forecast.gameweeks):
+    for start in range(len(forecast.gameweeks) - neighborhood_width + 1):
+        free_weeks = forecast.gameweeks[start : start + neighborhood_width]
         fixed = {
             w.gameweek: tuple(w.selected_squad.player_id)
             for w in incumbent.weeks
-            if w.gameweek not in pair
+            if w.gameweek not in free_weeks
         }
         candidate = optimize_transfer_plan(
             forecast,
@@ -117,7 +124,7 @@ def optimize_refined_plan(
             incumbent = candidate
         after = incumbent.objective_value
         assert after is not None
-        steps.append(RefinementStep(pair, candidate, accepted, before, after))
+        steps.append(RefinementStep(free_weeks, candidate, accepted, before, after))
     if incumbent is not baseline:
         # Consumers of chosen alone must not mistake a neighborhood optimum/bound
         # for global proof. Exact local statuses remain available in the step record.
