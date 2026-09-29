@@ -1,10 +1,11 @@
 """Deterministic CP-SAT optimizer for multi-gameweek transfer planning."""
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from itertools import pairwise
+from numbers import Integral
 from time import perf_counter
 from typing import Final
 
@@ -880,6 +881,32 @@ def _forbid_squads(
         )
 
 
+def _fix_week_squads(
+    artifacts: _PlanArtifacts,
+    tables: list[pd.DataFrame],
+    fixed: Mapping[int, tuple[object, ...]] | None,
+    squad_size: int,
+) -> None:
+    if fixed is None:
+        return
+    if not isinstance(fixed, Mapping):
+        raise TransferPlanningValidationError("Fixed squads must map gameweeks to player tuples.")
+    week_index = {int(t.iloc[0].gameweek): i for i, t in enumerate(tables)}
+    for week, ids in fixed.items():
+        if isinstance(week, bool) or not isinstance(week, Integral) or week not in week_index:
+            raise TransferPlanningValidationError("Fixed squad gameweek is outside the horizon.")
+        if not isinstance(ids, tuple) or len(ids) != squad_size:
+            raise TransferPlanningValidationError("Fixed squads require a full player tuple.")
+        if any(isinstance(p, bool) or not isinstance(p, (str, Integral)) for p in ids):
+            raise TransferPlanningValidationError("Fixed squads contain invalid player IDs.")
+        index = week_index[week]
+        columns = {p: i for i, p in enumerate(tables[index].player_id)}
+        if len(set(ids)) != squad_size or not set(ids) <= columns.keys():
+            raise TransferPlanningValidationError("Fixed squads contain duplicate or absent IDs.")
+        for player in ids:
+            artifacts.model.add(artifacts.squad_vars[index][columns[player]] == 1)
+
+
 def _bound_first_week_overlap(
     artifacts: _PlanArtifacts,
     first_week: pd.DataFrame,
@@ -984,8 +1011,14 @@ def optimize_transfer_plan(
     linearization_level: int | None = None,
     preferences: DecisionPreferences | None = None,
     protect_hold: bool = False,
+    fixed_week_squads: Mapping[int, tuple[object, ...]] | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
+
+    ``fixed_week_squads`` is an opt-in temporal neighborhood: named gameweeks keep
+    their entire squad, while all bank, transfer, chip and XI constraints still span
+    the original horizon. A restricted optimum is not a full-horizon optimum. None
+    preserves existing callers, including their diagnostic fingerprints.
 
     ``linearization_level`` is CP-SAT's own parameter, left at the solver's default
     when ``None`` so every existing caller solves exactly as before. At 2 the solver
@@ -1061,6 +1094,7 @@ def optimize_transfer_plan(
         settings,
         availability,
     )
+    _fix_week_squads(artifacts, players_by_week, fixed_week_squads, optimization_config.squad_size)
     _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)
     if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):
         raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
@@ -1222,6 +1256,9 @@ def optimize_transfer_plan(
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if fixed_week_squads is not None:
+        diagnostics["fixed_week_squads"] = dict(fixed_week_squads)
+        diagnostics["proof_scope"] = "restricted_week_squads"
     if preferences is not None and preferences.active:
         diagnostics["decision_preferences"] = preferences.payload()
     if protect_hold:
