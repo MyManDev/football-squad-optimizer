@@ -46,6 +46,7 @@ from squadopt.optimization.optimizer import (
     configure_solver,
 )
 from squadopt.optimization.validation import validate_players
+from squadopt.planning.acquisition import AcquisitionSales
 from squadopt.planning.models import (
     ChipAvailability,
     FirstWeekExclusion,
@@ -58,6 +59,7 @@ from squadopt.planning.models import (
     TransferPlanningValidationError,
     TransferPlanResult,
 )
+from squadopt.planning.pricing import sell_price_tenths
 
 # The wall ceiling bounds each phase rather than being divided between them, so a solve
 # that reached it in both phases would stop at twice this value. That is the shape
@@ -207,7 +209,14 @@ def _validate_integer_bounds(
             discount_weight * abs(banked_value_scaled) * transfer_config.max_free_transfers
         )
         largest_sell_prices = sorted(
-            (int(value) for value in players["sell_price_tenths"]),
+            (
+                int(value)
+                for value in players[
+                    "buy_price_tenths"
+                    if transfer_config.acquisition_sell_on_fee is not None
+                    else "sell_price_tenths"
+                ]
+            ),
             reverse=True,
         )[: optimization_config.squad_size]
         bank_bound += sum(largest_sell_prices)
@@ -310,6 +319,11 @@ def _build_model(
     transfer_count_vars: list[cp_model.IntVar] = []
     paid_transfer_vars: list[cp_model.IntVar] = []
     objective_terms: list[cp_model.LinearExpr] = []
+    acquisition = (
+        AcquisitionSales(players_by_week, transfer_config.acquisition_sell_on_fee)
+        if transfer_config.acquisition_sell_on_fee is not None
+        else None
+    )
 
     for week_index, players in enumerate(players_by_week):
         gameweek = int(players.iloc[0]["gameweek"])
@@ -462,11 +476,16 @@ def _build_model(
             bank_before = base_bank_vars[week_index - 1]
         sell_prices = [int(value) for value in players["sell_price_tenths"]]
         buy_prices = [int(value) for value in players["buy_price_tenths"]]
+        proceeds = (
+            cp_model.LinearExpr.weighted_sum(transfers_out, sell_prices)
+            if acquisition is None
+            else acquisition.add_week(
+                model, week_index, players, transfers_in, transfers_out, free_hit
+            )
+        )
         model.add(
             bank_after
-            == bank_before
-            + cp_model.LinearExpr.weighted_sum(transfers_out, sell_prices)
-            - cp_model.LinearExpr.weighted_sum(transfers_in, buy_prices)
+            == bank_before + proceeds - cp_model.LinearExpr.weighted_sum(transfers_in, buy_prices)
         )
 
         coefficients = objective_coefficients(
@@ -674,8 +693,21 @@ def _extract_plan(
     total_bench = 0.0
     total_hits = 0.0
     total_objective = 0.0
+    purchases: dict[object, int] = {}
+    fee = transfer_config.acquisition_sell_on_fee
+    if fee is not None:
+        diagnostics["sale_price_policy"] = "known_horizon_acquisitions_v1"
+        diagnostics["acquisition_sell_on_fee"] = fee
 
     for week_index, players in enumerate(artifacts.players_by_week):
+        if fee is not None:
+            # Independent numerical replay of the CP acquisition-week variables.
+            players = players.copy(deep=True)
+            for row_index, row in players.iterrows():
+                if row.player_id in purchases:
+                    players.at[row_index, "sell_price_tenths"] = sell_price_tenths(
+                        int(row.buy_price_tenths), purchases[row.player_id], sell_on_fee=fee
+                    )
         squad_indices = _selected_indices(solver, artifacts.squad_vars[week_index])
         starter_indices = _selected_indices(solver, artifacts.starter_vars[week_index])
         captain_indices = _selected_indices(solver, artifacts.captain_vars[week_index])
@@ -740,6 +772,20 @@ def _extract_plan(
         if free_next != expected_next:
             raise SolverExecutionError("Free-transfer carry failed verification.")
 
+        if fee is not None:
+            # A newly bought player's sale basis is this week's purchase, including
+            # a former original holding bought again after a sale.
+            for index in transfer_in_indices:
+                players.at[index, "sell_price_tenths"] = int(players.iloc[index].buy_price_tenths)
+            if chip != "freehit":
+                for player in transfer_out_ids:
+                    purchases.pop(player, None)
+                purchases.update(
+                    {
+                        players.iloc[index].player_id: int(players.iloc[index].buy_price_tenths)
+                        for index in transfer_in_indices
+                    }
+                )
         squad_set = set(squad_indices)
         starter_set = set(starter_indices)
         bench_indices = sorted(squad_set - starter_set)
