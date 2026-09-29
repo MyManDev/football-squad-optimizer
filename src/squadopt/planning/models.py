@@ -512,6 +512,11 @@ class TransferPlanningConfig:
     when what it buys inside the horizon exceeds it. Absent chips hold no value — the
     default, under which a horizon plays a chip worth anything now."""
     contract_version: str = TRANSFER_PLANNING_CONTRACT_VERSION
+    acquisition_sell_on_fee: float | None = None
+    """Opt-in sale accounting for purchases made inside this horizon. None uses
+    supplied sale paths unchanged. A fee in [0, 1] tracks each new acquisition;
+    original holdings retain their supplied sale paths until first sold.
+    """
 
     def __post_init__(self) -> None:
         if self.contract_version != TRANSFER_PLANNING_CONTRACT_VERSION:
@@ -541,6 +546,17 @@ class TransferPlanningConfig:
                 )
             holding[name] = _finite(value, f"chip_holding_value_points[{name}]", minimum=0.0)
         object.__setattr__(self, "chip_holding_value_points", MappingProxyType(holding))
+        if self.acquisition_sell_on_fee is not None:
+            object.__setattr__(
+                self,
+                "acquisition_sell_on_fee",
+                _finite(
+                    self.acquisition_sell_on_fee,
+                    "acquisition_sell_on_fee",
+                    minimum=0.0,
+                    maximum=1.0,
+                ),
+            )
         maximum = _integer(self.max_free_transfers, "max_free_transfers", 1)
         accrual = _integer(self.free_transfer_accrual, "free_transfer_accrual", 0)
         if accrual > maximum:
@@ -599,6 +615,9 @@ class TransferPlanningConfig:
                 for name, value in sorted(self.chip_holding_value_points.items())
             },
         }
+        # Existing supplied-path callers keep their recorded fingerprints.
+        if self.acquisition_sell_on_fee is not None:
+            payload["acquisition_sell_on_fee"] = float(self.acquisition_sell_on_fee).hex()
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
