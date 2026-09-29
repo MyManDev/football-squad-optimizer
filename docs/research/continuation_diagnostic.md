@@ -62,3 +62,7 @@ The archived source hashes describe the measured implementation, preserved in co
 both CI dependency profiles; it returns the same array without changing arithmetic,
 features, fits or selection. Original measurement records remain unchanged. This is
 not a new fit or a new evaluation of the consumed diagnostic season.
+
+The three measured source hashes used CRLF checkout bytes. Each was verified
+against `7ed2ce8d` after restoring that newline convention from Git LF content.
+No source content difference is hidden by the newline conversion.
