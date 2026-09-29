@@ -11,7 +11,7 @@ import inspect
 import json
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -83,7 +83,7 @@ def group_weights(frame: pd.DataFrame) -> np.ndarray:
     """One deadline is one weight, regardless of how many policies were recorded."""
     size = frame.groupby(["season", "gameweek"])["source"].transform("size").to_numpy()
     weights = 1.0 / size
-    return weights * len(weights) / weights.sum()
+    return cast(np.ndarray, weights * len(weights) / weights.sum())
 
 
 def fit_predict(

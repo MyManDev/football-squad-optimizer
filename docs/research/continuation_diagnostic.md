@@ -54,3 +54,11 @@ an existing sklearn version supporting weighted MLP fitting. No package is insta
 by the runner and no production dataset is written. Seven targeted tests cover
 future-only target construction, missing-week refusal, policy-clone weights,
 chronological selection, finite training and unknown-observation fallback.
+
+## Post-measurement typing compatibility
+
+The archived source hashes describe the measured implementation, preserved in commit
+`7ed2ce8d`. A later explicit return-type cast makes deadline weights type-check with
+both CI dependency profiles; it returns the same array without changing arithmetic,
+features, fits or selection. Original measurement records remain unchanged. This is
+not a new fit or a new evaluation of the consumed diagnostic season.
