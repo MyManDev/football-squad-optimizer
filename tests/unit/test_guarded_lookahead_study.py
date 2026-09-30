@@ -168,3 +168,25 @@ def test_failed_phase_is_saved_and_does_not_trigger_replacement_or_expansion(mon
     assert (
         json.loads((output / "summary.json").read_text(encoding="utf-8"))["core"]["passed"] is False
     )
+
+
+@pytest.mark.parametrize(
+    "status,used,valid",
+    [
+        ("UNKNOWN", 0.1, False),
+        ("FEASIBLE", 0.1, False),
+        ("FEASIBLE", 1, True),
+        ("UNKNOWN", 1, True),
+        ("OPTIMAL", 0.1, True),
+        ("INFEASIBLE", 0.1, True),
+    ],
+)
+def test_control_hold_probe_early_stop_is_part_of_fairness(status, used, valid):
+    diagnostics = {
+        "hold_protection": {
+            "status": status,
+            "deterministic_time": used,
+            "deterministic_time_limit": 1,
+        }
+    }
+    assert study.phase_fair(diagnostics, "OPTIMAL") is valid

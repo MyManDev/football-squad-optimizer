@@ -49,7 +49,9 @@ and actual deterministic work, overshoot, statuses and wall times. A seed failur
 invalidates that arm, with previous phase evidence retained. Nominal cap equality
 is not equality of actual work. Primary OPTIMAL or deterministic-budget exhaustion
 is required; unproved early/wall stops invalidate the engineering screen. Incomplete
-tie-breaking before deterministic exhaustion also invalidates the screen.
+tie-breaking before deterministic exhaustion also invalidates the screen. The
+hold probe must likewise finish with proof or exhaust its recorded deterministic
+cap; an unproved early hold stop is not ignored (tolerance1e-6 units).
 
 Each call has a1800second primary/tie wall ceiling, divided by segment length for
 construction. Certification has the existing30second ceiling. These are phase
