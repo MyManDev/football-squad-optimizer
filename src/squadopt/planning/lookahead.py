@@ -49,6 +49,7 @@ def optimize_with_lookahead(
     transfer: TransferPlanningConfig | None = None,
     chips: ChipAvailability | None = None,
     preferences: DecisionPreferences | None = None,
+    incumbent_plan: TransferPlanResult | None = None,
 ) -> LookaheadPlan:
     """Use an explicitly supplied tail instead of fitting a scalar terminal bonus.
 
@@ -56,6 +57,8 @@ def optimize_with_lookahead(
     missing tail is an error, never repeated current-week points or assumed zeros.
     This deterministic extension can trade window points for later points. It is
     not a calibrated season value function, and is not guaranteed to improve returns.
+    An optional full-horizon incumbent is certified and retained if search fails or
+    worsens its scaled objective; its claimed score and proof status are not trusted.
     """
     forecast = forecast.validated_copy()
     if isinstance(window, bool) or not isinstance(window, int) or window not in (3, 5):
@@ -78,7 +81,9 @@ def optimize_with_lookahead(
         settings,
         chips=chips,
         preferences=preferences,
-        protect_hold=True,
+        protect_hold=incumbent_plan is None,
+        incumbent_plan=incumbent_plan,
+        protect_incumbent=incumbent_plan is not None,
         linearization_level=2,
     )
     if not result.has_solution:
