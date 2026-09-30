@@ -129,3 +129,23 @@ def test_incompatible_or_corrupt_incumbent_is_rejected(known_optimum_players, sm
         plan = replace(plan, weeks=(first, *plan.weeks[1:]))
     with pytest.raises(TransferPlanningValidationError, match="Incumbent"):
         optimize_transfer_plan(*args, incumbent_plan=plan, **kw)
+
+
+def test_certification_overrun_exhausts_search_without_an_invalid_negative_budget(
+    known_optimum_players, small_config, monkeypatch
+):
+    args = problem(known_optimum_players, small_config)
+    incumbent = optimize_transfer_plan(*args)
+    actual_work = module._deterministic_time_used
+    calls = 0
+
+    def certification_overrun(solver, status):
+        nonlocal calls
+        calls += 1
+        return 6.0 if calls == 1 else actual_work(solver, status)
+
+    monkeypatch.setattr(module, "_deterministic_time_used", certification_overrun)
+    result = optimize_transfer_plan(*args, incumbent_plan=incumbent)
+    assert result.solver_status is SolverStatus.UNKNOWN
+    assert not result.has_solution
+    assert result.diagnostics["deterministic_time_budget_exhausted"] is True

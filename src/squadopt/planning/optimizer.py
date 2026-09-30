@@ -1298,7 +1298,7 @@ def optimize_transfer_plan(
             wall_limit,
             deterministic_limit,
         )
-    search_limit = deterministic_limit - incumbent_deterministic_time
+    search_limit = max(0.0, deterministic_limit - incumbent_deterministic_time)
     search_wall = wall_limit
     if incumbent_plan is not None:
         search_wall = max(0.001, wall_limit - (perf_counter() - started_at))
