@@ -49,6 +49,7 @@ def optimize_refined_plan(
     chips: ChipAvailability | None = None,
     preferences: DecisionPreferences | None = None,
     neighborhood_width: int = 2,
+    use_incumbent_hint: bool = False,
     repair_time_limit_seconds: float = 30,
     repair_deterministic_time_limit: float = 15,
 ) -> RefinedPlan:
@@ -60,6 +61,8 @@ def optimize_refined_plan(
     parameter is introduced. This is deterministic forecast optimization, not an MDP
     policy or evidence of realized-point improvement. Defaults remain opt-in.
     """
+    if not isinstance(use_incumbent_hint, bool):
+        raise ValueError("use_incumbent_hint must be boolean.")
     forecast = horizon.validated_copy()
     if len(forecast.gameweeks) not in (3, 5):
         raise ValueError("Temporal refinement requires three or five forecast weeks.")
@@ -106,6 +109,7 @@ def optimize_refined_plan(
             preferences=preferences,
             linearization_level=2,
             fixed_week_squads=fixed,
+            incumbent_plan=incumbent if use_incumbent_hint else None,
         )
         if candidate.solver_status is SolverStatus.INFEASIBLE:
             raise TransferPlanningValidationError(
