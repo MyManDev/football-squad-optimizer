@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
+from numbers import Integral
 from pathlib import Path
 from typing import Any
 
@@ -61,12 +63,35 @@ def causal_training(history: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
+def forecast_gameweeks(first: int, gameweeks: Sequence[int] | None = None) -> tuple[int, ...]:
+    """The consecutive gameweeks one artifact forecasts, starting at the capture's own target.
+
+    ``None`` is the artifact as it is served: five weeks from the target, fewer at the end
+    of the season. A caller may name a longer run for research. It must still start at the
+    target, because the first week is the decided forecast and the reader holds it to the
+    capture's deadline. Nothing here invents a calendar: a named week the capture does not
+    publish fails in the fixture calendar below, not by being filled in.
+    """
+    if gameweeks is None:
+        return tuple(range(first, min(first + 5, 39)))
+    weeks = tuple(gameweeks)
+    if not weeks or any(isinstance(w, bool) or not isinstance(w, Integral) for w in weeks):
+        raise ValueError("Forecast gameweeks must be a nonempty sequence of integers.")
+    weeks = tuple(int(w) for w in weeks)
+    if weeks[0] != first:
+        raise ValueError("Forecast gameweeks must start at the capture's own target gameweek.")
+    if weeks != tuple(range(weeks[0], weeks[-1] + 1)) or weeks[-1] > 38:
+        raise ValueError("Forecast gameweeks must be consecutive and end by gameweek 38.")
+    return weeks
+
+
 def produce_football_forecast(
     snapshot: CapturedSnapshot,
     archive_root: Path,
     *,
     contextual: bool = False,
     manager_words: ManagerWords | None = None,
+    gameweeks: Sequence[int] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(contextual, bool):
         raise ValueError("contextual must be a boolean.")
@@ -111,7 +136,7 @@ def produce_football_forecast(
             manager_words=manager_words,
         )
     fixtures = pd.DataFrame(json.loads(snapshot.payloads[FIXTURES_PAYLOAD]))
-    weeks = tuple(range(first, min(first + 5, 39)))
+    weeks = forecast_gameweeks(first, gameweeks)
     fixtures = fixtures.loc[fixtures.event.isin(weeks)]
     if fixtures.kickoff_time.isna().any():
         raise ValueError("Football window contains an undated fixture.")
