@@ -120,7 +120,10 @@ def test_selected_real_certified_seed_is_rescored_and_reusable(known_optimum_pla
     assert final.objective_value < 1e9
 
 
-def test_failed_phase_is_saved_and_does_not_trigger_replacement_or_expansion(monkeypatch, tmp_path):
+@pytest.mark.parametrize("method", study.METHODS)
+def test_failed_phase_is_saved_and_does_not_trigger_replacement_or_expansion(
+    monkeypatch, tmp_path, method
+):
     import json
     from datetime import UTC, datetime, timedelta
 
@@ -155,7 +158,18 @@ def test_failed_phase_is_saved_and_does_not_trigger_replacement_or_expansion(mon
     monkeypatch.setattr(study.segmented, "plan_in_segments", segment)
     monkeypatch.setattr(study, "optimize_transfer_plan", fail)
     output = tmp_path / "study"
-    study.run(tmp_path, tmp_path, "capture", tmp_path, evidence, states, output)
+    monkeypatch.setattr(study, "validate_reference", lambda *a: None)
+    study.run(
+        tmp_path,
+        tmp_path,
+        "capture",
+        tmp_path,
+        evidence,
+        states,
+        output,
+        method=method,
+        reference_study=tmp_path,
+    )
     records = json.loads((output / "results.json").read_text(encoding="utf-8"))
     assert len(records) == 4
     for record in records:
@@ -190,3 +204,213 @@ def test_control_hold_probe_early_stop_is_part_of_fairness(status, used, valid):
         }
     }
     assert study.phase_fair(diagnostics, "OPTIMAL") is valid
+
+
+@pytest.mark.parametrize("method", study.METHODS)
+def test_method_budget_and_unknown_method_refusal(method):
+    assert study.budgets(method) == (280, 280)
+    with pytest.raises(ValueError, match="Unknown"):
+        study.budgets("unregistered")
+
+
+@pytest.mark.parametrize(
+    "method,fault",
+    [
+        ("two_seed_v1", None),
+        ("single_seed_v1", None),
+        ("single_seed_v1", "corrupt_seed"),
+        ("single_seed_v1", "exhausted"),
+    ],
+)
+def test_registered_method_calls_use_same_state_and_only_their_declared_phases(
+    known_optimum_players, small_config, monkeypatch, tmp_path, method, fault
+):
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    from tests.unit.test_planner_incumbent import problem
+
+    from squadopt.planning import PlanningHorizon
+
+    horizon, initial, _ = problem(known_optimum_players, small_config, 14)
+    ids = {player: index + 1 for index, player in enumerate(horizon.table.player_id.unique())}
+    horizon = PlanningHorizon(horizon.table.assign(player_id=horizon.table.player_id.map(ids)))
+    states = tmp_path / "states.json"
+    states.write_text(
+        json.dumps(
+            {
+                str(profile): {
+                    "ids": [ids[p] for p in initial.squad_player_ids],
+                    "bank": 0,
+                    "ft": 1,
+                }
+                for profile in (1000, 900)
+            }
+        ),
+        encoding="utf-8",
+    )
+    evidence = tmp_path / "evidence.csv"
+    evidence.write_text("fixed", encoding="utf-8")
+    monkeypatch.setattr(study, "CUTOFF", datetime.now(UTC) + timedelta(days=1))
+    monkeypatch.setattr(study, "prepare", lambda *a: (None, None, SimpleNamespace(projection=None)))
+    monkeypatch.setattr(study, "top100_manifest_path", lambda p: evidence)
+    monkeypatch.setattr(study, "load_top100_counts", lambda *a, **kw: SimpleNamespace(counts={}))
+    monkeypatch.setattr(study, "weighted_horizon", lambda *a: None)
+    monkeypatch.setattr(study, "to_planning_horizon", lambda *a: horizon)
+    monkeypatch.setattr(study, "OptimizationConfig", lambda **kw: replace(small_config, **kw))
+    if fault == "corrupt_seed":
+        build = study.segmented.plan_in_segments
+
+        def corrupt(*a, **kw):
+            return replace(build(*a, **kw), horizon_fingerprint="0" * 64)
+
+        monkeypatch.setattr(study.segmented, "plan_in_segments", corrupt)
+    if fault == "exhausted":
+        import squadopt.planning.optimizer as core
+
+        real_solve = study.optimize_transfer_plan
+        real_used = core._deterministic_time_used
+
+        def solve(*a, **kw):
+            if not kw.get("protect_incumbent"):
+                return real_solve(*a, **kw)
+            calls = 0
+
+            def used(solver, status):
+                nonlocal calls
+                calls += 1
+                return 253.0 if calls == 1 else real_used(solver, status)
+
+            with monkeypatch.context() as scoped:
+                scoped.setattr(core, "_deterministic_time_used", used)
+                return real_solve(*a, **kw)
+
+        monkeypatch.setattr(study, "optimize_transfer_plan", solve)
+    references = []
+    monkeypatch.setattr(study, "validate_reference", lambda *a: references.append(a))
+    output = tmp_path / "study"
+    study.run(
+        tmp_path,
+        tmp_path,
+        "capture",
+        tmp_path,
+        evidence,
+        states,
+        output,
+        method=method,
+        reference_study=tmp_path,
+    )
+    records = json.loads((output / "results.json").read_text(encoding="utf-8"))
+    assert len(records) == 4  # Exact optimum in both arms: no gain, no expansion.
+    assert bool(references) == (method == "single_seed_v1")
+    for record in records:
+        control, candidate = (record["arms"][arm] for arm in ("control", "candidate"))
+        assert control["valid"]
+        if fault == "corrupt_seed":
+            assert not candidate["valid"]
+            assert candidate["error_type"] == "TransferPlanningValidationError"
+            assert candidate["stage"] == "final"
+            assert candidate["recorded_det"] > 0
+            assert candidate["actual_det"] is None
+            assert not candidate["cost_complete"]
+            continue
+        assert candidate["valid"]
+        assert candidate["weighted_net_points"] == pytest.approx(control["weighted_net_points"])
+        if fault == "exhausted":
+            assert candidate["diagnostics"]["primary_search_status"] == "UNKNOWN"
+            assert candidate["diagnostics"]["incumbent_protection"]["selected"]
+            assert candidate["diagnostics"]["best_objective_bound"] is None
+        phases = candidate["phases"]
+        assert sum(p["configured_det"] for p in phases) == 280
+        assert len(phases) == (15 if method == "single_seed_v1" else 19)
+        assert all("hold_protection" not in p["diagnostics"] for p in phases)
+        assert phases[-1]["diagnostics"]["incumbent_protection"]["claimed_objective_used"] is False
+        assert candidate["actual_det"] == pytest.approx(sum(p["actual_det"] for p in phases))
+        assert candidate["cost_complete"]
+        if method == "single_seed_v1":
+            assert [p["stage"] for p in phases] == ["sequential"] * 14 + ["final"]
+            assert phases[-1]["configured_det"] == 252
+    assert json.loads((output / "protocol.json").read_text())["method"] == method
+
+
+@pytest.mark.parametrize("separator", ["/", "\\"])
+@pytest.mark.parametrize("changed", [None, "states", "core", "forecast", "capture"])
+def test_reference_gate_refuses_changed_inputs_before_comparison(tmp_path, changed, separator):
+    import json
+
+    old, new = tmp_path / "old", tmp_path / "new"
+    for folder in (old, new):
+        folder.mkdir()
+        study.write_json(
+            folder / "protocol.json",
+            {
+                "states_sha256": "states",
+                "top100_sha256": "top",
+                "top100_manifest_sha256": "manifest",
+                "allowed_archive_seasons": ["allowed"],
+                "source_sha256": {
+                    "src/squadopt/planning/optimizer.py": "core",
+                    separator.join(("scripts", "measure_guarded_lookahead.py")): folder.name,
+                },
+            },
+        )
+        for name in ("forecast14.json", "forecast5.json"):
+            study.write_json(
+                folder / name,
+                {
+                    "fingerprint": name,
+                    "source_snapshot_id": "capture",
+                    "archive_hashes": {"ok": "hash"},
+                },
+            )
+        study.write_json(
+            folder / "forecast-provenance.json",
+            {
+                "source_fingerprint": "source",
+                "source_snapshot_id": "capture",
+                "archive_hashes": {"ok": "hash"},
+            },
+        )
+        study.write_json(folder / "results.json", [])
+    if changed:
+        filename = (
+            "protocol.json"
+            if changed in ("states", "core")
+            else ("forecast14.json" if changed == "forecast" else "forecast-provenance.json")
+        )
+        path = new / filename
+        data = json.loads(path.read_text())
+        if changed == "states":
+            data["states_sha256"] = "different"
+        elif changed == "core":
+            data["source_sha256"]["src/squadopt/planning/optimizer.py"] = "different"
+        elif changed == "forecast":
+            data["fingerprint"] = "different"
+        else:
+            data["source_fingerprint"] = "different"
+        study.write_json(path, data)
+        with pytest.raises(ValueError, match="Reference"):
+            study.validate_reference(new, old)
+        assert not (new / "reference-check.json").exists()
+    else:
+        study.validate_reference(new, old)
+        assert json.loads((new / "reference-check.json").read_text())["reused_development_data"]
+
+
+def test_single_seed_requires_reference_before_any_preparation(tmp_path, monkeypatch):
+    def forbidden(*a):
+        pytest.fail("No fitting or solving before reference requirement.")
+
+    monkeypatch.setattr(study, "prepare", forbidden)
+    with pytest.raises(ValueError, match="reference"):
+        study.run(
+            tmp_path,
+            tmp_path,
+            "capture",
+            tmp_path,
+            tmp_path,
+            tmp_path,
+            tmp_path / "output",
+            method="single_seed_v1",
+        )
+    assert not (tmp_path / "output").exists()
