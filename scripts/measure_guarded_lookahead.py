@@ -180,6 +180,14 @@ def prepare(snapshot_root, artifact_root, snapshot_id, archive_root, output):
 
 def phase_fair(diagnostics: dict[str, Any], status: str) -> bool:
     """An unproved early stop cannot pass as deterministic-budget evidence."""
+    hold = diagnostics.get("hold_protection")
+    if (
+        hold is not None
+        and hold.get("status") not in ("OPTIMAL", "INFEASIBLE")
+        and float(hold.get("deterministic_time", 0))
+        < float(hold["deterministic_time_limit"]) - 1e-6
+    ):
+        return False
     primary = diagnostics.get("primary_search_status", status)
     if primary != "OPTIMAL" and not diagnostics.get("deterministic_time_budget_exhausted", False):
         return False
