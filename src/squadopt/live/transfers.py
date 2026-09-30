@@ -17,7 +17,7 @@ records which chip was played so the season's second half knows what is left.
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Final, TypedDict
 
@@ -830,7 +830,8 @@ def plan_transfer_horizon(
     horizons default to at most one transfer per gameweek. That is the measured rolling
     discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
     churned, while the cap removed the mechanism. Callers may provide another explicit
-    policy, whose configuration fingerprint remains in the result.
+    policy. Multiweek sale accounting always uses the captured season fee, including
+    with an explicit policy; the effective configuration fingerprint is in the result.
 
     Chips are not offered unless the caller names them in ``chips``. A finite horizon
     values a chip inside the horizon only — its option value after the last week is
@@ -930,6 +931,16 @@ def plan_transfer_horizon(
         if transfer_config is None
         else transfer_config
     )
+    if len(projection_horizon.target_gameweeks) > 1:
+        # Initial lots retain the captured sell values, including unknown member
+        # purchase bases. A subsequent purchase starts a new lot at its actual
+        # planned buy price, even though captured market prices stay flat.
+        if (
+            planning_policy.acquisition_sell_on_fee is not None
+            and planning_policy.acquisition_sell_on_fee != fee
+        ):
+            raise DataSourceError("Planning sale fee differs from captured season rules.")
+        planning_policy = replace(planning_policy, acquisition_sell_on_fee=fee)
     state = InitialSquadState(
         held.squad_player_ids,
         bank_tenths=budget.bank_tenths,
