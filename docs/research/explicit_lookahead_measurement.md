@@ -124,22 +124,30 @@ equal difficulty, and the fourteen-week solves were expected to return FEASIBLE.
 number is in-forecast points on one supplied forecast; the realized negatives for longer
 horizons (`planner_horizon_rolling_note.md`: rolling H3 -2.30, H4 -8.32) stand beside it.
 Nothing here promotes a horizon, changes the served artifact, its reader, a default or
-the prospective protocol.
+the prospective protocol (`football_prospective_prereg.md`), which scores the served
+five-week `football_team_share_v1` and reads none of this. Injury probabilities are not
+calibrated by a longer horizon; the captured state is carried, not forecast. The served
+document was rebuilt with 89946 training rows, the extended one with the same
+89946; both headers are in the JSON record under `forecast_documents`.
 
 ## Follow-up boundary
 
 This record does not support lengthening the served artifact: the readable gain from
 the tail the artifact already carries is a quarter to a third of a point, and the longer
-tail is unsolved. What it supports is the experiment the triple-repair record named in
-its follow-up boundary, carrying a known incumbent into the solve as a hint. The hold
-guard already does this for the hold plan (a verified plan, a lower bound on the
-objective, a warm start); the same mechanism could take the rolling path or the
-window-then-continue path, after which a long lookahead is at least the best known path
-by construction and its difference is a menu-inclusion magnitude, readable even when
-FEASIBLE. That is a `planning/` change, separately declared, outside the freeze window.
-The chip arm was dropped because an unpriced right is spent inside any window solve;
-its proper control is a reservation-priced right, which the lookahead refuses to stack,
-so chip timing with transfers stays unmeasured.
+tail is unsolved. What it supports is handing the long solve a path it is known to admit.
+Since #901 the planner takes an optional `incumbent_plan`: the decisions are certified
+against the current model in a constrained clone and then hinted, never fixed, bounded or
+trusted for a score, and the input cannot be combined with `protect_hold`. Its own paired
+study found no gain where the unhinted repairs already reached their restricted optima.
+The case here is different in kind: a fourteen-week search that does not reach a path
+fourteen one-week solves find. Handing that path to the lookahead needs
+`optimize_with_lookahead` to take an incumbent in place of the hold guard, which is the
+planner track's seam (#632); this track supplies the paths, their handoff and the
+fingerprints an incumbent must match. Until then the expiry tail stays unread. The chip
+arm was dropped because an unpriced right is spent inside any window solve; its proper
+control is a reservation-priced right, which the lookahead refuses to stack, so chip
+timing with transfers stays unmeasured, and a longer dated horizon is not evidence that
+the automatic chip strategy is ready.
 
 Reproduce with `python -m scripts.measure_explicit_lookahead --snapshot-root <captures>
 --archive-root <vaastav archive> --snapshot-id fpl-live-20260922T205533Z-7ff2c68eac7f

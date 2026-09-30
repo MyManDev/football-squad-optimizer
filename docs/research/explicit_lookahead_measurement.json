@@ -1231,5 +1231,59 @@
       }
     },
     "full_local_results_sha256": "eea95a83bd224376e471c56132be6db7044b024935968a8af98b2d7af3f6ff98"
+  },
+  "forecast_documents": {
+    "note": "Both documents come from produce_football_forecast on the same capture and archive; the served one is live_football_forecast_v1 as the builder would write it, the extended one carries the same header with more weeks and is not that contract.",
+    "served": {
+      "contract_version": "live_football_forecast_v1",
+      "model_version": "football_team_share_v1",
+      "season": "2026-27",
+      "gameweek": 6,
+      "source_snapshot_id": "fpl-live-20260922T205533Z-7ff2c68eac7f",
+      "captured_at_utc": "2026-09-22T20:55:33.199192Z",
+      "source_fingerprint": "7ff2c68eac7fbd2eec2a13e2b8a95dee3650385a8c5b5bff4d36fe3d21479a66",
+      "training_rows": 89946,
+      "training_latest_kickoff": "2026-09-20T15:30:00+00:00",
+      "fingerprint": "c4670644db312e54459c78c4a43455b50be7204b02eeec9341861987a3ceec49",
+      "gameweeks": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "rows": 3335,
+      "players_per_week": 667
+    },
+    "extended": {
+      "contract_version": "live_football_forecast_v1",
+      "model_version": "football_team_share_v1",
+      "season": "2026-27",
+      "gameweek": 6,
+      "source_snapshot_id": "fpl-live-20260922T205533Z-7ff2c68eac7f",
+      "captured_at_utc": "2026-09-22T20:55:33.199192Z",
+      "source_fingerprint": "7ff2c68eac7fbd2eec2a13e2b8a95dee3650385a8c5b5bff4d36fe3d21479a66",
+      "training_rows": 89946,
+      "training_latest_kickoff": "2026-09-20T15:30:00+00:00",
+      "fingerprint": "8fbc003d9b80e817654831b6129617e742461708f80147182f7cf1e7d78a3b3c",
+      "gameweeks": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "rows": 9338,
+      "players_per_week": 667
+    }
   }
 }
