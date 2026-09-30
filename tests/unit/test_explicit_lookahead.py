@@ -241,7 +241,7 @@ def _records():
     ]
 
 
-def test_summary_and_compact_record_keep_labels_and_drop_week_tables():
+def test_summary_and_compact_record_keep_labels_and_moves_but_drop_squads():
     rolling = {"1000": {"valid": True, "net_points": 290.0, "weeks": [{"in": []}]}}
     summary = summarize(_records(), rolling)
     assert summary["cases"] == 2 and summary["valid_pairs"] == 1 and summary["failed_pairs"] == 1
@@ -249,8 +249,15 @@ def test_summary_and_compact_record_keep_labels_and_drop_week_tables():
     assert summary["rolling_one_week"] == {"1000": {"net_points": 290.0, "valid": True}}
     assert summary["promotion"] is False and summary["realized_returns"] is False
     compacted = compact(_records(), rolling)
-    assert all("weeks" not in arm for case in compacted["cases"] for arm in case["arms"].values())
-    assert "weeks" not in compacted["rolling_one_week"]["1000"]
+    kept = [
+        w
+        for case in compacted["cases"]
+        for arm in case["arms"].values()
+        for w in arm.get("weeks", [])
+    ]
+    assert kept and all("free_next" in w for w in kept)
+    assert all(k not in w for w in kept for k in ("squad", "starters", "captain"))
+    assert compacted["rolling_one_week"]["1000"]["weeks"] == [{"in": []}]
     table = render_markdown(compacted)
     assert table.splitlines()[0].startswith("| Profile | Window | Tail |")
     assert "| 1000 | 3 | served to GW10 |" in table and "+1.000000" in table

@@ -295,7 +295,49 @@
             },
             "transfer_count": 3,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 53.79971409051592
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  60307,
+                  465730
+                ],
+                "out": [
+                  115556,
+                  430871
+                ],
+                "bank": 11,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 53.07134262025584
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  483067
+                ],
+                "bank": 12,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.64881947903353
+              }
+            ]
           },
           "continuation": {
             "valid": true,
@@ -340,7 +382,37 @@
             },
             "transfer_count": 2,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 9,
+                "chip": null,
+                "in": [
+                  200834
+                ],
+                "out": [
+                  465730
+                ],
+                "bank": 7,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.78330948904935
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [
+                  586309
+                ],
+                "out": [
+                  502500
+                ],
+                "bank": 29,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 57.953554032760415
+              }
+            ]
           },
           "lookahead": {
             "valid": true,
@@ -383,7 +455,77 @@
             "paid_transfer_count": 0,
             "reversals": 0,
             "window_net_points": 159.05127700612445,
-            "tail_net_points": 111.55682271002561
+            "tail_net_points": 111.55682271002561,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 53.79971409051592
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  465730,
+                  567119
+                ],
+                "out": [
+                  60689,
+                  115556
+                ],
+                "bank": 3,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.296796496099
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  483067
+                ],
+                "bank": 4,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.95476641950952
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [
+                  200834
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 53.24261713285394
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [
+                  586309
+                ],
+                "out": [
+                  502500
+                ],
+                "bank": 22,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 58.31420557717168
+              }
+            ]
           }
         },
         "pair": {
@@ -453,7 +595,49 @@
             },
             "transfer_count": 3,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 53.79971409051592
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  60307,
+                  465730
+                ],
+                "out": [
+                  115556,
+                  430871
+                ],
+                "bank": 11,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 53.07134262025584
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  483067
+                ],
+                "bank": 12,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.64881947903353
+              }
+            ]
           },
           "lookahead": {
             "valid": true,
@@ -496,7 +680,153 @@
             "paid_transfer_count": 0,
             "reversals": 0,
             "window_net_points": 157.06081143737077,
-            "tail_net_points": 574.9457752933733
+            "tail_net_points": 574.9457752933733,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 53.79971409051592
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 51.338401837112485
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 51.92269550974236
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.64225885224433
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 56.22479088992876
+              },
+              {
+                "week": 11,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.10615472541139
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.84520501115993
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 49.21289877675341
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 55.888413895664755
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.34694222278251
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 49.04285077555037
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.6604300675339
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.17302392244233
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [
+                  513086
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 5,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.80280615390164
+              }
+            ]
           },
           "continuation": {
             "valid": true,
@@ -537,7 +867,123 @@
             },
             "transfer_count": 1,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 9,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 52.16998127282566
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 56.898377344500666
+              },
+              {
+                "week": 11,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 51.18638149830621
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.74206650819844
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 49.613528958050736
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 54.46168309970113
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.63152781535548
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.5937201941695
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.92082242004118
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 12,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.553736420296225
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [
+                  575476
+                ],
+                "out": [
+                  465730
+                ],
+                "bank": 6,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.83071673858838
+              }
+            ]
           }
         },
         "pair": {
@@ -607,7 +1053,77 @@
             },
             "transfer_count": 5,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 53.79971409051592
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  465730,
+                  567119
+                ],
+                "out": [
+                  60689,
+                  115556
+                ],
+                "bank": 3,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.296796496099
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  483067
+                ],
+                "bank": 4,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.95476641950952
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [
+                  200834
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 53.24261713285394
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [
+                  586309
+                ],
+                "out": [
+                  502500
+                ],
+                "bank": 22,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 58.31420557717168
+              }
+            ]
           },
           "continuation": {
             "valid": true,
@@ -648,7 +1164,103 @@
             },
             "transfer_count": 1,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 11,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 50.38258618809746
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 53.06215236861812
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 49.815057947040685
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 55.533052102433345
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.16504455383177
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.581125526113176
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.751807680068374
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 22,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.72285523102994
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [
+                  502500
+                ],
+                "out": [
+                  586309
+                ],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.99917452007333
+              }
+            ]
           },
           "lookahead": {
             "valid": true,
@@ -691,7 +1303,153 @@
             "paid_transfer_count": 0,
             "reversals": 0,
             "window_net_points": 265.92786117954387,
-            "tail_net_points": 466.07872555120025
+            "tail_net_points": 466.07872555120025,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 53.79971409051592
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 51.338401837112485
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 51.92269550974236
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.64225885224433
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 56.22479088992876
+              },
+              {
+                "week": 11,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.10615472541139
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.84520501115993
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 49.21289877675341
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 55.888413895664755
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.34694222278251
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 49.04285077555037
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.6604300675339
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.17302392244233
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [
+                  513086
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 5,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.80280615390164
+              }
+            ]
           }
         },
         "pair": {
@@ -761,7 +1519,47 @@
             },
             "transfer_count": 2,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.632942578797135
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  465730
+                ],
+                "out": [
+                  95658
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.735931103947614
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  483067
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.5418036879733
+              }
+            ]
           },
           "lookahead": {
             "valid": true,
@@ -804,7 +1602,75 @@
             "paid_transfer_count": 0,
             "reversals": 1,
             "window_net_points": 155.47255813522025,
-            "tail_net_points": 109.280970765696
+            "tail_net_points": 109.280970765696,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.632942578797135
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  465730
+                ],
+                "out": [
+                  95658
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.735931103947614
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  220237
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.103684452475505
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [
+                  95658
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 2,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.134677364317646
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [
+                  586309
+                ],
+                "out": [
+                  169432
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 57.14629340137835
+              }
+            ]
           },
           "continuation": {
             "valid": true,
@@ -849,7 +1715,37 @@
             },
             "transfer_count": 2,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 9,
+                "chip": null,
+                "in": [
+                  483067
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.038351439802504
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [
+                  586309
+                ],
+                "out": [
+                  169432
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 56.55580538342933
+              }
+            ]
           }
         },
         "pair": {
@@ -919,7 +1815,47 @@
             },
             "transfer_count": 2,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.632942578797135
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  465730
+                ],
+                "out": [
+                  95658
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.735931103947614
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  483067
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.5418036879733
+              }
+            ]
           },
           "continuation": {
             "valid": true,
@@ -960,7 +1896,119 @@
             },
             "transfer_count": 0,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 9,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 51.591758381183716
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 54.575940509655496
+              },
+              {
+                "week": 11,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 48.848339944727975
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.971540392196104
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 48.61987942690249
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 53.40404616375554
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 52.27734210874387
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 48.74396936561407
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.9793601255521
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.08685716155026
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.278815666807226
+              }
+            ]
           },
           "lookahead": {
             "valid": true,
@@ -1003,7 +2051,169 @@
             "paid_transfer_count": 0,
             "reversals": 5,
             "window_net_points": 153.8276285391933,
-            "tail_net_points": 559.4399249852545
+            "tail_net_points": 559.4399249852545,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.632942578797135
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 50.44008180089657
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 50.75460415949961
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 51.965591350231
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 54.15718124573615
+              },
+              {
+                "week": 11,
+                "chip": null,
+                "in": [
+                  173774,
+                  489639
+                ],
+                "out": [
+                  40383,
+                  220237
+                ],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 48.375666458598005
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.81992252144339
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [
+                  220237,
+                  586268
+                ],
+                "out": [
+                  173774,
+                  489639
+                ],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 48.45586392995477
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 54.48912408921262
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [
+                  40383
+                ],
+                "out": [
+                  586268
+                ],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.106414233732664
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 47.163208285505604
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.91911120234866
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.82400955826376
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [
+                  513086
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 5,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.16383211022783
+              }
+            ]
           }
         },
         "pair": {
@@ -1073,7 +2283,75 @@
             },
             "transfer_count": 4,
             "paid_transfer_count": 0,
-            "reversals": 1
+            "reversals": 1,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.632942578797135
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [
+                  465730
+                ],
+                "out": [
+                  95658
+                ],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.735931103947614
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [
+                  223827
+                ],
+                "out": [
+                  220237
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 51.103684452475505
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [
+                  95658
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 2,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.134677364317646
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [
+                  586309
+                ],
+                "out": [
+                  169432
+                ],
+                "bank": 1,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 57.14629340137835
+              }
+            ]
           },
           "lookahead": {
             "valid": true,
@@ -1116,7 +2394,169 @@
             "paid_transfer_count": 0,
             "reversals": 5,
             "window_net_points": 259.95040113516046,
-            "tail_net_points": 453.3171523892873
+            "tail_net_points": 453.3171523892873,
+            "weeks": [
+              {
+                "week": 6,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 1,
+                "hit_points": 0.0,
+                "net_points": 52.632942578797135
+              },
+              {
+                "week": 7,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 50.44008180089657
+              },
+              {
+                "week": 8,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 50.75460415949961
+              },
+              {
+                "week": 9,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 51.965591350231
+              },
+              {
+                "week": 10,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 54.15718124573615
+              },
+              {
+                "week": 11,
+                "chip": null,
+                "in": [
+                  173774,
+                  489639
+                ],
+                "out": [
+                  40383,
+                  220237
+                ],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 48.375666458598005
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.81992252144339
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [
+                  220237,
+                  586268
+                ],
+                "out": [
+                  173774,
+                  489639
+                ],
+                "bank": 0,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 48.45586392995477
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 54.48912408921262
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [
+                  40383
+                ],
+                "out": [
+                  586268
+                ],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.106414233732664
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 47.163208285505604
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.91911120234866
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 0,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.82400955826376
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [
+                  513086
+                ],
+                "out": [
+                  465642
+                ],
+                "bank": 5,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.16383211022783
+              }
+            ]
           },
           "continuation": {
             "valid": true,
@@ -1157,7 +2597,99 @@
             },
             "transfer_count": 0,
             "paid_transfer_count": 0,
-            "reversals": 0
+            "reversals": 0,
+            "weeks": [
+              {
+                "week": 11,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 2,
+                "hit_points": 0.0,
+                "net_points": 49.77917588643961
+              },
+              {
+                "week": 12,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 3,
+                "hit_points": 0.0,
+                "net_points": 52.33904409655176
+              },
+              {
+                "week": 13,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 4,
+                "hit_points": 0.0,
+                "net_points": 49.35705604889851
+              },
+              {
+                "week": 14,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 55.22844525946172
+              },
+              {
+                "week": 15,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.43959224125825
+              },
+              {
+                "week": 16,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 49.98640814297262
+              },
+              {
+                "week": 17,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.8622734155872
+              },
+              {
+                "week": 18,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 50.375718107805405
+              },
+              {
+                "week": 19,
+                "chip": null,
+                "in": [],
+                "out": [],
+                "bank": 1,
+                "free_next": 5,
+                "hit_points": 0.0,
+                "net_points": 51.37622458313147
+              }
+            ]
           }
         },
         "pair": {
@@ -1202,7 +2734,217 @@
         "paid_transfer_count": 0,
         "reversals": 10,
         "hit_points": 0.0,
-        "net_points": 741.3482654905928
+        "net_points": 741.3482654905928,
+        "weeks": [
+          {
+            "week": 6,
+            "chip": null,
+            "in": [],
+            "out": [],
+            "bank": 0,
+            "free_next": 2,
+            "hit_points": 0.0,
+            "net_points": 53.79971409051592,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 7,
+            "chip": null,
+            "in": [
+              60307,
+              465730
+            ],
+            "out": [
+              226597,
+              430871
+            ],
+            "bank": 52,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 53.07134262025584,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 8,
+            "chip": null,
+            "in": [
+              226597
+            ],
+            "out": [
+              483067
+            ],
+            "bank": 22,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.009762182960024,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 9,
+            "chip": null,
+            "in": [
+              223827
+            ],
+            "out": [
+              465730
+            ],
+            "bank": 22,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.16998127282566,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 10,
+            "chip": null,
+            "in": [
+              200834
+            ],
+            "out": [
+              465642
+            ],
+            "bank": 18,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 57.1798428894865,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 11,
+            "chip": null,
+            "in": [
+              477424
+            ],
+            "out": [
+              115556
+            ],
+            "bank": 0,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.30379148498772,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 12,
+            "chip": null,
+            "in": [
+              177815
+            ],
+            "out": [
+              502500
+            ],
+            "bank": 18,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 53.11533844846365,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 13,
+            "chip": null,
+            "in": [
+              586309
+            ],
+            "out": [
+              177815
+            ],
+            "bank": 22,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 50.00134772522655,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 14,
+            "chip": null,
+            "in": [
+              430871
+            ],
+            "out": [
+              60307
+            ],
+            "bank": 1,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 55.533052102433345,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 15,
+            "chip": null,
+            "in": [
+              169432
+            ],
+            "out": [
+              586309
+            ],
+            "bank": 2,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 53.7757732942979,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 16,
+            "chip": null,
+            "in": [
+              444102
+            ],
+            "out": [
+              60689
+            ],
+            "bank": 0,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 50.74271344227914,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 17,
+            "chip": null,
+            "in": [
+              231065
+            ],
+            "out": [
+              477424
+            ],
+            "bank": 12,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.70436905809525,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 18,
+            "chip": null,
+            "in": [
+              483067
+            ],
+            "out": [
+              231065
+            ],
+            "bank": 7,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.57638234693038,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 19,
+            "chip": null,
+            "in": [
+              243298
+            ],
+            "out": [
+              430871
+            ],
+            "bank": 14,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 54.36485453183489,
+            "status": "OPTIMAL"
+          }
+        ]
       },
       "900": {
         "valid": true,
@@ -1227,7 +2969,215 @@
         "paid_transfer_count": 0,
         "reversals": 12,
         "hit_points": 0.0,
-        "net_points": 728.4050280837814
+        "net_points": 728.4050280837814,
+        "weeks": [
+          {
+            "week": 6,
+            "chip": null,
+            "in": [],
+            "out": [],
+            "bank": 0,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.632942578797135,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 7,
+            "chip": null,
+            "in": [
+              465730
+            ],
+            "out": [
+              95658
+            ],
+            "bank": 0,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.735931103947614,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 8,
+            "chip": null,
+            "in": [
+              223827
+            ],
+            "out": [
+              483067
+            ],
+            "bank": 1,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.5418036879733,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 9,
+            "chip": null,
+            "in": [
+              483067
+            ],
+            "out": [
+              465730
+            ],
+            "bank": 0,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.43317846595709,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 10,
+            "chip": null,
+            "in": [
+              465730
+            ],
+            "out": [
+              465642
+            ],
+            "bank": 1,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 55.1449336876811,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 11,
+            "chip": null,
+            "in": [
+              231065
+            ],
+            "out": [
+              220237
+            ],
+            "bank": 6,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 50.31653328200266,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 12,
+            "chip": null,
+            "in": [
+              522047
+            ],
+            "out": [
+              231065
+            ],
+            "bank": 1,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.7904026319244,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 13,
+            "chip": null,
+            "in": [
+              231065
+            ],
+            "out": [
+              522047
+            ],
+            "bank": 6,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 49.63708721158527,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 14,
+            "chip": null,
+            "in": [
+              95658
+            ],
+            "out": [
+              231065
+            ],
+            "bank": 2,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 54.64212543114871,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 15,
+            "chip": null,
+            "in": [
+              477424
+            ],
+            "out": [
+              17761
+            ],
+            "bank": 6,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 52.64997530308337,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 16,
+            "chip": null,
+            "in": [
+              200834
+            ],
+            "out": [
+              95658
+            ],
+            "bank": 1,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.39845173522563,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 17,
+            "chip": null,
+            "in": [
+              231065
+            ],
+            "out": [
+              200834
+            ],
+            "bank": 10,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.345927968178266,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 18,
+            "chip": null,
+            "in": [
+              455084
+            ],
+            "out": [
+              223827
+            ],
+            "bank": 19,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 50.63497244547739,
+            "status": "OPTIMAL"
+          },
+          {
+            "week": 19,
+            "chip": null,
+            "in": [
+              513418
+            ],
+            "out": [
+              101282
+            ],
+            "bank": 1,
+            "free_next": 1,
+            "hit_points": 0.0,
+            "net_points": 51.50076255079946,
+            "status": "OPTIMAL"
+          }
+        ]
       }
     },
     "full_local_results_sha256": "eea95a83bd224376e471c56132be6db7044b024935968a8af98b2d7af3f6ff98"
@@ -1285,5 +3235,9 @@
       "rows": 9338,
       "players_per_week": 667
     }
+  },
+  "measured_source": {
+    "commit": "d9e92745",
+    "note": "The protocol's source hashes are of that commit. After the run the compaction was widened to keep each path's per-week moves in this record and the table prints the bound column to three decimals; no solve, input or number changed and the local results' sha256 above is unchanged."
   }
 }

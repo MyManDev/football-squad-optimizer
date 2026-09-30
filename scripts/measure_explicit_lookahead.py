@@ -293,10 +293,20 @@ def summarize(records: Sequence[Mapping[str, Any]], rolling: Mapping[str, Any]) 
 
 
 def compact(records: Sequence[Mapping[str, Any]], rolling: Mapping[str, Any]) -> dict[str, Any]:
-    """What the committed record keeps: first-week actions, statuses, units, totals, labels."""
+    """What the committed record keeps: statuses, units, totals, labels and each path's moves.
+
+    Per week: incoming, outgoing, bank, carried transfers, chip, hits and net points. The
+    squads follow from the initial state and those moves, so they stay in the local results.
+    """
 
     def arm(a: Mapping[str, Any]) -> dict[str, Any]:
-        return {k: v for k, v in a.items() if k != "weeks"}
+        out = {k: v for k, v in a.items() if k != "weeks"}
+        if "weeks" in a:
+            out["weeks"] = [
+                {k: v for k, v in week.items() if k not in ("squad", "starters", "captain")}
+                for week in a["weeks"]
+            ]
+        return out
 
     return {
         "cases": [
@@ -307,9 +317,7 @@ def compact(records: Sequence[Mapping[str, Any]], rolling: Mapping[str, Any]) ->
             }
             for r in records
         ],
-        "rolling_one_week": {
-            k: {kk: vv for kk, vv in v.items() if kk != "weeks"} for k, v in rolling.items()
-        },
+        "rolling_one_week": {k: arm(v) for k, v in rolling.items()},
     }
 
 
@@ -317,7 +325,7 @@ def render_markdown(compacted: Mapping[str, Any]) -> str:
     """The record's table, derived from the JSON so the two cannot disagree."""
     lines = [
         "| Profile | Window | Tail | Control (window + continuation) | Lookahead | Statuses "
-        "(window/continuation/lookahead) | Delta | Gain upper bound | Labels |",
+        "(window/continuation/lookahead) | Delta | Gain upper bound, scaled objective | Labels |",
         "| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |",
     ]
     for case in compacted["cases"]:
@@ -339,7 +347,7 @@ def render_markdown(compacted: Mapping[str, Any]) -> str:
             f"| {case['profile']} | {case['window']} | {case['tail']} to GW{case['last_week']} | "
             f"{pair.get('control_total', float('nan')):.6f} | "
             f"{pair.get('lookahead_total', float('nan')):.6f} | {statuses} | {shown} | "
-            f"{'none' if bound is None else f'{bound:+.6f}'} | "
+            f"{'none' if bound is None else f'{bound:+.3f}'} | "
             f"{', '.join(pair.get('labels', []))} |"
         )
     return "\n".join(lines)
