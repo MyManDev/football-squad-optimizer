@@ -3238,6 +3238,6 @@
   },
   "measured_source": {
     "commit": "d9e92745",
-    "note": "The protocol's source hashes are of that commit. After the run the compaction was widened to keep each path's per-week moves in this record and the table prints the bound column to three decimals; no solve, input or number changed and the local results' sha256 above is unchanged."
+    "note": "The protocol's source hashes are of that commit. After the run the compaction was widened to keep each path's per-week moves in this record and the table prints the bound column to three decimals; the forecast_documents block and this measured_source block were added by hand from the run's own served and extended documents, fingerprints cross-checked against the protocol, and the runner's compact.json does not carry them. No solve, input or number changed and the local results' sha256 above is unchanged."
   }
 }

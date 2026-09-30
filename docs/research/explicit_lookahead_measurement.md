@@ -37,7 +37,9 @@ chips, no preferences, no Top100 weight:
 
 Cases: two constructed squads (budget 1000 with one free transfer, 900 with none), the
 served tail (window 3, tail GW9-10, what today's artifact already supports) and the
-expiry tail (windows 3 and 5, tail to GW19).
+expiry tail (windows 3 and 5, tail to GW19). A tail of three weeks past the window was
+declared and dropped before the run, with the chip arm: it had no declared reason and
+the served tail replaces it.
 
 ## Reading rule, declared before the run
 
@@ -45,9 +47,12 @@ The window-then-continue path is a feasible full path for the lookahead's model,
 exact lookahead can never be below it. A difference is therefore read only where both
 control solves proved optimal; a negative difference is an unproved search shortfall and
 is never written as a loss. The lookahead's objective bound gives an upper bound on the
-in-forecast gain on the solver's integer-scaled objective, good to that scaling (about
-0.003 points here). The declared primary finding is how often the first-week action
-changed. A first-week action that moves a held player the capture prices below
+in-forecast gain on the solver's objective, whose coefficients are rounded to 0.001
+points per starter-week; on the four proved solves that bound differs from the unrounded
+rescore by at most 0.0021. The declared primary finding is how often the first-week
+action changed. Labels in the table: `gain_defined` (both control solves proved),
+`unproved_shortfall` (a negative difference under an unproved solve), `hold_equal` (the
+lookahead's first-week action is a hold, no incoming transfer), `availability_driven`. A first-week action that moves a held player the capture prices below
 one is labelled availability-driven and leaves the headline, because the captured state
 is held in every tail week and nobody holds that a player never returns. A solve the
 wall clock stops is failed and not read; no budget was raised after a result.
@@ -94,12 +99,12 @@ in the record, so the margin over it is not stated; what is recorded is that a b
 search at this rate found almost no transfer structure in fourteen weeks. The four differences (-4.0 to -13.2) are unproved shortfalls and
 are not read; the upper bounds (+18 to +28) say only that nothing is proved.
 
-**Fourteen proved one-week solves beat every fourteen-week solve on the model's own
-objective.** The rolling one-week control reached 741.348 (squad 1000) and 728.405
+**Fourteen proved one-week solves beat every fourteen-week solve on the same rescore.** The rolling one-week control reached 741.348 (squad 1000) and 728.405
 (squad 900), every one of its fourteen solves proved optimal at twenty units, in about
 sixteen seconds of wall clock per squad. Its path is itself a feasible fourteen-week
-path, so the fourteen-week lookahead is at least 9.342 and 15.137 points below a path
-its own model admits. That is a measured lower bound on the search shortfall, and it is
+path, so the fourteen-week lookahead is at least 9.34 and 15.13 points below a path its
+own model admits, on the independent rescore of both paths (the model's objective rounds
+each starter-week coefficient to 0.001 points, so the comparison is made on the rescore). That is a measured lower bound on the search shortfall, and it is
 the finding of the expiry arm: at twenty units a forecast week, the tail's value cannot
 be read from one long solve, because the long solve does not reach paths the short
 solves find. The rolling control also shows what a one-week policy does on a forecast
@@ -148,19 +153,30 @@ trusted for a score, and the input cannot be combined with `protect_hold`. Its o
 study found no gain where the unhinted repairs already reached their restricted optima.
 The case here is different in kind: a fourteen-week search that does not reach a path
 fourteen one-week solves find. Handing that path to the lookahead needs
-`optimize_with_lookahead` to take an incumbent in place of the hold guard, which is the
-planner track's seam (#632); this track supplies the paths (the record carries each arm's
-per-week moves, bank and carried transfers, from which every squad follows from the
-initial state), their handoff and the fingerprints an incumbent must match. Until then the expiry tail stays unread. The chip
+`optimize_with_lookahead` to take an incumbent in place of the hold guard. This track
+proposed that seam to the planner track on #632; the handoff there reserves
+`planning/optimizer.py` and `planning/refinement.py`, and `planning/lookahead.py` is not
+yet named by either side. What this record carries towards it: each arm's per-week
+moves, bank and carried transfers (from which every squad follows from the initial
+state), the forecast document and transfer-policy fingerprints. What an incumbent must
+also carry and the record does not: the planning horizon and chip availability
+fingerprints, and each week's XI and captain; those are in the local results whose
+sha256 the record holds, or are rebuilt from the archive hashes and the capture. Until then the expiry tail stays unread. The chip
 arm was dropped because an unpriced right is spent inside any window solve; its proper
 control is a reservation-priced right, which the lookahead refuses to stack, so chip
 timing with transfers stays unmeasured, and a longer dated horizon is not evidence that
 the automatic chip strategy is ready.
 
+## Post-measurement changes to the record
+
 The measured source is commit d9e92745; the protocol's source hashes are of that commit.
 After the run the compaction was widened to keep each path's per-week moves in the record
-and the table prints the bound column to three decimals; no solve, input or number
-changed, and the local results' sha256 in the record is unchanged.
+and the table prints the bound column to three decimals. The `forecast_documents` block
+(both rebuilt documents' headers) and the `measured_source` block were added to the
+committed JSON by hand from the run's own served and extended documents, their
+fingerprints cross-checked against the protocol; the runner's `compact.json` does not
+carry them. No solve, input or number changed, and the local results' sha256 in the
+record is unchanged.
 
 Reproduce with `python -m scripts.measure_explicit_lookahead --snapshot-root <captures>
 --archive-root <vaastav archive> --snapshot-id fpl-live-20260922T205533Z-7ff2c68eac7f
