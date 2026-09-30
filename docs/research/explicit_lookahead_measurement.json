@@ -1,0 +1,1235 @@
+{
+  "record": "explicit_lookahead_measurement_v1",
+  "measured_on": "2026-09-30",
+  "base_commit": "d9e92745",
+  "environment": {
+    "python": "3.13.15",
+    "ortools": "9.15.6755",
+    "machine": "development Mac, one search worker"
+  },
+  "protocol": {
+    "analysis_at": "2026-09-30T06:57:21.221644+00:00",
+    "snapshot": "fpl-live-20260922T205533Z-7ff2c68eac7f",
+    "snapshot_fingerprint": "7ff2c68eac7fbd2eec2a13e2b8a95dee3650385a8c5b5bff4d36fe3d21479a66",
+    "target_gameweek": 6,
+    "calendar_weeks": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "chip_expiry_week": 19,
+    "forecast_identity": "Rebuilt from archive plus capture through produce_football_forecast, the served football_team_share_v1 pipeline. No served artifact was read. Weeks beyond the fifth are not live_football_forecast_v1 and are never written under a football artifact root.",
+    "served_forecast_fingerprint": "c4670644db312e54459c78c4a43455b50be7204b02eeec9341861987a3ceec49",
+    "served_forecast_sha256": "6e0894fb2f176badbb952a361a1b6e2285e7d8623e1e91fceb4795f49690b1b4",
+    "extended_forecast_fingerprint": "8fbc003d9b80e817654831b6129617e742461708f80147182f7cf1e7d78a3b3c",
+    "archive_hashes": {
+      "2022-23/gws/merged_gw.csv": "b78a6d0456141f9033c32fc4122931baae780ac4a4938683451b1fce7a4fdd15",
+      "2022-23/players_raw.csv": "a874c12817bbf4d454e60a5765629742b528d4ad0c2f39f56e4fc89640605f7f",
+      "2022-23/teams.csv": "be6a1fe120a61f9c441a0751ca177c933bcbf234c1d28d49b3cd8827ca18066b",
+      "2022-23/fixtures.csv": "e783060da73700d4ec6fd12acec4568524eac8bb3ba3ccd8ce68a374dadba8f8",
+      "2023-24/gws/merged_gw.csv": "e9c09c8856f1c86b4f920f46ddd5033af83409439dfda53be925df2a3e7c8a9e",
+      "2023-24/players_raw.csv": "43d8cf5efb3d901f2499558c40b392b7f0ee22afe28030f36266ad29024c63d9",
+      "2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "2023-24/fixtures.csv": "d8521bdbb80edb5141bc17df71bf6026275f2e56fd6a6dc6041b3ae23a39ce6a",
+      "2024-25/gws/merged_gw.csv": "5bbbcba6353b4c72ad273adcc8e3aa451946a826564679788f45b1cb3325b84e",
+      "2024-25/players_raw.csv": "75686051b265cbe7755ac71213ecaad21b26ee1cc46a8bafbba19c39ce894b05",
+      "2024-25/teams.csv": "d10a6db8feca6db9e44a3ba50b15168396667ea387fee9235d6b211c7f598c3b",
+      "2024-25/fixtures.csv": "ce696e187569ca7c45da2562811d3c38f525b58e65575531be37bebd0769ee28",
+      "2025-26/gws/merged_gw.csv": "0d09f1f1cb1b5520ec8e2f25238aa652efe2a263d8ca7cb2b6538b27bf86727d",
+      "2025-26/players_raw.csv": "412ce0172016f8f98f25177dc6de9f3cd2a8ec7a6135f9aa638d7fdee784d67b",
+      "2025-26/teams.csv": "b29df099cb0ad25413e284e53116099b0e0496874f99743dbc0870d8241b46c5",
+      "2025-26/fixtures.csv": "2d7e3950d346df14ca486cb09e9b9ba406d37d943775244eed06cdc021ffb3a9"
+    },
+    "self_parity": "served weeks equal in the extension at atol 1e-10; week-range invariance only",
+    "availability": "captured state held in every week; a first-week difference moving a held player priced below one is labelled availability_driven",
+    "flagged_player_count": 201,
+    "prices": "buy equals sell at captured prices; purchase rebasing is inert; the opt-in acquisition accounting stays at its default None in every arm",
+    "transfer_policy": "c2cca2332fd0153493ced277cd10f6b933481d08b9eba2f9f8ed672fd6faf888",
+    "squads": "Constructed by optimize_squad on the availability-applied first week at 60 deterministic units, linearization 2, proof required; budgets/funds/FT [(1000, 1000, 1), (900, 900, 0)]; not owner holdings, not the squads of earlier records",
+    "cases": [
+      {
+        "profile": 1000,
+        "window": 3,
+        "tail": "served",
+        "last_week": 10
+      },
+      {
+        "profile": 1000,
+        "window": 3,
+        "tail": "expiry",
+        "last_week": 19
+      },
+      {
+        "profile": 1000,
+        "window": 5,
+        "tail": "expiry",
+        "last_week": 19
+      },
+      {
+        "profile": 900,
+        "window": 3,
+        "tail": "served",
+        "last_week": 10
+      },
+      {
+        "profile": 900,
+        "window": 3,
+        "tail": "expiry",
+        "last_week": 19
+      },
+      {
+        "profile": 900,
+        "window": 5,
+        "tail": "expiry",
+        "last_week": 19
+      }
+    ],
+    "budget": {
+      "units_per_forecast_week": 20.0,
+      "wall_ceiling_seconds": 7200.0,
+      "arithmetic": {
+        "1000/3/served": {
+          "control_units": 100.0,
+          "lookahead_units": 100.0,
+          "forecast_weeks": 5
+        },
+        "1000/3/expiry": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "1000/5/expiry": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "900/3/served": {
+          "control_units": 100.0,
+          "lookahead_units": 100.0,
+          "forecast_weeks": 5
+        },
+        "900/3/expiry": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "900/5/expiry": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        }
+      },
+      "rolling_one_week": 280.0,
+      "wall_stopped": "FAILED, never read; no budget is raised after a result"
+    },
+    "arms": {
+      "window_then_continue": "window solve blind to the tail, then a continuation over the tail from its end state",
+      "lookahead": "planning.lookahead.optimize_with_lookahead over window and tail together",
+      "rolling_one_week": "sequential one-week solves with the same handoff, the canonical control; transfer counts, paid transfers, reversals and net points reported apart"
+    },
+    "reading_rule": "delta is defined only when window and continuation are OPTIMAL; a negative delta is unproved_shortfall, never a loss; the lookahead bound gives an upper bound on the in-forecast gain; the primary finding is how often the first-week action changed",
+    "dropped": {
+      "tail_plus_three": "no declared reason; the served tail replaces it",
+      "chips": "an unpriced right is spent inside any window solve, so the control is degenerate"
+    },
+    "order": "per case, control arms first on even indices and lookahead first on odd",
+    "sources": {
+      "scripts/measure_explicit_lookahead.py": "0891f9ed902cba104bb7acec600d2b68668cd408ec8883f242f52862e1f47c73",
+      "scripts/measure_shortlist_matrix.py": "590c794f4b4274eadb59bf70b0bdec5e713e2a326b1176fdc8a4407f4fa53963",
+      "src/squadopt/application/football_live.py": "2578959d807c1f2b3f453bfb46921d5844da3bc2b96c4ff4ddf4f26820d2fa6d",
+      "src/squadopt/live/football_horizon.py": "028f511005e153a0b848141cdd5f9eede9ab977c9e30cc78afba402a5699229a",
+      "src/squadopt/live/football_artifact.py": "23ac19cf69d88ae99474ef9fbd164146f24be2b9876f9c13aea1b3dfc4eaf942",
+      "src/squadopt/prediction/football.py": "b7feec2e561583db04483f3bbcc2de762cd38a64b91b5137e848bf41269816e1",
+      "src/squadopt/prediction/availability.py": "722d068a342546d02ed8a32ee867d92e7901c6f4e132afffe8c13246be70f435",
+      "src/squadopt/planning/__init__.py": "46d30cf00e0460f148f76e7167a762fefdc7a210857f8e751b41a4b174df41e1",
+      "src/squadopt/planning/acquisition.py": "2a1b421eb86a9b8177e1695f7030d79c6b8e2b2c3129ea93382bca4d7a20b4dc",
+      "src/squadopt/planning/chip_strategy.py": "b3d40551ed2c5de529c934fde37e7f6af251b885233d6096627729050a85781a",
+      "src/squadopt/planning/horizon.py": "ee4a6c716ae0aaeb36349d9049c488495b0cbe81df3a362cc66871cd23985c7e",
+      "src/squadopt/planning/lookahead.py": "81ef6e0b63e8cc93d3c7a07070fa368a19ec838dcba815824e3dc3267d1dea1e",
+      "src/squadopt/planning/models.py": "e755a6896d2df1d8f775c19c44fc9446ea948570cdd8c2d501ebe58a9adbd239",
+      "src/squadopt/planning/optimizer.py": "e1d9facc0f5593dd446c499db03c6f4b3daff399bef7d098b767e0be161599e3",
+      "src/squadopt/planning/pricing.py": "08ab6b18c4f2ba04338e2d8f6aeaad3c799dd9e0bf1fea62c55a421dfdb694f3",
+      "src/squadopt/planning/recourse.py": "a1d89fdee0543627f9513d74ee0fa53f3379a66b1d742d21da9d305d9164b828",
+      "src/squadopt/planning/recourse_chips.py": "4ddb56739cc8d91a0cf92e2df7eb49f11f7baabf72ad8862989368056cc785c3",
+      "src/squadopt/planning/refinement.py": "429f17bf19bd6352dbfdd12ca350317e7eb7ee72a1ae0eb8d540bd79cf0ae0d2"
+    },
+    "historical_decision_replay": false,
+    "authored_after_capture": true,
+    "outcomes_read": false,
+    "tuning": false,
+    "promotion": false,
+    "realized_returns": false
+  },
+  "initial_states": {
+    "1000": {
+      "ids": [
+        17761,
+        40383,
+        60689,
+        75115,
+        115556,
+        141746,
+        154561,
+        223340,
+        226597,
+        430871,
+        446008,
+        465642,
+        483067,
+        484420,
+        502500
+      ],
+      "bank": 0,
+      "ft": 1,
+      "flagged_held": []
+    },
+    "900": {
+      "ids": [
+        17761,
+        40383,
+        95658,
+        101282,
+        141746,
+        154561,
+        169432,
+        220237,
+        223340,
+        446008,
+        465642,
+        483067,
+        484420,
+        490145,
+        500058
+      ],
+      "bank": 0,
+      "ft": 0,
+      "flagged_held": [
+        490145
+      ]
+    }
+  },
+  "summary": {
+    "cases": 6,
+    "valid_pairs": 6,
+    "failed_pairs": 0,
+    "first_week_changed": 0,
+    "availability_driven": 0,
+    "gain_defined": 2,
+    "gains_over_0_1": 2,
+    "unproved_shortfall": 4,
+    "hold_equal": 6,
+    "rolling_one_week": {
+      "1000": {
+        "net_points": 741.3482654905928,
+        "valid": true
+      },
+      "900": {
+        "net_points": 728.4050280837814,
+        "valid": true
+      }
+    },
+    "promotion": false,
+    "realized_returns": false,
+    "independent_future_performance": false
+  },
+  "results": {
+    "cases": [
+      {
+        "profile": 1000,
+        "window": 3,
+        "tail": "served",
+        "last_week": 10,
+        "budget": {
+          "control_units": 100.0,
+          "lookahead_units": 100.0,
+          "forecast_weeks": 5
+        },
+        "arms": {
+          "window": {
+            "valid": true,
+            "status": "OPTIMAL",
+            "net_points": 159.5198761898053,
+            "hit_points": 0.0,
+            "objective_value": 159.5198761898053,
+            "best_objective_bound": 159.522,
+            "relative_optimality_gap": 0.0,
+            "deterministic_time_used": 37.162093476949565,
+            "deterministic_time_limit": 60.0,
+            "deterministic_time_budget_exhausted": false,
+            "wall_seconds": 31.360934042022564,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60689,
+                75115,
+                115556,
+                141746,
+                154561,
+                223340,
+                226597,
+                430871,
+                446008,
+                465642,
+                483067,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 2
+            },
+            "transfer_count": 3,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "continuation": {
+            "valid": true,
+            "status": "OPTIMAL",
+            "net_points": 110.73686352180977,
+            "hit_points": 0.0,
+            "objective_value": 110.73686352180977,
+            "best_objective_bound": 110.735,
+            "relative_optimality_gap": 0.0,
+            "deterministic_time_used": 3.999710073713802,
+            "deterministic_time_limit": 40.0,
+            "deterministic_time_budget_exhausted": false,
+            "wall_seconds": 4.580600916990079,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60307,
+                60689,
+                75115,
+                141746,
+                154561,
+                200834,
+                223340,
+                223827,
+                226597,
+                446008,
+                465642,
+                484420,
+                502500
+              ],
+              "in": [
+                200834
+              ],
+              "out": [
+                465730
+              ],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 7,
+              "free_next": 1
+            },
+            "transfer_count": 2,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "lookahead": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 270.60809971615004,
+            "hit_points": 0.0,
+            "objective_value": 270.60809971615004,
+            "best_objective_bound": 272.387,
+            "relative_optimality_gap": 0.006577804713107837,
+            "deterministic_time_used": 100.00148975460634,
+            "deterministic_time_limit": 100.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 54.543598417018075,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60689,
+                75115,
+                115556,
+                141746,
+                154561,
+                223340,
+                226597,
+                430871,
+                446008,
+                465642,
+                483067,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 2
+            },
+            "transfer_count": 5,
+            "paid_transfer_count": 0,
+            "reversals": 0,
+            "window_net_points": 159.05127700612445,
+            "tail_net_points": 111.55682271002561
+          }
+        },
+        "pair": {
+          "valid": true,
+          "control_total": 270.25673971161507,
+          "lookahead_total": 270.60809971615004,
+          "delta": 0.35136000453496763,
+          "delta_unread": null,
+          "gain_upper_bound": 2.1302602883849318,
+          "labels": [
+            "hold_equal",
+            "gain_defined"
+          ],
+          "free_next_window_end": 1,
+          "free_next_lookahead_window_end": 1,
+          "hits_control": 0.0,
+          "hits_lookahead": 0.0
+        }
+      },
+      {
+        "profile": 1000,
+        "window": 3,
+        "tail": "expiry",
+        "last_week": 19,
+        "budget": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "arms": {
+          "window": {
+            "valid": true,
+            "status": "OPTIMAL",
+            "net_points": 159.5198761898053,
+            "hit_points": 0.0,
+            "objective_value": 159.5198761898053,
+            "best_objective_bound": 159.522,
+            "relative_optimality_gap": 0.0,
+            "deterministic_time_used": 37.162093476949565,
+            "deterministic_time_limit": 60.0,
+            "deterministic_time_budget_exhausted": false,
+            "wall_seconds": 31.360934042022564,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60689,
+                75115,
+                115556,
+                141746,
+                154561,
+                223340,
+                226597,
+                430871,
+                446008,
+                465642,
+                483067,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 2
+            },
+            "transfer_count": 3,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "lookahead": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 732.0065867307441,
+            "hit_points": 0.0,
+            "objective_value": 732.0065867307442,
+            "best_objective_bound": 764.691,
+            "relative_optimality_gap": 0.04464984624463985,
+            "deterministic_time_used": 280.00861684805807,
+            "deterministic_time_limit": 280.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 198.16086341702612,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60689,
+                75115,
+                115556,
+                141746,
+                154561,
+                223340,
+                226597,
+                430871,
+                446008,
+                465642,
+                483067,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 2
+            },
+            "transfer_count": 1,
+            "paid_transfer_count": 0,
+            "reversals": 0,
+            "window_net_points": 157.06081143737077,
+            "tail_net_points": 574.9457752933733
+          },
+          "continuation": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 580.6025422700336,
+            "hit_points": 0.0,
+            "objective_value": 580.6025422700337,
+            "best_objective_bound": 602.575,
+            "relative_optimality_gap": 0.03784520204890798,
+            "deterministic_time_used": 220.0743994253943,
+            "deterministic_time_limit": 220.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 145.64588470803574,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60307,
+                60689,
+                75115,
+                141746,
+                154561,
+                223340,
+                223827,
+                226597,
+                446008,
+                465642,
+                465730,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 12,
+              "free_next": 2
+            },
+            "transfer_count": 1,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          }
+        },
+        "pair": {
+          "valid": true,
+          "control_total": 740.1224184598389,
+          "lookahead_total": 732.0065867307441,
+          "delta": null,
+          "delta_unread": -8.115831729094793,
+          "gain_upper_bound": 24.568581540161176,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ],
+          "free_next_window_end": 1,
+          "free_next_lookahead_window_end": 4,
+          "hits_control": 0.0,
+          "hits_lookahead": 0.0
+        }
+      },
+      {
+        "profile": 1000,
+        "window": 5,
+        "tail": "expiry",
+        "last_week": 19,
+        "budget": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "arms": {
+          "window": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 270.60809971615004,
+            "hit_points": 0.0,
+            "objective_value": 270.60809971615004,
+            "best_objective_bound": 272.387,
+            "relative_optimality_gap": 0.006577804713107837,
+            "deterministic_time_used": 100.00148975460634,
+            "deterministic_time_limit": 100.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 53.04807066702051,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60689,
+                75115,
+                115556,
+                141746,
+                154561,
+                223340,
+                226597,
+                430871,
+                446008,
+                465642,
+                483067,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 2
+            },
+            "transfer_count": 5,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "continuation": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 470.0128561173062,
+            "hit_points": 0.0,
+            "objective_value": 470.0128561173062,
+            "best_objective_bound": 492.127,
+            "relative_optimality_gap": 0.0470453070646682,
+            "deterministic_time_used": 180.00956109467478,
+            "deterministic_time_limit": 180.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 122.2316728750011,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                75115,
+                141746,
+                154561,
+                200834,
+                223340,
+                223827,
+                226597,
+                430871,
+                446008,
+                465730,
+                484420,
+                567119,
+                586309
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 22,
+              "free_next": 2
+            },
+            "transfer_count": 1,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "lookahead": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 732.0065867307441,
+            "hit_points": 0.0,
+            "objective_value": 732.0065867307442,
+            "best_objective_bound": 764.691,
+            "relative_optimality_gap": 0.04464984624463985,
+            "deterministic_time_used": 280.00861684805807,
+            "deterministic_time_limit": 280.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 196.1127988329972,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                60689,
+                75115,
+                115556,
+                141746,
+                154561,
+                223340,
+                226597,
+                430871,
+                446008,
+                465642,
+                483067,
+                484420,
+                502500
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 2
+            },
+            "transfer_count": 1,
+            "paid_transfer_count": 0,
+            "reversals": 0,
+            "window_net_points": 265.92786117954387,
+            "tail_net_points": 466.07872555120025
+          }
+        },
+        "pair": {
+          "valid": true,
+          "control_total": 740.6209558334563,
+          "lookahead_total": 732.0065867307441,
+          "delta": null,
+          "delta_unread": -8.614369102712203,
+          "gain_upper_bound": 24.070044166543767,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ],
+          "free_next_window_end": 1,
+          "free_next_lookahead_window_end": 5,
+          "hits_control": 0.0,
+          "hits_lookahead": 0.0
+        }
+      },
+      {
+        "profile": 900,
+        "window": 3,
+        "tail": "served",
+        "last_week": 10,
+        "budget": {
+          "control_units": 100.0,
+          "lookahead_units": 100.0,
+          "forecast_weeks": 5
+        },
+        "arms": {
+          "window": {
+            "valid": true,
+            "status": "OPTIMAL",
+            "net_points": 155.91067737071805,
+            "hit_points": 0.0,
+            "objective_value": 155.91067737071805,
+            "best_objective_bound": 155.912,
+            "relative_optimality_gap": 0.0,
+            "deterministic_time_used": 18.735901987089193,
+            "deterministic_time_limit": 60.0,
+            "deterministic_time_budget_exhausted": false,
+            "wall_seconds": 14.46716862503672,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                446008,
+                465642,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 1
+            },
+            "transfer_count": 2,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "lookahead": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 264.75352890091625,
+            "hit_points": 0.0,
+            "objective_value": 264.75352890091625,
+            "best_objective_bound": 265.095,
+            "relative_optimality_gap": 0.0012879880946086108,
+            "deterministic_time_used": 100.00733809695221,
+            "deterministic_time_limit": 100.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 60.01486170798307,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                446008,
+                465642,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 1
+            },
+            "transfer_count": 4,
+            "paid_transfer_count": 0,
+            "reversals": 1,
+            "window_net_points": 155.47255813522025,
+            "tail_net_points": 109.280970765696
+          },
+          "continuation": {
+            "valid": true,
+            "status": "OPTIMAL",
+            "net_points": 108.59415682323183,
+            "hit_points": 0.0,
+            "objective_value": 108.59415682323183,
+            "best_objective_bound": 108.593,
+            "relative_optimality_gap": 0.0,
+            "deterministic_time_used": 4.329667905426692,
+            "deterministic_time_limit": 40.0,
+            "deterministic_time_budget_exhausted": false,
+            "wall_seconds": 5.479015416000038,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                223827,
+                446008,
+                465730,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [
+                483067
+              ],
+              "out": [
+                465642
+              ],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 1,
+              "free_next": 1
+            },
+            "transfer_count": 2,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          }
+        },
+        "pair": {
+          "valid": true,
+          "control_total": 264.5048341939499,
+          "lookahead_total": 264.75352890091625,
+          "delta": 0.24869470696637563,
+          "delta_unread": null,
+          "gain_upper_bound": 0.5901658060501518,
+          "labels": [
+            "hold_equal",
+            "gain_defined"
+          ],
+          "free_next_window_end": 1,
+          "free_next_lookahead_window_end": 1,
+          "hits_control": 0.0,
+          "hits_lookahead": 0.0
+        }
+      },
+      {
+        "profile": 900,
+        "window": 3,
+        "tail": "expiry",
+        "last_week": 19,
+        "budget": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "arms": {
+          "window": {
+            "valid": true,
+            "status": "OPTIMAL",
+            "net_points": 155.91067737071805,
+            "hit_points": 0.0,
+            "objective_value": 155.91067737071805,
+            "best_objective_bound": 155.912,
+            "relative_optimality_gap": 0.0,
+            "deterministic_time_used": 18.735901987089193,
+            "deterministic_time_limit": 60.0,
+            "deterministic_time_budget_exhausted": false,
+            "wall_seconds": 14.46716862503672,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                446008,
+                465642,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 1
+            },
+            "transfer_count": 2,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "continuation": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 561.3778492466888,
+            "hit_points": 0.0,
+            "objective_value": 561.3778492466888,
+            "best_objective_bound": 607.163,
+            "relative_optimality_gap": 0.08156016366897835,
+            "deterministic_time_used": 220.0197079111907,
+            "deterministic_time_limit": 220.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 141.7620592500316,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                223827,
+                446008,
+                465642,
+                465730,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 1,
+              "free_next": 2
+            },
+            "transfer_count": 0,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          },
+          "lookahead": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 713.2675535244477,
+            "hit_points": 0.0,
+            "objective_value": 713.2675535244477,
+            "best_objective_bound": 744.912,
+            "relative_optimality_gap": 0.04436920359193294,
+            "deterministic_time_used": 280.0084391734548,
+            "deterministic_time_limit": 280.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 224.94978312501917,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                446008,
+                465642,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 1
+            },
+            "transfer_count": 6,
+            "paid_transfer_count": 0,
+            "reversals": 5,
+            "window_net_points": 153.8276285391933,
+            "tail_net_points": 559.4399249852545
+          }
+        },
+        "pair": {
+          "valid": true,
+          "control_total": 717.2885266174069,
+          "lookahead_total": 713.2675535244477,
+          "delta": null,
+          "delta_unread": -4.020973092959139,
+          "gain_upper_bound": 27.623473382593147,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ],
+          "free_next_window_end": 1,
+          "free_next_lookahead_window_end": 3,
+          "hits_control": 0.0,
+          "hits_lookahead": 0.0
+        }
+      },
+      {
+        "profile": 900,
+        "window": 5,
+        "tail": "expiry",
+        "last_week": 19,
+        "budget": {
+          "control_units": 280.0,
+          "lookahead_units": 280.0,
+          "forecast_weeks": 14
+        },
+        "arms": {
+          "window": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 264.75352890091625,
+            "hit_points": 0.0,
+            "objective_value": 264.75352890091625,
+            "best_objective_bound": 265.095,
+            "relative_optimality_gap": 0.0012879880946086108,
+            "deterministic_time_used": 100.00733809695221,
+            "deterministic_time_limit": 100.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 60.356561707973015,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                446008,
+                465642,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 1
+            },
+            "transfer_count": 4,
+            "paid_transfer_count": 0,
+            "reversals": 1
+          },
+          "lookahead": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 713.2675535244477,
+            "hit_points": 0.0,
+            "objective_value": 713.2675535244477,
+            "best_objective_bound": 744.912,
+            "relative_optimality_gap": 0.04436920359193294,
+            "deterministic_time_used": 280.0084391734548,
+            "deterministic_time_limit": 280.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 223.52330162498401,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                169432,
+                220237,
+                223340,
+                446008,
+                465642,
+                483067,
+                484420,
+                490145,
+                500058
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 0,
+              "free_next": 1
+            },
+            "transfer_count": 6,
+            "paid_transfer_count": 0,
+            "reversals": 5,
+            "window_net_points": 259.95040113516046,
+            "tail_net_points": 453.3171523892873
+          },
+          "continuation": {
+            "valid": true,
+            "status": "FEASIBLE",
+            "net_points": 461.7439377821065,
+            "hit_points": 0.0,
+            "objective_value": 461.74393778210657,
+            "best_objective_bound": 492.959,
+            "relative_optimality_gap": 0.06760239440036031,
+            "deterministic_time_used": 180.00139112423358,
+            "deterministic_time_limit": 180.0,
+            "deterministic_time_budget_exhausted": true,
+            "wall_seconds": 125.86553166701924,
+            "first_action": {
+              "squad": [
+                17761,
+                40383,
+                95658,
+                101282,
+                141746,
+                154561,
+                223340,
+                223827,
+                446008,
+                465730,
+                483067,
+                484420,
+                490145,
+                500058,
+                586309
+              ],
+              "in": [],
+              "out": [],
+              "hit_points": 0.0,
+              "chip": null,
+              "bank_after": 1,
+              "free_next": 2
+            },
+            "transfer_count": 0,
+            "paid_transfer_count": 0,
+            "reversals": 0
+          }
+        },
+        "pair": {
+          "valid": true,
+          "control_total": 726.4974666830228,
+          "lookahead_total": 713.2675535244477,
+          "delta": null,
+          "delta_unread": -13.229913158575073,
+          "gain_upper_bound": 18.414533316977213,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ],
+          "free_next_window_end": 1,
+          "free_next_lookahead_window_end": 5,
+          "hits_control": 0.0,
+          "hits_lookahead": 0.0
+        }
+      }
+    ],
+    "rolling_one_week": {
+      "1000": {
+        "valid": true,
+        "statuses": [
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL"
+        ],
+        "wall_seconds": 16.24605345801683,
+        "transfer_count": 14,
+        "paid_transfer_count": 0,
+        "reversals": 10,
+        "hit_points": 0.0,
+        "net_points": 741.3482654905928
+      },
+      "900": {
+        "valid": true,
+        "statuses": [
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL",
+          "OPTIMAL"
+        ],
+        "wall_seconds": 15.845764208002947,
+        "transfer_count": 13,
+        "paid_transfer_count": 0,
+        "reversals": 12,
+        "hit_points": 0.0,
+        "net_points": 728.4050280837814
+      }
+    },
+    "full_local_results_sha256": "eea95a83bd224376e471c56132be6db7044b024935968a8af98b2d7af3f6ff98"
+  }
+}
