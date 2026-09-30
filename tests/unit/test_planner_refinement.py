@@ -81,10 +81,11 @@ def test_rejects_invalid_fixed_squads(known_optimum_players, small_config, bad):
         optimize_transfer_plan(*args, fixed_week_squads=bad)
 
 
+@pytest.mark.parametrize("hint", [False, True])
 @pytest.mark.parametrize("window", [3, 5])
 @pytest.mark.parametrize("width", [2, 3])
 def test_refinement_keeps_preferences_and_does_not_upgrade_restricted_proofs(
-    known_optimum_players, small_config, monkeypatch, window, width
+    known_optimum_players, small_config, monkeypatch, window, width, hint
 ):
     args = problem(known_optimum_players, small_config, window)
     ids = {p: i + 1 for i, p in enumerate(known_optimum_players.player_id)}
@@ -107,11 +108,16 @@ def test_refinement_keeps_preferences_and_does_not_upgrade_restricted_proofs(
     )
     chips = ChipAvailability(available={c: frozenset(args[0].gameweeks) for c in ("3xc", "bboost")})
     result = module.optimize_refined_plan(
-        *args, neighborhood_width=width, preferences=preferences, chips=chips
+        *args,
+        neighborhood_width=width,
+        preferences=preferences,
+        chips=chips,
+        use_incumbent_hint=hint,
     )
     assert result.proof_status == "FEASIBLE_REFINED_HORIZON"
     assert len(result.steps) == window - width + 1
     assert all(c["preferences"] == preferences for c in calls)
+    assert all((c.get("incumbent_plan") is not None) == hint for c in calls[1:])
     assert all(s.objective_after >= s.objective_before for s in result.steps)
     for week in result.chosen.weeks:
         assert 7 in set(week.selected_squad.player_id)

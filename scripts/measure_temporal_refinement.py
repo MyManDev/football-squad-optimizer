@@ -33,6 +33,7 @@ def run(
     states: Path,
     output: Path,
     neighborhood_width: int = 2,
+    incumbent_comparison: bool = False,
 ) -> None:
     if (
         isinstance(neighborhood_width, bool)
@@ -84,16 +85,34 @@ def run(
             },
             "cases": cases,
             "neighborhood_width": neighborhood_width,
+            "incumbent_comparison": incumbent_comparison,
+            "hint_protocol": (
+                {
+                    "control": "same temporal repair without incumbent hints",
+                    "candidate": "same temporal repair with certified incumbent hints",
+                    "certification": "min(1.0, repair det cap / 10), charged to repair cap",
+                    "caps": "both baseline120wall/60det, each pair repair30wall/15det",
+                    "scores": "claimed incumbent scores never form bounds or constraints",
+                }
+                if incumbent_comparison
+                else None
+            ),
             "pool": "full universe",
             "outcomes_read": False,
             "tuning": False,
             "repair": (
-                f"One forward sweep, free each adjacent {neighborhood_width}-week block; "
+                "Both arms one adjacent-pair sweep; only candidate uses a certified hint."
+                if incumbent_comparison
+                else f"One forward sweep, free each adjacent {neighborhood_width}-week block; "
                 "fix other squads to incumbent; "
                 "full-horizon constraints; retain better complete incumbent"
             ),
             "caps": (
-                "Baseline120wall/60det plus total repair30*(w-1)wall/15*(w-1)det, "
+                "Both arms baseline120wall/60det plus repair30wall/15det per pair. "
+                "Both baselines add existing hold30wall/1det; certification is charged "
+                "within each candidate repair cap. Phase wall ceilings and actual work recorded."
+                if incumbent_comparison
+                else "Baseline120wall/60det plus total repair30*(w-1)wall/15*(w-1)det, "
                 "divided equally across w-width+1 blocks. "
                 "Control120+30*(w-1)wall/60+15*(w-1)det. Both initial solves add existing "
                 "hold30wall/1det; repairs no hold. Wall ceilings may apply separately to tie "
@@ -146,7 +165,7 @@ def run(
             started = time.perf_counter()
             try:
                 extra: dict[str, Any] = {}
-                if arm == "control":
+                if arm == "control" and not incumbent_comparison:
                     plan = optimize_transfer_plan(
                         weighted,
                         state,
@@ -168,6 +187,7 @@ def run(
                         chips=chips,
                         preferences=preferences,
                         neighborhood_width=neighborhood_width,
+                        use_incumbent_hint=incumbent_comparison and arm == "refined",
                         repair_time_limit_seconds=30
                         * (window - 1)
                         / (window - neighborhood_width + 1),
