@@ -44,6 +44,8 @@ from squadopt.prediction.availability import apply_availability
 
 ALLOWED_SEASONS = ("2022-23", "2023-24", "2024-25")
 CAPS = {"sequential": 28.0, "window_tail": 84.0, "certify_each": 10.0, "final": 148.0}
+SINGLE_CAPS = {"sequential": 28.0, "final": 252.0}
+METHODS = ("two_seed_v1", "single_seed_v1")
 CONTROL_CAP = 279.0  # Existing hold probe adds 1 outside this cap.
 WALL_LIMIT = 1800.0  # Per primary/tie phase, not a total wall-budget claim.
 CUTOFF = datetime(2026, 10, 1, 5, tzinfo=UTC)
@@ -55,7 +57,11 @@ def write_json(path: Path, value: Any) -> None:
     )
 
 
-def budgets() -> tuple[float, float]:
+def budgets(method: str = "two_seed_v1") -> tuple[float, float]:
+    if method not in METHODS:
+        raise ValueError("Unknown study method.")
+    if method == "single_seed_v1":
+        return CONTROL_CAP + 1.0, sum(SINGLE_CAPS.values())
     return CONTROL_CAP + 1.0, CAPS["sequential"] + CAPS["window_tail"] + 2 * CAPS[
         "certify_each"
     ] + CAPS["final"]
@@ -206,6 +212,49 @@ def chosen_seed(plans: list[TransferPlanResult]) -> int:
     )
 
 
+def validate_reference(output: Path, reference: Path) -> None:
+    """Stop before any solve if this reused-development comparison changed its inputs."""
+    current = json.loads((output / "protocol.json").read_text(encoding="utf-8"))
+    previous = json.loads((reference / "protocol.json").read_text(encoding="utf-8"))
+    for key in (
+        "states_sha256",
+        "top100_sha256",
+        "top100_manifest_sha256",
+        "allowed_archive_seasons",
+    ):
+        if current[key] != previous[key]:
+            raise ValueError(f"Reference input mismatch: {key}")
+    for name, digest in previous["source_sha256"].items():
+        if name.replace("\\", "/") == "scripts/measure_guarded_lookahead.py":
+            continue
+        if current["source_sha256"].get(name) != digest:
+            raise ValueError(f"Reference source mismatch: {name}")
+    for filename in ("forecast14.json", "forecast5.json"):
+        left = json.loads((output / filename).read_text(encoding="utf-8"))
+        right = json.loads((reference / filename).read_text(encoding="utf-8"))
+        for key in ("fingerprint", "source_snapshot_id", "archive_hashes"):
+            if left[key] != right[key]:
+                raise ValueError(f"Reference forecast mismatch: {filename}/{key}")
+    left = json.loads((output / "forecast-provenance.json").read_text(encoding="utf-8"))
+    right = json.loads((reference / "forecast-provenance.json").read_text(encoding="utf-8"))
+    for key in ("source_fingerprint", "source_snapshot_id", "archive_hashes"):
+        if left[key] != right[key]:
+            raise ValueError(f"Reference provenance mismatch: {key}")
+    write_json(
+        output / "reference-check.json",
+        dict(
+            matched=True,
+            reused_development_data=True,
+            reference_protocol_sha256=hashlib.sha256(
+                (reference / "protocol.json").read_bytes()
+            ).hexdigest(),
+            reference_results_sha256=hashlib.sha256(
+                (reference / "results.json").read_bytes()
+            ).hexdigest(),
+        ),
+    )
+
+
 def run(
     snapshot_root: Path,
     artifact_root: Path,
@@ -214,14 +263,19 @@ def run(
     evidence: Path,
     states: Path,
     output: Path,
+    *,
+    method: str = "two_seed_v1",
+    reference_study: Path | None = None,
 ) -> None:
-    if budgets() != (280.0, 280.0):
+    if budgets(method) != (280.0, 280.0):
         raise ValueError("Changed preregistered budget.")
+    if method == "single_seed_v1" and reference_study is None:
+        raise ValueError("Single-seed follow-up requires the previous study reference.")
     if datetime.now(UTC) >= CUTOFF:
         raise ValueError("Night cutoff passed; no new heavy work.")
     output.mkdir(parents=True, exist_ok=False)
     start = datetime.now(UTC)
-    deadline = min(CUTOFF, start + timedelta(hours=6))
+    deadline = min(CUTOFF, start + timedelta(hours=4 if method == "single_seed_v1" else 6))
     root = Path(__file__).resolve().parents[1]
     sources = [
         Path(__file__),
@@ -231,14 +285,17 @@ def run(
         root / "src/squadopt/application/football_live.py",
         root / "src/squadopt/data/sources/football_history.py",
     ]
+    if method == "single_seed_v1":
+        sources.append(root / "docs/research/single_seed_lookahead_protocol.md")
     write_json(
         output / "protocol.json",
         dict(
+            method=method,
             started_at=start.isoformat(),
             stop_by=deadline.isoformat(),
             cases=case_list(),
-            budgets=budgets(),
-            phase_caps=CAPS,
+            budgets=budgets(method),
+            phase_caps=SINGLE_CAPS if method == "single_seed_v1" else CAPS,
             wall_seconds_per_primary_or_tie=WALL_LIMIT,
             allowed_archive_seasons=ALLOWED_SEASONS,
             states_sha256=hashlib.sha256(states.read_bytes()).hexdigest(),
@@ -255,6 +312,9 @@ def run(
     inputs, projection, forecast5 = prepare(
         snapshot_root, artifact_root, snapshot_id, archive_root, output
     )
+    if method == "single_seed_v1":
+        assert reference_study is not None
+        validate_reference(output, reference_study)
     counts = load_top100_counts(evidence, inputs=inputs, projection=forecast5.projection)
     profiles = json.loads(states.read_text(encoding="utf-8"))
     config = OptimizationConfig(
@@ -359,6 +419,37 @@ def run(
                         protect_hold=True,
                         linearization_level=2,
                     )
+                elif method == "single_seed_v1":
+                    entry["stage"] = "sequential"
+                    with patch.object(segmented, "optimize_transfer_plan", solve):
+                        seed = segmented.plan_in_segments(
+                            weighted,
+                            state,
+                            replace(
+                                config, solver_deterministic_time_limit=SINGLE_CAPS["sequential"]
+                            ),
+                            segment_lengths=(1,) * 14,
+                            transfer=settings,
+                            chips=chips,
+                            preferences=preferences,
+                        )
+                    entry["stage"] = "final"
+                    plan = solve(
+                        weighted,
+                        state,
+                        replace(config, solver_deterministic_time_limit=SINGLE_CAPS["final"]),
+                        settings,
+                        chips=chips,
+                        preferences=preferences,
+                        incumbent_plan=seed,
+                        protect_incumbent=True,
+                        linearization_level=2,
+                    )
+                    seed_value = plan.diagnostics["incumbent_protection"]["scaled_objective_value"]
+                    entry["selected_seed"] = 0
+                    entry["certified_seed_scores"] = [seed_value]
+                    if plan.diagnostics["scaled_model_objective_value"] < seed_value:
+                        raise ValueError("Certified incumbent regression.")
                 else:
                     seeds = []
                     for stage, lengths in (
@@ -440,6 +531,12 @@ def run(
                     )
             except Exception as error:
                 entry.update(valid=False, error_type=type(error).__name__, error=str(error))
+            known_costs = [
+                p["actual_det"] for p in entry["phases"] if p.get("actual_det") is not None
+            ]
+            entry["recorded_det"] = sum(known_costs)
+            entry["cost_complete"] = len(known_costs) == len(entry["phases"])
+            entry["actual_det"] = entry["recorded_det"] if entry["cost_complete"] else None
             entry["wall_seconds"] = time.perf_counter() - began
             write_json(output / "results.json", records)
             print(
@@ -451,6 +548,7 @@ def run(
     write_json(
         output / "summary.json",
         dict(
+            method=method,
             core=screen(records[:4], 4),
             expanded=screen(records, 16),
             finished_at=datetime.now(UTC).isoformat(),
@@ -463,4 +561,6 @@ if __name__ == "__main__":
     for name in ("snapshot-root", "artifact-root", "archive-root", "evidence", "states", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--snapshot-id", required=True)
+    parser.add_argument("--method", choices=METHODS, default="two_seed_v1")
+    parser.add_argument("--reference-study", type=Path)
     run(**vars(parser.parse_args()))
