@@ -107,7 +107,15 @@ def self_parity(served: pd.DataFrame, extended: pd.DataFrame) -> None:
     right = extended.loc[extended.gameweek.isin(weeks)].sort_values(keys).reset_index(drop=True)
     if len(left) != len(right) or not left[keys].equals(right[keys]):
         raise ValueError("Self-parity failed: the extension does not carry the served rows.")
-    for column in ("expected_points", "appearance_probability", "fixture_count", "price_tenths"):
+    # The reader's horizon carries the base projection columns only; compare what both hold.
+    shared = [
+        c
+        for c in ("expected_points", "fixture_count", "price_tenths", "appearance_probability")
+        if c in left.columns and c in right.columns
+    ]
+    if "expected_points" not in shared:
+        raise ValueError("Self-parity failed: no expected points to compare.")
+    for column in shared:
         if not np.allclose(
             left[column].to_numpy(dtype=float),
             right[column].to_numpy(dtype=float),

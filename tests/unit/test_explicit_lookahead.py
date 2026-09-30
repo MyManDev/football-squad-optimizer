@@ -82,6 +82,15 @@ def test_self_parity_holds_equal_served_weeks_and_refuses_a_moved_number_or_a_lo
         self_parity(served, _frame((6, 7, 8), {(7, 2): 5.0 + 1e-8}))
     with pytest.raises(ValueError, match="served rows"):
         self_parity(served, _frame((6, 8)))
+    # The reader narrows its horizon to the base columns; the gate compares what both carry.
+    self_parity(served.drop(columns="appearance_probability"), _frame((6, 7, 8)))
+    with pytest.raises(ValueError, match="expected_points"):
+        self_parity(
+            served.drop(columns="appearance_probability"),
+            _frame((6, 7, 8), {(6, 1): 4.0 + 1e-8}),
+        )
+    with pytest.raises(ValueError, match="no expected points"):
+        self_parity(served.drop(columns="expected_points"), _frame((6, 7, 8)))
 
 
 def test_flagged_players_are_those_the_capture_prices_below_one():
