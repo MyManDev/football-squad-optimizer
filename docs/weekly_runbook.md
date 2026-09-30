@@ -112,7 +112,8 @@ export) and under each setting (`.../vs-<rival>/top100-<w>.json`). The index lis
 the level one transfer reaches, and a window's price is against the member's pure-points
 window at 0; window solves are found rather than proven, so that price is nearly always
 stated as at most. This adds about forty window solves per member, so plan the league stage
-in hours, not minutes, and start a deadline-day run in the morning. The full menu against
+in hours, not minutes, and start a deadline-day run in the morning: the full menu took 74
+minutes with twelve workers on the GW6 rehearsal (timings below). The full menu against
 every rival is the on-demand path's work. A hand build passes the export to
 `scripts.build_league_site` with `--top100-evidence <csv>`. The same handoff feeds
 `--decide`, so on such a week the system's own squad is also decided without the uplift,
@@ -254,6 +255,18 @@ net columns beside it.
   32 min and 49.5 min, so treat half an hour as the floor and not the estimate. This
   figure is the run **without** `--publish`; the publish stage was rewritten since the
   last run that used it and its cost is not currently measured.
+- With the full menu (Top 100 on; windows 1, 3 and 5 for `saf-puan`, `ortak-koru` and
+  `fark-yarat`) the league stage is the run. Measured on the GW6 capture, rehearsal of
+  2026-09-26 with `--workers 12`, nothing published: preflight to scoreboard **74.5 min**,
+  the league stage 74.0 min of it, the handoff 0.4 min and everything else seconds; 1421
+  advice files, `check_league_tree` passing all three checks. Every one-week (572) and
+  three-week (300) window solve proved; of the 300 five-week solves 241 proved and 59
+  returned FEASIBLE. GW5's full-menu league stage took 1 h 35 min with fifteen workers,
+  before #655.
+- **Capture to live is about 1 h 45 min** with the full menu: league stage 74 min, publish
+  13.7 s (measured 16 Sep), release PR CI about 13 min, main CI about 15 min, deploy about
+  1 min. A capture three hours before the deadline leaves about an hour of slack; two hours
+  leaves about fifteen minutes. For GW6 (deadline 2026-10-10T10:00Z) that is 07:00Z.
 - `--decide` needs the ledger to hold the previous gameweek. A week nothing was decided
   for is recorded first as a roll (`squadopt gameweek roll`, below); the pre-flight says
   so before anything is captured. `held_squad_from_ledger` (`src/squadopt/live/ledger.py`)
