@@ -1053,8 +1053,8 @@ def _hint_incumbent(
     config: OptimizationConfig,
     wall_limit: float,
     deterministic_limit: float,
-) -> float:
-    """Certify the decisions against the current model; hint, never constrain, the search."""
+) -> tuple[cp_model.CpSolver, float]:
+    """Certify and hint decisions; retain the witness for optional incumbent protection."""
     if (
         not isinstance(incumbent, TransferPlanResult)
         or not incumbent.has_solution
@@ -1130,7 +1130,7 @@ def _hint_incumbent(
     for index in range(len(artifacts.model.proto.variables)):
         variable = artifacts.model.get_int_var_from_proto_index(index)
         artifacts.model.add_hint(variable, probe.value(variable))
-    return _deterministic_time_used(probe, raw)
+    return probe, _deterministic_time_used(probe, raw)
 
 
 def optimize_transfer_plan(
@@ -1148,6 +1148,7 @@ def optimize_transfer_plan(
     protect_hold: bool = False,
     fixed_week_squads: Mapping[int, tuple[object, ...]] | None = None,
     incumbent_plan: TransferPlanResult | None = None,
+    protect_incumbent: bool = False,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -1155,6 +1156,9 @@ def optimize_transfer_plan(
     They are certified in a constrained clone before being hinted to the original.
     Certification consumes the same deterministic budget as search. It cannot be
     combined with ``protect_hold``, which supplies a different incumbent and bound.
+    ``protect_incumbent`` additionally retains the certified witness after UNKNOWN
+    or a worse feasible search. Its value is computed from the current model, never
+    read from the supplied result. A retained witness is FEASIBLE, not an optimum.
 
     ``fixed_week_squads`` is an opt-in temporal neighborhood: named gameweeks keep
     their entire squad, while all bank, transfer, chip and XI constraints still span
@@ -1219,6 +1223,10 @@ def optimize_transfer_plan(
     if not isinstance(availability, ChipAvailability):
         raise TransferPlanningValidationError("chips must be a ChipAvailability instance.")
 
+    if not isinstance(protect_incumbent, bool):
+        raise TransferPlanningValidationError("protect_incumbent must be boolean.")
+    if protect_incumbent and incumbent_plan is None:
+        raise TransferPlanningValidationError("Incumbent protection requires an incumbent plan.")
     if incumbent_plan is not None and protect_hold:
         raise TransferPlanningValidationError("Incumbent and hold hints cannot be combined.")
     verified_horizon = horizon.validated_copy()
@@ -1287,8 +1295,10 @@ def optimize_transfer_plan(
         wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
         deterministic_budget_source = "planner_default"
     incumbent_deterministic_time = 0.0
+    incumbent_solver: cp_model.CpSolver | None = None
+    incumbent_value: int | None = None
     if incumbent_plan is not None:
-        incumbent_deterministic_time = _hint_incumbent(
+        incumbent_solver, incumbent_deterministic_time = _hint_incumbent(
             artifacts,
             incumbent_plan,
             verified_horizon,
@@ -1298,6 +1308,8 @@ def optimize_transfer_plan(
             wall_limit,
             deterministic_limit,
         )
+        if protect_incumbent:
+            incumbent_value = int(incumbent_solver.value(artifacts.primary_objective))
     search_limit = max(0.0, deterministic_limit - incumbent_deterministic_time)
     search_wall = wall_limit
     if incumbent_plan is not None:
@@ -1340,6 +1352,18 @@ def optimize_transfer_plan(
                 artifacts.model.add_hint(variable, probe.value(variable))
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
+    used_incumbent = False
+    if protect_incumbent:
+        assert incumbent_solver is not None and incumbent_value is not None
+        if primary_status is SolverStatus.INFEASIBLE or (
+            primary_status is SolverStatus.OPTIMAL
+            and int(primary_solver.value(artifacts.primary_objective)) < incumbent_value
+        ):
+            raise SolverExecutionError("Full search contradicts its certified incumbent plan.")
+        used_incumbent = primary_status is SolverStatus.UNKNOWN or (
+            primary_status is SolverStatus.FEASIBLE
+            and int(primary_solver.value(artifacts.primary_objective)) < incumbent_value
+        )
     used_hold = hold_solver is not None and (
         primary_status is SolverStatus.UNKNOWN
         or (
@@ -1423,6 +1447,14 @@ def optimize_transfer_plan(
             "validation_deterministic_time_limit": min(1.0, deterministic_limit / 10.0),
             "claimed_objective_used": False,
         }
+    if protect_incumbent:
+        assert incumbent_value is not None
+        diagnostics["incumbent_protection"] = {
+            "version": "certified_fallback_v1",
+            "selected": used_incumbent,
+            "scaled_objective_value": incumbent_value / divisor,
+            "claimed_objective_used": False,
+        }
     if fixed_week_squads is not None:
         diagnostics["fixed_week_squads"] = dict(fixed_week_squads)
         diagnostics["proof_scope"] = "restricted_week_squads"
@@ -1437,6 +1469,26 @@ def optimize_transfer_plan(
             "deterministic_time": hold_deterministic_time,
             "deterministic_time_limit": 1.0,
         }
+    if used_incumbent:
+        assert incumbent_solver is not None and incumbent_value is not None
+        # Certification fixes the proposed decisions. Its status cannot prove an
+        # unrestricted optimum, even if the input was labelled OPTIMAL.
+        diagnostics["solver_status_name"] = "FEASIBLE"
+        diagnostics["primary_search_status"] = primary_status.name
+        diagnostics["scaled_model_objective_value"] = incumbent_value / divisor
+        diagnostics["solve_time_seconds"] = perf_counter() - started_at
+        if linearization_level is not None:
+            diagnostics["linearization_level"] = linearization_level
+        return _extract_plan(
+            incumbent_solver,
+            SolverStatus.FEASIBLE,
+            artifacts,
+            verified_horizon,
+            initial_state,
+            optimization_config,
+            settings,
+            diagnostics,
+        )
     if used_hold:
         assert hold_solver is not None and hold_value is not None
         # The restricted hold optimum is NOT a proof for the unrestricted search.
