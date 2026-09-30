@@ -310,6 +310,21 @@ def _player_ids(document: Mapping[str, object]) -> set[int]:
                 player = move.get(side)
                 if player is not None:
                     found.add(int(str(player)))
+    evidence = document.get("planning_evidence")
+    fields = evidence.get("fields") if isinstance(evidence, Mapping) else None
+    weeks = fields.get("plan_weeks") if isinstance(fields, Mapping) else None
+    if isinstance(weeks, list):
+        for week in weeks:
+            if not isinstance(week, Mapping):
+                continue
+            for side in ("transfers_in", "transfers_out"):
+                rows = week.get(side)
+                if isinstance(rows, list):
+                    found.update(
+                        int(str(row["player_id"]))
+                        for row in rows
+                        if isinstance(row, Mapping) and "player_id" in row
+                    )
     return found
 
 
@@ -405,8 +420,31 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         settings["top100_weight"] = int(str(top100["weight"]))
     if "evidence" in payload:
         settings["managers_word"] = True
+    # Keep only facts the producer actually published. The first-week scoring
+    # record alone used to lose future moves, user restrictions and chip context.
+    fields = (
+        "plan_weeks",
+        "preferences",
+        "preferences_scope",
+        "selection_top100_weight",
+        "chip_strategy",
+    )
+    decoded = json.loads(encoded)
+    planning = {key: decoded[key] for key in fields if key in decoded}
     return {
         **settings,
+        **(
+            {
+                "planning_evidence": {
+                    "scope": "published_payload_only",
+                    "solver_replay_complete": False,
+                    "internal_search_alternatives_recorded": False,
+                    "fields": planning,
+                }
+            }
+            if planning
+            else {}
+        ),
         # Which document this is. Several are published per member — the pure-points
         # baseline, each rival strategy against each rival, each solved window — and only
         # one of them is what the member's page points at, so every one carries its own
