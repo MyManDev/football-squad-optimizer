@@ -110,8 +110,12 @@ every pure-points window (`saf-puan/<3|5>/top100-<w>.json`), each rival strategy
 export) and under each setting (`.../vs-<rival>/top100-<w>.json`). The index lists them under
 `top100.documents`, `windows` and `computed`. A window's band holds the first week only, at
 the level one transfer reaches, and a window's price is against the member's pure-points
-window at 0; window solves are found rather than proven, so that price is nearly always
-stated as at most. This adds about forty window solves per member, so plan the league stage
+window at 0. Since #655 window solves run at a linearization level that proves most of
+them: the GW6 rehearsal proved all 300 three-week solves and 241 of the 300 five-week ones.
+A price is stated as the cost where both plans are proved, as at most where only the priced
+window's proof is missing, and not at all where the pure-points window's proof is missing
+(`publish_price_ceiling` in `src/squadopt/application/advice.py`).
+This adds about forty window solves per member, so plan the league stage
 in hours, not minutes, and start a deadline-day run in the morning: the full menu took 74
 minutes with twelve workers on the GW6 rehearsal (timings below). The full menu against
 every rival is the on-demand path's work. A hand build passes the export to
@@ -253,11 +257,13 @@ net columns beside it.
   a 36 min 21 s run, with preflight, capture, settled outcomes, site and scoreboard
   together under four seconds and the handoff 28 s. Two earlier runs put the same stage at
   32 min and 49.5 min, so treat half an hour as the floor and not the estimate. This
-  figure is the run **without** `--publish`; the publish stage was rewritten since the
-  last run that used it and its cost is not currently measured.
+  figure is the run **without** `--publish`. The publish stage took 13.7 s when it was
+  timed on 16 September (#872, section 4); `src/squadopt/platform/weekly_publish.py`
+  has changed since, and no later timing is recorded.
 - With the full menu (Top 100 on; windows 1, 3 and 5 for `saf-puan`, `ortak-koru` and
-  `fark-yarat`) the league stage is the run. Measured on the GW6 capture, rehearsal of
-  2026-09-26 with `--workers 12`, nothing published: preflight to scoreboard **74.5 min**,
+  `fark-yarat`) the league stage is the run. From the rehearsal of 2026-09-26 that #872
+  (section 4) reports, on the fix3 code with `--workers 12` and nothing published (#872 names
+  no capture or run id): preflight to scoreboard **74.5 min**,
   the league stage 74.0 min of it, the handoff 0.4 min and everything else seconds; 1421
   advice files, `check_league_tree` passing all three checks. Every one-week (572) and
   three-week (300) window solve proved; of the 300 five-week solves 241 proved and 59
