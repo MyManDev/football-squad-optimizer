@@ -26,6 +26,7 @@ import pandas as pd
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
+from squadopt.live.football_observations import availability_observations
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import TRANSFER_HIT_POINTS, SeasonRules, chip_availability_for
 from squadopt.optimization import OptimizationConfig, SolverStatus
@@ -45,6 +46,7 @@ from squadopt.planning import (
 )
 from squadopt.planning.chip_strategy import optimize_chip_strategy
 from squadopt.planning.guarded import optimize_guarded_window
+from squadopt.planning.observed import optimize_observed_window
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -965,8 +967,33 @@ def plan_transfer_horizon(
         and first_week_transfer_cap is None
         and first_week_exclusion is None
     )
+    information = None
+    if (
+        guarded_football
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 5
+    ):
+        information = availability_observations(
+            PlanningHorizon(planning_table),
+            state,
+            inputs.availability,
+            model_version=projection_horizon.model_version,
+            source_snapshot_id=inputs.snapshot_id,
+            captured_at_utc=inputs.captured_at_utc,
+            deadline_utc=inputs.deadline.deadline_utc,
+        )
     plan = (
-        optimize_guarded_window(
+        optimize_observed_window(
+            PlanningHorizon(planning_table),
+            state,
+            information.nodes,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+        )
+        if information is not None and information.nodes
+        else optimize_guarded_window(
             PlanningHorizon(planning_table),
             state,
             settings,
@@ -1000,6 +1027,22 @@ def plan_transfer_horizon(
             protect_hold=True,
         )
     )
+    if information is not None:
+        plan = replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "availability_information": {
+                    "version": information.contract_version,
+                    "reason": information.reason,
+                    "source_snapshot_id": information.source_snapshot_id,
+                    "captured_at_utc": information.captured_at_utc,
+                    "player_id": information.player_id,
+                    "probability": information.stated_probability,
+                    "gameweek": information.information_gameweek,
+                },
+            },
+        )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
         relative_gap = plan.diagnostics.get("relative_optimality_gap")

@@ -101,7 +101,9 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         version,
         FEATURE_CONTRACT,
         "fixture_sum_blank_zero_v1",
-        **({"contract_version": APPEARANCE_HORIZON_CONTRACT_VERSION} if contextual else {}),
+        # Both producers carry appearance probabilities. Retain them through the
+        # horizon boundary so availability-conditioned windows do not lose minutes.
+        contract_version=APPEARANCE_HORIZON_CONTRACT_VERSION,
     )
     if set(horizon.table.gameweek) != set(range(first, min(first + 5, 39))):
         raise ValueError("Football forecast must cover the full available five-week window.")

@@ -105,6 +105,7 @@ def advise_chip_strategy(
         window=request.window,
         weeks=shown,
         optimality_gap_published=False,
+        base_horizon=base,
     )
     first = shown[0]
     choice = {

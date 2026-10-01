@@ -47,6 +47,7 @@ from squadopt.live.football_artifact import (
     read_football_forecast,
 )
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
+from squadopt.planning.observed import OBSERVED_WINDOW_VERSION
 
 __all__ = [
     "CHIP_SWITCH",
@@ -124,7 +125,11 @@ def switch_identity(
             raise SwitchInputUnavailable(
                 MODEL_SWITCH, "This capture has no usable football forecast."
             )
-        identity[MODEL_SWITCH] = {"name": model, "fingerprint": inputs.football.fingerprint}
+        identity[MODEL_SWITCH] = {
+            "name": model,
+            "fingerprint": inputs.football.fingerprint,
+            "planner_version": OBSERVED_WINDOW_VERSION,
+        }
     if chip is not None:
         identity[CHIP_SWITCH] = {
             "chip": chip,
