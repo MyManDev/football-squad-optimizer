@@ -1,5 +1,6 @@
 import type { PlayerView } from "../../../data/schema";
 import type { PlayMode, WindowSize } from "../../../lib/decisionVocabulary";
+import type { Top100Weight } from "../advice/top100";
 
 /**
  * The strategies the producer computes for a league member: the catalogue's computable
@@ -473,6 +474,8 @@ export interface EntryAdvice {
   evidence?: AdviceEvidence;
   /** Present on a Top 100 weighted document only. */
   top100?: AdviceTop100;
+  /** Selection weight when no paired setting-zero cost or change was measured. */
+  selection_top100_weight?: Top100Weight;
   /** Present only on a document solved with a chip the member chose. */
   chip_choice?: AdviceChipChoice;
   chip_strategy?: {

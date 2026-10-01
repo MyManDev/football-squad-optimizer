@@ -5,7 +5,7 @@
  * limit read back in the member's language. A document for another setting is not shown.
  */
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -87,6 +87,18 @@ function section(container: HTMLElement): string {
 }
 
 describe("a Top 100 weighted plan on the advice card", () => {
+  it("accepts a selected weight without inventing a paired price or change", () => {
+    const advice = weighted(20, false, { selection_top100_weight: 20 });
+    delete advice.payload.top100;
+    delete advice.payload.expected_points_cost;
+    delete advice.payload.expected_points_cost_ceiling;
+    const { container } = renderPage("en", advice, "mode=saf-puan&window=1&top100=20");
+    expect(screen.getByRole("list", { name: MESSAGES.en.squad.pitchLabel })).toBeInTheDocument();
+    expect(section(container)).toBe("");
+    expect(container.textContent).not.toContain(TOP100_COPY.en.unchanged);
+    expect(container.textContent).not.toContain(TOP100_COPY.en.cost("0.0"));
+  });
+
   it("states the setting, the change and one price, in Turkish", () => {
     const { container } = renderPage(
       "tr",

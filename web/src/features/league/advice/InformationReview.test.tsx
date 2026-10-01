@@ -66,3 +66,19 @@ it("rejects malformed conditional branches before rendering", () => {
   data.information_review!.source_playing_chance_percent = 150;
   expect(isAdvicePayload(data)).toBe(false);
 });
+
+it("distinguishes no alternative found from a completed comparison", () => {
+  const data = view();
+  data.information_review!.status = "baseline_retained";
+  data.information_review!.reason = "no_distinct_alternative";
+  data.information_review!.candidates = [];
+  render(
+    <LanguageProvider initialLanguage="en">
+      <InformationReview view={data} />
+    </LanguageProvider>,
+  );
+  expect(screen.getByTestId("information-review")).toHaveTextContent(
+    "No distinct feasible first action was found",
+  );
+  expect(screen.queryByText("Selected first action")).not.toBeInTheDocument();
+});
