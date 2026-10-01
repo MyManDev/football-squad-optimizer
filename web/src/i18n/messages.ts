@@ -694,6 +694,12 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
+        "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.",
+      "Experimental football model; independent predictive superiority is unverified.":
+        "Experimental football model; independent predictive superiority is unverified.",
+      "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.":
+        "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.",
       "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
         "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
       "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
@@ -1801,6 +1807,12 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
+        "Gelecek her maçın tahmini, kayıtlı geçmiş verilerinden ayrı hesaplanır; maçsız haftalarda yalnız o haftanın puanı sıfırdır. Gelecekteki maç sonuçları veya sakatlık güncellemeleri varsayılmaz.",
+      "Experimental football model; independent predictive superiority is unverified.":
+        "Deneysel futbol modelinin daha başarılı tahminler ürettiği bağımsız olarak doğrulanmadı.",
+      "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.":
+        "Önceki futbol tahminleri, bir oyuncunun yokluğunu sonraki haftalara da taşımış olabilir. Oyuncunun oynadığı durumdaki puan tahmini bilinmeden bu güncelleme o değerleri geri yüklemez.",
       "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
         "Tam planlar, beklenen otomatik değişiklik puanları ve kaptan oynamazsa yardımcı kaptanın ek puanı dahil edilerek karşılaştırılır. Sınırlı arama, mümkün olan en iyi planı veya gelecekteki başarıyı kanıtlamaz.",
       "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":

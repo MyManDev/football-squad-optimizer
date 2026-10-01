@@ -2,14 +2,16 @@
 
 import argparse
 import json
-import os
 from pathlib import Path
 
-from squadopt.application.football_live import produce_football_forecast
+from squadopt.application.football_live import (
+    produce_football_components,
+    produce_football_forecast,
+)
 from squadopt.application.manager_words import load_manager_words
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import infer_season, read_inputs
-from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
+from squadopt.platform.football_publication import publish_football_artifacts
 
 
 def main() -> None:
@@ -19,12 +21,21 @@ def main() -> None:
     parser.add_argument("--archive-root", type=Path, required=True)
     parser.add_argument("--artifact-root", type=Path, required=True)
     parser.add_argument("--contextual", action="store_true", help="Build football_contextual_v3.")
+    parser.add_argument(
+        "--with-components",
+        action="store_true",
+        help="Publish the v1 forecast and its verified fixture companion from one model fit.",
+    )
     parser.add_argument("--rotation-evidence", type=Path)
     parser.add_argument("--club-news-source", type=Path)
     args = parser.parse_args()
-    snapshot = read_snapshot(args.snapshot_root, args.snapshot_id)
+    if args.with_components and args.contextual:
+        parser.error("--with-components supports the v1 model only, not --contextual")
     if bool(args.rotation_evidence) != bool(args.club_news_source):
         parser.error("--rotation-evidence and --club-news-source must be supplied together")
+    if args.with_components and args.rotation_evidence:
+        parser.error("--with-components does not accept contextual manager inputs")
+    snapshot = read_snapshot(args.snapshot_root, args.snapshot_id)
     words = (
         load_manager_words(
             args.rotation_evidence,
@@ -34,27 +45,31 @@ def main() -> None:
         if args.rotation_evidence
         else None
     )
-    document = produce_football_forecast(
-        snapshot, args.archive_root, contextual=args.contextual, manager_words=words
-    )
-    target = football_artifact_path(args.artifact_root, args.snapshot_id)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        existing = json.loads(target.read_text(encoding="utf-8"))
-        if existing != document:
-            raise ValueError("A different football forecast already exists for this capture.")
+    if args.with_components:
+        document, companion = produce_football_components(snapshot, args.archive_root)
     else:
-        temporary = target.with_suffix(".pending")
-        with temporary.open("x", encoding="utf-8") as handle:
-            json.dump(document, handle, sort_keys=True, allow_nan=False)
-        read_football_forecast(temporary, read_inputs(snapshot, season=infer_season(snapshot)))
-        os.replace(temporary, target)
+        document = produce_football_forecast(
+            snapshot, args.archive_root, contextual=args.contextual, manager_words=words
+        )
+        companion = None
+    publish_football_artifacts(
+        artifact_root=args.artifact_root,
+        snapshot=snapshot,
+        inputs=read_inputs(snapshot, season=infer_season(snapshot)),
+        document=document,
+        companion=companion,
+    )
     print(
         json.dumps(
             {
                 "fingerprint": document["fingerprint"],
                 "rows": len(document["rows"]),
                 "model_version": document["model_version"],
+                **(
+                    {"components_fingerprint": companion["fingerprint"]}
+                    if companion is not None
+                    else {}
+                ),
             }
         )
     )

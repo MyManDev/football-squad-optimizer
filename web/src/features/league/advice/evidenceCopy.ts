@@ -21,6 +21,8 @@ export interface EvidenceCopy {
   sourceCapture: string;
   title: string;
   intro: (clubs: number) => string;
+  coveredClubs: string;
+  noCoveredClubs: string;
   unchanged: string;
   changed: string;
   /** The same, where no price is printed above to point at. */
@@ -48,6 +50,8 @@ const en: EvidenceCopy = {
   sourceExample: "Example data: not a real club page.",
   sourceCapture: "Read from registered club pages before this data snapshot.",
   title: "What the club's page said",
+  coveredClubs: "Clubs covered by the news",
+  noCoveredClubs: "No covered club names were reported for this result.",
   intro: (clubs: number) =>
     `Declared rule, not measured: a stated absence keeps a player out of the eleven, a stated doubt off the armband. Clubs read: ${clubs}.`,
   unchanged: "The club's page did not change this plan.",
@@ -86,6 +90,8 @@ const tr: EvidenceCopy = {
   sourceExample: "Örnek veri: gerçek bir kulüp sayfası değil.",
   sourceCapture: "Bu veri çekiminden önce kayıtlı kulüp sayfalarından okundu.",
   title: "Kulübün sayfası ne dedi",
+  coveredClubs: "Haber kapsamındaki kulüpler",
+  noCoveredClubs: "Bu sonuçta kapsanan kulüp adı bildirilmedi.",
   intro: (clubs) =>
     `Beyan edilmiş kural, ölçülmemiş: söylenmiş yokluk on birin, söylenmiş şüphe kaptanlığın dışında tutar. Okunan kulüp: ${clubs}.`,
   unchanged: "Kulübün sayfası bu planı değiştirmedi.",
