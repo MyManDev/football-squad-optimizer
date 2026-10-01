@@ -50,7 +50,8 @@ from squadopt.application.weekly_plan import (
 )
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import METADATA_FILENAME, PAYLOAD_DIRECTORY
+from squadopt.data.snapshots import METADATA_FILENAME, PAYLOAD_DIRECTORY, read_snapshot
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live import Projection, RecommendationInputs
 from squadopt.live.football_artifact import (
     FootballForecast,
@@ -221,7 +222,11 @@ def _rotation_candidates(
 
 
 def _rotation_manifest_binding(
-    document: object, inputs: RecommendationInputs, news_capture_id: str | None
+    document: object,
+    inputs: RecommendationInputs,
+    news_capture_id: str | None,
+    *,
+    news_captured_at_utc: str | None = None,
 ) -> str:
     """An artifact's contributing sources must be this exact decision and configured news."""
     if not isinstance(document, dict):
@@ -235,7 +240,34 @@ def _rotation_manifest_binding(
         raise ValueError("The rotation manifest season or gameweek differs from this decision.")
     sources = document.get("source_snapshot_ids")
     expected = {inputs.snapshot_id}
-    if news_capture_id is not None:
+    binding_fields = ("club_news_snapshot_id", "club_news_captured_at_utc")
+    explicitly_bound = any(key in document for key in binding_fields)
+    if explicitly_bound:
+        recorded_time = document.get("club_news_captured_at_utc")
+        if (
+            news_capture_id is None
+            or document.get("club_news_snapshot_id") != news_capture_id
+            or not isinstance(recorded_time, str)
+            or news_captured_at_utc is None
+        ):
+            raise ValueError(
+                "The rotation manifest does not bind the configured news capture time."
+            )
+        completed = as_instant(
+            normalize_utc_timestamp(recorded_time, label="club_news_captured_at_utc")
+        )
+        if completed != as_instant(news_captured_at_utc) or completed >= as_instant(
+            inputs.captured_at_utc
+        ):
+            raise ValueError(
+                "The rotation manifest does not bind the configured news capture time."
+            )
+    quiet = (
+        explicitly_bound
+        and type(document.get("claims_coded")) is int
+        and document["claims_coded"] == 0
+    )
+    if news_capture_id is not None and not quiet:
         expected.add(news_capture_id)
     if (
         not isinstance(sources, list)
@@ -351,8 +383,19 @@ def load_switch_inputs(
                 notes.append(f"managers_word: no rotation table {pairs[0][0].name}")
             else:
                 table, manifest = selected
+                document = json.loads(manifest.read_text(encoding="utf-8"))
+                news_completed = None
+                if (
+                    isinstance(document, dict)
+                    and news_id is not None
+                    and any(
+                        key in document
+                        for key in ("club_news_snapshot_id", "club_news_captured_at_utc")
+                    )
+                ):
+                    news_completed = read_snapshot(source.parent, news_id).metadata.captured_at_utc
                 recorded = _rotation_manifest_binding(
-                    json.loads(manifest.read_text(encoding="utf-8")), inputs, news_id
+                    document, inputs, news_id, news_captured_at_utc=news_completed
                 )
                 words = load_manager_words(
                     table, club_news_source=source, snapshot_root=snapshot_root

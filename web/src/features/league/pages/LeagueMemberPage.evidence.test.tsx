@@ -7,7 +7,7 @@
  * Nothing on any of it reads as a probability.
  */
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -229,6 +229,43 @@ describe("the manager's word on the advice card", () => {
     expect(text).toContain(EVIDENCE_COPY.tr.sourceCapture);
     expect(text).not.toContain(MESSAGES.tr.leagueMembers.exampleData);
   });
+
+  it.each(["tr", "en"] as const)(
+    "names only the declared covered clubs, including a read with no player statement, in %s",
+    (language) => {
+      const advice = switchedOn([], {}, "club_news_capture");
+      advice.payload.evidence!.clubs_covered = ["Liverpool", "Newcastle"];
+      renderPage(language, advice);
+
+      const section = screen.getByTestId("managers-word");
+      const copy = EVIDENCE_COPY[language];
+      const clubs = within(section).getByRole("list", { name: copy.coveredClubs });
+      expect(
+        within(clubs)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Liverpool", "Newcastle"]);
+      expect(section).toHaveTextContent(copy.intro(2));
+      expect(section).not.toHaveTextContent(copy.noCoveredClubs);
+      expect(section).not.toHaveTextContent("Arsenal");
+      expect(section.querySelector("blockquote")).toBeNull();
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "does not infer coverage from a player's club in %s",
+    (language) => {
+      const advice = switchedOn();
+      advice.payload.evidence!.clubs_covered = [];
+      renderPage(language, advice);
+
+      const section = screen.getByTestId("managers-word");
+      const copy = EVIDENCE_COPY[language];
+      expect(within(section).queryByRole("list", { name: copy.coveredClubs })).toBeNull();
+      expect(section).toHaveTextContent(copy.noCoveredClubs);
+      expect(section).toHaveTextContent(copy.intro(0));
+    },
+  );
 
   it("captions a move the word caused, and only that move", () => {
     const player = (id: number, name: string) => ({

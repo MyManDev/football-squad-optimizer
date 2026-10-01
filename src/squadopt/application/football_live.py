@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
+from numbers import Integral
 from pathlib import Path
 from typing import Any
 
@@ -19,10 +21,21 @@ from squadopt.data.sources.football_history import (
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.data.sources.fpl_set_pieces import TAKER_FIELDS, captured_taker_priorities
-from squadopt.live import infer_season, read_inputs
-from squadopt.live.football_artifact import ARTIFACT_CONTRACT, forecast_digest
+from squadopt.live import RecommendationInputs, infer_season, read_inputs
+from squadopt.live.football_artifact import (
+    ARTIFACT_CONTRACT,
+    SHARES_BEFORE_AVAILABILITY_LIMIT,
+    forecast_digest,
+)
 from squadopt.live.football_horizon import build_football_horizon
+from squadopt.prediction.availability import apply_availability
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, FixtureFootballModel
+from squadopt.prediction.football_components import (
+    COMPONENT_LIMITATIONS,
+    FIXTURE_COMPONENTS_CONTRACT,
+    captured_availability,
+    component_rows,
+)
 from squadopt.prediction.football_contextual import (
     CONTEXTUAL_MODEL_VERSION,
     ContextualFootballModel,
@@ -61,13 +74,38 @@ def causal_training(history: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(parts, ignore_index=True)
 
 
-def produce_football_forecast(
+def forecast_gameweeks(first: int, gameweeks: Sequence[int] | None = None) -> tuple[int, ...]:
+    """The consecutive gameweeks one artifact forecasts, starting at the capture's own target.
+
+    ``None`` is the artifact as it is served: five weeks from the target, fewer at the end
+    of the season. A caller may name a longer run for research. It must still start at the
+    target, because the first week is the decided forecast and the reader holds it to the
+    capture's deadline. Nothing here invents a calendar: a named week the capture does not
+    publish fails in the fixture calendar below, not by being filled in.
+    """
+    if gameweeks is None:
+        return tuple(range(first, min(first + 5, 39)))
+    weeks = tuple(gameweeks)
+    if not weeks or any(isinstance(w, bool) or not isinstance(w, Integral) for w in weeks):
+        raise ValueError("Forecast gameweeks must be a nonempty sequence of integers.")
+    weeks = tuple(int(w) for w in weeks)
+    if weeks[0] != first:
+        raise ValueError("Forecast gameweeks must start at the capture's own target gameweek.")
+    if weeks != tuple(range(weeks[0], weeks[-1] + 1)) or weeks[-1] > 38:
+        raise ValueError("Forecast gameweeks must be consecutive and end by gameweek 38.")
+    return weeks
+
+
+def _forecast_and_components(
     snapshot: CapturedSnapshot,
     archive_root: Path,
     *,
-    contextual: bool = False,
-    manager_words: ManagerWords | None = None,
-) -> dict[str, Any]:
+    contextual: bool,
+    manager_words: ManagerWords | None,
+    gameweeks: Sequence[int] | None,
+) -> tuple[dict[str, Any], pd.DataFrame, RecommendationInputs]:
+    """One producer call: the served document, the per-fixture components and the inputs."""
+
     if not isinstance(contextual, bool):
         raise ValueError("contextual must be a boolean.")
     if manager_words is not None and not contextual:
@@ -111,7 +149,7 @@ def produce_football_forecast(
             manager_words=manager_words,
         )
     fixtures = pd.DataFrame(json.loads(snapshot.payloads[FIXTURES_PAYLOAD]))
-    weeks = tuple(range(first, min(first + 5, 39)))
+    weeks = forecast_gameweeks(first, gameweeks)
     fixtures = fixtures.loc[fixtures.event.isin(weeks)]
     if fixtures.kickoff_time.isna().any():
         raise ValueError("Football window contains an undated fixture.")
@@ -204,4 +242,75 @@ def produce_football_forecast(
             ]
         )
     document["fingerprint"] = forecast_digest(document)
+    return document, components, inputs
+
+
+def produce_football_forecast(
+    snapshot: CapturedSnapshot,
+    archive_root: Path,
+    *,
+    contextual: bool = False,
+    manager_words: ManagerWords | None = None,
+    gameweeks: Sequence[int] | None = None,
+) -> dict[str, Any]:
+    document, _components, _inputs = _forecast_and_components(
+        snapshot,
+        archive_root,
+        contextual=contextual,
+        manager_words=manager_words,
+        gameweeks=gameweeks,
+    )
     return document
+
+
+def produce_football_components(
+    snapshot: CapturedSnapshot,
+    archive_root: Path,
+    *,
+    gameweeks: Sequence[int] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The served v1 document and its per-fixture components, from one producer call.
+
+    The first document is exactly what ``produce_football_forecast`` returns for the same
+    arguments. The second is ``football_fixture_components_v1``: every scheduled player-fixture's
+    model outputs, bound to the first by its fingerprint. The capture's availability is carried
+    once in its header, as the multiplier ``apply_availability`` gives each player and the rule
+    that gave it, and applied to no row. v1 only: the contextual model conditions its team
+    components on availability and is not this contract.
+    """
+
+    document, components, inputs = _forecast_and_components(
+        snapshot, archive_root, contextual=False, manager_words=None, gameweeks=gameweeks
+    )
+    roster = [int(player) for player in inputs.players.player_id]
+    unit = pd.DataFrame({"player_id": roster, "expected_points": [1.0] * len(roster)})
+    adjustment = apply_availability(unit, inputs.availability)
+    multipliers = dict(zip(roster, (float(v) for v in adjustment.multiplier), strict=True))
+    companion: dict[str, Any] = {
+        "contract_version": FIXTURE_COMPONENTS_CONTRACT,
+        "model_version": document["model_version"],
+        "experimental": True,
+        "season": document["season"],
+        "gameweek": document["gameweek"],
+        "gameweeks": sorted({int(row["gameweek"]) for row in document["rows"]}),
+        "source_snapshot_id": document["source_snapshot_id"],
+        "captured_at_utc": document["captured_at_utc"],
+        "source_fingerprint": document["source_fingerprint"],
+        "forecast_fingerprint": document["fingerprint"],
+        "training_rows": document["training_rows"],
+        "training_latest_kickoff": document["training_latest_kickoff"],
+        "archive_hashes": dict(document["archive_hashes"]),
+        "captured_availability": captured_availability(multipliers, adjustment.diagnostics),
+        "limitations": [
+            *document["limitations"],
+            SHARES_BEFORE_AVAILABILITY_LIMIT,
+            *COMPONENT_LIMITATIONS,
+        ],
+        "rows": []
+        if components.empty
+        else component_rows(
+            components, model_version=document["model_version"], players=multipliers
+        ),
+    }
+    companion["fingerprint"] = forecast_digest(companion)
+    return document, companion

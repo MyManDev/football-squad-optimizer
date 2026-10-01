@@ -56,7 +56,74 @@ Anthropic and Gemini continue to work through the same settings. Their existing 
 remain unchanged. Gemini's supported-model/thinking-setting list remains in force; this
 change does not claim that an arbitrary new Gemini model is compatible.
 
-API readiness is separate from club coverage. The committed source registry currently
-contains real hosts for Liverpool and Newcastle, plus an Example FC placeholder; entering
-a key does not supply news for all twenty clubs. The existing `--registry` option accepts
-an operator-maintained source file. This package does not extend or replace that registry.
+API readiness is separate from club coverage. The committed source registry contains
+three real hosts, for Liverpool, Newcastle and Crystal Palace, plus an Example FC
+placeholder. Palace is limited to the credited, linked written-article scope recorded in
+[the source reading](club_news_sources.md). Entering a key does not supply news for the
+entire captured league. The existing `--registry` option accepts an operator-maintained
+source file; the same terms-reading and bounded-discovery rules apply.
+
+
+## Bounded provider verification
+
+Limit a first paid or quota-limited call to one exact registered club. Selection is checked
+before fetching pages or contacting the provider; a misspelled name refuses the run.
+Repeated selections do not repeat requests. All registered pages for the selected club
+remain in scope.
+
+```text
+python -m scripts.capture_club_news --settings-file <private-file> --roster-snapshot <capture> --club Liverpool --capture-root <trial-output>
+```
+
+Repeat `--club` to select more clubs. `--capture-root` changes only where new news is
+written; the roster is still read from `--snapshot-root`. Without these options the
+existing registry and output defaults are unchanged. The command reports roster clubs,
+registered and selected clubs, received documents, coded responses and missing coverage
+separately. A coded empty response is a successful response, not a player update or proof
+that no news was published. The reader samples the registered pages and at most ten linked
+articles per host; it does not claim exhaustive coverage.
+
+A private Gemini file can use `provider = "gemini"`, a supported `model` such as
+`gemini-3.6-flash`, and the existing `api_key_env` or `api_key` setting. A transient service
+failure is recorded as a failed call. There is no automatic second request or silent model
+change. Validate a saved response against its captured source spans before claiming that
+it supplied any usable statements. The source reader and downstream timing checks apply
+regardless of provider.
+
+## Fixture components for minute evidence
+
+The v1 builder can publish the forecast and its fixture components from the same fit:
+
+```text
+python -m scripts.build_football_forecast --snapshot-root <captures> --snapshot-id <capture> --archive-root <authorized-archive> --artifact-root <artifacts> --with-components
+```
+
+This is opt-in and v1-only. The companion is validated against the full five-week forecast,
+its captured calendar and availability before either new document is published. Existing
+conflicting files are refused, not replaced. The companion is written first; an interrupted
+identical run can complete the forecast. The two-file publication is not a transaction. A
+per-capture publication marker excludes a second cooperating writer; after a process is
+killed an operator must inspect that marker before removing it.
+
+This command still fits the producer's configured archive seasons, including 2025-26.
+`--with-components` does not authorize archive access or manufacture a missing basis for an
+old forecast. Where a season is held out or its access is restricted, do not run this command
+against it. Old weekly totals alone cannot recover the exact player-fixture components.
+New news must precede the decision capture; changing its date to fit an old capture is not
+an integration path.
+
+## Personal ChatGPT and Claude accounts
+
+API configuration is not a subscription-account connection. As checked on 2026-10-01,
+[Sign in with ChatGPT for websites](https://developers.openai.com/siwc/website) requires
+provider acceptance for the website trial; identity login alone does not grant model use.
+The [open-source token-sharing flow](https://developers.openai.com/siwc/token-sharing-open-source)
+is for locally hosted applications. It is not a substitute for acceptance of this hosted
+site. The [provider interest form](https://openai.com/form/sign-in-with-chatgpt-interest/)
+is the route for a hosted integration.
+
+[Claude Code's official usage policy](https://code.claude.com/docs/en/legal-and-compliance)
+distinguishes native end-user Claude Code use from a third-party application routing
+Claude.ai subscription credentials. This site does not collect subscription session tokens
+or advertise a working account connection. Provider-approved hosted integration remains a
+separate prerequisite; the operator's Gemini/API configuration does not resolve it.

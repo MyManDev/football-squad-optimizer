@@ -25,6 +25,7 @@ from squadopt.data.sources.club_news_coding import (
     locate_claims_reporting,
 )
 from squadopt.data.tables import EXPORT_LINE_TERMINATOR
+from squadopt.data.timestamps import as_instant
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
     ClubModelProvenance,
@@ -85,6 +86,8 @@ class _ClubNewsInputs:
     #: Covered clubs at least one of whose registered pages was not read. A narrowing of
     #: coverage, never a substitute for it -- every name here is also in ``clubs_covered``.
     clubs_partially_covered: tuple[str, ...] = ()
+    capture_id: str | None = None
+    captured_at_utc: str | None = None
 
 
 def _club_news_inputs(request: RotationExportRequest) -> _ClubNewsInputs:
@@ -156,6 +159,8 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         clubs_covered=covered,
         unverifiable=tuple(unverifiable),
         clubs_partially_covered=partial,
+        capture_id=snapshot.metadata.snapshot_id,
+        captured_at_utc=snapshot.metadata.captured_at_utc,
     )
 
 
@@ -325,6 +330,8 @@ def _manifest(
     table_sha256: str,
     repository_commit: str,
     generated_at_utc: str,
+    news_capture_id: str | None = None,
+    news_captured_at_utc: str | None = None,
 ) -> dict[str, object]:
     attrs = table.attrs
     return {
@@ -354,6 +361,14 @@ def _manifest(
         "claims_coded": attrs["claims_coded"],
         "claims_ambiguous": attrs["claims_ambiguous"],
         "players_not_addressed": attrs["players_not_addressed"],
+        **(
+            {
+                "club_news_snapshot_id": news_capture_id,
+                "club_news_captured_at_utc": news_captured_at_utc,
+            }
+            if news_capture_id is not None
+            else {}
+        ),
     }
 
 
@@ -364,6 +379,11 @@ def _decision_snapshot(root: Path, snapshot_id: str) -> CapturedSnapshot:
 def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapping[str, object]:
     decision = _decision_snapshot(arguments.snapshot_root, arguments.snapshot)
     club_news = _club_news_inputs(arguments)
+    if club_news.capture_id is not None and (
+        club_news.captured_at_utc is None
+        or as_instant(club_news.captured_at_utc) >= as_instant(decision.metadata.captured_at_utc)
+    ):
+        raise DataError("The club-news capture must complete before the decision capture.")
     table = build_rotation_evidence_table(
         season=arguments.season,
         target_gameweek=arguments.target_gameweek,
@@ -400,6 +420,8 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         table_sha256=table_sha256,
         repository_commit=repository_commit,
         generated_at_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        news_capture_id=club_news.capture_id,
+        news_captured_at_utc=club_news.captured_at_utc,
     )
     manifest_outcome = write_document_once(
         manifest, manifest_path, replay_identity=_manifest_identity
