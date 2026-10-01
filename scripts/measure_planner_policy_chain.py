@@ -26,6 +26,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -49,6 +50,7 @@ from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE, g
 from squadopt.live.football_artifact import (
     FootballForecast,
     football_artifact_path,
+    forecast_digest,
     read_football_forecast,
 )
 from squadopt.live.recommendation import RecommendationInputs, infer_season, read_inputs
@@ -103,8 +105,15 @@ HOLD_PROBE_UNITS = 1.0
 SQUAD_CONFIG = OptimizationConfig(
     bench_weight=0, solver_time_limit_seconds=120, solver_deterministic_time_limit=60
 )
-#: Rule 9: a squad not proved at 60 units is built once more at this budget.
+#: Rule 9: a squad not proved at 60 units is built once more at this budget, with a wall ceiling
+#: that grows with it so the clock does not decide the retry.
 SQUAD_RETRY_UNITS = 240.0
+SQUAD_RETRY_WALL_SECONDS = 480.0
+#: Captures named before this instant belong to an earlier season and are never opened (rule 38).
+SEASON_OPENS = datetime(2026, 6, 1, tzinfo=UTC)
+CAPTURE_INSTANT = re.compile(r"-(\d{8}T\d{6}Z)-")
+#: Rule 40: no chain starts once this gameweek's deadline has passed.
+LAPSE_GAMEWEEK = 21
 #: Packages whose versions decide what the solver returns; a later run must match them.
 PINNED_PACKAGES: tuple[str, ...] = ("ortools", "numpy", "pandas")
 #: Rule 39: the decision step never runs on a Tuesday or a Friday, operator's time (UTC+3,
@@ -204,19 +213,45 @@ def _instant(text: str) -> datetime:
     return value.astimezone(UTC)
 
 
-def capture_index(snapshot_root: Path) -> tuple[CaptureIndexEntry, ...]:
+@dataclass(frozen=True)
+class CaptureInventory:
+    """The season's live captures that target a gameweek, and those taken after every deadline."""
+
+    entries: tuple[CaptureIndexEntry, ...]
+    closed: tuple[str, ...]
+
+
+def _named_before_season(snapshot_id: str) -> bool:
+    match = CAPTURE_INSTANT.search(snapshot_id)
+    if match is None:
+        return False
+    named = datetime.strptime(match.group(1), "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+    return named < SEASON_OPENS
+
+
+def capture_inventory(snapshot_root: Path) -> CaptureInventory:
     """Every live capture of the season with its instant, its own target and its deadline.
 
-    A capture of another season is left out. A capture of this season that cannot be read is a
-    fault, as in ``scripts/check_football_prospective_inputs.py``: its target is unknown, so no
-    week could be said to have its last capture.
+    A capture named before the season opens is never opened, and one of another season is left
+    out. A capture taken after every published deadline had closed targets no gameweek and is
+    listed apart (rule 5). Any other capture of this season that cannot be read is a fault, as in
+    ``scripts/check_football_prospective_inputs.py``: its target is unknown, so no week could be
+    said to have its last capture.
     """
 
     entries = []
+    closed = []
     for snapshot_id in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE):
+        if _named_before_season(snapshot_id):
+            continue
         try:
             snapshot = read_snapshot(snapshot_root, snapshot_id)
             if infer_season(snapshot) != SEASON:
+                continue
+            captured = _instant(snapshot.metadata.captured_at_utc)
+            deadlines = gameweek_deadlines(snapshot.payloads[BOOTSTRAP_PAYLOAD])
+            if deadlines and all(_instant(d.deadline_utc) <= captured for d in deadlines):
+                closed.append(snapshot_id)
                 continue
             inputs = read_inputs(snapshot, season=SEASON)
         except (DataError, ValueError, KeyError, TypeError) as error:
@@ -224,12 +259,18 @@ def capture_index(snapshot_root: Path) -> tuple[CaptureIndexEntry, ...]:
         entries.append(
             CaptureIndexEntry(
                 snapshot_id,
-                _instant(snapshot.metadata.captured_at_utc),
+                captured,
                 int(inputs.deadline.gameweek),
                 _instant(inputs.deadline.deadline_utc),
             )
         )
-    return tuple(entries)
+    return CaptureInventory(tuple(entries), tuple(closed))
+
+
+def capture_index(snapshot_root: Path) -> tuple[CaptureIndexEntry, ...]:
+    """The inventory's captures that target a gameweek."""
+
+    return capture_inventory(snapshot_root).entries
 
 
 @dataclass(frozen=True)
@@ -310,8 +351,11 @@ def week_inputs(
     artifact = football_artifact_path(artifact_root, snapshot_id)
     if not artifact.is_file():
         return "no_artifact", _receipt(snapshot_id, inputs, fingerprint, reason="no_artifact")
-    written = datetime.fromtimestamp(artifact.stat().st_mtime, tz=UTC)
-    data = artifact.read_bytes()
+    try:
+        written = datetime.fromtimestamp(artifact.stat().st_mtime, tz=UTC)
+        data = artifact.read_bytes()
+    except OSError as error:  # a file that exists but cannot be read now is not a missing week
+        raise ChainError(f"The artifact of {snapshot_id} cannot be read now: {error}") from error
     receipt = _receipt(
         snapshot_id,
         inputs,
@@ -325,8 +369,14 @@ def week_inputs(
         return reason, {**receipt, "reason": reason}
     try:
         document = json.loads(data)
+        if not isinstance(document, dict) or forecast_digest(document) != document.get(
+            "fingerprint"
+        ):
+            raise ValueError("The artifact's bytes do not carry their own fingerprint.")
         forecast = read_football_forecast(artifact, inputs)
-    except (OSError, ValueError, KeyError, TypeError, DataError):
+    except OSError as error:
+        raise ChainError(f"The artifact of {snapshot_id} cannot be read now: {error}") from error
+    except (ValueError, KeyError, TypeError, DataError):
         reason = "artifact_unreadable_or_unbound"
         return reason, {**receipt, "reason": reason}
     if forecast.horizon.model_version != FOOTBALL_MODEL_VERSION:
@@ -336,7 +386,7 @@ def week_inputs(
             "reason": reason,
             "model_version": forecast.horizon.model_version,
         }
-    if not isinstance(document, dict) or document.get("fingerprint") != forecast.fingerprint:
+    if document.get("fingerprint") != forecast.fingerprint:
         reason = "artifact_changed_while_read"
         return reason, {**receipt, "reason": reason}
     try:
@@ -355,7 +405,8 @@ def week_inputs(
             "reason": None,
             "forecast_fingerprint": forecast.fingerprint,
             "model_version": forecast.horizon.model_version,
-            "forecast_training_seasons": seasons,
+            "forecast_archive_seasons": seasons,
+            "forecast_training_rows": document.get("training_rows"),
             "forecast_training_latest_kickoff": document.get("training_latest_kickoff"),
         },
     )
@@ -407,12 +458,22 @@ def initial_states(forecast: FootballForecast, gameweek: int) -> Squads:
         profile = f"p{budget}"
         statuses[profile] = []
         solved = None
-        for units in (SQUAD_CONFIG.solver_deterministic_time_limit, SQUAD_RETRY_UNITS):
+        attempts = (
+            (SQUAD_CONFIG.solver_deterministic_time_limit, SQUAD_CONFIG.solver_time_limit_seconds),
+            (SQUAD_RETRY_UNITS, SQUAD_RETRY_WALL_SECONDS),
+        )
+        for units, wall in attempts:
             config = replace(
-                SQUAD_CONFIG, budget_tenths=budget, solver_deterministic_time_limit=units
+                SQUAD_CONFIG,
+                budget_tenths=budget,
+                solver_deterministic_time_limit=units,
+                solver_time_limit_seconds=wall,
             )
             solved = optimize_squad(first, config, linearization_level=2)
-            statuses[profile].append(solved.solver_status.name)
+            stopped = wall_clock_stopped_the_search(solved.solver_status, solved.diagnostics)
+            statuses[profile].append(
+                solved.solver_status.name + ("_clock_stopped" if stopped else "")
+            )
             if solved.solver_status is SolverStatus.OPTIMAL:
                 break
         assert solved is not None
@@ -564,13 +625,19 @@ def _status(plan: TransferPlanResult, route: str) -> dict[str, object]:
     compared = observed.get("status") == "compared"
     solver = plan.solver_status.name
     published = SolverStatus.FEASIBLE.name if compared else solver
+    seed = _block(plan, "sequential_incumbent").get("seed_completed")
     return {
         "solver_status": solver,
         "published_status": published,
         "proved": published == SolverStatus.OPTIMAL.name,
         "selection_status": plan.diagnostics.get("selection_status"),
         "observed_window_status": observed.get("status") if route == "observed" else None,
-        "seed_completed": _block(plan, "sequential_incumbent").get("seed_completed"),
+        "seed_completed": seed,
+        "seed_note": None
+        if seed is not None
+        else "observed_action_is_not_the_guarded_baseline"
+        if route == "observed"
+        else "no_guarded_construction",
     }
 
 
@@ -901,7 +968,8 @@ def refuse_output(output: Path, snapshot_root: Path, artifact_root: Path) -> Non
     resolved = output.resolve()
     if not resolved.is_relative_to(OUTPUT_ROOT.resolve()):
         raise ChainError(f"The chain writes only under {OUTPUT_ROOT}.")
-    for forbidden in (snapshot_root.resolve(), artifact_root.resolve(), REPOSITORY / "data"):
+    football = football_artifact_path(artifact_root, "chain").parent.resolve()
+    for forbidden in (snapshot_root.resolve(), football, REPOSITORY / "data"):
         if resolved == forbidden or resolved.is_relative_to(forbidden):
             raise ChainError(f"The chain never writes under {forbidden}.")
 
@@ -1107,6 +1175,7 @@ def decide_week(
     blocked: set[tuple[str, str]],
     commit: object,
     last_max_free_transfers: int,
+    moment: datetime | None = None,
 ) -> tuple[dict[tuple[str, str], ChainState], int, str]:
     """Rules 17 to 24 for one gameweek: every chain is computed, checked, then written.
 
@@ -1116,6 +1185,15 @@ def decide_week(
     """
 
     directory = output / f"gw{gameweek:02d}"
+    receipt = week.receipt if isinstance(week, WeekInputs) else week[1]
+    written = directory / "receipt.json"
+    if written.exists():
+        earlier = json.loads(written.read_text(encoding="utf-8")).get("snapshot_id")
+        if earlier != receipt.get("snapshot_id"):
+            raise ChainError(
+                f"GW{gameweek:02d} was started from {earlier} and would now be decided from "
+                f"{receipt.get('snapshot_id')}; the capture inventory changed under the chain."
+            )
     max_free = last_max_free_transfers
     if isinstance(week, WeekInputs):
         max_free = int(week.rules.transfers.max_free_transfers)
@@ -1136,7 +1214,6 @@ def decide_week(
             continue
         records[chain] = _chain_record(chain, state, gameweek, week, blocked, commit, max_free)
     _refuse_unequal_twins(records)
-    receipt = week.receipt if isinstance(week, WeekInputs) else week[1]
     write_document_once(_record(gameweek=gameweek, **dict(receipt)), directory / "receipt.json")
     if isinstance(week, WeekInputs):
         write_bytes_once(week.artifact_bytes, directory / "forecast.json")
@@ -1151,8 +1228,9 @@ def decide_week(
         missing_reason=None if isinstance(week, WeekInputs) else week[0],
         max_free_transfers=max_free,
         records=digests,
+        work={"decided_at_utc": None if moment is None else moment.isoformat()},
     )
-    write_document_once(manifest, directory / "manifest.json")
+    write_document_once(manifest, directory / "manifest.json", replay_identity=replay_identity)
     after_states = {chain: record.state_after for chain, record in records.items()}
     return (
         after_states,
@@ -1183,11 +1261,19 @@ def _load_week(
 def _week(
     index: Sequence[CaptureIndexEntry], snapshot_root: Path, artifact_root: Path, gameweek: int
 ) -> WeekInputs | tuple[str, Mapping[str, object]]:
+    own = [
+        {"snapshot_id": entry.snapshot_id, "captured_at_utc": entry.captured_at_utc.isoformat()}
+        for entry in sorted(index, key=lambda entry: (entry.captured_at_utc, entry.snapshot_id))
+        if entry.target == gameweek
+    ]
     selection = decision_capture(index, gameweek)
     if selection.snapshot_id is None:
         reason = selection.reason or "no_own_target_capture"
-        return reason, {"snapshot_id": None, "reason": reason}
-    return week_inputs(snapshot_root, artifact_root, selection.snapshot_id)
+        return reason, {"snapshot_id": None, "reason": reason, "own_target_captures": own}
+    loaded = week_inputs(snapshot_root, artifact_root, selection.snapshot_id)
+    if isinstance(loaded, WeekInputs):
+        return replace(loaded, receipt={**loaded.receipt, "own_target_captures": own})
+    return loaded[0], {**loaded[1], "own_target_captures": own}
 
 
 def start_chain(
@@ -1205,6 +1291,11 @@ def start_chain(
     week before it is skipped and listed. Returns the protocol record, or None while waiting.
     """
 
+    if moment > deadline_of(index, snapshot_root, LAPSE_GAMEWEEK):
+        raise ChainError(
+            f"No chain started before GW{LAPSE_GAMEWEEK}'s deadline; the protocol lapsed unrun "
+            "(rule 40)."
+        )
     commits = cast(Mapping[str, Mapping[str, str]], identity["binding_commits"])
     bound_week = first_bound_week(index, snapshot_root, binding_instant(commits))
     skipped: list[dict[str, object]] = []
@@ -1259,46 +1350,95 @@ def decide(
     refuse_output(output, snapshot_root, artifact_root)
     identity = source_identity()
     with single_run(output):
-        index = capture_index(snapshot_root)
-        protocol = bind_protocol(output, identity)
+        lines: list[str] = []
+
+        def say(line: str) -> None:
+            lines.append(line)
+            emit(line)
+
+        try:
+            _decide_weeks(
+                snapshot_root,
+                artifact_root,
+                output,
+                through_gameweek,
+                answer,
+                identity,
+                moment,
+                say,
+            )
+        except ChainError as error:
+            lines.append(f"refused: {error}")
+            raise
+        finally:
+            _log_run(output, moment, identity["repository_commit"], lines)
+
+
+def _log_run(output: Path, moment: datetime, commit: object, lines: Sequence[str]) -> None:
+    """Rule 24: one line per run, appended; the run log is the only file written twice."""
+
+    with (output / "runs.log").open("a", encoding="utf-8") as log:
+        log.write(f"{moment.isoformat()} {commit} {' | '.join(lines) or 'nothing to decide'}\n")
+
+
+def _decide_weeks(
+    snapshot_root: Path,
+    artifact_root: Path,
+    output: Path,
+    through_gameweek: int,
+    answer: str,
+    identity: Mapping[str, object],
+    moment: datetime,
+    emit: Callable[[str], None],
+) -> None:
+    inventory = capture_inventory(snapshot_root)
+    index = inventory.entries
+    if inventory.closed:
+        emit(f"left out {len(inventory.closed)} captures taken after every deadline")
+    protocol = bind_protocol(output, identity)
+    if protocol is None:
+        protocol = start_chain(
+            output, identity, answer, index, snapshot_root, artifact_root, moment
+        )
         if protocol is None:
-            protocol = start_chain(
-                output, identity, answer, index, snapshot_root, artifact_root, moment
-            )
-            if protocol is None:
-                emit("waiting: no first chain week has both a passed deadline and a forecast")
-                return
-        first = int(protocol["first_chain_week"])
-        states: dict[tuple[str, str], ChainState] = {}
-        for profile in sorted(
-            set(f"p{budget}" for budget, _, _ in PROFILES) - set(protocol["dropped_profiles"])
-        ):
-            state = ChainState.from_json(
-                json.loads((output / "initial" / f"{profile}.json").read_text(encoding="utf-8"))[
-                    "state"
-                ]
-            )
-            states.update({(profile, arm): state for arm in ARMS})
-        blocked: set[tuple[str, str]] = set()
-        max_free = 0
-        for gameweek in range(first, min(through_gameweek, LAST_GAMEWEEK) + 1):
-            directory = output / f"gw{gameweek:02d}"
-            if (directory / "manifest.json").exists():
-                states, max_free = _load_week(directory, blocked)
-                continue
-            if moment <= deadline_of(index, snapshot_root, gameweek):
-                emit(f"GW{gameweek:02d} pending: its deadline has not passed")
-                return
-            week = _week(index, snapshot_root, artifact_root, gameweek)
-            states, max_free, digest = decide_week(
-                output, gameweek, week, states, blocked, identity["repository_commit"], max_free
-            )
-            source = (
-                week.receipt["snapshot_id"]
-                if isinstance(week, WeekInputs)
-                else f"missing {week[0]}"
-            )
-            emit(f"GW{gameweek:02d} decided from {source}; manifest sha256 {digest}")
+            emit("waiting: no first chain week has both a passed deadline and a forecast")
+            return
+    first = int(protocol["first_chain_week"])
+    states: dict[tuple[str, str], ChainState] = {}
+    for profile in sorted(
+        set(f"p{budget}" for budget, _, _ in PROFILES) - set(protocol["dropped_profiles"])
+    ):
+        state = ChainState.from_json(
+            json.loads((output / "initial" / f"{profile}.json").read_text(encoding="utf-8"))[
+                "state"
+            ]
+        )
+        states.update({(profile, arm): state for arm in ARMS})
+    blocked: set[tuple[str, str]] = set()
+    max_free = 0
+    for gameweek in range(first, min(through_gameweek, LAST_GAMEWEEK) + 1):
+        directory = output / f"gw{gameweek:02d}"
+        if (directory / "manifest.json").exists():
+            states, max_free = _load_week(directory, blocked)
+            continue
+        if moment <= deadline_of(index, snapshot_root, gameweek):
+            emit(f"GW{gameweek:02d} pending: its deadline has not passed")
+            return
+        week = _week(index, snapshot_root, artifact_root, gameweek)
+        states, max_free, digest = decide_week(
+            output,
+            gameweek,
+            week,
+            states,
+            blocked,
+            identity["repository_commit"],
+            max_free,
+            moment,
+        )
+        source = (
+            week.receipt["snapshot_id"] if isinstance(week, WeekInputs) else f"missing {week[0]}"
+        )
+        emit(f"GW{gameweek:02d} decided from {source}; manifest sha256 {digest}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

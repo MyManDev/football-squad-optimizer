@@ -32,7 +32,7 @@ from squadopt.data.atomic import write_document_once
 from squadopt.data.errors import ConflictingBytesError
 from squadopt.live import plan_transfer_horizon
 from squadopt.live import transfers as live_transfers
-from squadopt.live.football_artifact import football_artifact_path
+from squadopt.live.football_artifact import football_artifact_path, forecast_digest
 from squadopt.live.recommendation import read_inputs
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import PlanningHorizon
@@ -356,22 +356,41 @@ def test_a_squad_is_retried_at_240_units_and_dropped_alone_when_still_unproved(
         950: [SolverStatus.FEASIBLE, SolverStatus.OPTIMAL],
         900: [SolverStatus.FEASIBLE, SolverStatus.FEASIBLE],
     }
-    calls: list[tuple[int, float]] = []
+    calls: list[tuple[int, float, float]] = []
 
     def optimize(first: pd.DataFrame, config: OptimizationConfig, **_: object) -> object:
         budget = int(config.budget_tenths)
-        calls.append((budget, float(config.solver_deterministic_time_limit or 0)))
+        calls.append(
+            (
+                budget,
+                float(config.solver_deterministic_time_limit or 0),
+                float(config.solver_time_limit_seconds),
+            )
+        )
         status = statuses[budget].pop(0)
         squad = pd.DataFrame({"player_id": list(SQUAD)})
+        stopped = budget == 900 and len(statuses[budget]) == 0
         return SimpleNamespace(
-            solver_status=status, selected_squad=squad, starting_xi=None, bench=None, captain=None
+            solver_status=status,
+            selected_squad=squad,
+            starting_xi=None,
+            bench=None,
+            captain=None,
+            diagnostics={} if stopped else {"deterministic_time_budget_exhausted": True},
         )
 
     monkeypatch.setattr(chain, "optimize_squad", optimize)
     monkeypatch.setattr(chain, "_lineup_block", lambda week: dict(LINEUP))
     forecast = SimpleNamespace(horizon=SimpleNamespace(table=_table()))
     squads = chain.initial_states(forecast, 6)  # type: ignore[arg-type]
-    assert calls == [(1000, 60.0), (950, 60.0), (950, 240.0), (900, 60.0), (900, 240.0)]
+    assert calls == [
+        (1000, 60.0, 120.0),
+        (950, 60.0, 120.0),
+        (950, 240.0, 480.0),
+        (900, 60.0, 120.0),
+        (900, 240.0, 480.0),
+    ]
+    assert squads.statuses["p900"] == ["FEASIBLE", "FEASIBLE_clock_stopped"]
     assert set(squads.states) == {"p1000", "p950"}
     assert squads.dropped == {"p900": "squad_not_proved_at_240_units"}
     assert squads.statuses["p950"] == ["FEASIBLE", "OPTIMAL"]
@@ -595,7 +614,15 @@ def test_an_observed_comparison_is_published_feasible_and_not_counted_as_proved(
         "selection_status": "FEASIBLE_RESTRICTED_MENU",
         "observed_window_status": "compared",
         "seed_completed": True,
+        "seed_note": None,
     }
+    nominal = _plan(diagnostics={"observed_window": {"status": "compared"}})
+    assert chain._status(nominal, "observed")["seed_note"] == (  # type: ignore[arg-type]
+        "observed_action_is_not_the_guarded_baseline"
+    )
+    assert chain._status(_plan(diagnostics={}), "hold")["seed_note"] == (  # type: ignore[arg-type]
+        "no_guarded_construction"
+    )
     assert chain._work(observed) == {"deterministic_time_used": 41.5, "solve_time_seconds": 9.0}  # type: ignore[arg-type]
     standard = _plan(
         diagnostics={
@@ -1084,7 +1111,9 @@ def _chain_world(
     monkeypatch.setattr(
         chain, "source_identity", lambda: {"repository_commit": "b", "binding_commits": commits}
     )
-    monkeypatch.setattr(chain, "capture_index", lambda root: ())
+    monkeypatch.setattr(
+        chain, "capture_inventory", lambda root: chain.CaptureInventory((), ("late-capture",))
+    )
     monkeypatch.setattr(chain, "first_bound_week", lambda index, root, bound: 6)
     monkeypatch.setattr(
         chain, "deadline_of", lambda index, root, week: T0 + timedelta(days=7 * (week - 6))
@@ -1121,7 +1150,12 @@ def test_the_chain_starts_at_the_first_week_with_a_forecast_and_lists_the_skippe
     assert protocol["answer"] == "issuecomment-1" and protocol["locked_holdout_accessed"] is False
     assert not (root / "gw06").exists() and (root / "gw07" / "manifest.json").exists()
     assert {week for _, week in solved} == {7} and len(solved) == 15
+    assert lines[0] == "left out 1 captures taken after every deadline"
     assert lines[-1].startswith("GW07 decided from capture-gw7; manifest sha256 ")
+    (logged,) = (root / "runs.log").read_text(encoding="utf-8").splitlines()
+    assert logged.startswith(f"{now.isoformat()} b ") and "GW07 decided from capture-gw7" in logged
+    manifest = json.loads((root / "gw07" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["work"] == {"decided_at_utc": now.isoformat()}
 
 
 def test_a_week_whose_deadline_has_not_passed_is_left_for_a_later_run(
@@ -1148,7 +1182,7 @@ def test_before_its_first_deadline_the_chain_writes_nothing(
     lines: list[str] = []
     chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0, emit=lines.append)
     assert not (root / "protocol.json").exists() and solved == []
-    assert lines == ["waiting: no first chain week has both a passed deadline and a forecast"]
+    assert lines[-1] == "waiting: no first chain week has both a passed deadline and a forecast"
 
 
 def test_the_decision_step_needs_an_answer_and_a_permitted_day(
@@ -1193,6 +1227,133 @@ def test_check_labels_each_week_pending_or_final_and_writes_nothing(
         "GW08 pending missing no_own_target_capture",
     ]
     assert list(tmp_path.iterdir()) == []
+
+
+# Review 4: post-season captures, the real artifact root, the inventory, the lapse, the receipt
+
+
+def test_a_capture_after_the_last_deadline_is_left_out_and_listed(tmp_path: Path) -> None:
+    root = tmp_path / "snapshots"
+    _capture(root, captured_at="2026-08-13T20:11:43Z")
+    _capture(root, captured_at="2026-08-25T09:00:00Z")
+    late = _capture(root, captured_at="2026-08-29T09:00:00Z")
+    inventory = chain.capture_inventory(root)
+    assert [entry.target for entry in inventory.entries] == [1, 2]
+    assert inventory.closed == (late.metadata.snapshot_id,)
+    assert chain.capture_index(root) == inventory.entries
+
+
+def test_a_capture_named_before_the_season_is_never_opened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "snapshots"
+    old = _capture(root, captured_at="2026-03-01T09:00:00Z")
+    current = _capture(root, captured_at="2026-08-13T20:11:43Z")
+    opened: list[str] = []
+    real = chain.read_snapshot
+
+    def tracked(snapshot_root: Path, snapshot_id: str) -> object:
+        opened.append(snapshot_id)
+        return real(snapshot_root, snapshot_id)
+
+    monkeypatch.setattr(chain, "read_snapshot", tracked)
+    entries = chain.capture_index(root)
+    assert opened == [current.metadata.snapshot_id]
+    assert [entry.snapshot_id for entry in entries] == [current.metadata.snapshot_id]
+    assert old.metadata.snapshot_id not in opened
+
+
+def test_the_chain_writes_beside_the_served_artifacts_but_never_among_them() -> None:
+    artifacts = chain.REPOSITORY / "artifacts"
+    snapshots = chain.REPOSITORY / "data" / "snapshots"
+    chain.refuse_output(chain.OUTPUT_ROOT, snapshots, artifacts)
+    with pytest.raises(chain.ChainError):
+        chain.refuse_output(chain.OUTPUT_ROOT, artifacts, artifacts)
+    with pytest.raises(chain.ChainError, match="football"):
+        chain.refuse_output(chain.OUTPUT_ROOT / "football" / "x", snapshots, chain.OUTPUT_ROOT)
+
+
+def test_each_weeks_receipt_lists_every_capture_that_targeted_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    index = (_entry("second", 3, 6), _entry("first", 1, 6), _entry("other", 2, 7))
+    monkeypatch.setattr(chain, "week_inputs", lambda root, artifacts, snapshot_id: _week(6))
+    week = chain._week(index, Path("."), Path("."), 6)
+    assert isinstance(week, chain.WeekInputs)
+    assert [entry["snapshot_id"] for entry in week.receipt["own_target_captures"]] == [
+        "first",
+        "second",
+    ]
+    missing = chain._week(index, Path("."), Path("."), 8)
+    assert missing[1]["own_target_captures"] == []  # type: ignore[index]
+
+
+def test_no_chain_starts_after_gameweek_21s_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, solved = _chain_world(tmp_path, monkeypatch, {6: _week(6)})
+    late = T0 + timedelta(days=7 * 15, hours=1)
+    with pytest.raises(chain.ChainError, match="lapsed unrun"):
+        chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=late)
+    assert not (root / "protocol.json").exists() and solved == []
+    assert "refused: No chain started" in (root / "runs.log").read_text(encoding="utf-8")
+
+
+def test_a_week_whose_capture_choice_changed_is_refused_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(chain, "run_arm", lambda *a: _outcome(_plan(_plan_week())))
+    write_document_once({"snapshot_id": "capture-earlier"}, tmp_path / "gw06" / "receipt.json")
+    states = {("p1000", "served_3"): _state()}
+    with pytest.raises(chain.ChainError, match="capture-earlier"):
+        chain.decide_week(tmp_path, 6, _week(), states, set(), "c", 2)
+
+
+def test_the_receipt_names_the_archive_seasons_and_training_rows(tmp_path: Path) -> None:
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+    path = football_artifact_path(artifacts, snapshot_id)
+    stamp = path.stat().st_mtime
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["archive_hashes"] = {"2022-23/teams.csv": "a", "2025-26/teams.csv": "b"}
+    document["training_rows"] = 1234
+    document["fingerprint"] = forecast_digest(document)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    os.utime(path, (stamp, stamp))
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id)
+    assert isinstance(week, chain.WeekInputs)
+    assert week.receipt["forecast_archive_seasons"] == ["2022-23", "2025-26"]
+    assert week.receipt["forecast_training_rows"] == 1234
+
+
+def test_bytes_that_do_not_carry_their_own_fingerprint_are_a_missing_week(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+    path = football_artifact_path(artifacts, snapshot_id)
+    forecast = chain.read_football_forecast(
+        path, read_inputs(chain.read_snapshot(snapshots, snapshot_id), season=chain.SEASON)
+    )
+    stamp = path.stat().st_mtime
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["rows"][0]["expected_points"] = 99.0
+    path.write_text(json.dumps(document), encoding="utf-8")
+    os.utime(path, (stamp, stamp))
+    monkeypatch.setattr(chain, "read_football_forecast", lambda path, inputs: forecast)
+    reason, _ = chain.week_inputs(snapshots, artifacts, snapshot_id)  # type: ignore[misc]
+    assert reason == "artifact_unreadable_or_unbound"
+
+
+def test_an_artifact_that_cannot_be_read_now_stops_the_run_instead_of_missing_the_week(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+
+    def locked(path: object, inputs: object) -> object:
+        raise PermissionError("The process cannot access the file.")
+
+    monkeypatch.setattr(chain, "read_football_forecast", locked)
+    with pytest.raises(chain.ChainError, match="cannot be read now"):
+        chain.week_inputs(snapshots, artifacts, snapshot_id)
 
 
 # Rules 8 and 38: what the runner never reads or records
