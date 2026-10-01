@@ -694,6 +694,8 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
+        "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
       "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
         "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.",
       "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
@@ -1799,6 +1801,8 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
+        "Tam planlar, beklenen otomatik değişiklik puanları ve kaptan oynamazsa yardımcı kaptanın ek puanı dahil edilerek karşılaştırılır. Sınırlı arama, mümkün olan en iyi planı veya gelecekteki başarıyı kanıtlamaz.",
       "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
         "Bu deneysel plan, bir sonraki karar gününden önce gelebilecek iki bilgi durumunda bugünkü hamleleri karşılaştırır. Sonraki transferler koşula bağlıdır. Haberin ne zaman netleşeceği bir varsayımdır; ölçülmüş iyileşme tahmini değildir.",
       "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":

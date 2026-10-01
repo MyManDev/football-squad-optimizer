@@ -26,7 +26,10 @@ from squadopt.data.sources.club_news import (
     RosterPlayer,
 )
 from squadopt.data.sources.club_news_capture import read_captured_coverage
-from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER
+from squadopt.data.sources.club_news_coding import (
+    CODING_MODEL_IDENTIFIER,
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+)
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.platform.club_news_acquire import acquire_week, main
 from squadopt.platform.club_news_fetch import CLUB_NEWS_SOURCES_CONTRACT_VERSION, ClubSource
@@ -107,7 +110,13 @@ class _Provider:
         if club == self._refuses:
             raise ClubNewsError(f"The response reached the ceiling, for {club}.")
         return ClaimResponse(
-            text=json.dumps({"documents": [], "claims": []}),
+            text=json.dumps(
+                {
+                    "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+                    "documents": [],
+                    "claims": [],
+                }
+            ),
             model_identifier=CODING_MODEL_IDENTIFIER,
             model_version="v1",
         )
@@ -384,3 +393,51 @@ def test_an_unlisted_model_refuses_the_command_before_any_page_is_fetched(
     assert "'gemini-2.0-flash'" in printed
     assert key not in printed
     assert requested == []
+
+
+def test_private_settings_drive_the_acquisition_command_without_environment_edits(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    selected: list[CodingProviderConfig] = []
+
+    def configured(config: CodingProviderConfig) -> _Provider:
+        selected.append(config)
+        return _Provider()
+
+    name = "fake-settings-acquire"
+    register_provider(name, configured)
+    private = tmp_path / "private.toml"
+    private.write_text(
+        f'[llm]\nprovider="{name}"\nmodel="{CODING_MODEL_IDENTIFIER}"\n'
+        'api_key="private-command-sentinel"\n',
+        encoding="utf-8",
+    )
+    registry = _registry(tmp_path / "sources.json", SOURCES)
+    snapshots = tmp_path / "snapshots"
+    roster = _roster_snapshot(snapshots)
+    assert (
+        main(
+            [
+                "--settings-file",
+                str(private),
+                "--roster-snapshot",
+                roster,
+                "--registry",
+                str(registry),
+                "--snapshot-root",
+                str(snapshots),
+            ],
+            environ={},
+            opener=_opener(),
+            now=lambda: FETCHED_AT,
+            sleeper=lambda _: None,
+        )
+        == 0
+    )
+    printed = capsys.readouterr().out
+    assert "Capture" in printed and "private-command-sentinel" not in printed
+    assert len(selected) == 1
+    assert selected[0].provider == name
+    assert selected[0].model_identifier == CODING_MODEL_IDENTIFIER
+    assert selected[0].api_key == "private-command-sentinel"
+    assert "private-command-sentinel" not in repr(selected[0])

@@ -1757,8 +1757,25 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     )
     table.parent.mkdir(parents=True)
     table.write_text("rows", encoding="utf-8")
-    manifest.write_text(json.dumps({"table_sha256": "7" * 64}), encoding="utf-8")
-    words = top100_tests._words(STARTING_ELEVEN[-1])
+    # This is the valid fixture-source branch: its only contributing capture is
+    # the exact decision capture, and the resolved words name that configured file.
+    manifest.write_text(
+        json.dumps(
+            {
+                "table_sha256": "7" * 64,
+                "season": SEASON,
+                "target_gameweek": 2,
+                "roster_snapshot_id": running["snapshot_id"],
+                "source_snapshot_ids": [running["snapshot_id"]],
+            }
+        ),
+        encoding="utf-8",
+    )
+    words = replace(
+        top100_tests._words(STARTING_ELEVEN[-1]),
+        source_label=fixture.name,
+        evidence_table=table.name,
+    )
     monkeypatch.setattr(switches_module, "load_manager_words", lambda *_a, **_k: words)
 
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))

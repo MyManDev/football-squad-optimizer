@@ -385,6 +385,35 @@ export interface EntryAdviceIndex {
  * it pays, the chip it plays, the free transfers around it and the planner's expected
  * points for that week's eleven (captain doubled, before hits).
  */
+export interface AdviceLineupExpectation {
+  version: "expected_lineup_v1";
+  expected_net_points: number;
+  starting_points: number;
+  autosub_points: number;
+  captain_bonus_points: number;
+  vice_bonus_points: number;
+  bench_boost_points: number;
+  assumptions: string[];
+}
+
+export interface AdviceParticipationEvidence {
+  version: "football_participation_evidence_v1";
+  as_of: string | null;
+  gameweek: number | null;
+  applied_player_count: number;
+  unapplied_statement_count: number;
+  captured_percentage_count: number;
+  manager_statement_count: number;
+  assumptions: string[];
+}
+
+export interface AdviceLineup<Player = AdvicePlayer> {
+  starting_xi: Player[];
+  captain: Player;
+  vice_captain: Player;
+  bench: Player[];
+}
+
 export interface AdvicePlanWeek {
   gameweek: number;
   transfers_in: AdvicePlayer[];
@@ -394,6 +423,8 @@ export interface AdvicePlanWeek {
   free_transfers_before: number;
   free_transfers_after: number;
   expected_points: number;
+  lineup_expectation?: AdviceLineupExpectation;
+  lineup?: AdviceLineup;
 }
 
 export interface EntryAdvice {
@@ -524,7 +555,10 @@ export interface EntryAdvice {
    * published before the producer carried them.
    */
   expected_own_points?: number | null;
+  /** Expected official scoring on the base forecast, including autosubs and vice recovery. */
+  lineup_expectation?: AdviceLineupExpectation;
   captain?: AdvicePlayer | null;
+  participation_evidence?: AdviceParticipationEvidence;
   vice_captain?: AdvicePlayer | null;
   starting_xi?: AdvicePlayer[] | null;
   bench?: AdvicePlayer[] | null;
@@ -551,6 +585,7 @@ export interface EntryAdvice {
       transfers_out: string[];
       chip: string | null;
       expected_net_points: number | null;
+      first_lineup?: AdviceLineup<string>;
       branches: {
         state: "eligible" | "unavailable";
         expected_net_points: number | null;
@@ -562,6 +597,7 @@ export interface EntryAdvice {
           chip: string | null;
           bank_tenths: number;
           free_transfers: number;
+          lineup?: AdviceLineup<string>;
         }[];
       }[];
     }[];

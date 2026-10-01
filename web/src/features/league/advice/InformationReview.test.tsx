@@ -1,6 +1,6 @@
 import { mockInformationReview } from "../../../fixtures/information";
 import { isAdvicePayload } from "./adviceShape";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
@@ -82,3 +82,75 @@ it("distinguishes no alternative found from a completed comparison", () => {
   );
   expect(screen.queryByText("Selected first action")).not.toBeInTheDocument();
 });
+
+it("shows the first vice and bench order when alternatives differ only in lineup decisions", () => {
+  const data = view();
+  data.information_review!.candidates[0]!.first_lineup = {
+    starting_xi: Array.from({ length: 11 }, (_, i) => `Starter ${i + 1}`),
+    captain: "Starter 1",
+    vice_captain: "Starter 3",
+    bench: ["Reserve keeper", "First substitute", "Second substitute", "Third substitute"],
+  };
+  render(
+    <LanguageProvider initialLanguage="en">
+      <InformationReview view={data} />
+    </LanguageProvider>,
+  );
+  const region = screen.getByTestId("information-review");
+  expect(region).toHaveTextContent("Vice-captain: Starter 3");
+  expect(region).toHaveTextContent(
+    "Bench order: Reserve keeper → First substitute → Second substitute → Third substitute",
+  );
+  expect(isAdvicePayload(data)).toBe(true);
+  data.information_review!.candidates[0]!.first_lineup.bench.pop();
+  expect(isAdvicePayload(data)).toBe(false);
+});
+
+it.each([3, 5] as const)(
+  "shows the future lineup for each news branch in a %s-week plan",
+  (window) => {
+    const data = view();
+    data.window = window;
+    const candidate = data.information_review!.candidates[0]!;
+    for (const branch of candidate.branches) {
+      branch.weeks = Array.from({ length: window - 1 }, (_, index) => ({
+        ...branch.weeks[0]!,
+        gameweek: 3 + index,
+        lineup: {
+          starting_xi: Array.from(
+            { length: 11 },
+            (_, player) => `${branch.state} week ${index} player ${player}`,
+          ),
+          captain: `${branch.state} captain ${index}`,
+          vice_captain: `${branch.state} vice ${index}`,
+          bench: [`keeper ${index}`, `first ${index}`, `second ${index}`, `third ${index}`],
+        },
+      }));
+    }
+    expect(isAdvicePayload(data)).toBe(true);
+    render(
+      <LanguageProvider initialLanguage="en">
+        <InformationReview view={data} />
+      </LanguageProvider>,
+    );
+    for (const branch of candidate.branches) {
+      const summary = screen.getByText(
+        branch.state === "eligible"
+          ? "If eligibility is confirmed"
+          : "If unavailability is confirmed",
+      );
+      fireEvent.click(summary);
+      const section = summary.closest("details")!;
+      for (const week of branch.weeks) {
+        const detail = within(section).getByTestId(`week-lineup-${week.gameweek}`);
+        fireEvent.click(within(detail).getByText(/This week's starting eleven and bench/));
+        expect(detail).toHaveAttribute("open");
+        expect(detail).toHaveTextContent(week.lineup!.starting_xi.join(", "));
+        expect(detail).toHaveTextContent(`Vice-captain: ${week.lineup!.vice_captain}`);
+        expect(detail).toHaveTextContent(week.lineup!.bench.join(" → "));
+      }
+    }
+    candidate.branches[0]!.weeks[0]!.lineup!.starting_xi.pop();
+    expect(isAdvicePayload(data)).toBe(false);
+  },
+);

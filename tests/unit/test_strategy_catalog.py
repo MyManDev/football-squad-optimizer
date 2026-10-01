@@ -271,6 +271,7 @@ _MUST_PASS = (
     "expected_gap_vs_rival",
     "expected_points_cost_ceiling",
     "expected_gain_vs_hold",
+    "lineup_expectation",
     "difference_makers",
     "optimality_gap",
     "control_optimality_gap",

@@ -1,0 +1,1647 @@
+{
+  "code_provenance": {
+    "repository_commit": "b42b6ab136bda55f66157184e3c0c063addfd148",
+    "repository_dirty": true,
+    "basis": "base_HEAD_with_uncommitted_expected_lineup_changes",
+    "unchanged_measured_core_sha256": {
+      "src/squadopt/scenarios/expected_lineup.py": "860af1eb91f3ef6f7d9c89555e7959cc97addf06dc1ac604def78d8f7c0f9c29",
+      "src/squadopt/planning/lineup_utility.py": "e5fd573511c46ca3f00d665a3d28683cd23e3a845e346677514d386fee9a637c",
+      "src/squadopt/planning/observed.py": "5c1e75a02f83723cdf6f502e2ae64814dcb6afb7b99d194219ec60d1cda04b77",
+      "src/squadopt/planning/policy_seed.py": "a75b40c2016526fee8a480d1d0dd6f1bf3480b7a5bc827282e68aed6cc232493",
+      "src/squadopt/live/transfers.py": "be3015387fd60ce9d10fe6c6a9e5c93d6a4f78202f26cb56a465100ee1c7f7f8"
+    },
+    "limits": [
+      "The matrix ran on a frozen working tree before the later LLM/minute integration, not on a clean committed release.",
+      "The named commit is the base HEAD. It does not contain the uncommitted expected-lineup implementation by itself.",
+      "These retained core file hashes identify code unchanged since the matrix. They are not a complete measured-tree archive.",
+      "The later LLM/minute implementation and one-proposal diagnostic fix were not measured in these 42 runs; their separate tests do not turn this into a clean-release benchmark."
+    ]
+  },
+  "record_count": 42,
+  "comparison_count": 14,
+  "snapshot": "fpl-live-20260922T214539Z-364991a4f832",
+  "tie_tolerance": 1e-07,
+  "common_selection_policy": {
+    "hit_points_charged": 4,
+    "transfer_hit_cost_points": 8,
+    "horizon_discount_factor": 1,
+    "banked_transfer_value_points": 0,
+    "chip_holding_value_points": {},
+    "chip_holding_value_overrides": {}
+  },
+  "metric_units": {
+    "raw_nominal_expected_net": "unweighted model expected FPL net points",
+    "raw_conditional_expected_net": "unweighted conditional expected FPL net points",
+    "common_top100_nominal_selection_utility": "Top100 preference/selection utility",
+    "common_top100_conditional_selection_utility": "Top100 preference/selection utility"
+  },
+  "counts": {
+    "raw_nominal_expected_net_vs_legacy": {
+      "positive": 11,
+      "negative": 3,
+      "tie": 0,
+      "missing": 0
+    },
+    "raw_nominal_expected_net_vs_zero": {
+      "positive": 7,
+      "negative": 7,
+      "tie": 0,
+      "missing": 0
+    },
+    "raw_conditional_expected_net_vs_legacy": {
+      "positive": 7,
+      "negative": 6,
+      "tie": 1,
+      "missing": 0
+    },
+    "raw_conditional_expected_net_vs_zero": {
+      "positive": 6,
+      "negative": 8,
+      "tie": 0,
+      "missing": 0
+    },
+    "common_top100_nominal_selection_utility_vs_legacy": {
+      "positive": 14,
+      "negative": 0,
+      "tie": 0,
+      "missing": 0
+    },
+    "common_top100_nominal_selection_utility_vs_zero": {
+      "positive": 9,
+      "negative": 5,
+      "tie": 0,
+      "missing": 0
+    },
+    "common_top100_conditional_selection_utility_vs_legacy": {
+      "positive": 13,
+      "negative": 0,
+      "tie": 1,
+      "missing": 0
+    },
+    "common_top100_conditional_selection_utility_vs_zero": {
+      "positive": 9,
+      "negative": 5,
+      "tie": 0,
+      "missing": 0
+    }
+  },
+  "counts_by_window": {
+    "3": {
+      "raw_nominal_expected_net_vs_legacy": {
+        "positive": 6,
+        "negative": 1,
+        "tie": 0,
+        "missing": 0
+      },
+      "raw_nominal_expected_net_vs_zero": {
+        "positive": 6,
+        "negative": 1,
+        "tie": 0,
+        "missing": 0
+      },
+      "raw_conditional_expected_net_vs_legacy": {
+        "positive": 2,
+        "negative": 4,
+        "tie": 1,
+        "missing": 0
+      },
+      "raw_conditional_expected_net_vs_zero": {
+        "positive": 5,
+        "negative": 2,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_nominal_selection_utility_vs_legacy": {
+        "positive": 7,
+        "negative": 0,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_nominal_selection_utility_vs_zero": {
+        "positive": 7,
+        "negative": 0,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_conditional_selection_utility_vs_legacy": {
+        "positive": 6,
+        "negative": 0,
+        "tie": 1,
+        "missing": 0
+      },
+      "common_top100_conditional_selection_utility_vs_zero": {
+        "positive": 7,
+        "negative": 0,
+        "tie": 0,
+        "missing": 0
+      }
+    },
+    "5": {
+      "raw_nominal_expected_net_vs_legacy": {
+        "positive": 5,
+        "negative": 2,
+        "tie": 0,
+        "missing": 0
+      },
+      "raw_nominal_expected_net_vs_zero": {
+        "positive": 1,
+        "negative": 6,
+        "tie": 0,
+        "missing": 0
+      },
+      "raw_conditional_expected_net_vs_legacy": {
+        "positive": 5,
+        "negative": 2,
+        "tie": 0,
+        "missing": 0
+      },
+      "raw_conditional_expected_net_vs_zero": {
+        "positive": 1,
+        "negative": 6,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_nominal_selection_utility_vs_legacy": {
+        "positive": 7,
+        "negative": 0,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_nominal_selection_utility_vs_zero": {
+        "positive": 2,
+        "negative": 5,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_conditional_selection_utility_vs_legacy": {
+        "positive": 7,
+        "negative": 0,
+        "tie": 0,
+        "missing": 0
+      },
+      "common_top100_conditional_selection_utility_vs_zero": {
+        "positive": 2,
+        "negative": 5,
+        "tie": 0,
+        "missing": 0
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "window": 3,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": {
+        "expected": 154.9300224881149,
+        "legacy": 154.44029202063433,
+        "zero": 154.4052410220912
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.4897304674805696,
+        "zero": 0.5247814660237111
+      },
+      "raw_conditional_expected_net": {
+        "expected": 155.00319050529765,
+        "legacy": 154.9300224881149,
+        "zero": 154.93029157319182
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 0.07316801718275201,
+        "zero": 0.07289893210582932
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 154.9300224881149,
+        "legacy": 154.44029202063433,
+        "zero": 154.4052410220912
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.4897304674805696,
+        "zero": 0.5247814660237111
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 155.00319050529765,
+        "legacy": 154.9300224881149,
+        "zero": 154.93029157319182
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.07316801718275201,
+        "zero": 0.07289893210582932
+      }
+    },
+    {
+      "window": 3,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": {
+        "expected": 154.96550092539468,
+        "legacy": 154.4757704579141,
+        "zero": 154.4052410220912
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.4897304674805696,
+        "zero": 0.5602599033034892
+      },
+      "raw_conditional_expected_net": {
+        "expected": 154.96550092539465,
+        "legacy": 154.96550092539465,
+        "zero": 154.93029157319182
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 0.0,
+        "zero": 0.03520935220282695
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 157.8545103745798,
+        "legacy": 157.35912263836607,
+        "zero": 157.21648772651793
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.4953877362137291,
+        "zero": 0.6380226480618774
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 157.8545103745798,
+        "legacy": 157.8545103745798,
+        "zero": 157.76809116153933
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.0,
+        "zero": 0.08641921304047173
+      }
+    },
+    {
+      "window": 3,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": {
+        "expected": 154.68991747019874,
+        "legacy": 154.2036496426084,
+        "zero": 154.66847259449125
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.48626782759032494,
+        "zero": 0.021444875707487654
+      },
+      "raw_conditional_expected_net": {
+        "expected": 154.6899174701987,
+        "legacy": 154.69338011008898,
+        "zero": 154.65817075788615
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": -0.003462639890273067,
+        "zero": 0.03174671231255388
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 160.8170786081214,
+        "legacy": 160.31557423504177,
+        "zero": 160.68930230455229
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.5015043730796265,
+        "zero": 0.12777630356910663
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 160.8170786081214,
+        "legacy": 160.8166192399886,
+        "zero": 160.67899016611057
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.0004593681327946797,
+        "zero": 0.13808844201082593
+      }
+    },
+    {
+      "window": 3,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": {
+        "expected": 154.54436236877044,
+        "legacy": 154.06261816145755,
+        "zero": 154.06261816145755
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.4817442073128859,
+        "zero": 0.4817442073128859
+      },
+      "raw_conditional_expected_net": {
+        "expected": 154.54436236877044,
+        "legacy": 154.55234862893812,
+        "zero": 154.58025698037125
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": -0.007986260167683668,
+        "zero": -0.03589461160080987
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 166.95164136300195,
+        "legacy": 166.43378853185575,
+        "zero": 166.43378853185575
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.5178528311462003,
+        "zero": 0.5178528311462003
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 166.95164136300195,
+        "legacy": 166.9461480742689,
+        "zero": 166.849906709293
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.0054932887330494395,
+        "zero": 0.10173465370894519
+      }
+    },
+    {
+      "window": 3,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": {
+        "expected": 154.42734756841097,
+        "legacy": 154.06261816145755,
+        "zero": 152.6630320420395
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.3647294069534155,
+        "zero": 1.7643155263714618
+      },
+      "raw_conditional_expected_net": {
+        "expected": 154.42734756841097,
+        "legacy": 154.55234862893812,
+        "zero": 152.6630320420395
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": -0.1250010605271541,
+        "zero": 1.7643155263714618
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 173.167111090878,
+        "legacy": 172.61937371705483,
+        "zero": 171.53842704149218
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.5477373738231677,
+        "zero": 1.6286840493858108
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 173.167111090878,
+        "legacy": 173.1430477969343,
+        "zero": 171.53842704149218
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.024063293943697772,
+        "zero": 1.6286840493858108
+      }
+    },
+    {
+      "window": 3,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": {
+        "expected": 154.42734756841097,
+        "legacy": 151.84710358375634,
+        "zero": 151.84710358375634
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 2.5802439846546292,
+        "zero": 2.5802439846546292
+      },
+      "raw_conditional_expected_net": {
+        "expected": 154.42734756841097,
+        "legacy": 151.84710358375634,
+        "zero": 151.84710358375634
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 2.5802439846546292,
+        "zero": 2.5802439846546292
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 179.41369893170034,
+        "legacy": 178.06398521701385,
+        "zero": 178.06398521701385
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 1.3497137146864873,
+        "zero": 1.3497137146864873
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 179.4136989317003,
+        "legacy": 178.06398521701385,
+        "zero": 178.06398521701385
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 1.3497137146864588,
+        "zero": 1.3497137146864588
+      }
+    },
+    {
+      "window": 3,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": {
+        "expected": 151.40920536371138,
+        "legacy": 151.47264808459045,
+        "zero": 151.47264808459045
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": -0.06344272087906688,
+        "zero": -0.06344272087906688
+      },
+      "raw_conditional_expected_net": {
+        "expected": 151.40920536371135,
+        "legacy": 151.47264808459045,
+        "zero": 151.47264808459045
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": -0.0634427208790953,
+        "zero": -0.0634427208790953
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 184.8161007032887,
+        "legacy": 184.69504811652087,
+        "zero": 184.69504811652087
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.12105258676783137,
+        "zero": 0.12105258676783137
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 184.8161007032887,
+        "legacy": 184.69504811652087,
+        "zero": 184.69504811652087
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.12105258676783137,
+        "zero": 0.12105258676783137
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": {
+        "expected": 260.1061550362561,
+        "legacy": 259.0913990017125,
+        "zero": 260.55563995047964
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 1.014756034543609,
+        "zero": -0.44948491422354664
+      },
+      "raw_conditional_expected_net": {
+        "expected": 259.924160915692,
+        "legacy": 259.5213055276855,
+        "zero": 259.9545682629092
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 0.40285538800651466,
+        "zero": -0.030407347217192182
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 260.1061550362561,
+        "legacy": 259.0913990017125,
+        "zero": 260.55563995047964
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 1.014756034543609,
+        "zero": -0.44948491422354664
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 259.924160915692,
+        "legacy": 259.5213055276855,
+        "zero": 259.9545682629092
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.40285538800651466,
+        "zero": -0.030407347217192182
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": {
+        "expected": 260.08133353165596,
+        "legacy": 252.56750271719966,
+        "zero": 260.11726524698673
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 7.513830814456298,
+        "zero": -0.03593171533077566
+      },
+      "raw_conditional_expected_net": {
+        "expected": 257.20773196823495,
+        "legacy": 252.55594853183527,
+        "zero": 260.11726524698673
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 4.651783436399683,
+        "zero": -2.9095332787517805
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 264.59480703375385,
+        "legacy": 257.2505823713505,
+        "zero": 264.987299705961
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 7.344224662403349,
+        "zero": -0.39249267220714046
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 261.756834633575,
+        "legacy": 257.23902240889345,
+        "zero": 264.987299705961
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 4.517812224681563,
+        "zero": -3.2304650723859822
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": {
+        "expected": 256.2905414625926,
+        "legacy": 256.23331186117275,
+        "zero": 257.71519176545166
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.057229601419862774,
+        "zero": -1.4246503028590496
+      },
+      "raw_conditional_expected_net": {
+        "expected": 256.2905414625926,
+        "legacy": 256.26092425763767,
+        "zero": 257.7132068396254
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 0.029617204954945464,
+        "zero": -1.4226653770327857
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 266.1245890486335,
+        "legacy": 266.04859698584215,
+        "zero": 267.28493713542366
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.07599206279132886,
+        "zero": -1.1603480867901794
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 266.1245890486335,
+        "legacy": 266.099454623238,
+        "zero": 267.36693221613757
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.0251344253954926,
+        "zero": -1.2423431675040888
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": {
+        "expected": 255.05728509913862,
+        "legacy": 255.06474808570803,
+        "zero": 257.12523700579527
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": -0.0074629865694078035,
+        "zero": -2.0679519066566456
+      },
+      "raw_conditional_expected_net": {
+        "expected": 254.91573131498495,
+        "legacy": 255.06474808570803,
+        "zero": 257.17264393627363
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": -0.14901677072307962,
+        "zero": -2.256912621288677
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 275.14218545307887,
+        "legacy": 275.1209681520744,
+        "zero": 276.71215720684796
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.02121730100446939,
+        "zero": -1.5699717537690958
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 275.15672559447967,
+        "legacy": 275.1209681520744,
+        "zero": 276.99518043502707
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.03575744240527001,
+        "zero": -1.8384548405473993
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": {
+        "expected": 259.80493606356976,
+        "legacy": 253.98272092810848,
+        "zero": 258.06323511494315
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 5.822215135461278,
+        "zero": 1.741700948626601
+      },
+      "raw_conditional_expected_net": {
+        "expected": 258.533180160253,
+        "legacy": 254.45949163765798,
+        "zero": 255.64216082164342
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 4.073688522595006,
+        "zero": 2.891019338609567
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 289.7521685061779,
+        "legacy": 283.24484580693974,
+        "zero": 288.9403551031737
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 6.507322699238159,
+        "zero": 0.8118134030041801
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 289.6943336824011,
+        "legacy": 285.99001011758304,
+        "zero": 286.99075112031016
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 3.7043235648180826,
+        "zero": 2.7035825620909577
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": {
+        "expected": 256.2846592284739,
+        "legacy": 255.91474784953195,
+        "zero": 258.82243169622507
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": 0.36991137894196413,
+        "zero": -2.5377724677511537
+      },
+      "raw_conditional_expected_net": {
+        "expected": 256.2846592284739,
+        "legacy": 255.91474784953198,
+        "zero": 258.82243169622507
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": 0.3699113789419357,
+        "zero": -2.5377724677511537
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 299.2154456310827,
+        "legacy": 298.38816703300057,
+        "zero": 301.9241106058496
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.8272785980821027,
+        "zero": -2.7086649747669185
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 299.2154456310827,
+        "legacy": 298.38816703300057,
+        "zero": 301.9241106058496
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.8272785980821027,
+        "zero": -2.7086649747669185
+      }
+    },
+    {
+      "window": 5,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": {
+        "expected": 254.20198870641588,
+        "legacy": 254.22876304860472,
+        "zero": 254.55612198766647
+      },
+      "raw_nominal_expected_net_deltas": {
+        "legacy": -0.026774342188844003,
+        "zero": -0.35413328125059707
+      },
+      "raw_conditional_expected_net": {
+        "expected": 254.2019887064159,
+        "legacy": 254.22876304860472,
+        "zero": 254.55612198766647
+      },
+      "raw_conditional_expected_net_deltas": {
+        "legacy": -0.02677434218881558,
+        "zero": -0.35413328125056864
+      },
+      "common_top100_nominal_selection_utility": {
+        "expected": 310.90801407457604,
+        "legacy": 310.8758028124955,
+        "zero": 308.2408321402118
+      },
+      "common_top100_nominal_selection_utility_deltas": {
+        "legacy": 0.03221126208052283,
+        "zero": 2.667181934364237
+      },
+      "common_top100_conditional_selection_utility": {
+        "expected": 310.90801407457604,
+        "legacy": 310.8758028124955,
+        "zero": 308.2408321402118
+      },
+      "common_top100_conditional_selection_utility_deltas": {
+        "legacy": 0.03221126208052283,
+        "zero": 2.667181934364237
+      }
+    }
+  ],
+  "cases": [
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": 154.9300224881149,
+      "raw_conditional_expected_net": 155.00319050529765,
+      "common_top100_nominal_selection_utility": 154.9300224881149,
+      "common_top100_conditional_selection_utility": 155.00319050529765,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 47.73820278451477,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 3223,
+      "recorded_role_search_states": 1711560,
+      "fixed_rescore_evaluations_without_state_counts": 15,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 68.04932079999708,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": 154.44029202063433,
+      "raw_conditional_expected_net": 154.9300224881149,
+      "common_top100_nominal_selection_utility": 154.44029202063433,
+      "common_top100_conditional_selection_utility": 154.9300224881149,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 47.71857149533275,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 60.521876199985854,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": 154.4052410220912,
+      "raw_conditional_expected_net": 154.93029157319182,
+      "common_top100_nominal_selection_utility": 154.4052410220912,
+      "common_top100_conditional_selection_utility": 154.93029157319182,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 49.195113829308795,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 65.0911876000464,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": 154.96550092539468,
+      "raw_conditional_expected_net": 154.96550092539465,
+      "common_top100_nominal_selection_utility": 157.8545103745798,
+      "common_top100_conditional_selection_utility": 157.8545103745798,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 50.45443842160672,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 3223,
+      "recorded_role_search_states": 1711160,
+      "fixed_rescore_evaluations_without_state_counts": 15,
+      "publication_rescores": 3,
+      "publication_rescore_states": 1536,
+      "dispatcher_seconds": 79.04998240002897,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": 154.4757704579141,
+      "raw_conditional_expected_net": 154.96550092539465,
+      "common_top100_nominal_selection_utility": 157.35912263836607,
+      "common_top100_conditional_selection_utility": 157.8545103745798,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 50.50443651989981,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 54.66891639993992,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": 154.4052410220912,
+      "raw_conditional_expected_net": 154.93029157319182,
+      "common_top100_nominal_selection_utility": 157.21648772651793,
+      "common_top100_conditional_selection_utility": 157.76809116153933,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 50.51508582445307,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 58.62494330003392,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": 154.68991747019874,
+      "raw_conditional_expected_net": 154.6899174701987,
+      "common_top100_nominal_selection_utility": 160.8170786081214,
+      "common_top100_conditional_selection_utility": 160.8170786081214,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 47.49331888100962,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 3223,
+      "recorded_role_search_states": 1709928,
+      "fixed_rescore_evaluations_without_state_counts": 15,
+      "publication_rescores": 3,
+      "publication_rescore_states": 1536,
+      "dispatcher_seconds": 64.3271156999981,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": 154.2036496426084,
+      "raw_conditional_expected_net": 154.69338011008898,
+      "common_top100_nominal_selection_utility": 160.31557423504177,
+      "common_top100_conditional_selection_utility": 160.8166192399886,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 47.57157381049957,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 58.10394890001044,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": 154.66847259449125,
+      "raw_conditional_expected_net": 154.65817075788615,
+      "common_top100_nominal_selection_utility": 160.68930230455229,
+      "common_top100_conditional_selection_utility": 160.67899016611057,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 48.86963662770973,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 56.983106300001964,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": 154.54436236877044,
+      "raw_conditional_expected_net": 154.54436236877044,
+      "common_top100_nominal_selection_utility": 166.95164136300195,
+      "common_top100_conditional_selection_utility": 166.95164136300195,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 50.49176239998689,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 3223,
+      "recorded_role_search_states": 1745320,
+      "fixed_rescore_evaluations_without_state_counts": 15,
+      "publication_rescores": 3,
+      "publication_rescore_states": 1656,
+      "dispatcher_seconds": 70.83646429993678,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": 154.06261816145755,
+      "raw_conditional_expected_net": 154.55234862893812,
+      "common_top100_nominal_selection_utility": 166.43378853185575,
+      "common_top100_conditional_selection_utility": 166.9461480742689,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 50.56869852950832,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 59.03458520001732,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": 154.06261816145755,
+      "raw_conditional_expected_net": 154.58025698037125,
+      "common_top100_nominal_selection_utility": 166.43378853185575,
+      "common_top100_conditional_selection_utility": 166.849906709293,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 49.27915114155038,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 58.749075099942274,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": 154.42734756841097,
+      "raw_conditional_expected_net": 154.42734756841097,
+      "common_top100_nominal_selection_utility": 173.167111090878,
+      "common_top100_conditional_selection_utility": 173.167111090878,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 47.85358066432917,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 3223,
+      "recorded_role_search_states": 1783768,
+      "fixed_rescore_evaluations_without_state_counts": 15,
+      "publication_rescores": 3,
+      "publication_rescore_states": 1656,
+      "dispatcher_seconds": 63.66612690000329,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": 154.06261816145755,
+      "raw_conditional_expected_net": 154.55234862893812,
+      "common_top100_nominal_selection_utility": 172.61937371705483,
+      "common_top100_conditional_selection_utility": 173.1430477969343,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 47.8903779058256,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 54.57630529999733,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": 152.6630320420395,
+      "raw_conditional_expected_net": 152.6630320420395,
+      "common_top100_nominal_selection_utility": 171.53842704149218,
+      "common_top100_conditional_selection_utility": 171.53842704149218,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 50.68811113678314,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 58.50609459995758,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": 154.42734756841097,
+      "raw_conditional_expected_net": 154.42734756841097,
+      "common_top100_nominal_selection_utility": 179.41369893170034,
+      "common_top100_conditional_selection_utility": 179.4136989317003,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 52.81986016220495,
+      "cp_allocated_cap": 60.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 4774,
+      "recorded_role_search_states": 2733872,
+      "fixed_rescore_evaluations_without_state_counts": 24,
+      "publication_rescores": 3,
+      "publication_rescore_states": 1656,
+      "dispatcher_seconds": 76.99072880006861,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": 151.84710358375634,
+      "raw_conditional_expected_net": 151.84710358375634,
+      "common_top100_nominal_selection_utility": 178.06398521701385,
+      "common_top100_conditional_selection_utility": 178.06398521701385,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 46.91134938162301,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 55.18093710008543,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": 151.84710358375634,
+      "raw_conditional_expected_net": 151.84710358375634,
+      "common_top100_nominal_selection_utility": 178.06398521701385,
+      "common_top100_conditional_selection_utility": 178.06398521701385,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 46.63065933818733,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 54.72597750008572,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 3,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": 151.40920536371138,
+      "raw_conditional_expected_net": 151.40920536371135,
+      "common_top100_nominal_selection_utility": 184.8161007032887,
+      "common_top100_conditional_selection_utility": 184.8161007032887,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 48.05220426188282,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 3223,
+      "recorded_role_search_states": 1878304,
+      "fixed_rescore_evaluations_without_state_counts": 15,
+      "publication_rescores": 3,
+      "publication_rescore_states": 1776,
+      "dispatcher_seconds": 66.65153520007152,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 3,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": 151.47264808459045,
+      "raw_conditional_expected_net": 151.47264808459045,
+      "common_top100_nominal_selection_utility": 184.69504811652087,
+      "common_top100_conditional_selection_utility": 184.69504811652087,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 48.047098810100564,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 55.92961110000033,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 3,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": 151.47264808459045,
+      "raw_conditional_expected_net": 151.47264808459045,
+      "common_top100_nominal_selection_utility": 184.69504811652087,
+      "common_top100_conditional_selection_utility": 184.69504811652087,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 46.34472866770193,
+      "cp_allocated_cap": 54.0,
+      "cp_configured_cap": 60,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 55.863447699928656,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": 260.1061550362561,
+      "raw_conditional_expected_net": 259.924160915692,
+      "common_top100_nominal_selection_utility": 260.1061550362561,
+      "common_top100_conditional_selection_utility": 259.924160915692,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 94.9758505599936,
+      "cp_allocated_cap": 100.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 9142,
+      "recorded_role_search_states": 5121048,
+      "fixed_rescore_evaluations_without_state_counts": 40,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 160.75877009995747,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": 259.0913990017125,
+      "raw_conditional_expected_net": 259.5213055276855,
+      "common_top100_nominal_selection_utility": 259.0913990017125,
+      "common_top100_conditional_selection_utility": 259.5213055276855,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.83913110550357,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 116.30639230005909,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 0,
+      "raw_nominal_expected_net": 260.55563995047964,
+      "raw_conditional_expected_net": 259.9545682629092,
+      "common_top100_nominal_selection_utility": 260.55563995047964,
+      "common_top100_conditional_selection_utility": 259.9545682629092,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 94.98430354358166,
+      "cp_allocated_cap": 100.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 132.10065720009152,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": 260.08133353165596,
+      "raw_conditional_expected_net": 257.20773196823495,
+      "common_top100_nominal_selection_utility": 264.59480703375385,
+      "common_top100_conditional_selection_utility": 261.756834633575,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 95.00549437401199,
+      "cp_allocated_cap": 100.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 9142,
+      "recorded_role_search_states": 4603952,
+      "fixed_rescore_evaluations_without_state_counts": 40,
+      "publication_rescores": 5,
+      "publication_rescore_states": 2784,
+      "dispatcher_seconds": 169.70273629995063,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": 252.56750271719966,
+      "raw_conditional_expected_net": 252.55594853183527,
+      "common_top100_nominal_selection_utility": 257.2505823713505,
+      "common_top100_conditional_selection_utility": 257.23902240889345,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 85.00553908788315,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 124.3788024999667,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 5,
+      "raw_nominal_expected_net": 260.11726524698673,
+      "raw_conditional_expected_net": 260.11726524698673,
+      "common_top100_nominal_selection_utility": 264.987299705961,
+      "common_top100_conditional_selection_utility": 264.987299705961,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 84.97221652121107,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 122.77257739997003,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": 256.2905414625926,
+      "raw_conditional_expected_net": 256.2905414625926,
+      "common_top100_nominal_selection_utility": 266.1245890486335,
+      "common_top100_conditional_selection_utility": 266.1245890486335,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 84.97630729635729,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 8111,
+      "recorded_role_search_states": 4620000,
+      "fixed_rescore_evaluations_without_state_counts": 35,
+      "publication_rescores": 5,
+      "publication_rescore_states": 2712,
+      "dispatcher_seconds": 158.9630763999885,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": 256.23331186117275,
+      "raw_conditional_expected_net": 256.26092425763767,
+      "common_top100_nominal_selection_utility": 266.04859698584215,
+      "common_top100_conditional_selection_utility": 266.099454623238,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.86380584146781,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 115.3414965000702,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 10,
+      "raw_nominal_expected_net": 257.71519176545166,
+      "raw_conditional_expected_net": 257.7132068396254,
+      "common_top100_nominal_selection_utility": 267.28493713542366,
+      "common_top100_conditional_selection_utility": 267.36693221613757,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.86445092059695,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 118.34893169999123,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": 255.05728509913862,
+      "raw_conditional_expected_net": 254.91573131498495,
+      "common_top100_nominal_selection_utility": 275.14218545307887,
+      "common_top100_conditional_selection_utility": 275.15672559447967,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.83721665804035,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 6049,
+      "recorded_role_search_states": 3510640,
+      "fixed_rescore_evaluations_without_state_counts": 25,
+      "publication_rescores": 5,
+      "publication_rescore_states": 2896,
+      "dispatcher_seconds": 139.3257516999729,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": 255.06474808570803,
+      "raw_conditional_expected_net": 255.06474808570803,
+      "common_top100_nominal_selection_utility": 275.1209681520744,
+      "common_top100_conditional_selection_utility": 275.1209681520744,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 84.99177391602505,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 118.57613639999181,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 20,
+      "raw_nominal_expected_net": 257.12523700579527,
+      "raw_conditional_expected_net": 257.17264393627363,
+      "common_top100_nominal_selection_utility": 276.71215720684796,
+      "common_top100_conditional_selection_utility": 276.99518043502707,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 85.23071145982566,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 123.03097099997103,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": 259.80493606356976,
+      "raw_conditional_expected_net": 258.533180160253,
+      "common_top100_nominal_selection_utility": 289.7521685061779,
+      "common_top100_conditional_selection_utility": 289.6943336824011,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 94.97506925009597,
+      "cp_allocated_cap": 100.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 9142,
+      "recorded_role_search_states": 4573568,
+      "fixed_rescore_evaluations_without_state_counts": 40,
+      "publication_rescores": 5,
+      "publication_rescore_states": 2808,
+      "dispatcher_seconds": 168.3210693000583,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": 253.98272092810848,
+      "raw_conditional_expected_net": 254.45949163765798,
+      "common_top100_nominal_selection_utility": 283.24484580693974,
+      "common_top100_conditional_selection_utility": 285.99001011758304,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.83528292303046,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 125.25605919992086,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 30,
+      "raw_nominal_expected_net": 258.06323511494315,
+      "raw_conditional_expected_net": 255.64216082164342,
+      "common_top100_nominal_selection_utility": 288.9403551031737,
+      "common_top100_conditional_selection_utility": 286.99075112031016,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 95.10587677136913,
+      "cp_allocated_cap": 100.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 144.45761659997515,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": 256.2846592284739,
+      "raw_conditional_expected_net": 256.2846592284739,
+      "common_top100_nominal_selection_utility": 299.2154456310827,
+      "common_top100_conditional_selection_utility": 299.2154456310827,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.88780673511998,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 6049,
+      "recorded_role_search_states": 3485920,
+      "fixed_rescore_evaluations_without_state_counts": 25,
+      "publication_rescores": 5,
+      "publication_rescore_states": 2808,
+      "dispatcher_seconds": 137.5109101999551,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": 255.91474784953195,
+      "raw_conditional_expected_net": 255.91474784953198,
+      "common_top100_nominal_selection_utility": 298.38816703300057,
+      "common_top100_conditional_selection_utility": 298.38816703300057,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 85.02985576734255,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 111.06207660003565,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 40,
+      "raw_nominal_expected_net": 258.82243169622507,
+      "raw_conditional_expected_net": 258.82243169622507,
+      "common_top100_nominal_selection_utility": 301.9241106058496,
+      "common_top100_conditional_selection_utility": 301.9241106058496,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 94.9852666508467,
+      "cp_allocated_cap": 100.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 144.21553829999175,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "expected",
+      "window": 5,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": 254.20198870641588,
+      "raw_conditional_expected_net": 254.2019887064159,
+      "common_top100_nominal_selection_utility": 310.90801407457604,
+      "common_top100_conditional_selection_utility": 310.90801407457604,
+      "comparison_status": "compared",
+      "candidate_count": 3,
+      "cp_actual": 84.97510238789393,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 8111,
+      "recorded_role_search_states": 4699888,
+      "fixed_rescore_evaluations_without_state_counts": 35,
+      "publication_rescores": 5,
+      "publication_rescore_states": 3032,
+      "dispatcher_seconds": 138.94687659991905,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "legacy",
+      "window": 5,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": 254.22876304860472,
+      "raw_conditional_expected_net": 254.22876304860472,
+      "common_top100_nominal_selection_utility": 310.8758028124955,
+      "common_top100_conditional_selection_utility": 310.8758028124955,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.83653323813435,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 110.75485639995895,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    },
+    {
+      "variant": "zero",
+      "window": 5,
+      "top100_weight": 50,
+      "raw_nominal_expected_net": 254.55612198766647,
+      "raw_conditional_expected_net": 254.55612198766647,
+      "common_top100_nominal_selection_utility": 308.2408321402118,
+      "common_top100_conditional_selection_utility": 308.2408321402118,
+      "comparison_status": "compared",
+      "candidate_count": 2,
+      "cp_actual": 84.83786294547,
+      "cp_allocated_cap": 90.0,
+      "cp_configured_cap": 100,
+      "role_evaluations": 0,
+      "recorded_role_search_states": 0,
+      "fixed_rescore_evaluations_without_state_counts": 0,
+      "publication_rescores": 0,
+      "publication_rescore_states": 0,
+      "dispatcher_seconds": 137.37561510002706,
+      "news_status": "unavailable_no_cited_rotation_artifact_for_capture"
+    }
+  ],
+  "limitations": [
+    "Scores are model expectations on the same unweighted football forecast scale, net of actual four-point paid transfers; they are not realized FPL gains.",
+    "Conditional scores use the declared two-outcome information assumption; a missing complete comparison remains null.",
+    "Top100 and the eight-point selection penalty influence choice; selection utility is not reported as an FPL points gain.",
+    "The separate common Top100 tables rescore every variant on the same expected lineup basis and declared selection policy: the stored weighted net already charges four points per paid transfer, then another four-point premium is subtracted. There is no discount or terminal value. These units are preference utility, not actual FPL points; legacy bench-surrogate utility is not compared.",
+    "Counts describe fourteen overlapping settings, not independent samples or evidence of calibrated improvement.",
+    "Latency covers the dispatcher only, excluding input loading and posthoc common scoring.",
+    "Recorded role-search states omit uninstrumented fixed-policy rescoring states; these unknown states are not presented as zero.",
+    "No cited news artifact or external calibration is available for this capture. The news variant is identical without new evidence and is not solved again.",
+    "This summary validates record structure and pairing; it does not replace independent resource and score replay."
+  ]
+}

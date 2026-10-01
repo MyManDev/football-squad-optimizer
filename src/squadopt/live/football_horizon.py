@@ -88,6 +88,14 @@ def build_football_horizon(
         raise ValueError("Forecast calendar contains a match already underway.")
     base = roster.rename(columns={"player_id": "player_code"})
     targets = base.merge(schedule, on="club", validate="many_to_many").assign(season=season)
+    if "manager_context_gameweek" in targets:
+        if "captured_availability_probability" not in targets:
+            raise ValueError("Week-bound manager context requires its captured eligibility basis.")
+        later = targets.GW.ne(targets.manager_context_gameweek)
+        targets.loc[later, "availability_probability"] = targets.loc[
+            later, "captured_availability_probability"
+        ]
+        targets.loc[later, "minutes_limited"] = False
     target_parts: list[pd.DataFrame] = []
     if not targets.empty:
         targets = targets.sort_values(["kickoff", "fixture", "player_code"], kind="stable")

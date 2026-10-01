@@ -26,14 +26,18 @@ from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
     CLUB_NEWS_FIXTURE_CONTRACT_VERSION,
     PUBLISHED_PRECISIONS,
-    ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
-    ROTATION_DISPOSITIONS,
     ClaimResponse,
     ClubNewsError,
     ClubNewsProvider,
     FixtureClubNewsProvider,
     RawDocument,
     RosterPlayer,
+)
+from squadopt.data.sources.club_news import (
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION as ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+)
+from squadopt.data.sources.club_news import (
+    LEGACY_ROTATION_DISPOSITIONS as ROTATION_DISPOSITIONS,
 )
 
 PROVIDER_MODULE = (

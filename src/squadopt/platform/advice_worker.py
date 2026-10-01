@@ -55,6 +55,7 @@ from squadopt.application.advice_menu import (
     MenuRequest,
     advise_menu_entry,
 )
+from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, participation_summary
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
@@ -348,10 +349,22 @@ def build_advice_compute(
                 "experimental": True,
                 "fingerprint": football.fingerprint,
             }
+            participation = participation_summary(projection.diagnostics)
+            if participation is not None:
+                advice["participation_evidence"] = participation
+            participation_assumptions = (
+                participation.get("assumptions", []) if participation is not None else []
+            )
             existing_limits = advice.get("stated_limits")
             advice["stated_limits"] = [
                 *(existing_limits if isinstance(existing_limits, list) else []),
                 "Experimental football model; independent predictive superiority is unverified.",
+                *(
+                    [INHERITED_ZERO_LIMIT]
+                    if isinstance(participation_assumptions, list)
+                    and "future_values_not_recovered" in participation_assumptions
+                    else []
+                ),
                 # Only the version that splits attacking shares before availability.
                 *(
                     [SHARES_BEFORE_AVAILABILITY_LIMIT]

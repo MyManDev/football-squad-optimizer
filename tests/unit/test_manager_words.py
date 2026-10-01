@@ -7,6 +7,7 @@ citation and from nothing else; a source without its evidence (or the reverse) i
 
 import hashlib
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -75,6 +76,7 @@ def test_the_rule_is_declared_over_the_whole_vocabulary() -> None:
         "stated_rotation_risk": "not_captain",
         "stated_returning_from_injury": None,
         "stated_minutes_limited": "not_captain",
+        "stated_full_match_unavailable": None,
         "ambiguous": None,
     }
 
@@ -161,9 +163,15 @@ def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
     assert resolved.club == "Arsenal"
     assert resolved.source_url == arsenal.final_url
     assert resolved.speaker == "the manager"
+    assert (resolved.source_sha256, resolved.span_start, resolved.span_end) == (digest, start, end)
     unresolved = words.words[1]
     assert unresolved.words is None and unresolved.club is None and unresolved.source_url is None
     assert unresolved.role == "not_captain"
+    assert (unresolved.source_sha256, unresolved.span_start, unresolved.span_end) == (
+        None,
+        None,
+        None,
+    )
 
 
 def test_covered_is_what_the_capture_recorded_and_not_what_was_read(
@@ -309,6 +317,9 @@ def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_rea
     (word,) = words.words
     assert word.words is None
     assert word.words_status == WORDS_WITHHELD_FIGURE
+    assert word.source_sha256 == table.iloc[0].rotation_claim_source_sha256
+    assert word.span_start == table.iloc[0].rotation_claim_span_start
+    assert word.span_end == table.iloc[0].rotation_claim_span_end
     assert word.role == "not_captain"
     assert word.source_url is not None
     exclusion = words.exclusion()
@@ -466,3 +477,24 @@ def test_the_quote_screen_withholds_every_form_the_pages_may_not_show(quote: str
 )
 def test_the_quote_screen_leaves_plain_statements_alone(quote: str) -> None:
     assert not module.QUOTE_WITHHELD_PATTERN.search(quote)
+
+
+def test_unresolved_or_partial_provenance_cannot_claim_a_verified_span():
+    with pytest.raises(ManagerWordsError, match="resolved complete byte span"):
+        replace(_word(1, "stated_expected_absent"), source_sha256="a" * 64)
+    with pytest.raises(ManagerWordsError, match="resolved complete byte span"):
+        replace(
+            _word(1, "stated_expected_absent"),
+            words=None,
+            source_sha256="a" * 64,
+            span_start=0,
+            span_end=5,
+        )
+
+
+def test_a_byte_span_cutting_through_utf8_is_not_verified():
+    documents, _, _ = documents_from_source(FIXTURE)
+    source = replace(documents[0], content="é".encode(), readable="é".encode(), byte_length=2)
+    digest = hashlib.sha256(source.readable).hexdigest()
+    document, words = module._resolve((source,), digest, 0, 1)
+    assert document == source and words is None

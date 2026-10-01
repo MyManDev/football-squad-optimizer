@@ -34,7 +34,8 @@ CLUB_NEWS_SOURCE: Final = "club-news"
 
 #: The response format the prompt asks for and the parser reads. Bumped whenever either
 #: end changes, because a response stored under one version is not readable under another.
-ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v1"
+LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v1"
+ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v2"
 
 #: The fixture's own contract, separate from the response's: the fixture carries documents,
 #: a roster and responses, and its shape can change without the response format moving.
@@ -44,7 +45,7 @@ CLUB_NEWS_FIXTURE_CONTRACT_VERSION: Final = "club_news_fixture_v1"
 #: likelihood, percentage, chance or score is forbidden on a member-facing surface and is
 #: an unmeasured claim besides, so there is no probability anywhere in this lane -- not even
 #: internally. A closed vocabulary also cannot invent a nuance the source did not have.
-ROTATION_DISPOSITIONS: Final[tuple[str, ...]] = (
+LEGACY_ROTATION_DISPOSITIONS: Final[tuple[str, ...]] = (
     "not_addressed",
     "no_statement",
     "stated_expected_to_start",
@@ -53,6 +54,12 @@ ROTATION_DISPOSITIONS: Final[tuple[str, ...]] = (
     "stated_returning_from_injury",
     "stated_minutes_limited",
     "ambiguous",
+)
+
+# The old vocabulary remains closed when reading a V1 response.
+ROTATION_DISPOSITIONS: Final[tuple[str, ...]] = (
+    *LEGACY_ROTATION_DISPOSITIONS,
+    "stated_full_match_unavailable",
 )
 
 #: How precisely the source dated itself. A day-only dateline is recorded as ``day`` and is

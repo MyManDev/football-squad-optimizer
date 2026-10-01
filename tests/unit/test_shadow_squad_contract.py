@@ -89,6 +89,8 @@ _SHA = "ab" * 32
 #: reading nothing from a squad verdict and stating no spread around either.
 #: ``movement`` and ``movement_places`` describe the difference between two captured
 #: league ranks; neither is a squad-calibration diagnostic (#533).
+#: ``lineup_expectation`` decomposes expected points under stated lineup rules; it
+#: carries no squad-calibration verdict, score distribution or ranking estimate.
 _PUBLISHED_ENVELOPE = frozenset(
     {
         "moves",
@@ -101,6 +103,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "chip_forecast",
         "transfer_hit_points",
         "expected_own_points",
+        "lineup_expectation",
         "expected_gain_vs_hold",
         "expected_gap_vs_rival",
         "expected_points_cost",

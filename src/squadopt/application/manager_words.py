@@ -29,6 +29,7 @@ import logging
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from numbers import Integral
 from pathlib import Path
 from typing import Final
 
@@ -36,8 +37,8 @@ import pandas as pd
 
 from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import read_snapshot
-from squadopt.data.sources.club_news import FixtureClubNewsProvider, RawDocument
+from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
+from squadopt.data.sources.club_news import CLUB_NEWS_SOURCE, FixtureClubNewsProvider, RawDocument
 from squadopt.data.sources.club_news_capture import read_captured_documents
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.planning import FirstWeekExclusion
@@ -124,12 +125,28 @@ class ManagerWord:
     words: str | None
     """The cited span, decoded; ``None`` when unresolved or withheld (``words_status``)."""
     words_status: str = WORDS_SHOWN
+    # Internal provenance retained only after the held source span resolves.
+    source_sha256: str | None = None
+    span_start: int | None = None
+    span_end: int | None = None
 
     def __post_init__(self) -> None:
         if self.words is None and self.words_status == WORDS_SHOWN:
             object.__setattr__(self, "words_status", WORDS_UNRESOLVED)
         if self.words is not None and self.words_status != WORDS_SHOWN:
             raise ManagerWordsError("Words are either shown or withheld, never both.")
+        provenance = (self.source_sha256, self.span_start, self.span_end)
+        if any(value is not None for value in provenance) and (
+            self.words_status == WORDS_UNRESOLVED
+            or not isinstance(self.source_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", self.source_sha256) is None
+            or isinstance(self.span_start, bool)
+            or not isinstance(self.span_start, Integral)
+            or isinstance(self.span_end, bool)
+            or not isinstance(self.span_end, Integral)
+            or not 0 <= self.span_start < self.span_end
+        ):
+            raise ManagerWordsError("Source provenance requires one resolved complete byte span.")
 
     @property
     def role(self) -> str | None:
@@ -222,7 +239,11 @@ def _resolve(
                 return document, None
             if not 0 <= first < last <= len(candidate):
                 return document, None
-            return document, candidate[first:last].decode("utf-8", errors="replace").strip()
+            try:
+                words = candidate[first:last].decode("utf-8").strip()
+            except UnicodeDecodeError:
+                return document, None
+            return document, words or None
     return None, None
 
 
@@ -329,7 +350,8 @@ def manager_words_from_artifact(
             row.get("rotation_claim_span_start"),
             row.get("rotation_claim_span_end"),
         )
-        status = WORDS_SHOWN if cited is not None else WORDS_UNRESOLVED
+        resolved = cited is not None
+        status = WORDS_SHOWN if resolved else WORDS_UNRESOLVED
         if cited is not None and QUOTE_WITHHELD_PATTERN.search(cited):
             cited, status = None, WORDS_WITHHELD_FIGURE
         words.append(
@@ -344,6 +366,9 @@ def manager_words_from_artifact(
                 fetched_at_utc=None if document is None else document.fetched_at_utc,
                 words=cited,
                 words_status=status,
+                source_sha256=_text(row.get("rotation_claim_source_sha256")) if resolved else None,
+                span_start=int(str(row["rotation_claim_span_start"])) if resolved else None,
+                span_end=int(str(row["rotation_claim_span_end"])) if resolved else None,
             )
         )
     return ManagerWords(
@@ -356,6 +381,26 @@ def manager_words_from_artifact(
         words=tuple(sorted(words, key=lambda word: word.player_id)),
         source_check=source_check,
     )
+
+
+def _club_news_snapshot(source: Path, snapshot_root: Path | None) -> CapturedSnapshot:
+    root = Path(snapshot_root) if snapshot_root is not None else source.parent
+    if source.resolve() != (root / source.name).resolve():
+        raise ManagerWordsError("Configured club-news capture is outside its snapshot root.")
+    snapshot = read_snapshot(root, source.name)
+    if snapshot.metadata.source != CLUB_NEWS_SOURCE:
+        raise ManagerWordsError("Configured capture is not a club-news capture.")
+    return snapshot
+
+
+def club_news_capture_id(source: Path, *, snapshot_root: Path | None = None) -> str | None:
+    """Validate a configured capture's identity; a fixture file has no news capture ID."""
+    source = Path(source)
+    if source.is_file():
+        return None
+    if source.is_dir():
+        return _club_news_snapshot(source, snapshot_root).metadata.snapshot_id
+    raise ManagerWordsError("Configured club-news source is missing.")
 
 
 def documents_from_source(
@@ -375,9 +420,12 @@ def documents_from_source(
         synthetic = json.loads(path.read_text(encoding="utf-8")).get("synthetic") is True
         return documents, SOURCE_SYNTHETIC_FIXTURE if synthetic else SOURCE_FIXTURE_FILE, path.name
     if path.is_dir():
-        root = Path(snapshot_root) if snapshot_root is not None else path.parent
-        snapshot = read_snapshot(root, path.name)
-        return read_captured_documents(snapshot), SOURCE_CLUB_NEWS_CAPTURE, path.name
+        snapshot = _club_news_snapshot(path, snapshot_root)
+        return (
+            read_captured_documents(snapshot),
+            SOURCE_CLUB_NEWS_CAPTURE,
+            snapshot.metadata.snapshot_id,
+        )
     raise ManagerWordsError(f"No club-news source at {path}: not a fixture file, not a capture.")
 
 
@@ -413,6 +461,7 @@ __all__ = [
     "ManagerWord",
     "ManagerWords",
     "ManagerWordsError",
+    "club_news_capture_id",
     "documents_from_source",
     "load_manager_words",
     "manager_words_from_artifact",

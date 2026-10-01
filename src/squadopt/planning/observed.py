@@ -1,14 +1,17 @@
 """Bounded observation-aware window selection with a complete nominal fallback.
 
-The objective retains the caller's bench and hit policy. Information branches are
-posterior forecasts, never realized points. Every first action faces every branch.
+The optional expected-lineup route ranks every action using the same official
+points forecast and selection hit policy. Linear CP objectives only propose
+resource paths. Information branches are posterior forecasts, never realized
+points. Every action faces every branch.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -20,6 +23,11 @@ from squadopt.optimization import (
     wall_clock_stopped_the_search,
 )
 from squadopt.planning.guarded import optimize_guarded_window
+from squadopt.planning.lineup_utility import (
+    expected_selection_policy,
+    expected_week_utility,
+    improve_plan_lineups,
+)
 from squadopt.planning.models import (
     ChipAvailability,
     FirstWeekExclusion,
@@ -34,7 +42,7 @@ from squadopt.planning.policy_seed import forecast_policy_seed
 from squadopt.planning.recourse import ObservationNode
 from squadopt.planning.recourse_chips import net_week_points, restrict_first_chip
 
-OBSERVED_WINDOW_VERSION = "complete_observed_window_v2"
+OBSERVED_WINDOW_VERSION = "expected_lineup_observed_window_v3"
 OBSERVED_WINDOW_LIMIT = (
     "This experimental plan compares today's actions under two possible updates before "
     "the next deadline. Later transfers are conditional plans, not certain moves. "
@@ -91,6 +99,8 @@ def validate_observations(baseline: PlanningHorizon, nodes: tuple[ObservationNod
 def _utility(
     week: PlanningWeekResult, optimization: OptimizationConfig, transfer: TransferPlanningConfig
 ) -> float:
+    if week.lineup_expectation is not None:
+        return expected_week_utility(week, transfer)
     bench = 1.0 if week.chip == "bboost" else optimization.bench_weight
     return (
         week.projected_score
@@ -108,6 +118,7 @@ def optimize_observed_window(
     *,
     chips: ChipAvailability | None = None,
     preferences: DecisionPreferences | None = None,
+    expected_lineups: bool = False,
 ) -> TransferPlanResult:
     """40% baseline, 20% proposals, 30% continuations, 10% nominal reconciliation.
 
@@ -136,10 +147,34 @@ def optimize_observed_window(
     ):
         raise ValueError("Observed windows require zero terminal values and no discount.")
     ledger: list[dict[str, object]] = []
+    lineup_ledger: list[dict[str, object]] = []
+    proposal_optimization = (
+        replace(optimization, bench_weight=0.0) if expected_lineups else optimization
+    )
 
-    def config(fraction: float) -> OptimizationConfig:
+    def lineups(
+        plan: TransferPlanResult, phase: str, fixed: PlanningWeekResult | None = None
+    ) -> TransferPlanResult:
+        if not expected_lineups or not plan.has_solution:
+            return plan
+        updated = improve_plan_lineups(plan, proposal_optimization, transfer, fixed_first=fixed)
+        lineup_ledger.append(
+            {"phase": phase, **cast(Mapping[str, object], updated.diagnostics["lineup_search"])}
+        )
+        return updated
+
+    def seed_for(*args: Any, **kwargs: Any) -> TransferPlanResult:
+        seeded = forecast_policy_seed(*args, **kwargs)
+        count = sum(w.lineup_expectation is not None for w in seeded.weeks)
+        if count:
+            lineup_ledger.append(
+                {"phase": "fixed_policy_forecast_rescore", "evaluations": count, "cap": count}
+            )
+        return seeded
+
+    def config(fraction: float, *, legacy: bool = False) -> OptimizationConfig:
         return replace(
-            optimization,
+            optimization if legacy else proposal_optimization,
             solver_deterministic_time_limit=budget * fraction,
             solver_time_limit_seconds=optimization.solver_time_limit_seconds * fraction,
         )
@@ -175,11 +210,12 @@ def optimize_observed_window(
         )
 
     baseline = optimize_guarded_window(
-        horizon, initial, config(0.4), transfer, chips=rights, preferences=preferences
+        horizon, initial, config(0.4, legacy=True), transfer, chips=rights, preferences=preferences
     )
     record("baseline", 0.4, baseline)
     if not baseline.has_solution:
         return baseline
+    baseline = lineups(baseline, "baseline_lineups")
     menu = [baseline]
     first = horizon.gameweeks[0]
 
@@ -195,6 +231,18 @@ def optimize_observed_window(
                     "allocated_total": sum(float(str(x["cap"])) for x in ledger),
                     "actual_total": sum(float(str(x["actual"])) for x in ledger),
                     "ledger": ledger,
+                    "lineup_evaluator_ledger": lineup_ledger,
+                    "lineup_evaluations": sum(
+                        int(str(item["evaluations"])) for item in lineup_ledger
+                    ),
+                    "selection_basis": "expected_lineup_selection_utility"
+                    if expected_lineups
+                    else "legacy_bench_utility",
+                    **(
+                        {"selection_policy": expected_selection_policy(transfer, rights)}
+                        if expected_lineups
+                        else {}
+                    ),
                     **details,
                 },
             },
@@ -209,15 +257,16 @@ def optimize_observed_window(
             return
         # Normalize provenance and scores to the nominal horizon; every branch
         # independently certifies these decisions in its final constrained model.
-        plan = forecast_policy_seed(
+        plan = seed_for(
             plan,
             source,
             horizon,
-            optimization,
+            proposal_optimization,
             transfer,
             source_chips=source_rights,
             target_chips=rights,
         )
+        plan = lineups(plan, "proposal_lineups")
         week = plan.weeks[0]
         key = action_key(week)
         if all(key != action_key(p.weeks[0]) for p in menu):
@@ -229,6 +278,8 @@ def optimize_observed_window(
             frozenset(week.starting_xi.player_id),
             week.captain.player_id,
             week.chip,
+            week.vice_captain_id if expected_lineups else None,
+            tuple(week.bench.player_id) if expected_lineups else None,
         )
 
     def retain_float_utility(
@@ -289,11 +340,11 @@ def optimize_observed_window(
     branches = tuple(
         PlanningHorizon(pd.concat([today, node.horizon.table], ignore_index=True)) for node in nodes
     )
-    proposal_seed = forecast_policy_seed(
+    proposal_seed = seed_for(
         baseline,
         horizon,
         branches[0],
-        optimization,
+        proposal_optimization,
         transfer,
         source_chips=rights,
         target_chips=rights,
@@ -323,11 +374,11 @@ def optimize_observed_window(
     ) -> TransferPlanResult:
         week = candidate.weeks[0]
         branch_rights = restrict_first_chip(rights, first, week.chip)
-        seed = forecast_policy_seed(
+        seed = seed_for(
             candidate,
             horizon,
             target,
-            optimization,
+            proposal_optimization,
             transfer,
             source_chips=rights,
             target_chips=branch_rights,
@@ -348,6 +399,10 @@ def optimize_observed_window(
             incumbent_plan=seed,
             protect_incumbent=True,
         )
+        # Reapply the same first vice/bench order: the CP model owns squad/XI/captain,
+        # while these extra roles are validated by the exact fixed-action scorer.
+        seed = lineups(seed, "continuation_seed_lineups", week)
+        result = lineups(result, "continuation_result_lineups", week)
         return retain_float_utility(result, seed)
 
     baseline_points = horizon.table.set_index(["gameweek", "player_id"]).expected_points
@@ -355,6 +410,23 @@ def optimize_observed_window(
     def point_terms(weeks: tuple[PlanningWeekResult, ...]) -> list[dict[str, object]]:
         terms: list[dict[str, object]] = []
         for week in weeks:
+            if week.lineup_expectation is not None:
+                multipliers = cast(
+                    Mapping[object, float], week.lineup_expectation["scoring_multipliers"]
+                )
+                for row in week.selected_squad.itertuples():
+                    terms.append(
+                        {
+                            "gameweek": week.gameweek,
+                            "player_id": row.player_id,
+                            "multiplier": multipliers[row.player_id],
+                            "forecast": float(str(row.expected_points)),
+                            "baseline_forecast": float(
+                                baseline_points.loc[(week.gameweek, row.player_id)]
+                            ),
+                        }
+                    )
+                continue
             frame = week.selected_squad if week.chip == "bboost" else week.starting_xi
             for row in frame.itertuples():
                 multiplier = (
@@ -402,6 +474,8 @@ def optimize_observed_window(
                         "squad": continuation.weeks[0].selected_squad.player_id.tolist(),
                         "starters": continuation.weeks[0].starting_xi.player_id.tolist(),
                         "captain": continuation.weeks[0].captain.player_id,
+                        "vice_captain": continuation.weeks[0].vice_captain_id,
+                        "bench": continuation.weeks[0].bench.player_id.tolist(),
                         "chip": continuation.weeks[0].chip,
                         "in": continuation.weeks[0].transfers_in.player_id.tolist(),
                         "out": continuation.weeks[0].transfers_out.player_id.tolist(),
@@ -411,6 +485,10 @@ def optimize_observed_window(
                     "weeks": [
                         {
                             "gameweek": w.gameweek,
+                            "starters": w.starting_xi.player_id.tolist(),
+                            "captain": w.captain.player_id,
+                            "vice_captain": w.vice_captain_id,
+                            "bench": w.bench.player_id.tolist(),
                             "in": w.transfers_in.player_id.tolist(),
                             "out": w.transfers_out.player_id.tolist(),
                             "chip": w.chip,
@@ -440,10 +518,7 @@ def optimize_observed_window(
         if not nominal.has_solution:
             return finish(baseline, "incomplete_nominal")
         published = nominal.weeks[0]
-        if (
-            frozenset(published.starting_xi.player_id) != frozenset(week.starting_xi.player_id)
-            or published.captain.player_id != week.captain.player_id
-        ):
+        if action_key(published) != action_key(week):
             # A bounded solve may pick another lineup for the same squad. Its score
             # was not the first action evaluated in every information branch.
             return finish(baseline, "incomplete_nominal_action")

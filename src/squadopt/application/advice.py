@@ -45,6 +45,9 @@ from squadopt.application.lineup_publication import advice_player as _advice_pla
 from squadopt.application.lineup_publication import (
     best_eleven_basis,
     best_eleven_points_under,
+    expected_week_points,
+    lineup_decision_fields,
+    lineup_expectation_fields,
 )
 from squadopt.application.lineup_publication import best_eleven_points as best_eleven_points
 from squadopt.application.lineup_publication import lineup_fields as lineup_fields
@@ -122,6 +125,10 @@ WINDOW_WALL_CEILING_SECONDS = 1800.0
 #: fifteen five-week plans are proved. The one-week plan, the system's own horizon path
 #: and every measurement runner do not pass it and solve as they always did.
 WINDOW_LINEARIZATION_LEVEL = 2
+EXPECTED_LINEUP_PLAN_LIMIT = (
+    "Complete plans are compared using expected automatic substitutions and vice-captain "
+    "recovery. The limited search does not prove the best possible plan or future performance."
+)
 
 #: Builds the projection horizon for the requested consecutive gameweeks from the one
 #: capture the advice is answered from. Bound by the caller (``member_horizon_builder``)
@@ -940,9 +947,17 @@ def window_payload(
         choice=choice_points,
         expected_total=_published_total(lineup_fields(first)),
     )
+    if first.lineup_expectation is not None:
+        # The legacy held-squad calculation has no autosubs or vice recovery.
+        # A difference between these two scoring bases is not a measured gain.
+        gain_vs_hold = None
+        for move in moves:
+            move["expected_points_delta"] = None
     limits = window_stated_limits(projection)
     construction = plan.diagnostics.get("sequential_incumbent")
-    if isinstance(construction, dict):
+    if first.lineup_expectation is not None:
+        limits.append(EXPECTED_LINEUP_PLAN_LIMIT)
+    elif isinstance(construction, dict):
         limits.append(
             GUARDED_PLAN_LIMIT
             if construction.get("seed_completed") is True
@@ -993,8 +1008,8 @@ def window_payload(
             plan.solver_status, plan.diagnostics
         ),
         **lineup_fields(first),
-        # One row per gameweek. ``expected_points`` is the planner's projected score
-        # for that week's eleven with the captain's multiplier, before hits.
+        # One row per gameweek. Expected-lineup metadata includes autosubs and vice
+        # recovery; legacy weeks use the eleven and captain. Both totals are before hits.
         "plan_weeks": [
             {
                 "gameweek": int(week.gameweek),
@@ -1004,7 +1019,15 @@ def window_payload(
                 "chip": week.chip,
                 "free_transfers_before": int(week.free_transfers_before),
                 "free_transfers_after": int(week.free_transfers_for_next_gameweek),
-                "expected_points": float(week.projected_score),
+                "expected_points": expected_week_points(week),
+                **(
+                    {
+                        "lineup_expectation": lineup_expectation_fields(week),
+                        "lineup": lineup_decision_fields(week),
+                    }
+                    if week.lineup_expectation is not None
+                    else {}
+                ),
             }
             for week in shown
         ],
