@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>In-browser solve spike</title>
+    <style>
+      body { font: 15px/1.45 system-ui, sans-serif; margin: 16px; max-width: 900px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+      th, td { border-bottom: 1px solid #ccc; padding: 4px 8px; text-align: right; }
+      th:first-child, td:first-child { text-align: left; }
+      .bad { color: #b00020; font-weight: 600; }
+      #summary { font-weight: 600; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>One-week plan, solved in this browser</h1>
+    <p>
+      Feasibility spike. Each row is one member's real one-week problem, solved here by HiGHS
+      compiled to WebAssembly and compared with the server solver's answer on the same input.
+      Nothing is sent anywhere.
+    </p>
+    <p id="status">Loading the solver…</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Entry</th>
+          <th>Transfers</th>
+          <th>Same as server</th>
+          <th>Seconds here</th>
+          <th>Server seconds</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="summary"></p>
+    <script type="module">
+      import loadHighs from "./highs.mjs";
+      import { compare, solve } from "./planner.mjs";
+
+      const status = document.getElementById("status");
+      const loadStarted = performance.now();
+      const wasmStarted = performance.now();
+      const highs = await loadHighs({ locateFile: (file) => `./${file}` });
+      const loadSeconds = (performance.now() - loadStarted) / 1000;
+      status.textContent = `Solver loaded in ${loadSeconds.toFixed(2)} s. Solving…`;
+
+      const names = await (await fetch("./instances_published/_list.json")).json();
+      const results = [];
+      for (const name of names.filter((value) => !value.startsWith("_"))) {
+        const instance = await (await fetch(`./instances_published/${name}`)).json();
+        const answer = solve(highs, instance);
+        const matches = compare(answer, instance);
+        const same = Object.values(matches).every(Boolean);
+        const seconds = answer.primarySeconds + answer.tieSeconds;
+        results.push({
+          entry: instance.entry_id,
+          transfers: answer.transfersIn.length,
+          same,
+          seconds,
+          primarySeconds: answer.primarySeconds,
+          serverSeconds: instance.reference.seconds,
+        });
+        const row = document.createElement("tr");
+        row.innerHTML =
+          `<td>${instance.entry_id}</td><td>${answer.transfersIn.length}</td>` +
+          `<td class="${same ? "" : "bad"}">${same ? "yes" : "NO"}</td>` +
+          `<td>${seconds.toFixed(3)}</td><td>${instance.reference.seconds.toFixed(2)}</td>`;
+        document.getElementById("rows").append(row);
+        // Let the page paint between solves so progress is visible on a slow device.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      const sorted = results.map((row) => row.seconds).sort((a, b) => a - b);
+      const agree = results.filter((row) => row.same).length;
+      const summary =
+        `${agree} of ${results.length} identical to the server. Seconds per plan: ` +
+        `min ${sorted[0].toFixed(3)}, median ${sorted[Math.floor(sorted.length / 2)].toFixed(3)}, ` +
+        `max ${sorted.at(-1).toFixed(3)}. Solver load ${loadSeconds.toFixed(2)} s.`;
+      document.getElementById("summary").textContent = summary;
+      status.textContent = "Done.";
+      window.__results = {
+        loadSeconds,
+        results,
+        summary,
+        userAgent: navigator.userAgent,
+        cores: navigator.hardwareConcurrency,
+      };
+    </script>
+  </body>
+</html>
