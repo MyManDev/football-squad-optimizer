@@ -113,7 +113,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `compare_component_oof_development.py` | artifact-only runner | `--output-dir` (`comparison.json`, `comparison.md`) | 2026-09-07 |
 | `export_component_oof.py` | artifact-only runner | `artifacts/phase_c/` | 2026-09-07 |
 | `export_decided_appearance.py` | artifact-only runner | `artifacts/double_reduction/`; the `--fitted` input of `measure_double_reduction.py` | 2026-09-25 |
-| `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); protocol `docs/research/availability_transitions_prereg.md` | 2026-10-01 |
+| `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); refuses `data/`, `docs/` and the snapshot root; protocol `docs/availability_transitions_prereg.md` | 2026-10-01 |
 | `measure_instrument.py` | artifact-only runner | caller-selected `--output`; replay in `docs/measurement_instrument.md` | 2026-09-13 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
 | `probe_phase_e_runtime.py` | artifact-only runner | checkpoints via `_phase_e_checkpoints`; prereg `docs/phase_e_candidate_selection_prereg.md` | 2026-09-07 |
