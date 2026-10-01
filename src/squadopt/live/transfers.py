@@ -17,7 +17,7 @@ records which chip was played so the season's second half knows what is left.
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Final, TypedDict
 
@@ -44,6 +44,7 @@ from squadopt.planning import (
     spending_power,
 )
 from squadopt.planning.chip_strategy import optimize_chip_strategy
+from squadopt.planning.guarded import optimize_guarded_window
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -830,7 +831,8 @@ def plan_transfer_horizon(
     horizons default to at most one transfer per gameweek. That is the measured rolling
     discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
     churned, while the cap removed the mechanism. Callers may provide another explicit
-    policy, whose configuration fingerprint remains in the result.
+    policy. Multiweek sale accounting always uses the captured season fee, including
+    with an explicit policy; the effective configuration fingerprint is in the result.
 
     Chips are not offered unless the caller names them in ``chips``. A finite horizon
     values a chip inside the horizon only — its option value after the last week is
@@ -930,6 +932,16 @@ def plan_transfer_horizon(
         if transfer_config is None
         else transfer_config
     )
+    if len(projection_horizon.target_gameweeks) > 1:
+        # Initial lots retain the captured sell values, including unknown member
+        # purchase bases. A subsequent purchase starts a new lot at its actual
+        # planned buy price, even though captured market prices stay flat.
+        if (
+            planning_policy.acquisition_sell_on_fee is not None
+            and planning_policy.acquisition_sell_on_fee != fee
+        ):
+            raise DataSourceError("Planning sale fee differs from captured season rules.")
+        planning_policy = replace(planning_policy, acquisition_sell_on_fee=fee)
     state = InitialSquadState(
         held.squad_player_ids,
         bank_tenths=budget.bank_tenths,
@@ -943,8 +955,27 @@ def plan_transfer_horizon(
         raise DataSourceError(
             "Automatic chip strategy currently supports the pure-points path only."
         )
+    guarded_football = (
+        projection_horizon.model_name == "fixture_football_candidate"
+        and len(projection_horizon.target_gameweeks) in (3, 5)
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 2
+        and not chip_strategy
+        and first_week_overlap is None
+        and first_week_transfer_cap is None
+        and first_week_exclusion is None
+    )
     plan = (
-        optimize_chip_strategy(
+        optimize_guarded_window(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+        )
+        if guarded_football
+        else optimize_chip_strategy(
             PlanningHorizon(planning_table),
             state,
             settings,

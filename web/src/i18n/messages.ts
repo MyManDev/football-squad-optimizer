@@ -694,6 +694,10 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
+        "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
+      "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
+        "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.",
       "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
         "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
@@ -1791,6 +1795,10 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
+        "Bu deneysel plan, hafta hafta kurulan başlangıç planını tüm pencereyi birlikte arayan yöntemle karşılaştırır. Başlangıç planı ancak pencerenin tamamı için geçerliliği doğrulanırsa korunur. Gelecekteki başarısı henüz ölçülmedi.",
+      "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
+        "Hafta hafta başlangıç planı tamamlanamadı; bu sonuç kalan bütçeyle standart pencere aramasından üretildi.",
       "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
         "Futbol modeli her kulübün tahmin edilen gol ve asistlerini, oynayabilirlik uygulanmadan önce kulübün bütün oyuncuları arasında paylaştırır. Oynayabilirliğin, veri kesitinde oynayamaz ya da şüpheli görünen bir oyuncudan düşürdüğü kısım takım arkadaşlarına aktarılmaz; bu yüzden eksik oyuncusu olan bir kulüpte oyunculara toplamda, modelin kulüp için tahmin ettiğinden daha az gol ve asist yazılır.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":

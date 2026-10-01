@@ -1,0 +1,369 @@
+{
+  "protocol": {
+    "created_utc": "2026-09-29T20:51:06.622597+00:00",
+    "features": [
+      "gameweek",
+      "bank_after_tenths",
+      "squad_sell_value_tenths",
+      "free_transfers_after",
+      "projected_points",
+      "transfer_count"
+    ],
+    "train": [
+      "2021-22",
+      "2022-23"
+    ],
+    "select": [
+      "2023-24"
+    ],
+    "diagnostic_test": [
+      "2024-25"
+    ],
+    "independent_holdout": false,
+    "promotion": false,
+    "sklearn": "1.9.0",
+    "source_hashes": {
+      "src/squadopt/experiments/continuation_diagnostic.py": "40c42f1eec5bfd90e3cf5c9f27615f8dafa8e5716639f96e40d67a157b82451e",
+      "scripts/measure_continuation_diagnostic.py": "9f85df35cb7747280a781784959156ef7e6adb94d3215c8a57c68c5d55d6a32f",
+      "docs/research/continuation_diagnostic_protocol.md": "34df71beb1f7ef13f2dc38a6ec1a40cf759935cfcfa0aca679aa60b25a4496f4"
+    }
+  },
+  "input_sha256": {
+    "season_chain/2021-22.json": "b2b8d0d37d0d021a5bce3ad953386c9f59f1871d670d5aa87ee2973a15347a64",
+    "season_chain/2022-23.json": "76b40ac6f875534c20cbb4845a1eac604ea45e5ebfffaf9140c8e09a7c43acb7",
+    "season_chain/2023-24.json": "4ad2dab1e40a54ed6eee95380c58522d0e076bd5ee8d10a2ba02cbdf11e5e76e",
+    "season_chain/2024-25.json": "d3a22328b949097b4eec4d1e4d73ce6fd59e74108def7ba8e97d87e2131f0c0b",
+    "season_chain_blind/2021-22.json": "f540a6b255db4096bcce0a11c6824d0f88bdb0fb620270185f4cc860319d4d37",
+    "season_chain_blind/2022-23.json": "5409b47207f7c0139ad4654124520ec39a23e4aec3608539887ed70ab8ac8312",
+    "season_chain_blind/2023-24.json": "8db10fefdc80b7955891372352373237478c61d4bf5f4113a3a609f1f2e087cc",
+    "season_chain_blind/2024-25.json": "44d09576c4109672111b2f211ff095e68f160f6d0ba7a010e4ebfbb36655d57f",
+    "season_chain_fh/2021-22.json": "f3f95b5a3427787ded55f46fa8e4fa26ce616a905c7a02693e2e3df27d313a46",
+    "season_chain_fh/2022-23.json": "81590c0af71d866eead08b9b14ec18201a233d0feb645b8df29f401da19aa2d4",
+    "season_chain_fh/2023-24.json": "4c47438a2ffcbcc62ddc18922dad6c68ef0922478463210957701b33cb8a8050",
+    "season_chain_fh/2024-25.json": "12769aa8e3eb49b650b011c021a45958bb2b216ce5057e8c98e2a4cd2417b911",
+    "season_chain_hybrid/2021-22.json": "636ea5ed2fa8622579adfeb8a0e63bf2699026ef61d5afc9d3b7c8d26fec774a",
+    "season_chain_hybrid/2022-23.json": "145aae79aa4d282948a93f1c3719b03488b3f83bd1649ebb67ec2bda727a95f2",
+    "season_chain_hybrid/2023-24.json": "3bac71862215e4677a26e91b32031e48ac799ab3bb718473a3226f9ac03e39f9",
+    "season_chain_hybrid/2024-25.json": "960a50c5f523ddf1dbc094cfcfbcccd0901f438e3e4501d164cc797b4a14aa28",
+    "season_chain_value/2021-22.json": "25a8e0bd7d4ed13b23ffee42bd5d61c1670ca59b3fa022256976500e19ec0e2f",
+    "season_chain_value/2022-23.json": "7b1a596dd8f2caf000ed1aa7153e7967db523e280a1f79faa7057b00aada95a4",
+    "season_chain_value/2023-24.json": "c4d4dfefd089a5205c1ba009096ed0e772b666ba8613496d8df54c267a11dd72",
+    "season_chain_value/2024-25.json": "a9db0a97e6f936c0111c0dc07877c1df044ce9d78425772b13b179b216527088",
+    "chain_tuned/2021-22.json": "939c76fa23128d13e65cfceae709f3812135d14a59abc44e0011a7e9fcc26c6b",
+    "chain_tuned/2022-23.json": "e0f6d574eaac0861d52d67c9cb8df8a42f44887675777608e1b91d97c7c2002a",
+    "chain_tuned/2023-24.json": "3905c259075fbb89d3786c821d03d38d98202496f37c179899e201b265f283fb",
+    "chain_tuned/2024-25.json": "c74b16a758f8e92f7eeb85e502d675adc7c7d1ed7073456820937d122eb7651c"
+  },
+  "source_chains": 80,
+  "source_decisions": 2940,
+  "results": {
+    "3": {
+      "partition_rows": {
+        "train": 1280,
+        "selection": 680,
+        "diagnostic_test": 680
+      },
+      "selection_trials": [
+        {
+          "configuration": [
+            16,
+            1.0
+          ],
+          "mae": 12.15726802452401,
+          "rmse": 15.419175271756169,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 680,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ]
+        },
+        {
+          "configuration": [
+            16,
+            10.0
+          ],
+          "mae": 12.243760375410359,
+          "rmse": 15.472409878369474,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 680,
+          "warnings": []
+        },
+        {
+          "configuration": [
+            32,
+            1.0
+          ],
+          "mae": 15.929242165593255,
+          "rmse": 20.21726654929836,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 680,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ]
+        },
+        {
+          "configuration": [
+            32,
+            10.0
+          ],
+          "mae": 16.48029251807979,
+          "rmse": 20.53862260507697,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 680,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ]
+        }
+      ],
+      "selected_configuration": [
+        16,
+        1.0
+      ],
+      "scores": {
+        "constant_0": {
+          "mae": 12.58969537815126,
+          "rmse": 15.32336085541165,
+          "kind": "constant",
+          "fallback_rows": 7,
+          "rows": 680,
+          "warnings": [],
+          "mae_gain_interval_95": [
+            0.0,
+            0.0
+          ]
+        },
+        "ridge_0": {
+          "mae": 13.559968615876222,
+          "rmse": 16.55355948853572,
+          "kind": "ridge",
+          "fallback_rows": 7,
+          "rows": 680,
+          "warnings": [],
+          "mae_gain_interval_95": [
+            -2.552391876179404,
+            1.3580136992052423
+          ]
+        },
+        "tree_0": {
+          "mae": 15.574507603540368,
+          "rmse": 18.678200759949632,
+          "kind": "tree",
+          "fallback_rows": 7,
+          "rows": 680,
+          "warnings": [],
+          "mae_gain_interval_95": [
+            -4.970712004201685,
+            -0.1801402921702193
+          ]
+        },
+        "mlp_0": {
+          "mae": 15.299743823261679,
+          "rmse": 18.842419646617664,
+          "kind": "mlp",
+          "fallback_rows": 7,
+          "rows": 680,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ],
+          "mae_gain_interval_95": [
+            -4.445106208021853,
+            0.7080225598786132
+          ]
+        },
+        "mlp_1": {
+          "mae": 14.824380021823275,
+          "rmse": 18.59199524342636,
+          "kind": "mlp",
+          "fallback_rows": 7,
+          "rows": 680,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ],
+          "mae_gain_interval_95": [
+            -3.121321910238614,
+            0.2885504236439567
+          ]
+        },
+        "mlp_2": {
+          "mae": 14.992576438779373,
+          "rmse": 18.714530753162254,
+          "kind": "mlp",
+          "fallback_rows": 7,
+          "rows": 680,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ],
+          "mae_gain_interval_95": [
+            -3.553364131303117,
+            0.7197104627957788
+          ]
+        }
+      },
+      "development_only": true,
+      "policy_evaluated": false,
+      "promotion": false,
+      "independent_holdout": false
+    },
+    "5": {
+      "partition_rows": {
+        "train": 1160,
+        "selection": 640,
+        "diagnostic_test": 640
+      },
+      "selection_trials": [
+        {
+          "configuration": [
+            16,
+            1.0
+          ],
+          "mae": 11.17247974912263,
+          "rmse": 13.287210217043178,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 640,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ]
+        },
+        {
+          "configuration": [
+            16,
+            10.0
+          ],
+          "mae": 11.074779005245754,
+          "rmse": 13.236554174576819,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 640,
+          "warnings": []
+        },
+        {
+          "configuration": [
+            32,
+            1.0
+          ],
+          "mae": 12.094173933961645,
+          "rmse": 14.684330148443191,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 640,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ]
+        },
+        {
+          "configuration": [
+            32,
+            10.0
+          ],
+          "mae": 11.31521510386333,
+          "rmse": 14.404643257806216,
+          "kind": "mlp",
+          "fallback_rows": 58,
+          "rows": 640,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ]
+        }
+      ],
+      "selected_configuration": [
+        16,
+        10.0
+      ],
+      "scores": {
+        "constant_0": {
+          "mae": 11.225984027777777,
+          "rmse": 13.088283951133313,
+          "kind": "constant",
+          "fallback_rows": 7,
+          "rows": 640,
+          "warnings": [],
+          "mae_gain_interval_95": [
+            0.0,
+            0.0
+          ]
+        },
+        "ridge_0": {
+          "mae": 12.233770285535883,
+          "rmse": 14.420523504491628,
+          "kind": "ridge",
+          "fallback_rows": 7,
+          "rows": 640,
+          "warnings": [],
+          "mae_gain_interval_95": [
+            -2.5199066590754224,
+            1.082587261509613
+          ]
+        },
+        "tree_0": {
+          "mae": 13.117161192023643,
+          "rmse": 15.649418952448588,
+          "kind": "tree",
+          "fallback_rows": 7,
+          "rows": 640,
+          "warnings": [],
+          "mae_gain_interval_95": [
+            -3.5741251357625,
+            0.9105240969051016
+          ]
+        },
+        "mlp_0": {
+          "mae": 12.562842642512065,
+          "rmse": 15.03986943200714,
+          "kind": "mlp",
+          "fallback_rows": 7,
+          "rows": 640,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ],
+          "mae_gain_interval_95": [
+            -2.8131321066454285,
+            1.0245659371977365
+          ]
+        },
+        "mlp_1": {
+          "mae": 12.4176255806561,
+          "rmse": 14.805115673641602,
+          "kind": "mlp",
+          "fallback_rows": 7,
+          "rows": 640,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ],
+          "mae_gain_interval_95": [
+            -3.1299590025759776,
+            1.232207701836081
+          ]
+        },
+        "mlp_2": {
+          "mae": 13.488704847545407,
+          "rmse": 15.869676999772445,
+          "kind": "mlp",
+          "fallback_rows": 7,
+          "rows": 640,
+          "warnings": [
+            "lbfgs failed to converge after 500 iteration(s) (status=1):\nSTOP: TOTAL NO. OF ITERATIONS REACHED LIMIT\n\nIncrease the number of iterations to improve the convergence (max_iter=500).\nYou might also want to scale the data as shown in:\n    https://scikit-learn.org/stable/modules/preprocessing.html"
+          ],
+          "mae_gain_interval_95": [
+            -3.8279252705669893,
+            -0.3347832688238582
+          ]
+        }
+      },
+      "development_only": true,
+      "policy_evaluated": false,
+      "promotion": false,
+      "independent_holdout": false
+    }
+  },
+  "decision": "No optimizer integration or promotion; all fitted models lost to the constant diagnostic control.",
+  "provenance": {
+    "repository_base_commit": "d373baa8c69e95a5c0af177cc2de61481f757dcf",
+    "working_tree_dirty": true,
+    "exact_source_identity": "protocol.source_hashes"
+  }
+}
