@@ -12,9 +12,12 @@ states a 25, 50 or 75 per cent chance of playing for a held player who meets the
 `availability_observations` in `src/squadopt/live/football_observations.py`, the window is
 solved by `bounded_observed_window_v1` (`src/squadopt/planning/observed.py`, released in
 `site-2026-27-gw06-fix7`); otherwise by `sequential_certified_window_v1`
-(`src/squadopt/planning/guarded.py`, released in `site-2026-27-gw06-fix6`). Windows under the
-current model keep the full-window solver, `optimize_transfer_plan(..., protect_hold=True)` in
-`src/squadopt/planning/optimizer.py`, which is also the path a football window took before #907.
+(`src/squadopt/planning/guarded.py`, released in `site-2026-27-gw06-fix6`). #911, merged the same
+day for the next release, replaces the observed route with `complete_observed_window_v2`. Windows
+under the current model keep the full-window solver, `optimize_transfer_plan(..., protect_hold=True)`
+in `src/squadopt/planning/optimizer.py`, which is also the path a football window took before #907.
+These routes change between releases, so the arm this protocol calls `served` is whatever
+`plan_transfer_horizon` routes to at the frozen commit (rule 3), and its records name the version.
 
 The evidence for the two routes is in-forecast. #907 shipped functional checks and no
 measurement. #909's record, `docs/research/football_information_windows.md`, is a four-case
@@ -72,9 +75,9 @@ intervals to include zero. These are stated priors, and no clause reads them.
    deadline falls after the later of two merges: this document's, and that of the runner
    `scripts/measure_planner_policy_chain.py`. The target is GW6, whose deadline the bootstrap of
    capture `fpl-live-20260922T214539Z-364991a4f832` puts at 2026-10-10T10:00:00Z. If either
-   merges later, the first chain week moves to the next deadline and nothing else changes. A
-   first chain week fixed before any of its inputs exist cannot be chosen after its outcome is
-   seen.
+   merges later, the first chain week moves to the next deadline; the reading dates do not move,
+   so a later start leaves fewer weeks to read. A first chain week fixed before any of its inputs
+   exist cannot be chosen after its outcome is seen.
 3. Every decision is computed from the runner's merge commit, the frozen source, and `served`
    is the routed planner at that commit, whatever version strings it carries. The first run
    refuses unless HEAD is that commit. It records the commit, the sha256 of this document's
@@ -86,9 +89,11 @@ intervals to include zero. These are stated priors, and no clause reads them.
 4. A fault found in the runner after it binds is fixed in its own pull request, which changes
    only the runner or the scorer. The fixed runner runs from the frozen commit with only that
    file replaced, recomputes the last week already decided and must reproduce it exactly before
-   it decides another. The fix and its first week are a declared deviation in every later
-   record, and decisions already written stand. A change to what an arm does is not a fix: it
-   needs a new protocol.
+   it decides another. That pull request adds the recompute-and-compare step to the runner and
+   the identity rule that admits the replaced file, because the runner as it binds refuses a
+   changed runner. The fix and its first week are a declared deviation in every later record,
+   and decisions already written stand. A change to what an arm does is not a fix: it needs a
+   new protocol.
 
 ## 2. What each week reads
 
@@ -99,16 +104,21 @@ intervals to include zero. These are stated priors, and no clause reads them.
    `scripts/check_football_prospective_inputs.py` applies for `docs/football_prospective_prereg.md`,
    so both protocols read the same capture each week. Which capture is the last is known only
    once the deadline has passed, so the runner decides gameweek g only after its deadline,
-   refuses an earlier decision, and decides weeks in order, each once.
+   refuses an earlier decision, and decides weeks in order, each once. A capture taken after
+   every published deadline has closed targets no gameweek and is left out. Each week's receipt
+   lists every capture whose own target is that week, with its instant, so the choice can be
+   checked against the inventory later.
 6. The forecast is the served football artifact for that capture, read by
    `read_football_forecast` in `src/squadopt/live/football_artifact.py` with the capture's own
    inputs. Its model version must be `football_team_share_v1`, its fingerprint must verify, and
    its file's modification time, as the file system reports it, must fall before the deadline.
    The runner reads the file's bytes once, records their sha256, the fingerprint and the
    modification time, and copies those bytes into the chain's evidence. The artifact is never
-   rebuilt, never borrowed from another capture and never written to. A producer change that
-   keeps the version name is recorded with its first week; those weeks are pooled and also
-   reported apart.
+   rebuilt, never borrowed from another capture and never written to. Inputs read on a machine
+   other than the one that wrote them are copied with their modification times kept (for
+   example `robocopy /COPY:DAT /DCOPY:T` or `rsync -t`); a copy that loses them makes the week
+   missing, and that is never repaired. A producer change that keeps the version name is
+   recorded with its first week; those weeks are pooled and also reported apart.
 7. The season rules are `read_season_rules` in `src/squadopt/live/rules.py`, on the same
    capture.
 8. The decision step uses no archive, no handoff, no member or entry payload and nothing
@@ -215,7 +225,8 @@ intervals to include zero. These are stated priors, and no clause reads them.
 24. Records are written once, by `write_document_once` in `src/squadopt/data/atomic.py`. Work
     and clock fields are kept out of the replay identity, because the deterministic time used
     varies in its last digit between runs. A recomputation that disagrees on any decision is
-    refused, and the first record stands. Every run is logged. The operator posts the frozen
+    refused, and the first record stands. Every run appends a line to a run log in the output
+   directory, with its instant, the weeks it decided and why it stopped. The operator posts the frozen
     commit and each week's manifest sha256 on the chain's tracking issue, and each reading checks
     the manifests against those receipts.
 
@@ -262,8 +273,9 @@ intervals to include zero. These are stated priors, and no clause reads them.
     per cent of replicates at 7, 15 and 31 weeks, and its upper bound fell below zero in 20, 12
     and 12 per cent. At a lag-one autocorrelation of 0.2 the interval covered zero in 54, 74 and
     78 per cent, and fell below zero in 26, 15 and 10 per cent. Each record states this beside its
-    intervals. The rule below is set with it in mind: no harm clause at fewer than 15 weeks, and
-    one interim reading only. The check is this code, run from a checkout:
+    intervals. The rule below is set with it in mind: no verdict at fewer than 15 weeks, no
+    verdict at the interim, and one interim reading only. The check is this code, run from a
+    checkout:
 
     ```python
     import random
@@ -291,9 +303,10 @@ intervals to include zero. These are stated priors, and no clause reads them.
 32. The final verdict for each contrast is the first clause that holds: fewer than 15 scored
     weeks gives `insufficient_evidence`; an upper bound below 0 gives `worse`; a lower bound
     above 0 with a mean of at least 0.5 points a week gives `better`; anything else gives
-    `not_separated`. The interim may record only `worse_interim`, when at least 15 weeks are
-    scored and the upper bound is below 0; otherwise it records no verdict. The interim counts
-    realized points only; free transfers and bank are reported beside it.
+    `not_separated`. The interim records no verdict. GW6 to GW20 is at most 15 weeks, so a harm
+    clause there would need every week scored and could not fire at all after a late start; the
+    interim reports its intervals, counts and means and nothing else. It counts realized points
+    only; free transfers and bank are reported beside it.
 33. Each reading reports the minimum detectable effect at its own week count from the observed
     standard deviation, by `detectable_effect` under
     `DetectionPolicy(confidence_level=0.90, power=0.80)`, treating weeks as independent. No
@@ -333,9 +346,11 @@ intervals to include zero. These are stated priors, and no clause reads them.
     and a reading taken twice. Each record names the scorer's merge commit and the sha256 of
     its bytes.
 38. Records name no member, entry or league, hold no news text and set
-    `locked_holdout_accessed: false`: the chain loads no 2025-26 row. They also record
-    `forecast_training_seasons`, because the served forecast's producer was trained on 2022-23
-    to 2025-26.
+    `locked_holdout_accessed: false`: the chain loads no 2025-26 row. The served forecast's
+    producer does: it fits on 2023-24 to 2025-26 and the capture's settled 2026-27 weeks, with
+    2022-23 as priors only. So each receipt also records `forecast_archive_seasons`, the seasons
+    whose archive files the artifact hashes, with the artifact's training row count and latest
+    training kickoff.
 39. The decision step runs once after each deadline, as one heavy job at a time, never on a
     Tuesday or Friday and never during a weekly run or a rehearsal. It reads captures and
     football artifacts read-only and writes only under `artifacts/planner_policy_chain/`. It
@@ -344,13 +359,14 @@ intervals to include zero. These are stated priors, and no clause reads them.
     announces each run on the tracking issue.
 40. Who runs the decision step and the scorer, and on which machine, is the owner's decision,
     asked on #632 as Question PC1. Nothing runs before an Answer names the operator and the
-    machine, and silence is not an answer. If the Answer comes after the first chain week's
+    machine, and silence is not an answer. The machine is best the one that writes the football
+    artifacts; any other copies its inputs as rule 6 says. If the Answer comes after the first chain week's
     deadline, the chain still starts at its first chain week and decides weeks in order, each
     from its own capture and artifact if both are still on disk with a write time before that
     week's deadline; a week whose inputs are gone is missing. Each decision is a function of the
     frozen source and of inputs written before its week's deadline, so when it is computed does
-    not change it. If no operator is named before gameweek 20 settles, nothing is read and the
-    protocol lapses unrun.
+    not change it. If no chain has started by gameweek 21's deadline, the runner refuses to start
+    one, nothing is read and the protocol lapses unrun.
 
 ## 11. What this does not claim
 

@@ -98,20 +98,29 @@ def _protocol() -> str:
         "a confidence level of 0.90, 5000 resamples, blocks of 4, deterministic seed 0 and a"
         " minimum mean improvement of 0.5 points a week",
         "No interval is printed with fewer than six scored weeks.",
-        "no harm clause at fewer than 15 weeks, and one interim reading only",
+        "no verdict at fewer than 15 weeks, no verdict at the interim, and one interim reading"
+        " only",
+        "The interim records no verdict.",
+        "the reading dates do not move, so a later start leaves fewer weeks to read",
+        "A capture taken after every published deadline has closed targets no gameweek and is left"
+        " out.",
+        "Each week's receipt lists every capture whose own target is that week, with its instant",
+        "copied with their modification times kept",
+        "Every run appends a line to a run log in the output directory",
+        "adds the recompute-and-compare step to the runner",
         "fewer than 15 scored weeks gives `insufficient_evidence`",
-        "The interim may record only `worse_interim`, when at least 15 weeks are scored",
         "No verdict switches anything.",
         "it computes none of that protocol's quantities",
         "No chain reading may be used to withdraw, change or re-time the football option.",
         "and a reading taken twice",
         "`locked_holdout_accessed: false`",
-        "`forecast_training_seasons`",
+        "`forecast_archive_seasons`",
         "never on a Tuesday or Friday",
         "Nothing runs before an Answer names the operator and the machine, and silence is not"
         " an answer.",
-        "If no operator is named before gameweek 20 settles, nothing is read and the protocol"
-        " lapses unrun.",
+        "If no chain has started by gameweek 21's deadline, the runner refuses to start one,"
+        " nothing is read and the protocol lapses unrun.",
+        "is whatever `plan_transfer_horizon` routes to at the frozen commit",
     ],
 )
 def test_the_protocol_states_the_rule_its_runner_is_held_to(sentence: str) -> None:
