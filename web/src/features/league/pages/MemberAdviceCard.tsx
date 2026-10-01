@@ -9,6 +9,7 @@ import { CHIP_COPY, chipLimit, chipRescores, type ChipCopy } from "../advice/chi
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { publishedPrice } from "../advice/publishedPrice";
+import { InformationReview } from "../advice/InformationReview";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
@@ -413,6 +414,7 @@ export function AdviceDetails({
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <EvidenceSection view={view} priced={priced} />
       <Top100Section view={view} priced={priced} />
+      <InformationReview view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
       <StatedLimits view={view} />

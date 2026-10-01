@@ -1,7 +1,7 @@
 /**
  * The standing rule, applied to the whole of the site's own words.
  *
- * No member-facing page or payload, in English or Turkish, publishes a probability, a
+ * No member-facing page or payload, in English or Turkish, publishes a modeled probability, a
  * percentage of a probability, a quantile, a spread, a likelihood, a chance or odds. Only
  * expected points, an expected gap against a named rival, overlap counts and a price in
  * points are publishable. The repository's pre-registered attempts to publish rank
@@ -206,7 +206,35 @@ function inlineText(path: string): { at: string; text: string }[] {
 
 const INLINE = PRODUCTION.filter((path) => path.endsWith(".tsx")).flatMap(inlineText);
 
+// The owner requested captured FPL playing percentages as inputs to conditional plans.
+// This sole display copies source data (25/50/75); it is not a modeled rank/win estimate.
+// Keep exact bilingual labels, one component and exactly one percent marker. All other
+// probability claims still pass through the unchanged site-wide guard.
+const SOURCE_AVAILABILITY_COPY = [
+  "Kaynakta belirtilen oynama ihtimali",
+  "Source-stated playing chance",
+  "%",
+] as const;
+const isSourceAvailability = ({ at, text }: { at: string; text: string }) =>
+  at.startsWith("features/league/advice/InformationReview.tsx:") &&
+  SOURCE_AVAILABILITY_COPY.some((label) => label === text);
+
 describe("every string a production component writes inline", () => {
+  it("only exempts the captured availability labels and marker", () => {
+    expect(
+      INLINE.filter(isSourceAvailability)
+        .map(({ text }) => text)
+        .sort(),
+    ).toEqual([...SOURCE_AVAILABILITY_COPY].sort());
+    for (const text of SOURCE_AVAILABILITY_COPY) expect(AS_A_CHANCE.test(text)).toBe(true);
+    expect(isSourceAvailability({ at: "other.tsx:1", text: "%" })).toBe(false);
+    expect(
+      isSourceAvailability({
+        at: "features/league/advice/InformationReview.tsx:1",
+        text: "Win probability",
+      }),
+    ).toBe(false);
+  });
   it("was actually read: literals, template text and JSX text, in both languages", () => {
     expect(INLINE.length).toBeGreaterThan(1000);
     const texts = new Set(INLINE.map(({ text }) => text));
@@ -216,9 +244,9 @@ describe("every string a production component writes inline", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const offenders = INLINE.filter(({ text }) => AS_A_CHANCE.test(text)).map(
-      ({ at, text }) => `${at}: ${text}`,
-    );
+    const offenders = INLINE.filter((entry) => !isSourceAvailability(entry))
+      .filter(({ text }) => AS_A_CHANCE.test(text))
+      .map(({ at, text }) => `${at}: ${text}`);
     expect(offenders).toEqual([]);
   });
 });
