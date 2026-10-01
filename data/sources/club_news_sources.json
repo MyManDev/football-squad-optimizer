@@ -19,6 +19,12 @@
       "url": "https://club.example/team-news",
       "terms_record": "docs/club_news_sources.md",
       "terms_read_on": null
+    },
+    {
+      "club": "Crystal Palace",
+      "url": "https://www.cpfc.co.uk/news/first-team/",
+      "terms_record": "docs/club_news_sources.md",
+      "terms_read_on": "2026-10-01"
     }
   ]
 }

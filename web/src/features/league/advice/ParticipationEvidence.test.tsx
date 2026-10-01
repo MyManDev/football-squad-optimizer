@@ -44,6 +44,64 @@ it.each(["tr", "en"] as const)(
   },
 );
 
+it.each(["tr", "en"] as const)(
+  "separates source availability records from no applied coach news and names the evidence context in %s",
+  (language) => {
+    const view = {
+      ...mockEntryAdviceEnvelope(101, "saf-puan", 3).payload,
+      participation_evidence: {
+        ...evidence,
+        applied_player_count: 0,
+        manager_statement_count: 0,
+        unapplied_statement_count: 0,
+      },
+    };
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <ParticipationEvidence view={view} />
+      </LanguageProvider>,
+    );
+    const detail = screen.getByTestId("participation-evidence");
+    expect(detail).not.toHaveAttribute("open");
+    expect(detail).toHaveTextContent(
+      language === "tr"
+        ? "Kontrol edilen FPL oynayabilirlik kaydı: 5"
+        : "FPL availability records checked: 5",
+    );
+    expect(detail).toHaveTextContent(
+      language === "tr" ? "Değerlendirilen hoca açıklaması: 0" : "Coach statements considered: 0",
+    );
+    expect(detail).toHaveTextContent(
+      language === "tr"
+        ? "Bu tahmine uygulanmış hoca açıklaması yok."
+        : "No coach statement was applied to this forecast.",
+    );
+    expect(detail.querySelector("time")).toHaveAttribute("datetime", evidence.as_of);
+    expect(detail.querySelector("time")).toHaveTextContent("UTC");
+    expect(detail).toHaveTextContent(language === "tr" ? "OH6" : "GW6");
+    // The forecast fixture belongs to GW2; the displayed context comes from the evidence.
+    expect(view.gameweek).not.toBe(view.participation_evidence.gameweek);
+  },
+);
+
+it.each([null, "not-a-date"])("does not invent a missing or invalid evidence date (%s)", (asOf) => {
+  const view = {
+    ...mockEntryAdviceEnvelope(101, "saf-puan", 3).payload,
+    participation_evidence: { ...evidence, as_of: asOf, gameweek: null },
+  };
+  render(
+    <LanguageProvider initialLanguage="tr">
+      <ParticipationEvidence view={view} />
+    </LanguageProvider>,
+  );
+  const detail = screen.getByTestId("participation-evidence");
+  expect(detail.querySelector("time")).toBeNull();
+  expect(detail).toHaveTextContent("Tarih bildirilmedi");
+  expect(detail).toHaveTextContent("Hafta bildirilmedi");
+  expect(detail).not.toHaveTextContent("not-a-date");
+  expect(detail).not.toHaveTextContent("Bu tahmine uygulanmış hoca açıklaması yok.");
+});
+
 it("keeps evidence optional and rejects audit internals and invalid counts", () => {
   const view = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
   render(

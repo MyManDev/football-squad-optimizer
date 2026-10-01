@@ -43,7 +43,11 @@ from squadopt.data.sources.club_news import (
     RosterPlayer,
 )
 from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, short_name_roster
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, short_name_roster, team_names
+from squadopt.platform.club_news_coverage import (
+    build_club_news_coverage,
+    format_club_news_coverage,
+)
 from squadopt.platform.club_news_fetch import (
     ClubSource,
     Opener,
@@ -161,6 +165,23 @@ def acquire_week(
     )
 
 
+def select_club_sources(
+    sources: Sequence[ClubSource], clubs: Sequence[str] | None
+) -> tuple[ClubSource, ...]:
+    """Restrict both fetches and model calls before contacting any host.
+
+    Exact registry names are required; a typo must never broaden a paid run.
+    Registry order is preserved, and duplicate selections do not repeat a call.
+    """
+    if clubs is None:
+        return tuple(sources)
+    selected = {name.strip() for name in clubs}
+    known = {source.club for source in sources}
+    if not selected or "" in selected or not selected <= known:
+        raise ClubNewsError("Every selected club must exactly match a registered club name.")
+    return tuple(source for source in sources if source.club in selected)
+
+
 def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -172,6 +193,16 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
         "--snapshot-root", type=Path, default=REPOSITORY_ROOT / DEFAULT_SNAPSHOT_ROOT
     )
     parser.add_argument("--settings-file", type=Path, help="private [llm] TOML settings")
+    parser.add_argument(
+        "--club",
+        action="append",
+        help="restrict acquisition to this exact registry club; repeat for more clubs",
+    )
+    parser.add_argument(
+        "--capture-root",
+        type=Path,
+        help="write new news captures here; roster still comes from --snapshot-root",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="fetch and code, but write nothing")
     mode.add_argument(
@@ -215,13 +246,23 @@ def main(
                 "authentication and service availability were not tested."
             )
             return 0
-        sources = load_club_sources(arguments.registry)
+        registry_sources = load_club_sources(arguments.registry)
+        sources = select_club_sources(registry_sources, arguments.club)
         roster_snapshot = read_snapshot(arguments.snapshot_root, arguments.roster_snapshot)
         bootstrap = roster_snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
         if bootstrap is None:
             raise DataError(
                 f"{arguments.roster_snapshot} carries no {BOOTSTRAP_PAYLOAD!r}, so it cannot "
                 "supply the short names a claim is matched against."
+            )
+        league_clubs = tuple(team_names(bootstrap).values())
+        if len(set(league_clubs)) != len(league_clubs):
+            raise ClubNewsError("Snapshot teams must have unique exact club names.")
+        unknown = {source.club for source in sources} - set(league_clubs) - {"Example FC"}
+        if unknown:
+            raise ClubNewsError(
+                "Selected source clubs do not match exact snapshot team names: "
+                f"{sorted(unknown)!r}."
             )
         roster = roster_from_short_names(short_name_roster(bootstrap))
         provider, config = build_coding_provider(environ, settings_file=arguments.settings_file)
@@ -243,6 +284,21 @@ def main(
     print(f"Coded         {len(week.coded)} clubs, provider {config.provider!r}")
     print(f"Covered       {len(week.clubs_covered)} clubs")
     print(f"Partly read   {len(week.clubs_partially_covered)} clubs")
+    print(
+        format_club_news_coverage(
+            build_club_news_coverage(
+                roster_clubs=league_clubs,
+                registry_sources=registry_sources,
+                selected_sources=sources,
+                documents=week.documents,
+                coded_clubs=tuple(entry.club for entry in week.coded),
+                covered_clubs=week.clubs_covered,
+                partially_covered_clubs=week.clubs_partially_covered,
+                refused_pages=week.refused_pages,
+                refused_coding=week.refused_coding,
+            )
+        )
+    )
     for club, reason in (*week.refused_pages, *week.refused_coding):
         print(f"  refused     {club}: {reason}")
     if not week.coded:
@@ -253,7 +309,7 @@ def main(
         return 0
 
     metadata = write_club_news_capture(
-        arguments.snapshot_root,
+        arguments.capture_root or arguments.snapshot_root,
         documents=week.documents,
         coded=week.coded,
         clubs_declared=week.clubs_declared,
@@ -270,4 +326,4 @@ if __name__ == "__main__":  # pragma: no cover - exercised through the shim
     sys.exit(main())
 
 
-__all__ = ["AcquiredWeek", "acquire_week", "main"]
+__all__ = ["AcquiredWeek", "acquire_week", "main", "select_club_sources"]
