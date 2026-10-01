@@ -19,6 +19,8 @@ export interface Top100Copy {
   windowComparisonBasis: string;
   legend: string;
   zero: string;
+  /** What the disclosure that holds `help` is called. */
+  helpTitle: string;
   help: string;
   published: string;
   onlyBaseline: string;
@@ -57,6 +59,7 @@ const en: Top100Copy = {
     "Both totals use the base model for this member, after transfer hits. They describe the plan above and the published pure-points plan of the same capture. Read them with the proof status and limits shown here.",
   legend: "Top 100 influence",
   zero: "0 (off)",
+  helpTitle: "How the Top 100 influence works",
   help: "Players in last week's Top 100 starting elevens count for more in proportion to how many of those teams started them: at setting 20, a player all 100 teams started counts 1.2 times their base points, and one that 50 teams started counts 1.1 times. The plan is chosen on those points and every number on the card is the base model's. 0 switches it off.",
   published: "This week's published plan carries no Top 100 influence (0).",
   onlyBaseline: "One-week pure-points plan only.",
@@ -122,6 +125,7 @@ const tr: Top100Copy = {
     "İki toplam da bu üyenin temel model puanlarını kullanır; transfer cezaları düşülmüştür. Yukarıdaki planı ve aynı veri kesitinin yayınlanmış saf puan planını gösterir. Buradaki kanıt durumu ve sınırlarla birlikte okunmalı.",
   legend: "Top 100 etkisi",
   zero: "0 (kapalı)",
+  helpTitle: "Top 100 etkisi nasıl çalışır?",
   help: "Önceki haftada Top 100 takımlarının ilk 11'ine aldığı oyuncular, onları ilk 11'ine alan takım sayısıyla orantılı olarak daha değerli sayılır: 20 ayarında, 100 takımın hepsinin ilk 11'ine aldığı bir oyuncu temel puanının 1,2 katı, 50 takımın aldığı bir oyuncu 1,1 katı sayılır. Plan bu puanlarla seçilir, karttaki her sayı temel modelindir. 0 etkiyi kapatır.",
   published: "Bu hafta yayınlanan plan Top 100 etkisi içermez (0).",
   onlyBaseline: "Yalnız bir haftalık saf puan planında.",

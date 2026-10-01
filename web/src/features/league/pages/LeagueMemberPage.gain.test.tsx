@@ -103,7 +103,7 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     // add up to is on the page beside them, with the basis it is measured on.
     expect(text).toContain(COPY.moveRowsBasis);
     expect(gainLine(COPY.gainCaption)).toBe(`+1.7 ${COPY.gainCaption}`);
-    expect(COPY.gainCaption).toContain("for the eleven with the captain doubled");
+    expect(COPY.gainCaption).toContain("the eleven, captain doubled");
   });
 
   it("names the week's transfer cost in the gain sentence when the plan pays one", () => {
@@ -126,14 +126,14 @@ describe("the card states one basis for the rows, the total and the gain", () =>
   it("prints no gain sentence where the producer measured none", () => {
     const unmeasured = withPayload({ moves: [move("m1", null)], expected_gain_vs_hold: null });
 
-    expect(renderAdvice(unmeasured)).not.toContain("against keeping the squad you hold");
+    expect(renderAdvice(unmeasured)).not.toContain("over making no transfer");
 
     cleanup();
     const absent = withPayload({ moves: [move("m1", 1.2)] });
     delete (absent.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
 
-    expect(renderAdvice(absent)).not.toContain("against keeping the squad you hold");
-    expect(COPY.gainCaption).toContain("against keeping the squad you hold");
+    expect(renderAdvice(absent)).not.toContain("over making no transfer");
+    expect(COPY.gainCaption).toContain("over making no transfer");
   });
 
   it("says a row's share was not published rather than printing it as zero", () => {

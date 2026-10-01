@@ -480,6 +480,22 @@ section.notice p {
   overflow-wrap: anywhere;
 }
 
+/* The way down to the plan settings, beside the settings the decision names. The text is
+   small and the target is not: it keeps the 44 px a thumb needs without widening the row. */
+.changePlan {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: -14px;
+  font-size: var(--step--2);
+}
+
+/* The settings are reached by that link, so they stop under the sticky bar rather than
+   behind it. */
+.planSettings {
+  scroll-margin-top: var(--space-6);
+}
+
 /* On a phone the proof stamp leaves the heading row for its place after the gain strip,
    as the phone artboard draws it (MemberDecision.module.css orders the parts), and the
    rhythm tightens so the boards and the captain line come up first. */
