@@ -44,6 +44,7 @@ from squadopt.planning import (
     spending_power,
 )
 from squadopt.planning.chip_strategy import optimize_chip_strategy
+from squadopt.planning.guarded import optimize_guarded_window
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -954,8 +955,27 @@ def plan_transfer_horizon(
         raise DataSourceError(
             "Automatic chip strategy currently supports the pure-points path only."
         )
+    guarded_football = (
+        projection_horizon.model_name == "fixture_football_candidate"
+        and len(projection_horizon.target_gameweeks) in (3, 5)
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 2
+        and not chip_strategy
+        and first_week_overlap is None
+        and first_week_transfer_cap is None
+        and first_week_exclusion is None
+    )
     plan = (
-        optimize_chip_strategy(
+        optimize_guarded_window(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+        )
+        if guarded_football
+        else optimize_chip_strategy(
             PlanningHorizon(planning_table),
             state,
             settings,

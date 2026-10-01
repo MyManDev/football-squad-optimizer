@@ -89,6 +89,7 @@ from squadopt.planning import (
     TransferPlanningError,
     TransferPlanResult,
 )
+from squadopt.planning.guarded import GUARDED_FALLBACK_LIMIT, GUARDED_PLAN_LIMIT
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
@@ -936,6 +937,14 @@ def window_payload(
         choice=choice_points,
         expected_total=_published_total(lineup_fields(first)),
     )
+    limits = window_stated_limits(projection)
+    construction = plan.diagnostics.get("sequential_incumbent")
+    if isinstance(construction, dict):
+        limits.append(
+            GUARDED_PLAN_LIMIT
+            if construction.get("seed_completed") is True
+            else GUARDED_FALLBACK_LIMIT
+        )
     return {
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
@@ -981,7 +990,7 @@ def window_payload(
             }
             for week in shown
         ],
-        "stated_limits": window_stated_limits(projection),
+        "stated_limits": limits,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
         # Which squad the advice stands on: the captured week's own, or the one held

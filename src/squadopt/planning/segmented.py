@@ -10,7 +10,7 @@ from numbers import Integral
 from typing import cast
 
 from squadopt.contracts.preferences import DecisionPreferences
-from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.optimization import OptimizationConfig, SolverStatus, wall_clock_stopped_the_search
 from squadopt.planning.models import (
     ChipAvailability,
     ChipUseWindow,
@@ -23,6 +23,15 @@ from squadopt.planning.models import (
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths
 from squadopt.planning.recourse_chips import remaining_chips
+
+
+class SegmentConstructionError(TransferPlanningValidationError):
+    """An incomplete construction with its spent work preserved for the caller."""
+
+    def __init__(self, message: str, *, actual_work: float, clock_stopped: bool):
+        super().__init__(message)
+        self.actual_work = actual_work
+        self.clock_stopped = clock_stopped
 
 
 def _segment_rights(rights: ChipAvailability, last: int) -> ChipAvailability:
@@ -109,8 +118,9 @@ def plan_in_segments(
     state = initial
     purchases: dict[object, int] = {}
     weeks = []
-    parts = []
+    parts: list[TransferPlanResult] = []
     offset = 0
+    clock_stopped = False
     fee = settings.acquisition_sell_on_fee
     for length in lengths:
         dates = forecast.gameweeks[offset : offset + length]
@@ -136,11 +146,18 @@ def plan_in_segments(
             preferences=preferences,
             linearization_level=2,
         )
+        clock_stopped = clock_stopped or wall_clock_stopped_the_search(
+            part.solver_status, part.diagnostics
+        )
         if not part.has_solution or tuple(w.gameweek for w in part.weeks) != dates:
-            raise TransferPlanningValidationError(
+            raise SegmentConstructionError(
                 f"Segment starting at GW{dates[0]} did not produce a complete feasible path "
                 f"({part.solver_status.name}); used deterministic time "
-                f"{part.diagnostics.get('deterministic_time_used')}."
+                f"{part.diagnostics.get('deterministic_time_used')}.",
+                actual_work=sum(
+                    cast(float, p.diagnostics["deterministic_time_used"]) for p in [*parts, part]
+                ),
+                clock_stopped=clock_stopped,
             )
         parts.append(part)
         for week in part.weeks:
@@ -187,6 +204,7 @@ def plan_in_segments(
         "absolute_optimality_gap": None,
         "relative_optimality_gap": None,
         "segment_lengths": lengths,
+        "construction_wall_clock_stopped": clock_stopped,
         "segment_statuses": tuple(part.solver_status.name for part in parts),
         "solver_deterministic_time_limit": budget,
         "deterministic_time_used": sum(
