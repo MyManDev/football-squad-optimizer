@@ -1,10 +1,11 @@
 """Deterministic CP-SAT optimizer for multi-gameweek transfer planning."""
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from itertools import pairwise
+from numbers import Integral
 from time import perf_counter
 from typing import Final
 
@@ -45,6 +46,7 @@ from squadopt.optimization.optimizer import (
     configure_solver,
 )
 from squadopt.optimization.validation import validate_players
+from squadopt.planning.acquisition import AcquisitionSales
 from squadopt.planning.models import (
     ChipAvailability,
     FirstWeekExclusion,
@@ -57,6 +59,7 @@ from squadopt.planning.models import (
     TransferPlanningValidationError,
     TransferPlanResult,
 )
+from squadopt.planning.pricing import sell_price_tenths
 
 # The wall ceiling bounds each phase rather than being divided between them, so a solve
 # that reached it in both phases would stop at twice this value. That is the shape
@@ -206,7 +209,14 @@ def _validate_integer_bounds(
             discount_weight * abs(banked_value_scaled) * transfer_config.max_free_transfers
         )
         largest_sell_prices = sorted(
-            (int(value) for value in players["sell_price_tenths"]),
+            (
+                int(value)
+                for value in players[
+                    "buy_price_tenths"
+                    if transfer_config.acquisition_sell_on_fee is not None
+                    else "sell_price_tenths"
+                ]
+            ),
             reverse=True,
         )[: optimization_config.squad_size]
         bank_bound += sum(largest_sell_prices)
@@ -309,6 +319,11 @@ def _build_model(
     transfer_count_vars: list[cp_model.IntVar] = []
     paid_transfer_vars: list[cp_model.IntVar] = []
     objective_terms: list[cp_model.LinearExpr] = []
+    acquisition = (
+        AcquisitionSales(players_by_week, transfer_config.acquisition_sell_on_fee)
+        if transfer_config.acquisition_sell_on_fee is not None
+        else None
+    )
 
     for week_index, players in enumerate(players_by_week):
         gameweek = int(players.iloc[0]["gameweek"])
@@ -461,11 +476,16 @@ def _build_model(
             bank_before = base_bank_vars[week_index - 1]
         sell_prices = [int(value) for value in players["sell_price_tenths"]]
         buy_prices = [int(value) for value in players["buy_price_tenths"]]
+        proceeds = (
+            cp_model.LinearExpr.weighted_sum(transfers_out, sell_prices)
+            if acquisition is None
+            else acquisition.add_week(
+                model, week_index, players, transfers_in, transfers_out, free_hit
+            )
+        )
         model.add(
             bank_after
-            == bank_before
-            + cp_model.LinearExpr.weighted_sum(transfers_out, sell_prices)
-            - cp_model.LinearExpr.weighted_sum(transfers_in, buy_prices)
+            == bank_before + proceeds - cp_model.LinearExpr.weighted_sum(transfers_in, buy_prices)
         )
 
         coefficients = objective_coefficients(
@@ -673,8 +693,21 @@ def _extract_plan(
     total_bench = 0.0
     total_hits = 0.0
     total_objective = 0.0
+    purchases: dict[object, int] = {}
+    fee = transfer_config.acquisition_sell_on_fee
+    if fee is not None:
+        diagnostics["sale_price_policy"] = "known_horizon_acquisitions_v1"
+        diagnostics["acquisition_sell_on_fee"] = fee
 
     for week_index, players in enumerate(artifacts.players_by_week):
+        if fee is not None:
+            # Independent numerical replay of the CP acquisition-week variables.
+            players = players.copy(deep=True)
+            for row_index, row in players.iterrows():
+                if row.player_id in purchases:
+                    players.at[row_index, "sell_price_tenths"] = sell_price_tenths(
+                        int(row.buy_price_tenths), purchases[row.player_id], sell_on_fee=fee
+                    )
         squad_indices = _selected_indices(solver, artifacts.squad_vars[week_index])
         starter_indices = _selected_indices(solver, artifacts.starter_vars[week_index])
         captain_indices = _selected_indices(solver, artifacts.captain_vars[week_index])
@@ -739,6 +772,20 @@ def _extract_plan(
         if free_next != expected_next:
             raise SolverExecutionError("Free-transfer carry failed verification.")
 
+        if fee is not None:
+            # A newly bought player's sale basis is this week's purchase, including
+            # a former original holding bought again after a sale.
+            for index in transfer_in_indices:
+                players.at[index, "sell_price_tenths"] = int(players.iloc[index].buy_price_tenths)
+            if chip != "freehit":
+                for player in transfer_out_ids:
+                    purchases.pop(player, None)
+                purchases.update(
+                    {
+                        players.iloc[index].player_id: int(players.iloc[index].buy_price_tenths)
+                        for index in transfer_in_indices
+                    }
+                )
         squad_set = set(squad_indices)
         starter_set = set(starter_indices)
         bench_indices = sorted(squad_set - starter_set)
@@ -880,6 +927,32 @@ def _forbid_squads(
         )
 
 
+def _fix_week_squads(
+    artifacts: _PlanArtifacts,
+    tables: list[pd.DataFrame],
+    fixed: Mapping[int, tuple[object, ...]] | None,
+    squad_size: int,
+) -> None:
+    if fixed is None:
+        return
+    if not isinstance(fixed, Mapping):
+        raise TransferPlanningValidationError("Fixed squads must map gameweeks to player tuples.")
+    week_index = {int(t.iloc[0].gameweek): i for i, t in enumerate(tables)}
+    for week, ids in fixed.items():
+        if isinstance(week, bool) or not isinstance(week, Integral) or week not in week_index:
+            raise TransferPlanningValidationError("Fixed squad gameweek is outside the horizon.")
+        if not isinstance(ids, tuple) or len(ids) != squad_size:
+            raise TransferPlanningValidationError("Fixed squads require a full player tuple.")
+        if any(isinstance(p, bool) or not isinstance(p, (str, Integral)) for p in ids):
+            raise TransferPlanningValidationError("Fixed squads contain invalid player IDs.")
+        index = week_index[week]
+        columns = {p: i for i, p in enumerate(tables[index].player_id)}
+        if len(set(ids)) != squad_size or not set(ids) <= columns.keys():
+            raise TransferPlanningValidationError("Fixed squads contain duplicate or absent IDs.")
+        for player in ids:
+            artifacts.model.add(artifacts.squad_vars[index][columns[player]] == 1)
+
+
 def _bound_first_week_overlap(
     artifacts: _PlanArtifacts,
     first_week: pd.DataFrame,
@@ -971,6 +1044,95 @@ def _cap_later_week_transfers(
             artifacts.model.add(transfer_count <= cap)
 
 
+def _hint_incumbent(
+    artifacts: _PlanArtifacts,
+    incumbent: TransferPlanResult,
+    horizon: PlanningHorizon,
+    initial: InitialSquadState,
+    settings: TransferPlanningConfig,
+    config: OptimizationConfig,
+    wall_limit: float,
+    deterministic_limit: float,
+) -> tuple[cp_model.CpSolver, float]:
+    """Certify and hint decisions; retain the witness for optional incumbent protection."""
+    if (
+        not isinstance(incumbent, TransferPlanResult)
+        or not incumbent.has_solution
+        or incumbent.horizon_fingerprint != horizon.horizon_fingerprint
+        or tuple(w.gameweek for w in incumbent.weeks) != horizon.gameweeks
+        or incumbent.diagnostics.get("configuration_fingerprint")
+        != settings.configuration_fingerprint
+        or incumbent.diagnostics.get("chip_availability_fingerprint")
+        != artifacts.chips.availability_fingerprint
+    ):
+        raise TransferPlanningValidationError(
+            "Incumbent must match the complete horizon and rules."
+        )
+    probe_model = artifacts.model.clone()
+    probe_model.clear_objective()  # type: ignore[no-untyped-call]
+    bank_before = initial.bank_tenths
+    for index, week in enumerate(incumbent.weeks):
+        universe = set(artifacts.players_by_week[index].player_id)
+        groups = []
+        for frame in (
+            week.selected_squad,
+            week.starting_xi,
+            week.bench,
+            week.transfers_in,
+            week.transfers_out,
+        ):
+            if "player_id" not in frame:
+                raise TransferPlanningValidationError("Incumbent is missing player identifiers.")
+            ids = frame.player_id.tolist()
+            if len(set(ids)) != len(ids) or not set(ids) <= universe:
+                raise TransferPlanningValidationError("Incumbent has duplicate or unknown players.")
+            groups.append(set(ids))
+        squad, starters, bench, incoming, outgoing = groups
+        captain = week.captain.get("player_id")
+        if starters & bench or starters | bench != squad or captain not in starters:
+            raise TransferPlanningValidationError("Incumbent roles do not partition its squad.")
+        if week.bank_before_tenths != bank_before:
+            raise TransferPlanningValidationError("Incumbent bank continuity is inconsistent.")
+        if week.chip != "freehit":
+            bank_before = week.bank_after_tenths
+        for variables, chosen in (
+            (artifacts.squad_vars, squad),
+            (artifacts.starter_vars, starters),
+            (artifacts.captain_vars, {captain}),
+            (artifacts.transfer_in_vars, incoming),
+            (artifacts.transfer_out_vars, outgoing),
+        ):
+            for player_index, player in enumerate(artifacts.players_by_week[index].player_id):
+                probe_model.add(variables[index][player_index] == int(player in chosen))
+        if week.chip is not None and week.chip not in artifacts.chip_vars[index]:
+            raise TransferPlanningValidationError("Incumbent chip is unavailable.")
+        for name, variable in artifacts.chip_vars[index].items():
+            probe_model.add(variable == int(week.chip == name))
+        for resources, value in (
+            (artifacts.bank_after_vars, week.bank_after_tenths),
+            (artifacts.free_before_vars, week.free_transfers_before),
+            (artifacts.free_unused_vars, week.free_transfers_unused),
+            (artifacts.free_next_vars, week.free_transfers_for_next_gameweek),
+            (artifacts.transfer_count_vars, week.transfer_count),
+            (artifacts.paid_transfer_vars, week.paid_transfer_count),
+        ):
+            if isinstance(value, bool) or not isinstance(value, Integral):
+                raise TransferPlanningValidationError("Incumbent resource values must be integers.")
+            probe_model.add(resources[index] == int(value))
+    probe = cp_model.CpSolver()
+    configure_solver(probe, config, min(wall_limit, 30.0), min(1.0, deterministic_limit / 10.0))
+    raw = _solve(probe_model, probe)
+    if _map_solver_status(raw) not in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
+        raise TransferPlanningValidationError(
+            "Incumbent could not be certified against the current constraints."
+        )
+    # Clone indices include auxiliary purchase-lot and chip variables too.
+    for index in range(len(artifacts.model.proto.variables)):
+        variable = artifacts.model.get_int_var_from_proto_index(index)
+        artifacts.model.add_hint(variable, probe.value(variable))
+    return probe, _deterministic_time_used(probe, raw)
+
+
 def optimize_transfer_plan(
     horizon: PlanningHorizon,
     initial_state: InitialSquadState,
@@ -984,8 +1146,24 @@ def optimize_transfer_plan(
     linearization_level: int | None = None,
     preferences: DecisionPreferences | None = None,
     protect_hold: bool = False,
+    fixed_week_squads: Mapping[int, tuple[object, ...]] | None = None,
+    incumbent_plan: TransferPlanResult | None = None,
+    protect_incumbent: bool = False,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
+
+    ``incumbent_plan`` supplies optional decisions, never a claimed score or bound.
+    They are certified in a constrained clone before being hinted to the original.
+    Certification consumes the same deterministic budget as search. It cannot be
+    combined with ``protect_hold``, which supplies a different incumbent and bound.
+    ``protect_incumbent`` additionally retains the certified witness after UNKNOWN
+    or a worse feasible search. Its value is computed from the current model, never
+    read from the supplied result. A retained witness is FEASIBLE, not an optimum.
+
+    ``fixed_week_squads`` is an opt-in temporal neighborhood: named gameweeks keep
+    their entire squad, while all bank, transfer, chip and XI constraints still span
+    the original horizon. A restricted optimum is not a full-horizon optimum. None
+    preserves existing callers, including their diagnostic fingerprints.
 
     ``linearization_level`` is CP-SAT's own parameter, left at the solver's default
     when ``None`` so every existing caller solves exactly as before. At 2 the solver
@@ -1045,6 +1223,12 @@ def optimize_transfer_plan(
     if not isinstance(availability, ChipAvailability):
         raise TransferPlanningValidationError("chips must be a ChipAvailability instance.")
 
+    if not isinstance(protect_incumbent, bool):
+        raise TransferPlanningValidationError("protect_incumbent must be boolean.")
+    if protect_incumbent and incumbent_plan is None:
+        raise TransferPlanningValidationError("Incumbent protection requires an incumbent plan.")
+    if incumbent_plan is not None and protect_hold:
+        raise TransferPlanningValidationError("Incumbent and hold hints cannot be combined.")
     verified_horizon = horizon.validated_copy()
     players_by_week = _validated_week_tables(verified_horizon, optimization_config)
     initial_ids = _validate_initial_state(
@@ -1061,6 +1245,7 @@ def optimize_transfer_plan(
         settings,
         availability,
     )
+    _fix_week_squads(artifacts, players_by_week, fixed_week_squads, optimization_config.squad_size)
     _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)
     if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):
         raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
@@ -1109,12 +1294,32 @@ def optimize_transfer_plan(
         deterministic_limit = PLAN_DETERMINISTIC_TIME_LIMIT
         wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
         deterministic_budget_source = "planner_default"
+    incumbent_deterministic_time = 0.0
+    incumbent_solver: cp_model.CpSolver | None = None
+    incumbent_value: int | None = None
+    if incumbent_plan is not None:
+        incumbent_solver, incumbent_deterministic_time = _hint_incumbent(
+            artifacts,
+            incumbent_plan,
+            verified_horizon,
+            initial_state,
+            settings,
+            optimization_config,
+            wall_limit,
+            deterministic_limit,
+        )
+        if protect_incumbent:
+            incumbent_value = int(incumbent_solver.value(artifacts.primary_objective))
+    search_limit = max(0.0, deterministic_limit - incumbent_deterministic_time)
+    search_wall = wall_limit
+    if incumbent_plan is not None:
+        search_wall = max(0.001, wall_limit - (perf_counter() - started_at))
     primary_solver = cp_model.CpSolver()
     configure_solver(
         primary_solver,
         optimization_config,
-        wall_limit,
-        deterministic_limit,
+        search_wall,
+        search_limit,
     )
     if linearization_level is not None:
         primary_solver.parameters.linearization_level = linearization_level
@@ -1147,6 +1352,18 @@ def optimize_transfer_plan(
                 artifacts.model.add_hint(variable, probe.value(variable))
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
+    used_incumbent = False
+    if protect_incumbent:
+        assert incumbent_solver is not None and incumbent_value is not None
+        if primary_status is SolverStatus.INFEASIBLE or (
+            primary_status is SolverStatus.OPTIMAL
+            and int(primary_solver.value(artifacts.primary_objective)) < incumbent_value
+        ):
+            raise SolverExecutionError("Full search contradicts its certified incumbent plan.")
+        used_incumbent = primary_status is SolverStatus.UNKNOWN or (
+            primary_status is SolverStatus.FEASIBLE
+            and int(primary_solver.value(artifacts.primary_objective)) < incumbent_value
+        )
     used_hold = hold_solver is not None and (
         primary_status is SolverStatus.UNKNOWN
         or (
@@ -1213,15 +1430,34 @@ def optimize_transfer_plan(
         "primary_deterministic_time": primary_deterministic_time,
         "tiebreak_deterministic_time_limit": None,
         "tiebreak_deterministic_time": None,
-        "deterministic_time_used": primary_deterministic_time,
+        "deterministic_time_used": incumbent_deterministic_time + primary_deterministic_time,
         "deterministic_time_budget_exhausted": (
             primary_status is not SolverStatus.OPTIMAL
-            and primary_deterministic_time >= deterministic_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
+            and primary_deterministic_time >= search_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
         ),
         "tiebreak_attempted": False,
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if incumbent_plan is not None:
+        diagnostics["incumbent_hint"] = {
+            # Runtime work remains in the existing top-level runtime counters.
+            # Nested metadata is also used by immutable horizon documents.
+            "version": "certified_decisions_v1",
+            "validation_deterministic_time_limit": min(1.0, deterministic_limit / 10.0),
+            "claimed_objective_used": False,
+        }
+    if protect_incumbent:
+        assert incumbent_value is not None
+        diagnostics["incumbent_protection"] = {
+            "version": "certified_fallback_v1",
+            "selected": used_incumbent,
+            "scaled_objective_value": incumbent_value / divisor,
+            "claimed_objective_used": False,
+        }
+    if fixed_week_squads is not None:
+        diagnostics["fixed_week_squads"] = dict(fixed_week_squads)
+        diagnostics["proof_scope"] = "restricted_week_squads"
     if preferences is not None and preferences.active:
         diagnostics["decision_preferences"] = preferences.payload()
     if protect_hold:
@@ -1233,6 +1469,26 @@ def optimize_transfer_plan(
             "deterministic_time": hold_deterministic_time,
             "deterministic_time_limit": 1.0,
         }
+    if used_incumbent:
+        assert incumbent_solver is not None and incumbent_value is not None
+        # Certification fixes the proposed decisions. Its status cannot prove an
+        # unrestricted optimum, even if the input was labelled OPTIMAL.
+        diagnostics["solver_status_name"] = "FEASIBLE"
+        diagnostics["primary_search_status"] = primary_status.name
+        diagnostics["scaled_model_objective_value"] = incumbent_value / divisor
+        diagnostics["solve_time_seconds"] = perf_counter() - started_at
+        if linearization_level is not None:
+            diagnostics["linearization_level"] = linearization_level
+        return _extract_plan(
+            incumbent_solver,
+            SolverStatus.FEASIBLE,
+            artifacts,
+            verified_horizon,
+            initial_state,
+            optimization_config,
+            settings,
+            diagnostics,
+        )
     if used_hold:
         assert hold_solver is not None and hold_value is not None
         # The restricted hold optimum is NOT a proof for the unrestricted search.
@@ -1269,7 +1525,7 @@ def optimize_transfer_plan(
     result_solver = primary_solver
     remaining_deterministic_time = _remaining_deterministic_time(
         deterministic_limit,
-        primary_deterministic_time,
+        incumbent_deterministic_time + primary_deterministic_time,
     )
     deterministic_budget_available = (
         remaining_deterministic_time is None
@@ -1314,7 +1570,7 @@ def optimize_transfer_plan(
         configure_solver(
             tiebreak_solver,
             optimization_config,
-            wall_limit,
+            search_wall,
             remaining_deterministic_time,
         )
         if linearization_level is not None:
@@ -1328,7 +1584,7 @@ def optimize_transfer_plan(
         diagnostics["tiebreak_status"] = _raw_status_name(raw_tiebreak_status)
         diagnostics["tiebreak_deterministic_time"] = tiebreak_deterministic_time
         diagnostics["deterministic_time_used"] = (
-            primary_deterministic_time + tiebreak_deterministic_time
+            incumbent_deterministic_time + primary_deterministic_time + tiebreak_deterministic_time
         )
         diagnostics["deterministic_time_budget_exhausted"] = (
             remaining_deterministic_time is not None

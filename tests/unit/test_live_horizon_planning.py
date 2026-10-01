@@ -154,6 +154,8 @@ def test_the_horizon_path_plans_under_the_same_policy_as_the_one_week_path(
     plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
 
     expected = live_transfers._transfer_config(rules, transfer_cap=None if length == 1 else 1)
+    if length > 1:
+        expected = replace(expected, acquisition_sell_on_fee=float(rules.transfers.sell_on_fee))
     assert config.configuration_fingerprint == expected.configuration_fingerprint
     assert (
         config.transfer_hit_cost_points
@@ -475,7 +477,12 @@ def test_the_horizon_path_passes_a_band_and_a_first_week_cap_to_the_planner(
     assert all(week.transfer_count <= 1 for week in plan.weeks[1:])
     # The cap is not a configuration control, so the digest the ledger records for this
     # plan is the digest of the policy the caller handed in, unchanged.
-    assert config.configuration_fingerprint == uncapped.configuration_fingerprint
+    assert (
+        config.configuration_fingerprint
+        == replace(
+            uncapped, acquisition_sell_on_fee=float(rules.transfers.sell_on_fee)
+        ).configuration_fingerprint
+    )
     assert config.max_transfers_per_gameweek is None
 
 
@@ -559,3 +566,115 @@ def test_a_solve_that_reported_no_numbers_leaves_them_absent_rather_than_zero(
 
     assert refusal.value.deterministic_time_used is None
     assert refusal.value.relative_optimality_gap is None
+
+
+@pytest.mark.parametrize("length", [3, 5])
+@pytest.mark.parametrize("chip", [None, "freehit", "wildcard"])
+@pytest.mark.parametrize("fee", [0.0, 0.5, 1.0])
+@pytest.mark.parametrize("known", [True, False])
+def test_live_repurchase_uses_new_basis_and_chip_restore(
+    tmp_path, monkeypatch, length, chip, fee, known
+):
+    from collections import Counter
+
+    from squadopt.planning import ChipAvailability
+
+    inputs, horizon, held, rules = _inputs(tmp_path, tuple(range(2, 2 + length)))
+    table = horizon.table.copy()
+    table["price_tenths"] = 50
+    first = table.loc[table.gameweek.eq(2)].set_index("player_id")
+    original = set(held.squad_player_ids)
+    counts = Counter(first.loc[list(original), "team_id"])
+    outgoing, incoming = next(
+        (a, b)
+        for a in sorted(original)
+        for b in sorted(set(first.index) - original)
+        if first.loc[a, "position"] == first.loc[b, "position"]
+        and (
+            first.loc[a, "team_id"] == first.loc[b, "team_id"]
+            or counts[first.loc[b, "team_id"]] < 3
+        )
+    )
+    alternate = tuple(sorted(original - {outgoing} | {incoming}))
+    prices = {p: 50 for p in original}
+    prices[outgoing] = 44 if known else 50
+    held = replace(
+        held,
+        purchase_prices=prices,
+        bank_tenths=100,
+        squad_sell_value_tenths=None if known else 747,
+    )
+    rules = replace(rules, transfers=replace(rules.transfers, sell_on_fee=fee))
+    horizon = replace(horizon, table=table)
+    chips = (
+        ChipAvailability()
+        if chip is None
+        else ChipAvailability(available={chip: frozenset({3})}, forced={3: chip})
+    )
+    solve = live_transfers.optimize_transfer_plan
+
+    def restricted(*args, **kwargs):
+        return solve(
+            *args,
+            **kwargs,
+            fixed_week_squads={
+                w: held.squad_player_ids if w == 3 else alternate for w in horizon.target_gameweeks
+            },
+        )
+
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", restricted)
+    plan, policy = plan_transfer_horizon(inputs, horizon, held, rules, chips=chips)
+    assert policy.acquisition_sell_on_fee == fee
+    expected_bank = 100 - int(6 * fee) if known else 97
+    assert [w.bank_after_tenths for w in plan.weeks] == [expected_bank] * length
+    assert plan.weeks[0].transfers_out.iloc[0].sell_price_tenths == (
+        50 - int(6 * fee) if known else 50
+    )
+    assert plan.weeks[2].transfer_count == (0 if chip == "freehit" else 1)
+    if chip != "freehit":
+        assert plan.weeks[2].transfers_out.iloc[0].sell_price_tenths == 50
+    for previous, following in zip(plan.weeks, plan.weeks[1:], strict=False):
+        assert following.free_transfers_before == previous.free_transfers_for_next_gameweek
+
+
+def test_live_multiweek_refuses_explicit_fee_that_contradicts_capture(tmp_path):
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    policy = replace(live_transfers._transfer_config(rules), acquisition_sell_on_fee=0.0)
+    with pytest.raises(DataSourceError, match="sale fee"):
+        plan_transfer_horizon(inputs, horizon, held, rules, transfer_config=policy)
+
+
+@pytest.mark.parametrize("length", [3, 5])
+@pytest.mark.parametrize("weight", [0, 20, 50])
+def test_acquisition_accounting_keeps_window_weight_and_user_constraints(tmp_path, length, weight):
+    from squadopt.application.advice_variants import weighted_horizon
+    from squadopt.contracts.preferences import DecisionPreferences
+    from squadopt.planning import ChipAvailability
+
+    inputs, horizon, held, rules = _inputs(tmp_path, tuple(range(2, 2 + length)))
+    chosen = int(held.squad_player_ids[0])
+    preferences = DecisionPreferences(keep_players=(chosen,), no_hits=True, save_chips=True)
+    weighted = weighted_horizon(horizon, {chosen: 100}, weight)
+    chips = ChipAvailability(available={"3xc": frozenset(horizon.target_gameweeks)})
+    plan, policy = plan_transfer_horizon(
+        inputs,
+        weighted,
+        held,
+        rules,
+        preferences=preferences,
+        chips=chips,
+    )
+    assert tuple(w.gameweek for w in plan.weeks) == horizon.target_gameweeks
+    assert policy.acquisition_sell_on_fee == rules.transfers.sell_on_fee
+    assert plan.diagnostics["decision_preferences"] == preferences.payload()
+    for week in plan.weeks:
+        assert chosen in set(week.selected_squad.player_id)
+        assert week.transfer_hit_points == 0
+        assert week.chip is None
+        original_points = horizon.table.loc[
+            horizon.table.gameweek.eq(week.gameweek) & horizon.table.player_id.eq(chosen),
+            "expected_points",
+        ].item()
+        assert week.selected_squad.loc[
+            week.selected_squad.player_id.eq(chosen), "expected_points"
+        ].item() == pytest.approx(original_points * (1 + weight / 100))

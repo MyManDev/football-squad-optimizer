@@ -87,3 +87,18 @@ describe("the plan states that football v1 splits attacking shares before availa
     if (language === "tr") expect(limits).not.toHaveTextContent(FOOTBALL_SHARE_STATED_LIMIT);
   });
 });
+
+describe("experimental football construction limits", () => {
+  const limits = [
+    "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
+    "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.",
+  ];
+  it.each(["tr", "en"] as const)("renders the chosen method and fallback in %s", (language) => {
+    const copy = MESSAGES[language].leagueMembers;
+    renderAdvice(withLimits(3, limits), language);
+    const region = screen.getByRole("region", { name: copy.windowLimitsLabel });
+    expect(listed(region)).toEqual(limits.map((limit) => copy.statedLimits[limit]));
+    expect(region).not.toHaveTextContent(copy.statedLimitUnknown);
+    if (language === "tr") expect(region).not.toHaveTextContent(limits[0]!);
+  });
+});

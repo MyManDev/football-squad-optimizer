@@ -22,6 +22,7 @@ from squadopt.live.football_artifact import (
     forecast_digest,
     read_football_forecast,
 )
+from squadopt.planning.guarded import GUARDED_PLAN_LIMIT
 from squadopt.platform.advice_queue import run_advice_worker_once
 from squadopt.platform.advice_switches import AdviceSwitchInputs
 from squadopt.platform.advice_worker import build_advice_compute
@@ -123,6 +124,7 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     assert result["stated_limits"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == (
         0 if contextual else 1
     )
+    assert (GUARDED_PLAN_LIMIT in result["stated_limits"]) is (window > 1)
     assert result["window"] == window
     assert result.get("top100", {}).get("weight", 0) == weight
     if window > 1:
