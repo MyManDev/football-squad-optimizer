@@ -11,6 +11,8 @@ from tests.unit.test_advice_worker import ENTRY_ID, LEAGUE_ID, _deployment, worl
 from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_football_development import football_fixture  # noqa: F401
 
+from squadopt.application.advice import TOP100_LIMIT
+from squadopt.application.advice_variants import TOP100_WINDOW_LIMIT
 from squadopt.application.football_live import causal_training
 from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
 from squadopt.data.errors import InvalidValueError
@@ -126,7 +128,34 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     )
     assert (GUARDED_PLAN_LIMIT in result["stated_limits"]) is (window > 1)
     assert result["window"] == window
-    assert result.get("top100", {}).get("weight", 0) == weight
+    if window in (3, 5) and weight:
+        # This route solves only the selected weight, so it cannot claim a measured
+        # change or point cost against a separate setting-zero plan.
+        assert result["selection_top100_weight"] == weight
+        assert result["selection_top100_source"] == COUNTS.source_record()
+        assert result["stated_limits"].count(TOP100_LIMIT.format(weight=weight)) == 1
+        assert result["stated_limits"].count(TOP100_WINDOW_LIMIT) == 1
+        assert "top100" not in result
+        assert "expected_points_cost" not in result
+        assert "expected_points_cost_ceiling" not in result
+        assert "control_solver_status" not in result
+        assert "control_optimality_gap" not in result
+        base_points = football.horizon.table.query("gameweek == 2").set_index("player_id")
+        for player in [*result["starting_xi"], *result["bench"], result["captain"]]:
+            assert player["expected_points"] == pytest.approx(
+                base_points.loc[player["player_id"], "expected_points"]
+            )
+        assert result["expected_own_points"] == pytest.approx(
+            sum(player["expected_points"] for player in result["starting_xi"])
+            + result["captain"]["expected_points"]
+        )
+        assert result["expected_own_points"] == pytest.approx(
+            result["plan_weeks"][0]["expected_points"]
+        )
+    else:
+        assert result.get("top100", {}).get("weight", 0) == weight
+        assert "selection_top100_weight" not in result
+        assert "selection_top100_source" not in result
     if window > 1:
         assert len(result["plan_weeks"]) == window
         assert not any("stays at zero" in s for s in result["stated_limits"])

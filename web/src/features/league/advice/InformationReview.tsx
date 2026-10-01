@@ -26,6 +26,8 @@ const COPY = {
     scale:
       "Puanlar temel futbol tahmininden gelir; Top100 ağırlığı puan kazancı değildir. Seçim, mevcut transfer temkin payını ve yedek değerini de korur.",
     fallback: "Bu karşılaştırma tamamlanamadı. Tam ve geçerli başlangıç planı korunuyor.",
+    single:
+      "Farklı ve geçerli bir ilk hamle bulunamadı. Farklı bir ilk hamle karşılaştırması yapılmadı; başlangıç planı korunuyor.",
     missing:
       "Bu kadro için karşılaştırmaya uygun, sayısal oynama belirsizliği bulunmadı. Mevcut planlama yöntemi kullanılıyor.",
     components:
@@ -53,6 +55,8 @@ const COPY = {
     scale:
       "Points use the base football forecast; Top100 influence is not a points gain. Selection also retains the existing hit caution and bench value.",
     fallback: "This comparison could not be completed. The complete feasible baseline is retained.",
+    single:
+      "No distinct feasible first action was found. No distinct first-action comparison was made; the baseline plan is retained.",
     missing:
       "No usable quantified playing uncertainty was found for this squad. The existing planner is used.",
     components:
@@ -136,9 +140,11 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
         <p className={styles.muted}>
           {review.reason.startsWith("incomplete_")
             ? copy.fallback
-            : review.reason === "conditional_team_components_unavailable"
-              ? copy.components
-              : copy.missing}
+            : review.reason === "no_distinct_alternative"
+              ? copy.single
+              : review.reason === "conditional_team_components_unavailable"
+                ? copy.components
+                : copy.missing}
         </p>
       )}
       <p className={styles.muted}>

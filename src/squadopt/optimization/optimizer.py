@@ -217,7 +217,11 @@ def wall_clock_stopped_the_search(
     budget is what ran out; anything else means the clock did.
     """
 
-    unfinished_primary = status in {SolverStatus.FEASIBLE, SolverStatus.UNKNOWN}
+    # A certified policy can be returned as FEASIBLE after an optimal search on
+    # another (rounded or restricted) objective. Its selection status is not a
+    # clock stop; retain the actual search status separately from that claim.
+    search_status = diagnostics.get("primary_search_status", status.name)
+    unfinished_primary = search_status in {"FEASIBLE", "UNKNOWN"}
     unfinished_tiebreak = (
         diagnostics.get("tiebreak_attempted") is True
         and diagnostics.get("tiebreak_completed") is not True
