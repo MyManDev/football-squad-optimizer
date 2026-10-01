@@ -1079,6 +1079,18 @@ function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean 
         </p>
       )}
       <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
+      {evidence.clubs_covered.length > 0 ? (
+        <div>
+          <p className={styles.muted}>{copy.coveredClubs}</p>
+          <ul className={styles.assumptionList} aria-label={copy.coveredClubs}>
+            {evidence.clubs_covered.map((club) => (
+              <li key={club}>{club}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className={styles.muted}>{copy.noCoveredClubs}</p>
+      )}
       {evidence.binding === undefined ? null : (
         <p className={styles.muted}>
           {evidence.binding ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}

@@ -25,7 +25,7 @@ Nothing opens a socket, nothing reads a key, and every write is under ``tmp_path
 import json
 import urllib.error
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -188,13 +188,19 @@ def _decision(root: Path) -> str:
     return metadata.snapshot_id
 
 
-def _acquire(tmp_path: Path, *, now: datetime, decision: str) -> int:
+def _acquire(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, now: datetime, decision: str
+) -> int:
     """Run the command as a real day would, against the week's own decision capture.
 
     The roster comes from that capture rather than from a second one, which is the command's
     own rule: its only network reach is the club hosts the registry names.
     """
 
+    # Fetch time and model completion are separate clocks in production. Keep both
+    # on this synthetic week's clock, with completion strictly after the documents.
+    completed = (now + timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    monkeypatch.setattr("squadopt.platform.club_news_acquire._utc_now", lambda: completed)
     snapshots = tmp_path / "snapshots"
     code = acquire(
         [
@@ -229,7 +235,7 @@ def _capture_id(printed: str) -> str:
 
 
 def test_a_week_is_acquired_and_exported_without_a_key(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The whole path, with the provider chosen by an environment variable and nothing else.
 
@@ -241,7 +247,7 @@ def test_a_week_is_acquired_and_exported_without_a_key(
     snapshots = tmp_path / "snapshots"
     decision = _decision(snapshots)
 
-    code = _acquire(tmp_path, now=FETCHED_AT, decision=decision)
+    code = _acquire(tmp_path, monkeypatch, now=FETCHED_AT, decision=decision)
     printed = capsys.readouterr().out
     assert code == 0, printed
 
@@ -273,6 +279,8 @@ def test_a_week_is_acquired_and_exported_without_a_key(
     # names a model no vendor serves, and a real vendor's identifier can be served through
     # another's compatible endpoint. #551's fourth rehearsal item is this line.
     assert manifest["provider"] == REHEARSAL_PROVIDER
+    assert manifest["club_news_snapshot_id"] == capture
+    assert manifest["club_news_captured_at_utc"] == "2026-09-12T14:01:00Z"
     # And a consumer reading the artifact back sees it, which is what makes the field a record
     # rather than a line in a file nobody opens.
     read_back = read_rotation_evidence_artifact(
@@ -285,7 +293,7 @@ def test_a_week_is_acquired_and_exported_without_a_key(
 
 
 def test_the_timing_guard_refuses_a_document_read_after_the_decision(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Shown, not described: a week whose documents were read too late is refused.
 
@@ -298,7 +306,7 @@ def test_the_timing_guard_refuses_a_document_read_after_the_decision(
     snapshots = tmp_path / "snapshots"
     decision = _decision(snapshots)
 
-    code = _acquire(tmp_path, now=FETCHED_TOO_LATE, decision=decision)
+    code = _acquire(tmp_path, monkeypatch, now=FETCHED_TOO_LATE, decision=decision)
     printed = capsys.readouterr().out
     assert code == 0, printed
     capture = _capture_id(printed)
@@ -318,6 +326,8 @@ def test_the_timing_guard_refuses_a_document_read_after_the_decision(
             repository_commit=COMMIT,
         )
 
-    # The distinguishing sentence, not merely the word "capture", which many refusals carry.
-    assert "fetched at or after the decision capture" in str(refusal.value), refusal.value
+    # A late fetch also completes late, so the completion guard refuses this first.
+    # The independent late-document test in test_rotation_export_from_capture keeps
+    # completion before the decision while the document fetch itself is too late.
+    assert "must complete before the decision capture" in str(refusal.value), refusal.value
     assert not (tmp_path / "late" / "table.csv").exists()

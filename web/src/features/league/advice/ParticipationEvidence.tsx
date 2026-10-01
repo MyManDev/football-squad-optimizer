@@ -1,15 +1,21 @@
 import { useLanguage } from "../../../i18n/context";
+import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
 import styles from "../pages/LeagueMemberPage.module.css";
 
 const COPY = {
   tr: {
     title: "Oynama haberleri nasıl kullanıldı?",
-    checked: "Kontrol edilen oyuncu kaynak kaydı",
+    checked: "Kontrol edilen FPL oynayabilirlik kaydı",
+    statements: "Değerlendirilen hoca açıklaması",
+    asOf: "Bilgi kesiti",
+    dateUnknown: "Tarih bildirilmedi",
+    gameweekUnknown: "Hafta bildirilmedi",
+    noneApplied: "Bu tahmine uygulanmış hoca açıklaması yok.",
     applied: "Doğrulanmış haberin uygulandığı oyuncu",
     unapplied: "Uygulanamayan açıklama",
     explanation:
-      "Kaynak kayıtları ve doğrulanmış açıklamalar, oyuncunun sahaya çıkmasıyla ilgili tahminde kullanılır. Belirsiz açıklamalar tek başına tahmini değiştirmez.",
+      "FPL oynayabilirlik kayıtları ile hoca açıklamaları ayrı değerlendirilir. Belirsiz açıklamalar tek başına tahmini değiştirmez.",
     rules: {
       source_eligibility_only:
         "Açıklamalar oyuncunun oynayabilmesiyle ilgili bilgi sağlar; ilk 11 garantisi sayılmaz.",
@@ -36,11 +42,16 @@ const COPY = {
   },
   en: {
     title: "How was playing news used?",
-    checked: "Player source records checked",
+    checked: "FPL availability records checked",
+    statements: "Coach statements considered",
+    asOf: "Information as of",
+    dateUnknown: "Date not reported",
+    gameweekUnknown: "Gameweek not reported",
+    noneApplied: "No coach statement was applied to this forecast.",
     applied: "Players with verified statements applied",
     unapplied: "Statements that could not be applied",
     explanation:
-      "Source records and verified statements inform the participation forecast. Uncertain statements alone do not change that forecast.",
+      "FPL availability records and coach statements are evaluated separately. Uncertain statements alone do not change the forecast.",
     rules: {
       source_eligibility_only:
         "Statements describe whether a player can appear; they do not guarantee a start.",
@@ -68,10 +79,12 @@ const COPY = {
 };
 
 export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
-  const { language } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const evidence = view.participation_evidence;
   if (!evidence) return null;
   const copy = COPY[language];
+  const asOf =
+    evidence.as_of && !Number.isNaN(new Date(evidence.as_of).getTime()) ? evidence.as_of : null;
   const assumptions = [...new Set(evidence.assumptions)]
     .filter((rule): rule is keyof typeof copy.rules => Object.hasOwn(copy.rules, rule))
     .map((rule) => copy.rules[rule]);
@@ -79,17 +92,30 @@ export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
     <details className={styles.adviceSection} data-testid="participation-evidence">
       <summary>{copy.title}</summary>
       <p>{copy.explanation}</p>
-      <p>
-        {copy.checked}: <span className="num">{evidence.captured_percentage_count}</span>.{" "}
-        {copy.applied}: <span className="num">{evidence.applied_player_count}</span>.
-        {evidence.unapplied_statement_count > 0 && (
-          <>
-            {" "}
-            {copy.unapplied}: <span className="num">{evidence.unapplied_statement_count}</span>.
-          </>
-        )}
+      <p className={styles.muted}>
+        {copy.asOf}:{" "}
+        {asOf ? <time dateTime={asOf}>{utcShort(asOf, locale)}</time> : copy.dateUnknown}
+        {" · "}
+        {evidence.gameweek === null
+          ? copy.gameweekUnknown
+          : messages.leagueMembers.windowWeekOf(evidence.gameweek)}
       </p>
-      <ul>
+      <ul className={styles.assumptionList}>
+        <li>
+          {copy.checked}: <span className="num">{evidence.captured_percentage_count}</span>.
+        </li>
+        <li>
+          {copy.statements}: <span className="num">{evidence.manager_statement_count}</span>.
+        </li>
+        <li>
+          {copy.applied}: <span className="num">{evidence.applied_player_count}</span>.
+        </li>
+        <li>
+          {copy.unapplied}: <span className="num">{evidence.unapplied_statement_count}</span>.
+        </li>
+      </ul>
+      {evidence.applied_player_count === 0 && <p>{copy.noneApplied}</p>}
+      <ul className={styles.assumptionList}>
         {assumptions.map((assumption) => (
           <li key={assumption}>{assumption}</li>
         ))}

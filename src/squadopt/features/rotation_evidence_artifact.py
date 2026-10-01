@@ -31,6 +31,7 @@ from squadopt.data.sources.club_news import (
     PUBLISHED_PRECISIONS,
     ROTATION_DISPOSITIONS,
 )
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.features.rotation_evidence import (
     _ROTATION_EVIDENCE_DTYPES,
     CONTRACT_VERSION,
@@ -176,6 +177,41 @@ def _row_sources(table: pd.DataFrame) -> tuple[str, ...]:
     for value in table["source_snapshot_ids"].tolist():
         identifiers.update(part for part in str(value).split(";") if part)
     return tuple(sorted(identifiers))
+
+
+def _validate_news_binding(manifest: Mapping[str, object], table: pd.DataFrame) -> None:
+    """Optional capture-level provenance also identifies a genuinely quiet reading.
+
+    Row sources stay factual: an unaddressed player was read from the decision
+    capture alone. Older manifests have no separate capture binding and retain
+    their original validation; a partial or malformed new binding is refused.
+    """
+    fields = ("club_news_snapshot_id", "club_news_captured_at_utc")
+    if not any(key in manifest for key in fields):
+        return
+    news_id = _optional_name(manifest, fields[0])
+    news_at = _optional_name(manifest, fields[1])
+    if news_id is None or news_at is None or news_id == manifest["roster_snapshot_id"]:
+        raise DataValidationError("The club-news capture binding is incomplete or invalid.")
+    completed = as_instant(normalize_utc_timestamp(news_at, label="club_news_captured_at_utc"))
+    if any(
+        completed >= as_instant(normalize_utc_timestamp(value, label="captured_at_utc"))
+        for value in table.captured_at_utc
+    ):
+        raise DataValidationError("The club-news capture must complete before the decision.")
+    observed = table.rotation_claim_observed.astype("boolean")
+    if int(observed.sum()) != _whole_number(manifest, "claims_coded"):
+        raise DataValidationError("The club-news claim count differs from the actual table.")
+    expected = {str(manifest["roster_snapshot_id"])}
+    if observed.any():
+        expected.add(news_id)
+        if any(
+            news_id not in str(value).split(";")
+            for value in table.loc[observed, "source_snapshot_ids"]
+        ):
+            raise DataValidationError("A coded claim is missing its club-news source capture.")
+    if set(_row_sources(table)) != expected:
+        raise DataValidationError("The club-news capture binding differs from the row sources.")
 
 
 def _validate_manifest_and_table(
@@ -345,6 +381,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
         raise DataValidationError(f"{table_path.name} could not be read: {error}") from error
 
     _validate_manifest_and_table(manifest, table, table_path)
+    _validate_news_binding(manifest, table)
 
     # Every list here becomes a **tuple**. Phase B's consumer compares one of its own against
     # ``()`` to decide whether an artifact is fit for operational use, and a list would never
@@ -359,6 +396,8 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "roster_size": manifest["roster_size"],
             "roster_snapshot_id": manifest["roster_snapshot_id"],
             "source_snapshot_ids": _string_list(manifest, "source_snapshot_ids"),
+            "club_news_snapshot_id": _optional_name(manifest, "club_news_snapshot_id"),
+            "club_news_captured_at_utc": _optional_name(manifest, "club_news_captured_at_utc"),
             "clubs_declared": _string_list(manifest, "clubs_declared"),
             "clubs_covered": _string_list(manifest, "clubs_covered"),
             # Required of the manifest since the export contract gained it, and carried here

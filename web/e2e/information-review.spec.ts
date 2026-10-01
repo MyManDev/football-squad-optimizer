@@ -198,7 +198,13 @@ for (const [window, width] of [
     await expect(breakdown).toContainText("ikinci kez uygulanmaz");
     const participation = page.getByTestId("participation-evidence");
     await participation.locator(":scope > summary").click();
-    await expect(participation).toContainText("Kontrol edilen oyuncu kaynak kaydı: 2");
+    await expect(participation).toContainText("Kontrol edilen FPL oynayabilirlik kaydı: 2");
+    await expect(participation).toContainText("Değerlendirilen hoca açıklaması: 2");
+    await expect(participation).toContainText("Doğrulanmış haberin uygulandığı oyuncu: 1");
+    await expect(participation.locator("time")).toHaveAttribute(
+      "datetime",
+      answer.payload.participation_evidence!.as_of!,
+    );
     await expect(participation).toContainText("Uygulanamayan açıklama: 1");
     const nominal = page.getByRole("region", { name: `${window} haftalık pencere`, exact: true });
     const weeks = answer.payload.plan_weeks!;

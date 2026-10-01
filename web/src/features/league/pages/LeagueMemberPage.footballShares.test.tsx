@@ -88,6 +88,29 @@ describe("the plan states that football v1 splits attacking shares before availa
   });
 });
 
+describe("captured football forecast limits", () => {
+  const limits = [
+    "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.",
+    "Experimental football model; independent predictive superiority is unverified.",
+    "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.",
+  ];
+
+  it.each(["tr", "en"] as const)("explains all three published limits in %s", (language) => {
+    const copy = MESSAGES[language].leagueMembers;
+    const advice = withLimits(3, [...limits]);
+    renderAdvice(advice, language);
+
+    const region = screen.getByRole("region", { name: copy.windowLimitsLabel });
+    for (const sentence of limits) {
+      expect(Object.hasOwn(copy.statedLimits, sentence), sentence).toBe(true);
+      if (language === "tr") expect(region).not.toHaveTextContent(sentence);
+    }
+    expect(listed(region)).toEqual(limits.map((sentence) => copy.statedLimits[sentence]));
+    expect(region).not.toHaveTextContent(copy.statedLimitUnknown);
+    expect(advice.payload.stated_limits).toEqual(limits);
+  });
+});
+
 describe("experimental football construction limits", () => {
   const limits = [
     "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
