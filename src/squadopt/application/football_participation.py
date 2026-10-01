@@ -10,6 +10,10 @@ from dataclasses import replace
 
 import pandas as pd
 
+from squadopt.application.football_context import (
+    FULL_MATCH_UNAVAILABLE,
+    manager_word_attestation_reason,
+)
 from squadopt.application.manager_words import (
     SOURCE_CHECK_CITED_DOCUMENTS_HELD,
     WORDS_UNRESOLVED,
@@ -29,9 +33,8 @@ from squadopt.prediction.participation_updates import (
     apply_participation_updates,
 )
 
-FOOTBALL_PARTICIPATION_VERSION = "football_participation_evidence_v2"
+FOOTBALL_PARTICIPATION_VERSION = "football_participation_evidence_v3"
 PUBLIC_PARTICIPATION_VERSION = "football_participation_evidence_v1"
-FULL_MATCH_UNAVAILABLE = "stated_full_match_unavailable"
 INHERITED_ZERO_LIMIT = (
     "Earlier football forecasts may already carry an absence into later weeks. "
     "This update does not restore those values without a known conditional forecast."
@@ -78,7 +81,11 @@ def participation_summary(diagnostics: Mapping[str, object]) -> dict[str, object
         assumptions.append("future_values_not_recovered")
     if unsupported:
         assumptions.append("unsupported_appearance_contract")
-    return {
+    outcomes = audit.get("statement_outcomes")
+    public_outcomes = outcomes if isinstance(outcomes, list) else None
+    if public_outcomes is not None:
+        statement_count = len(public_outcomes)
+    summary: dict[str, object] = {
         "version": PUBLIC_PARTICIPATION_VERSION,
         "as_of": audit.get("as_of"),
         "gameweek": audit.get("gameweek"),
@@ -99,6 +106,66 @@ def participation_summary(diagnostics: Mapping[str, object]) -> dict[str, object
         "manager_statement_count": statement_count,
         "assumptions": assumptions,
     }
+    if public_outcomes is not None:
+        summary["statement_outcomes"] = public_outcomes
+        summary["applied_player_count"] = len(
+            {
+                row["player_id"]
+                for row in public_outcomes
+                if isinstance(row, dict) and row.get("applied") is True
+            }
+        )
+        summary["unapplied_statement_count"] = sum(
+            isinstance(row, dict) and row.get("applied") is False for row in public_outcomes
+        )
+    return summary
+
+
+def _statement_outcomes(
+    records: list[tuple[str, ManagerWord]],
+    decisions: list[dict[str, object]],
+    withheld: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Whitelist one public outcome per statement, including losing/conflicting sources."""
+    results: dict[str, tuple[bool, str]] = {}
+    for row in decisions:
+        items = row.get("evidence", [])
+        sources = items if isinstance(items, list) else []
+        if not sources and isinstance(row.get("evidence_id"), str):
+            sources = [row]
+        for source in sources:
+            if not isinstance(source, dict) or not isinstance(source.get("evidence_id"), str):
+                continue
+            identity = source["evidence_id"]
+            reason = str(source.get("reason", row.get("reason", "evidence_not_applied")))
+            applied = row.get("status") == "applied" and (
+                reason == "eligible" or row.get("reason") == "explicit_full_match_restriction"
+            )
+            if applied or row.get("reason") in (
+                "conflicting_sources",
+                "duplicate_evidence_or_source",
+                "zero_prior_without_conditional_mean",
+            ):
+                reason = str(row.get("reason", reason))
+            results[identity] = (applied, reason)
+    for row in withheld:
+        identity = row.get("evidence_id")
+        if isinstance(identity, str):
+            results[identity] = (False, str(row["reason"]))
+    outcomes: list[dict[str, object]] = []
+    for identity, word in records:
+        applied, reason = results.get(identity, (False, "evidence_not_applied"))
+        outcomes.append(
+            {
+                "player_id": word.player_id,
+                "disposition": word.disposition,
+                "applied": applied,
+                "reason": reason,
+                "source_url": word.source_url,
+                "source_published_at": word.published_at_utc,
+            }
+        )
+    return outcomes
 
 
 def _minute_updates(
@@ -318,6 +385,17 @@ def bind_football_participation(
                         "captured_percentages": [],
                         "manager_statements": [],
                         "unapplied_statements": [],
+                        "statement_outcomes": [
+                            {
+                                "player_id": word.player_id,
+                                "disposition": word.disposition,
+                                "applied": False,
+                                "reason": "unsupported_contract",
+                                "source_url": word.source_url,
+                                "source_published_at": word.published_at_utc,
+                            }
+                            for word in (() if manager_words is None else manager_words.words)
+                        ],
                         "external_calibration_supplied": False,
                         "starts_reestimated": False,
                         "minutes_reestimated": False,
@@ -362,9 +440,17 @@ def bind_football_participation(
     )
     news: list[ParticipationEvidence] = []
     source_words: dict[str, ManagerWord] = {}
+    statement_records: list[tuple[str, ManagerWord]] = []
     withheld: list[dict[str, object]] = []
     if manager_words is not None:
         for word in manager_words.words:
+            identity = hashlib.sha256(
+                json.dumps(
+                    [rotation_table_sha256, word.player_id, word.disposition, word.source_url],
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            statement_records.append((identity, word))
             reason = None
             if not rotation_table_sha256 or (
                 manager_words.source_check != SOURCE_CHECK_CITED_DOCUMENTS_HELD
@@ -381,9 +467,25 @@ def bind_football_participation(
                 or word.published_precision != "instant"
             ):
                 reason = "source_time_or_citation_missing"
+            if reason is None:
+                reason = manager_word_attestation_reason(word)
+            if reason is None and word.disposition in (
+                "stated_expected_absent",
+                FULL_MATCH_UNAVAILABLE,
+                "stated_expected_to_start",
+                "stated_minutes_limited",
+            ):
+                fixtures = base.loc[base.player_id.eq(word.player_id), "fixture_count"]
+                if len(fixtures) != 1 or int(fixtures.iloc[0]) != 1:
+                    reason = "ambiguous_current_week_fixture"
             if reason is not None:
                 withheld.append(
-                    {"player_id": word.player_id, "disposition": word.disposition, "reason": reason}
+                    {
+                        "player_id": word.player_id,
+                        "disposition": word.disposition,
+                        "evidence_id": identity,
+                        "reason": reason,
+                    }
                 )
                 continue
             try:
@@ -396,16 +498,11 @@ def bind_football_participation(
                     {
                         "player_id": word.player_id,
                         "disposition": word.disposition,
+                        "evidence_id": identity,
                         "reason": "invalid_source_timing",
                     }
                 )
                 continue
-            identity = hashlib.sha256(
-                json.dumps(
-                    [rotation_table_sha256, word.player_id, word.disposition, word.source_url],
-                    separators=(",", ":"),
-                ).encode()
-            ).hexdigest()
             source_words[identity] = word
             news.append(
                 ParticipationEvidence(
@@ -445,6 +542,9 @@ def bind_football_participation(
     first_mask = adjusted.gameweek.eq(first)
     for column in ("expected_points", "appearance_probability"):
         adjusted.loc[first_mask, column] = result.table[column].to_numpy()
+    statements = [
+        row for row in result.diagnostics if row.get("reason") != "no_evidence"
+    ] + minute_audit
     audit = {
         "version": FOOTBALL_PARTICIPATION_VERSION,
         "contract": PARTICIPATION_UPDATE_CONTRACT,
@@ -457,10 +557,8 @@ def bind_football_participation(
         "captured_percentages": [
             row for row in feed.diagnostics if row.get("reason") != "no_evidence"
         ],
-        "manager_statements": [
-            row for row in result.diagnostics if row.get("reason") != "no_evidence"
-        ]
-        + minute_audit,
+        "manager_statements": statements,
+        "statement_outcomes": _statement_outcomes(statement_records, statements, withheld),
         "unapplied_statements": withheld,
         "external_calibration_supplied": False,
         "minutes_reestimated": any(row.get("status") == "applied" for row in minute_audit),

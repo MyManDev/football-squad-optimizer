@@ -42,7 +42,7 @@ from squadopt.planning.policy_seed import forecast_policy_seed
 from squadopt.planning.recourse import ObservationNode
 from squadopt.planning.recourse_chips import net_week_points, restrict_first_chip
 
-OBSERVED_WINDOW_VERSION = "expected_lineup_observed_window_v3"
+OBSERVED_WINDOW_VERSION = "expected_lineup_observed_window_v4"
 OBSERVED_WINDOW_LIMIT = (
     "This experimental plan compares today's actions under two possible updates before "
     "the next deadline. Later transfers are conditional plans, not certain moves. "
@@ -123,7 +123,7 @@ def optimize_observed_window(
     """40% baseline, 20% proposals, 30% continuations, 10% nominal reconciliation.
 
     Complete policies are reused and certified against every full-horizon branch.
-    At most three distinct first actions and two information branches are compared.
+    At most four distinct first actions and two information branches are compared.
     Optional proposals are admitted only when complete. Incomplete evaluation of
     an admitted action never selects from the surviving subset. The baseline
     remains a feasible fallback, not a guarantee of better realized FPL performance.
@@ -340,28 +340,34 @@ def optimize_observed_window(
     branches = tuple(
         PlanningHorizon(pd.concat([today, node.horizon.table], ignore_index=True)) for node in nodes
     )
-    proposal_seed = seed_for(
-        baseline,
-        horizon,
-        branches[0],
-        proposal_optimization,
-        transfer,
-        source_chips=rights,
-        target_chips=rights,
-    )
-    proposal = optimize_transfer_plan(
-        branches[0],
-        initial,
-        config(0.1),
-        transfer,
-        chips=rights,
-        preferences=preferences,
-        linearization_level=2,
-        incumbent_plan=proposal_seed,
-        protect_incumbent=True,
-    )
-    record("information_proposal", 0.1, proposal)
-    add(proposal, branches[0], rights)
+    proposal_completed = {}
+    # Both independently proposed actions face every branch below. Split the old
+    # single-branch allocation, rather than increasing total search work or treating
+    # a favorable update as the only useful source of alternative decisions.
+    for node, branch in zip(nodes, branches, strict=True):
+        proposal_seed = seed_for(
+            baseline,
+            horizon,
+            branch,
+            proposal_optimization,
+            transfer,
+            source_chips=rights,
+            target_chips=rights,
+        )
+        proposal = optimize_transfer_plan(
+            branch,
+            initial,
+            config(0.05),
+            transfer,
+            chips=rights,
+            preferences=preferences,
+            linearization_level=2,
+            incumbent_plan=proposal_seed,
+            protect_incumbent=True,
+        )
+        record(f"information_proposal:{node.observation_id}", 0.05, proposal)
+        proposal_completed[node.observation_id] = proposal.has_solution
+        add(proposal, branch, rights)
     if len(menu) < 2:
         return finish(baseline, "no_distinct_alternative", candidate_count=len(menu))
     share = 0.3 / (len(menu) * len(nodes))
@@ -551,5 +557,6 @@ def optimize_observed_window(
         candidate_count=len(menu),
         branch_count=len(nodes),
         horizon_length=len(horizon.gameweeks),
-        proposal_completed=proposal.has_solution,
+        proposal_completed=all(proposal_completed.values()),
+        proposal_completion_by_observation=proposal_completed,
     )

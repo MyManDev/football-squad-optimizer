@@ -34,7 +34,10 @@ from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError
 SEASON = "2026-27"
 CAPTURE = "fpl-live-20260826T083133Z-d45f1bea8b68"
 INPUTS: Any = SimpleNamespace(
-    season=SEASON, snapshot_id=CAPTURE, deadline=SimpleNamespace(gameweek=3)
+    season=SEASON,
+    snapshot_id=CAPTURE,
+    deadline=SimpleNamespace(gameweek=3),
+    official_information=None,
 )
 
 
@@ -337,18 +340,18 @@ def test_capture_payload_tamper_is_refused_before_artifact_discovery(tmp_path, m
     )
 
 
-def _v3_artifact(root, season, gameweek, capture):
-    stem = f"rotation_evidence_v3_{season}_gw{gameweek:02d}_{capture[-12:]}"
-    return root / (stem + ".csv"), root / (stem + ".manifest.json")
-
-
-def test_current_v3_writer_keeps_existing_v2_lookup_and_signature(tmp_path, monkeypatch):
+@pytest.mark.parametrize("legacy_version", [2, 3])
+def test_current_v4_writer_keeps_legacy_lookup_and_signature(tmp_path, monkeypatch, legacy_version):
     source = tmp_path / "club_news_v1.fixture.json"
     source.write_text("{}", encoding="utf-8")
-    v2 = tmp_path / "rotation" / f"rotation_evidence_v2_{SEASON}_gw03_{CAPTURE[-12:]}.csv"
-    v2.parent.mkdir(parents=True)
-    v2.write_text("rows", encoding="utf-8")
-    v2.with_suffix(".manifest.json").write_text(
+    legacy = (
+        tmp_path
+        / "rotation"
+        / f"rotation_evidence_v{legacy_version}_{SEASON}_gw03_{CAPTURE[-12:]}.csv"
+    )
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("rows", encoding="utf-8")
+    legacy.with_suffix(".manifest.json").write_text(
         json.dumps(
             {
                 "table_sha256": "7" * 64,
@@ -360,7 +363,6 @@ def test_current_v3_writer_keeps_existing_v2_lookup_and_signature(tmp_path, monk
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(module, "rotation_artifact", _v3_artifact)
     seen = []
 
     def load(path, **kwargs):
@@ -369,7 +371,7 @@ def test_current_v3_writer_keeps_existing_v2_lookup_and_signature(tmp_path, monk
 
     monkeypatch.setattr(module, "load_manager_words", load)
     assert _load(tmp_path, club_news_source=source).manager_words is not None
-    assert seen == [v2]
+    assert seen == [legacy]
     signature = discovery_signature(
         artifact_root=tmp_path,
         club_news_source=source,
@@ -377,12 +379,13 @@ def test_current_v3_writer_keeps_existing_v2_lookup_and_signature(tmp_path, monk
         gameweek=3,
         capture_snapshot_id=CAPTURE,
     )
-    assert any(entry[0] == v2.name for entry in signature)
-    v3, _ = _v3_artifact(tmp_path / "rotation", SEASON, 3, CAPTURE)
-    v3.write_text("partial current artifact", encoding="utf-8")
-    # A broken current artifact must be reported, not hidden by falling back to V2.
+    assert any(entry[0] == legacy.name for entry in signature)
+    current, _ = rotation_artifact(tmp_path / "rotation", SEASON, 3, CAPTURE)
+    assert current.name.startswith("rotation_evidence_v4_")
+    current.write_text("partial current artifact", encoding="utf-8")
+    # A broken current artifact must be reported, not hidden by falling back to a legacy artifact.
     assert _load(tmp_path, club_news_source=source).manager_words is None
-    assert seen == [v2]
+    assert seen == [legacy]
 
 
 def test_real_capture_payload_stat_changes_discovery_signature(tmp_path):

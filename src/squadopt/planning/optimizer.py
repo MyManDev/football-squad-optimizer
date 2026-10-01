@@ -405,10 +405,19 @@ def _build_model(
         # Transfer discipline: a hard cap on moves per gameweek, lifted under a rebuild.
         cap = transfer_config.max_transfers_per_gameweek
         if cap is not None:
+            effective_cap: cp_model.IntVar | int = cap
+            if cap == 1 and transfer_config.allow_two_free_transfers:
+                two_free = model.new_bool_var(f"two_free_transfers_gw{gameweek}")
+                model.add(free_before >= 2).only_enforce_if(two_free)
+                model.add(free_before <= 1).only_enforce_if(two_free.Not())
+                effective_cap = model.new_int_var(1, 2, f"transfer_cap_gw{gameweek}")
+                model.add(effective_cap == 1 + two_free)
             if rebuild_vars:
-                model.add(transfer_count <= cap + optimization_config.squad_size * rebuild)
+                model.add(
+                    transfer_count <= effective_cap + optimization_config.squad_size * rebuild
+                )
             else:
-                model.add(transfer_count <= cap)
+                model.add(transfer_count <= effective_cap)
         # Transfers that draw on the free-transfer bank this week. Under a wildcard
         # (when the rule preserves the bank) none of them do. The value is pinned in
         # both directions — count without the chip, zero with it — because the bank it
@@ -1416,6 +1425,8 @@ def optimize_transfer_plan(
         "hit_points_charged": settings.hit_points_charged,
         "hit_cost_scaled": artifacts.hit_cost_scaled,
         "max_free_transfers": settings.max_free_transfers,
+        "max_transfers_per_gameweek": settings.max_transfers_per_gameweek,
+        "allow_two_free_transfers": settings.allow_two_free_transfers,
         "free_transfer_accrual": settings.free_transfer_accrual,
         "budget_policy": "stateful_bank_accounting",
         "rounding_mode": "ROUND_HALF_UP",

@@ -28,7 +28,7 @@ import argparse
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -42,8 +42,20 @@ from squadopt.data.sources.club_news import (
     RawDocument,
     RosterPlayer,
 )
-from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, short_name_roster, team_names
+from squadopt.data.sources.club_news_capture import (
+    CodedClub,
+    read_captured_responses,
+    write_club_news_capture,
+)
+from squadopt.data.sources.fpl_live import (
+    BOOTSTRAP_PAYLOAD,
+    gameweek_deadlines,
+    next_open_deadline,
+    short_name_roster,
+    team_names,
+)
+from squadopt.data.timestamps import as_instant
+from squadopt.live.recommendation import season_from_bootstrap
 from squadopt.platform.club_news_coverage import (
     build_club_news_coverage,
     format_club_news_coverage,
@@ -95,6 +107,7 @@ class AcquiredWeek:
     clubs_partially_covered: tuple[str, ...]
     refused_pages: tuple[tuple[str, str], ...]
     refused_coding: tuple[tuple[str, str], ...]
+    reused_clubs: tuple[str, ...] = ()
 
 
 def _coverage(
@@ -140,6 +153,8 @@ def acquire_week(
     now: Callable[[], datetime] = _utc_instant,
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
+    max_calls: int | None = None,
+    previous: Sequence[CodedClub] = (),
 ) -> AcquiredWeek:
     """Read the registered pages, code them club by club, and report what happened.
 
@@ -152,7 +167,9 @@ def acquire_week(
     documents, refused_pages = fetch_registered_documents(
         sources, opener=opener, now=now, sleeper=sleeper, check_robots=check_robots
     )
-    coded, refused_coding = code_week_by_club(provider, config, documents, roster)
+    coded, refused_coding = code_week_by_club(
+        provider, config, documents, roster, max_calls=max_calls, previous=previous
+    )
     declared, covered, partial = _coverage(sources, documents, coded)
     return AcquiredWeek(
         documents=documents,
@@ -162,6 +179,7 @@ def acquire_week(
         clubs_partially_covered=partial,
         refused_pages=refused_pages,
         refused_coding=refused_coding,
+        reused_clubs=tuple(entry.club for entry in coded if any(entry is old for old in previous)),
     )
 
 
@@ -203,12 +221,25 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="write new news captures here; roster still comes from --snapshot-root",
     )
+    parser.add_argument(
+        "--max-model-calls",
+        type=int,
+        default=3,
+        help="maximum paid requests in this run, from zero to twenty (default: 3)",
+    )
+    parser.add_argument(
+        "--previous-news-capture",
+        type=Path,
+        help="optional earlier capture directory for unchanged evidence reuse",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="fetch and code, but write nothing")
     mode.add_argument(
         "--check-config", action="store_true", help="offline settings/dependency check"
     )
     arguments = parser.parse_args(argv)
+    if not 0 <= arguments.max_model_calls <= 20:
+        parser.error("--max-model-calls must be between zero and twenty")
     if not arguments.check_config and not arguments.roster_snapshot:
         parser.error("--roster-snapshot is required unless --check-config is selected")
     return arguments
@@ -265,7 +296,27 @@ def main(
                 f"{sorted(unknown)!r}."
             )
         roster = roster_from_short_names(short_name_roster(bootstrap))
-        provider, config = build_coding_provider(environ, settings_file=arguments.settings_file)
+        as_of = now().isoformat().replace("+00:00", "Z")
+        deadline = next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=as_of)
+        target_context = {
+            "season": season_from_bootstrap(bootstrap),
+            "gameweek": deadline.gameweek,
+            "deadline": deadline.deadline_utc,
+            "as_of": as_of,
+        }
+        previous: tuple[CodedClub, ...] = ()
+        if arguments.previous_news_capture is not None:
+            prior_path = arguments.previous_news_capture
+            prior = read_snapshot(prior_path.parent, prior_path.name)
+            if as_instant(prior.metadata.captured_at_utc) >= as_instant(as_of):
+                raise ClubNewsError("Previous news capture must precede this run.")
+            previous = tuple(
+                replace(entry, reused_from_snapshot=prior.metadata.snapshot_id)
+                for entry in read_captured_responses(prior)
+            )
+        provider, config = build_coding_provider(
+            environ, settings_file=arguments.settings_file, target_context=target_context
+        )
         week = acquire_week(
             sources=sources,
             provider=provider,
@@ -274,6 +325,8 @@ def main(
             opener=opener,
             now=now,
             sleeper=sleeper,
+            max_calls=arguments.max_model_calls,
+            previous=previous,
         )
     except (ClubNewsError, DataError, OSError, ValueError) as error:
         print(f"Refused: {error}")
@@ -282,6 +335,8 @@ def main(
     print(f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared")
     print(f"Read          {len(week.documents)} documents")
     print(f"Coded         {len(week.coded)} clubs, provider {config.provider!r}")
+    print(f"Reused        {len(week.reused_clubs)} unchanged club responses")
+    print(f"Call budget   {arguments.max_model_calls}; no automatic provider retry")
     print(f"Covered       {len(week.clubs_covered)} clubs")
     print(f"Partly read   {len(week.clubs_partially_covered)} clubs")
     print(

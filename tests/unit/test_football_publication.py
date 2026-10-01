@@ -187,17 +187,20 @@ def test_active_publication_marker_refuses_without_removing_it(publication_case)
 
 
 @pytest.mark.parametrize("with_components", [False, True])
+@pytest.mark.parametrize("training_seasons", [None, ["2022-23", "2024-25"]])
 def test_cli_selects_one_producer_and_keeps_default_output(
-    publication_case, monkeypatch, capsys, with_components
+    publication_case, monkeypatch, capsys, with_components, training_seasons
 ):
     case = publication_case
     calls = []
 
     def ordinary(*args, **kwargs):
+        assert kwargs["training_seasons"] == training_seasons
         calls.append("ordinary")
         return case["document"]
 
     def paired(*args, **kwargs):
+        assert kwargs["training_seasons"] == training_seasons
         calls.append("paired")
         return case["document"], case["companion"]
 
@@ -217,6 +220,8 @@ def test_cli_selects_one_producer_and_keeps_default_output(
         "--artifact-root",
         str(case["artifact_root"]),
     ]
+    for season in training_seasons or []:
+        argv.extend(["--training-season", season])
     if with_components:
         argv.append("--with-components")
     monkeypatch.setattr("sys.argv", argv)

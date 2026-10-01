@@ -36,6 +36,25 @@ const DOCUMENT = {
 };
 
 describe("league capabilities", () => {
+  it.each(["model_opportunity_reservation_v1", "model_opportunity_reservation_v2"])(
+    "accepts published chip strategy %s and refuses unknown versions",
+    (version) => {
+      const chips = {
+        held_by_entry: { "101": ["wildcard", "3xc"] },
+        strategy: { version, windows: [1, 3, 5] },
+      };
+      expect(checkedCapabilities({ ...DOCUMENT, chips }, 352490).chipStrategyWindows).toEqual([
+        1, 3, 5,
+      ]);
+      expect(() =>
+        checkedCapabilities(
+          { ...DOCUMENT, chips: { ...chips, strategy: { ...chips.strategy, version: "unknown" } } },
+          352490,
+        ),
+      ).toThrow(AdviceCapabilitiesError);
+    },
+  );
+
   it("distinguishes held chips, no chips and unknown member history", () => {
     const held = { "101": ["wildcard", "3xc"], "202": [] };
     const result = checkedCapabilities({ ...DOCUMENT, chips: { held_by_entry: held } }, 352490);

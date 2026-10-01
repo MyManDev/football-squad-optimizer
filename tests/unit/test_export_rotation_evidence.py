@@ -33,6 +33,8 @@ from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
     LEGACY_CONTRACT_VERSION,
+    LEGACY_ROTATION_EVIDENCE_COLUMNS,
+    PREVIOUS_CONTRACT_VERSION,
     ROTATION_EVIDENCE_COLUMNS,
 )
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
@@ -462,7 +464,9 @@ def test_coverage_beyond_what_was_declared_is_refused(published: tuple[Path, Pat
         read_rotation_evidence_artifact(table_path, manifest_path)
 
 
-@pytest.mark.parametrize("contract", [LEGACY_CONTRACT_VERSION, CONTRACT_VERSION])
+@pytest.mark.parametrize(
+    "contract", [LEGACY_CONTRACT_VERSION, PREVIOUS_CONTRACT_VERSION, CONTRACT_VERSION]
+)
 def test_old_and_new_rotation_table_contracts_read_without_changing_citations(
     tmp_path: Path,
     clean_tree: None,
@@ -474,6 +478,8 @@ def test_old_and_new_rotation_table_contracts_read_without_changing_citations(
     before = read_rotation_evidence_artifact(table_path, manifest_path)
     rewritten = pd.read_csv(table_path)
     rewritten["contract_version"] = contract
+    if contract != CONTRACT_VERSION:
+        rewritten = rewritten[list(LEGACY_ROTATION_EVIDENCE_COLUMNS)]
     rewritten.to_csv(table_path, index=False)
     _rewrite_manifest(
         manifest_path,
@@ -491,7 +497,9 @@ def test_old_and_new_rotation_table_contracts_read_without_changing_citations(
     assert set(after["contract_version"]) == {contract}
 
 
-@pytest.mark.parametrize("contract", [LEGACY_CONTRACT_VERSION, CONTRACT_VERSION])
+@pytest.mark.parametrize(
+    "contract", [LEGACY_CONTRACT_VERSION, PREVIOUS_CONTRACT_VERSION, CONTRACT_VERSION]
+)
 def test_full_match_label_is_admitted_only_by_the_new_rotation_table_contract(
     tmp_path: Path,
     clean_tree: None,
@@ -504,6 +512,8 @@ def test_full_match_label_is_admitted_only_by_the_new_rotation_table_contract(
     table["contract_version"] = contract
     claim = table["rotation_disposition"].notna().idxmax()
     table.loc[claim, "rotation_disposition"] = "stated_full_match_unavailable"
+    if contract != CONTRACT_VERSION:
+        table = table[list(LEGACY_ROTATION_EVIDENCE_COLUMNS)]
     table.to_csv(table_path, index=False)
     _rewrite_manifest(
         manifest_path,

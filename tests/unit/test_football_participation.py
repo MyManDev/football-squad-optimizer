@@ -86,7 +86,15 @@ def _world():
         "Synthetic Club",
         "https://example.test/club/captured-statement",
         (AS_OF - pd.Timedelta(hours=1)).isoformat(),
-        "He will miss this match.",
+        "He will miss the next Premier League match.",
+        source_sha256="a" * 64,
+        span_start=0,
+        span_end=42,
+        fixture_scope="upcoming_premier_league",
+        scope_verified=True,
+        publication_verified=True,
+        publication_source="html_publication_meta",
+        publication_source_sha256="b" * 64,
     )
     words = ManagerWords(
         inputs.season,
@@ -225,26 +233,18 @@ def test_football_cache_identity_includes_news_even_when_manager_constraint_swit
     first = switch_identity(before, model="football")
     second = switch_identity(after, model="football")
     assert first != second
-    assert first["model"]["participation_version"] == "football_participation_evidence_v2"
+    assert first["model"]["participation_version"] == "football_participation_evidence_v3"
     assert first["model"]["fingerprint"] == forecast.fingerprint
     assert switch_identity(before, model="current") == switch_identity(after, model="current") == {}
 
 
-@pytest.mark.parametrize("disposition", ["stated_expected_absent", "stated_minutes_limited"])
+@pytest.mark.parametrize("disposition", ["stated_expected_absent", "stated_full_match_unavailable"])
 def test_new_producer_scopes_manager_override_to_its_week_before_model_prediction(
     monkeypatch, disposition
 ):
     _, inputs, words = _world()
     words = replace(words, words=(replace(words.words[0], disposition=disposition),))
     roster = inputs.players.assign(club=inputs.players.team_id)
-    roster, _ = bind_football_context(
-        roster,
-        inputs.availability,
-        season=inputs.season,
-        gameweek=6,
-        cutoff=AS_OF,
-        manager_words=words,
-    )
     fixtures = pd.DataFrame(
         {
             "fixture": [1, 1, 2, 2],
@@ -255,6 +255,15 @@ def test_new_producer_scopes_manager_override_to_its_week_before_model_predictio
             "kickoff": [DEADLINE + pd.Timedelta(hours=3)] * 2
             + [DEADLINE + pd.Timedelta(days=7, hours=3)] * 2,
         }
+    )
+    roster, _ = bind_football_context(
+        roster,
+        inputs.availability,
+        season=inputs.season,
+        gameweek=6,
+        cutoff=AS_OF,
+        manager_words=words,
+        fixture_calendar=fixtures,
     )
     seen = []
 
@@ -306,13 +315,216 @@ def test_new_producer_preserves_captured_eligibility_for_conflicting_valid_sourc
     )
     for statements in ((words.words[0], other), (other, words.words[0])):
         roster, audit = bind_football_context(
-            inputs.players,
+            inputs.players.assign(club=inputs.players.team_id),
             inputs.availability,
             season=inputs.season,
             gameweek=6,
             cutoff=AS_OF,
             manager_words=replace(words, words=statements),
+            fixture_calendar=_calendar(),
         )
         assert roster.set_index("player_id").loc[1, "availability_probability"] == 0.75
         assert not roster.set_index("player_id").loc[1, "minutes_limited"]
         assert all(row["reason"] == "conflicting_sources" for row in audit)
+
+
+def _calendar(*, double=False):
+    calendar = pd.DataFrame(
+        {
+            "fixture": [61, 61],
+            "club": [1, 2],
+            "GW": [6, 6],
+            "kickoff": [DEADLINE + pd.Timedelta(hours=3)] * 2,
+        }
+    )
+    return (
+        pd.concat([calendar, calendar.assign(fixture=62)], ignore_index=True)
+        if double
+        else calendar
+    )
+
+
+@pytest.mark.parametrize(
+    "disposition",
+    ["stated_expected_absent", "stated_full_match_unavailable", "stated_minutes_limited"],
+)
+@pytest.mark.parametrize(
+    "damage,reason",
+    [
+        ({"publication_verified": False}, "publication_unverified"),
+        (
+            {"scope_verified": False, "fixture_scope": "other_competition"},
+            "upcoming_league_scope_unverified",
+        ),
+        ({"scope_verified": False, "fixture_scope": "past"}, "upcoming_league_scope_unverified"),
+        (
+            {"scope_verified": False, "fixture_scope": "ambiguous"},
+            "upcoming_league_scope_unverified",
+        ),
+    ],
+)
+def test_both_consumers_refuse_unverified_or_wrong_fixture_claims(disposition, damage, reason):
+    forecast, inputs, words = _world()
+    words = replace(words, words=(replace(words.words[0], disposition=disposition, **damage),))
+    result = _bind(forecast, inputs, words)
+    assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
+    summary = participation_summary(result.projection.diagnostics)
+    assert summary["statement_outcomes"][0]["reason"] == reason
+    assert summary["statement_outcomes"][0]["applied"] is False
+    context, audit = bind_football_context(
+        inputs.players.assign(club=inputs.players.team_id),
+        inputs.availability,
+        season=inputs.season,
+        gameweek=6,
+        cutoff=AS_OF,
+        manager_words=words,
+        fixture_calendar=_calendar(),
+    )
+    assert context.availability_probability.tolist() == [0.75, 1.0]
+    assert not context.minutes_limited.any()
+    assert audit[0]["reason"] == reason
+
+
+@pytest.mark.parametrize("disposition", ["stated_expected_absent", "stated_full_match_unavailable"])
+def test_both_consumers_refuse_ambiguous_double_gameweek(disposition):
+    forecast, inputs, words = _world()
+    words = replace(words, words=(replace(words.words[0], disposition=disposition),))
+    table = forecast.horizon.table.assign(fixture_count=2)
+    forecast = replace(forecast, horizon=replace(forecast.horizon, table=table))
+    result = _bind(forecast, inputs, words)
+    assert_frame_equal(result.horizon.table, table, check_exact=True)
+    assert (
+        participation_summary(result.projection.diagnostics)["statement_outcomes"][0]["reason"]
+        == "ambiguous_current_week_fixture"
+    )
+    context, audit = bind_football_context(
+        inputs.players.assign(club=inputs.players.team_id),
+        inputs.availability,
+        season=inputs.season,
+        gameweek=6,
+        cutoff=AS_OF,
+        manager_words=words,
+        fixture_calendar=_calendar(double=True),
+    )
+    assert not context.minutes_limited.any()
+    assert context.availability_probability.tolist() == [0.75, 1.0]
+    assert audit[0]["reason"] == "ambiguous_current_week_fixture"
+
+
+def test_vague_minutes_cannot_restrict_contextual_full_match_support():
+    _, inputs, words = _world()
+    words = replace(words, words=(replace(words.words[0], disposition="stated_minutes_limited"),))
+    context, audit = bind_football_context(
+        inputs.players.assign(club=inputs.players.team_id),
+        inputs.availability,
+        season=inputs.season,
+        gameweek=6,
+        cutoff=AS_OF,
+        manager_words=words,
+        fixture_calendar=_calendar(),
+    )
+    assert context.availability_probability.tolist() == [0.75, 1.0]
+    assert not context.minutes_limited.any()
+    assert context.manager_context_fixture.isna().all()
+    assert audit[0]["reason"] == "categorical_statement_has_no_probability"
+
+
+@pytest.mark.parametrize(
+    "other,applied", [("stated_full_match_unavailable", True), ("stated_expected_to_start", False)]
+)
+def test_public_outcomes_identify_only_the_applied_source_and_hide_internal_provenance(
+    other, applied
+):
+    forecast, inputs, words = _world()
+    second = replace(words.words[0], disposition=other, source_url="https://example.test/second")
+    result = _bind(forecast, inputs, replace(words, words=(words.words[0], second)))
+    summary = participation_summary(result.projection.diagnostics)
+    outcomes = summary["statement_outcomes"]
+    assert [row["applied"] for row in outcomes] == [applied, False]
+    assert summary["manager_statement_count"] == 2
+    assert summary["unapplied_statement_count"] == 1 + int(not applied)
+    assert summary["applied_player_count"] == int(applied)
+    assert outcomes[1]["reason"] == (
+        "explicit_absence_supersedes_minute_restriction" if applied else "conflicting_sources"
+    )
+    for row in outcomes:
+        assert set(row) == {
+            "player_id",
+            "disposition",
+            "applied",
+            "reason",
+            "source_url",
+            "source_published_at",
+        }
+        assert row["source_published_at"] == words.words[0].published_at_utc
+
+
+def test_public_duplicate_source_outcomes_do_not_claim_an_applied_absence():
+    forecast, inputs, words = _world()
+    result = _bind(forecast, inputs, replace(words, words=words.words * 2))
+    assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
+    summary = participation_summary(result.projection.diagnostics)
+    assert len(summary["statement_outcomes"]) == 2
+    assert all(
+        not row["applied"] and row["reason"] == "duplicate_evidence_or_source"
+        for row in summary["statement_outcomes"]
+    )
+
+
+@pytest.mark.parametrize(
+    "dispositions,same_source,reason",
+    [
+        (("stated_expected_absent", "stated_rotation_risk"), True, "duplicate_evidence_or_source"),
+        (
+            ("stated_full_match_unavailable", "stated_full_match_unavailable"),
+            False,
+            "overlapping_minute_statements",
+        ),
+    ],
+)
+def test_contextual_and_runtime_consumers_refuse_the_same_whole_source_set(
+    dispositions, same_source, reason
+):
+    forecast, inputs, words = _world()
+    claims = tuple(
+        replace(
+            words.words[0],
+            disposition=disposition,
+            source_url=words.words[0].source_url if same_source else f"https://example.test/{i}",
+        )
+        for i, disposition in enumerate(dispositions)
+    )
+    words = replace(words, words=claims)
+    result = _bind(forecast, inputs, words)
+    assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
+    outcomes = participation_summary(result.projection.diagnostics)["statement_outcomes"]
+    assert all(not row["applied"] and row["reason"] == reason for row in outcomes)
+    context, audit = bind_football_context(
+        inputs.players.assign(club=inputs.players.team_id),
+        inputs.availability,
+        season=inputs.season,
+        gameweek=6,
+        cutoff=AS_OF,
+        manager_words=words,
+        fixture_calendar=_calendar(),
+    )
+    assert not context.minutes_limited.any()
+    assert context.availability_probability.tolist() == [0.75, 1.0]
+    assert all(row["reason"] == reason for row in audit)
+
+
+def test_each_refused_source_keeps_its_own_reason_when_none_is_actionable():
+    forecast, inputs, words = _world()
+    stale = replace(words.words[0], published_at_utc=(AS_OF - pd.Timedelta(days=8)).isoformat())
+    vague = replace(
+        words.words[0],
+        disposition="stated_minutes_limited",
+        source_url="https://example.test/vague",
+    )
+    result = _bind(forecast, inputs, replace(words, words=(stale, vague)))
+    outcomes = participation_summary(result.projection.diagnostics)["statement_outcomes"]
+    assert [row["reason"] for row in outcomes] == [
+        "expired_evidence",
+        "categorical_statement_has_no_probability",
+    ]
+    assert all(not row["applied"] for row in outcomes)

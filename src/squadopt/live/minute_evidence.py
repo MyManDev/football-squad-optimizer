@@ -345,6 +345,8 @@ class FixtureComponentBasis:
             raise ValueError("Companion belongs to a different forecast.")
         if any(companion.get(key) != served.get(key) or key not in served for key in _ID_FIELDS):
             raise ValueError("Companion source, cutoff or training binding differs.")
+        if companion.get("training_selection") != served.get("training_selection"):
+            raise ValueError("Companion training selection differs from the served forecast.")
         weekly = pd.DataFrame(cast(list[dict[str, object]], served["rows"]))
         required = {
             "gameweek",

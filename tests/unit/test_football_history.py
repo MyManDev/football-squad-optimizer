@@ -15,7 +15,7 @@ from squadopt.data.errors import (
     InvalidValueError,
     MissingColumnsError,
 )
-from squadopt.data.sources.football_history import normalize_history
+from squadopt.data.sources.football_history import archive_history, normalize_history
 
 
 def _history() -> pd.DataFrame:
@@ -140,3 +140,37 @@ def test_a_short_appearance_with_a_clean_sheet_is_refused_by_player() -> None:
 
     with pytest.raises(InvalidValueError, match="202"):
         normalize_history(history)
+
+
+@pytest.mark.parametrize(
+    "seasons", [(), "2024-25", ("2024-25", "2024-25"), ("2024-25", "2099-00"), (None,)]
+)
+def test_archive_allowlist_is_validated_entirely_before_access(tmp_path, monkeypatch, seasons):
+    reads = []
+    monkeypatch.setattr(pd, "read_csv", lambda *a, **kw: reads.append(a))
+    with pytest.raises(InvalidValueError, match="Archive seasons"):
+        archive_history(tmp_path, seasons=seasons)
+    assert reads == []
+
+
+def test_archive_reader_never_opens_an_excluded_season(tmp_path, monkeypatch):
+    reads = []
+    raw = _history().assign(element=[1, 2], was_home=True, team_h_score=2, team_a_score=0)
+    raw["kickoff_time"] = raw.kickoff
+    files = {
+        "merged_gw.csv": raw,
+        "players_raw.csv": pd.DataFrame({"id": [1, 2], "code": [101, 202]}),
+        "teams.csv": pd.DataFrame({"id": [11, 22], "code": [3, 7]}),
+        "fixtures.csv": pd.DataFrame({"id": [10], "team_h": [11], "team_a": [22]}),
+    }
+
+    def read(path, **kwargs):
+        reads.append(path)
+        return files[path.name].copy()
+
+    monkeypatch.setattr(pd, "read_csv", read)
+    history = archive_history(tmp_path, seasons=("2024-25",))
+    assert len(reads) == 4
+    assert all("2024-25" in path.parts for path in reads)
+    assert history.season.eq("2024-25").all()
+    assert history.player_code.tolist() == [101, 202]

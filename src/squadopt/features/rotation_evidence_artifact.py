@@ -18,6 +18,7 @@ one row's value; this one compares the manifest against the **union** over rows.
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
@@ -31,6 +32,8 @@ from squadopt.data.sources.club_news import (
     PUBLISHED_PRECISIONS,
     ROTATION_DISPOSITIONS,
 )
+from squadopt.data.sources.club_news_metadata import PUBLICATION_SOURCES
+from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.features.rotation_evidence import (
     _ROTATION_EVIDENCE_DTYPES,
@@ -38,6 +41,8 @@ from squadopt.features.rotation_evidence import (
     FEED_NEWS_STATES,
     FORBIDDEN_COLUMNS,
     LEGACY_CONTRACT_VERSION,
+    LEGACY_ROTATION_EVIDENCE_COLUMNS,
+    PREVIOUS_CONTRACT_VERSION,
     ROTATION_EVIDENCE_COLUMNS,
 )
 
@@ -217,7 +222,8 @@ def _validate_news_binding(manifest: Mapping[str, object], table: pd.DataFrame) 
 def _validate_manifest_and_table(
     manifest: Mapping[str, object], table: pd.DataFrame, table_path: Path
 ) -> None:
-    if manifest.get("contract_version") not in (LEGACY_CONTRACT_VERSION, CONTRACT_VERSION):
+    version = manifest.get("contract_version")
+    if version not in (LEGACY_CONTRACT_VERSION, PREVIOUS_CONTRACT_VERSION, CONTRACT_VERSION):
         raise DataValidationError(
             f"{table_path.name} declares contract {manifest.get('contract_version')!r}, not "
             f"{CONTRACT_VERSION!r}."
@@ -233,7 +239,12 @@ def _validate_manifest_and_table(
             f"The manifest names table {manifest.get('table_file')!r} but was read beside "
             f"{table_path.name!r}."
         )
-    if tuple(table.columns) != ROTATION_EVIDENCE_COLUMNS:
+    columns = (
+        ROTATION_EVIDENCE_COLUMNS
+        if version == CONTRACT_VERSION
+        else LEGACY_ROTATION_EVIDENCE_COLUMNS
+    )
+    if tuple(table.columns) != columns:
         raise DataValidationError(
             f"{table_path.name} columns do not match {CONTRACT_VERSION} in its declared order."
         )
@@ -292,6 +303,8 @@ def _validate_manifest_and_table(
         )
 
     observed_claims = table["rotation_claim_observed"].astype("boolean")
+    if version == CONTRACT_VERSION:
+        _validate_attestation(table, observed_claims)
     for column in _CLAIM_ONLY_COLUMNS:
         present = table[column].notna()
         if not bool((present == observed_claims).all()):
@@ -353,6 +366,40 @@ def _validate_manifest_and_table(
     for key in ("documents_read", "claims_coded", "claims_ambiguous", "players_not_addressed"):
         _whole_number(manifest, key)
     _string_list(manifest, "document_sha256s")
+
+
+def _validate_attestation(table: pd.DataFrame, observed: pd.Series) -> None:
+    """Check declared fact shape; source bytes are independently checked by the consumer."""
+    scope = table["rotation_claim_fixture_scope"]
+    if not (scope.notna() == observed).all():
+        raise DataValidationError("Fixture scope must be recorded exactly for observed claims.")
+    for column, allowed in (
+        ("rotation_claim_fixture_scope", FIXTURE_SCOPES),
+        ("rotation_claim_publication_source", PUBLICATION_SOURCES),
+    ):
+        if set(table[column].dropna().astype(str)) - set(allowed):
+            raise DataValidationError(f"Unknown attestation value in {column}.")
+    for column in ("rotation_claim_scope_verified", "rotation_claim_publication_verified"):
+        if table[column].isna().any() or (table[column] & ~observed).any():
+            raise DataValidationError("An attestation flag requires an observed claim.")
+    for row in table.to_dict(orient="records"):
+        if (
+            row["rotation_claim_scope_verified"]
+            and row["rotation_claim_fixture_scope"] != "upcoming_premier_league"
+        ):
+            raise DataValidationError("Only explicit upcoming league scope can be verified.")
+        source = row["rotation_claim_publication_source"]
+        digest = row["rotation_claim_publication_source_sha256"]
+        if pd.notna(source) != pd.notna(digest) or (
+            pd.notna(digest) and re.fullmatch(r"[0-9a-f]{64}", str(digest)) is None
+        ):
+            raise DataValidationError("Publication source and digest must be complete.")
+        if row["rotation_claim_publication_verified"] and (
+            pd.isna(source)
+            or pd.isna(row["rotation_claim_published_at_utc"])
+            or row["rotation_claim_published_precision"] == "unknown"
+        ):
+            raise DataValidationError("Verified publication requires an explicit source date.")
 
 
 def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd.DataFrame:

@@ -144,7 +144,17 @@ class ContextualFootballModel(FixtureFootballModel):
         if "minutes_limited" in target:
             if not target.minutes_limited.isin((True, False)).all():
                 raise ValueError("Minute-limit evidence must be categorical.")
-            limited = target.minutes_limited.to_numpy(bool)
+            limited = target.minutes_limited.to_numpy(bool, copy=True)
+            if "manager_context_fixture" in target:
+                # Unnamed fixtures cannot authorize a restriction. Compare only present
+                # identities: an object column containing pd.NA cannot be compared to
+                # an integer Series safely on every supported pandas version.
+                scoped = pd.Series(False, index=target.index)
+                known = target.manager_context_fixture.notna()
+                scoped.loc[known] = target.loc[known, "fixture"].eq(
+                    target.loc[known, "manager_context_fixture"]
+                )
+                limited &= scoped.to_numpy(bool)
             shorter = probabilities[:, 1:3].sum(axis=1)
             if (limited & (shorter <= 0) & (probabilities[:, 3] > 0)).any():
                 raise ValueError("No learned sub-90 support for minute-limit evidence.")

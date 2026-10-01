@@ -8,11 +8,13 @@ path are the same code with different bytes.
 
 import json
 import re
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.unit.test_club_news_model import _RecordingSdk
 
 from squadopt.data.sources.club_news import (
     ClaimResponse,
@@ -25,6 +27,7 @@ from squadopt.data.sources.club_news_coding import (
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     coding_prompt_sha256,
 )
+from squadopt.platform import club_news_provider
 from squadopt.platform.club_news_gemini import (
     GEMINI_PROVIDER,
     ClubNewsGeminiError,
@@ -99,6 +102,44 @@ def test_a_provider_is_selected_by_environment_variable_alone(fake: str) -> None
     assert isinstance(provider, _Fake)
     assert config.provider == fake
     assert config.model_identifier == "fake-model-1"
+
+
+def test_configured_anthropic_acquisition_has_no_hidden_transport_retries(monkeypatch) -> None:
+    sdk = _RecordingSdk()
+    monkeypatch.setitem(sys.modules, "anthropic", sdk)
+    provider, config = build_coding_provider({VENDOR_VARIABLE: "synthetic-key"})
+    assert isinstance(provider, AnthropicClubNewsProvider)
+    assert config.provider == DEFAULT_PROVIDER
+    assert sdk.kwargs["max_retries"] == 0
+
+
+def test_openai_context_is_forwarded_to_adapter_after_offline_config_validation(
+    monkeypatch,
+) -> None:
+    context = {
+        "season": "2026-27",
+        "gameweek": 6,
+        "deadline": "2026-10-10T10:00:00Z",
+        "as_of": "2026-10-02T00:00:00Z",
+    }
+    recorder = {}
+
+    def factory(**kwargs):
+        recorder.update(kwargs)
+        return _Recorder()
+
+    monkeypatch.setattr(club_news_provider, "OpenAIClubNewsProvider", factory)
+    _, config = build_coding_provider(
+        {
+            PROVIDER_ENVIRONMENT_VARIABLE: "openai",
+            MODEL_ENVIRONMENT_VARIABLE: "synthetic-model",
+            KEY_ENVIRONMENT_VARIABLE: "synthetic-key",
+        },
+        target_context=context,
+    )
+    assert config.target_context == context
+    assert recorder["target_context"] == context
+    assert recorder["model_identifier"] == "synthetic-model"
 
 
 def test_an_unregistered_provider_is_refused_and_the_alternatives_are_named() -> None:
@@ -397,6 +438,11 @@ class _Recorder:
 CONFIG = CodingProviderConfig(
     provider=DEFAULT_PROVIDER, model_identifier=CODING_MODEL_IDENTIFIER, api_key="k"
 )
+ROSTER = (
+    RosterPlayer(1, "Arsenal Player", "Arsenal"),
+    RosterPlayer(2, "United Player", "Man Utd"),
+    RosterPlayer(3, "Everton Player", "Everton"),
+)
 
 
 def test_each_club_is_one_call_and_no_call_carries_two_clubs() -> None:
@@ -410,7 +456,7 @@ def test_each_club_is_one_call_and_no_call_carries_two_clubs() -> None:
     ]
     recorder = _Recorder()
 
-    coded, refused = code_week_by_club(recorder, CONFIG, documents, ())
+    coded, refused = code_week_by_club(recorder, CONFIG, documents, ROSTER)
 
     assert refused == ()
     assert len(recorder.calls) == 3
@@ -431,7 +477,7 @@ def test_a_club_whose_answer_hits_the_ceiling_does_not_cost_the_week() -> None:
         _document("Everton", "everton/news"),
     ]
 
-    coded, refused = code_week_by_club(_Recorder(fails_for="Man Utd"), CONFIG, documents, ())
+    coded, refused = code_week_by_club(_Recorder(fails_for="Man Utd"), CONFIG, documents, ROSTER)
 
     assert [club.club for club in coded] == ["Arsenal", "Everton"]
     assert [club for club, _reason in refused] == ["Man Utd"]
@@ -447,7 +493,7 @@ def test_a_club_s_pages_arrive_together_in_its_one_call() -> None:
     ]
     recorder = _Recorder()
 
-    code_week_by_club(recorder, CONFIG, documents, ())
+    code_week_by_club(recorder, CONFIG, documents, ROSTER)
 
     assert len(recorder.calls) == 1
 
@@ -456,7 +502,7 @@ def test_every_coded_club_carries_the_fingerprint_of_the_model_that_was_asked() 
     """A response is only interpretable against the question that produced it."""
 
     coded, _refused = code_week_by_club(
-        _Recorder(), CONFIG, [_document("Arsenal", "arsenal/team-news")], ()
+        _Recorder(), CONFIG, [_document("Arsenal", "arsenal/team-news")], ROSTER
     )
 
     assert coded[0].prompt_sha256 == coding_prompt_sha256(CODING_MODEL_IDENTIFIER)
@@ -470,7 +516,7 @@ def test_a_different_model_produces_a_different_recorded_question() -> None:
     )
 
     coded, _refused = code_week_by_club(
-        _Recorder(), other, [_document("Arsenal", "arsenal/team-news")], ()
+        _Recorder(), other, [_document("Arsenal", "arsenal/team-news")], ROSTER
     )
 
     assert coded[0].prompt_sha256 != coding_prompt_sha256(CODING_MODEL_IDENTIFIER)
@@ -502,7 +548,7 @@ def test_contract_mismatch_refuses_one_club_without_retrying_or_losing_other_clu
             _document("Arsenal", "arsenal/news"),
             _document("Man Utd", "united/news"),
         ],
-        (),
+        ROSTER,
     )
     assert provider.calls == [("Arsenal",), ("Man Utd",)]
     assert [entry.club for entry in coded] == ["Man Utd"]

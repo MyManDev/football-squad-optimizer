@@ -716,6 +716,10 @@ const en = {
         "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
         "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+      "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.":
+        "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.",
+      "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.":
+        "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
         "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
       "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
@@ -1829,6 +1833,10 @@ const tr: MessageSchema<typeof en> = {
         "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için veri kesitindeki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
         "Oynayabilirlik bir kez, veri kesitinden uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
+      "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.":
+        "Her hafta bir transfer; birikmiş en az iki ücretsiz hakkın varsa ikisini kullanarak iki transfer yapılabilir. Wildcard ve Free Hit haftalarında kadro yeniden kurulabilir; tek haftalık planda bu sınır yoktur.",
+      "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.":
+        "Çipli ve çipsiz adaylar, otomatik yedek değişimi ve yardımcı kaptan katkısı dahil aynı beklenen ilk 11 puanıyla karşılaştırılır. Otomatik çip planları henüz gelecekteki haber durumlarına göre dallanmaz.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
         "Pencere içindeki her hafta, ilki dahil, bir transferle sınırlıdır (wildcard haftası hariç); bir haftalık planda böyle bir sınır yoktur.",
       "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":

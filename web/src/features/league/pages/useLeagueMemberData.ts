@@ -13,7 +13,7 @@ import {
   loadEntryAdviceIndex,
   loadEntryAdviceTop100,
 } from "../data";
-import { LEAGUE_READ, useEntrySquad, useLeagueMembers } from "../queries";
+import { CAPABILITIES_READ, LEAGUE_READ, useEntrySquad, useLeagueMembers } from "../queries";
 
 /** Read only the publication authorized by the current member index and URL. */
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
@@ -33,8 +33,8 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const index = indexQuery.isError ? null : (indexQuery.data?.payload ?? null);
   // A build with no compute service has a client that cannot be asked, and this query
   // never runs: the page is the static site. With one, what it computes right now is read
-  // once; a service that is down, slow or answering for another capture leaves the page
-  // on the published tree with a notice, never on an error.
+  // on entry and again on focus once stale. A service that is down, slow or answering
+  // for another capture leaves the page on the published tree with a notice, never an error.
   const client = useMemo(() => createAdviceClient(), []);
   const leagueId = squad.data?.payload.league_id;
   const canAsk = client.readCapabilities !== undefined;
@@ -42,8 +42,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     queryKey: ["advice-capabilities", leagueId],
     queryFn: ({ signal }) => client.readCapabilities!(leagueId!, { signal }),
     enabled: validEntryId && canAsk && leagueId !== undefined,
-    ...LEAGUE_READ,
-    refetchOnWindowFocus: false,
+    ...CAPABILITIES_READ,
   });
   const capabilities = squad.data
     ? capabilitiesForPage(capabilitiesQuery.data, {

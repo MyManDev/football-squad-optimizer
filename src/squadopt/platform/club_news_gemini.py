@@ -303,6 +303,7 @@ class GeminiClubNewsProvider:
         *,
         api_key: str | None = None,
         model_identifier: str = DEFAULT_GEMINI_MODEL,
+        target_context: Mapping[str, object] | None = None,
         transport: Transport | None = None,
         timeout: float = REQUEST_TIMEOUT_SECONDS,
     ) -> None:
@@ -315,6 +316,7 @@ class GeminiClubNewsProvider:
         """
 
         validate_gemini_model(model_identifier)
+        self._target_context = target_context
         self._model_identifier = model_identifier
         self._timeout = timeout
         self._api_key = "" if api_key is None else _checked_key(api_key)
@@ -375,7 +377,16 @@ class GeminiClubNewsProvider:
         body = {
             "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": [
-                {"role": "user", "parts": [{"text": build_user_content(documents, roster)}]}
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": build_user_content(
+                                documents, roster, target_context=self._target_context
+                            )
+                        }
+                    ],
+                }
             ],
             "generationConfig": {
                 "responseMimeType": "application/json",

@@ -1,3 +1,4 @@
+import { OfficialInformationCard } from "../advice/OfficialInformationCard";
 import { useId, type CSSProperties } from "react";
 
 import { Badge } from "../../../design/components/Badge";
@@ -420,6 +421,7 @@ export function AdviceDetails({
       <Top100Section view={view} priced={priced} />
       <ExpectedLineup view={view} />
       <ParticipationEvidence view={view} />
+      <OfficialInformationCard view={view} />
       <InformationReview view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />

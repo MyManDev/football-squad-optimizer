@@ -320,7 +320,7 @@
               ]
             },
             "version": {
-              "const": "model_opportunity_reservation_v1"
+              "const": "model_opportunity_reservation_v2"
             }
           },
           "required": [
@@ -355,6 +355,43 @@
             "partial",
             "empty"
           ]
+        },
+        "decision_information": {
+          "additionalProperties": false,
+          "properties": {
+            "coach_news_bound": {
+              "type": "boolean"
+            },
+            "minute_components_bound": {
+              "type": "boolean"
+            },
+            "observed_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "revision": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "source_snapshot_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "version": {
+              "const": "football_decision_information_v1"
+            }
+          },
+          "required": [
+            "version",
+            "revision",
+            "source_snapshot_id",
+            "observed_at",
+            "coach_news_bound",
+            "minute_components_bound"
+          ],
+          "type": "object"
         },
         "entry_id": {
           "minimum": 1,
@@ -708,7 +745,7 @@
                 ],
                 "type": "object"
               },
-              "maxItems": 3,
+              "maxItems": 4,
               "type": "array"
             },
             "captured_at_utc": {
@@ -938,6 +975,114 @@
           },
           "type": "array"
         },
+        "official_information": {
+          "additionalProperties": false,
+          "properties": {
+            "declared_team_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "gameweek": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "observed_at": {
+              "type": "string"
+            },
+            "player_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "players": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "news_state": {
+                    "enum": [
+                      "present",
+                      "cleared",
+                      "not_reported"
+                    ]
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "source_added_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_chance_percent": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "team_name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "name",
+                  "team_name",
+                  "status",
+                  "source_chance_percent",
+                  "source_added_at",
+                  "news_state"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "revision": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "season": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "source_snapshot_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "source_url": {
+              "const": "https://fantasy.premierleague.com/"
+            },
+            "team_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "const": "fpl_information_v1"
+            }
+          },
+          "required": [
+            "version",
+            "season",
+            "gameweek",
+            "source_snapshot_id",
+            "observed_at",
+            "revision",
+            "source_url",
+            "player_count",
+            "team_count",
+            "declared_team_count",
+            "players"
+          ],
+          "type": "object"
+        },
         "optimality_gap": {
           "type": [
             "number",
@@ -986,6 +1131,48 @@
             "manager_statement_count": {
               "minimum": 0,
               "type": "integer"
+            },
+            "statement_outcomes": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "applied": {
+                    "type": "boolean"
+                  },
+                  "disposition": {
+                    "type": "string"
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "source_published_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "disposition",
+                  "applied",
+                  "reason",
+                  "source_url",
+                  "source_published_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             },
             "unapplied_statement_count": {
               "minimum": 0,
