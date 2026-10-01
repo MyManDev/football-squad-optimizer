@@ -518,8 +518,12 @@ const en = {
   },
   leagueEntry: {
     title: "Find your league",
+    intro:
+      "SquadOpt suggests a transfer and a captain for your FPL squad every gameweek. Open your league to see yours.",
     label: "League ID",
     hint: "Type your league ID to continue.",
+    helpTitle: "Where do I find my league ID?",
+    help: "Open your league on the FPL site. The number in the address is the league ID: in fantasy.premierleague.com/leagues/123456/standings/c it is 123456.",
     submit: "Find league",
     invalid: "Enter a positive whole-number league ID.",
     loading: "Reading the published league…",
@@ -917,6 +921,7 @@ const en = {
     memberLine: (manager: string, entryId: number) => `${manager} · #${entryId}`,
     planTitle: "Plan settings",
     viewPlan: "View plan",
+    changePlan: "Change settings",
     planNow: (summary: string) => `now: ${summary}`,
     optionNotes: "About these options",
     modelLegend: "Model",
@@ -946,16 +951,16 @@ const en = {
     fixtureAway: "A",
     fixtureNone: "no match",
     fixtureStrip: (first: number, last: number) => `Fixtures, gameweeks ${first} to ${last}`,
-    gainCaption:
-      "expected points against keeping the squad you hold, for the eleven with the captain doubled",
+    gainCaption: "expected points gained over making no transfer (the eleven, captain doubled)",
     gainCaptionBeforeCost: (cost: string) =>
-      `expected points against keeping the squad you hold, for the eleven with the captain doubled, before this week's transfer cost of ${cost}`,
+      `expected points gained over making no transfer (the eleven, captain doubled), before this week's transfer cost of ${cost}`,
     freeTransfersUsed: (used: number, free: number) => `${used}/${free} free transfers`,
     freeTransfersKeptUnderChip: (chip: string, free: number) =>
       `${chip}: none of the ${free} free transfers held is used`,
     hitPointsFact: (points: string) => `${points} hit points`,
-    stampOptimal: "PROVEN · OPTIMAL",
-    stampOptimalCaption: "Proved the best plan for its own objective.",
+    stampOptimal: "BEST PLAN · PROVEN",
+    stampOptimalCaption:
+      "On these forecasts and settings no better plan exists, and that is proved.",
     captainMark: "C",
     viceMark: "V",
     honestyModel: "Expected points are a model's estimate, not a promise.",
@@ -1652,8 +1657,12 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueEntry: {
     title: "Ligini bul",
+    intro:
+      "SquadOpt, FPL kadron için her hafta transfer ve kaptan önerir. Önerini görmek için ligini aç.",
     label: "Lig numarası",
     hint: "Devam etmek için lig numaranı yaz.",
+    helpTitle: "Lig numaramı nerede bulurum?",
+    help: "FPL sitesinde ligini aç. Adresteki sayı lig numarandır: fantasy.premierleague.com/leagues/123456/standings/c adresinde lig numarası 123456.",
     submit: "Ligi bul",
     invalid: "Pozitif tam sayı olan bir lig numarası gir.",
     loading: "Yayımlanan lig okunuyor…",
@@ -2024,6 +2033,7 @@ const tr: MessageSchema<typeof en> = {
     memberLine: (manager, entryId) => `${manager} · #${entryId}`,
     planTitle: "Plan ayarları",
     viewPlan: "Planı gör",
+    changePlan: "Ayarları değiştir",
     planNow: (summary) => `şu an: ${summary}`,
     optionNotes: "Seçenekler hakkında",
     modelLegend: "Model",
@@ -2050,15 +2060,15 @@ const tr: MessageSchema<typeof en> = {
     fixtureAway: "D",
     fixtureNone: "maç yok",
     fixtureStrip: (first, last) => `${first}-${last}. hafta fikstürü`,
-    gainCaption: "beklenen puan, mevcut kadronu korumaya göre (ilk on bir, kaptan iki kat)",
+    gainCaption: "beklenen puan kazancı, hiç transfer yapmamana göre (ilk on bir, kaptan iki kat)",
     gainCaptionBeforeCost: (cost) =>
-      `beklenen puan, mevcut kadronu korumaya göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
+      `beklenen puan kazancı, hiç transfer yapmamana göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
     freeTransfersUsed: (used, free) => `${used}/${free} ücretsiz transfer`,
     freeTransfersKeptUnderChip: (chip, free) =>
       `${chip}: eldeki ${free} ücretsiz transfer kullanılmaz`,
     hitPointsFact: (points) => `${points} ceza puanı`,
-    stampOptimal: "KANITLANDI · OPTİMAL",
-    stampOptimalCaption: "Kendi hedefine göre en iyi plan olduğu kanıtlandı.",
+    stampOptimal: "EN İYİ PLAN · KANITLANDI",
+    stampOptimalCaption: "Bu tahminlere ve ayarlara göre daha iyi bir plan yok; bu kanıtlandı.",
     captainMark: "C",
     viceMark: "V",
     honestyModel: "Beklenen puan bir model tahminidir, söz değildir.",

@@ -267,6 +267,89 @@ function LeagueMemberContent({
     </div>
   );
 
+  // The plan's settings sit under the decision they change. A member opens the page to
+  // read this week's move; the controls that recompute it are one link away, not in front.
+  const planSettings = (
+    <section
+      id="plan-settings"
+      aria-labelledby="plan-settings-title"
+      className={styles.planSettings}
+    >
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        part="plan"
+      />
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        part="top100"
+      />
+      <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          part="advanced"
+        />
+        <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
+        <TemplatePicker
+          canApply={(params) => {
+            const offered = resolve(params);
+            return (
+              !adviceLoading &&
+              indexReadable &&
+              (offered.status === "ready" || offered.computable?.selection === true)
+            );
+          }}
+        />
+      </Tool>
+      <AdviceRequestPanel
+        dockClassName={styles.computeDock}
+        request={request}
+        job={job}
+        selectionAvailable={
+          selectionAvailable &&
+          !selection.evidence.on &&
+          selection.top100.weight === 0 &&
+          selection.chip.chip === null
+        }
+        service={
+          selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
+        }
+        computable={computeAvailable}
+        pending={computePending}
+        published={
+          adviceLoading || !indexReadable
+            ? undefined
+            : selection.status === "not-listed" || selection.status === "declared-unavailable"
+              ? false
+              : selectionAvailable &&
+                  advice &&
+                  !adviceIssue &&
+                  !rejectedContext &&
+                  !rejectedUnreadable
+                ? true
+                : undefined
+        }
+        chipChosen={selection.chip.chip !== null}
+        deadlinePassed={deadlinePassed !== null}
+      />
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        part="notes"
+      />
+    </section>
+  );
+
   return (
     <div className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
@@ -304,89 +387,6 @@ function LeagueMemberContent({
           </p>
         ) : null}
 
-        <section
-          id="plan-settings"
-          aria-labelledby="plan-settings-title"
-          className={styles.planSettings}
-        >
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="plan"
-          />
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="top100"
-          />
-          <Tool title={copy.advancedSettings}>
-            <MemberDecisionControls
-              entryId={entryId}
-              members={members}
-              index={selection.status === "index-error" ? null : index}
-              capabilities={capabilities}
-              part="advanced"
-            />
-            <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-            <TemplatePicker
-              canApply={(params) => {
-                const offered = resolve(params);
-                return (
-                  !adviceLoading &&
-                  indexReadable &&
-                  (offered.status === "ready" || offered.computable?.selection === true)
-                );
-              }}
-            />
-          </Tool>
-          <AdviceRequestPanel
-            dockClassName={styles.computeDock}
-            request={request}
-            job={job}
-            selectionAvailable={
-              selectionAvailable &&
-              !selection.evidence.on &&
-              selection.top100.weight === 0 &&
-              selection.chip.chip === null
-            }
-            service={
-              selection.computable
-                ? "ready"
-                : computeService === "ready"
-                  ? "static"
-                  : computeService
-            }
-            computable={computeAvailable}
-            pending={computePending}
-            published={
-              adviceLoading || !indexReadable
-                ? undefined
-                : selection.status === "not-listed" || selection.status === "declared-unavailable"
-                  ? false
-                  : selectionAvailable &&
-                      advice &&
-                      !adviceIssue &&
-                      !rejectedContext &&
-                      !rejectedUnreadable
-                    ? true
-                    : undefined
-            }
-            chipChosen={selection.chip.chip !== null}
-            deadlinePassed={deadlinePassed !== null}
-          />
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="notes"
-          />
-        </section>
-
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
@@ -397,6 +397,11 @@ function LeagueMemberContent({
                 <p className={styles.selectionSummary} data-testid="member-selection-summary">
                   {selectionSummary}
                 </p>
+                {/* The settings now sit under the decision, so the way to them is named
+                    where the decision says which settings it was made under. */}
+                <a href="#plan-settings" className={styles.changePlan}>
+                  {copy.changePlan}
+                </a>
                 <p className={styles.echo} aria-live="polite">
                   {echo}
                 </p>
@@ -453,6 +458,8 @@ function LeagueMemberContent({
             </>
           ) : null}
         </section>
+
+        {planSettings}
 
         {viewer ? (
           <Card tone="muted" title={copy.viewerTitle}>
