@@ -111,13 +111,14 @@ def captures(tmp_path: Path) -> Path:
 def test_the_decision_capture_is_the_latest_one_whose_open_deadline_is_that_week(
     captures: Path,
 ) -> None:
-    chosen, skipped = decision_captures(captures)
+    chosen, skipped, inventory = decision_captures(captures)
     assert sorted(chosen) == [6, 7, 8]
+    assert len(inventory) == 6 and all("captured_at_utc" in c for c in inventory)
     assert chosen[6].captured_at_utc == "2026-10-10T07:00:00Z"
     assert chosen[6].deadline_utc == "2026-10-10T10:00:00Z"
     assert chosen[7].deadline_utc == "2026-10-17T17:30:00Z"
     assert sorted(s["reason"] for s in skipped) == ["after_every_deadline", "no_bootstrap_payload"]
-    assert all(s["snapshot_id"].startswith("fpl-live-") for s in skipped)
+    assert all(s["snapshot_id"].startswith("fpl-live-") and s["captured_at_utc"] for s in skipped)
 
 
 def test_a_missing_root_or_one_without_live_captures_is_refused(tmp_path: Path) -> None:
@@ -155,7 +156,7 @@ def test_the_later_row_is_read_by_the_availability_rules_precedence(
 
 
 def test_a_pair_counts_every_stated_player_once_and_names_what_happened(captures: Path) -> None:
-    chosen, _ = decision_captures(captures)
+    chosen, _, _ = decision_captures(captures)
     pair = pair_transitions(chosen[6], chosen[7])
     by_chance = {cell["stated_chance"]: cell for cell in pair["cells"]}
     assert set(by_chance) == {25, 50, 75, None}
@@ -205,12 +206,15 @@ def test_wilson_interval_is_the_score_interval_and_absent_for_no_trials() -> Non
 def test_a_pair_is_consecutive_follows_the_earlier_deadline_and_repeats_no_player(
     captures: Path,
 ) -> None:
-    chosen, _ = decision_captures(captures)
+    chosen, _, _ = decision_captures(captures)
     with pytest.raises(TransitionsRefusal, match="consecutive"):
         pair_transitions(chosen[7], chosen[6])
     early = replace(chosen[7], captured_at_utc="2026-10-10T09:00:00Z")
-    with pytest.raises(TransitionsRefusal, match="follow the earlier deadline"):
+    with pytest.raises(TransitionsRefusal, match="taken before the earlier deadline"):
         pair_transitions(chosen[6], early)
+    # A capture at the deadline instant is closed for that week and so belongs to the next.
+    at_deadline = replace(chosen[7], captured_at_utc="2026-10-10T10:00:00Z")
+    assert pair_transitions(chosen[6], at_deadline)["later"]["gameweek"] == 7
     moved = [dict(e, deadline_time="2026-10-12T10:00:00Z") if e["id"] == 6 else e for e in EVENTS]
     republished = replace(
         chosen[7],
@@ -228,6 +232,9 @@ def test_prospective_means_the_earlier_deadline_fell_after_the_protocol_merged(
 ) -> None:
     both = measure(captures, "2026-10-09T15:00:00+03:00", protocol_commit="abc1234")
     assert both["protocol_merged_at_utc"] == "2026-10-09T12:00:00Z"
+    fraction = measure(captures, "2026-10-09T15:00:00.250+03:00", protocol_commit="abc1234")
+    assert fraction["protocol_merged_at_utc"].endswith("T12:00:00.250000Z")
+    assert both["pairs_refused"] == []
     assert [pair["prospective"] for pair in both["pairs"]] == [True, True]
     assert both["prospective_pairs"] == 2 and both["pooled_prospective"]["pairs"] == 2
     assert both["protocol_commit"] == "abc1234"
@@ -248,9 +255,13 @@ def test_prospective_means_the_earlier_deadline_fell_after_the_protocol_merged(
     bounded = measure(captures, "2026-10-09T12:00:00Z", through_gameweek=7)
     assert [pair["later"]["gameweek"] for pair in bounded["pairs"]] == [7]
     assert bounded["through_gameweek"] == 7
-    # The reading's inventory ends at its bound: GW8 is not part of it, GW7 has no partner.
+    # The reading's inventory ends at its bound: GW8 is not part of it, GW7 has no partner,
+    # and the captures after GW7's deadline (GW8's and the one after every deadline) are not
+    # read into it, while the no-bootstrap capture of 11 October is.
     assert [d["gameweek"] for d in bounded["decision_captures"]] == [6, 7]
     assert bounded["gameweeks_without_partner"] == [7]
+    assert bounded["captures_read"] == 4
+    assert [s["reason"] for s in bounded["captures_skipped"]] == ["no_bootstrap_payload"]
     with pytest.raises(TransitionsRefusal, match=r"1\.\.38"):
         measure(captures, "2026-10-09T12:00:00Z", through_gameweek=40)
     with pytest.raises(TransitionsRefusal, match="No decision capture at or before"):
@@ -291,8 +302,9 @@ def test_a_refusal_leaves_no_directory_and_the_inputs_are_never_written_into(
             run(captures, "2026-10-09T12:00:00Z", REPOSITORY_ROOT / name / "transitions_probe")
         assert not (REPOSITORY_ROOT / name / "transitions_probe").exists()
     (tmp_path / "afile").write_text("x")
-    with pytest.raises(TransitionsRefusal, match="under a file"):
-        run(captures, "2026-10-09T12:00:00Z", tmp_path / "afile" / "child")
+    for below in (tmp_path / "afile" / "child", tmp_path / "afile" / "child" / "grandchild"):
+        with pytest.raises(TransitionsRefusal, match="under a file"):
+            run(captures, "2026-10-09T12:00:00Z", below)
 
 
 def test_main_refuses_on_stderr_and_reports_on_stdout(
@@ -330,9 +342,11 @@ def test_main_refuses_on_stderr_and_reports_on_stdout(
     assert (tmp_path / "b" / "record.json").exists()
     assert json.loads(capsys.readouterr().out) == {
         "pairs": 2,
+        "pairs_refused": 0,
         "prospective_pairs": 1,
         "gameweeks_without_partner": [8],
-        "captures_skipped": 2,
+        # Bounded at GW8, the capture after every deadline lies past the inventory's end.
+        "captures_skipped": 1,
     }
 
 
@@ -361,11 +375,35 @@ def test_the_summary_prints_pooled_and_per_pair_rows_and_marks_thin_intervals(
     assert "No share is a calibrated probability" in text
 
 
-def test_two_captures_in_the_same_second_resolve_to_the_later_listed_as_the_backend_does(
-    tmp_path: Path,
-) -> None:
+def test_two_captures_at_an_identical_instant_resolve_to_the_later_listed(tmp_path: Path) -> None:
     root = tmp_path / "snapshots"
     first = _write(root, "2026-10-10T07:00:00Z", GW6)
     second = _write(root, "2026-10-10T07:00:00Z", [*GW6, _element(10, "a", None)])
-    chosen, _ = decision_captures(root)
+    chosen, _, _ = decision_captures(root)
     assert chosen[6].snapshot_id == max(first, second)
+
+
+def test_a_refused_pair_is_listed_with_its_reason_and_the_other_pairs_stand(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "snapshots"
+    _write(root, "2026-10-10T07:00:00Z", GW6)
+    moved = [dict(e, deadline_time="2026-10-12T10:00:00Z") if e["id"] == 6 else e for e in EVENTS]
+    write_snapshot(
+        root,
+        source="fpl-live",
+        captured_at_utc="2026-10-16T12:00:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: json.dumps(
+                {"events": moved, "teams": TEAMS, "elements": GW7}
+            ).encode(),
+            FIXTURES_PAYLOAD: b"[]",
+        },
+    )
+    _write(root, "2026-10-24T09:00:00Z", GW8)
+    record = measure(root, "2026-10-09T12:00:00Z", protocol_commit="abc1234")
+    assert [p["later"]["gameweek"] for p in record["pairs"]] == [8]
+    assert len(record["pairs_refused"]) == 1
+    refused = record["pairs_refused"][0]
+    assert refused["earlier"]["gameweek"] == 6 and "different deadline" in refused["reason"]
+    assert "Pair GW6 to GW7 refused: " in summary(record)

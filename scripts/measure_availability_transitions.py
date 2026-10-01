@@ -9,7 +9,8 @@ chance of playing as resolving before the next decision, eligible with that prob
 (``live/football_observations.py``). The stored captures already hold the answer: the
 decision capture of gameweek g says what the source stated, and the decision capture of
 g+1 says how the same player stood when the next decision was made. This counts, per
-stated chance, how many were by then available, still doubtful, out, or no longer listed.
+stated chance, how many were by then available, still doubtful, out, no longer listed, or
+carried a status the rule does not know.
 Counts and player codes are recorded; no note text leaves the capture. Nothing is
 fetched, fitted or scored against a match outcome. Protocol:
 ``docs/availability_transitions_prereg.md``.
@@ -131,15 +132,21 @@ def resolve(status: str, chance: float | None) -> str:
     return "unknown"
 
 
+def _skipped(identifier: str, captured_at_utc: str, reason: str) -> dict[str, str]:
+    return {"snapshot_id": identifier, "captured_at_utc": captured_at_utc, "reason": reason}
+
+
 def decision_captures(
     snapshot_root: Path,
-) -> tuple[dict[int, DecisionCapture], list[dict[str, str]]]:
-    """One decision capture per gameweek, and the captures that were no decision at all.
+) -> tuple[dict[int, DecisionCapture], list[dict[str, str]], list[dict[str, str]]]:
+    """One decision capture per gameweek, the captures that were no decision, the inventory.
 
-    The decision capture is the latest capture whose open deadline is that week, the rule
-    the prospective football protocol scores from. A capture with no bootstrap payload,
-    one whose deadlines cannot be read, or one taken after every published deadline
-    describes no decision; it is listed as skipped with its reason, not treated as a week.
+    The decision capture is the latest capture by instant whose open deadline is that
+    week, the rule the prospective football protocol scores from; on an identical instant
+    the later listed capture is taken. A capture with no bootstrap payload, one whose
+    deadlines cannot be read, or one taken after every published deadline describes no
+    decision; it is listed as skipped with its reason, not treated as a week. The inventory
+    names every capture read with its instant, so a bounded reading can say which it saw.
     """
     if not snapshot_root.is_dir():
         raise TransitionsRefusal(f"No snapshot directory at {snapshot_root}.")
@@ -148,33 +155,35 @@ def decision_captures(
         raise TransitionsRefusal(f"No {FPL_LIVE_SOURCE} captures under {snapshot_root}.")
     chosen: dict[int, DecisionCapture] = {}
     skipped: list[dict[str, str]] = []
+    inventory: list[dict[str, str]] = []
     for identifier in identifiers:
         snapshot = read_snapshot(snapshot_root, identifier)
+        captured_at_utc = snapshot.metadata.captured_at_utc
+        inventory.append({"snapshot_id": identifier, "captured_at_utc": captured_at_utc})
         bootstrap = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
         if bootstrap is None:
-            skipped.append({"snapshot_id": identifier, "reason": "no_bootstrap_payload"})
+            skipped.append(_skipped(identifier, captured_at_utc, "no_bootstrap_payload"))
             continue
-        captured_at_utc = snapshot.metadata.captured_at_utc
         try:
             deadlines = gameweek_deadlines(bootstrap)
         except DataError:
-            skipped.append({"snapshot_id": identifier, "reason": "deadlines_unreadable"})
+            skipped.append(_skipped(identifier, captured_at_utc, "deadlines_unreadable"))
             continue
         try:
             deadline = next_open_deadline(deadlines, as_of_utc=captured_at_utc)
         except DataSourceError:
-            skipped.append({"snapshot_id": identifier, "reason": "after_every_deadline"})
+            skipped.append(_skipped(identifier, captured_at_utc, "after_every_deadline"))
             continue
         candidate = DecisionCapture(
             deadline.gameweek, identifier, captured_at_utc, deadline.deadline_utc, bootstrap
         )
         held = chosen.get(candidate.gameweek)
-        # Ties on the instant go to the later listed id, as the backend's newest capture does.
+        # An identical instant goes to the later listed id.
         if held is None or as_instant(candidate.captured_at_utc) >= as_instant(
             held.captured_at_utc
         ):
             chosen[candidate.gameweek] = candidate
-    return chosen, skipped
+    return chosen, skipped, inventory
 
 
 def _merge_instant(value: str) -> str:
@@ -186,7 +195,7 @@ def _merge_instant(value: str) -> str:
     if parsed.tzinfo is None:
         raise TransitionsRefusal("protocol merge instant must carry its offset or Z.")
     return normalize_utc_timestamp(
-        parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), label="protocol merge instant"
+        parsed.astimezone(UTC).isoformat().replace("+00:00", "Z"), label="protocol merge instant"
     )
 
 
@@ -243,10 +252,10 @@ def pair_transitions(earlier: DecisionCapture, later: DecisionCapture) -> dict[s
     """How every player stated at 25, 50 or 75 in the earlier capture stood in the later one."""
     if later.gameweek != earlier.gameweek + 1:
         raise TransitionsRefusal("A pair is two consecutive decision captures.")
-    if as_instant(later.captured_at_utc) <= as_instant(earlier.deadline_utc):
+    if as_instant(later.captured_at_utc) < as_instant(earlier.deadline_utc):
         raise TransitionsRefusal(
-            f"The later decision capture {later.snapshot_id} must follow the earlier "
-            f"deadline {earlier.deadline_utc}; a moved deadline is a different week."
+            f"The later decision capture {later.snapshot_id} was taken before the earlier "
+            f"deadline {earlier.deadline_utc}."
         )
     republished = {d.gameweek: d.deadline_utc for d in gameweek_deadlines(later.bootstrap)}
     if republished.get(earlier.gameweek) != earlier.deadline_utc:
@@ -304,22 +313,38 @@ def measure(
         isinstance(through_gameweek, bool) or not 1 <= through_gameweek <= 38
     ):
         raise TransitionsRefusal("through_gameweek must be a gameweek in 1..38.")
-    captures, skipped = decision_captures(snapshot_root)
+    captures, skipped, inventory = decision_captures(snapshot_root)
     if through_gameweek is not None:
-        # A reading's inventory ends at its bound: later decision captures are not part of it.
+        # A reading's inventory ends at its bound: the last kept decision capture's deadline.
         captures = {g: c for g, c in captures.items() if g <= through_gameweek}
         if not captures:
             raise TransitionsRefusal(
                 f"No decision capture at or before gameweek {through_gameweek}."
             )
+        horizon = as_instant(captures[max(captures)].deadline_utc)
+        inventory = [c for c in inventory if as_instant(c["captured_at_utc"]) <= horizon]
+        skipped = [c for c in skipped if as_instant(c["captured_at_utc"]) <= horizon]
     pairs: list[dict[str, Any]] = []
+    refused: list[dict[str, Any]] = []
     without_partner: list[int] = []
     for gameweek in sorted(captures):
         later = captures.get(gameweek + 1)
         if later is None:
             without_partner.append(gameweek)
             continue
-        pair = pair_transitions(captures[gameweek], later)
+        try:
+            pair = pair_transitions(captures[gameweek], later)
+        except TransitionsRefusal as error:
+            # A refused pair is listed with its reason, like a skipped capture; the other
+            # pairs of the reading stand.
+            refused.append(
+                {
+                    "earlier": captures[gameweek].identity(),
+                    "later": later.identity(),
+                    "reason": str(error),
+                }
+            )
+            continue
         # Prospective means the earlier week's decision was still open when the protocol
         # merged; a pair whose later state could already have been seen is retrospective.
         pair["prospective"] = as_instant(captures[gameweek].deadline_utc) > as_instant(merged)
@@ -336,10 +361,11 @@ def measure(
         "protocol_merged_at_utc": merged,
         "protocol_commit": protocol_commit,
         "through_gameweek": through_gameweek,
-        "captures_read": len(list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE)),
+        "captures_read": len(inventory),
         "captures_skipped": skipped,
         "decision_captures": [captures[week].identity() for week in sorted(captures)],
         "pairs": pairs,
+        "pairs_refused": refused,
         "prospective_pairs": sum(bool(pair["prospective"]) for pair in pairs),
         "pooled_prospective": pooled_prospective(pairs),
         "gameweeks_without_partner": without_partner,
@@ -420,6 +446,12 @@ def summary(record: Mapping[str, Any]) -> str:
     missing = record["gameweeks_without_partner"]
     if missing:
         lines += ["", "No pair for gameweek(s) " + ", ".join(str(w) for w in missing) + "."]
+    for pair in record["pairs_refused"]:
+        lines += [
+            "",
+            f"Pair GW{pair['earlier']['gameweek']} to GW{pair['later']['gameweek']} refused: "
+            f"{pair['reason']}",
+        ]
     if record["captures_skipped"]:
         lines += [
             "",
@@ -445,7 +477,8 @@ def _refuse_destination(output: Path, snapshot_root: Path) -> None:
     ):
         if target == forbidden or forbidden in target.parents:
             raise TransitionsRefusal(f"Refusing to write {why}: {output}.")
-    if output.parent.exists() and not output.parent.is_dir():
+    ancestor = next((path for path in output.parents if path.exists()), None)
+    if ancestor is not None and not ancestor.is_dir():
         raise TransitionsRefusal(f"Refusing to write under a file: {output}.")
 
 
@@ -516,6 +549,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         json.dumps(
             {
                 "pairs": len(result["pairs"]),
+                "pairs_refused": len(result["pairs_refused"]),
                 "prospective_pairs": result["prospective_pairs"],
                 "gameweeks_without_partner": result["gameweeks_without_partner"],
                 "captures_skipped": len(result["captures_skipped"]),

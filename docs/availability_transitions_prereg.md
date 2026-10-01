@@ -22,22 +22,25 @@ decision was made. Nothing else is needed, and nothing else is read.
 
 ## Captures and pairs
 
-- A **decision capture** of gameweek g is the latest stored `fpl-live` capture whose own open
-  deadline is g (`next_open_deadline` on the capture's own bootstrap at its capture instant),
-  the rule `docs/football_prospective_prereg.md` scores from. A capture without a bootstrap
+- A **decision capture** of gameweek g is the latest stored `fpl-live` capture, by capture
+  instant, whose own open deadline is g (`next_open_deadline` on the capture's own bootstrap
+  at its capture instant), the rule `docs/football_prospective_prereg.md` scores from; on an
+  identical instant, the later listed capture. A capture without a bootstrap
   payload, one whose deadlines cannot be read, or one taken after every published deadline
   is no decision capture; the record lists it as skipped, with the reason.
-- A **pair** is the decision captures of g and g+1. The later one must have been taken
-  after the earlier deadline, and it must publish the same deadline for g that the earlier
-  one did; a deadline that moved between the two is a different week, refused. A gameweek
-  with no following decision capture has no pair; it is listed as such, not counted as zero
-  of anything.
+- A **pair** is the decision captures of g and g+1. The later one must not have been taken
+  before the earlier deadline (a capture at the deadline instant is closed for g and belongs
+  to g+1), it must publish the same deadline for g that the earlier one did, and neither
+  capture may repeat a player; a deadline that moved between the two is a different week.
+  A pair that fails one of these is **refused and listed with its reason**, like a skipped
+  capture; the reading's other pairs stand. A gameweek with no following decision capture
+  has no pair; it is listed as such, not counted as zero of anything.
 - A pair is **prospective** when the earlier gameweek's deadline falls after this protocol
   merges, so its later state could not have been seen when the count was declared. The
   runner cannot know that instant: it receives it as `--protocol-merged-at`, the committer
   timestamp of the merge commit on `develop` (`git log -1 --format=%cI <commit>`, any
-  offset accepted and kept in UTC), and the required `--protocol-commit` names that commit
-  in the record. Earlier pairs are **retrospective**: the 22 September captures already target
+  offset accepted and kept in UTC to the precision given), and the required
+  `--protocol-commit` names that commit in the record. Earlier pairs are **retrospective**: the 22 September captures already target
   GW6 and show how the GW5 doubtful players stood four days after the GW5 deadline.
   Retrospective pairs are reported, labelled, and never pooled with prospective ones. If
   this merges before the GW6 deadline (2026-10-10T10:00Z), the first prospective pair is
@@ -85,9 +88,10 @@ the directory is created so a refusal leaves nothing behind; it refuses a destin
 inside the snapshot root or under the repository's `data/` or `docs/`. The C2 question
 proposed `artifacts/` as the destination; any directory outside those three is accepted
 instead, `artifacts/` by convention, because the reading's pull request copies the result
-into `docs/research/`. `--through-gameweek` bounds a reading: decision captures after that
-gameweek are not part of its inventory, so its pairs, its partnerless gameweeks and its
-pooled block are the protocol's and not the run date's. It is to be run only by the operator of the
+into `docs/research/`. `--through-gameweek` bounds a reading: its inventory ends at the last kept decision
+capture's deadline, so its decision captures, pairs, refused pairs, partnerless gameweeks,
+skipped captures, capture count and pooled block are the protocol's and not the run
+date's. It is to be run only by the operator of the
 machine that holds the captures, and only once that operator has said so.
 
 ## Readings
