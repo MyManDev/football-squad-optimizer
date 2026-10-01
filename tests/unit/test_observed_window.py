@@ -56,6 +56,14 @@ def test_complete_budgeted_branches_retain_resources(
     assert review["allocated_total"] <= 5.000001
     assert review["actual_total"] <= 5.01
     assert review["utility_gain_vs_baseline"] >= 0
+    proposals = [
+        row for row in review["ledger"] if row["phase"].startswith("information_proposal:")
+    ]
+    assert {row["phase"] for row in proposals} == {
+        "information_proposal:good",
+        "information_proposal:bad",
+    }
+    assert sum(row["cap"] for row in proposals) == pytest.approx(0.1 * review["configured_total"])
     for candidate in review["candidates"]:
         assert len(candidate["branches"]) == 2
         for branch in candidate["branches"]:
@@ -64,6 +72,54 @@ def test_complete_budgeted_branches_retain_resources(
     if freehit:
         assert result.weeks[0].chip == "freehit"
         assert result.weeks[1].bank_before_tenths == initial.bank_tenths
+
+
+def test_bad_news_proposal_finds_a_hedge_that_cannot_be_bought_after_the_update(
+    known_optimum_players, small_config
+):
+    horizon, initial, config = problem(known_optimum_players, small_config)
+    table = horizon.table.copy()
+    table["expected_points"] = 0.0
+    table.loc[table.player_id.isin(("GK_A", "DEF_A", "MID_A")), "expected_points"] = 1.0
+    for week, player, points in (
+        (1, "FWD_A", 8),
+        (1, "FWD_B", 5),
+        (2, "FWD_A", 12),
+        (2, "FWD_B", 10),
+    ):
+        table.loc[table.gameweek.eq(week) & table.player_id.eq(player), "expected_points"] = points
+    # An explicitly supplied synthetic price path: today's bank cannot pay the
+    # later premium. Buying the alternative before the news is a distinct action.
+    table.loc[
+        table.gameweek.gt(1) & table.player_id.eq("FWD_B"),
+        ["buy_price_tenths", "sell_price_tenths"],
+    ] = 70
+    horizon = PlanningHorizon(table)
+    future = table.loc[table.gameweek.ne(1)].copy()
+    yes, no = future.copy(), future.copy()
+    target = future.gameweek.eq(2) & future.player_id.eq("FWD_A")
+    yes.loc[target, "expected_points"] = 24
+    no.loc[target, "expected_points"] = 0
+    nodes = (
+        ObservationNode("eligible", 0.5, PlanningHorizon(yes)),
+        ObservationNode("unavailable", 0.5, PlanningHorizon(no)),
+    )
+    result = optimize_observed_window(
+        horizon,
+        initial,
+        nodes,
+        replace(config, solver_time_limit_seconds=120),
+        TransferPlanningConfig(max_transfers_per_gameweek=1, acquisition_sell_on_fee=0.5),
+    )
+    review = result.diagnostics["observed_window"]
+    assert review["status"] == "compared"
+    assert review["candidates"][0]["first_in"] == []
+    assert result.weeks[0].transfers_in.player_id.tolist() == ["FWD_B"]
+    assert review["utility_gain_vs_baseline"] > 0
+    chosen = review["candidates"][review["chosen_index"]]
+    assert {branch["id"] for branch in chosen["branches"]} == {"eligible", "unavailable"}
+    assert all(branch["first_action"]["in"] == ["FWD_B"] for branch in chosen["branches"])
+    assert review["allocated_total"] <= review["configured_total"] + 1e-9
 
 
 @pytest.mark.parametrize("corruption", ["price", "mean", "probability"])
@@ -97,7 +153,7 @@ def test_partial_comparison_keeps_complete_baseline(
         nonlocal calls
         calls += 1
         result = original(*args, **kwargs)
-        if calls == 3:
+        if kwargs.get("first_week_exclusion") is not None and calls == 4:
             return replace(
                 result,
                 solver_status=SolverStatus.UNKNOWN,
@@ -403,7 +459,7 @@ def test_optional_proposal_failure_keeps_complete_action_comparison(
         TransferPlanningConfig(),
     )
     review = result.diagnostics["observed_window"]
-    assert len(failed) == 1
+    assert len(failed) == 2
     assert review["status"] == "compared"
     assert review["candidate_count"] == 2
     assert review["proposal_completed"] is False

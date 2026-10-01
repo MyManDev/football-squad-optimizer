@@ -35,7 +35,8 @@ CLUB_NEWS_SOURCE: Final = "club-news"
 #: The response format the prompt asks for and the parser reads. Bumped whenever either
 #: end changes, because a response stored under one version is not readable under another.
 LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v1"
-ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v2"
+PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v2"
+ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION: Final = "rotation_claim_response_v3"
 
 #: The fixture's own contract, separate from the response's: the fixture carries documents,
 #: a roster and responses, and its shape can change without the response format moving.

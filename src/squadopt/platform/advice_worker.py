@@ -124,6 +124,21 @@ DEFAULT_MAX_ATTEMPTS: Final = 3
 DEFAULT_MAX_BACKOFF_SECONDS: Final = 60.0
 
 
+def _advice_player_ids(value: object) -> set[int]:
+    """Only named decision players are included in a public information card."""
+    found: set[int] = set()
+    if isinstance(value, dict):
+        code = value.get("player_id")
+        if isinstance(code, int) and not isinstance(code, bool):
+            found.add(code)
+        for item in value.values():
+            found.update(_advice_player_ids(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(_advice_player_ids(item))
+    return found
+
+
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
@@ -343,6 +358,9 @@ def build_advice_compute(
                 "No plan was found for this selection from this capture.",
             ) from error
         if football is not None:
+            advice["decision_information"] = capture.switches.decision_information(
+                capture.inputs.snapshot_id
+            )
             advice["prediction_model"] = {
                 "id": "football",
                 "version": football.horizon.model_version,
@@ -372,6 +390,12 @@ def build_advice_compute(
                     else []
                 ),
             ]
+        if capture.inputs.official_information is not None:
+            # Statement outcomes may name a player outside the chosen squad. Include
+            # those public decisions before selecting the matching official facts.
+            advice["official_information"] = capture.inputs.official_information.public_record(
+                _advice_player_ids(advice)
+            )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

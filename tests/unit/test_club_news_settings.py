@@ -245,6 +245,7 @@ def test_selected_openai_settings_reach_the_existing_provider_factory(
             "response_format": "json_object",
             "max_completion_tokens": 4096,
             "allow_local_http": False,
+            "target_context": None,
         }
     ]
     assert SECRET not in repr(config)

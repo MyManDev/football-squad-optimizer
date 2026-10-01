@@ -517,6 +517,12 @@ class TransferPlanningConfig:
     supplied sale paths unchanged. A fee in [0, 1] tracks each new acquisition;
     original holdings retain their supplied sale paths until first sold.
     """
+    allow_two_free_transfers: bool = False
+    """Under a one-move cap, allow a second move only from two banked free transfers.
+
+    This bounded financing neighborhood never permits a two-move paid transfer;
+    Wildcard and Free Hit retain their ordinary rebuild exemption.
+    """
 
     def __post_init__(self) -> None:
         if self.contract_version != TRANSFER_PLANNING_CONTRACT_VERSION:
@@ -527,6 +533,8 @@ class TransferPlanningConfig:
             raise TransferPlanningConfigurationError(
                 "wildcard_preserves_free_transfers must be a boolean."
             )
+        if not isinstance(self.allow_two_free_transfers, bool):
+            raise TransferPlanningConfigurationError("allow_two_free_transfers must be a boolean.")
         if self.max_transfers_per_gameweek is not None:
             object.__setattr__(
                 self,
@@ -618,6 +626,8 @@ class TransferPlanningConfig:
         # Existing supplied-path callers keep their recorded fingerprints.
         if self.acquisition_sell_on_fee is not None:
             payload["acquisition_sell_on_fee"] = float(self.acquisition_sell_on_fee).hex()
+        if self.allow_two_free_transfers:
+            payload["allow_two_free_transfers"] = True
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 

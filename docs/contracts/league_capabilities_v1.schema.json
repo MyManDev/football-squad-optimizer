@@ -32,7 +32,7 @@
           "additionalProperties": false,
           "properties": {
             "version": {
-              "const": "model_opportunity_reservation_v1"
+              "const": "model_opportunity_reservation_v2"
             },
             "windows": {
               "items": {
@@ -61,6 +61,43 @@
     "contract_version": {
       "const": "league_capabilities_v1",
       "type": "string"
+    },
+    "decision_information": {
+      "additionalProperties": false,
+      "properties": {
+        "coach_news_bound": {
+          "type": "boolean"
+        },
+        "minute_components_bound": {
+          "type": "boolean"
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "const": "football_decision_information_v1"
+        }
+      },
+      "required": [
+        "version",
+        "revision",
+        "source_snapshot_id",
+        "observed_at",
+        "coach_news_bound",
+        "minute_components_bound"
+      ],
+      "type": "object"
     },
     "gameweek": {
       "minimum": 1,

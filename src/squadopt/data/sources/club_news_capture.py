@@ -91,8 +91,20 @@ class CodedClub:
     provider: str | None = None
     request_configuration: Mapping[str, str | int] | None = None
     """Optional coding-request identity. No key or raw operator endpoint is stored."""
+    request_fingerprint: str | None = None
+    reused_from_snapshot: str | None = None
 
     def __post_init__(self) -> None:
+        if (
+            self.reused_from_snapshot is not None
+            and re.fullmatch(r"[A-Za-z0-9_-]+", self.reused_from_snapshot) is None
+        ):
+            raise InvalidValueError("Invalid reused news capture identifier.")
+        if (
+            self.request_fingerprint is not None
+            and re.fullmatch(r"[0-9a-f]{64}", self.request_fingerprint) is None
+        ):
+            raise InvalidValueError("Invalid coding input fingerprint.")
         if self.request_configuration is not None:
             object.__setattr__(
                 self,
@@ -236,6 +248,16 @@ def capture_payloads(
                 "prompt_contract_version": entry.prompt_contract_version,
                 "prompt_sha256": entry.prompt_sha256,
                 "provider": entry.provider,
+                **(
+                    {"reused_from_snapshot": entry.reused_from_snapshot}
+                    if entry.reused_from_snapshot is not None
+                    else {}
+                ),
+                **(
+                    {"request_fingerprint": entry.request_fingerprint}
+                    if entry.request_fingerprint is not None
+                    else {}
+                ),
                 **(
                     {"request_configuration": dict(entry.request_configuration)}
                     if entry.request_configuration is not None
@@ -436,6 +458,8 @@ def read_captured_responses(snapshot: CapturedSnapshot) -> tuple[CodedClub, ...]
                 prompt_contract_version=_text(entry, "prompt_contract_version"),
                 prompt_sha256=_text(entry, "prompt_sha256"),
                 provider=_optional_text(entry, "provider"),
+                reused_from_snapshot=_optional_text(entry, "reused_from_snapshot"),
+                request_fingerprint=_optional_text(entry, "request_fingerprint"),
                 request_configuration=(
                     _request_configuration(entry["request_configuration"])
                     if "request_configuration" in entry

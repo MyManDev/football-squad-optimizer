@@ -78,6 +78,11 @@ def world(parts=None):
         source_sha256="c" * 64,
         span_start=0,
         span_end=27,
+        fixture_scope="upcoming_premier_league",
+        scope_verified=True,
+        publication_verified=True,
+        publication_source="html_publication_meta",
+        publication_source_sha256="b" * 64,
     )
     words = ManagerWords(
         inputs.season,
@@ -164,8 +169,14 @@ def test_optional_companion_refusal_preserves_football_and_reports_label(reason)
         ({"fetched_at_utc": "2026-09-22T13:00:00+00:00"}, "future_evidence"),
         ({"published_precision": "day"}, "source_time_or_citation_missing"),
         (
-            {"source_sha256": None, "span_start": None, "span_end": None},
-            "verified_source_span_missing",
+            {
+                "source_sha256": None,
+                "span_start": None,
+                "span_end": None,
+                "scope_verified": False,
+                "publication_verified": False,
+            },
+            "publication_unverified",
         ),
         ({"disposition": "stated_minutes_limited"}, "categorical_statement_has_no_probability"),
     ],
@@ -411,3 +422,44 @@ def test_optional_loader_refuses_bad_basis_without_mutation(tmp_path, kind):
         "missing_components" if kind == "missing" else "invalid_components_or_source"
     )
     assert_frame_equal(case[3].horizon.table, before, check_exact=True)
+
+
+@pytest.mark.parametrize("kind", ["valid", "malformed", "wrong_header"])
+def test_switch_decision_information_reports_only_a_verified_component_binding(
+    tmp_path, monkeypatch, kind
+):
+    from squadopt.platform import advice_switches
+
+    artifacts, snapshots, inputs, football, _, path = captured_files(tmp_path)
+    if kind == "malformed":
+        path.write_text("{invalid", encoding="utf-8")
+    elif kind == "wrong_header":
+        companion = json.loads(path.read_text(encoding="utf-8"))
+        companion["source_fingerprint"] = "f" * 64
+        companion["fingerprint"] = forecast_digest(companion)
+        path.write_text(json.dumps(companion), encoding="utf-8")
+    # This test owns the optional companion boundary; the five-week served reader is
+    # independently covered. Companion validation, source reading and binding are real.
+    monkeypatch.setattr(advice_switches, "read_football_forecast", lambda *_: football)
+    switches = advice_switches.load_switch_inputs(
+        artifact_root=artifacts,
+        club_news_source=None,
+        snapshot_root=snapshots,
+        inputs=inputs,
+        projection=football.projection,
+    )
+    assert switches.football is not None
+    assert switches.football_components_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert switches.football_components_bound is (kind == "valid")
+    information = switches.decision_information(inputs.snapshot_id)
+    assert information["minute_components_bound"] is (kind == "valid")
+    assert information["coach_news_bound"] is False
+    assert_frame_equal(switches.football.horizon.table, football.horizon.table, check_exact=True)
+    # A readable digest alone never claims that its numeric contents were accepted.
+    digest_only = replace(switches, football_components_bound=False)
+    assert digest_only.decision_information(inputs.snapshot_id)["minute_components_bound"] is False
+    if kind == "valid":
+        assert (
+            digest_only.decision_information(inputs.snapshot_id)["revision"]
+            != information["revision"]
+        )

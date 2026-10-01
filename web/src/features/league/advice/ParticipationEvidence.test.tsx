@@ -19,6 +19,68 @@ const evidence: AdviceParticipationEvidence = {
 };
 
 it.each(["tr", "en"] as const)(
+  "accepts and explains source-specific outcomes in %s",
+  (language) => {
+    const view = {
+      ...mockEntryAdviceEnvelope(101, "saf-puan", 3).payload,
+      participation_evidence: {
+        ...evidence,
+        statement_outcomes: [
+          {
+            player_id: 1,
+            disposition: "stated_expected_absent",
+            applied: true,
+            reason: "explicit_evidence",
+            source_url: "https://www.liverpoolfc.com/news/team-update",
+            source_published_at: evidence.as_of,
+          },
+          {
+            player_id: 2,
+            disposition: "stated_minutes_managed",
+            applied: false,
+            reason: "categorical_statement_has_no_probability",
+            source_url: "javascript:alert(1)",
+            source_published_at: null,
+          },
+        ],
+      },
+    };
+    expect(isAdvicePayload(view)).toBe(true);
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <ParticipationEvidence view={view} />
+      </LanguageProvider>,
+    );
+    const detail = screen.getByTestId("statement-outcomes");
+    expect(detail).toHaveTextContent(
+      language === "tr" ? "Açık yokluk haberi uygulandı" : "explicit absence statement was applied",
+    );
+    expect(detail).toHaveTextContent(
+      language === "tr"
+        ? "sayısal değişiklik için yeterli değil"
+        : "cannot supply a numerical adjustment",
+    );
+    expect(detail.querySelectorAll("a")).toHaveLength(1);
+    expect(detail.querySelector("a")).toHaveAttribute(
+      "href",
+      "https://www.liverpoolfc.com/news/team-update",
+    );
+    expect(detail).not.toHaveTextContent("categorical_statement_has_no_probability");
+    expect(
+      isAdvicePayload({
+        ...view,
+        participation_evidence: {
+          ...view.participation_evidence,
+          statement_outcomes: [
+            { ...view.participation_evidence.statement_outcomes[0], raw_quote: "private" },
+          ],
+        },
+      }),
+    ).toBe(false);
+  },
+);
+
+it.each(["tr", "en"] as const)(
   "explains relevant participation evidence in %s without internal audit data",
   (language) => {
     const view = {

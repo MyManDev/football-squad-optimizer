@@ -206,6 +206,7 @@ class OpenAIClubNewsProvider:
         *,
         api_key: str,
         model_identifier: str,
+        target_context: Mapping[str, object] | None = None,
         base_url: str = DEFAULT_OPENAI_BASE_URL,
         response_format: str = "json_schema",
         max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
@@ -227,6 +228,7 @@ class OpenAIClubNewsProvider:
                 "A nonblank, header-safe API key must be supplied explicitly."
             )
         self._api_key = key
+        self._target_context = target_context
         self._model_identifier = model_identifier
         self._endpoint = base + "/chat/completions"
         self._response_format = response_format
@@ -253,7 +255,12 @@ class OpenAIClubNewsProvider:
             "model": self._model_identifier,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_content(documents, roster)},
+                {
+                    "role": "user",
+                    "content": build_user_content(
+                        documents, roster, target_context=self._target_context
+                    ),
+                },
             ],
             "response_format": output_format,
             "max_completion_tokens": self._max_completion_tokens,

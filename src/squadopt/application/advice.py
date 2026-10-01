@@ -759,6 +759,14 @@ WINDOW_TOP100_LIMIT: str = (
 #: What a three- or five-week window assumes, stated in the payload beside the plan so
 #: the reader gets the limits with the answer. Every sentence names a mechanism the code
 #: applies; none of them is softened.
+WINDOW_TRANSFER_CAP_LIMIT = (
+    "Every week inside the window, the first included, is capped at one transfer "
+    "(a wildcard week excepted); the one-week plan has no such cap."
+)
+WINDOW_FREE_PAIR_LIMIT = (
+    "Each week allows one transfer, or up to two when both use banked free transfers. "
+    "Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap."
+)
 WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "The first week's projection is repeated over the later weeks, rescaled by each "
     "club's fixture count in that week relative to its count in the first week, from "
@@ -766,8 +774,7 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "the way through, and the later weeks are not projected separately.",
     "Availability is applied once, from the capture: injuries, rotation and "
     "suspensions after it are not seen.",
-    "Every week inside the window, the first included, is capped at one transfer "
-    "(a wildcard week excepted); the one-week plan has no such cap.",
+    WINDOW_TRANSFER_CAP_LIMIT,
     WINDOW_TOP100_LIMIT,
     "Prices are held at the captured values; no price change is modelled.",
     NO_CHIP_LIMIT,
@@ -954,6 +961,13 @@ def window_payload(
         for move in moves:
             move["expected_points_delta"] = None
     limits = window_stated_limits(projection)
+    if (
+        plan.diagnostics.get("allow_two_free_transfers") is True
+        and plan.diagnostics.get("max_transfers_per_gameweek") == 1
+    ):
+        limits = [
+            WINDOW_FREE_PAIR_LIMIT if text == WINDOW_TRANSFER_CAP_LIMIT else text for text in limits
+        ]
     construction = plan.diagnostics.get("sequential_incumbent")
     if first.lineup_expectation is not None:
         limits.append(EXPECTED_LINEUP_PLAN_LIMIT)

@@ -1,3 +1,4 @@
+import { isDecisionInformation, isOfficialInformation } from "./informationFacts";
 /** Runtime counterpart of docs/contracts/advice_read_v1.schema.json. */
 import { checkedPreferences } from "./decisionPreferences";
 
@@ -123,17 +124,35 @@ const planWeek: Predicate = (value) =>
   );
 const participationEvidence: Predicate = (value) =>
   record(value) &&
-  Object.keys(value).length === 8 &&
-  fields(value, {
-    version: oneOf("football_participation_evidence_v1"),
-    as_of: nullable(text),
-    gameweek: nullable(identity),
-    applied_player_count: integer,
-    unapplied_statement_count: integer,
-    captured_percentage_count: integer,
-    manager_statement_count: integer,
-    assumptions: array(text),
-  });
+  Object.keys(value).length === (value.statement_outcomes === undefined ? 8 : 9) &&
+  fields(
+    value,
+    {
+      version: oneOf("football_participation_evidence_v1"),
+      as_of: nullable(text),
+      gameweek: nullable(identity),
+      applied_player_count: integer,
+      unapplied_statement_count: integer,
+      captured_percentage_count: integer,
+      manager_statement_count: integer,
+      assumptions: array(text),
+    },
+    {
+      statement_outcomes: array(
+        (row) =>
+          record(row) &&
+          Object.keys(row).length === 6 &&
+          fields(row, {
+            player_id: identity,
+            disposition: text,
+            applied: oneOf(true, false),
+            reason: text,
+            source_url: nullable(text),
+            source_published_at: nullable(text),
+          }),
+      ),
+    },
+  );
 const alternative: Predicate = (value) =>
   fields(
     value,
@@ -183,7 +202,7 @@ const chipChoice: Predicate = (value) =>
 
 const chipStrategy: Predicate = (value) =>
   fields(value, {
-    version: oneOf("model_opportunity_reservation_v1"),
+    version: oneOf("model_opportunity_reservation_v1", "model_opportunity_reservation_v2"),
     mode: oneOf("auto", "manual"),
     requested_chip: oneOf("auto", "bboost", "3xc", "wildcard", "freehit"),
     selected_chip: chip,
@@ -274,6 +293,8 @@ export function isAdvicePayload(value: unknown): boolean {
       information_review: informationReview,
       lineup_expectation: lineupExpectation,
       participation_evidence: participationEvidence,
+      official_information: isOfficialInformation,
+      decision_information: isDecisionInformation,
       preferences,
       preferences_scope: oneOf("all_selected_weeks"),
       selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),

@@ -397,3 +397,21 @@ def test_unmodified_digest_refuses_tamper_and_signed_residual_is_supported():
     parts[1]["rows"][0]["goals"] += 1
     with pytest.raises(ValueError, match="fingerprint"):
         basis_from(parts)
+
+
+def test_optional_training_selection_must_match_the_served_forecast():
+    parts = documents()
+    served, companion = parts[:2]
+    served["training_selection"] = {
+        "contract_version": "football_training_selection_v1",
+        "allowed_seasons": ["2024-25"],
+    }
+    served["fingerprint"] = forecast_digest(served)
+    companion["forecast_fingerprint"] = served["fingerprint"]
+    companion["fingerprint"] = forecast_digest(companion)
+    with pytest.raises(ValueError, match="training selection"):
+        basis_from(parts)
+    companion["training_selection"] = deepcopy(served["training_selection"])
+    companion["fingerprint"] = forecast_digest(companion)
+    basis = basis_from(parts)
+    assert basis.served["training_selection"] == basis.companion["training_selection"]
