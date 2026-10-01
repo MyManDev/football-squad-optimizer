@@ -11,7 +11,7 @@ from tests.unit.test_advice_worker import ENTRY_ID, LEAGUE_ID, _deployment, worl
 from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_football_development import football_fixture  # noqa: F401
 
-from squadopt.application.advice import TOP100_LIMIT
+from squadopt.application.advice import EXPECTED_LINEUP_PLAN_LIMIT, TOP100_LIMIT
 from squadopt.application.advice_variants import TOP100_WINDOW_LIMIT
 from squadopt.application.football_live import causal_training
 from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
@@ -32,6 +32,7 @@ from squadopt.platform.api_contract import ApiCommandRequest
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
 from squadopt.prediction.football_features import BASE_FEATURES
+from squadopt.scenarios.expected_lineup import expected_lineup_score
 
 
 def test_live_training_does_not_use_same_week_or_later_labels(football_fixture):  # noqa: F811
@@ -126,7 +127,8 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     assert result["stated_limits"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == (
         0 if contextual else 1
     )
-    assert (GUARDED_PLAN_LIMIT in result["stated_limits"]) is (window > 1)
+    assert GUARDED_PLAN_LIMIT not in result["stated_limits"]
+    assert (EXPECTED_LINEUP_PLAN_LIMIT in result["stated_limits"]) is (window > 1)
     assert result["window"] == window
     if window in (3, 5) and weight:
         # This route solves only the selected weight, so it cannot claim a measured
@@ -145,13 +147,6 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
             assert player["expected_points"] == pytest.approx(
                 base_points.loc[player["player_id"], "expected_points"]
             )
-        assert result["expected_own_points"] == pytest.approx(
-            sum(player["expected_points"] for player in result["starting_xi"])
-            + result["captain"]["expected_points"]
-        )
-        assert result["expected_own_points"] == pytest.approx(
-            result["plan_weeks"][0]["expected_points"]
-        )
     else:
         assert result.get("top100", {}).get("weight", 0) == weight
         assert "selection_top100_weight" not in result
@@ -159,6 +154,66 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
     if window > 1:
         assert len(result["plan_weeks"]) == window
         assert not any("stays at zero" in s for s in result["stated_limits"])
+        # Rebuild the frozen public decision from the unweighted artifact, including
+        # its appearance probabilities. This verifies publication independently of
+        # the emitted metadata; scorer arithmetic has a separate official-rules oracle.
+        starters = tuple(player["player_id"] for player in result["starting_xi"])
+        bench = tuple(player["player_id"] for player in result["bench"])
+        squad = football.horizon.table.loc[
+            football.horizon.table.gameweek.eq(2)
+            & football.horizon.table.player_id.isin((*starters, *bench))
+        ]
+        score = expected_lineup_score(
+            squad,
+            starters,
+            bench,
+            result["captain"]["player_id"],
+            result["vice_captain"]["player_id"],
+            chip=result["chip"],
+            hit_points=result["transfer_hit_points"],
+        )
+        gross = score.expected_net_points + result["transfer_hit_points"]
+        assert result["expected_own_points"] == pytest.approx(gross)
+        assert result["plan_weeks"][0]["expected_points"] == pytest.approx(gross)
+        terms = (
+            "starting_points",
+            "autosub_points",
+            "captain_bonus_points",
+            "vice_bonus_points",
+            "bench_boost_points",
+        )
+        for field in (*terms, "expected_net_points"):
+            assert result["lineup_expectation"][field] == pytest.approx(getattr(score, field))
+        assert result["lineup_expectation"]["assumptions"] == list(score.assumptions)
+        for week in result["plan_weeks"]:
+            explanation = week["lineup_expectation"]
+            assert sum(explanation[field] for field in terms) == pytest.approx(
+                week["expected_points"]
+            )
+            assert explanation["expected_net_points"] == pytest.approx(
+                week["expected_points"] - week["transfer_hit_points"]
+            )
+            lineup = week["lineup"]
+            assert set(lineup) == {"starting_xi", "captain", "vice_captain", "bench"}
+            raw = football.horizon.table.loc[
+                football.horizon.table.gameweek.eq(week["gameweek"])
+            ].set_index("player_id", drop=False)
+            for player in [*lineup["starting_xi"], *lineup["bench"]]:
+                assert player["expected_points"] == pytest.approx(
+                    raw.loc[player["player_id"], "expected_points"]
+                )
+            xi = tuple(player["player_id"] for player in lineup["starting_xi"])
+            ordered_bench = tuple(player["player_id"] for player in lineup["bench"])
+            rescored = expected_lineup_score(
+                raw.loc[list((*xi, *ordered_bench))],
+                xi,
+                ordered_bench,
+                lineup["captain"]["player_id"],
+                lineup["vice_captain"]["player_id"],
+                chip=week["chip"],
+                hit_points=week["transfer_hit_points"],
+            )
+            assert explanation["expected_net_points"] == pytest.approx(rescored.expected_net_points)
     other = client.get(route, params={**body, "model": "current"})
     assert other.status_code == 404  # football must not fill current model's address
 

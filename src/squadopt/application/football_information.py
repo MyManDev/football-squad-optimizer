@@ -30,6 +30,16 @@ def information_review_payload(
     def names(ids: list[int]) -> list[str]:
         return [players.get(int(player), str(player)) for player in ids]
 
+    def named_lineup(action: Mapping[str, Any]) -> dict[str, Any] | None:
+        if action.get("vice_captain") is None or "bench" not in action:
+            return None
+        return {
+            "starting_xi": names(action["starters"]),
+            "captain": names([action["captain"]])[0],
+            "vice_captain": names([action["vice_captain"]])[0],
+            "bench": names(action["bench"]),
+        }
+
     def net(branch: Mapping[str, Any]) -> float | None:
         if weighted and base is None:
             return None
@@ -43,7 +53,7 @@ def information_review_payload(
                     if original
                     else 0
                 )
-            total += int(term["multiplier"]) * forecast
+            total += float(term["multiplier"]) * forecast
         return total
 
     candidates = []
@@ -51,6 +61,8 @@ def information_review_payload(
     if compared:
         assert review is not None
         for index, candidate in enumerate(review["candidates"]):
+            first = candidate["branches"][0].get("first_action", {})
+            first_lineup = named_lineup(first)
             branches = []
             for branch in candidate["branches"]:
                 branches.append(
@@ -66,6 +78,11 @@ def information_review_payload(
                                 "chip": w["chip"],
                                 "bank_tenths": w["bank"],
                                 "free_transfers": w["ft"],
+                                **(
+                                    {"lineup": lineup}
+                                    if (lineup := named_lineup(w)) is not None
+                                    else {}
+                                ),
                             }
                             for w in branch["weeks"]
                         ],
@@ -79,6 +96,7 @@ def information_review_payload(
                     "transfers_in": names(candidate["first_in"]),
                     "transfers_out": names(candidate["first_out"]),
                     "chip": candidate["first_chip"],
+                    **({"first_lineup": first_lineup} if first_lineup is not None else {}),
                     "expected_net_points": (
                         sum(
                             raw["probability"] * shown["expected_net_points"]

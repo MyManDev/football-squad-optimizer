@@ -49,6 +49,8 @@ def remaining_chips(chips: ChipAvailability, week: PlanningWeekResult) -> ChipAv
 
 def net_week_points(week: PlanningWeekResult) -> float:
     """projected_score includes TC but stores BB bench points separately."""
+    if week.lineup_expectation is not None:
+        return float(str(week.lineup_expectation["expected_net_points"]))
     return (
         week.projected_score
         + (week.projected_bench_points if week.chip == "bboost" else 0)

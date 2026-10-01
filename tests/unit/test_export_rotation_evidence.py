@@ -6,6 +6,7 @@ written from the same misreading of the contract -- and then every test passes w
 is checked. A pair that came out of the writer cannot share that mistake.
 """
 
+import hashlib
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -29,7 +30,11 @@ from squadopt.application.weekly_plan import rotation_pair_is_readable
 from squadopt.data.errors import DataValidationError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
-from squadopt.features.rotation_evidence import CONTRACT_VERSION, ROTATION_EVIDENCE_COLUMNS
+from squadopt.features.rotation_evidence import (
+    CONTRACT_VERSION,
+    LEGACY_CONTRACT_VERSION,
+    ROTATION_EVIDENCE_COLUMNS,
+)
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "data" / "sample" / "club_news_v1.fixture.json"
@@ -455,3 +460,59 @@ def test_coverage_beyond_what_was_declared_is_refused(published: tuple[Path, Pat
 
     with pytest.raises(DataValidationError, match="never declared"):
         read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+@pytest.mark.parametrize("contract", [LEGACY_CONTRACT_VERSION, CONTRACT_VERSION])
+def test_old_and_new_rotation_table_contracts_read_without_changing_citations(
+    tmp_path: Path,
+    clean_tree: None,
+    contract: str,
+) -> None:
+    code, _, output_dir = _run(tmp_path)
+    assert code == 0
+    table_path, manifest_path = _pair(output_dir)
+    before = read_rotation_evidence_artifact(table_path, manifest_path)
+    rewritten = pd.read_csv(table_path)
+    rewritten["contract_version"] = contract
+    rewritten.to_csv(table_path, index=False)
+    _rewrite_manifest(
+        manifest_path,
+        contract_version=contract,
+        table_sha256=hashlib.sha256(table_path.read_bytes()).hexdigest(),
+    )
+    after = read_rotation_evidence_artifact(table_path, manifest_path)
+    for column in (
+        "rotation_disposition",
+        "rotation_claim_source_sha256",
+        "rotation_claim_span_start",
+        "rotation_claim_span_end",
+    ):
+        pd.testing.assert_series_equal(before[column], after[column])
+    assert set(after["contract_version"]) == {contract}
+
+
+@pytest.mark.parametrize("contract", [LEGACY_CONTRACT_VERSION, CONTRACT_VERSION])
+def test_full_match_label_is_admitted_only_by_the_new_rotation_table_contract(
+    tmp_path: Path,
+    clean_tree: None,
+    contract: str,
+) -> None:
+    code, _, output_dir = _run(tmp_path)
+    assert code == 0
+    table_path, manifest_path = _pair(output_dir)
+    table = pd.read_csv(table_path)
+    table["contract_version"] = contract
+    claim = table["rotation_disposition"].notna().idxmax()
+    table.loc[claim, "rotation_disposition"] = "stated_full_match_unavailable"
+    table.to_csv(table_path, index=False)
+    _rewrite_manifest(
+        manifest_path,
+        contract_version=contract,
+        table_sha256=hashlib.sha256(table_path.read_bytes()).hexdigest(),
+    )
+    if contract == LEGACY_CONTRACT_VERSION:
+        with pytest.raises(DataValidationError, match="closed"):
+            read_rotation_evidence_artifact(table_path, manifest_path)
+    else:
+        loaded = read_rotation_evidence_artifact(table_path, manifest_path)
+        assert loaded.loc[claim, "rotation_disposition"] == "stated_full_match_unavailable"

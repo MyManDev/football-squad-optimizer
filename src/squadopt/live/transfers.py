@@ -45,6 +45,7 @@ from squadopt.planning import (
     spending_power,
 )
 from squadopt.planning.chip_strategy import optimize_chip_strategy
+from squadopt.planning.expected_window import optimize_expected_window
 from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.observed import optimize_observed_window
 
@@ -967,6 +968,12 @@ def plan_transfer_horizon(
         and first_week_transfer_cap is None
         and first_week_exclusion is None
     )
+    expected_lineups = (
+        guarded_football
+        and "appearance_probability" in planning_table
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 5
+    )
     information = None
     if (
         guarded_football
@@ -991,8 +998,18 @@ def plan_transfer_horizon(
             planning_policy,
             chips=chips,
             preferences=preferences,
+            expected_lineups=expected_lineups,
         )
         if information is not None and information.nodes
+        else optimize_expected_window(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+        )
+        if expected_lineups
         else optimize_guarded_window(
             PlanningHorizon(planning_table),
             state,

@@ -28,6 +28,7 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "source_snapshot_id",  # provenance: the capture the advice was computed from
         "information_review",  # conditional actions and source playing chance; no rank odds
         "prediction_model",  # provenance: selected experimental forecast version and digest
+        "participation_evidence",  # provenance: source record counts and update assumptions
         "preferences",  # inputs: canonical user constraints applied by the producer
         "preferences_scope",  # inputs: these constraints bind every selected week
         "selection_top100_weight",  # inputs: selection weight, not a measured points cost

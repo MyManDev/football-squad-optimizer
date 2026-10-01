@@ -50,7 +50,10 @@ from squadopt.data.sources.club_news import (
     RawDocument,
     RosterPlayer,
 )
-from squadopt.data.sources.club_news_coding import CodingFixture
+from squadopt.data.sources.club_news_coding import (
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    CodingFixture,
+)
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.platform.club_news_acquire import main as acquire
@@ -137,7 +140,7 @@ class _RehearsalProvider:
         return ClaimResponse(
             text=json.dumps(
                 {
-                    "contract_version": fixture["contract_version"],
+                    "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
                     "documents": [e for e in fixture["documents"] if e["url"] in served],
                     "claims": [e for e in fixture["claims"] if e["source_url"] in served],
                 },

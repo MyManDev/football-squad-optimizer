@@ -45,7 +45,7 @@ from squadopt.data.sources.club_news_capture import (
 )
 from squadopt.data.sources.club_news_claims import parse_claim_response
 from squadopt.data.sources.club_news_coding import (
-    ROTATION_CLAIM_CODING_CONTRACT_VERSION as CODING_CONTRACT,
+    LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION as CODING_CONTRACT,
 )
 from squadopt.data.sources.club_news_coding import (
     CodingFixture,
@@ -73,7 +73,7 @@ def _coded() -> tuple[CodedClub, ...]:
             club=club,
             response=response,
             prompt_contract_version=CODING_CONTRACT,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_sha256=coding_prompt_sha256(contract_version=CODING_CONTRACT),
         )
         for club in FixtureClubNewsProvider(FIXTURE).clubs_covered()
     )
@@ -138,7 +138,9 @@ def test_the_response_and_its_question_come_back(tmp_path: Path) -> None:
     coded = read_captured_responses(read_snapshot(tmp_path, identifier))
 
     assert {entry.club for entry in coded} == set(FixtureClubNewsProvider(FIXTURE).clubs_covered())
-    assert {entry.prompt_sha256 for entry in coded} == {coding_prompt_sha256()}
+    assert {entry.prompt_sha256 for entry in coded} == {
+        coding_prompt_sha256(contract_version=CODING_CONTRACT)
+    }
     assert {entry.prompt_contract_version for entry in coded} == {CODING_CONTRACT}
 
 

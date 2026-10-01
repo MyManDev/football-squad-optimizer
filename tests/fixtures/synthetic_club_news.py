@@ -18,7 +18,9 @@ from typing import Any, Final
 
 from squadopt.data.sources.club_news import (
     CLUB_NEWS_FIXTURE_CONTRACT_VERSION,
-    ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+)
+from squadopt.data.sources.club_news import (
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION as ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
 )
 
 ARSENAL_URL: Final = "https://club.example/arsenal/team-news-gw4"

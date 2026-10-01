@@ -153,7 +153,7 @@ def _answer_about(documents: Sequence[RawDocument]) -> str:
     served = {url for document in documents for url in (document.requested_url, document.final_url)}
     return json.dumps(
         {
-            "contract_version": fixture["contract_version"],
+            "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
             "documents": [entry for entry in fixture["documents"] if entry["url"] in served],
             "claims": [entry for entry in fixture["claims"] if entry["source_url"] in served],
         },

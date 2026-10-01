@@ -52,6 +52,7 @@ from squadopt.application.advice import (
     window_stated_limits,
 )
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
+from squadopt.application.lineup_publication import expected_week_points
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.top100_weight import (
     TOP100_PRICE_BASIS,
@@ -134,7 +135,7 @@ def _rebased_weeks(
 
 def _window_total(weeks: tuple[PlanningWeekResult, ...]) -> float:
     total = math.fsum(
-        float(week.projected_score) - float(week.transfer_hit_points) for week in weeks
+        expected_week_points(week) - float(week.transfer_hit_points) for week in weeks
     )
     if not math.isfinite(total):
         raise EntryError("A window must score to finite base points.")
