@@ -532,6 +532,37 @@ export interface EntryAdvice {
    * repeated over the fixture calendar, among others). The moves and the lineup
    * above are the first week's. Absent on one-week documents.
    */
+  information_review?: {
+    version: "football_information_review_v1";
+    status: "compared" | "baseline_retained";
+    reason: string;
+    source_snapshot_id: string;
+    captured_at_utc: string;
+    player_name: string | null;
+    source_playing_chance_percent: number | null;
+    information_gameweek: number | null;
+    candidates: {
+      selected: boolean;
+      baseline: boolean;
+      transfers_in: string[];
+      transfers_out: string[];
+      chip: string | null;
+      expected_net_points: number | null;
+      branches: {
+        state: "eligible" | "unavailable";
+        expected_net_points: number | null;
+        hit_points: number;
+        weeks: {
+          gameweek: number;
+          transfers_in: string[];
+          transfers_out: string[];
+          chip: string | null;
+          bank_tenths: number;
+          free_transfers: number;
+        }[];
+      }[];
+    }[];
+  };
   plan_weeks?: AdvicePlanWeek[] | null;
   stated_limits?: string[] | null;
   data_quality: EntryDataQuality;

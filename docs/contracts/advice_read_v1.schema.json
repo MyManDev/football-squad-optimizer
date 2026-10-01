@@ -503,6 +503,198 @@
           "minimum": 1,
           "type": "integer"
         },
+        "information_review": {
+          "additionalProperties": false,
+          "properties": {
+            "candidates": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "baseline": {
+                    "type": "boolean"
+                  },
+                  "branches": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "expected_net_points": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "hit_points": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "state": {
+                          "enum": [
+                            "eligible",
+                            "unavailable"
+                          ]
+                        },
+                        "weeks": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "bank_tenths": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "chip": {
+                                "enum": [
+                                  null,
+                                  "bboost",
+                                  "3xc",
+                                  "wildcard",
+                                  "freehit"
+                                ]
+                              },
+                              "free_transfers": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "gameweek": {
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "transfers_in": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "transfers_out": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "gameweek",
+                              "transfers_in",
+                              "transfers_out",
+                              "chip",
+                              "bank_tenths",
+                              "free_transfers"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 4,
+                          "minItems": 2,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "expected_net_points",
+                        "hit_points",
+                        "weeks"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "chip": {
+                    "enum": [
+                      null,
+                      "bboost",
+                      "3xc",
+                      "wildcard",
+                      "freehit"
+                    ]
+                  },
+                  "expected_net_points": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "selected": {
+                    "type": "boolean"
+                  },
+                  "transfers_in": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "transfers_out": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "selected",
+                  "baseline",
+                  "transfers_in",
+                  "transfers_out",
+                  "chip",
+                  "expected_net_points",
+                  "branches"
+                ],
+                "type": "object"
+              },
+              "maxItems": 3,
+              "type": "array"
+            },
+            "captured_at_utc": {
+              "type": "string"
+            },
+            "information_gameweek": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "player_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "source_playing_chance_percent": {
+              "enum": [
+                null,
+                25,
+                50,
+                75
+              ]
+            },
+            "source_snapshot_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "compared",
+                "baseline_retained"
+              ]
+            },
+            "version": {
+              "const": "football_information_review_v1"
+            }
+          },
+          "required": [
+            "version",
+            "status",
+            "reason",
+            "source_snapshot_id",
+            "captured_at_utc",
+            "player_name",
+            "source_playing_chance_percent",
+            "information_gameweek",
+            "candidates"
+          ],
+          "type": "object"
+        },
         "league_id": {
           "minimum": 1,
           "type": "integer"

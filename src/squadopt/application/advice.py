@@ -40,6 +40,7 @@ from squadopt.application.entries import (
     EntryPicksProvider,
     held_squad_from_picks,
 )
+from squadopt.application.football_information import information_review_payload
 from squadopt.application.lineup_publication import advice_player as _advice_player
 from squadopt.application.lineup_publication import (
     best_eleven_basis,
@@ -90,6 +91,7 @@ from squadopt.planning import (
     TransferPlanResult,
 )
 from squadopt.planning.guarded import GUARDED_FALLBACK_LIMIT, GUARDED_PLAN_LIMIT
+from squadopt.planning.observed import OBSERVED_FALLBACK_LIMIT, OBSERVED_WINDOW_LIMIT
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
@@ -909,6 +911,7 @@ def window_payload(
     optimality_gap_published: bool = True,
     move_reason: Callable[[int | None, int | None], str] | None = None,
     choice_points: Mapping[int, float] | None = None,
+    base_horizon: ProjectionHorizon | None = None,
 ) -> dict[str, object]:
     """The published shape of a solved window: the first week as a one-week card, the
     whole window in ``plan_weeks``.
@@ -945,6 +948,16 @@ def window_payload(
             if construction.get("seed_completed") is True
             else GUARDED_FALLBACK_LIMIT
         )
+    information = information_review_payload(
+        plan, projection, base_horizon=base_horizon, weighted=weeks is not None
+    )
+    observed = plan.diagnostics.get("observed_window")
+    if isinstance(observed, dict):
+        limits.append(
+            OBSERVED_WINDOW_LIMIT
+            if observed.get("status") == "compared"
+            else OBSERVED_FALLBACK_LIMIT
+        )
     return {
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
@@ -965,7 +978,12 @@ def window_payload(
         "rival_label": None,
         # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
         # the plan it found with the measured bound gap beside it.
-        "solver_status": plan.solver_status.name,
+        "solver_status": (
+            "FEASIBLE"
+            if information is not None and information["status"] == "compared"
+            else plan.solver_status.name
+        ),
+        **({"information_review": information} if information is not None else {}),
         "optimality_gap": float(str(raw_gap)) if raw_gap is not None else None,
         # Which budget stopped the search. This path already refuses a plan the clock cut
         # short, so the flag published here is always false; it is published anyway, because
