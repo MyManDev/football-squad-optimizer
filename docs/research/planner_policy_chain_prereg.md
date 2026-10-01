@@ -12,17 +12,20 @@ states a 25, 50 or 75 per cent chance of playing for a held player who meets the
 `availability_observations` in `src/squadopt/live/football_observations.py`, the window is
 solved by `bounded_observed_window_v1` (`src/squadopt/planning/observed.py`, released in
 `site-2026-27-gw06-fix7`); otherwise by `sequential_certified_window_v1`
-(`src/squadopt/planning/guarded.py`, released in `site-2026-27-gw06-fix6`). #911, merged the same
-day for the next release, replaces the observed route with `complete_observed_window_v2`. Windows
-under the current model keep the full-window solver, `optimize_transfer_plan(..., protect_hold=True)`
-in `src/squadopt/planning/optimizer.py`, which is also the path a football window took before #907.
+(`src/squadopt/planning/guarded.py`, released in `site-2026-27-gw06-fix6`). #911, released the
+same day in `site-2026-27-gw06-fix8`, replaces the observed route with
+`complete_observed_window_v2`. Windows under the current model keep the full-window solver,
+`optimize_transfer_plan(..., protect_hold=True)` in `src/squadopt/planning/optimizer.py`, which is
+also the path a football window took before #907.
 These routes change between releases, so the arm this protocol calls `served` is whatever
 `plan_transfer_horizon` routes to at the frozen commit (rule 3), and its records name the version.
 
 The evidence for the two routes is in-forecast. #907 shipped functional checks and no
 measurement. #909's record, `docs/research/football_information_windows.md`, is a four-case
 comparison on a synthetic eight-player roster in which the information menu gained nothing over
-its own baseline. A sequential construction certified inside a full-window solve, the method
+its own baseline. #911 added to the same record a fourteen-case completion matrix on one captured
+forecast of GW6 to GW10, in which every selection retained the baseline; the record calls it
+completion and accounting evidence, not prospective football accuracy. A sequential construction certified inside a full-window solve, the method
 the guarded route ships, was measured in #906, still open, as forecast utility on one capture,
 `fpl-live-20260922T214539Z-364991a4f832`, with two constructed squads over a fourteen-week
 forecast. `guarded.py` says future performance is not established.
