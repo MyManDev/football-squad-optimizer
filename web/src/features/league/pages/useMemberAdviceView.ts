@@ -135,8 +135,10 @@ export function useMemberAdviceView(
       }
       // A weighted document names its weight, and the plain one names none.
       if (
-        (checked.payload.chip_strategy?.top100_weight ?? checked.payload.top100?.weight ?? 0) !==
-        selection.top100.weight
+        (checked.payload.chip_strategy?.top100_weight ??
+          checked.payload.selection_top100_weight ??
+          checked.payload.top100?.weight ??
+          0) !== selection.top100.weight
       ) {
         throw new Error("The advice document does not match the Top 100 setting.");
       }
