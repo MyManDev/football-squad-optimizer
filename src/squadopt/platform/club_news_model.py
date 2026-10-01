@@ -46,6 +46,7 @@ extra, following ``load_parquet``'s handling of an absent Parquet engine.
 """
 
 import os
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Final, Protocol
 
@@ -153,6 +154,21 @@ def read_api_key(environ: Mapping[str, str] | None = None) -> str:
     return key
 
 
+def _checked_key(key: str) -> str:
+    normalized = key.strip()
+    if not re.fullmatch(r"[\x21-\x7e]+", normalized):
+        raise ClubNewsModelError("The API key must be a single printable token.")
+    return normalized
+
+
+def _transport_error_types() -> tuple[type[Exception], ...]:
+    try:
+        import anthropic
+    except ImportError:
+        return ()
+    return (anthropic.APIError,)
+
+
 class AnthropicClubNewsProvider:
     """Codes club documents by calling the model named in the coding contract.
 
@@ -188,10 +204,12 @@ class AnthropicClubNewsProvider:
         """
 
         self._model_identifier = model_identifier
+        self._api_key = "" if api_key is None else _checked_key(api_key)
         if client is not None:
             self._client = client
             return
-        api_key = read_api_key(environ) if api_key is None else api_key
+        api_key = _checked_key(read_api_key(environ)) if api_key is None else self._api_key
+        self._api_key = api_key
         try:
             import anthropic
         except ImportError as error:
@@ -232,17 +250,29 @@ class AnthropicClubNewsProvider:
         """
 
         user_content = build_user_content(documents, roster)
-        message = self._client.messages.create(
-            model=self._model_identifier,
-            max_tokens=MAX_OUTPUT_TOKENS,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
-            output_config={
-                "effort": CODING_EFFORT,
-                "format": {"type": "json_schema", "schema": response_schema()},
-            },
-        )
-        return _claim_response(message, asked_for=self._model_identifier)
+        try:
+            message = self._client.messages.create(
+                model=self._model_identifier,
+                max_tokens=MAX_OUTPUT_TOKENS,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_content}],
+                output_config={
+                    "effort": CODING_EFFORT,
+                    "format": {"type": "json_schema", "schema": response_schema()},
+                },
+            )
+        except _transport_error_types() as error:
+            status = getattr(error, "status_code", None)
+            detail = f" (HTTP {status})" if type(status) is int and 100 <= status <= 599 else ""
+            # SDK exception strings can contain remote response bodies and headers.
+            raise ClubNewsModelError(f"The Anthropic request did not complete{detail}.") from None
+        try:
+            return _claim_response(message, asked_for=self._model_identifier)
+        except ClubNewsModelError as error:
+            message = str(error)
+            if self._api_key:
+                message = message.replace(self._api_key, "[key withheld]")
+            raise ClubNewsModelError(message) from None
 
 
 def _claim_response(message: object, *, asked_for: str) -> ClaimResponse:

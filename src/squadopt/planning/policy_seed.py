@@ -9,6 +9,7 @@ from dataclasses import replace
 import pandas as pd
 
 from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.planning.lineup_utility import rescore_expected_week
 from squadopt.planning.models import (
     ChipAvailability,
     PlanningHorizon,
@@ -148,6 +149,10 @@ def forecast_policy_seed(
                 ),
             )
         )
+    weeks = [
+        rescore_expected_week(week) if week.lineup_expectation is not None else week
+        for week in weeks
+    ]
     discount = transfer.horizon_discount_factor ** (len(weeks) - 1)
     terminal_transfers = (
         transfer.banked_transfer_value_points

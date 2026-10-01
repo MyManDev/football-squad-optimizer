@@ -10,6 +10,10 @@ import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { publishedPrice } from "../advice/publishedPrice";
 import { InformationReview } from "../advice/InformationReview";
+import { ExpectedLineup } from "../advice/ExpectedLineup";
+import { expectedLineupLabel } from "../advice/expectedLineupLabel";
+import { ParticipationEvidence } from "../advice/ParticipationEvidence";
+import { WeekLineup } from "../advice/WeekLineup";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
@@ -414,6 +418,8 @@ export function AdviceDetails({
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <EvidenceSection view={view} priced={priced} />
       <Top100Section view={view} priced={priced} />
+      <ExpectedLineup view={view} />
+      <ParticipationEvidence view={view} />
       <InformationReview view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
@@ -1020,6 +1026,12 @@ function WindowSection({ view }: { view: EntryAdvice }) {
           ))}
         </tbody>
       </table>
+      {weeks.map(
+        (week) =>
+          week.lineup && (
+            <WeekLineup key={week.gameweek} gameweek={week.gameweek} lineup={week.lineup} />
+          ),
+      )}
     </section>
   );
 }
@@ -1272,12 +1284,14 @@ function LineupSection({
       {/* The total as the pitch's heading prints it, so switching views keeps the figure. */}
       {finiteNumber(view.expected_own_points) ? (
         <p className={lineup.own}>
-          {chipBasis !== null
-            ? CHIP_COPY[language].expectedOwnPoints(
-                figure(view.expected_own_points, locale),
-                chipBasis,
-              )
-            : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
+          {view.lineup_expectation
+            ? expectedLineupLabel(figure(view.expected_own_points, locale), language)
+            : chipBasis !== null
+              ? CHIP_COPY[language].expectedOwnPoints(
+                  figure(view.expected_own_points, locale),
+                  chipBasis,
+                )
+              : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
         </p>
       ) : null}
       <dl className={lineup.armband}>

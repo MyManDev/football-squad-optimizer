@@ -90,6 +90,7 @@ describe("the plan states that football v1 splits attacking shares before availa
 
 describe("experimental football construction limits", () => {
   const limits = [
+    "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
     "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
     "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.",
   ];

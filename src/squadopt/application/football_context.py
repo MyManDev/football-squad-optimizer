@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from squadopt.application.manager_words import WORDS_UNRESOLVED, ManagerWords
+from squadopt.application.manager_words import WORDS_UNRESOLVED, ManagerWord, ManagerWords
 from squadopt.prediction.availability import apply_availability
 
 
@@ -36,27 +36,67 @@ def bind_football_context(
         return result, audit
     if manager_words.season != season or manager_words.gameweek != gameweek:
         raise ValueError("Manager evidence does not match the forecast decision week.")
+    # Preserve the captured feed separately. A statement for this week is not a
+    # recovery forecast or a claim that the same absence lasts every later week.
+    result["captured_availability_probability"] = result.availability_probability
+    result["manager_context_gameweek"] = gameweek
+    valid_words: list[ManagerWord] = []
     for word in manager_words.words:
         if word.player_id not in set(result.player_id):
             raise ValueError("Manager evidence names a player outside the captured roster.")
-        if word.disposition not in ("stated_expected_absent", "stated_minutes_limited"):
-            continue  # expected start/return/risk is not a calibrated numeric probability
+        if word.disposition not in (
+            "stated_expected_absent",
+            "stated_minutes_limited",
+            "stated_expected_to_start",
+        ):
+            continue  # return/risk is not a calibrated numeric probability
         if (
             not word.source_url
             or word.published_at_utc is None
             or word.fetched_at_utc is None
             or word.words_status == WORDS_UNRESOLVED
         ):
+            if word.disposition == "stated_expected_to_start":
+                continue  # An unusable positive statement cannot constrain the forecast.
             raise ValueError("An applied manager statement must have source and timestamps.")
-        published = pd.Timestamp(word.published_at_utc)
-        fetched = pd.Timestamp(word.fetched_at_utc)
+        try:
+            published = pd.Timestamp(word.published_at_utc)
+            fetched = pd.Timestamp(word.fetched_at_utc)
+        except (TypeError, ValueError):
+            if word.disposition == "stated_expected_to_start":
+                continue
+            raise
         if (
             published.tzinfo is None
             or fetched.tzinfo is None
             or not published <= fetched < cutoff
             or cutoff - published > pd.Timedelta(days=7)
         ):
+            if word.disposition == "stated_expected_to_start":
+                continue
             raise ValueError("Manager statement is late, stale or has invalid source timing.")
+        valid_words.append(word)
+    absent = {w.player_id for w in valid_words if w.disposition == "stated_expected_absent"}
+    playing = {
+        w.player_id
+        for w in valid_words
+        if w.disposition in ("stated_expected_to_start", "stated_minutes_limited")
+    }
+    conflicts = absent & playing
+    for word in valid_words:
+        if word.player_id in conflicts:
+            audit.append(
+                {
+                    "player_id": word.player_id,
+                    "disposition": word.disposition,
+                    "source_url": word.source_url,
+                    "gameweek": gameweek,
+                    "reason": "conflicting_sources",
+                }
+            )
+            continue
+        if word.disposition == "stated_expected_to_start":
+            continue  # Used to detect contradictions; never converted into a probability.
         mask = result.player_id.eq(word.player_id)
         if word.disposition == "stated_expected_absent":
             result.loc[mask, "availability_probability"] = 0.0
@@ -69,6 +109,7 @@ def bind_football_context(
                 "source_url": word.source_url,
                 "published_at_utc": word.published_at_utc,
                 "fetched_at_utc": word.fetched_at_utc,
+                "gameweek": gameweek,
             }
         )
     return result, audit

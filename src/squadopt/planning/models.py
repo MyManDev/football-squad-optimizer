@@ -645,8 +645,14 @@ class PlanningWeekResult:
     projected_bench_points: float
     discounted_objective_contribution: float
     chip: str | None = None
+    vice_captain_id: object | None = None
+    lineup_expectation: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
+        if self.lineup_expectation is not None:
+            object.__setattr__(
+                self, "lineup_expectation", MappingProxyType(dict(self.lineup_expectation))
+            )
         if self.chip is not None and self.chip not in CHIP_NAMES:
             raise TransferPlanningValidationError(f"Unknown chip {self.chip!r} on a week result.")
         for name in ("selected_squad", "starting_xi", "bench", "transfers_in", "transfers_out"):

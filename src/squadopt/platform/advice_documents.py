@@ -42,6 +42,68 @@ class AdviceDocumentError(ValueError):
     """Bytes that claim to be a versioned advice answer, and are not."""
 
 
+def lineup_expectation_schema() -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "version": {"const": "expected_lineup_v1"},
+        **{
+            name: {"type": "number"}
+            for name in (
+                "expected_net_points",
+                "starting_points",
+                "autosub_points",
+                "captain_bonus_points",
+                "vice_bonus_points",
+                "bench_boost_points",
+            )
+        },
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": fields,
+        "required": list(fields),
+    }
+
+
+def participation_evidence_schema() -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "version": {"const": "football_participation_evidence_v1"},
+        "as_of": {"type": ["string", "null"]},
+        "gameweek": {"type": ["integer", "null"], "minimum": 1},
+        **{
+            name: {"type": "integer", "minimum": 0}
+            for name in (
+                "applied_player_count",
+                "unapplied_statement_count",
+                "captured_percentage_count",
+                "manager_statement_count",
+            )
+        },
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": fields,
+        "required": list(fields),
+    }
+
+
+def lineup_decision_schema(player: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "starting_xi": {"type": "array", "items": player, "minItems": 11, "maxItems": 11},
+            "captain": player,
+            "vice_captain": player,
+            "bench": {"type": "array", "items": player, "minItems": 4, "maxItems": 4},
+        },
+        "required": ["starting_xi", "captain", "vice_captain", "bench"],
+    }
+
+
 def information_review_schema() -> dict[str, Any]:
     names = {"type": "array", "items": {"type": "string"}}
     nullable = {"type": ["number", "null"]}
@@ -53,6 +115,7 @@ def information_review_schema() -> dict[str, Any]:
         "chip": chip,
         "bank_tenths": {"type": "integer", "minimum": 0},
         "free_transfers": {"type": "integer", "minimum": 0},
+        "lineup": lineup_decision_schema({"type": "string"}),
     }
     branch = {
         "state": {"enum": ["eligible", "unavailable"]},
@@ -66,7 +129,7 @@ def information_review_schema() -> dict[str, Any]:
                 "type": "object",
                 "additionalProperties": False,
                 "properties": week,
-                "required": list(week),
+                "required": [name for name in week if name != "lineup"],
             },
         },
     }
@@ -77,6 +140,7 @@ def information_review_schema() -> dict[str, Any]:
         "transfers_out": names,
         "chip": chip,
         "expected_net_points": nullable,
+        "first_lineup": lineup_decision_schema({"type": "string"}),
         "branches": {
             "type": "array",
             "minItems": 2,
@@ -105,7 +169,7 @@ def information_review_schema() -> dict[str, Any]:
                 "type": "object",
                 "additionalProperties": False,
                 "properties": candidate,
-                "required": list(candidate),
+                "required": [name for name in candidate if name != "first_lineup"],
             },
         },
     }
@@ -144,6 +208,8 @@ def advice_read_schema() -> dict[str, Any]:
             "free_transfers_before": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
             "expected_points": {"type": "number"},
+            "lineup_expectation": lineup_expectation_schema(),
+            "lineup": lineup_decision_schema(player),
         },
         "required": [
             "gameweek",
@@ -341,6 +407,8 @@ def advice_read_schema() -> dict[str, Any]:
                 "required": ["chip", "gain_vs_no_chip", "basis"],
             },
             "expected_own_points": nullable_number,
+            "lineup_expectation": lineup_expectation_schema(),
+            "participation_evidence": participation_evidence_schema(),
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
             "expected_gain_vs_hold": nullable_number,

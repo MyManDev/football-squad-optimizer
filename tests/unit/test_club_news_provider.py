@@ -6,6 +6,7 @@ would not be an offline test, and this whole lane's point is that the offline pa
 path are the same code with different bytes.
 """
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -19,7 +20,11 @@ from squadopt.data.sources.club_news import (
     RawDocument,
     RosterPlayer,
 )
-from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER, coding_prompt_sha256
+from squadopt.data.sources.club_news_coding import (
+    CODING_MODEL_IDENTIFIER,
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    coding_prompt_sha256,
+)
 from squadopt.platform.club_news_gemini import (
     GEMINI_PROVIDER,
     ClubNewsGeminiError,
@@ -355,7 +360,15 @@ def _document(club: str, path: str) -> RawDocument:
     )
 
 
-def _response(text: str = "{}") -> ClaimResponse:
+def _response(text: str | None = None) -> ClaimResponse:
+    if text is None:
+        text = json.dumps(
+            {
+                "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+                "documents": [],
+                "claims": [],
+            }
+        )
     return ClaimResponse(text=text, model_identifier="m", model_version="v")
 
 
@@ -461,3 +474,41 @@ def test_a_different_model_produces_a_different_recorded_question() -> None:
     )
 
     assert coded[0].prompt_sha256 != coding_prompt_sha256(CODING_MODEL_IDENTIFIER)
+
+
+def test_contract_mismatch_refuses_one_club_without_retrying_or_losing_other_clubs() -> None:
+    class MixedContracts(_Recorder):
+        def code(
+            self, documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]
+        ) -> ClaimResponse:
+            current = super().code(documents, roster)
+            if documents[0].club == "Arsenal":
+                return _response(
+                    json.dumps(
+                        {
+                            "contract_version": "rotation_claim_coding_v1",
+                            "claims": [],
+                            "documents": [],
+                        }
+                    )
+                )
+            return current
+
+    provider = MixedContracts()
+    coded, refused = code_week_by_club(
+        provider,
+        CONFIG,
+        [
+            _document("Arsenal", "arsenal/news"),
+            _document("Man Utd", "united/news"),
+        ],
+        (),
+    )
+    assert provider.calls == [("Arsenal",), ("Man Utd",)]
+    assert [entry.club for entry in coded] == ["Man Utd"]
+    assert len(refused) == 1 and refused[0][0] == "Arsenal"
+    assert "requested coding contract" in refused[0][1]
+    assert coded[0].prompt_contract_version == ROTATION_CLAIM_CODING_CONTRACT_VERSION
+    assert (
+        json.loads(coded[0].response.text)["contract_version"] == coded[0].prompt_contract_version
+    )

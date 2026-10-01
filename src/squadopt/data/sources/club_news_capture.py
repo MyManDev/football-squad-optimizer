@@ -28,9 +28,11 @@ down, and where they are picked back up.
 """
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Final
 
 from squadopt.data.errors import DataSourceError, InvalidValueError
@@ -87,8 +89,16 @@ class CodedClub:
     prompt_contract_version: str
     prompt_sha256: str
     provider: str | None = None
+    request_configuration: Mapping[str, str | int] | None = None
+    """Optional coding-request identity. No key or raw operator endpoint is stored."""
 
     def __post_init__(self) -> None:
+        if self.request_configuration is not None:
+            object.__setattr__(
+                self,
+                "request_configuration",
+                MappingProxyType(_request_configuration(self.request_configuration)),
+            )
         if not self.club.strip():
             raise InvalidValueError("A coded club must be named.")
         for name in ("prompt_contract_version", "prompt_sha256"):
@@ -103,6 +113,32 @@ class CodedClub:
                 "carries None, which says nobody recorded it; an empty string would claim a "
                 "provider with no name, which is a different and false statement."
             )
+
+
+def _request_configuration(value: object) -> dict[str, str | int]:
+    """Validate the only supported optional instrument record without echoing input."""
+    keys = {"protocol", "endpoint_sha256", "response_format", "max_completion_tokens"}
+    if not isinstance(value, Mapping) or set(value) != keys:
+        raise InvalidValueError("Invalid coding request configuration fields.")
+    digest = value.get("endpoint_sha256")
+    mode = value.get("response_format")
+    tokens = value.get("max_completion_tokens")
+    if (
+        value.get("protocol") != "openai_chat_completions_v1"
+        or not isinstance(digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        or mode not in ("json_schema", "json_object")
+        or isinstance(tokens, bool)
+        or not isinstance(tokens, int)
+        or not 1 <= tokens <= 16000
+    ):
+        raise InvalidValueError("Invalid coding request configuration values.")
+    return {
+        "protocol": "openai_chat_completions_v1",
+        "endpoint_sha256": digest,
+        "response_format": str(mode),
+        "max_completion_tokens": tokens,
+    }
 
 
 def _document_payload(position: int) -> str:
@@ -200,6 +236,11 @@ def capture_payloads(
                 "prompt_contract_version": entry.prompt_contract_version,
                 "prompt_sha256": entry.prompt_sha256,
                 "provider": entry.provider,
+                **(
+                    {"request_configuration": dict(entry.request_configuration)}
+                    if entry.request_configuration is not None
+                    else {}
+                ),
             }
         )
 
@@ -395,6 +436,11 @@ def read_captured_responses(snapshot: CapturedSnapshot) -> tuple[CodedClub, ...]
                 prompt_contract_version=_text(entry, "prompt_contract_version"),
                 prompt_sha256=_text(entry, "prompt_sha256"),
                 provider=_optional_text(entry, "provider"),
+                request_configuration=(
+                    _request_configuration(entry["request_configuration"])
+                    if "request_configuration" in entry
+                    else None
+                ),
             )
         )
     return tuple(coded)

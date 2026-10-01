@@ -7,6 +7,7 @@ import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
 import { PointsUnit } from "../components/PointsUnit";
+import { expectedLineupLabel } from "../advice/expectedLineupLabel";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
 import styles from "./MemberSquad.module.css";
@@ -34,7 +35,7 @@ export function MemberSquad({
   /** The plan's lineup as a list; without one there is no list view and no toggle. */
   list: ReactNode;
 }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   const [view, setView] = useState<"pitch" | "list">("pitch");
@@ -55,7 +56,11 @@ export function MemberSquad({
   // does not say it twice.
   const line = [
     formation(onPitch.eleven),
-    own !== null && !(hasList && view === "list") ? copy.squadOwnPoints(figure(own, locale)) : null,
+    own !== null && !(hasList && view === "list")
+      ? plan?.lineup_expectation
+        ? expectedLineupLabel(figure(own, locale), language)
+        : copy.squadOwnPoints(figure(own, locale))
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");

@@ -26,6 +26,7 @@ rule; refusing names the problem where someone can decide it.
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -33,6 +34,8 @@ from typing import Final
 
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+    LEGACY_ROTATION_DISPOSITIONS,
     PUBLISHED_PRECISIONS,
     ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ROTATION_DISPOSITIONS,
@@ -45,7 +48,7 @@ from squadopt.data.timestamps import normalize_utc_timestamp
 #: This parser's own contract, separate from the response format's. The response format is
 #: what a model is asked to produce; this is what the parser produces from it, and the two
 #: can move independently.
-CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v1"
+CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v2"
 
 #: Keys a claim must carry. ``paraphrase`` is required and then discarded -- see the module
 #: docstring. A response missing any of these is a different format, not a sparse one.
@@ -238,6 +241,34 @@ def _fetched_bytes(documents: Sequence[RawDocument]) -> dict[str, bytes]:
     return indexed
 
 
+def _require_explicit_full_match_limit(quote: bytes) -> None:
+    """A conservative source gate, not a general language-understanding claim.
+
+    The new label must carry a clear next-league-match inability in its own cited
+    span. Unrecognized wording remains refused; managed minutes never implies it.
+    Existing labels and source-role handling do not pass through this gate.
+    """
+    text = " ".join(quote.decode("utf-8").casefold().replace("\u2019", "'").split())
+    scope = re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game)\b", text)
+    uncertainty = re.search(
+        r"\b(?:if|unless|might|may|could|unlikely|perhaps|possibly)\b"
+        r"|\b(?:not saying|did not say|didn't say|not true|no longer|not the case)\b",
+        text,
+    )
+    inability = re.search(
+        r"\b(?:cannot|can't|will not(?: be able to)?|won't(?: be able to)?|is unable to) "
+        r"(?:complete|finish|play|last) (?:the )?"
+        r"(?:(?:full|whole|entire) (?:(?:upcoming|next) )?(?:(?:premier )?league )?"
+        r"(?:match|game)|(?:full )?(?:90|ninety) minutes)\b",
+        text,
+    )
+    if scope is None or inability is None or uncertainty is not None:
+        raise ClubNewsError(
+            "The full-match-unavailable claim needs an explicit, unconditional quoted "
+            "inability to complete the upcoming league match; vague limits are not enough."
+        )
+
+
 def parse_claim_response(
     response: ClaimResponse, documents: Sequence[RawDocument]
 ) -> tuple[ParsedClaim, ...]:
@@ -260,12 +291,20 @@ def parse_claim_response(
         )
     document = _object(response.text)
     version = document.get("contract_version")
-    if version != ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION:
+    if version not in (
+        LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+        ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+    ):
         raise ClubNewsError(
             f"The response declares contract {version!r}, not "
             f"{ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION!r}. A response stored under one "
             "version is not readable under another."
         )
+    dispositions = (
+        LEGACY_ROTATION_DISPOSITIONS
+        if version == LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+        else ROTATION_DISPOSITIONS
+    )
     datelines = _declared_datelines(document)
     available = _fetched_bytes(documents)
 
@@ -281,7 +320,7 @@ def parse_claim_response(
         _text(record, "paraphrase", f"The claim about {player_name!r}")
         disposition = _one_of(
             _text(record, "disposition", f"The claim about {player_name!r}"),
-            ROTATION_DISPOSITIONS,
+            dispositions,
             f"The disposition for {player_name!r}",
         )
         speaker = _one_of(
@@ -321,6 +360,8 @@ def parse_claim_response(
                 f"{source_url!r}, which holds {len(content)} bytes. A span outside the bytes "
                 "it cites is an unresolvable citation."
             )
+        if disposition == "stated_full_match_unavailable":
+            _require_explicit_full_match_limit(content[span_start:span_end])
         claims.append(
             ParsedClaim(
                 player_name=player_name,

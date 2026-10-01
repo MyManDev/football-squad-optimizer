@@ -69,7 +69,8 @@ from squadopt.data.sources.fpl_live import (
 from squadopt.data.timestamps import as_instant
 
 #: This table's contract. A row written under one version is not readable under another.
-CONTRACT_VERSION: Final = "rotation_evidence_v2"
+LEGACY_CONTRACT_VERSION: Final = "rotation_evidence_v2"
+CONTRACT_VERSION: Final = "rotation_evidence_v3"
 
 #: The locked holdout. Evidence for it is not built, listed or fingerprinted.
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
@@ -843,6 +844,7 @@ __all__ = [
     "CONTRACT_VERSION",
     "FEED_NEWS_STATES",
     "FORBIDDEN_COLUMNS",
+    "LEGACY_CONTRACT_VERSION",
     "MIDWEEK_WINDOW_DAYS",
     "MIN_TARGET_GAMEWEEK",
     "ROTATION_EVIDENCE_COLUMNS",
