@@ -12,6 +12,7 @@ from tests.unit.test_league_views import (
     _legal_squad,
     _member_picks,
     _Provider,
+    _verified_manager_word,
     _world_context,
 )
 
@@ -24,7 +25,7 @@ from squadopt.application.advice import (
 )
 from squadopt.application.entries import EntryError, EntryRegistration
 from squadopt.application.league_views import build_league_views
-from squadopt.application.manager_words import ManagerWord, ManagerWords
+from squadopt.application.manager_words import ManagerWords
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import FirstWeekExclusion
@@ -1241,21 +1242,9 @@ def _managers_word(player_id: int, disposition: str) -> ManagerWords:
         gameweek=2,
         source_kind="synthetic_fixture",
         source_label="club_news_v1.fixture.json",
-        evidence_table="rotation_evidence_v2_2026-27_gw02.csv",
+        evidence_table="rotation_evidence_v4_2026-27_gw02.csv",
         clubs_covered=("Club 1",),
-        words=(
-            ManagerWord(
-                player_id=player_id,
-                disposition=disposition,
-                speaker="the manager",
-                published_at_utc="2026-08-21T10:00:00Z",
-                published_precision="instant",
-                club="Club 1",
-                source_url="https://club.example/club-1/news",
-                fetched_at_utc="2026-08-22T11:00:00Z",
-                words="He will not travel.",
-            ),
-        ),
+        words=(_verified_manager_word(player_id, disposition),),
     )
 
 
@@ -1304,7 +1293,7 @@ def test_the_managers_word_keeps_the_named_player_out_and_prices_it(
     assert isinstance(applied, list) and len(applied) == 1
     assert applied[0]["player_id"] == starter
     assert applied[0]["role"] == "not_starting"
-    assert applied[0]["words"] == "He will not travel."
+    assert applied[0]["words"] == f"Player {starter} will miss the next Premier League match."
     assert applied[0]["source_url"] == "https://club.example/club-1/news"
     # A swap the pure-points control makes too keeps its own reason; the rest is there
     # because of what the page said, and at least one such swap exists here.
@@ -1347,6 +1336,44 @@ def test_a_word_that_binds_nobody_changes_nothing_and_says_so(world: dict[str, A
     assert payload.pop("expected_points_cost_ceiling") == 0.0
     assert payload["expected_points_cost"] == 0.0
     assert isinstance(evidence, dict) and evidence["applied"] == []
+    assert payload == baseline
+
+
+def test_an_unsigned_legacy_absence_cannot_constrain_the_plan(world: dict[str, Any]) -> None:
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    baseline = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+    starter = int(str(baseline["captain"]["player_id"]))  # type: ignore[index]
+    words = _managers_word(starter, "stated_expected_absent")
+    unsigned = dataclasses.replace(
+        words.words[0],
+        words="He will not travel.",
+        source_sha256=None,
+        span_start=None,
+        span_end=None,
+        fixture_scope="unspecified",
+        scope_verified=False,
+        publication_verified=False,
+        publication_source=None,
+        publication_source_sha256=None,
+    )
+    legacy = dataclasses.replace(
+        words, evidence_table="rotation_evidence_v2_2026-27_gw02.csv", words=(unsigned,)
+    )
+    assert legacy.exclusion() is None
+    payload = advise_with_managers_word(
+        _request(),
+        words=legacy,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    evidence = payload.pop("evidence")
+    assert evidence["binding"] is False and evidence["applied"] == []
+    assert payload.pop("expected_points_cost_ceiling") == 0.0
     assert payload == baseline
 
 

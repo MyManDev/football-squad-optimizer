@@ -25,6 +25,7 @@ from typing import Any, Final
 import jsonschema
 
 from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
+from squadopt.contracts.information import decision_information_schema, official_information_schema
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import preferences_schema
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
@@ -85,7 +86,32 @@ def participation_evidence_schema() -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "properties": fields,
+        "properties": {
+            **fields,
+            "statement_outcomes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "player_id": {"type": "integer", "minimum": 1},
+                        "disposition": {"type": "string"},
+                        "applied": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                        "source_url": {"type": ["string", "null"]},
+                        "source_published_at": {"type": ["string", "null"]},
+                    },
+                    "required": [
+                        "player_id",
+                        "disposition",
+                        "applied",
+                        "reason",
+                        "source_url",
+                        "source_published_at",
+                    ],
+                },
+            },
+        },
         "required": list(fields),
     }
 
@@ -164,7 +190,7 @@ def information_review_schema() -> dict[str, Any]:
         "information_gameweek": {"type": ["integer", "null"]},
         "candidates": {
             "type": "array",
-            "maxItems": 3,
+            "maxItems": 4,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -409,6 +435,8 @@ def advice_read_schema() -> dict[str, Any]:
             "expected_own_points": nullable_number,
             "lineup_expectation": lineup_expectation_schema(),
             "participation_evidence": participation_evidence_schema(),
+            "official_information": official_information_schema(),
+            "decision_information": decision_information_schema(),
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
             "expected_gain_vs_hold": nullable_number,
@@ -598,6 +626,7 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "required": ["available", "weights"],
                 "additionalProperties": False,
             },
+            "decision_information": decision_information_schema(),
             "models": {
                 "type": "array",
                 "items": {"enum": list(PREDICTION_MODELS)},

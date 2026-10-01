@@ -96,6 +96,31 @@ def forecast_gameweeks(first: int, gameweeks: Sequence[int] | None = None) -> tu
     return weeks
 
 
+def _training_sources(
+    selected: Sequence[str] | None, current_season: str
+) -> tuple[tuple[str, ...], bool]:
+    """Resolve an allowlist before opening either archive or captured outcome history."""
+    if selected is None:
+        return ARCHIVE_SEASONS, True
+    supported = {*ARCHIVE_SEASONS, current_season}
+    if (
+        isinstance(selected, (str, bytes))
+        or not isinstance(selected, Sequence)
+        or not selected
+        or any(not isinstance(season, str) or season not in supported for season in selected)
+        or len(set(selected)) != len(selected)
+    ):
+        raise ValueError("Training seasons must be a nonempty unique supported selection.")
+    return tuple(sorted(set(selected) & set(ARCHIVE_SEASONS))), current_season in selected
+
+
+def _season_counts(frame: pd.DataFrame) -> dict[str, int]:
+    return {
+        str(season): int(count)
+        for season, count in frame.groupby("season", sort=True).size().items()
+    }
+
+
 def _forecast_and_components(
     snapshot: CapturedSnapshot,
     archive_root: Path,
@@ -103,6 +128,7 @@ def _forecast_and_components(
     contextual: bool,
     manager_words: ManagerWords | None,
     gameweeks: Sequence[int] | None,
+    training_seasons: Sequence[str] | None,
 ) -> tuple[dict[str, Any], pd.DataFrame, RecommendationInputs]:
     """One producer call: the served document, the per-fixture components and the inputs."""
 
@@ -114,13 +140,24 @@ def _forecast_and_components(
     inputs = read_inputs(snapshot, season=season)
     cutoff = pd.Timestamp(inputs.captured_at_utc)
     first = int(inputs.deadline.gameweek)
-    history = archive_history(archive_root)
-    history = history.loc[
-        (history.season < season) & (history.kickoff + pd.Timedelta(hours=3) < cutoff)
-    ]
-    current = captured_history(snapshot, season=season, gameweek=first)
-    if not current.empty:
-        history = pd.concat([history, current], ignore_index=True)
+    archives, include_current = _training_sources(training_seasons, season)
+    history = (
+        archive_history(archive_root)
+        if training_seasons is None
+        else archive_history(archive_root, seasons=archives)
+        if archives
+        else pd.DataFrame()
+    )
+    if not history.empty:
+        history = history.loc[
+            (history.season < season) & (history.kickoff + pd.Timedelta(hours=3) < cutoff)
+        ]
+    if include_current:
+        current = captured_history(snapshot, season=season, gameweek=first)
+        if not current.empty:
+            history = pd.concat([history, current], ignore_index=True)
+    if history.empty:
+        raise ValueError("The selected training seasons contain no usable history.")
     training = causal_training(history)
     model = (
         ContextualFootballModel(training, history, cutoff=cutoff)
@@ -132,22 +169,6 @@ def _forecast_and_components(
     player_clubs = {p["code"]: clubs[p["team"]] for p in boot["elements"]}
     roster = inputs.players.copy()
     roster["club"] = roster.player_id.map(player_clubs)
-    context_audit: list[dict[str, Any]] = []
-    if contextual:
-        roster = roster.merge(
-            captured_taker_priorities(snapshot.payloads[BOOTSTRAP_PAYLOAD]),
-            on="player_id",
-            how="left",
-            validate="one_to_one",
-        )
-        roster, context_audit = bind_football_context(
-            roster,
-            inputs.availability,
-            season=season,
-            gameweek=first,
-            cutoff=cutoff,
-            manager_words=manager_words,
-        )
     fixtures = pd.DataFrame(json.loads(snapshot.payloads[FIXTURES_PAYLOAD]))
     weeks = forecast_gameweeks(first, gameweeks)
     fixtures = fixtures.loc[fixtures.event.isin(weeks)]
@@ -169,6 +190,23 @@ def _forecast_and_components(
         ],
         ignore_index=True,
     )
+    context_audit: list[dict[str, Any]] = []
+    if contextual:
+        roster = roster.merge(
+            captured_taker_priorities(snapshot.payloads[BOOTSTRAP_PAYLOAD]),
+            on="player_id",
+            how="left",
+            validate="one_to_one",
+        )
+        roster, context_audit = bind_football_context(
+            roster,
+            inputs.availability,
+            season=season,
+            gameweek=first,
+            cutoff=cutoff,
+            manager_words=manager_words,
+            fixture_calendar=calendar,
+        )
     horizon, components = build_football_horizon(
         model,
         history,
@@ -194,7 +232,7 @@ def _forecast_and_components(
             for w, p in zip(table.gameweek, table.player_id, strict=True)
         ]
     hashes = {}
-    for prior in ARCHIVE_SEASONS:
+    for prior in archives:
         for name in ("gws/merged_gw.csv", "players_raw.csv", "teams.csv", "fixtures.csv"):
             path = archive_root / "data" / prior / name
             hashes[f"{prior}/{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -218,6 +256,19 @@ def _forecast_and_components(
         ],
         "rows": table.to_dict("records"),
     }
+    if training_seasons is not None:
+        document["training_selection"] = {
+            "contract_version": "football_training_selection_v1",
+            "allowed_seasons": sorted(training_seasons),
+            "archive_seasons_read": list(archives),
+            "captured_history_included": include_current,
+            "captured_history_season": season if include_current else None,
+            "prior_only_seasons": [ARCHIVE_SEASONS[0]]
+            if ARCHIVE_SEASONS and ARCHIVE_SEASONS[0] in archives
+            else [],
+            "history_rows_by_season": _season_counts(history),
+            "supervised_rows_by_season": _season_counts(training),
+        }
     if contextual:
         document["availability_application"] = "before_team_shares_v1"
         document["projection_contract"] = horizon.contract_version
@@ -252,6 +303,7 @@ def produce_football_forecast(
     contextual: bool = False,
     manager_words: ManagerWords | None = None,
     gameweeks: Sequence[int] | None = None,
+    training_seasons: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     document, _components, _inputs = _forecast_and_components(
         snapshot,
@@ -259,6 +311,7 @@ def produce_football_forecast(
         contextual=contextual,
         manager_words=manager_words,
         gameweeks=gameweeks,
+        training_seasons=training_seasons,
     )
     return document
 
@@ -268,6 +321,7 @@ def produce_football_components(
     archive_root: Path,
     *,
     gameweeks: Sequence[int] | None = None,
+    training_seasons: Sequence[str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """The served v1 document and its per-fixture components, from one producer call.
 
@@ -280,7 +334,12 @@ def produce_football_components(
     """
 
     document, components, inputs = _forecast_and_components(
-        snapshot, archive_root, contextual=False, manager_words=None, gameweeks=gameweeks
+        snapshot,
+        archive_root,
+        contextual=False,
+        manager_words=None,
+        gameweeks=gameweeks,
+        training_seasons=training_seasons,
     )
     roster = [int(player) for player in inputs.players.player_id]
     unit = pd.DataFrame({"player_id": roster, "expected_points": [1.0] * len(roster)})
@@ -312,5 +371,7 @@ def produce_football_components(
             components, model_version=document["model_version"], players=multipliers
         ),
     }
+    if "training_selection" in document:
+        companion["training_selection"] = json.loads(json.dumps(document["training_selection"]))
     companion["fingerprint"] = forecast_digest(companion)
     return document, companion

@@ -287,3 +287,37 @@ def test_contextual_model_to_legal_plan_and_shared_scenarios(contextual):
     assert result.scenario_mean_diagnostics["player_fixtures"] == 160
     clubs = result.draws.outcomes.merge(roster[["player_id", "club"]], on="player_id")
     assert clubs.groupby(["scenario_id", "club"]).minutes.sum().eq(990).all()
+
+
+def test_explicit_minute_restriction_is_confined_to_its_exact_fixture(contextual):
+    _, _, roster, _ = contextual
+    _, reference = build(contextual)
+    player = int(roster.loc[roster.position.eq("FWD"), "player_id"].iloc[0])
+    player_rows = reference.loc[reference.player_code.eq(player)]
+    fixture = int(player_rows.fixture.iloc[0])
+    limited = roster.assign(minutes_limited=False, manager_context_fixture=pd.NA)
+    mask = limited.player_id.eq(player)
+    limited.loc[mask, "minutes_limited"] = True
+    limited.loc[mask, "manager_context_fixture"] = fixture
+    _, result = build(contextual, limited)
+    before = reference.set_index(["fixture", "player_code"])
+    after = result.set_index(["fixture", "player_code"])
+    assert after.loc[(fixture, player), "minute_probability_3"] == 0
+    assert (
+        after.loc[(fixture, player), "appearance_probability"]
+        == before.loc[(fixture, player), "appearance_probability"]
+    )
+    assert (
+        after.loc[(fixture, player), "expected_minutes"]
+        < before.loc[(fixture, player), "expected_minutes"]
+    )
+    unaffected = after.index.get_level_values("fixture") != fixture
+    columns = [
+        "expected_points",
+        "appearance_probability",
+        "expected_minutes",
+        "minute_probability_3",
+    ]
+    assert_frame_equal(
+        after.loc[unaffected, columns], before.loc[unaffected, columns], check_exact=True
+    )

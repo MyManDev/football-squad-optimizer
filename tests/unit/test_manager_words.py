@@ -49,6 +49,14 @@ def _word(player_id: int, disposition: str) -> ManagerWord:
         source_url="https://club.example/arsenal/news",
         fetched_at_utc="2026-09-12T14:05:00Z",
         words="He will not travel.",
+        source_sha256="a" * 64,
+        span_start=0,
+        span_end=19,
+        fixture_scope="upcoming_premier_league",
+        scope_verified=True,
+        publication_verified=True,
+        publication_source="text_published",
+        publication_source_sha256="b" * 64,
     )
 
 
@@ -75,7 +83,7 @@ def test_the_rule_is_declared_over_the_whole_vocabulary() -> None:
         "stated_expected_absent": "not_starting",
         "stated_rotation_risk": "not_captain",
         "stated_returning_from_injury": None,
-        "stated_minutes_limited": "not_captain",
+        "stated_minutes_limited": None,
         "stated_full_match_unavailable": None,
         "ambiguous": None,
     }
@@ -166,7 +174,7 @@ def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
     assert (resolved.source_sha256, resolved.span_start, resolved.span_end) == (digest, start, end)
     unresolved = words.words[1]
     assert unresolved.words is None and unresolved.club is None and unresolved.source_url is None
-    assert unresolved.role == "not_captain"
+    assert unresolved.role is None
     assert (unresolved.source_sha256, unresolved.span_start, unresolved.span_end) == (
         None,
         None,
@@ -299,7 +307,7 @@ def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_rea
 ) -> None:
     """The fixture's captain line carries a per cent sign. The source said it, but the rule
     about what a member page shows covers every sentence on it, so the words are withheld
-    and the status says why; the constraint itself still stands."""
+    and the status says why; legacy unscoped wording cannot constrain a decision."""
 
     documents, kind, label = documents_from_source(FIXTURE)
     sentence = b'Asked about the captain, he said: "Odegaard is at 80% and we will see."'
@@ -320,10 +328,10 @@ def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_rea
     assert word.source_sha256 == table.iloc[0].rotation_claim_source_sha256
     assert word.span_start == table.iloc[0].rotation_claim_span_start
     assert word.span_end == table.iloc[0].rotation_claim_span_end
-    assert word.role == "not_captain"
+    assert word.role is None
     assert word.source_url is not None
     exclusion = words.exclusion()
-    assert exclusion is not None and exclusion.not_captain == frozenset({11})
+    assert exclusion is None
 
 
 def test_a_quote_that_cannot_be_cut_is_unresolved_not_withheld() -> None:
@@ -481,7 +489,7 @@ def test_the_quote_screen_leaves_plain_statements_alone(quote: str) -> None:
 
 def test_unresolved_or_partial_provenance_cannot_claim_a_verified_span():
     with pytest.raises(ManagerWordsError, match="resolved complete byte span"):
-        replace(_word(1, "stated_expected_absent"), source_sha256="a" * 64)
+        replace(_word(1, "stated_expected_absent"), span_end=None)
     with pytest.raises(ManagerWordsError, match="resolved complete byte span"):
         replace(
             _word(1, "stated_expected_absent"),

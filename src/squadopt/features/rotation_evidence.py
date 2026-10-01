@@ -32,6 +32,7 @@ column of nulls, because a missing field is the source having renamed something,
 observation of nothing.
 """
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -55,6 +56,8 @@ from squadopt.data.sources.club_news import (
 )
 from squadopt.data.sources.club_news_claims import ParsedClaim
 from squadopt.data.sources.club_news_coding import UnlocatableClaim
+from squadopt.data.sources.club_news_metadata import PUBLICATION_SOURCES
+from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -66,11 +69,12 @@ from squadopt.data.sources.fpl_live import (
     team_codes,
     team_names,
 )
-from squadopt.data.timestamps import as_instant
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 #: This table's contract. A row written under one version is not readable under another.
 LEGACY_CONTRACT_VERSION: Final = "rotation_evidence_v2"
-CONTRACT_VERSION: Final = "rotation_evidence_v3"
+PREVIOUS_CONTRACT_VERSION: Final = "rotation_evidence_v3"
+CONTRACT_VERSION: Final = "rotation_evidence_v4"
 
 #: The locked holdout. Evidence for it is not built, listed or fingerprinted.
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
@@ -90,7 +94,7 @@ MIN_TARGET_GAMEWEEK: Final = 2
 
 #: The 28 columns, in the one order they are ever written or read. The "absent means" contract
 #: for each lives in ``docs/rotation_evidence_contract.md`` and in the builder's guards.
-ROTATION_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
+LEGACY_ROTATION_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
     "contract_version",
     "season",
     "target_gameweek",
@@ -120,6 +124,14 @@ ROTATION_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
     "model_response_sha256",
     "model_evidence_observed",
     "fixture_context_midweek",
+)
+ROTATION_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
+    *LEGACY_ROTATION_EVIDENCE_COLUMNS,
+    "rotation_claim_fixture_scope",
+    "rotation_claim_scope_verified",
+    "rotation_claim_publication_verified",
+    "rotation_claim_publication_source",
+    "rotation_claim_publication_source_sha256",
 )
 
 # The pandas dtype each column is cast to. The nullable families carry ``pd.NA`` rather than a
@@ -156,6 +168,11 @@ _ROTATION_EVIDENCE_DTYPES: Final[Mapping[str, str]] = {
     "model_response_sha256": "string",
     "model_evidence_observed": "boolean",
     "fixture_context_midweek": "boolean",
+    "rotation_claim_fixture_scope": "string",
+    "rotation_claim_scope_verified": "boolean",
+    "rotation_claim_publication_verified": "boolean",
+    "rotation_claim_publication_source": "string",
+    "rotation_claim_publication_source_sha256": "string",
 }
 
 #: Names that would carry an identity, a raw quote or a generated number if they ever
@@ -430,6 +447,109 @@ class _ClaimRow:
     published_at_utc: str | None
     published_precision: str
     speaker: str
+    fixture_scope: str
+    scope_verified: bool
+    publication_verified: bool
+    publication_source: str | None
+    publication_source_sha256: str | None
+
+
+def claim_fixture_calendar(
+    fixtures: pd.DataFrame, fixtures_payload: bytes, bootstrap: bytes
+) -> pd.DataFrame:
+    """Retain unassigned matches for attestation, without changing projection rows.
+
+    The ordinary fixture reader deliberately excludes event=null. Such a match can
+    still invalidate a source's 'next league match', so this narrower calendar
+    preserves its club and kickoff (including an unknown kickoff).
+    """
+    columns = ["team_id", "gameweek", "fixture_id", "kickoff_time_utc"]
+    result = fixtures[columns].copy()
+    records = json.loads(fixtures_payload)
+    if not isinstance(records, list):
+        raise DataSourceError("Claim fixture calendar requires a fixture list.")
+    codes = team_codes(bootstrap)
+    extra: list[dict[str, object]] = []
+    for record in records:
+        if not isinstance(record, dict) or "event" not in record:
+            raise DataSourceError("Claim fixture calendar has a malformed fixture.")
+        if record["event"] is not None:
+            continue
+        identifier = record.get("id")
+        home, away = record.get("team_h"), record.get("team_a")
+        if (
+            type(identifier) is not int
+            or identifier <= 0
+            or type(home) is not int
+            or type(away) is not int
+            or home not in codes
+            or away not in codes
+            or home == away
+        ):
+            raise DataSourceError("Unassigned claim fixture has an invalid identity or club.")
+        value = record.get("kickoff_time")
+        kickoff = (
+            None
+            if value is None
+            else normalize_utc_timestamp(value, label="Unassigned claim fixture kickoff_time")
+        )
+        for club in (home, away):
+            extra.append(
+                {
+                    "team_id": codes[club],
+                    "gameweek": pd.NA,
+                    "fixture_id": identifier,
+                    "kickoff_time_utc": kickoff,
+                }
+            )
+    if extra:
+        result = pd.concat([result, pd.DataFrame(extra, columns=columns)], ignore_index=True)
+    result["gameweek"] = result.gameweek.astype("Int64")
+    return result
+
+
+def claim_targets_next_fixture(
+    fixtures: pd.DataFrame,
+    *,
+    team_code: int,
+    target_gameweek: int,
+    captured_at_utc: str,
+    published_at_utc: str | None,
+    published_precision: str,
+) -> bool:
+    """Bind 'next league match' to the first club fixture after the source instant.
+
+    A lexical next-match label cannot skip a game already played since publication.
+    Undated relevant fixtures and a double gameweek leave the weekly claim unbound.
+    """
+    if published_at_utc is None or published_precision != "instant":
+        return False
+    try:
+        published, cutoff = as_instant(published_at_utc), as_instant(captured_at_utc)
+    except (TypeError, ValueError):
+        return False
+    if published.tzinfo is None or cutoff.tzinfo is None or published > cutoff:
+        return False
+    club = fixtures.loc[fixtures.team_id.eq(team_code)]
+    possibly_before_target = club.gameweek.isna() | club.gameweek.le(target_gameweek)
+    if club.loc[possibly_before_target, "kickoff_time_utc"].isna().any():
+        return False
+    target = club.loc[club.gameweek.eq(target_gameweek)]
+    if len(target) != 1 or target.kickoff_time_utc.isna().any():
+        return False
+    try:
+        kickoff = as_instant(str(target.iloc[0].kickoff_time_utc))
+    except (TypeError, ValueError):
+        return False
+    if kickoff.tzinfo is None or kickoff <= cutoff:
+        return False
+    known = club.dropna(subset=["kickoff_time_utc"])
+    after = known.loc[pd.to_datetime(known.kickoff_time_utc, utc=True).gt(published)]
+    if after.empty:
+        return False
+    kickoffs = pd.to_datetime(after.kickoff_time_utc, utc=True)
+    first = kickoffs.min()
+    return bool(first == kickoff and int(kickoffs.eq(first).sum()) == 1)
 
 
 def _resolved_claims(
@@ -444,6 +564,7 @@ def _resolved_claims(
     """
 
     seam_roster = roster_from_short_names(roster)
+    names = {player.player_id: player.web_name for player in seam_roster}
     placed: dict[int, _ClaimRow] = {}
     unresolved: dict[str, int] = {}
     for claim in claims:
@@ -464,6 +585,13 @@ def _resolved_claims(
             published_at_utc=claim.published_at_utc,
             published_precision=claim.published_precision,
             speaker=claim.speaker,
+            fixture_scope=claim.fixture_scope,
+            scope_verified=claim.scope_verified
+            and " ".join(claim.player_name.casefold().replace("\u2019", "'").split())
+            == " ".join(names[identity.player_id].casefold().replace("\u2019", "'").split()),
+            publication_verified=claim.publication_verified,
+            publication_source=claim.publication_source,
+            publication_source_sha256=claim.publication_source_sha256,
         )
     return placed, unresolved
 
@@ -660,6 +788,7 @@ def build_rotation_evidence_table(
         snapshot_id=decision_snapshot.metadata.snapshot_id,
         captured_at_utc=decision_snapshot.metadata.captured_at_utc,
     )
+    claim_fixtures = claim_fixture_calendar(fixtures, fixtures_payload, bootstrap)
     midweek = _midweek_clubs(
         fixtures,
         target_gameweek=target_gameweek,
@@ -748,6 +877,25 @@ def build_rotation_evidence_table(
                     pd.NA if claim is None else claim.published_precision
                 ),
                 "rotation_claim_speaker": pd.NA if claim is None else claim.speaker,
+                "rotation_claim_fixture_scope": pd.NA if claim is None else claim.fixture_scope,
+                "rotation_claim_scope_verified": claim is not None
+                and claim.scope_verified
+                and claim_targets_next_fixture(
+                    claim_fixtures,
+                    team_code=team_code,
+                    target_gameweek=target_gameweek,
+                    captured_at_utc=captured_at_utc,
+                    published_at_utc=claim.published_at_utc,
+                    published_precision=claim.published_precision,
+                ),
+                "rotation_claim_publication_verified": claim is not None
+                and claim.publication_verified,
+                "rotation_claim_publication_source": pd.NA
+                if claim is None
+                else claim.publication_source,
+                "rotation_claim_publication_source_sha256": pd.NA
+                if claim is None
+                else claim.publication_source_sha256,
                 "model_identifier": pd.NA if model is None else model.identifier,
                 "prompt_sha256": pd.NA if model is None else model.prompt_sha256,
                 # This player's club's response, not the week's only one. Two players from
@@ -830,6 +978,8 @@ def _require_closed_vocabularies(table: pd.DataFrame) -> None:
         ("rotation_disposition", ROTATION_DISPOSITIONS),
         ("rotation_claim_published_precision", PUBLISHED_PRECISIONS),
         ("rotation_claim_speaker", CLAIM_SPEAKERS),
+        ("rotation_claim_fixture_scope", FIXTURE_SCOPES),
+        ("rotation_claim_publication_source", PUBLICATION_SOURCES),
         ("feed_news_state", FEED_NEWS_STATES),
     ):
         observed = {str(value) for value in table[column].dropna().tolist()}

@@ -10,6 +10,7 @@ import pytest
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.club_news import (
     LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+    PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ClaimResponse,
     ClubNewsError,
@@ -24,6 +25,7 @@ from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_resp
 from squadopt.data.sources.club_news_coding import (
     LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     LEGACY_SYSTEM_PROMPT,
+    PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     SYSTEM_PROMPT,
     coding_prompt_sha256,
@@ -38,7 +40,7 @@ URL = "https://club.example/arsenal/news"
 
 
 def _document(quote: str = QUOTE) -> RawDocument:
-    content = quote.encode("utf-8")
+    content = ("Published: 2026-09-12T13:00:00Z\n" + quote).encode("utf-8")
     return RawDocument(
         club="Arsenal",
         requested_url=URL,
@@ -78,6 +80,11 @@ def _response(
                     "source_url": URL,
                     "quote": quote,
                     "paraphrase": "The source reports a limit for this league match.",
+                    **(
+                        {"fixture_scope": "upcoming_premier_league"}
+                        if version == ROTATION_CLAIM_CODING_CONTRACT_VERSION
+                        else {}
+                    ),
                 }
             ],
         }
@@ -98,6 +105,10 @@ def test_old_prompt_schema_and_digest_remain_exactly_available() -> None:
     assert "Vague managed minutes" in SYSTEM_PROMPT
     assert "probability" in SYSTEM_PROMPT
     assert coding_prompt_sha256() != coding_prompt_sha256(contract_version=legacy)
+    assert (
+        coding_prompt_sha256(contract_version=PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION)
+        == "932de6f6bc43ba10042d38e50450215cfa0d7258b4b19afc2e3f8b12ab975b19"
+    )
 
 
 @pytest.mark.parametrize(
@@ -108,6 +119,10 @@ def test_old_prompt_schema_and_digest_remain_exactly_available() -> None:
             LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
         ),
         (ROTATION_CLAIM_CODING_CONTRACT_VERSION, ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION),
+        (
+            PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+        ),
     ],
 )
 def test_locator_preserves_response_generation_and_prior_labels(
@@ -146,6 +161,7 @@ def test_explicit_upcoming_full_match_limit_remains_categorical_and_cited(quote:
     assert claim.disposition == LABEL
     assert claim.speaker == "manager"
     assert claim.published_at_utc == "2026-09-12T13:00:00Z"
+    assert claim.scope_verified and claim.publication_verified
     assert claim.source_sha256 == hashlib.sha256(document.readable).hexdigest()
     assert resolve_span(document.readable, claim) == quote.encode()
     assert not {"probability", "confidence", "expected_minutes"} & {

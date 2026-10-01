@@ -52,9 +52,11 @@ compatible service that does not support it; local claim/schema validation still
 The completion token limit is a positive integer no greater than 16000.
 There is no automatic provider, model or output-format fallback.
 
-Anthropic and Gemini continue to work through the same settings. Their existing defaults
-remain unchanged. Gemini's supported-model/thinking-setting list remains in force; this
-change does not claim that an arbitrary new Gemini model is compatible.
+Anthropic and Gemini continue to work through the same settings and model defaults.
+Configured acquisition providers do not retry automatically, so the request budget also
+bounds transport attempts. Direct Anthropic adapter callers retain their existing retry
+default. Gemini's supported-model/thinking-setting list remains in force; this change does
+not claim that an arbitrary new Gemini model is compatible.
 
 API readiness is separate from club coverage. The committed source registry contains
 three real hosts, for Liverpool, Newcastle and Crystal Palace, plus an Example FC
@@ -72,7 +74,7 @@ Repeated selections do not repeat requests. All registered pages for the selecte
 remain in scope.
 
 ```text
-python -m scripts.capture_club_news --settings-file <private-file> --roster-snapshot <capture> --club Liverpool --capture-root <trial-output>
+python -m scripts.capture_club_news --settings-file <private-file> --roster-snapshot <capture> --club Liverpool --capture-root <trial-output> --max-model-calls 1
 ```
 
 Repeat `--club` to select more clubs. `--capture-root` changes only where new news is
@@ -92,25 +94,43 @@ regardless of provider.
 
 ## Fixture components for minute evidence
 
-The v1 builder can publish the forecast and its fixture components from the same fit:
+The v1 builder can publish the forecast and its fixture components from the same fit.
+Choose every permitted training season explicitly. For an archive-only development run
+that excludes 2025-26 and the current season:
 
 ```text
-python -m scripts.build_football_forecast --snapshot-root <captures> --snapshot-id <capture> --archive-root <authorized-archive> --artifact-root <artifacts> --with-components
+python -m scripts.build_football_forecast --snapshot-root <captures> --snapshot-id <capture> --archive-root <authorized-archive> --artifact-root <trial-artifacts> --with-components --training-season 2022-23 --training-season 2023-24 --training-season 2024-25
 ```
 
-This is opt-in and v1-only. The companion is validated against the full five-week forecast,
+Repeat `--training-season` for each allowed season; a comma-separated list is not accepted.
+Excluded archive seasons are neither read nor hashed. The forecast and companion record
+the selected seasons and actual training populations. Choosing a different population is
+a new development fit, not evidence that the resulting model is better. The 2022-23 season
+supplies historical priors rather than supervised target rows.
+
+To include 2026-27, add `--training-season 2026-27` only when the selected immutable capture
+contains every required settled `event-gwNN-live.json` from gameweek 1 through the week
+before its target. A capture containing only bootstrap and fixtures cannot supply those
+observations. The builder refuses missing history; do not add files to an existing capture.
+
+This is opt-in and v1-only. The companion is validated against the full forecast horizon,
 its captured calendar and availability before either new document is published. Existing
 conflicting files are refused, not replaced. The companion is written first; an interrupted
 identical run can complete the forecast. The two-file publication is not a transaction. A
 per-capture publication marker excludes a second cooperating writer; after a process is
 killed an operator must inspect that marker before removing it.
 
-This command still fits the producer's configured archive seasons, including 2025-26.
-`--with-components` does not authorize archive access or manufacture a missing basis for an
-old forecast. Where a season is held out or its access is restricted, do not run this command
-against it. Old weekly totals alone cannot recover the exact player-fixture components.
-New news must precede the decision capture; changing its date to fit an old capture is not
-an integration path.
+Omitting `--training-season` retains the existing archive population, including 2025-26,
+and includes captured current-season history. Do not omit the option when a season is held
+out or access is restricted. `--with-components` itself does not authorize archive access
+or manufacture a missing basis for an old forecast. The snapshot reader still verifies
+every payload in the named capture; the training selection is not a payload filter.
+
+Use a new ignored trial artifact directory for independent validation. Writing a trial
+forecast does not activate it for the live service. Old weekly totals alone cannot recover
+the exact player-fixture components. New news must precede the decision capture; changing
+its date to fit an old capture is not an integration path. Activation requires the normal
+publication process for the exact new decision capture and its matching artifacts.
 
 ## Personal ChatGPT and Claude accounts
 

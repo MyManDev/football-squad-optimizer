@@ -35,10 +35,11 @@ apart; a convenience default here would undo it in one line.
 
 import hashlib
 import importlib.util
+import json
 import os
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Final
 
@@ -52,6 +53,7 @@ from squadopt.data.sources.club_news_capture import CodedClub
 from squadopt.data.sources.club_news_coding import (
     CODING_MODEL_IDENTIFIER,
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    build_user_content,
     coding_prompt_sha256,
     require_requested_coding_contract,
 )
@@ -125,6 +127,7 @@ class CodingProviderConfig:
     response_format: str = "json_schema"
     max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS
     allow_local_http: bool = False
+    target_context: Mapping[str, object] | None = None
 
 
 #: Name -> a factory taking the resolved configuration. A second provider is one entry here
@@ -321,6 +324,7 @@ def build_coding_provider(
     environ: Mapping[str, str] | None = None,
     *,
     settings_file: Path | None = None,
+    target_context: Mapping[str, object] | None = None,
 ) -> tuple[ClubNewsProvider, CodingProviderConfig]:
     """The configured provider, and the configuration it was built from.
 
@@ -329,8 +333,49 @@ def build_coding_provider(
     """
 
     config = resolve_provider_config(environ, settings_file=settings_file)
+    config = replace(config, target_context=target_context)
     validate_provider_config(config)
     return _FACTORIES[config.provider](config), config
+
+
+def coding_input_fingerprint(
+    config: CodingProviderConfig, documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]
+) -> str:
+    """Reuse unchanged held evidence only within the same declared pre-deadline target.
+
+    Retrieval/as-of clocks are not fresh editorial content. Original responses and their
+    source publication dates remain unchanged; reuse never manufactures a new statement.
+    A different target, roster, instrument or any source bytes demands another call.
+    """
+    build_user_content(documents, roster, target_context=config.target_context)
+    target = dict(config.target_context or {})
+    target.pop("as_of", None)
+    value = {
+        "provider": config.provider,
+        "model": config.model_identifier,
+        "prompt": coding_prompt_sha256(config.model_identifier),
+        "target": target,
+        "instrument": {
+            "endpoint": hashlib.sha256((config.base_url or "").encode()).hexdigest(),
+            "format": config.response_format,
+            "max_tokens": config.max_completion_tokens,
+        },
+        "documents": [
+            {
+                "club": d.club,
+                "url": d.final_url,
+                "content_type": d.content_type.split(";", 1)[0].strip().lower(),
+                "content": hashlib.sha256(d.content).hexdigest(),
+                "readable": hashlib.sha256(d.readable).hexdigest(),
+                "last_modified": d.last_modified_utc,
+            }
+            for d in documents
+        ],
+        "roster": sorted(
+            [asdict(player) for player in roster], key=lambda row: json.dumps(row, sort_keys=True)
+        ),
+    }
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
 def code_week_by_club(
@@ -338,6 +383,9 @@ def code_week_by_club(
     config: CodingProviderConfig,
     documents: Sequence[RawDocument],
     roster: Sequence[RosterPlayer],
+    *,
+    max_calls: int | None = None,
+    previous: Sequence[CodedClub] = (),
 ) -> tuple[tuple[CodedClub, ...], tuple[tuple[str, str], ...]]:
     """Code a week one club at a time, returning what was coded and why the rest was not.
 
@@ -370,6 +418,10 @@ def code_week_by_club(
     week carries on.
     """
 
+    if max_calls is not None and (
+        isinstance(max_calls, bool) or not isinstance(max_calls, int) or max_calls < 0
+    ):
+        raise ClubNewsProviderError("Call budget must be a nonnegative integer.")
     by_club: dict[str, list[RawDocument]] = {}
     for document in documents:
         by_club.setdefault(document.club, []).append(document)
@@ -377,8 +429,27 @@ def code_week_by_club(
     prompt_sha256 = coding_prompt_sha256(config.model_identifier)
     coded: list[CodedClub] = []
     refused: list[tuple[str, str]] = []
+    previous_by_club = {item.club: item for item in previous}
+    attempted = 0
     for club, club_documents in by_club.items():
         try:
+            fingerprint = coding_input_fingerprint(config, club_documents, roster)
+            held = previous_by_club.get(club)
+            if (
+                config.target_context is not None
+                and held is not None
+                and held.request_fingerprint == fingerprint
+                and held.provider == config.provider
+                and held.prompt_sha256 == prompt_sha256
+                and held.response.model_identifier == config.model_identifier
+            ):
+                require_requested_coding_contract(held.response)
+                coded.append(held)
+                continue
+            if max_calls is not None and attempted >= max_calls:
+                refused.append((club, "Call budget exhausted; no model request was sent."))
+                continue
+            attempted += 1
             response = provider.code(club_documents, roster)
             require_requested_coding_contract(response)
         except ClubNewsError as error:
@@ -388,6 +459,7 @@ def code_week_by_club(
             CodedClub(
                 club=club,
                 response=response,
+                request_fingerprint=fingerprint,
                 prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
                 prompt_sha256=prompt_sha256,
                 # Which adapter was asked, beside which model answered. The two are not
@@ -417,20 +489,30 @@ def _anthropic(config: CodingProviderConfig) -> ClubNewsProvider:
     from squadopt.platform.club_news_model import AnthropicClubNewsProvider
 
     return AnthropicClubNewsProvider(
-        api_key=config.api_key, model_identifier=config.model_identifier
+        api_key=config.api_key,
+        model_identifier=config.model_identifier,
+        target_context=config.target_context,
+        # The acquisition budget counts requests, so SDK retries cannot spend more
+        # requests behind one counted call. Direct adapter callers keep their default.
+        max_transport_retries=0,
     )
 
 
 def _gemini(config: CodingProviderConfig) -> ClubNewsProvider:
     """Build the free-tier adapter. Its HTTP client is built here and not before."""
 
-    return GeminiClubNewsProvider(api_key=config.api_key, model_identifier=config.model_identifier)
+    return GeminiClubNewsProvider(
+        api_key=config.api_key,
+        model_identifier=config.model_identifier,
+        target_context=config.target_context,
+    )
 
 
 def _openai(config: CodingProviderConfig) -> ClubNewsProvider:
     return OpenAIClubNewsProvider(
         api_key=config.api_key,
         model_identifier=config.model_identifier,
+        target_context=config.target_context,
         base_url=config.base_url or DEFAULT_OPENAI_BASE_URL,
         response_format=config.response_format,
         max_completion_tokens=config.max_completion_tokens,

@@ -182,6 +182,7 @@ def test_a_player_the_roster_does_not_hold_reaches_the_resolver_and_is_unresolve
                     "source_url": DOCUMENTS[0].final_url,
                     "quote": "Saka trained fully.",
                     "paraphrase": "He is out.",
+                    "fixture_scope": "unspecified",
                 }
             ],
         }

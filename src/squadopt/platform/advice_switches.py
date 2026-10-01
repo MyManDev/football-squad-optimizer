@@ -19,6 +19,7 @@ cache key and the job spec carry the identity mapping whole, so neither changes.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +52,7 @@ from squadopt.application.weekly_plan import (
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import METADATA_FILENAME, PAYLOAD_DIRECTORY, read_snapshot
+from squadopt.data.sources.fpl_information import FplInformation
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live import Projection, RecommendationInputs
 from squadopt.live.football_artifact import (
@@ -111,6 +113,31 @@ class AdviceSwitchInputs:
     notes: tuple[str, ...] = ()
     football: FootballForecast | None = None
     football_components_sha256: str | None = None
+    official_information: FplInformation | None = None
+    football_components_bound: bool = False
+
+    def decision_information(self, snapshot_id: str) -> dict[str, object] | None:
+        if self.football is None:
+            return None
+        identity = {
+            "snapshot_id": snapshot_id,
+            "forecast": self.football.fingerprint,
+            "components": self.football_components_sha256,
+            "components_bound": self.football_components_bound,
+            "news": self.rotation_table_sha256,
+            "participation": FOOTBALL_PARTICIPATION_VERSION,
+        }
+        revision = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+        return {
+            "version": "football_decision_information_v1",
+            "revision": revision,
+            "source_snapshot_id": snapshot_id,
+            "observed_at": self.official_information.observed_at
+            if self.official_information
+            else None,
+            "coach_news_bound": self.rotation_table_sha256 is not None,
+            "minute_components_bound": self.football_components_bound,
+        }
 
 
 def switch_identity(
@@ -214,11 +241,13 @@ def _stat(path: Path) -> tuple[str, int, int]:
 def _rotation_candidates(
     root: Path, season: str, gameweek: int, source_id: str
 ) -> tuple[tuple[Path, Path], ...]:
-    """Prefer the current writer, retaining the supported V2 artifact name after V3 lands."""
+    """Prefer the current writer, then supported V3/V2; never mask an invalid new table."""
     current = rotation_artifact(root, season, gameweek, source_id)
-    legacy_stem = f"rotation_evidence_v2_{season}_gw{gameweek:02d}_{source_id[-12:]}"
-    legacy = (root / f"{legacy_stem}.csv", root / f"{legacy_stem}.manifest.json")
-    return tuple(dict.fromkeys((current, legacy)))
+    legacy = []
+    for version in (3, 2):
+        stem = f"rotation_evidence_v{version}_{season}_gw{gameweek:02d}_{source_id[-12:]}"
+        legacy.append((root / f"{stem}.csv", root / f"{stem}.manifest.json"))
+    return tuple(dict.fromkeys((current, *legacy)))
 
 
 def _rotation_manifest_binding(
@@ -424,6 +453,7 @@ def load_switch_inputs(
             words, digest = None, None
     football = None
     components_sha256 = None
+    components_bound = False
     try:
         football = read_football_forecast(
             football_artifact_path(artifact_root, inputs.snapshot_id), inputs
@@ -435,6 +465,7 @@ def load_switch_inputs(
             football=football,
         )
         components_sha256 = minute_input.components_sha256
+        components_bound = minute_input.basis is not None
         football = bind_football_participation(
             football,
             inputs,
@@ -452,4 +483,6 @@ def load_switch_inputs(
         notes=tuple(notes),
         football=football,
         football_components_sha256=components_sha256,
+        football_components_bound=components_bound,
+        official_information=inputs.official_information,
     )
