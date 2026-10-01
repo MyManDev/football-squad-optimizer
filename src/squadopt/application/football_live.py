@@ -22,12 +22,18 @@ from squadopt.data.sources.football_history import (
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.data.sources.fpl_set_pieces import TAKER_FIELDS, captured_taker_priorities
 from squadopt.live import RecommendationInputs, infer_season, read_inputs
-from squadopt.live.football_artifact import ARTIFACT_CONTRACT, forecast_digest
+from squadopt.live.football_artifact import (
+    ARTIFACT_CONTRACT,
+    SHARES_BEFORE_AVAILABILITY_LIMIT,
+    forecast_digest,
+)
 from squadopt.live.football_horizon import build_football_horizon
 from squadopt.prediction.availability import apply_availability
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, FixtureFootballModel
 from squadopt.prediction.football_components import (
+    COMPONENT_LIMITATIONS,
     FIXTURE_COMPONENTS_CONTRACT,
+    captured_availability,
     component_rows,
 )
 from squadopt.prediction.football_contextual import (
@@ -267,9 +273,10 @@ def produce_football_components(
 
     The first document is exactly what ``produce_football_forecast`` returns for the same
     arguments. The second is ``football_fixture_components_v1``: every scheduled player-fixture's
-    model outputs, bound to the first by its fingerprint, with the capture's availability carried
-    as each player's ``apply_availability`` multiplier and not applied. v1 only: the contextual
-    model conditions its team components on availability and is not this contract.
+    model outputs, bound to the first by its fingerprint. The capture's availability is carried
+    once in its header, as the multiplier ``apply_availability`` gives each player and the rule
+    that gave it, and applied to no row. v1 only: the contextual model conditions its team
+    components on availability and is not this contract.
     """
 
     document, components, inputs = _forecast_and_components(
@@ -277,11 +284,12 @@ def produce_football_components(
     )
     roster = [int(player) for player in inputs.players.player_id]
     unit = pd.DataFrame({"player_id": roster, "expected_points": [1.0] * len(roster)})
-    scaled = apply_availability(unit, inputs.availability).multiplier
-    multipliers = {player: float(value) for player, value in zip(roster, scaled, strict=True)}
+    adjustment = apply_availability(unit, inputs.availability)
+    multipliers = dict(zip(roster, (float(v) for v in adjustment.multiplier), strict=True))
     companion: dict[str, Any] = {
         "contract_version": FIXTURE_COMPONENTS_CONTRACT,
         "model_version": document["model_version"],
+        "experimental": True,
         "season": document["season"],
         "gameweek": document["gameweek"],
         "gameweeks": sorted({int(row["gameweek"]) for row in document["rows"]}),
@@ -291,14 +299,18 @@ def produce_football_components(
         "forecast_fingerprint": document["fingerprint"],
         "training_rows": document["training_rows"],
         "training_latest_kickoff": document["training_latest_kickoff"],
-        "archive_hashes": document["archive_hashes"],
-        "availability_application": "not_applied",
+        "archive_hashes": dict(document["archive_hashes"]),
+        "captured_availability": captured_availability(multipliers, adjustment.diagnostics),
         "limitations": [
             *document["limitations"],
-            "Bonus, saves and cards sit inside residual_if_appearance; "
-            "the model has no separate head for them.",
+            SHARES_BEFORE_AVAILABILITY_LIMIT,
+            *COMPONENT_LIMITATIONS,
         ],
-        "rows": [] if components.empty else component_rows(components, multipliers),
+        "rows": []
+        if components.empty
+        else component_rows(
+            components, model_version=document["model_version"], players=multipliers
+        ),
     }
     companion["fingerprint"] = forecast_digest(companion)
     return document, companion
