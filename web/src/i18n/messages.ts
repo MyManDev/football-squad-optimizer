@@ -694,6 +694,10 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
+        "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.",
+      "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
+        "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.",
       "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
         "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
       "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
@@ -1795,6 +1799,10 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
+        "Bu deneysel plan, bir sonraki karar gününden önce gelebilecek iki bilgi durumunda bugünkü hamleleri karşılaştırır. Sonraki transferler koşula bağlıdır. Haberin ne zaman netleşeceği bir varsayımdır; ölçülmüş iyileşme tahmini değildir.",
+      "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
+        "Bilgi karşılaştırması ortak hesaplama bütçesinde tamamlanamadı; tam başlangıç planı korunuyor.",
       "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
         "Bu deneysel plan, hafta hafta kurulan başlangıç planını tüm pencereyi birlikte arayan yöntemle karşılaştırır. Başlangıç planı ancak pencerenin tamamı için geçerliliği doğrulanırsa korunur. Gelecekteki başarısı henüz ölçülmedi.",
       "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":

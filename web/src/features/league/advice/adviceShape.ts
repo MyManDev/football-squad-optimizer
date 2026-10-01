@@ -163,6 +163,45 @@ const chipStrategy: Predicate = (value) =>
     limits: array(text),
   });
 
+const informationReview: Predicate = (value) =>
+  fields(value, {
+    version: oneOf("football_information_review_v1"),
+    status: oneOf("compared", "baseline_retained"),
+    reason: text,
+    source_snapshot_id: text,
+    captured_at_utc: text,
+    player_name: nullable(text),
+    source_playing_chance_percent: oneOf(null, 25, 50, 75),
+    information_gameweek: nullable(identity),
+    candidates: array((candidate) =>
+      fields(candidate, {
+        selected: oneOf(true, false),
+        baseline: oneOf(true, false),
+        transfers_in: array(text),
+        transfers_out: array(text),
+        chip,
+        expected_net_points: nullable(finite),
+        branches: array((branch) =>
+          fields(branch, {
+            state: oneOf("eligible", "unavailable"),
+            expected_net_points: nullable(finite),
+            hit_points: finite,
+            weeks: array((week) =>
+              fields(week, {
+                gameweek: identity,
+                transfers_in: array(text),
+                transfers_out: array(text),
+                chip,
+                bank_tenths: integer,
+                free_transfers: integer,
+              }),
+            ),
+          }),
+        ),
+      }),
+    ),
+  });
+
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
@@ -180,6 +219,7 @@ export function isAdvicePayload(value: unknown): boolean {
     {
       source_snapshot_id: nullable(text),
       prediction_model: predictionModel,
+      information_review: informationReview,
       preferences,
       preferences_scope: oneOf("all_selected_weeks"),
       selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),

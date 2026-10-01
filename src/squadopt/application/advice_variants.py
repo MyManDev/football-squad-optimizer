@@ -299,6 +299,7 @@ def advise_window_with_top100(
         weeks=weeks,
         optimality_gap_published=False,
         choice_points=base_points(weighted_projection(projection, counts.counts, weight)),
+        base_horizon=base,
     )
     _limits(payload, TOP100_LIMIT.format(weight=weight), TOP100_WINDOW_LIMIT)
     note = _price(payload, control_payload=control_payload, selected_total=_window_total(weeks))
@@ -492,6 +493,9 @@ def advise_rival_window(
         for move in moves if isinstance(moves, list) else []:
             if move.get("reason_code") == "window_value":
                 move["reason_code"] = "mode_tradeoff"
+        # The selected plan holds this rival band, but the pure-points alternatives
+        # were not solved under it. Do not publish those as rival-feasible choices.
+        payload.pop("information_review", None)
         payload["stated_limits"] = window_stated_limits(projection)
         payload.pop("top100", None)
         rows = payload.get("plan_weeks")
