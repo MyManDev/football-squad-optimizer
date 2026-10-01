@@ -4,7 +4,7 @@ Synthetic captures: a gameweek with two captures (the later one is the decision 
 two following gameweeks with one each, a capture with no bootstrap and one taken after
 every deadline (both skipped, with their reason), and nothing for the week after. Players
 stated at 25, 50 and 75 resolve every way the rule names, one is no longer listed, one
-carries a status the rule does not know, and two are outside the population. No note text
+carries a status the rule does not know, and three are outside the population. No note text
 reaches the record, a refusal leaves no directory behind, and pooling takes prospective
 pairs only.
 """
@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 from scripts.measure_availability_transitions import (
     OUTCOME_CLASSES,
+    REPOSITORY_ROOT,
     STATED_CHANCES,
     TransitionsRefusal,
     decision_captures,
@@ -29,7 +30,6 @@ from scripts.measure_availability_transitions import (
     wilson_interval,
 )
 
-from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 
@@ -135,7 +135,10 @@ def test_a_missing_root_or_one_without_live_captures_is_refused(tmp_path: Path) 
         ("a", 0, "out"),
         ("a", 75, "doubtful"),
         ("d", 40, "doubtful"),
+        ("a", 0.5, "doubtful"),
         ("a", 101, "unknown"),
+        ("a", float("nan"), "unknown"),
+        ("x", 50, "unknown"),
         ("a", None, "available"),
         ("d", None, "doubtful"),
         ("i", None, "out"),
@@ -146,7 +149,7 @@ def test_a_missing_root_or_one_without_live_captures_is_refused(tmp_path: Path) 
     ],
 )
 def test_the_later_row_is_read_by_the_availability_rules_precedence(
-    status: str, chance: int | None, expected: str
+    status: str, chance: float | None, expected: str
 ) -> None:
     assert resolve(status, chance) == expected
 
@@ -184,7 +187,8 @@ def test_a_pair_counts_every_stated_player_once_and_names_what_happened(captures
     assert by_chance[75]["available_among_resolved"]["value"] == 1.0
     assert by_chance[25]["available_among_resolved"]["value"] == 0.5
     assert by_chance[50]["available_among_resolved"] is None
-    assert all(cell["small_sample"] for cell in pair["cells"])
+    assert all(cell["small_sample"] and cell["small_resolved"] for cell in pair["cells"])
+    assert pooled["distinct_players"] == 6
 
 
 def test_wilson_interval_is_the_score_interval_and_absent_for_no_trials() -> None:
@@ -199,7 +203,7 @@ def test_wilson_interval_is_the_score_interval_and_absent_for_no_trials() -> Non
 
 
 def test_a_pair_is_consecutive_follows_the_earlier_deadline_and_repeats_no_player(
-    captures: Path, tmp_path: Path
+    captures: Path,
 ) -> None:
     chosen, _ = decision_captures(captures)
     with pytest.raises(TransitionsRefusal, match="consecutive"):
@@ -207,6 +211,13 @@ def test_a_pair_is_consecutive_follows_the_earlier_deadline_and_repeats_no_playe
     early = replace(chosen[7], captured_at_utc="2026-10-10T09:00:00Z")
     with pytest.raises(TransitionsRefusal, match="follow the earlier deadline"):
         pair_transitions(chosen[6], early)
+    moved = [dict(e, deadline_time="2026-10-12T10:00:00Z") if e["id"] == 6 else e for e in EVENTS]
+    republished = replace(
+        chosen[7],
+        bootstrap=json.dumps({"events": moved, "teams": TEAMS, "elements": GW7}).encode(),
+    )
+    with pytest.raises(TransitionsRefusal, match="different deadline"):
+        pair_transitions(chosen[6], republished)
     repeated = replace(chosen[6], bootstrap=_bootstrap([*GW6, _element(1, "d", 75)]))
     with pytest.raises(TransitionsRefusal, match="repeats a player"):
         pair_transitions(repeated, chosen[7])
@@ -215,10 +226,14 @@ def test_a_pair_is_consecutive_follows_the_earlier_deadline_and_repeats_no_playe
 def test_prospective_means_the_earlier_deadline_fell_after_the_protocol_merged(
     captures: Path,
 ) -> None:
-    both = measure(captures, "2026-10-09T12:00:00Z", protocol_commit="abc1234")
+    both = measure(captures, "2026-10-09T15:00:00+03:00", protocol_commit="abc1234")
+    assert both["protocol_merged_at_utc"] == "2026-10-09T12:00:00Z"
     assert [pair["prospective"] for pair in both["pairs"]] == [True, True]
     assert both["prospective_pairs"] == 2 and both["pooled_prospective"]["pairs"] == 2
     assert both["protocol_commit"] == "abc1234"
+    # Player 2 is doubtful at GW6 and at GW7: two observations of one player.
+    pooled_all = next(c for c in both["pooled_prospective"]["cells"] if c["stated_chance"] is None)
+    assert pooled_all["players_stated"] == 7 and pooled_all["distinct_players"] == 6
     assert both["gameweeks_without_partner"] == [8]
     assert both["captures_read"] == 6 and len(both["decision_captures"]) == 3
     assert len(both["captures_skipped"]) == 2
@@ -233,8 +248,15 @@ def test_prospective_means_the_earlier_deadline_fell_after_the_protocol_merged(
     bounded = measure(captures, "2026-10-09T12:00:00Z", through_gameweek=7)
     assert [pair["later"]["gameweek"] for pair in bounded["pairs"]] == [7]
     assert bounded["through_gameweek"] == 7
+    # The reading's inventory ends at its bound: GW8 is not part of it, GW7 has no partner.
+    assert [d["gameweek"] for d in bounded["decision_captures"]] == [6, 7]
+    assert bounded["gameweeks_without_partner"] == [7]
     with pytest.raises(TransitionsRefusal, match=r"1\.\.38"):
         measure(captures, "2026-10-09T12:00:00Z", through_gameweek=40)
+    with pytest.raises(TransitionsRefusal, match="No decision capture at or before"):
+        measure(captures, "2026-10-09T12:00:00Z", through_gameweek=3)
+    with pytest.raises(TransitionsRefusal, match="offset"):
+        measure(captures, "2026-10-09T12:00:00")
 
 
 def test_no_note_text_leaves_the_capture_and_the_record_says_so(
@@ -255,13 +277,22 @@ def test_no_note_text_leaves_the_capture_and_the_record_says_so(
 
 
 def test_a_refusal_leaves_no_directory_and_the_inputs_are_never_written_into(
-    captures: Path, tmp_path: Path
+    captures: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with pytest.raises(TransitionsRefusal, match="inside the snapshot root"):
         run(captures, "2026-10-09T12:00:00Z", captures / "out")
-    with pytest.raises(DataError):
+    with pytest.raises(TransitionsRefusal, match="ISO-8601"):
         run(captures, "not an instant", tmp_path / "refused")
     assert not (tmp_path / "refused").exists()
+    # The repository's data/ and docs/ are refused from any working directory.
+    monkeypatch.chdir(tmp_path)
+    for name in ("data", "docs"):
+        with pytest.raises(TransitionsRefusal, match=f"repository's {name}/"):
+            run(captures, "2026-10-09T12:00:00Z", REPOSITORY_ROOT / name / "transitions_probe")
+        assert not (REPOSITORY_ROOT / name / "transitions_probe").exists()
+    (tmp_path / "afile").write_text("x")
+    with pytest.raises(TransitionsRefusal, match="under a file"):
+        run(captures, "2026-10-09T12:00:00Z", tmp_path / "afile" / "child")
 
 
 def test_main_refuses_on_stderr_and_reports_on_stdout(
@@ -273,6 +304,8 @@ def test_main_refuses_on_stderr_and_reports_on_stdout(
             str(tmp_path / "nowhere"),
             "--protocol-merged-at",
             "2026-10-09T12:00:00Z",
+            "--protocol-commit",
+            "abc1234",
             "--output",
             str(tmp_path / "a"),
         ]
@@ -285,6 +318,8 @@ def test_main_refuses_on_stderr_and_reports_on_stdout(
             str(captures),
             "--protocol-merged-at",
             "2026-10-12T00:00:00Z",
+            "--protocol-commit",
+            "abc1234",
             "--through-gameweek",
             "8",
             "--output",
@@ -292,6 +327,7 @@ def test_main_refuses_on_stderr_and_reports_on_stdout(
         ]
     )
     assert code == 0
+    assert (tmp_path / "b" / "record.json").exists()
     assert json.loads(capsys.readouterr().out) == {
         "pairs": 2,
         "prospective_pairs": 1,
@@ -310,13 +346,26 @@ def test_the_summary_prints_pooled_and_per_pair_rows_and_marks_thin_intervals(
     resolved = wilson_interval(1, 1)
     assert (
         f"| GW6 to GW7 | no | 75 | 2 | 1 | 0 | 0 | 1 | 0 | 0.50 [0.12, 0.88] thin | "
-        f"1.00 [{resolved[0]:.2f}, {resolved[1]:.2f}] |"
+        f"1.00 [{resolved[0]:.2f}, {resolved[1]:.2f}] thin |"
     ) in text
     assert (
         "| GW6 to GW7 | no | 50 | 2 | 0 | 1 | 0 | 0 | 1 | 0.00 [0.00, 0.57] thin | not observed |"
         in text
     )
+    # No interval, no thin mark.
+    assert "| GW7 to GW8 | yes | 75 | 0 | 0 | 0 | 0 | 0 | 0 | not observed | not observed |" in text
+    assert "The pooled unit is a player-pair" in text
     assert "| GW7 to GW8 | yes | all | 1 |" in text
     assert "No pair for gameweek(s) 8." in text
     assert "Captures that were no decision:" in text and "no_bootstrap_payload" in text
     assert "No share is a calibrated probability" in text
+
+
+def test_two_captures_in_the_same_second_resolve_to_the_later_listed_as_the_backend_does(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "snapshots"
+    first = _write(root, "2026-10-10T07:00:00Z", GW6)
+    second = _write(root, "2026-10-10T07:00:00Z", [*GW6, _element(10, "a", None)])
+    chosen, _ = decision_captures(root)
+    assert chosen[6].snapshot_id == max(first, second)

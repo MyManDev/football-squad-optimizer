@@ -1,7 +1,8 @@
 """Count how stated playing chances resolved by the next decision capture; nothing is fitted.
 
     python -m scripts.measure_availability_transitions --snapshot-root <captures> \\
-        --protocol-merged-at <UTC instant> --output <fresh directory>
+        --protocol-merged-at <instant> --protocol-commit <sha> \\
+        [--through-gameweek <n>] --output <fresh directory>
 
 The experimental football planner treats a held player's stated 25, 50 or 75 per cent
 chance of playing as resolving before the next decision, eligible with that probability
@@ -22,6 +23,7 @@ import math
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -38,6 +40,7 @@ from squadopt.data.sources.fpl_live import (
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.prediction.availability import (
     AVAILABILITY_RULE_CONTRACT_VERSION,
+    KNOWN_STATUSES,
     STATUS_AVAILABLE,
     STATUS_DOUBTFUL,
     UNAVAILABLE_STATUSES,
@@ -53,8 +56,10 @@ STATED_CHANCES: Final = (25, 50, 75)
 #: longer lists; ``unknown`` is a status the rule does not know or a chance outside 0 to
 #: 100. Both are reported as their own count, never folded into another class or zero.
 OUTCOME_CLASSES: Final = ("available", "doubtful", "out", "absent", "unknown")
-#: Below this many stated players a cell's interval is printed and marked thin.
+#: Below this many observations an interval is printed and marked thin.
 SMALL_SAMPLE: Final = 10
+#: The repository root, so the destination refusals do not depend on the working directory.
+REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[1]
 #: Two-sided 90 percent, the interval width the repository's other records use.
 Z_90: Final = 1.6448536269514722
 
@@ -98,19 +103,23 @@ def wilson_interval(successes: int, trials: int, z: float = Z_90) -> tuple[float
 def resolve(status: str, chance: float | None) -> str:
     """Read one later-capture row by the availability rule's precedence, into our classes.
 
-    A stated chance wins over the status, as ``apply_availability`` applies it: 100 is
-    available, 0 is out, and any chance between them is a partial multiplier, so the
-    player is still doubtful. Without a chance the status decides. A status the rule
-    does not know would stop that rule; here it is ``unknown``, not a guess, and so is a
-    chance outside 0 to 100, which the rule would clip.
+    The rule reads the status first and stops on one it does not know, whatever the
+    chance says; here that row is ``unknown``, not a guess. Then a stated chance wins over
+    the status, as ``apply_availability`` applies it: 100 is available, 0 is out, and any
+    chance between them is a partial multiplier, so the player is still doubtful. A chance
+    outside 0 to 100, which the rule would clip, or one that is not finite, is ``unknown``.
+    Without a chance the status decides.
     """
+    if status not in KNOWN_STATUSES:
+        return "unknown"
     if chance is not None:
-        value = int(chance)
-        if value == 100:
+        if not math.isfinite(chance):
+            return "unknown"
+        if chance == 100:
             return "available"
-        if value == 0:
+        if chance == 0:
             return "out"
-        if 0 < value < 100:
+        if 0 < chance < 100:
             return "doubtful"
         return "unknown"
     if status == STATUS_AVAILABLE:
@@ -160,9 +169,25 @@ def decision_captures(
             deadline.gameweek, identifier, captured_at_utc, deadline.deadline_utc, bootstrap
         )
         held = chosen.get(candidate.gameweek)
-        if held is None or as_instant(candidate.captured_at_utc) > as_instant(held.captured_at_utc):
+        # Ties on the instant go to the later listed id, as the backend's newest capture does.
+        if held is None or as_instant(candidate.captured_at_utc) >= as_instant(
+            held.captured_at_utc
+        ):
             chosen[candidate.gameweek] = candidate
     return chosen, skipped
+
+
+def _merge_instant(value: str) -> str:
+    """The protocol's merge instant, accepted with any offset and recorded in UTC."""
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as error:
+        raise TransitionsRefusal(f"protocol merge instant must be ISO-8601: {value!r}") from error
+    if parsed.tzinfo is None:
+        raise TransitionsRefusal("protocol merge instant must carry its offset or Z.")
+    return normalize_utc_timestamp(
+        parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), label="protocol merge instant"
+    )
 
 
 def _share(successes: int, trials: int) -> dict[str, Any] | None:
@@ -185,7 +210,9 @@ def cell_from_outcomes(stated: int | None, outcomes: Mapping[str, Sequence[int]]
     return {
         "stated_chance": stated,
         "players_stated": trials,
+        "distinct_players": len({code for name in OUTCOME_CLASSES for code in outcomes[name]}),
         "small_sample": trials < SMALL_SAMPLE,
+        "small_resolved": resolved < SMALL_SAMPLE,
         "counts": counts,
         "players": {name: sorted(outcomes[name]) for name in OUTCOME_CLASSES},
         "shares": (
@@ -221,6 +248,13 @@ def pair_transitions(earlier: DecisionCapture, later: DecisionCapture) -> dict[s
             f"The later decision capture {later.snapshot_id} must follow the earlier "
             f"deadline {earlier.deadline_utc}; a moved deadline is a different week."
         )
+    republished = {d.gameweek: d.deadline_utc for d in gameweek_deadlines(later.bootstrap)}
+    if republished.get(earlier.gameweek) != earlier.deadline_utc:
+        raise TransitionsRefusal(
+            f"The later capture {later.snapshot_id} publishes a different deadline for "
+            f"gameweek {earlier.gameweek} than {earlier.deadline_utc}; a moved deadline is a "
+            "different week."
+        )
     before = availability_snapshot(earlier.bootstrap)
     if before.player_id.duplicated().any():
         raise TransitionsRefusal(f"The earlier capture {earlier.snapshot_id} repeats a player.")
@@ -241,8 +275,9 @@ def pair_transitions(earlier: DecisionCapture, later: DecisionCapture) -> dict[s
 def pooled_prospective(pairs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """The reading's figure: prospective pairs only, per stated chance and over the three.
 
-    Counts are player-pairs; a player doubtful in two consecutive decisions is two
-    observations. Retrospective pairs never enter here.
+    The unit is a player-pair: a player doubtful at two consecutive decisions is two
+    observations, and the interval treats them as such; ``distinct_players`` says how many
+    players they are. Retrospective pairs never enter here.
     """
     kept = [pair for pair in pairs if pair["prospective"]]
     cells = []
@@ -264,20 +299,25 @@ def measure(
     through_gameweek: int | None = None,
 ) -> dict[str, Any]:
     """Every consecutive pair of decision captures under ``snapshot_root``, read once."""
-    merged = normalize_utc_timestamp(protocol_merged_at, label="protocol merge instant")
+    merged = _merge_instant(protocol_merged_at)
     if through_gameweek is not None and (
         isinstance(through_gameweek, bool) or not 1 <= through_gameweek <= 38
     ):
         raise TransitionsRefusal("through_gameweek must be a gameweek in 1..38.")
     captures, skipped = decision_captures(snapshot_root)
+    if through_gameweek is not None:
+        # A reading's inventory ends at its bound: later decision captures are not part of it.
+        captures = {g: c for g, c in captures.items() if g <= through_gameweek}
+        if not captures:
+            raise TransitionsRefusal(
+                f"No decision capture at or before gameweek {through_gameweek}."
+            )
     pairs: list[dict[str, Any]] = []
     without_partner: list[int] = []
     for gameweek in sorted(captures):
         later = captures.get(gameweek + 1)
         if later is None:
             without_partner.append(gameweek)
-            continue
-        if through_gameweek is not None and later.gameweek > through_gameweek:
             continue
         pair = pair_transitions(captures[gameweek], later)
         # Prospective means the earlier week's decision was still open when the protocol
@@ -322,12 +362,15 @@ def _row(label: str, prospective: str, cell: Mapping[str, Any]) -> str:
     counts = cell["counts"]
     stated = "all" if cell["stated_chance"] is None else str(cell["stated_chance"])
     available = _interval(None if cell["shares"] is None else cell["shares"]["available"])
-    if cell["small_sample"]:
+    if cell["small_sample"] and cell["shares"] is not None:
         available += " thin"
+    resolved = _interval(cell["available_among_resolved"])
+    if cell["small_resolved"] and cell["available_among_resolved"] is not None:
+        resolved += " thin"
     return (
         f"| {label} | {prospective} | {stated} | {cell['players_stated']} | "
         f"{counts['available']} | {counts['doubtful']} | {counts['out']} | {counts['absent']} | "
-        f"{counts['unknown']} | {available} | {_interval(cell['available_among_resolved'])} |"
+        f"{counts['unknown']} | {available} | {resolved} |"
     )
 
 
@@ -355,9 +398,10 @@ def summary(record: Mapping[str, Any]) -> str:
         "had already passed when the protocol merged, so its later state could have been seen;",
         "it is shown and never pooled with the prospective pairs. A gameweek with no following",
         "decision capture has no pair, which is absent rather than zero. An interval on fewer",
-        f"than {record['small_sample_below']} stated players is marked thin. Available among",
+        f"than {record['small_sample_below']} observations is marked thin. Available among",
         "resolved reads available against available plus out, the two states the planner's",
-        "binary branch can represent.",
+        "binary branch can represent. The pooled unit is a player-pair: a player doubtful at",
+        "two consecutive decisions is two observations.",
         "",
         f"## Pooled over {pooled['pairs']} prospective pair(s)",
         "",
@@ -396,11 +440,13 @@ def _refuse_destination(output: Path, snapshot_root: Path) -> None:
     target = output.resolve()
     for forbidden, why in (
         (snapshot_root.resolve(), "inside the snapshot root"),
-        (Path("data").resolve(), "under data/"),
-        (Path("docs").resolve(), "under docs/"),
+        ((REPOSITORY_ROOT / "data").resolve(), "under the repository's data/"),
+        ((REPOSITORY_ROOT / "docs").resolve(), "under the repository's docs/"),
     ):
         if target == forbidden or forbidden in target.parents:
             raise TransitionsRefusal(f"Refusing to write {why}: {output}.")
+    if output.parent.exists() and not output.parent.is_dir():
+        raise TransitionsRefusal(f"Refusing to write under a file: {output}.")
 
 
 def run(
@@ -431,11 +477,29 @@ def run(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--snapshot-root", type=Path, required=True)
-    parser.add_argument("--protocol-merged-at", required=True)
-    parser.add_argument("--protocol-commit", default=None)
-    parser.add_argument("--through-gameweek", type=int, default=None)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--snapshot-root",
+        type=Path,
+        required=True,
+        help="the store of fpl-live captures, read only",
+    )
+    parser.add_argument(
+        "--protocol-merged-at",
+        required=True,
+        help="committer instant of the protocol's merge commit on develop; any offset, kept in UTC",
+    )
+    parser.add_argument(
+        "--protocol-commit", required=True, help="that merge commit's hash, named in the record"
+    )
+    parser.add_argument(
+        "--through-gameweek",
+        type=int,
+        default=None,
+        help="a reading's bound: decision captures after this gameweek are not part of it",
+    )
+    parser.add_argument(
+        "--output", type=Path, required=True, help="a directory that must not exist yet"
+    )
     arguments = parser.parse_args(argv)
     try:
         result = run(
@@ -445,7 +509,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             protocol_commit=arguments.protocol_commit,
             through_gameweek=arguments.through_gameweek,
         )
-    except (TransitionsRefusal, FileExistsError, DataError, ValueError) as error:
+    except (TransitionsRefusal, DataError, ValueError, OSError) as error:
         print(f"Refused: {error}", file=sys.stderr)
         return 1
     print(
