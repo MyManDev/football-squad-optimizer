@@ -15,12 +15,16 @@ import pytest
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
     PUBLISHED_PRECISIONS,
-    ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
-    ROTATION_DISPOSITIONS,
     ClaimResponse,
     ClubNewsError,
     FixtureClubNewsProvider,
     RawDocument,
+)
+from squadopt.data.sources.club_news import (
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION as ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+)
+from squadopt.data.sources.club_news import (
+    LEGACY_ROTATION_DISPOSITIONS as ROTATION_DISPOSITIONS,
 )
 from squadopt.data.sources.club_news_claims import (
     ParsedClaim,
@@ -210,7 +214,7 @@ def test_each_unparseable_case_is_refused_for_its_own_reason(
 
     expected = {
         "The response is not the declared JSON format",
-        "not 'rotation_claim_response_v1'",
+        "declares contract 'rotation_claim_response_v0'",
         "outside the closed vocabulary",
         "must be an array, got str",
         "does not declare among its own source documents",

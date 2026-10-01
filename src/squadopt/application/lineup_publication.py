@@ -6,6 +6,7 @@ by the same code: the plan's own total (``lineup_fields``) and the total a fifte
 planner did not solve for would be worth (``best_eleven_points``).
 """
 
+import math
 from collections.abc import Iterable
 from typing import Any, Final
 
@@ -271,17 +272,61 @@ def _ranking(row: "pd.Series[Any]") -> tuple[float, int]:
     return (-float(str(row["expected_points"])), int(str(row["player_id"])))
 
 
+def lineup_expectation_fields(week: PlanningWeekResult) -> dict[str, object] | None:
+    """Publish the score explanation without internal selection coefficients."""
+    expectation = week.lineup_expectation
+    if expectation is None:
+        return None
+    if expectation.get("version") != "expected_lineup_v1":
+        raise EntryError("Unknown expected-lineup scoring version.")
+    result: dict[str, object] = {"version": "expected_lineup_v1"}
+    for key in (
+        "expected_net_points",
+        "starting_points",
+        "autosub_points",
+        "captain_bonus_points",
+        "vice_bonus_points",
+        "bench_boost_points",
+    ):
+        value = float(str(expectation[key]))
+        if not math.isfinite(value):
+            raise EntryError("Expected-lineup scores must be finite.")
+        result[key] = value
+    assumptions = expectation.get("assumptions")
+    if not isinstance(assumptions, (list, tuple)) or not all(
+        isinstance(item, str) for item in assumptions
+    ):
+        raise EntryError("Expected-lineup assumptions must be stated.")
+    result["assumptions"] = list(assumptions)
+    return result
+
+
+def expected_week_points(week: PlanningWeekResult) -> float:
+    """The published gross score; the actual transfer hit is stated separately."""
+    if week.lineup_expectation is not None:
+        return float(str(week.lineup_expectation["expected_net_points"])) + week.transfer_hit_points
+    return float(week.projected_score)
+
+
+def lineup_decision_fields(week: PlanningWeekResult) -> dict[str, object]:
+    """The same four named roles for a future week, on its published forecast basis."""
+    fields = lineup_fields(week)
+    return {key: fields[key] for key in ("starting_xi", "captain", "vice_captain", "bench")}
+
+
 def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
     """The complete decision a member acts on, read from the plan's first week.
 
     Transfers alone are not a gameweek: the member still has to name a captain, a
     vice-captain, an eleven and a bench order, and decide whether a chip is played.
-    The planner decides the eleven, the captain and the chip; the vice-captain follows the
-    same rule the official scorer applies (highest expected points first, ties by player
-    id), and the bench order is **delegated to the function the official scorer calls**,
+    An expected-lineup policy carries its chosen vice and authoritative bench order,
+    together with its expected official score. Publication preserves that decision.
+    On legacy plans the planner decides the eleven, the captain and the chip; the vice
+    follows the shared rule (highest expected points first, ties by player id), and the
+    bench order is **delegated to the function the official scorer calls**,
     :func:`~squadopt.contracts.order_outfield_bench`, with the bench goalkeeper first.
-    ``expected_own_points`` is the eleven plus the captain's double: expected points,
-    nothing else.
+    ``expected_own_points`` is before transfer hits: the expected official score when
+    metadata is present, otherwise the legacy eleven plus the captain's double.
 
     Legacy projection horizons omit ``appearance_probability``, so the shared bench rule
     uses its expected-points fallback. The versioned appearance horizon carries the chance
@@ -295,27 +340,46 @@ def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
     starters = {int(str(row["player_id"])): row for row in eleven}
     if captain_id not in starters:
         raise EntryError("The plan's captain is not in its starting eleven.")
-    vice_candidates = sorted(
-        (row for row in eleven if int(str(row["player_id"])) != captain_id), key=_ranking
-    )
+    expectation = lineup_expectation_fields(week)
+    if expectation is not None:
+        if week.vice_captain_id is None:
+            raise EntryError("The expected-lineup plan needs its distinct starting vice-captain.")
+        vice_id = int(str(week.vice_captain_id))
+        if vice_id not in starters or vice_id == captain_id:
+            raise EntryError("The expected-lineup plan needs its distinct starting vice-captain.")
+        vice_candidates = [starters[vice_id]]
+    else:
+        vice_candidates = sorted(
+            (row for row in eleven if int(str(row["player_id"])) != captain_id), key=_ranking
+        )
     if not vice_candidates:
         raise EntryError("The plan's eleven has no vice-captain candidate.")
     goalkeepers = [row for row in bench if str(row["position"]) == "GK"]
     if len(goalkeepers) != 1:
         raise EntryError("The plan's bench must hold exactly one goalkeeper.")
-    outfield_frame = week.bench.loc[week.bench["position"].astype("string") != "GK"]
-    outfield = [row for _, row in order_outfield_bench(outfield_frame).iterrows()]
+    if expectation is not None:
+        if str(bench[0]["position"]) != "GK":
+            raise EntryError("The expected-lineup bench must name its goalkeeper first.")
+        ordered_bench = bench
+    else:
+        outfield_frame = week.bench.loc[week.bench["position"].astype("string") != "GK"]
+        outfield = [row for _, row in order_outfield_bench(outfield_frame).iterrows()]
+        ordered_bench = [*goalkeepers, *outfield]
     ordered_eleven = sorted(
         eleven, key=lambda row: (_POSITION_ORDER.index(str(row["position"])), _ranking(row))
     )
-    expected_own = sum(float(str(row["expected_points"])) for row in eleven) + float(
-        str(starters[captain_id]["expected_points"])
+    expected_own = (
+        expected_week_points(week)
+        if expectation is not None
+        else sum(float(str(row["expected_points"])) for row in eleven)
+        + float(str(starters[captain_id]["expected_points"]))
     )
     return {
         "expected_own_points": expected_own,
         "captain": _lineup_player(starters[captain_id]),
         "vice_captain": _lineup_player(vice_candidates[0]),
         "starting_xi": [_lineup_player(row) for row in ordered_eleven],
-        "bench": [_lineup_player(row) for row in (*goalkeepers, *outfield)],
+        "bench": [_lineup_player(row) for row in ordered_bench],
         "chip": week.chip,
+        **({"lineup_expectation": expectation} if expectation is not None else {}),
     }

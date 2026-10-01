@@ -266,6 +266,29 @@ def _transport_error_types() -> tuple[type[BaseException], ...]:
     return (httpx2.HTTPError,)
 
 
+def validate_gemini_model(model_identifier: str) -> None:
+    """Validate the documented model selection without constructing a client."""
+    if not _MODEL_SAFE.fullmatch(str(model_identifier)):
+        raise ClubNewsGeminiError(
+            f"{model_identifier!r} is not a model identifier this adapter can ask for: it "
+            "may hold letters, digits, dots, underscores and hyphens only. The name goes "
+            "into the request path, and one this client cannot build would escape as a "
+            "traceback rather than as a refused club."
+        )
+    if model_identifier not in DOCUMENTED_MODELS:
+        # Refused here, where the acquisition command builds the provider, and so before
+        # a single page is fetched. Left to the service, a name it no longer serves costs
+        # the whole week one club at a time, after every page has already been read.
+        raise ClubNewsGeminiError(
+            f"{model_identifier!r} is not in the provider's model list as this adapter "
+            f"read it ({MODELS_PAGE}, read on {DOCUMENTATION_READ_ON}). Name one of: "
+            f"{', '.join(DOCUMENTED_MODELS)} in SQUADOPT_LLM_MODEL, or leave it unset "
+            f"for {DEFAULT_GEMINI_MODEL}. A model the page adds later joins the list in "
+            "club_news_gemini.DOCUMENTED_MODELS together with the thinking setting its "
+            "documentation gives, so that what it is sent is a setting somebody cited."
+        )
+
+
 class GeminiClubNewsProvider:
     """Codes club documents by asking the Generative Language API.
 
@@ -291,25 +314,7 @@ class GeminiClubNewsProvider:
         so the identifier recorded in the capture is the one actually asked for.
         """
 
-        if not _MODEL_SAFE.fullmatch(str(model_identifier)):
-            raise ClubNewsGeminiError(
-                f"{model_identifier!r} is not a model identifier this adapter can ask for: it "
-                "may hold letters, digits, dots, underscores and hyphens only. The name goes "
-                "into the request path, and one this client cannot build would escape as a "
-                "traceback rather than as a refused club."
-            )
-        if model_identifier not in DOCUMENTED_MODELS:
-            # Refused here, where the acquisition command builds the provider, and so before
-            # a single page is fetched. Left to the service, a name it no longer serves costs
-            # the whole week one club at a time, after every page has already been read.
-            raise ClubNewsGeminiError(
-                f"{model_identifier!r} is not in the provider's model list as this adapter "
-                f"read it ({MODELS_PAGE}, read on {DOCUMENTATION_READ_ON}). Name one of: "
-                f"{', '.join(DOCUMENTED_MODELS)} in SQUADOPT_LLM_MODEL, or leave it unset "
-                f"for {DEFAULT_GEMINI_MODEL}. A model the page adds later joins the list in "
-                "club_news_gemini.DOCUMENTED_MODELS together with the thinking setting its "
-                "documentation gives, so that what it is sent is a setting somebody cited."
-            )
+        validate_gemini_model(model_identifier)
         self._model_identifier = model_identifier
         self._timeout = timeout
         self._api_key = "" if api_key is None else _checked_key(api_key)
@@ -557,4 +562,5 @@ __all__ = [
     "Reply",
     "Transport",
     "gemini_schema",
+    "validate_gemini_model",
 ]

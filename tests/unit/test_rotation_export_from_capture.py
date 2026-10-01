@@ -47,7 +47,7 @@ from squadopt.data.sources.club_news import (
 )
 from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
 from squadopt.data.sources.club_news_coding import (
-    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     CodingFixture,
     coding_prompt_sha256,
 )
@@ -93,8 +93,10 @@ def _coded(clubs: tuple[str, ...] | None = None) -> tuple[CodedClub, ...]:
         CodedClub(
             club=club,
             response=response,
-            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
         )
         for club in covered
     )
@@ -174,7 +176,9 @@ def test_the_two_sources_do_not_pretend_to_share_a_provenance(tmp_path: Path) ->
     from_fixture = _export(tmp_path / "a", from_capture=False)
     from_capture = _export(tmp_path / "b", from_capture=True)
 
-    assert set(from_capture["prompt_sha256"].dropna()) == {coding_prompt_sha256()}
+    assert set(from_capture["prompt_sha256"].dropna()) == {
+        coding_prompt_sha256(contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION)
+    }
     assert set(from_fixture["prompt_sha256"].dropna()) != set(
         from_capture["prompt_sha256"].dropna()
     )
@@ -258,8 +262,10 @@ def test_each_club_cites_its_own_response(tmp_path: Path) -> None:
         CodedClub(
             club=club,
             response=_response_for(club),
-            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
         )
         for club in ("Arsenal", "Man Utd")
     )
@@ -282,8 +288,10 @@ def test_the_manifest_lists_every_response_the_capture_held(tmp_path: Path) -> N
         CodedClub(
             club=club,
             response=_response_for(club),
-            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
         )
         for club in ("Arsenal", "Man Utd")
     )
@@ -444,8 +452,10 @@ def _broken_export(tmp_path: Path, player: str) -> pd.DataFrame:
         CodedClub(
             club=club,
             response=response,
-            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
         )
         for club in covered
     )
@@ -541,8 +551,10 @@ def test_a_format_breach_still_refuses_the_whole_response(tmp_path: Path) -> Non
         CodedClub(
             club=club,
             response=response,
-            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
         )
         for club in FixtureClubNewsProvider(FIXTURE).clubs_covered()
     )
@@ -575,8 +587,10 @@ def test_a_club_whose_every_claim_lost_its_citation_is_no_longer_covered(
         CodedClub(
             club=name,
             response=response,
-            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
-            prompt_sha256=coding_prompt_sha256(),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
         )
         for name in FixtureClubNewsProvider(FIXTURE).clubs_covered()
     )

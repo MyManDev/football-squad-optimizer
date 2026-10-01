@@ -2,6 +2,7 @@ import { useLanguage } from "../../../i18n/context";
 import { points, utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
 import styles from "../pages/LeagueMemberPage.module.css";
+import { WeekLineup } from "./WeekLineup";
 
 const COPY = {
   tr: {
@@ -25,6 +26,12 @@ const COPY = {
     next: "Sonraki karar haftası",
     scale:
       "Puanlar temel futbol tahmininden gelir; Top100 ağırlığı puan kazancı değildir. Seçim, mevcut transfer temkin payını ve yedek değerini de korur.",
+    expectedScale:
+      "Puanlar temel futbol tahmininden gelir; otomatik değişiklikler ve kaptan oynamazsa yardımcı kaptanın ek puanı dahildir. Top100 ağırlığı puan kazancı değildir. Seçim, transfer temkin payını korur; yedeklere sabit bir değer eklenmez.",
+    starters: "İlk 11",
+    captain: "Kaptan",
+    vice: "Yardımcı kaptan",
+    bench: "Yedek sırası",
     fallback: "Bu karşılaştırma tamamlanamadı. Tam ve geçerli başlangıç planı korunuyor.",
     single:
       "Farklı ve geçerli bir ilk hamle bulunamadı. Farklı bir ilk hamle karşılaştırması yapılmadı; başlangıç planı korunuyor.",
@@ -54,6 +61,12 @@ const COPY = {
     next: "Next decision gameweek",
     scale:
       "Points use the base football forecast; Top100 influence is not a points gain. Selection also retains the existing hit caution and bench value.",
+    expectedScale:
+      "Points use the base football forecast, including automatic substitutions and the vice-captain bonus when the captain does not play. Top100 influence is not a points gain. Selection retains the hit caution; no fixed bench value is added.",
+    starters: "Starting eleven",
+    captain: "Captain",
+    vice: "Vice-captain",
+    bench: "Bench order",
     fallback: "This comparison could not be completed. The complete feasible baseline is retained.",
     single:
       "No distinct feasible first action was found. No distinct first-action comparison was made; the baseline plan is retained.",
@@ -88,7 +101,9 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
           <p className={styles.muted}>
             {copy.next}: {review.information_gameweek}
           </p>
-          <p className={styles.muted}>{copy.scale}</p>
+          <p className={styles.muted}>
+            {view.lineup_expectation ? copy.expectedScale : copy.scale}
+          </p>
           {review.candidates.map((candidate, index) => (
             <details key={index} open={candidate.selected}>
               <summary>
@@ -102,6 +117,20 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
               </p>
               {candidate.chip && (
                 <p>{messages.leagueMembers.chipNames[candidate.chip] ?? candidate.chip}</p>
+              )}
+              {candidate.first_lineup && (
+                <div className={styles.muted}>
+                  <p>
+                    {copy.captain}: {candidate.first_lineup.captain} · {copy.vice}:{" "}
+                    {candidate.first_lineup.vice_captain}
+                  </p>
+                  <p>
+                    {copy.starters}: {candidate.first_lineup.starting_xi.join(", ")}
+                  </p>
+                  <p>
+                    {copy.bench}: {candidate.first_lineup.bench.join(" → ")}
+                  </p>
+                </div>
               )}
               <p>
                 {copy.expected}:{" "}
@@ -128,6 +157,9 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
                           ? ` · ${messages.leagueMembers.chipNames[week.chip] ?? week.chip}`
                           : ""}
                         {` · ${week.free_transfers} ${copy.ft} · ${copy.bank}: ${points(week.bank_tenths / 10, 1, locale)}`}
+                        {week.lineup && (
+                          <WeekLineup gameweek={week.gameweek} lineup={week.lineup} />
+                        )}
                       </li>
                     ))}
                   </ul>

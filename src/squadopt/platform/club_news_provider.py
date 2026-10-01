@@ -33,9 +33,13 @@ fixture said" are different facts, and the lane spends a lot of effort keeping f
 apart; a convenience default here would undo it in one line.
 """
 
+import hashlib
+import importlib.util
 import os
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Final
 
 from squadopt.data.sources.club_news import (
@@ -49,6 +53,7 @@ from squadopt.data.sources.club_news_coding import (
     CODING_MODEL_IDENTIFIER,
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     coding_prompt_sha256,
+    require_requested_coding_contract,
 )
 
 # Eager, and the laziness that matters is kept where it belongs. Registration needs the name
@@ -58,7 +63,15 @@ from squadopt.platform.club_news_gemini import (
     DEFAULT_GEMINI_MODEL,
     GEMINI_PROVIDER,
     GeminiClubNewsProvider,
+    validate_gemini_model,
 )
+from squadopt.platform.club_news_openai import (
+    DEFAULT_MAX_COMPLETION_TOKENS,
+    DEFAULT_OPENAI_BASE_URL,
+    OpenAIClubNewsProvider,
+    validate_openai_configuration,
+)
+from squadopt.platform.club_news_settings import configured_environment
 
 #: Which adapter codes the week. No vendor name, by contract.
 PROVIDER_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_PROVIDER"
@@ -68,6 +81,11 @@ MODEL_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_MODEL"
 
 #: The key, read from the environment and never committed.
 KEY_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_API_KEY"
+BASE_URL_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_BASE_URL"
+FORMAT_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_RESPONSE_FORMAT"
+TOKENS_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_MAX_COMPLETION_TOKENS"
+LOCAL_HTTP_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_ALLOW_LOCAL_HTTP"
+_OPENAI_PROVIDERS: Final = frozenset({"openai", "openai-compatible"})
 
 #: The provider selected when nothing says otherwise: the adapter the coding contract was
 #: written against. A second adapter does not change it, because the model a run asks is
@@ -80,6 +98,7 @@ DEFAULT_PROVIDER: Final = "anthropic"
 VENDOR_KEY_VARIABLES: Final[Mapping[str, str]] = {
     "anthropic": "ANTHROPIC_API_KEY",
     GEMINI_PROVIDER: "GEMINI_API_KEY",
+    "openai": "OPENAI_API_KEY",
 }
 
 
@@ -102,6 +121,10 @@ class CodingProviderConfig:
     #: debugger frame that touches it, and the one field here that must never appear in
     #: one is this.
     api_key: str = field(repr=False)
+    base_url: str | None = None
+    response_format: str = "json_schema"
+    max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS
+    allow_local_http: bool = False
 
 
 #: Name -> a factory taking the resolved configuration. A second provider is one entry here
@@ -156,6 +179,8 @@ def _read_key(provider: str, source: Mapping[str, str]) -> str:
 
 def resolve_provider_config(
     environ: Mapping[str, str] | None = None,
+    *,
+    settings_file: Path | None = None,
 ) -> CodingProviderConfig:
     """Read the three variables, or refuse by name.
 
@@ -163,7 +188,7 @@ def resolve_provider_config(
     can select a fake provider by handing in a mapping rather than by editing anything.
     """
 
-    source = os.environ if environ is None else environ
+    source = configured_environment(settings_file, os.environ if environ is None else environ)
     declared = source.get(PROVIDER_ENVIRONMENT_VARIABLE, "").strip()
     # The generic key carries no vendor, so with no provider line the default is a guess
     # about whose key this is, and the guess is acted on by sending the key to that vendor.
@@ -186,8 +211,50 @@ def resolve_provider_config(
             f"Registered providers: {list(registered_providers())!r}."
         )
     model = source.get(MODEL_ENVIRONMENT_VARIABLE, "").strip() or _default_model(provider)
+    base_url = source.get(BASE_URL_ENVIRONMENT_VARIABLE, "").strip() or None
+    response_format = source.get(FORMAT_ENVIRONMENT_VARIABLE, "").strip() or "json_schema"
+    tokens = source.get(TOKENS_ENVIRONMENT_VARIABLE, "").strip()
+    local_http = source.get(LOCAL_HTTP_ENVIRONMENT_VARIABLE, "").strip().lower()
+    option_names = (
+        BASE_URL_ENVIRONMENT_VARIABLE,
+        FORMAT_ENVIRONMENT_VARIABLE,
+        TOKENS_ENVIRONMENT_VARIABLE,
+        LOCAL_HTTP_ENVIRONMENT_VARIABLE,
+    )
+    if provider not in _OPENAI_PROVIDERS and any(
+        source.get(name, "").strip() for name in option_names
+    ):
+        raise ClubNewsProviderError(
+            "Endpoint and completion settings apply only to OpenAI adapters."
+        )
+    if provider == "openai-compatible" and base_url is None:
+        raise ClubNewsProviderError("The openai-compatible provider requires an explicit base_url.")
+    if provider == "openai" and base_url is None:
+        base_url = DEFAULT_OPENAI_BASE_URL
+    if tokens and not (tokens.isascii() and tokens.isdecimal()):
+        raise ClubNewsProviderError("max_completion_tokens must be a positive integer.")
+    if local_http not in ("", "true", "false"):
+        raise ClubNewsProviderError("allow_local_http must be true or false.")
+    if provider in _OPENAI_PROVIDERS:
+        base_url = validate_openai_configuration(
+            model_identifier=model,
+            base_url=base_url or DEFAULT_OPENAI_BASE_URL,
+            response_format=response_format,
+            max_completion_tokens=int(tokens) if tokens else DEFAULT_MAX_COMPLETION_TOKENS,
+            allow_local_http=local_http == "true",
+        )
+    if provider == "openai" and base_url != DEFAULT_OPENAI_BASE_URL:
+        raise ClubNewsProviderError(
+            "Use openai-compatible for an explicitly configured custom endpoint."
+        )
     return CodingProviderConfig(
-        provider=provider, model_identifier=model, api_key=_read_key(provider, source)
+        provider=provider,
+        model_identifier=model,
+        api_key=_read_key(provider, source),
+        base_url=base_url,
+        response_format=response_format,
+        max_completion_tokens=int(tokens) if tokens else DEFAULT_MAX_COMPLETION_TOKENS,
+        allow_local_http=local_http == "true",
     )
 
 
@@ -213,8 +280,47 @@ def _default_model(provider: str) -> str:
     )
 
 
+def validate_provider_config(config: CodingProviderConfig) -> None:
+    """Validate local settings without constructing an SDK or HTTP client."""
+    if not re.fullmatch(r"[\x21-\x7e]+", config.api_key):
+        raise ClubNewsProviderError("The API key must be a single printable token.")
+    if config.provider == GEMINI_PROVIDER:
+        validate_gemini_model(config.model_identifier)
+    elif config.provider in _OPENAI_PROVIDERS:
+        validate_openai_configuration(
+            model_identifier=config.model_identifier,
+            base_url=config.base_url or DEFAULT_OPENAI_BASE_URL,
+            response_format=config.response_format,
+            max_completion_tokens=config.max_completion_tokens,
+            allow_local_http=config.allow_local_http,
+        )
+    elif not re.fullmatch(r"[A-Za-z0-9._:/-]+", config.model_identifier):
+        raise ClubNewsProviderError("The configured model identifier is invalid.")
+
+
+def check_coding_provider(
+    environ: Mapping[str, str] | None = None, *, settings_file: Path | None = None
+) -> CodingProviderConfig:
+    """Offline configuration/dependency check; never authenticates or creates a client."""
+    config = resolve_provider_config(environ, settings_file=settings_file)
+    validate_provider_config(config)
+    dependency = {
+        DEFAULT_PROVIDER: "anthropic",
+        GEMINI_PROVIDER: "httpx2",
+        "openai": "httpx2",
+        "openai-compatible": "httpx2",
+    }.get(config.provider)
+    if dependency and importlib.util.find_spec(dependency) is None:
+        raise ClubNewsProviderError(
+            "The selected provider needs the project's llm extra installed."
+        )
+    return config
+
+
 def build_coding_provider(
     environ: Mapping[str, str] | None = None,
+    *,
+    settings_file: Path | None = None,
 ) -> tuple[ClubNewsProvider, CodingProviderConfig]:
     """The configured provider, and the configuration it was built from.
 
@@ -222,7 +328,8 @@ def build_coding_provider(
     asked, and reading it back off the adapter would ask the adapter to be honest about itself.
     """
 
-    config = resolve_provider_config(environ)
+    config = resolve_provider_config(environ, settings_file=settings_file)
+    validate_provider_config(config)
     return _FACTORIES[config.provider](config), config
 
 
@@ -273,6 +380,7 @@ def code_week_by_club(
     for club, club_documents in by_club.items():
         try:
             response = provider.code(club_documents, roster)
+            require_requested_coding_contract(response)
         except ClubNewsError as error:
             refused.append((club, str(error)))
             continue
@@ -286,6 +394,18 @@ def code_week_by_club(
                 # recoverable from each other: a fake adapter can name any model, and one
                 # vendor's identifier can be served through another's compatible endpoint.
                 provider=config.provider,
+                request_configuration=(
+                    {
+                        "protocol": "openai_chat_completions_v1",
+                        "endpoint_sha256": hashlib.sha256(
+                            (str(config.base_url) + "/chat/completions").encode("utf-8")
+                        ).hexdigest(),
+                        "response_format": config.response_format,
+                        "max_completion_tokens": config.max_completion_tokens,
+                    }
+                    if config.provider in _OPENAI_PROVIDERS
+                    else None
+                ),
             )
         )
     return tuple(coded), tuple(refused)
@@ -307,8 +427,21 @@ def _gemini(config: CodingProviderConfig) -> ClubNewsProvider:
     return GeminiClubNewsProvider(api_key=config.api_key, model_identifier=config.model_identifier)
 
 
+def _openai(config: CodingProviderConfig) -> ClubNewsProvider:
+    return OpenAIClubNewsProvider(
+        api_key=config.api_key,
+        model_identifier=config.model_identifier,
+        base_url=config.base_url or DEFAULT_OPENAI_BASE_URL,
+        response_format=config.response_format,
+        max_completion_tokens=config.max_completion_tokens,
+        allow_local_http=config.allow_local_http,
+    )
+
+
 register_provider(DEFAULT_PROVIDER, _anthropic)
 register_provider(GEMINI_PROVIDER, _gemini)
+register_provider("openai", _openai)
+register_provider("openai-compatible", _openai)
 
 
 __all__ = [
@@ -320,8 +453,10 @@ __all__ = [
     "ClubNewsProviderError",
     "CodingProviderConfig",
     "build_coding_provider",
+    "check_coding_provider",
     "code_week_by_club",
     "register_provider",
     "registered_providers",
     "resolve_provider_config",
+    "validate_provider_config",
 ]

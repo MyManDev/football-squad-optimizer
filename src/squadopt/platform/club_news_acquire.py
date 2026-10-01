@@ -54,6 +54,7 @@ from squadopt.platform.club_news_fetch import (
 from squadopt.platform.club_news_provider import (
     CodingProviderConfig,
     build_coding_provider,
+    check_coding_provider,
     code_week_by_club,
 )
 
@@ -164,15 +165,22 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--roster-snapshot",
-        required=True,
         help="a capture already on disk whose bootstrap supplies the short-name roster",
     )
     parser.add_argument("--registry", type=Path, default=REPOSITORY_ROOT / DEFAULT_REGISTRY)
     parser.add_argument(
         "--snapshot-root", type=Path, default=REPOSITORY_ROOT / DEFAULT_SNAPSHOT_ROOT
     )
-    parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
-    return parser.parse_args(argv)
+    parser.add_argument("--settings-file", type=Path, help="private [llm] TOML settings")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="fetch and code, but write nothing")
+    mode.add_argument(
+        "--check-config", action="store_true", help="offline settings/dependency check"
+    )
+    arguments = parser.parse_args(argv)
+    if not arguments.check_config and not arguments.roster_snapshot:
+        parser.error("--roster-snapshot is required unless --check-config is selected")
+    return arguments
 
 
 def _utc_now() -> str:
@@ -196,6 +204,17 @@ def main(
 
     arguments = _parse_arguments(argv)
     try:
+        if arguments.check_config:
+            config = check_coding_provider(environ, settings_file=arguments.settings_file)
+            print(
+                f"Configuration valid: provider {config.provider!r}, "
+                f"model {config.model_identifier!r}."
+            )
+            print(
+                "API key configured. Offline check only; "
+                "authentication and service availability were not tested."
+            )
+            return 0
         sources = load_club_sources(arguments.registry)
         roster_snapshot = read_snapshot(arguments.snapshot_root, arguments.roster_snapshot)
         bootstrap = roster_snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
@@ -205,7 +224,7 @@ def main(
                 "supply the short names a claim is matched against."
             )
         roster = roster_from_short_names(short_name_roster(bootstrap))
-        provider, config = build_coding_provider(environ)
+        provider, config = build_coding_provider(environ, settings_file=arguments.settings_file)
         week = acquire_week(
             sources=sources,
             provider=provider,

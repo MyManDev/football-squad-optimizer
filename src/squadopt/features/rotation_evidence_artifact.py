@@ -27,6 +27,7 @@ import pandas as pd
 from squadopt.data.errors import DataSourceError, DataValidationError
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
+    LEGACY_ROTATION_DISPOSITIONS,
     PUBLISHED_PRECISIONS,
     ROTATION_DISPOSITIONS,
 )
@@ -35,6 +36,7 @@ from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
     FEED_NEWS_STATES,
     FORBIDDEN_COLUMNS,
+    LEGACY_CONTRACT_VERSION,
     ROTATION_EVIDENCE_COLUMNS,
 )
 
@@ -179,7 +181,7 @@ def _row_sources(table: pd.DataFrame) -> tuple[str, ...]:
 def _validate_manifest_and_table(
     manifest: Mapping[str, object], table: pd.DataFrame, table_path: Path
 ) -> None:
-    if manifest.get("contract_version") != CONTRACT_VERSION:
+    if manifest.get("contract_version") not in (LEGACY_CONTRACT_VERSION, CONTRACT_VERSION):
         raise DataValidationError(
             f"{table_path.name} declares contract {manifest.get('contract_version')!r}, not "
             f"{CONTRACT_VERSION!r}."
@@ -263,8 +265,13 @@ def _validate_manifest_and_table(
                 "observed and nothing where none was."
             )
 
+    dispositions = (
+        LEGACY_ROTATION_DISPOSITIONS
+        if manifest.get("contract_version") == LEGACY_CONTRACT_VERSION
+        else ROTATION_DISPOSITIONS
+    )
     for column, allowed in (
-        ("rotation_disposition", ROTATION_DISPOSITIONS),
+        ("rotation_disposition", dispositions),
         ("rotation_claim_published_precision", PUBLISHED_PRECISIONS),
         ("rotation_claim_speaker", CLAIM_SPEAKERS),
         ("feed_news_state", FEED_NEWS_STATES),

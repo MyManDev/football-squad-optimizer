@@ -179,6 +179,8 @@ def chip_week_points(week: PlanningWeekResult) -> float:
     (``projected_bench_points``) and scores in full that week.
     """
 
+    if week.lineup_expectation is not None:
+        return float(str(week.lineup_expectation["expected_net_points"])) + week.transfer_hit_points
     score = float(week.projected_score)
     if week.chip == "bboost":
         score += float(week.projected_bench_points)
