@@ -60,6 +60,9 @@ The 22 September [football component ablation](research/football_component_ablat
 also read that season. Prior authorization provenance was unresolved; the owner
 [approved further football development use on 28 September](research/football_defcon_development_scope.md).
 This does not backdate permission or restore an untouched holdout.
+The 30 September [explicit lookahead measurement](research/explicit_lookahead_measurement.md)
+rebuilds the served football forecast, whose training includes 2025-26, after that approval;
+it scores plans on that forecast and scores nothing on 2025-26.
 `tests/unit/test_measurements_index.py` holds the rule that every committed artifact appears
 here (ADR 0003, rule 1).
 

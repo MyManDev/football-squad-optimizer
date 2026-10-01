@@ -22,6 +22,13 @@ week-range-invariant on those columns, not that it equals an artifact the backen
 (none exists on this machine for this capture, and the capture is not the one the
 earlier planning records used).
 
+The producer trains on the four archive seasons it always reads, 2022-23 to 2025-26
+(89,946 rows; the archive hashes are in the JSON), so this measurement reads 2025-26 as
+training data, two days after the owner
+[approved football development use of that season](football_defcon_development_scope.md).
+It scores nothing on 2025-26. The owner's later planner studies (#906) restrict the
+archive to 2022-23 to 2024-25, so their forecasts differ from this one.
+
 Three policies are scored on that one forecast, every solve at the production rate of
 twenty deterministic units per forecast week, `protect_hold=True`, linearization 2,
 `TransferPlanningConfig()` defaults (a hit costs the four points it is charged), no
