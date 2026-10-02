@@ -30,7 +30,7 @@ import { useViewerEntry } from "../identity/useViewerEntry";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
 import { COMPUTE_COPY, failureSentence } from "./computeCopy";
-import type { AdviceJob } from "./useAdviceJob";
+import type { AdviceJob, EarlierAnswer } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
 /**
@@ -39,6 +39,11 @@ import styles from "./AdviceRequestPanel.module.css";
  * answering (`unreachable`), or answering from another data capture (`other-capture`).
  */
 export type ComputeService = "static" | "ready" | "unreachable" | "other-capture";
+
+/** What stays on the page after an attempt: the earlier answer when one is kept. */
+function kept(earlier: EarlierAnswer | null | undefined): "published" | "earlier" {
+  return earlier ? "earlier" : "published";
+}
 
 export function AdviceRequestPanel({
   request,
@@ -112,7 +117,11 @@ export function AdviceRequestPanel({
             <Badge tone="accent">
               {state.status === "queued" ? copy.computeQueued : copy.computeRunning}
             </Badge>{" "}
-            {state.fallback !== null ? copy.computeWaitingWithFallback : copy.computeWaiting}
+            {state.earlier
+              ? computeCopy.waitingWithEarlier
+              : state.fallback !== null
+                ? copy.computeWaitingWithFallback
+                : copy.computeWaiting}
           </p>
         ) : null}
         {state.phase === "done" ? (
@@ -130,15 +139,22 @@ export function AdviceRequestPanel({
         {state.phase === "unavailable" ? (
           <p className={styles.state}>
             {state.reason == null
-              ? copy.computeUnavailable
-              : failureSentence(computeCopy, state.reason)}
+              ? state.earlier
+                ? `${copy.computeUnavailable} ${computeCopy.earlierRemains}`
+                : copy.computeUnavailable
+              : failureSentence(computeCopy, state.reason, null, kept(state.earlier))}
           </p>
         ) : null}
         {state.phase === "failed" ? (
           <p className={styles.state}>
-            {state.reason == null
+            {state.reason == null && !state.earlier
               ? copy.computeFailed
-              : failureSentence(computeCopy, state.reason, state.retryAfterSeconds)}
+              : failureSentence(
+                  computeCopy,
+                  state.reason,
+                  state.retryAfterSeconds,
+                  kept(state.earlier),
+                )}
           </p>
         ) : null}
       </div>

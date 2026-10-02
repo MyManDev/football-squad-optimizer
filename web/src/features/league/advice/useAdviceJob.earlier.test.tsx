@@ -140,9 +140,13 @@ describe("the answer a selection already received", () => {
     expect(screen.getByTestId("phase")).toHaveTextContent("failed");
     expect(screen.getByTestId("earlier")).toHaveTextContent("none");
 
+    // The first selection's answer, refused again: the refusal carries it, reset drops it.
+    await act(async () => screen.getByText("reset").click());
     await act(async () => screen.getByText("read").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("done");
     await act(async () => screen.getByText("go").click());
-    expect(screen.getByTestId("earlier")).toHaveTextContent("none");
+    expect(screen.getByTestId("phase")).toHaveTextContent("failed");
+    expect(screen.getByTestId("earlier")).toHaveTextContent("1");
     await act(async () => screen.getByText("reset").click());
     expect(screen.getByTestId("phase")).toHaveTextContent("idle");
     expect(screen.getByTestId("earlier")).toHaveTextContent("none");

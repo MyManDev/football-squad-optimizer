@@ -36,8 +36,24 @@ export interface ComputeCopy {
   top100Computable: string;
   rivalComputable: string;
   rateLimitedFor: (seconds: number) => string;
+  /** Said while a computation runs and the same selection's earlier answer is on the page. */
+  waitingWithEarlier: string;
+  /** What stays on the page after an attempt that did not finish. */
+  publishedRemains: string;
+  earlierRemains: string;
   failures: Record<string, string> & { unknown: string };
 }
+
+/** The failures after which the page says what remains readable. */
+const REMAINS_AFTER = new Set([
+  "QUEUE_INTEGRITY_ERROR",
+  "ADVICE_BACKEND_DISABLED",
+  "INTERNAL_ERROR",
+  "SERVICE_UNREACHABLE",
+  "ADVICE_FAILED",
+  "PLAN_NOT_FOUND",
+  "unknown",
+]);
 
 const en: ComputeCopy = {
   notPrecomputed:
@@ -74,6 +90,10 @@ const en: ComputeCopy = {
   rivalComputable: "Any member can be chosen; a pair that was not published is computed now.",
   rateLimitedFor: (seconds) =>
     `Too many requests arrived in a short time. Try again in about ${seconds} seconds.`,
+  waitingWithEarlier:
+    "The answer this selection already received stays on the page while this computes.",
+  publishedRemains: "The published plan, if any, remains available to read.",
+  earlierRemains: "The answer this selection already received stays on the page.",
   failures: {
     UNSUPPORTED_ADVICE_REQUEST: "The service does not compute this selection.",
     VALIDATION_FAILED: "The service does not compute this selection.",
@@ -100,22 +120,16 @@ const en: ComputeCopy = {
     NOT_READY: "The compute service is not ready yet. Try again in a little while.",
     QUEUE_UNAVAILABLE:
       "The queue could not take the request just now. Try again in a little while.",
-    QUEUE_INTEGRITY_ERROR:
-      "The compute service cannot answer right now. The published plan, if any, remains available to read.",
-    ADVICE_BACKEND_DISABLED:
-      "The compute service cannot answer right now. The published plan, if any, remains available to read.",
-    INTERNAL_ERROR:
-      "The compute service cannot answer right now. The published plan, if any, remains available to read.",
-    SERVICE_UNREACHABLE:
-      "The compute service could not be reached. The published plan, if any, remains available to read.",
-    ADVICE_FAILED:
-      "The service could not solve this plan. The published plan, if any, remains available to read.",
+    QUEUE_INTEGRITY_ERROR: "The compute service cannot answer right now.",
+    ADVICE_BACKEND_DISABLED: "The compute service cannot answer right now.",
+    INTERNAL_ERROR: "The compute service cannot answer right now.",
+    SERVICE_UNREACHABLE: "The compute service could not be reached.",
+    ADVICE_FAILED: "The service could not solve this plan.",
     CONTEXT_UNAVAILABLE:
       "The service's data capture changed while this was computing. Reload the page and try again.",
     ENTRY_NOT_IN_CAPTURE: "The service's data capture has no squad for this member or this rival.",
     TOO_MANY_ATTEMPTS: "The service tried this computation several times and could not finish it.",
-    PLAN_NOT_FOUND:
-      "The service found no plan for this selection. The published plan, if any, remains available to read.",
+    PLAN_NOT_FOUND: "The service found no plan for this selection.",
     SWITCH_INPUTS_CHANGED:
       "The Top 100 selections or the club news were refreshed while this was computing. Press Compute again.",
     REQUEST_UNREADABLE: "The service could not read the request. You can press Compute again.",
@@ -126,8 +140,7 @@ const en: ComputeCopy = {
     ANSWER_MISMATCH: "The returned answer does not match this selection, so it is not shown.",
     ANSWER_OTHER_CAPTURE:
       "The service computed this from a different data capture than this page shows, so it is not shown. Reload the page and try again.",
-    unknown:
-      "The computation did not complete. The published plan, if any, remains available to read.",
+    unknown: "The computation did not complete.",
   },
 };
 
@@ -164,6 +177,9 @@ const tr: ComputeCopy = {
   rivalComputable: "Her üye seçilebilir; yayınlanmamış bir eşleşme şimdi hesaplanır.",
   rateLimitedFor: (seconds) =>
     `Kısa sürede çok fazla istek geldi. Yaklaşık ${seconds} saniye sonra yeniden dene.`,
+  waitingWithEarlier: "Hesap sürerken bu seçimin daha önce aldığı cevap sayfada kalıyor.",
+  publishedRemains: "Yayınlanmış plan, varsa, okunabilir.",
+  earlierRemains: "Bu seçimin daha önce aldığı cevap sayfada kalıyor.",
   failures: {
     UNSUPPORTED_ADVICE_REQUEST: "Servis bu seçimi hesaplamıyor.",
     VALIDATION_FAILED: "Servis bu seçimi hesaplamıyor.",
@@ -187,18 +203,16 @@ const tr: ComputeCopy = {
       "Bu oyun haftasının son tarihi geçti. Önceden hesaplanan planlara erişebilirsin.",
     NOT_READY: "Hesaplama servisi henüz hazır değil. Biraz sonra yeniden dene.",
     QUEUE_UNAVAILABLE: "Hesap sırası isteği şu an alamadı. Biraz sonra yeniden dene.",
-    QUEUE_INTEGRITY_ERROR:
-      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, okunabilir.",
-    ADVICE_BACKEND_DISABLED:
-      "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, okunabilir.",
-    INTERNAL_ERROR: "Hesaplama servisi şu an cevap veremiyor. Yayınlanmış plan, varsa, okunabilir.",
-    SERVICE_UNREACHABLE: "Hesaplama servisine ulaşılamadı. Yayınlanmış plan, varsa, okunabilir.",
-    ADVICE_FAILED: "Servis bu planı çözemedi. Yayınlanmış plan, varsa, okunabilir.",
+    QUEUE_INTEGRITY_ERROR: "Hesaplama servisi şu an cevap veremiyor.",
+    ADVICE_BACKEND_DISABLED: "Hesaplama servisi şu an cevap veremiyor.",
+    INTERNAL_ERROR: "Hesaplama servisi şu an cevap veremiyor.",
+    SERVICE_UNREACHABLE: "Hesaplama servisine ulaşılamadı.",
+    ADVICE_FAILED: "Servis bu planı çözemedi.",
     CONTEXT_UNAVAILABLE:
       "Hesap sürerken servisin veri kaydı değişti. Sayfayı yenileyip yeniden dene.",
     ENTRY_NOT_IN_CAPTURE: "Servisin veri kaydında bu üyenin ya da bu rakibin kadrosu yok.",
     TOO_MANY_ATTEMPTS: "Servis bu hesabı birkaç kez denedi ve bitiremedi.",
-    PLAN_NOT_FOUND: "Servis bu seçim için plan bulamadı. Yayımlanmış plan varsa okunabilir.",
+    PLAN_NOT_FOUND: "Servis bu seçim için plan bulamadı.",
     SWITCH_INPUTS_CHANGED:
       "Hesap sürerken Top 100 seçimleri ya da kulüp haberleri yenilendi. Yeniden Hesapla'ya bas.",
     REQUEST_UNREADABLE: "Servis isteği okuyamadı. Yeniden Hesapla'ya basabilirsin.",
@@ -209,7 +223,7 @@ const tr: ComputeCopy = {
     ANSWER_MISMATCH: "Dönen cevap bu seçimle eşleşmiyor; bu yüzden gösterilmiyor.",
     ANSWER_OTHER_CAPTURE:
       "Servis bunu bu sayfadakinden farklı bir veri kaydıyla hesapladı; bu yüzden gösterilmiyor. Sayfayı yenileyip yeniden dene.",
-    unknown: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, okunabilir.",
+    unknown: "Hesap tamamlanamadı.",
   },
 };
 
@@ -218,17 +232,24 @@ export const COMPUTE_COPY: Record<Language, ComputeCopy> = { tr, en };
 /**
  * The sentence for a failure. A code this page does not know says only that the
  * computation did not complete; nothing the service sent is ever printed.
+ *
+ * What the sentence says remains on the page is what the page shows: the published plan
+ * after the failures that leave only it, or, when the same selection's earlier answer is
+ * kept, that answer, after every failure.
  */
 export function failureSentence(
   copy: ComputeCopy,
   reason: string | null | undefined,
   retryAfterSeconds?: number | null,
+  kept: "published" | "earlier" = "published",
 ): string {
   if (reason === "RATE_LIMITED" && retryAfterSeconds != null && retryAfterSeconds > 0) {
-    return copy.rateLimitedFor(retryAfterSeconds);
+    return kept === "earlier"
+      ? `${copy.rateLimitedFor(retryAfterSeconds)} ${copy.earlierRemains}`
+      : copy.rateLimitedFor(retryAfterSeconds);
   }
-  return (
-    (reason != null && Object.hasOwn(copy.failures, reason) ? copy.failures[reason] : undefined) ??
-    copy.failures.unknown
-  );
+  const known = reason != null && Object.hasOwn(copy.failures, reason) ? reason : "unknown";
+  const sentence = copy.failures[known] ?? copy.failures.unknown;
+  if (kept === "earlier") return `${sentence} ${copy.earlierRemains}`;
+  return REMAINS_AFTER.has(known) ? `${sentence} ${copy.publishedRemains}` : sentence;
 }

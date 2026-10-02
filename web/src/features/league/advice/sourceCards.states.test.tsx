@@ -70,7 +70,7 @@ describe("statement outcomes", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "labels the source's publication instant and reads a day alone as no instant in %s",
+    "labels the source's publication instant and shows a day alone as a day in %s",
     (language) => {
       const named = base().starting_xi![0]!;
       const instant = outcomes("2026-09-01T09:30:00Z", named.player_id);
@@ -83,13 +83,23 @@ describe("statement outcomes", () => {
       expect(rows.querySelector("time")).toHaveAttribute("datetime", "2026-09-01T09:30:00Z");
       cleanup();
 
+      // A day is a day: no clock is invented for it and it is not called an instant.
       const day = outcomes("2026-09-01", named.player_id);
       show(language, <ParticipationEvidence view={day} />);
       const dayRows = screen.getByTestId("statement-outcomes");
-      expect(dayRows.querySelector("time")).toBeNull();
-      expect(dayRows).not.toHaveTextContent(
-        language === "tr" ? "Kaynak yayın zamanı" : "Source published",
+      expect(dayRows.querySelector("time")).toHaveAttribute("datetime", "2026-09-01");
+      expect(dayRows).toHaveTextContent(
+        language === "tr" ? "Kaynak yayın günü:" : "Source published on:",
       );
+      expect(dayRows).not.toHaveTextContent(language === "tr" ? "yayın zamanı" : "published:");
+      expect(dayRows).not.toHaveTextContent("00:00");
+      expect(dayRows).not.toHaveTextContent("UTC");
+      cleanup();
+
+      // Anything else the producer did not write is not shown at all.
+      const odd = outcomes("2026-09", named.player_id);
+      show(language, <ParticipationEvidence view={odd} />);
+      expect(screen.getByTestId("statement-outcomes").querySelector("time")).toBeNull();
     },
   );
 
