@@ -128,15 +128,19 @@ intervals to include zero. These are stated priors, and no clause reads them.
    checked against the inventory later.
 6. The forecast is the served football artifact for that capture, read by
    `read_football_forecast` in `src/squadopt/live/football_artifact.py` with the capture's own
-   inputs. Its model version must be `football_team_share_v1`, its fingerprint must verify, and
-   its file's modification time, as the file system reports it, must fall before the deadline.
+   inputs. Its model version must be one this protocol admits, `football_team_share_v1` or
+   `football_joint_role_minutes_v1`, and one the reader at the frozen commit accepts; its
+   fingerprint must verify, and its file's modification time, as the file system reports it,
+   must fall before the deadline.
    The runner reads the file's bytes once, records their sha256, the fingerprint and the
    modification time, and copies those bytes into the chain's evidence. The artifact is never
    rebuilt, never borrowed from another capture and never written to. Inputs read on a machine
    other than the one that wrote them are copied with their modification times kept (for
    example `robocopy /COPY:DAT /DCOPY:T` or `rsync -t`); a copy that loses them makes the week
    missing, and that is never repaired. A producer change that keeps the version name is
-   recorded with its first week; those weeks are pooled and also reported apart.
+   recorded with its first week; those weeks are pooled and also reported apart. A change from
+   one admitted version to the other is recorded the same way, with each week's own version,
+   and the two are never relabelled as one (rule 29).
 7. The season rules are `read_season_rules` in `src/squadopt/live/rules.py`, on the same
    capture.
 8. The decision step uses no archive, no handoff, no member or entry payload and nothing
@@ -285,7 +289,10 @@ intervals to include zero. These are stated priors, and no clause reads them.
     pooled over windows 3 and 5 over the weeks that are not truncated. They are read separately,
     with no adjustment for there being two. Each window alone, `hold` minus `one_week`, each
     squad, truncated weeks, contrast A by route and outcome, and gross points, hits, free
-    transfers, bank and sale value apart are secondary and descriptive only.
+    transfers, bank and sale value apart are secondary and descriptive only. Each contrast is
+    also reported for each admitted model version on its own weeks, with the first week of each;
+    the pooled figure stays primary, because every arm in a week plans on that week's one
+    forecast, so each week's paired difference lies within one version.
 30. The interval is `season_aware_moving_block_interval` in
     `src/squadopt/evaluation/statistics.py` on the weekly differences, under a `PromotionPolicy`
     from `src/squadopt/evaluation/promotion.py` built with these values, stated here so that a
@@ -350,8 +357,9 @@ intervals to include zero. These are stated priors, and no clause reads them.
     no difference between the football and current models and no per-player forecast error, so
     it computes none of that protocol's quantities. Its two readings fall after the same weeks
     as that protocol's two. It never asks for a capture or an artifact for its own sake: it reads
-    only what the football option already produced. If the football option is withdrawn or stops
-    being served as `football_team_share_v1`, later chain weeks are missing for that reason. At
+    only what the football option already produced. If the football option is withdrawn, or is
+    served under a model version rule 6 does not admit, later chain weeks are missing for that
+    reason. At
     the interim, gross points, hits, free transfers, bank and sale value appear only as paired
     differences between arms; each arm's absolute totals appear only at `gw38`. No chain reading
     may be used to withdraw, change or re-time the football option.
@@ -374,10 +382,11 @@ intervals to include zero. These are stated priors, and no clause reads them.
     its bytes.
 38. Records name no member, entry or league, hold no news text and set
     `locked_holdout_accessed: false`: the chain loads no 2025-26 row. The served forecast's
-    producer does: it fits on 2023-24 to 2025-26 and the capture's settled 2026-27 weeks, with
-    2022-23 as priors only. So each receipt also records `forecast_archive_seasons`, the seasons
-    whose archive files the artifact hashes, with the artifact's training row count and latest
-    training kickoff.
+    producer may read archive seasons the chain does not, and which ones depends on the producer
+    and its version, so this protocol asserts none. Each receipt records them from the artifact
+    itself: `forecast_archive_seasons`, the seasons whose archive files the artifact hashes, with
+    the artifact's training row count and latest training kickoff as it states them. A field the
+    artifact does not carry is recorded as absent and never filled in.
 39. The decision step runs once after each deadline, as one heavy job at a time, never on a
     Tuesday or Friday and never during a weekly run or a rehearsal. It reads captures and
     football artifacts read-only and writes only under `artifacts/planner_policy_chain/`. It

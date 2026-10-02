@@ -56,7 +56,13 @@ def _protocol() -> str:
         "Two captures at the same latest instant make the week missing.",
         "the runner decides gameweek g only after its deadline, refuses an earlier decision, and"
         " decides weeks in order, each once.",
-        "Its model version must be `football_team_share_v1`",
+        "Its model version must be one this protocol admits, `football_team_share_v1` or"
+        " `football_joint_role_minutes_v1`, and one the reader at the frozen commit accepts",
+        "the two are never relabelled as one",
+        "Each contrast is also reported for each admitted model version on its own weeks",
+        "served under a model version rule 6 does not admit",
+        "so this protocol asserts none. Each receipt records them from the artifact itself",
+        "A field the artifact does not carry is recorded as absent and never filled in.",
         "The runner reads the file's bytes once, records their sha256",
         "The artifact is never rebuilt, never borrowed from another capture and never written to.",
         "The decision step uses no archive, no handoff, no member or entry payload and nothing"
