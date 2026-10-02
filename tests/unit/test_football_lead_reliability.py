@@ -224,6 +224,35 @@ def test_a_forecast_without_an_outcome_stays_unknown_and_is_counted() -> None:
     assert (count["forecast"], count["matched"], count["unmatched"]) == (2, 1, 1)
 
 
+def test_the_interval_reads_each_seasons_units_in_week_order_under_its_own_lead_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With four units and blocks of four every resample takes them all, so order and seed
+    cannot show in the bounds; what the interval is handed is checked instead."""
+
+    seen: list[tuple[list[tuple[str, float]], str]] = []
+
+    def spy(differences, *, policy, candidate_id):
+        seen.append((list(differences), candidate_id))
+        return (0.0, 0.0)
+
+    monkeypatch.setattr(runner, "season_aware_moving_block_interval", spy)
+    pairs = pd.DataFrame(
+        {
+            "season": ["2024-25", "2023-24", "2024-25", "2023-24"],
+            "GW": [13, 12, 11, 11],
+            "lead": [3] * 4,
+            "difference": [3.0, 2.0, 1.0, 0.5],
+            "error": [1.0] * 4,
+            "error_1": [0.5] * 4,
+        }
+    )
+    runner.lead_figures(pairs)
+    assert seen == [
+        ([("2023-24", 0.5), ("2023-24", 2.0), ("2024-25", 1.0), ("2024-25", 3.0)], "lead_3")
+    ]
+
+
 def test_units_are_ordered_by_target_week_and_a_short_lead_is_thin() -> None:
     weeks = [12, 11, 14, 13]
     pairs = pd.DataFrame(
