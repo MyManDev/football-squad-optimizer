@@ -22,6 +22,24 @@ whole reach should be the club hosts the registry names.
 **There is no fixture path here.** A run with no key refuses, loudly, from
 ``club_news_provider``. "We could not ask" and "the fixture said" are different facts, and a
 convenience branch in this command would be the one place that quietly merged them.
+
+**Four instants, four meanings.** They are kept apart because each answers a different
+question, and a run that let one stand in for another would report a time nobody observed.
+
+- *Publication*: when the club says an article was published. It comes from the held page's
+  own verifiable fields and is never rewritten by this command.
+- *Fetch*: when one page was read. Each document carries its own.
+- *Coding observation*: the one instant the week's coding looks from. It is taken once, after
+  the last page was read, and it is what the document selection, the model's decision
+  context and the target-deadline check all use. Taken before the fetch, as it used to be,
+  it turned an article published while the pages were being read into one "published after
+  the observation" although the page in hand already carried it.
+- *Capture completion*: when the capture was written, after coding.
+
+The target gameweek is settled before any page is read, from the instant the run started.
+The coding observation must still fall before that same deadline. If the deadline passed
+while the pages were being read, the run stops: it does not code against a closed week, and
+it does not move to the next gameweek on its own.
 """
 
 import argparse
@@ -72,9 +90,13 @@ from squadopt.platform.club_news_fetch import (
 )
 from squadopt.platform.club_news_provider import (
     CodingProviderConfig,
-    build_coding_provider,
+    bind_coding_provider,
     check_coding_provider,
     code_week_by_club,
+    coding_as_of,
+    require_provider_dependency,
+    resolve_provider_config,
+    validate_provider_config,
 )
 from squadopt.platform.official_injury_capture import (
     read_official_injury_capture,
@@ -116,6 +138,8 @@ class AcquiredWeek:
     refused_coding: tuple[tuple[str, str], ...]
     reused_clubs: tuple[str, ...] = ()
     document_selection: DocumentSelection | None = None
+    #: The instant the coding looked from, when this run took one after the fetch.
+    coding_observed_at: str | None = None
 
 
 def _coverage(
@@ -151,11 +175,20 @@ def _coverage(
     return declared, covered, partial
 
 
+#: Builds the provider once the coding observation instant is known. Raising
+#: :class:`ClubNewsError` here stops the week before any model request.
+BindCoding = Callable[[str], tuple[ClubNewsProvider, CodingProviderConfig]]
+
+
+def _instant_text(moment: datetime) -> str:
+    return moment.isoformat().replace("+00:00", "Z")
+
+
 def acquire_week(
     *,
     sources: Sequence[ClubSource],
-    provider: ClubNewsProvider,
-    config: CodingProviderConfig,
+    provider: ClubNewsProvider | None = None,
+    config: CodingProviderConfig | None = None,
     roster: Sequence[RosterPlayer],
     opener: Opener = _default_opener,
     now: Callable[[], datetime] = _utc_instant,
@@ -164,6 +197,7 @@ def acquire_week(
     max_calls: int | None = None,
     previous: Sequence[CodedClub] = (),
     additional_article_urls: Mapping[str, Sequence[str]] | None = None,
+    bind_coding: BindCoding | None = None,
 ) -> AcquiredWeek:
     """Read the registered pages, code them club by club, and report what happened.
 
@@ -171,8 +205,23 @@ def acquire_week(
     this whole function without a store. ``opener`` and ``now`` are the fetcher's own
     parameters, forwarded rather than re-invented, so an offline test drives this exactly as
     it drives the fetch.
+
+    The coding side is given in one of two ways. ``bind_coding`` is the acquisition command's:
+    after the last page is read this function takes one instant from ``now`` and hands it
+    over, and what comes back is the provider and configuration built for that instant. The
+    selection, the model's decision context and the caller's own deadline check then all look
+    from the same moment. ``provider`` with ``config`` is the direct form, for a caller that
+    has already settled its context; nothing is observed here in that case.
+
+    The documents are selected once, and that one selection is both what is coded and what
+    is reported.
     """
 
+    direct = provider is not None and config is not None
+    if direct == (bind_coding is not None) or (provider is None) != (config is None):
+        raise ClubNewsError(
+            "Give either a provider with its configuration, or bind_coding, and not both."
+        )
     documents, refused_pages = fetch_registered_documents(
         sources,
         opener=opener,
@@ -181,8 +230,43 @@ def acquire_week(
         check_robots=check_robots,
         additional_article_urls=additional_article_urls,
     )
+    observed_at: str | None = None
+    if bind_coding is not None:
+        if not documents:
+            # Nothing was read, so there is nothing to observe and no adapter to build.
+            declared, _covered, _partial = _coverage(sources, documents, ())
+            return AcquiredWeek(
+                documents=(),
+                coded=(),
+                clubs_declared=declared,
+                clubs_covered=(),
+                clubs_partially_covered=(),
+                refused_pages=refused_pages,
+                refused_coding=(),
+            )
+        # After the fetch, never before. The order is checked rather than assumed: a page
+        # stamped later than the instant the coding looks from would be read "in the future"
+        # of its own selection, so the week stops.
+        observed_at = _instant_text(now())
+        late = [d for d in documents if as_instant(d.fetched_at_utc) > as_instant(observed_at)]
+        if late:
+            raise ClubNewsError(
+                f"The coding observation {observed_at} is earlier than {len(late)} page "
+                f"read(s), the latest at {max(d.fetched_at_utc for d in late)}; the clock "
+                "went backwards, so nothing was coded."
+            )
+        provider, config = bind_coding(observed_at)
+    if provider is None or config is None:  # pragma: no cover - excluded by the check above
+        raise ClubNewsError("No coding provider was given.")
+    selection = select_coding_documents(documents, as_of=coding_as_of(config))
     coded, refused_coding = code_week_by_club(
-        provider, config, documents, roster, max_calls=max_calls, previous=previous
+        provider,
+        config,
+        documents,
+        roster,
+        max_calls=max_calls,
+        previous=previous,
+        selection=selection,
     )
     declared, covered, partial = _coverage(sources, documents, coded)
     return AcquiredWeek(
@@ -194,12 +278,8 @@ def acquire_week(
         refused_pages=refused_pages,
         refused_coding=refused_coding,
         reused_clubs=tuple(entry.club for entry in coded if any(entry is old for old in previous)),
-        document_selection=select_coding_documents(
-            documents,
-            as_of=str(config.target_context["as_of"])
-            if config.target_context and "as_of" in config.target_context
-            else None,
-        ),
+        document_selection=selection,
+        coding_observed_at=observed_at,
     )
 
 
@@ -323,13 +403,17 @@ def main(
                 f"{sorted(unknown)!r}."
             )
         roster = roster_from_short_names(short_name_roster(bootstrap))
-        as_of = now().isoformat().replace("+00:00", "Z")
-        deadline = next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=as_of)
+        # The run's own start. It settles the target gameweek and bounds the inputs that
+        # must already exist (an earlier capture, a referral capture); it is not what the
+        # coding observes from, which is taken after the pages are read.
+        as_of = _instant_text(now())
+        deadlines = gameweek_deadlines(bootstrap)
+        deadline = next_open_deadline(deadlines, as_of_utc=as_of)
+        season = season_from_bootstrap(bootstrap)
         target_context = {
-            "season": season_from_bootstrap(bootstrap),
+            "season": season,
             "gameweek": deadline.gameweek,
             "deadline": deadline.deadline_utc,
-            "as_of": as_of,
         }
         referrals = None
         if arguments.official_injury_capture is not None:
@@ -338,9 +422,7 @@ def main(
                 read_snapshot(central_path.parent, central_path.name)
             )
             age = as_instant(as_of) - as_instant(central.observed_at)
-            if central.season != target_context["season"] or not timedelta(0) <= age <= timedelta(
-                days=7
-            ):
+            if central.season != season or not timedelta(0) <= age <= timedelta(days=7):
                 raise ClubNewsError(
                     "Official injury referrals must be from this season "
                     "and a current prior capture."
@@ -356,13 +438,42 @@ def main(
                 replace(entry, reused_from_snapshot=prior.metadata.snapshot_id)
                 for entry in read_captured_responses(prior)
             )
-        provider, config = build_coding_provider(
-            environ, settings_file=arguments.settings_file, target_context=target_context
-        )
+        # Resolved and checked before any page is fetched, so a missing key, an unlisted
+        # model or a client library that is not installed refuses with nothing read. The
+        # adapter itself is built after the fetch.
+        resolved = resolve_provider_config(environ, settings_file=arguments.settings_file)
+        validate_provider_config(resolved)
+        require_provider_dependency(resolved)
+
+        def _bind(observed_at: str) -> tuple[ClubNewsProvider, CodingProviderConfig]:
+            if as_instant(observed_at) < as_instant(as_of):
+                raise ClubNewsError(
+                    f"The coding observation {observed_at} is earlier than the run's start "
+                    f"{as_of}; the clock went backwards, so nothing was coded."
+                )
+            try:
+                still_open = next_open_deadline(deadlines, as_of_utc=observed_at)
+            except DataError as error:
+                raise ClubNewsError(
+                    f"The gameweek {deadline.gameweek} deadline {deadline.deadline_utc} passed "
+                    f"while the pages were being read (observed {observed_at}), and no later "
+                    "deadline is published. Nothing was coded."
+                ) from error
+            if (
+                still_open.gameweek != deadline.gameweek
+                or still_open.deadline_utc != deadline.deadline_utc
+            ):
+                raise ClubNewsError(
+                    f"The gameweek {deadline.gameweek} deadline {deadline.deadline_utc} passed "
+                    f"while the pages were being read (observed {observed_at}). Nothing was "
+                    f"coded, and gameweek {still_open.gameweek} was not substituted; start a "
+                    "new run for it."
+                )
+            return bind_coding_provider(resolved, {**target_context, "as_of": observed_at})
+
         week = acquire_week(
             sources=sources,
-            provider=provider,
-            config=config,
+            bind_coding=_bind,
             roster=roster,
             opener=opener,
             now=now,
@@ -375,8 +486,14 @@ def main(
         print(f"Refused: {error}")
         return 1
 
+    config = resolved
     print(f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared")
     print(f"Read          {len(week.documents)} documents")
+    if week.coding_observed_at is not None:
+        print(
+            f"Observed      {week.coding_observed_at}, after the last page was read, for "
+            f"gameweek {deadline.gameweek} (deadline {deadline.deadline_utc})"
+        )
     if week.document_selection is not None:
         print(f"Selected      {len(week.document_selection.documents)} documents for coding")
         for decision in week.document_selection.decisions:

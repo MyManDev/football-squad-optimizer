@@ -59,6 +59,7 @@ from squadopt.data.sources.club_news_coding import (
 )
 from squadopt.data.sources.club_news_selection import (
     SELECTION_POLICY_VERSION,
+    DocumentSelection,
     select_coding_documents,
 )
 
@@ -311,6 +312,18 @@ def check_coding_provider(
     """Offline configuration/dependency check; never authenticates or creates a client."""
     config = resolve_provider_config(environ, settings_file=settings_file)
     validate_provider_config(config)
+    require_provider_dependency(config)
+    return config
+
+
+def require_provider_dependency(config: CodingProviderConfig) -> None:
+    """Refuse a provider whose client library is not installed, without importing it.
+
+    The adapters refuse the same thing when they are built. This is the check for a caller
+    that builds its adapter later than it wants the refusal: the acquisition command builds
+    after the pages are read, and a missing library is a reason to read none of them.
+    """
+
     dependency = {
         DEFAULT_PROVIDER: "anthropic",
         GEMINI_PROVIDER: "httpx2",
@@ -321,7 +334,6 @@ def check_coding_provider(
         raise ClubNewsProviderError(
             "The selected provider needs the project's llm extra installed."
         )
-    return config
 
 
 def build_coding_provider(
@@ -337,9 +349,32 @@ def build_coding_provider(
     """
 
     config = resolve_provider_config(environ, settings_file=settings_file)
+    return bind_coding_provider(config, target_context)
+
+
+def bind_coding_provider(
+    config: CodingProviderConfig, target_context: Mapping[str, object] | None
+) -> tuple[ClubNewsProvider, CodingProviderConfig]:
+    """Build the provider for an already-resolved configuration and one target context.
+
+    Resolution and binding are separate so the acquisition command can refuse a bad
+    configuration before any page is fetched and still build the adapter afterwards, once
+    the instant the coding observes from is known. The adapter keeps the context it is built
+    with, so a provider built before the fetch would tell the model an earlier time than the
+    one the documents were selected at.
+    """
+
     config = replace(config, target_context=target_context)
     validate_provider_config(config)
     return _FACTORIES[config.provider](config), config
+
+
+def coding_as_of(config: CodingProviderConfig) -> str | None:
+    """The instant the coding observes from, or ``None`` when no target was declared."""
+
+    if config.target_context and "as_of" in config.target_context:
+        return str(config.target_context["as_of"])
+    return None
 
 
 def coding_input_fingerprint(
@@ -391,8 +426,14 @@ def code_week_by_club(
     *,
     max_calls: int | None = None,
     previous: Sequence[CodedClub] = (),
+    selection: DocumentSelection | None = None,
 ) -> tuple[tuple[CodedClub, ...], tuple[tuple[str, str], ...]]:
     """Code a week one club at a time, returning what was coded and why the rest was not.
+
+    ``selection`` is the caller's own selection of these documents, when it has already made
+    one. Passing it means the documents that are coded and the documents the caller reports
+    as selected are one result and cannot drift apart; left out, the selection is made here
+    from the configuration's own ``as_of``.
 
     **The request unit is one club, and that is a decision about failure rather than about
     tidiness.** ``MAX_OUTPUT_TOKENS`` and ``REQUEST_TIMEOUT_SECONDS`` are each justified in
@@ -427,11 +468,10 @@ def code_week_by_club(
         isinstance(max_calls, bool) or not isinstance(max_calls, int) or max_calls < 0
     ):
         raise ClubNewsProviderError("Call budget must be a nonnegative integer.")
-    selected = select_coding_documents(
-        documents,
-        as_of=str(config.target_context["as_of"])
-        if config.target_context and "as_of" in config.target_context
-        else None,
+    selected = (
+        selection
+        if selection is not None
+        else select_coding_documents(documents, as_of=coding_as_of(config))
     )
     by_club: dict[str, list[RawDocument]] = {}
     for document in selected.documents:
@@ -549,11 +589,14 @@ __all__ = [
     "VENDOR_KEY_VARIABLES",
     "ClubNewsProviderError",
     "CodingProviderConfig",
+    "bind_coding_provider",
     "build_coding_provider",
     "check_coding_provider",
     "code_week_by_club",
+    "coding_as_of",
     "register_provider",
     "registered_providers",
+    "require_provider_dependency",
     "resolve_provider_config",
     "validate_provider_config",
 ]
