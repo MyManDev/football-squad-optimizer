@@ -17,6 +17,7 @@ from typing import Any
 
 from squadopt.application.manager_words import load_manager_words
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news_capture import read_club_news_capture
@@ -54,7 +55,7 @@ def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
     # read_snapshot validates exact bytes; reject path aliases before opening them.
     if not re.fullmatch(r"[a-z0-9][A-Za-z0-9-]{0,159}", capture_id):
         raise ValueError("Invalid bundle source capture identity.")
-    _safe(snapshot_root / capture_id)
+    _safe(Path(addressable(snapshot_root / capture_id)))
     return read_snapshot(snapshot_root, capture_id)
 
 
@@ -99,7 +100,7 @@ def _validate(
     ) != has_rotation:
         raise ValueError("News requires both exact rotation artifacts, or none of the three.")
     for path in files.values():
-        _safe(path)
+        _safe(Path(addressable(path)))
     snapshot = _source(snapshot_root, snapshot_id)
     if snapshot.metadata.source != FPL_LIVE_SOURCE:
         raise ValueError("A ready football bundle requires an FPL decision capture.")
@@ -108,8 +109,8 @@ def _validate(
         raise ValueError("A ready decision capture must precede its deadline.")
     forecast = read_football_forecast(files["forecast"], inputs)
     _basis_from_snapshot(
-        _object(files["forecast"].read_bytes()),
-        _object(files["components"].read_bytes()),
+        _object(Path(addressable(files["forecast"])).read_bytes()),
+        _object(Path(addressable(files["components"])).read_bytes()),
         snapshot,
         inputs,
         forecast,
@@ -128,7 +129,7 @@ def _validate(
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
     for role, path in site_files.items():
-        document = _object(path.read_bytes())
+        document = _object(Path(addressable(path)).read_bytes())
         payload = document["payload"]
         if (
             payload.get("season") != inputs.season
@@ -163,7 +164,7 @@ def _validate(
         rotation = read_rotation_evidence_artifact(
             files["rotation_table"], files["rotation_manifest"]
         )
-        manifest = _object(files["rotation_manifest"].read_bytes())
+        manifest = _object(Path(addressable(files["rotation_manifest"])).read_bytes())
         if (
             manifest.get("roster_snapshot_id") != snapshot_id
             or manifest.get("club_news_snapshot_id") != news_capture_id
@@ -226,8 +227,8 @@ def _validate(
 def _site_files(site_data_root: Path) -> dict[str, Path]:
     """Read the existing member/entry envelopes, without importing runtime services."""
     member_path = site_data_root / "league" / "members.json"
-    _safe(member_path)
-    document = _object(member_path.read_bytes())
+    _safe(Path(addressable(member_path)))
+    document = _object(Path(addressable(member_path)).read_bytes())
     payload = document.get("payload")
     if document.get("contract_version") != LEAGUE_VIEW_CONTRACT_VERSION or not isinstance(
         payload, dict
@@ -257,8 +258,8 @@ def _site_files(site_data_root: Path) -> dict[str, Path]:
         if role in result:
             raise ValueError("Duplicate site member identity.")
         path = site_data_root / "league" / "entries" / f"{identifier}.json"
-        _safe(path)
-        entry = _object(path.read_bytes())
+        _safe(Path(addressable(path)))
+        entry = _object(Path(addressable(path)).read_bytes())
         row = entry.get("payload")
         if (
             entry.get("contract_version") != LEAGUE_VIEW_CONTRACT_VERSION
@@ -305,8 +306,8 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
         elif relative != expected:
             raise ValueError("Bundle role has an unexpected filename.")
         path = marker.parent / relative
-        _safe(path)
-        if _digest(path.read_bytes()) != entry["sha256"]:
+        _safe(Path(addressable(path)))
+        if _digest(Path(addressable(path)).read_bytes()) != entry["sha256"]:
             raise ValueError("Bundle file digest mismatch.")
         result[role] = path
     return result
@@ -317,8 +318,8 @@ def read_football_bundle(
 ) -> FootballBundle:
     """Read only this exact ready marker and revalidate every declared input."""
     marker = football_bundle_path(artifact_root, snapshot_id)
-    _safe(marker)
-    raw = marker.read_bytes()
+    _safe(Path(addressable(marker)))
+    raw = Path(addressable(marker)).read_bytes()
     record = _object(raw)
     if (
         record.get("contract_version") != CONTRACT_VERSION
@@ -380,8 +381,10 @@ def seal_football_bundle(
     Repeating the identical inputs completes that interruption or returns a replay.
     """
     marker = football_bundle_path(artifact_root, snapshot_id)
-    _safe(marker)
-    existing = marker.read_bytes() if marker.exists() else None
+    _safe(Path(addressable(marker)))
+    existing = (
+        Path(addressable(marker)).read_bytes() if Path(addressable(marker)).exists() else None
+    )
     if existing is not None:
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
@@ -414,7 +417,7 @@ def seal_football_bundle(
         if files[role].name in {"handoff.json", "site.json"}:
             raise ValueError("Reserved rotation artifact filename.")
         destinations[role] = folder / files[role].name
-    payloads = {role: path.read_bytes() for role, path in files.items()}
+    payloads = {role: Path(addressable(path)).read_bytes() for role, path in files.items()}
     record = {
         "contract_version": CONTRACT_VERSION,
         "snapshot_id": snapshot_id,
@@ -432,8 +435,11 @@ def seal_football_bundle(
         raise ValueError("A different ready bundle already exists for this capture.")
     # Preflight every immutable destination before writing any copy.
     for role, path in destinations.items():
-        _safe(path)
-        if path.exists() and path.read_bytes() != payloads[role]:
+        _safe(Path(addressable(path)))
+        if (
+            Path(addressable(path)).exists()
+            and Path(addressable(path)).read_bytes() != payloads[role]
+        ):
             raise ValueError("A different immutable bundle artifact already exists.")
     for role, path in destinations.items():
         if path != files[role]:
@@ -448,7 +454,10 @@ def seal_football_bundle(
     )
     if final_identity != identity:
         raise ValueError("A bundle source identity changed while it was being sealed.")
-    if any(path.read_bytes() != payloads[role] for role, path in destinations.items()):
+    if any(
+        Path(addressable(path)).read_bytes() != payloads[role]
+        for role, path in destinations.items()
+    ):
         raise ValueError("A bundle input changed while it was being sealed.")
     write_bytes_once(raw_marker, marker)
     return read_football_bundle(

@@ -20,11 +20,13 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
+from io import BytesIO
 from pathlib import Path
 from typing import Final
 
 import pandas as pd
 
+from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataSourceError, DataValidationError
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
@@ -114,7 +116,7 @@ _CLAIM_ONLY_COLUMNS: Final[tuple[str, ...]] = (
 
 def _read_manifest(path: Path) -> Mapping[str, object]:
     try:
-        raw = path.read_text(encoding="utf-8")
+        raw = Path(addressable(path)).read_text(encoding="utf-8")
     except (OSError, UnicodeError) as error:
         raise DataSourceError(f"Cannot read the manifest at {path}: {error}") from error
     try:
@@ -427,7 +429,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
 
     manifest = _read_manifest(manifest_path)
     try:
-        table_bytes = table_path.read_bytes()
+        table_bytes = Path(addressable(table_path)).read_bytes()
     except OSError as error:
         raise DataSourceError(f"Cannot read the table at {table_path}: {error}") from error
     digest = hashlib.sha256(table_bytes).hexdigest()
@@ -438,7 +440,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "published, so they are refused before they are parsed."
         )
     try:
-        table = pd.read_csv(table_path, dtype=dict(_ROTATION_EVIDENCE_DTYPES))
+        table = pd.read_csv(BytesIO(table_bytes), dtype=dict(_ROTATION_EVIDENCE_DTYPES))
     except (ValueError, pd.errors.ParserError) as error:
         raise DataValidationError(f"{table_path.name} could not be read: {error}") from error
 

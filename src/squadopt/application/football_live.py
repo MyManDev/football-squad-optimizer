@@ -209,9 +209,15 @@ def _forecast_and_components(
         ignore_index=True,
     )
     context_audit: list[dict[str, Any]] = []
+    takers = (
+        captured_taker_priorities(snapshot.payloads[BOOTSTRAP_PAYLOAD])
+        if contextual or role_minutes
+        else None
+    )
     if contextual:
+        assert takers is not None
         roster = roster.merge(
-            captured_taker_priorities(snapshot.payloads[BOOTSTRAP_PAYLOAD]),
+            takers,
             on="player_id",
             how="left",
             validate="one_to_one",
@@ -301,6 +307,10 @@ def _forecast_and_components(
         document["availability_application"] = "before_team_shares_v1"
         document["projection_contract"] = horizon.contract_version
         document["manager_context"] = context_audit
+    if contextual or role_minutes:
+        assert takers is not None
+        # Source facts only: ranks do not identify event-channel intensities and
+        # must not change the joint role model's roster, features or predictions.
         document["taker_priorities"] = {
             "source_snapshot_id": inputs.snapshot_id,
             "captured_at_utc": inputs.captured_at_utc,
@@ -310,9 +320,17 @@ def _forecast_and_components(
                     "player_id": int(row["player_id"]),
                     **{key: None if pd.isna(row[key]) else int(row[key]) for key in TAKER_FIELDS},
                 }
-                for row in roster[["player_id", *TAKER_FIELDS]].to_dict("records")
+                for row in (roster[["player_id", *TAKER_FIELDS]] if contextual else takers).to_dict(
+                    "records"
+                )
             ],
         }
+        if role_minutes:
+            document["limitations"].append(
+                "Captured penalty and set-piece priorities are source facts only; "
+                "separate event-channel rates are not estimated."
+            )
+    if contextual:
         document["limitations"].extend(
             [
                 "Joint intensity uncertainty is a moment-matched working approximation.",

@@ -360,12 +360,19 @@ def test_a_named_capture_reaches_the_export_from_the_stage_that_runs_it(
         "snapshot_id": operation.request.snapshot_id,
         "deadline_utc": "2026-08-28T17:30:00Z",
     }
-    table, manifest = rotation_artifact(operation.paths.rotation, "2026-27", 2, capture)
+    table, manifest = rotation_artifact(
+        operation.paths.rotation,
+        "2026-27",
+        2,
+        capture,
+        decision_snapshot_id=operation.request.snapshot_id,
+    )
+    news_only, _ = rotation_artifact(operation.paths.rotation, "2026-27", 2, capture)
     from_decision, _ = rotation_artifact(
         operation.paths.rotation, "2026-27", 2, operation.request.snapshot_id or ""
     )
-    # The two names must differ, or the artifact assertion below would prove nothing.
-    assert table != from_decision
+    # V4 binds both captures: neither an older news-only pair nor a fixture pair is reusable.
+    assert table not in (news_only, from_decision)
 
     calls = []
 
@@ -387,7 +394,7 @@ def test_a_named_capture_reaches_the_export_from_the_stage_that_runs_it(
     assert calls[0].club_news_fixture is None
     # The decision capture stays in its own field. A week carries two captures, not one.
     assert calls[0].snapshot == operation.request.snapshot_id
-    # And the artifact is named after the claims, so a fixture read cannot reuse this pair.
+    # The artifact binds the claims to this decision, so neither other source can reuse it.
     assert result.value["table"] == str(table)
 
 

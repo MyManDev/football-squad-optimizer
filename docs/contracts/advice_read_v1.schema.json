@@ -1924,6 +1924,53 @@
                     "minimum": 1,
                     "type": "integer"
                   },
+                  "point_components": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "appearance": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "assists": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "clean_sheet": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "clipping": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "defcon": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "goals": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "other": {
+                        "type": "number"
+                      },
+                      "total": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "appearance",
+                      "goals",
+                      "assists",
+                      "clean_sheet",
+                      "defcon",
+                      "clipping",
+                      "total",
+                      "other"
+                    ],
+                    "type": "object"
+                  },
                   "sixty_minute_probability": {
                     "maximum": 1,
                     "minimum": 0,

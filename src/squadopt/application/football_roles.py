@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Set
 from typing import Any, cast
 
@@ -10,6 +11,23 @@ import pandas as pd
 from squadopt.live import RecommendationInputs
 from squadopt.live.minute_evidence import FixtureComponentBasis
 from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSION
+
+
+def _point_components(row: Mapping[str, Any], season: str, eligibility: float) -> dict[str, float]:
+    """Explain the existing individual fixture score, before captain or Top100 weighting."""
+    goal = {"GK": 10 if season >= "2024-25" else 6, "DEF": 6, "MID": 5, "FWD": 4}
+    clean = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
+    values = {
+        "appearance": row["appearance_probability"] + row["p60"],
+        "goals": goal[row["position"]] * row["goals"],
+        "assists": 3 * row["assists"],
+        "clean_sheet": clean[row["position"]] * row["clean_sheet_probability"],
+        "defcon": 2 * row["defcon_probability"] if season >= "2025-26" else 0.0,
+        "other": row["appearance_probability"] * row["residual_if_appearance"],
+        "clipping": row["expected_points"] - row["raw_expected_points"],
+        "total": row["expected_points"],
+    }
+    return {key: float(value) * eligibility for key, value in values.items()}
 
 
 def fixture_role_estimates(
@@ -28,6 +46,7 @@ def fixture_role_estimates(
         for row in cast(dict[str, Any], basis.companion["captured_availability"])["multipliers"]
     }
     names = inputs.players.set_index("player_id").name.to_dict()
+    season = str(basis.served["season"])
     estimates = []
     for row in rows.loc[rows.GW.eq(inputs.deadline.gameweek)].to_dict("records"):
         eligibility = multipliers[int(row["player_code"])]
@@ -51,6 +70,9 @@ def fixture_role_estimates(
                 "sixty_minute_probability": float(row["p60"]) * eligibility,
                 "captured_eligibility_multiplier": eligibility,
                 "news_applied": (int(row["player_code"]), int(row["fixture"])) in applied_fixtures,
+                "point_components": _point_components(
+                    cast(Mapping[str, Any], row), season, eligibility
+                ),
             }
         )
     return estimates
@@ -59,11 +81,15 @@ def fixture_role_estimates(
 def bind_role_absences(
     rows: list[dict[str, Any]], final_week: pd.DataFrame
 ) -> list[dict[str, Any]]:
-    """A verified absence zeroes this fixture's law; no other role is re-estimated here."""
+    """Apply absence and withhold any explanation that differs from the final weekly score."""
     absent = set(final_week.loc[final_week.appearance_probability.eq(0), "player_id"])
     result = []
     for row in rows:
         updated = dict(row)
+        if "point_components" in row:
+            updated["point_components"] = dict(row["point_components"])
+            if row["player_id"] in absent:
+                updated["point_components"] = dict.fromkeys(updated["point_components"], 0.0)
         if row["player_id"] in absent and row["zero_probability"] < 1:
             for key in ("start_probability", "cameo_probability"):
                 if updated[key] is not None:
@@ -76,6 +102,34 @@ def bind_role_absences(
                 news_applied=True,
             )
         result.append(updated)
+    final_points = final_week.set_index("player_id").expected_points.to_dict()
+    for player in {row["player_id"] for row in result}:
+        fixtures = [row for row in result if row["player_id"] == player]
+        components = [row.get("point_components") for row in fixtures]
+        consistent = all(
+            part is not None
+            and all(math.isfinite(value) for value in part.values())
+            and all(value >= 0 for key, value in part.items() if key != "other")
+            and math.isclose(
+                math.fsum(value for key, value in part.items() if key != "total"),
+                part["total"],
+                rel_tol=1e-10,
+                abs_tol=1e-10,
+            )
+            for part in components
+        )
+        if (
+            not consistent
+            or player not in final_points
+            or not math.isclose(
+                math.fsum(part["total"] for part in components if part is not None),
+                float(final_points[player]),
+                rel_tol=1e-10,
+                abs_tol=1e-10,
+            )
+        ):
+            for row in fixtures:
+                row.pop("point_components", None)
     return result
 
 

@@ -40,6 +40,24 @@ def role_forecast_schema() -> dict[str, Any]:
             "news_applied": {"type": "boolean"},
         }
     )
+    # Optional for already published role rows; a supplied breakdown is complete.
+    row["properties"]["point_components"] = _object(
+        {
+            **{
+                key: {"type": "number", "minimum": 0}
+                for key in (
+                    "appearance",
+                    "goals",
+                    "assists",
+                    "clean_sheet",
+                    "defcon",
+                    "clipping",
+                    "total",
+                )
+            },
+            "other": {"type": "number"},
+        }
+    )
     return _object(
         {
             "version": {"const": "football_role_forecast_v1"},

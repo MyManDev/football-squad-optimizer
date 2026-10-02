@@ -9,6 +9,7 @@ is checked. A pair that came out of the writer cannot share that mistake.
 import hashlib
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from tests.fixtures.synthetic_rotation_capture import (
     fixtures_payload,
     roster_entries,
 )
+from tests.unit.test_rotation_export_from_capture import NEWS_CAPTURED_AT, _coded, _news_capture
 
 from squadopt.application.weekly_plan import rotation_pair_is_readable
 from squadopt.data.errors import DataValidationError
@@ -125,30 +127,79 @@ def test_a_stale_export_contract_makes_a_pair_on_disk_unreusable(
     assert not rotation_pair_is_readable(table, manifest)
 
 
+@pytest.mark.parametrize("legacy_contract", [LEGACY_CONTRACT_VERSION, PREVIOUS_CONTRACT_VERSION])
 def test_the_provider_survives_the_artifact_and_an_older_one_stays_readable(
-    tmp_path: Path, clean_tree: None
+    tmp_path: Path, clean_tree: None, legacy_contract: str
 ) -> None:
-    """Written into the manifest is only half of a record; a consumer has to be able to see it.
-
-    The fixture path names no adapter, so this artifact's silence is the true statement. An
-    artifact that does name one carries it through the reader, and one written before the
-    field existed is still read rather than refused.
-    """
+    """Captured provider provenance survives; genuine older schemas need no new binding."""
 
     code, _, output_dir = _run(tmp_path)
     assert code == 0
     table_path, manifest_path = _pair(output_dir)
     assert read_rotation_evidence_artifact(table_path, manifest_path).attrs["provider"] is None
 
+    # A provider cannot be pasted onto fixture evidence to bypass the V4 capture binding.
     _rewrite_manifest(manifest_path, provider="gemini")
-    assert read_rotation_evidence_artifact(table_path, manifest_path).attrs["provider"] == "gemini"
+    with pytest.raises(DataValidationError, match="capture binding"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
 
+    snapshot_root = tmp_path / "captured" / "snapshots"
+    decision_id = _written_snapshot(snapshot_root)
+    news_id = _news_capture(
+        snapshot_root, coded=tuple(replace(entry, provider="gemini") for entry in _coded())
+    )
+    output_dir = tmp_path / "captured" / "out"
+    assert (
+        export_rotation_evidence.main(
+            [
+                "--season",
+                SEASON,
+                "--target-gameweek",
+                str(TARGET_GAMEWEEK),
+                "--deadline-utc",
+                DEADLINE,
+                "--snapshot",
+                decision_id,
+                "--snapshot-root",
+                str(snapshot_root),
+                "--club-news-snapshot",
+                news_id,
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+        == 0
+    )
+    table_path, manifest_path = _pair(output_dir)
+    current = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert current.attrs["provider"] == "gemini"
+    assert current.attrs["club_news_snapshot_id"] == news_id
+    assert current.attrs["club_news_captured_at_utc"] == NEWS_CAPTURED_AT
+
+    # Replay an actual legacy-shaped table, not a V4 table with required provenance removed.
+    legacy = pd.read_csv(table_path)[list(LEGACY_ROTATION_EVIDENCE_COLUMNS)]
+    legacy["contract_version"] = legacy_contract
+    legacy.to_csv(table_path, index=False)
     document = json.loads(manifest_path.read_text(encoding="utf-8"))
-    del document["provider"]
+    document.update(
+        contract_version=legacy_contract,
+        table_sha256=hashlib.sha256(table_path.read_bytes()).hexdigest(),
+    )
+    for field in (
+        "provider",
+        "club_news_source_kind",
+        "club_news_snapshot_id",
+        "club_news_captured_at_utc",
+    ):
+        del document[field]
     manifest_path.write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    assert read_rotation_evidence_artifact(table_path, manifest_path).attrs["provider"] is None
+    older = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert older.attrs["provider"] is None
+    assert set(older.contract_version) == {legacy_contract}
+    for column in ("source_snapshot_ids", "rotation_claim_source_sha256", "model_response_sha256"):
+        pd.testing.assert_series_equal(current[column], older[column])
 
     _rewrite_manifest(manifest_path, provider="   ")
     with pytest.raises(DataValidationError, match="must be a non-empty string or absent"):

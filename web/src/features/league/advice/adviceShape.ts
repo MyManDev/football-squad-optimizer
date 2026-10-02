@@ -59,11 +59,17 @@ function fields(
   );
 }
 
-function closedFields(value: unknown, required: Record<string, Predicate>): boolean {
+function closedFields(
+  value: unknown,
+  required: Record<string, Predicate>,
+  optional: Record<string, Predicate> = {},
+): boolean {
   return (
     record(value) &&
-    Object.keys(value).length === Object.keys(required).length &&
-    fields(value, required)
+    Object.keys(value).every(
+      (key) => Object.hasOwn(required, key) || Object.hasOwn(optional, key),
+    ) &&
+    fields(value, required, optional)
   );
 }
 
@@ -242,6 +248,18 @@ const chipStrategy: Predicate = (value) =>
   });
 
 const probability: Predicate = (value) => finite(value) && Number(value) >= 0 && Number(value) <= 1;
+const nonnegative: Predicate = (value) => finite(value) && Number(value) >= 0;
+const rolePointComponents: Predicate = (value) =>
+  closedFields(value, {
+    appearance: nonnegative,
+    goals: nonnegative,
+    assists: nonnegative,
+    clean_sheet: nonnegative,
+    defcon: nonnegative,
+    other: finite,
+    clipping: nonnegative,
+    total: nonnegative,
+  });
 const roleForecast: Predicate = (value) =>
   closedFields(value, {
     version: oneOf("football_role_forecast_v1"),
@@ -249,22 +267,26 @@ const roleForecast: Predicate = (value) =>
     calibration: oneOf("not_independently_verified"),
     scope: oneOf("current_gameweek_fixtures"),
     rows: array((row) =>
-      closedFields(row, {
-        player_id: identity,
-        name: text,
-        fixture_id: identity,
-        gameweek: identity,
-        kickoff: text,
-        status: oneOf("fitted_known_start_labels", "unavailable_no_known_start_labels"),
-        start_probability: nullable(probability),
-        cameo_probability: nullable(probability),
-        zero_probability: probability,
-        unknown_role_probability: probability,
-        expected_minutes: (v) => finite(v) && Number(v) >= 0 && Number(v) <= 120,
-        sixty_minute_probability: probability,
-        captured_eligibility_multiplier: probability,
-        news_applied: oneOf(true, false),
-      }),
+      closedFields(
+        row,
+        {
+          player_id: identity,
+          name: text,
+          fixture_id: identity,
+          gameweek: identity,
+          kickoff: text,
+          status: oneOf("fitted_known_start_labels", "unavailable_no_known_start_labels"),
+          start_probability: nullable(probability),
+          cameo_probability: nullable(probability),
+          zero_probability: probability,
+          unknown_role_probability: probability,
+          expected_minutes: (v) => finite(v) && Number(v) >= 0 && Number(v) <= 120,
+          sixty_minute_probability: probability,
+          captured_eligibility_multiplier: probability,
+          news_applied: oneOf(true, false),
+        },
+        { point_components: rolePointComponents },
+      ),
     ),
   });
 

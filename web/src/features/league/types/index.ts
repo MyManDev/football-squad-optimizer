@@ -437,6 +437,17 @@ export interface AdvicePlanWeek {
   lineup?: AdviceLineup;
 }
 
+export interface AdviceRolePointComponents {
+  appearance: number;
+  goals: number;
+  assists: number;
+  clean_sheet: number;
+  defcon: number;
+  other: number;
+  clipping: number;
+  total: number;
+}
+
 export interface EntryAdvice {
   role_forecast?: {
     version: "football_role_forecast_v1";
@@ -458,6 +469,7 @@ export interface EntryAdvice {
       sixty_minute_probability: number;
       captured_eligibility_multiplier: number;
       news_applied: boolean;
+      point_components?: AdviceRolePointComponents;
     }[];
   };
   prediction_model?: {

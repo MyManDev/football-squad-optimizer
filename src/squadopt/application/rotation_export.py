@@ -11,6 +11,7 @@ from typing import Final
 
 import pandas as pd
 
+from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import write_document_once
 from squadopt.data.errors import DataError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -287,19 +288,19 @@ def _publish_once(payload: bytes, destination: Path) -> str:
     same, and the player evidence and settled outcomes exports publish through it.
     """
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    Path(addressable(destination.parent)).mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(
         f".{destination.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}"
     )
     try:
-        with temporary.open("xb") as handle:
+        with Path(addressable(temporary)).open("xb") as handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
         try:
-            os.link(temporary, destination)
+            os.link(addressable(temporary), addressable(destination))
         except FileExistsError:
-            if destination.read_bytes() == payload:
+            if Path(addressable(destination)).read_bytes() == payload:
                 return "replay"
             raise DataError(
                 f"{destination} already exists with different content; an artifact is never "
@@ -307,7 +308,7 @@ def _publish_once(payload: bytes, destination: Path) -> str:
             ) from None
         return "written"
     finally:
-        temporary.unlink(missing_ok=True)
+        Path(addressable(temporary)).unlink(missing_ok=True)
 
 
 def _manifest_identity(document: Mapping[str, object]) -> dict[str, object]:

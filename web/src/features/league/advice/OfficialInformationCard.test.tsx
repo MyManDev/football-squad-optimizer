@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
@@ -115,4 +115,89 @@ it("does not announce unchanged information or another capture as this plan's up
     </LanguageProvider>,
   );
   expect(screen.queryByRole("status")).toBeNull();
+});
+
+it.each(["tr", "en"] as const)(
+  "compares actual source bindings without changing or recalculating the displayed plan in %s",
+  (language) => {
+    const original = JSON.stringify(view);
+    const latest: DecisionInformation = {
+      ...decision,
+      revision: "d".repeat(64),
+      observed_at: "2026-10-02T01:00:00Z",
+      coach_news_bound: true,
+      minute_components_bound: false,
+    };
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <NewInformationNotice view={view} latest={latest} />
+      </LanguageProvider>,
+    );
+    const detail = screen.getByTestId("information-binding-differences");
+    expect(detail).not.toHaveAttribute("open");
+    fireEvent.click(detail.querySelector("summary")!);
+    expect(detail).toHaveAttribute("open");
+    const rows = within(detail).getAllByRole("row");
+    expect(
+      within(rows[2]!)
+        .getAllByRole("cell")
+        .map((cell) => cell.textContent),
+    ).toEqual(language === "tr" ? ["Bağlı değil", "Bağlı"] : ["Not bound", "Bound"]);
+    expect(
+      within(rows[3]!)
+        .getAllByRole("cell")
+        .map((cell) => cell.textContent),
+    ).toEqual(language === "tr" ? ["Bağlı", "Bağlı değil"] : ["Bound", "Not bound"]);
+    expect([...detail.querySelectorAll("time")].map((node) => node.dateTime)).toEqual([
+      decision.observed_at,
+      latest.observed_at,
+    ]);
+    expect(detail).toHaveTextContent(
+      language === "tr"
+        ? "bir açıklamanın uygulandığı veya puanların değiştiği anlamına gelmez"
+        : "does not mean a statement was applied or points changed",
+    );
+    expect(detail).toHaveTextContent(
+      language === "tr" ? "gösterilen plan korunur" : "displayed plan is retained",
+    );
+    expect(detail).not.toHaveTextContent(decision.revision);
+    expect(detail).not.toHaveTextContent(latest.revision);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(JSON.stringify(view)).toBe(original);
+  },
+);
+
+it("does not invent a visible source change from a revision change alone", () => {
+  render(
+    <LanguageProvider initialLanguage="en">
+      <NewInformationNotice view={view} latest={{ ...decision, revision: "d".repeat(64) }} />
+    </LanguageProvider>,
+  );
+  expect(screen.getByTestId("information-binding-differences")).toHaveTextContent(
+    "these summary fields are unchanged",
+  );
+});
+
+it("keeps an absent previous revision and missing check time distinct from an unbound source", () => {
+  const legacy = { ...view };
+  delete (legacy as { decision_information?: DecisionInformation }).decision_information;
+  render(
+    <LanguageProvider initialLanguage="en">
+      <NewInformationNotice view={legacy} latest={{ ...decision, observed_at: null }} />
+    </LanguageProvider>,
+  );
+  const detail = screen.getByTestId("information-binding-differences");
+  fireEvent.click(detail.querySelector("summary")!);
+  const rows = within(detail).getAllByRole("row");
+  expect(
+    within(rows[1]!)
+      .getAllByRole("cell")
+      .map((cell) => cell.textContent),
+  ).toEqual(["Not recorded", "Not recorded"]);
+  expect(
+    within(rows[2]!)
+      .getAllByRole("cell")
+      .map((cell) => cell.textContent),
+  ).toEqual(["Not recorded", "Not bound"]);
+  expect(detail.querySelector("time")).toBeNull();
 });

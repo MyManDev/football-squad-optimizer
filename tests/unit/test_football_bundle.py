@@ -73,6 +73,8 @@ def case(publication_case, tmp_path):
             for row in roster.itertuples(index=False)
         ],
     }
+    # Optional captured season rules for callers exercising the real planner.
+    boot.update(source.get("bootstrap_extra", {}))
     fixtures = json.loads(source["snapshot"].payloads[FIXTURES_PAYLOAD])
     for row in fixtures:
         row.update(

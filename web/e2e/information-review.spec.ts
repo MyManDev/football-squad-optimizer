@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { mockInformationReview } from "../src/fixtures/information";
@@ -165,6 +166,16 @@ function expectedAnswer(window: 3 | 5) {
           sixty_minute_probability: 0.4,
           captured_eligibility_multiplier: 0.5,
           news_applied: false,
+          point_components: {
+            appearance: 0.9,
+            goals: 0,
+            assists: 0,
+            clean_sheet: 1.2,
+            defcon: 0,
+            other: 0.9,
+            clipping: 0,
+            total: 3,
+          },
         },
         {
           player_id: first.vice_captain.player_id,
@@ -310,6 +321,14 @@ for (const [window, width] of [
     await expect(role).toContainText("Bağımsız doğruluk ölçümü henüz tamamlanmış değildir");
     await expect(role).toContainText("İlk 11 bilgisi için yeterli kayıt yok");
     await expect(role).toContainText("İlk 11: — · Sonradan girer: — · Oynamaz: 0%");
+    const rolePoints = role.getByTestId("role-point-components");
+    await expect(rolePoints).not.toHaveAttribute("open");
+    await rolePoints.locator(":scope > summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(rolePoints).toHaveAttribute("open", "");
+    await expect(rolePoints).toContainText("Toplam oyuncu puanı: 3,00");
+    await expect(rolePoints).toContainText("kaptan çarpanı ve Top100 seçim ağırlığı öncesidir");
+    await expect(rolePoints).toContainText("Oynayabilirlik zaten bir kez uygulanmıştır");
     const nominal = page.getByRole("region", { name: `${window} haftalık pencere`, exact: true });
     const weeks = answer.payload.plan_weeks!;
     for (const [index, week] of weeks.entries()) {
@@ -382,6 +401,15 @@ for (const [window, width] of [
         ),
       ),
     ).toBe(true);
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    expect(
+      accessibility.violations
+        .filter((violation) => ["critical", "serious"].includes(violation.impact ?? ""))
+        .map((violation) => ({
+          id: violation.id,
+          targets: violation.nodes.slice(0, 3).map((node) => node.target.join(" ")),
+        })),
+    ).toEqual([]);
     expect(pageErrors).toEqual([]);
     await nominal.screenshot({ path: info.outputPath(`lineups-window${window}-${width}.png`) });
     await region.screenshot({ path: info.outputPath(`information-window${window}-${width}.png`) });

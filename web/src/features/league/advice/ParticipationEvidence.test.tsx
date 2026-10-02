@@ -212,7 +212,9 @@ it.each(["tr", "en"] as const)(
       language === "tr" ? "daha kısa sürelere" : "learned shorter durations",
     );
     expect(detail).toHaveTextContent(
-      language === "tr" ? "gol ve asist toplamı korunur" : "goal and assist totals stay fixed",
+      language === "tr"
+        ? "gol ve asist toplamı, oynayabilirlik uygulanmadan önce korunur"
+        : "goal and assist totals stay fixed before eligibility is applied",
     );
     expect(detail).toHaveTextContent(
       language === "tr" ? "açık bir model varsayımı" : "explicit model assumption",

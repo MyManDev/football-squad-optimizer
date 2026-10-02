@@ -50,6 +50,7 @@ from squadopt.application.weekly_plan import (
     rotation_source_capture,
 )
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
+from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import METADATA_FILENAME, PAYLOAD_DIRECTORY, read_snapshot
 from squadopt.data.sources.fpl_information import FplInformation
@@ -239,7 +240,7 @@ def _generated_at(table: Path) -> str:
 
 def _stat(path: Path) -> tuple[str, int, int]:
     try:
-        status = path.stat()
+        status = Path(addressable(path)).stat()
     except OSError:
         return (path.name, -1, -1)
     return (path.name, status.st_size, status.st_mtime_ns)
@@ -362,15 +363,20 @@ def discovery_signature(
     # A ready marker is written last. Sealed files are immutable, but stat their
     # small directory too so accidental corruption invalidates held contexts.
     sealed = marker.with_suffix("")
-    if sealed.is_dir():
-        found.extend(_stat(path) for path in sorted(sealed.rglob("*")) if path.is_file())
-    if snapshot_root is not None and marker.is_file():
+    reachable_sealed = Path(addressable(sealed))
+    if reachable_sealed.is_dir():
+        found.extend(
+            _stat(sealed / path.relative_to(reachable_sealed))
+            for path in sorted(reachable_sealed.rglob("*"))
+            if path.is_file()
+        )
+    if snapshot_root is not None and Path(addressable(marker)).is_file():
         # Invalidation only; load_switch_inputs performs the authoritative digest,
         # clock and roster checks before using any bytes from these captures.
         try:
-            if marker.stat().st_size > 2 * 1024 * 1024:
+            if Path(addressable(marker)).stat().st_size > 2 * 1024 * 1024:
                 raise ValueError("Ready marker exceeds the discovery size bound.")
-            record = json.loads(marker.read_bytes())
+            record = json.loads(Path(addressable(marker)).read_bytes())
             root = snapshot_root.resolve()
             for key in ("decision", "news", "official_injuries"):
                 entry = record.get(key)
@@ -461,7 +467,7 @@ def load_switch_inputs(
     bundle = None
     invalid_bundle = False
     marker = football_bundle_path(artifact_root, inputs.snapshot_id)
-    if marker.exists():
+    if Path(addressable(marker)).exists():
         try:
             bundle = read_football_bundle(
                 artifact_root=artifact_root,
@@ -497,12 +503,15 @@ def load_switch_inputs(
             )
             # V2 is used only when the current pair is absent. A present but invalid
             # current artifact must not silently fall back to an older interpretation.
-            selected = next((pair for pair in pairs if any(path.exists() for path in pair)), None)
+            selected = next(
+                (pair for pair in pairs if any(Path(addressable(path)).exists() for path in pair)),
+                None,
+            )
             if selected is None:
                 notes.append(f"managers_word: no rotation table {pairs[0][0].name}")
             else:
                 table, manifest = selected
-                document = json.loads(manifest.read_text(encoding="utf-8"))
+                document = json.loads(Path(addressable(manifest)).read_text(encoding="utf-8"))
                 news_completed = None
                 if (
                     isinstance(document, dict)
