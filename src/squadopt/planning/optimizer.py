@@ -479,16 +479,13 @@ def _build_model(
             optimization_config.squad_size,
             f"paid_transfers_gw{gameweek}",
         )
-        # Inequality form: paid transfers carry a negative objective weight, so the
-        # solver takes the smallest value the bounds allow — max(count - free, 0)
-        # without a wildcard, zero under one.
-        if rebuild_vars:
-            model.add(
-                paid_transfers
-                >= transfer_count - free_before - optimization_config.squad_size * rebuild
-            )
-        else:
-            model.add(paid_transfers >= transfer_count - free_before)
+        # Accounting must be exact even with a zero hit weight or a merely feasible
+        # incumbent. A rebuild makes the expression nonpositive because the number
+        # of transfers is bounded by squad_size, so WC/FH always pay zero hits.
+        model.add_max_equality(
+            paid_transfers,
+            [transfer_count - free_before - optimization_config.squad_size * rebuild, 0],
+        )
 
         bank_after = model.new_int_var(0, bank_bound, f"bank_after_gw{gameweek}")
         bank_before: cp_model.LinearExpr | int

@@ -125,6 +125,88 @@ def test_chip_periods_renew_without_recreating_used_right(known_optimum_players,
     assert optimize_transfer_plan(*args, chips=rights, incumbent_plan=result).has_solution
 
 
+@pytest.mark.parametrize(("forced_week", "lengths"), [(2, (1, 2)), (2, (1, 1, 1)), (3, (1, 1, 1))])
+def test_renewed_freehit_reserves_only_the_week_before_forced_use(
+    known_optimum_players, small_config, monkeypatch, forced_week, lengths
+):
+    horizon, initial, config = problem(known_optimum_players, small_config)
+    table = horizon.table.loc[
+        horizon.table.player_id.isin((*initial.squad_player_ids, "FWD_B"))
+    ].copy()
+    table.loc[table.player_id.eq("FWD_B"), "expected_points"] = 0
+    table.loc[table.player_id.eq("FWD_B") & table.gameweek.eq(1), "expected_points"] = 30
+    horizon = PlanningHorizon(table)
+    initial = replace(initial, free_transfers=0)
+    rights = ChipAvailability(
+        {"freehit": frozenset({1, 2, 3})},
+        {forced_week: "freehit"},
+        {"freehit": (ChipUseWindow(frozenset({1})), ChipUseWindow(frozenset({2, 3})))},
+    )
+    actual = module.optimize_transfer_plan
+    parts = []
+    budgets = []
+
+    def recorded(part_horizon, state, part_config, *args, **kwargs):
+        budgets.append(part_config.solver_deterministic_time_limit)
+        part = actual(part_horizon, state, part_config, *args, **kwargs)
+        parts.append(part)
+        return part
+
+    monkeypatch.setattr(module, "optimize_transfer_plan", recorded)
+    result = plan_in_segments(horizon, initial, config, segment_lengths=lengths, chips=rights)
+    # FH in GW1 saves a strictly positive hit on the temporary high-scoring move.
+    # Only the adjacent forced renewal makes that earlier use illegal.
+    assert "FWD_B" in set(result.weeks[0].selected_squad.player_id)
+    if forced_week == 2:
+        assert dict(result.chips_played) == {2: "freehit"}
+        assert result.weeks[0].paid_transfer_count == 1
+    else:
+        assert dict(result.chips_played) == {1: "freehit", 3: "freehit"}
+        assert result.weeks[0].paid_transfer_count == 0
+    assert tuple(w.gameweek for w in result.weeks) == (1, 2, 3)
+    assert result.diagnostics["proof_scope"] == "segmented_feasible_only"
+    assert sum(budgets) == pytest.approx(config.solver_deterministic_time_limit)
+    assert result.diagnostics["deterministic_time_used"] == pytest.approx(
+        sum(part.diagnostics["deterministic_time_used"] for part in parts)
+    )
+    assert result.diagnostics["deterministic_time_used"] <= 5.005
+    # Full-horizon certification independently checks the original dated rights,
+    # adjacency, restored permanent holdings, bank and free-transfer transitions.
+    checked = optimize_transfer_plan(
+        horizon, initial, config, chips=rights, incumbent_plan=result, protect_incumbent=True
+    )
+    assert checked.has_solution
+    assert checked.diagnostics["incumbent_hint"]["claimed_objective_used"] is False
+    assert checked.diagnostics["deterministic_time_used"] <= 5.005
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "3xc", "bboost"])
+def test_other_renewed_chips_keep_the_date_before_their_forced_use(chip):
+    rights = ChipAvailability(
+        {chip: frozenset({1, 2, 3}), "freehit": frozenset({1})},
+        {2: chip},
+        {
+            chip: (ChipUseWindow(frozenset({1})), ChipUseWindow(frozenset({2, 3}))),
+            "freehit": (ChipUseWindow(frozenset({1})),),
+        },
+    )
+    limited = module._segment_rights(rights, 1)
+    assert limited.available == rights.available
+    assert limited.use_windows == rights.use_windows
+    assert limited.forced == rights.forced
+
+
+def test_consecutive_forced_freehits_are_not_silently_unforced():
+    rights = ChipAvailability(
+        {"freehit": frozenset({1, 2, 3})},
+        {1: "freehit", 2: "freehit"},
+        {"freehit": (ChipUseWindow(frozenset({1})), ChipUseWindow(frozenset({2, 3})))},
+    )
+    with pytest.raises(TransferPlanningValidationError, match=r"Forced chip.*gameweek 1"):
+        module._segment_rights(rights, 1)
+    assert dict(rights.forced) == {1: "freehit", 2: "freehit"}
+
+
 def test_preferences_and_integer_ids_survive_every_segment(known_optimum_players, small_config):
     horizon, initial, config = problem(known_optimum_players, small_config, 5)
     ids = {player: index + 1 for index, player in enumerate(horizon.table.player_id.unique())}
