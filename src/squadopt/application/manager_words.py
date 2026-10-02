@@ -310,6 +310,8 @@ _SPACE: Final = " \t"
 _MARKS: Final = "\"'\u201c\u201d\u2018\u2019()[]"
 _SENTENCE_END: Final = ".!?"
 _BOUNDARY: Final = _SENTENCE_END + "\n\r"
+#: What may close the quoted statement itself: a period, an exclamation mark or a line end.
+_STATEMENT_END: Final = ".!\n\r"
 
 
 def _is_whole_sentence(text: bytes, first: int, last: int) -> bool:
@@ -324,9 +326,17 @@ def _is_whole_sentence(text: bytes, first: int, last: int) -> bool:
 
     So a statement can bind only where the source's own text bounds it: what comes before
     it is the start of the text, a line break, or the end of a sentence, and what comes
-    after it is the end of the text, a line break, or sentence punctuation. Anything else,
-    including an attribution such as "Arteta said", leaves the words readable and without
-    authority. That refuses some true statements. It never turns a sentence into its part.
+    after it is the end of the text, a line break, or the end of a sentence. A question
+    mark is not the end of a statement, and an ellipsis is not the end of anything. Anything
+    else, including an attribution such as "Arteta said", leaves the words readable and
+    without authority. That refuses some true statements. It never turns a sentence into
+    its part.
+
+    A line break counts as a boundary because the readable text puts a headline, a dateline
+    and each paragraph on a line of its own, and most pages open their first sentence after
+    one. It also stands for a ``<br>`` inside a sentence, which this rule cannot tell from
+    a paragraph end; the same goes for a period that ends an abbreviation. Those two are
+    the limit of a rule that reads punctuation and not grammar.
     """
 
     try:
@@ -338,10 +348,18 @@ def _is_whole_sentence(text: bytes, first: int, last: int) -> bool:
     lead = before.rstrip(_SPACE).rstrip(_MARKS).rstrip(_SPACE)
     if lead and lead[-1] not in _BOUNDARY:
         return False
-    if quoted.strip().rstrip(_MARKS).endswith(tuple(_SENTENCE_END)):
-        return True
     rest = after.lstrip(_SPACE).lstrip(_MARKS).lstrip(_SPACE)
-    return not rest or rest[0] in _BOUNDARY
+    if rest.startswith((".", "\u2026")):
+        # "... if he fails a late test": the sentence goes on, whatever the quote ends with.
+        return False
+    core = quoted.strip().rstrip(_MARKS)
+    if core.endswith(("..", "\u2026")):
+        return False
+    if core.endswith((".", "!")):
+        return True
+    if core.endswith("?") or rest.startswith("?"):
+        return False
+    return not rest or rest[0] in _STATEMENT_END
 
 
 def _covered(table: pd.DataFrame, table_path: Path) -> tuple[str, ...]:

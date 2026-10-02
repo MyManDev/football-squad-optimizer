@@ -151,6 +151,10 @@ ABSENCE = "Saka will miss the next Premier League match."
         (f"{ABSENCE[:-1]} if he fails a late test.", ABSENCE[:-1]),
         (f"{ABSENCE[:-1]}, according to one report the club rejects.", ABSENCE[:-1]),
         (f"Arteta said {ABSENCE}", ABSENCE),
+        # A question is not a statement, whichever side of the quote its mark falls.
+        (f"{ABSENCE[:-1]}? Not at all, said Arteta.", ABSENCE[:-1]),
+        # An ellipsis is not the end of anything.
+        (f"{ABSENCE[:-1]}... if he fails a late test.", ABSENCE[:-1]),
     ],
 )
 def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body, quote):
@@ -204,6 +208,13 @@ def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, bo
         ("Saka is out, they say.", "Saka is out", False),
         ("Saka is out for now", "Saka is out", False),
         ("Saka is outstanding.", "Saka is out", False),
+        ("Saka is out? No.", "Saka is out", False),
+        ("Saka is out?", "Saka is out?", False),
+        ("Saka is out... for now.", "Saka is out...", False),
+        ("Saka is out... for now.", "Saka is out", False),
+        ("Saka is out\u2026 for now.", "Saka is out", False),
+        ("Saka is out!", "Saka is out!", True),
+        ("Is he fit? Saka is out.", "Saka is out.", True),
         ("“Saka is out.”", "Saka is out.", True),
         ("(Saka is out)", "Saka is out", True),
     ],

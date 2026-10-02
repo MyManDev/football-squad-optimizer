@@ -134,6 +134,11 @@ class AdviceSwitchInputs:
             "participation": FOOTBALL_PARTICIPATION_VERSION,
             "ready_bundle": self.football_bundle_sha256,
         }
+        if self.rotation_table_sha256 is not None:
+            # The same news read under a different rule is different information: a plan
+            # shown under the old rule must be told it is stale. Only where news is bound,
+            # so a revision with no news does not move.
+            identity["news_rule"] = MANAGERS_WORD_RULE_VERSION
         revision = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         return {
             "version": "football_decision_information_v1",

@@ -256,6 +256,25 @@ def test_football_cache_identity_names_the_news_rule_only_where_news_is_bound():
     assert "news_rule_version" not in switch_identity(unbound, model="football")["model"]
 
 
+def test_decision_information_revision_follows_the_news_rule_only_where_news_is_bound(
+    monkeypatch,
+):
+    """A plan shown under the old rule must be told it is stale by the information revision."""
+
+    from squadopt.platform import advice_switches
+
+    forecast, _, words = _world()
+    bound = AdviceSwitchInputs(football=forecast, manager_words=words, rotation_table_sha256="a")
+    unbound = AdviceSwitchInputs(football=forecast)
+    before_bound = bound.decision_information("snap")["revision"]
+    before_unbound = unbound.decision_information("snap")["revision"]
+
+    monkeypatch.setattr(advice_switches, "MANAGERS_WORD_RULE_VERSION", "managers_word_rule_v99")
+
+    assert bound.decision_information("snap")["revision"] != before_bound
+    assert unbound.decision_information("snap")["revision"] == before_unbound
+
+
 @pytest.mark.parametrize("disposition", ["stated_expected_absent", "stated_full_match_unavailable"])
 def test_new_producer_scopes_manager_override_to_its_week_before_model_prediction(
     monkeypatch, disposition

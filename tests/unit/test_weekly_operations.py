@@ -329,10 +329,50 @@ def test_rotation_export_is_capture_pinned_and_existing_pair_is_validated(
     result = operation._rotation()
     assert checked == [(table, manifest)]
     assert result.value["table"] == str(table)
+    assert result.value["responses_refused"] == []
     assert len(calls) == (0 if existing else 1)
     if calls:
         assert calls[0].snapshot == operation.request.snapshot_id
         assert calls[0].deadline_utc == "2026-08-28T17:30:00Z"
+
+
+def test_an_answer_the_export_refused_is_kept_in_the_stage_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The manifest cannot say why a club is not covered; the run's receipt does."""
+
+    operation = world(tmp_path)
+    operation.run.directory.mkdir(parents=True)
+    operation.values["capture"] = {
+        "snapshot_id": operation.request.snapshot_id,
+        "deadline_utc": "2026-08-28T17:30:00Z",
+    }
+    table, manifest = rotation_artifact(
+        operation.paths.rotation, "2026-27", 2, operation.request.snapshot_id or ""
+    )
+    refusal = {"clubs": ["Arsenal"], "reason": "Saka is coded twice in one response."}
+
+    def export(request, *, repository_commit):
+        table.parent.mkdir(parents=True, exist_ok=True)
+        table.write_text("table")
+        manifest.write_text("manifest")
+        return {"responses_refused": [refusal]}
+
+    monkeypatch.setattr(weekly, "rotation_pair_is_readable", lambda *args: False)
+    monkeypatch.setattr(weekly, "export_rotation_evidence", export)
+    monkeypatch.setattr(weekly, "read_rotation_evidence_artifact", lambda *args: None)
+    logged: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        operation.log, "event", lambda name, **fields: logged.append((name, fields))
+    )
+
+    result = operation._rotation()
+
+    assert result.value["responses_refused"] == [refusal]
+    assert (
+        "tick.week.rotation.answer_refused",
+        {"clubs": ["Arsenal"], "reason": refusal["reason"]},
+    ) in logged
 
 
 def test_a_named_capture_reaches_the_export_from_the_stage_that_runs_it(
