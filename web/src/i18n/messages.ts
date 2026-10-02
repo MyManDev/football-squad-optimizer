@@ -559,8 +559,7 @@ const en = {
     deviceRefused: "This device did not prove a plan for this selection.",
     deviceFailed: "The computation on this device did not run.",
     deviceUnpublished: "This publish carries no inputs for a solve on a device.",
-    deviceOtherCapture:
-      "The published inputs on this device are from another data capture than this page.",
+    deviceOtherCapture: "The published inputs are from another data capture than this page.",
     computeRivalNearest: "Nearest above in the standings",
     computeButton: "Compute",
     computeRequesting: "Sending the request…",
@@ -1681,8 +1680,7 @@ const tr: MessageSchema<typeof en> = {
     deviceRefused: "Bu cihaz bu seçim için bir plan kanıtlayamadı.",
     deviceFailed: "Bu cihazdaki hesap çalışmadı.",
     deviceUnpublished: "Bu yayında cihazda hesap için girdi yok.",
-    deviceOtherCapture:
-      "Bu cihazdaki yayımlanmış girdiler bu sayfadakinden farklı bir veri kaydından.",
+    deviceOtherCapture: "Yayımlanmış girdiler bu sayfadakinden farklı bir veri kaydından.",
     computeRivalNearest: "Sıralamada hemen üstündeki",
     computeButton: "Hesapla",
     computeRequesting: "İstek gönderiliyor…",

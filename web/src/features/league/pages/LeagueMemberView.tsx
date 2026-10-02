@@ -184,7 +184,7 @@ function LeagueMemberContent({
     .filter(Boolean)
     .join(" · ");
   const echo =
-    device.state.phase === "done"
+    shown?.source === "device"
       ? copy.computeEcho(copy.computeEchoStates.device)
       : computeEcho(copy, job.state);
   const dateTime = (iso: string) =>

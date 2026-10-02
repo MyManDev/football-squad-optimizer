@@ -10,6 +10,10 @@
  * The job itself belongs to the page: the panel asks for a computation and reports its
  * state, and the page hands the finished answer to the advice card beside it.
  *
+ * Beside it, where the publisher wrote the member's inputs, a second button asks the
+ * member's own device for the plain one-week plan (`device`); its states are the same
+ * kind of sentence, and the two buttons wait for each other, one answer at a time.
+ *
  * A build with no compute service renders exactly what it always has. With one, the page
  * passes `service`: what may be computed is then the capabilities' word (`computable`),
  * a selection nobody published says so and offers the computation with about how long it
@@ -148,7 +152,12 @@ export function AdviceRequestPanel({
             type="button"
             className={styles.compute}
             data-device-compute
-            disabled={device.state.phase === "loading" || device.state.phase === "solving"}
+            disabled={
+              device.state.phase === "loading" ||
+              device.state.phase === "solving" ||
+              state.phase === "requesting" ||
+              state.phase === "waiting"
+            }
             onClick={device.run}
           >
             {copy.deviceButton}

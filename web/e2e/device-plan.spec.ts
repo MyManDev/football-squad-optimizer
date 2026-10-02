@@ -44,6 +44,13 @@ test("a member's plan is solved on the device and drawn as a computation result"
     }),
   );
   const wasm: string[] = [];
+  // Every request made from the press onward; the page's own opening read of the
+  // service's capabilities (mocked and refused by the league mocks) is before it.
+  const requested: string[] = [];
+  let pressed = false;
+  page.on("request", (request) => {
+    if (pressed) requested.push(request.url());
+  });
   page.on("response", (response) => {
     if (response.url().endsWith(".wasm")) wasm.push(`${response.status()} ${response.url()}`);
   });
@@ -51,6 +58,7 @@ test("a member's plan is solved on the device and drawn as a computation result"
   await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1`);
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
+  pressed = true;
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("Hesap sonucu")).toBeVisible();
@@ -60,7 +68,8 @@ test("a member's plan is solved on the device and drawn as a computation result"
     await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();
   }
   expect(wasm.some((line) => line.startsWith("200 ") && line.includes("/assets/"))).toBe(true);
-  // Nothing left the site: no request to any other origin.
-  const foreign = wasm.filter((line) => !line.includes("127.0.0.1:4173"));
+  // Nothing left the site: from the press on, every request went to the site's own origin.
+  expect(requested.length).toBeGreaterThan(0);
+  const foreign = requested.filter((url) => !url.startsWith("http://127.0.0.1:4173/"));
   expect(foreign).toEqual([]);
 });

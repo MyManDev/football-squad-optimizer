@@ -60,12 +60,15 @@ const REQUEST: AdviceRequest = {
 /** The worker, answered in process with the real solver. */
 class InProcessSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
   terminated = false;
   private readonly answer?: (request: DevicePlanRequest) => DevicePlanReply;
   constructor(answer?: (request: DevicePlanRequest) => DevicePlanReply) {
     this.answer = answer;
   }
   postMessage(request: DevicePlanRequest): void {
+    // As the worker does: ready once the solver is loaded, then the answer.
+    const ready: DevicePlanReply = { id: request.id, kind: "ready" };
     const reply: DevicePlanReply = this.answer
       ? this.answer(request)
       : {
@@ -73,7 +76,10 @@ class InProcessSolver implements DeviceSolver {
           kind: "answer",
           answer: solvePlan(highs, request.document, request.entry, () => 0),
         };
-    queueMicrotask(() => this.onmessage?.({ data: reply } as MessageEvent<DevicePlanReply>));
+    queueMicrotask(() => {
+      this.onmessage?.({ data: ready } as MessageEvent<DevicePlanReply>);
+      this.onmessage?.({ data: reply } as MessageEvent<DevicePlanReply>);
+    });
   }
   terminate(): void {
     this.terminated = true;
@@ -288,6 +294,76 @@ describe("a solve on the device", () => {
     await act(async () => screen.getByText("run").click());
 
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+  });
+
+  it("answers a worker that cannot load as a failure and makes a fresh one next time", async () => {
+    class Dead implements DeviceSolver {
+      onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      terminated = false;
+      postMessage(): void {
+        queueMicrotask(() => this.onerror?.({ message: "script failed" }));
+      }
+      terminate(): void {
+        this.terminated = true;
+      }
+    }
+    const made: Dead[] = [];
+    function Page() {
+      const device = useDevicePlan(squadWith(entry), REQUEST, {
+        loadDocument: async () => envelope(document),
+        createSolver: () => {
+          const next = new Dead();
+          made.push(next);
+          return next;
+        },
+      });
+      return (
+        <div>
+          <output data-testid="phase">{device.state.phase}</output>
+          <button type="button" onClick={device.run}>
+            run
+          </button>
+        </div>
+      );
+    }
+    render(<Page />);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(made).toHaveLength(1);
+    expect(made[0]!.terminated).toBe(true);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(made).toHaveLength(2);
+  });
+
+  it("drops a run that reset interrupts while its inputs are still loading", async () => {
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    render(
+      <Harness
+        squad={squadWith(entry)}
+        request={REQUEST}
+        loadDocument={async () => {
+          await gate;
+          return envelope(document);
+        }}
+        solver={new InProcessSolver()}
+        onState={() => {}}
+      />,
+    );
+    await act(async () => screen.getByText("run").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    await act(async () => screen.getByText("reset").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    await act(async () => {
+      release!();
+      await gate;
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
   });
 
   it("is dropped by a new selection and by reset, and a late reply for the old one is ignored", async () => {

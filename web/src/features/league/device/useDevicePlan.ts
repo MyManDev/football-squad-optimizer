@@ -39,6 +39,8 @@ export interface DevicePlan {
 export interface DeviceSolver {
   postMessage(request: DevicePlanRequest): void;
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null;
+  /** A worker that could not load or evaluate reports here; the page treats it as failed. */
+  onerror?: ((event: unknown) => void) | null;
   terminate(): void;
 }
 
@@ -91,6 +93,7 @@ export function useDevicePlan(
   const solver = useRef<DeviceSolver | null>(null);
   const generation = useRef(0);
   const requestKey = JSON.stringify([
+    squad.source_snapshot_id,
     request.leagueId,
     request.entryId,
     request.season ?? null,
@@ -146,12 +149,29 @@ export function useDevicePlan(
         setState({ phase: "other-capture" });
         return;
       }
-      setState({ phase: "solving" });
-      solver.current ??= createSolver();
-      const worker = solver.current;
+      // A worker that cannot be created, load or evaluate answers as a failure, and the
+      // next press creates a fresh one rather than reusing a dead worker.
+      let worker: DeviceSolver;
+      try {
+        solver.current ??= createSolver();
+        worker = solver.current;
+      } catch {
+        setState({ phase: "failed" });
+        return;
+      }
       const reply = await new Promise<DevicePlanReply | null>((resolve) => {
         worker.onmessage = (event) => {
-          if (event.data.id === run) resolve(event.data);
+          if (event.data.id !== run) return;
+          if (event.data.kind === "ready") {
+            if (alive()) setState({ phase: "solving" });
+            return;
+          }
+          resolve(event.data);
+        };
+        worker.onerror = () => {
+          solver.current?.terminate();
+          solver.current = null;
+          resolve(null);
         };
         try {
           worker.postMessage({ id: run, document, entry });
@@ -160,28 +180,19 @@ export function useDevicePlan(
         }
       });
       if (!alive()) return;
-      if (reply === null || reply.kind === "failed") {
+      if (reply === null || reply.kind === "failed" || reply.kind === "ready") {
         setState({ phase: "failed" });
       } else if (reply.kind === "refused") {
         setState({ phase: "refused", status: reply.status });
       } else {
         setState({
           phase: "done",
-          envelope: deviceAdviceEnvelope(document, squad.entry.entry_id, reply.answer, now()),
+          envelope: deviceAdviceEnvelope(document, squad, reply.answer, now()),
           seconds: reply.answer.seconds,
         });
       }
     })();
-  }, [
-    available,
-    entry,
-    loadDocument,
-    createSolver,
-    now,
-    setState,
-    squad.source_snapshot_id,
-    squad.entry.entry_id,
-  ]);
+  }, [available, entry, loadDocument, createSolver, now, setState, squad]);
 
   return { available, state, run, reset };
 }

@@ -5,7 +5,7 @@
  * documents do not say.
  */
 
-import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
+import type { AdvicePlayer, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanPlayer } from "./types";
 
 export const DEVICE_SOLVER = "highs-wasm";
@@ -31,10 +31,14 @@ function advicePlayer(player: DevicePlanPlayer): AdvicePlayer {
  */
 export function deviceAdviceEnvelope(
   document: DevicePlanDocument,
-  entryId: number,
+  squad: Pick<EntrySquad, "entry" | "free_transfers_known" | "purchase_prices_known">,
   answer: DevicePlanAnswer,
   generatedAt: Date,
 ): LeagueViewEnvelope<EntryAdvice> {
+  // As the advice derives them: a count or a price the source did not state is named.
+  const missing: string[] = [];
+  if (!squad.free_transfers_known) missing.push("free_transfers");
+  if (!squad.purchase_prices_known) missing.push("purchase_prices");
   const byId = new Map(document.players.map((player) => [player.id, player]));
   const player = (id: number | null): AdvicePlayer | null => {
     const row = id === null ? undefined : byId.get(id);
@@ -45,7 +49,7 @@ export function deviceAdviceEnvelope(
     league_id: document.league_id,
     season: document.season,
     gameweek,
-    entry_id: entryId,
+    entry_id: squad.entry.entry_id,
     mode: "saf-puan",
     window: 1,
     source_snapshot_id: document.source_snapshot_id,
@@ -68,9 +72,8 @@ export function deviceAdviceEnvelope(
     chip: null,
     solver_status: "OPTIMAL",
     optimality_gap: 0,
-    plan_kind: answer.transfer_hit_points > 0 ? "with_hits" : "within_free_transfers",
-    data_quality: "complete",
-    missing_fields: [],
+    data_quality: missing.length ? "partial" : "complete",
+    missing_fields: missing,
   };
   return {
     contract_version: "provisional_league_ui_v1",

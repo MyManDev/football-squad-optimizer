@@ -5,7 +5,7 @@
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useSearchParams } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import fixture from "../../../fixtures/device-plan/instances.json";
@@ -79,8 +79,33 @@ class CannedSolver implements DeviceSolver {
         seconds: 0.42,
       },
     };
-    queueMicrotask(() => this.onmessage?.({ data: reply } as MessageEvent<DevicePlanReply>));
+    queueMicrotask(() => {
+      this.onmessage?.({
+        data: { id: request.id, kind: "ready" },
+      } as MessageEvent<DevicePlanReply>);
+      this.onmessage?.({ data: reply } as MessageEvent<DevicePlanReply>);
+    });
   }
+}
+
+/** Moves the selection to a three-week window and back, through the URL as the page does. */
+function SwitchWindow() {
+  const [params, setParams] = useSearchParams();
+  const to = (window: string) => {
+    const next = new URLSearchParams(params);
+    next.set("window", window);
+    setParams(next);
+  };
+  return (
+    <>
+      <button type="button" onClick={() => to("3")}>
+        to-3
+      </button>
+      <button type="button" onClick={() => to("1")}>
+        to-1
+      </button>
+    </>
+  );
 }
 
 class ServiceClient implements AdviceClient {
@@ -103,6 +128,7 @@ function renderView(squad: LeagueViewEnvelope<EntrySquad>, search = "mode=saf-pu
   return render(
     <LanguageProvider initialLanguage="tr">
       <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
+        <SwitchWindow />
         <LeagueMemberView
           squad={squad}
           advice={null}
@@ -155,6 +181,19 @@ describe("the device solve on the member page", () => {
       expect(container).toHaveTextContent(names.get(move.in!)!);
     }
     expect(container).not.toHaveTextContent("%");
+  });
+
+  it("is dropped by a new selection and does not come back with the old one", async () => {
+    const { container } = renderView(squadWith(entryBlock));
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await act(async () => screen.getByText("to-3").click());
+    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
+    expect(deviceButton()).toBeNull();
+    await act(async () => screen.getByText("to-1").click());
+    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
+    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    expect(deviceButton()).not.toBeNull();
   });
 
   it("gives way to the service's answer, and takes the page back when asked again", async () => {

@@ -211,11 +211,17 @@ export class DevicePlanRefused extends Error {
  */
 export function solvePlan(
   solver: LpSolver,
-  document: DevicePlanDocument,
+  published: DevicePlanDocument,
   entry: DevicePlanEntry,
   now: () => number = () => performance.now(),
 ): DevicePlanAnswer {
   const started = now();
+  // The planner sorts its table by id before it solves and ranks ties in that order;
+  // the device does the same whatever order the document arrived in.
+  const document: DevicePlanDocument = {
+    ...published,
+    players: [...published.players].sort((a, b) => a.id - b.id),
+  };
   const first = solver.solve(buildLp(document, entry), EXACT);
   if (first.Status !== "Optimal") throw new DevicePlanRefused(first.Status, "plan");
   const primaryValue = Math.round(first.ObjectiveValue);
@@ -381,7 +387,10 @@ export function viceCaptain(
 
 /**
  * The bench in the order the game walks it: the goalkeeper first, then outfield by
- * descending expected points, the document's order on a tie.
+ * descending expected points, the document's order on a tie. The server's shared bench
+ * rule orders by points per appearance chance where every row carries one and falls
+ * back to points otherwise; the one-week member path's table carries no chance, so the
+ * fallback is what the server publishes for this plan.
  */
 export function orderedBench(
   document: DevicePlanDocument,

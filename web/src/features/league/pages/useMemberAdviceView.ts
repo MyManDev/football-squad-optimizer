@@ -95,10 +95,12 @@ export function useMemberAdviceView(
   useEffect(() => {
     resumable.current = request;
   });
+  const { reset: resetDevice, run: runOnDevice } = deviceJob;
   useEffect(() => {
     reset();
+    resetDevice();
     if (computeAvailable) resume?.(resumable.current);
-  }, [requestKey, computeAvailable, reset, resume]);
+  }, [requestKey, computeAvailable, reset, resetDevice, resume]);
   useEffect(() => {
     if (readOnOpen) readCached?.(resumable.current);
   }, [requestKey, readOnOpen, readCached]);
@@ -202,7 +204,6 @@ export function useMemberAdviceView(
   // One answer at a time: asking the service drops the device's answer, and asking the
   // device drops the service's, so what the card shows is what was asked for last.
   const { reset: resetJob, compute: computeOnService } = job;
-  const { reset: resetDevice, run: runOnDevice } = deviceJob;
   const runOnDeviceAndDropJob = useCallback(() => {
     resetJob();
     runOnDevice();

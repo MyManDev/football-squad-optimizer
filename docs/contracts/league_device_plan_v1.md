@@ -39,6 +39,11 @@ solves. The order is part of the contract: the server breaks ties between equal 
 rank in that order, and a device that reorders the table resolves the same tie
 differently.
 
+The bench is ordered by the goalkeeper first and then by descending expected points, the
+document's order on a tie. That is what the server publishes for this plan: the one-week
+member path's planning table carries no appearance chance, so the shared bench rule's
+expected-points fallback is the rule in force, and the device restates that fallback.
+
 Two things the device model takes as given: a player not held has no sale price (the
 planner fills the buy price, which a one-week answer never uses, since a player not held
 cannot be sold), and no per-week transfer cap applies under the member policy.

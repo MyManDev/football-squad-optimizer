@@ -18,14 +18,21 @@ export interface DevicePlanRequest {
 }
 
 export type DevicePlanReply =
+  | { id: number; kind: "ready" }
   | { id: number; kind: "answer"; answer: DevicePlanAnswer }
   | { id: number; kind: "refused"; status: string; stage: string }
   | { id: number; kind: "failed" };
 
 let solver: Promise<LpSolver> | null = null;
 
+/** The solver, loaded once; a load that failed is tried again on the next request. */
 function highs(): Promise<LpSolver> {
-  solver ??= loadHighs({ locateFile: () => wasmUrl }) as unknown as Promise<LpSolver>;
+  solver ??= (loadHighs({ locateFile: () => wasmUrl }) as unknown as Promise<LpSolver>).catch(
+    (error: unknown) => {
+      solver = null;
+      throw error;
+    },
+  );
   return solver;
 }
 
@@ -33,7 +40,10 @@ self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
   const { id, document, entry } = event.data;
   let reply: DevicePlanReply;
   try {
-    reply = { id, kind: "answer", answer: solvePlan(await highs(), document, entry) };
+    const loaded = await highs();
+    // The page shows the solver as loading until here, and as computing from here.
+    self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
+    reply = { id, kind: "answer", answer: solvePlan(loaded, document, entry) };
   } catch (error) {
     reply =
       error instanceof DevicePlanRefused
