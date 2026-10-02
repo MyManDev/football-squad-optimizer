@@ -104,6 +104,12 @@ HOLD_PROBE_UNITS = 1.0
 #: The model name ``build_football_horizon`` gives a football horizon; ``plan_transfer_horizon``
 #: routes and finances a three- or five-week window by it (rule 12).
 FOOTBALL_HORIZON_MODEL = "fixture_football_candidate"
+#: Rule 6: the served model versions a week may carry, each only as the reader at the frozen
+#: commit accepts it. A week records its own version and the two are never relabelled.
+ADMITTED_MODEL_VERSIONS: tuple[str, ...] = (
+    FOOTBALL_MODEL_VERSION,
+    "football_joint_role_minutes_v1",
+)
 #: The configuration measure_shortlist_matrix.py builds its squads under (rule 9).
 SQUAD_CONFIG = OptimizationConfig(
     bench_weight=0, solver_time_limit_seconds=120, solver_deterministic_time_limit=60
@@ -382,7 +388,7 @@ def week_inputs(
     except (ValueError, KeyError, TypeError, DataError):
         reason = "artifact_unreadable_or_unbound"
         return reason, {**receipt, "reason": reason}
-    if forecast.horizon.model_version != FOOTBALL_MODEL_VERSION:
+    if forecast.horizon.model_version not in ADMITTED_MODEL_VERSIONS:
         reason = "artifact_of_another_model_version"
         return reason, {
             **receipt,

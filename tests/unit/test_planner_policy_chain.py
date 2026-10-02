@@ -307,10 +307,40 @@ def test_a_forecast_of_another_model_version_is_a_missing_week(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     snapshots, artifacts, snapshot_id = _served(tmp_path)
-    monkeypatch.setattr(chain, "FOOTBALL_MODEL_VERSION", "football_contextual_v3")
+    monkeypatch.setattr(chain, "ADMITTED_MODEL_VERSIONS", ("football_contextual_v3",))
     reason, receipt = chain.week_inputs(snapshots, artifacts, snapshot_id)  # type: ignore[misc]
     assert reason == "artifact_of_another_model_version"
     assert receipt["model_version"] == FOOTBALL_MODEL_VERSION
+
+
+def test_the_admitted_versions_are_the_protocols_and_each_week_keeps_its_own(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 6: a week of the joint model is accepted under its own name, never relabelled.
+
+    The reader at this commit accepts only `football_team_share_v1`; the joint model's own
+    reader joins the frozen commit when it lands, with its acceptance case beside this one.
+    """
+
+    assert chain.ADMITTED_MODEL_VERSIONS == (
+        FOOTBALL_MODEL_VERSION,
+        "football_joint_role_minutes_v1",
+    )
+    for version in chain.ADMITTED_MODEL_VERSIONS:
+        assert f"`{version}`" in PROTOCOL_TEXT
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+    read = chain.read_football_forecast
+
+    def joint(path: Path, inputs: object) -> object:
+        forecast = read(path, inputs)  # type: ignore[arg-type]
+        horizon = replace(forecast.horizon, model_version="football_joint_role_minutes_v1")
+        return replace(forecast, horizon=horizon)
+
+    monkeypatch.setattr(chain, "read_football_forecast", joint)
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id)
+    assert isinstance(week, chain.WeekInputs)
+    assert week.receipt["model_version"] == "football_joint_role_minutes_v1"
+    assert week.receipt["reason"] is None
 
 
 def test_a_forecast_that_changed_while_it_was_read_is_a_missing_week(
