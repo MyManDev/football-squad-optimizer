@@ -411,6 +411,8 @@ section.notice p {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The squad, and on a tablet the fixtures beside it where the column has room for both
@@ -776,6 +778,7 @@ section.notice p {
   margin: 0;
   padding-left: 1.2rem;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .back {

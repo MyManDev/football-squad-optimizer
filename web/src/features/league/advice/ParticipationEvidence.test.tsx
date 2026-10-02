@@ -107,6 +107,57 @@ it.each(["tr", "en"] as const)(
 );
 
 it.each(["tr", "en"] as const)(
+  "says which of three things left nothing applied in %s",
+  (language) => {
+    const base = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
+    const states = [
+      // Statements read, all turned away.
+      {
+        counts: { manager_statement_count: 3, unapplied_statement_count: 3 },
+        text:
+          language === "tr"
+            ? "Okunan açıklamaların hiçbiri gerekli koşulları sağlamadı; tahmin değişmedi."
+            : "None of the statements read met the requirements; the forecast is unchanged.",
+      },
+      // Statements read, some not turned away, and still none reached a player.
+      {
+        counts: { manager_statement_count: 3, unapplied_statement_count: 1 },
+        text:
+          language === "tr"
+            ? "Bu tahmine uygulanmış hoca açıklaması yok."
+            : "No coach statement was applied to this forecast.",
+      },
+      // Nothing read.
+      {
+        counts: { manager_statement_count: 0, unapplied_statement_count: 0 },
+        text:
+          language === "tr"
+            ? "Bu hafta değerlendirilecek hoca açıklaması okunmadı."
+            : "No coach statement was read for this week.",
+      },
+    ];
+    const sentences = states.map((state) => state.text);
+    for (const state of states) {
+      const view = {
+        ...base,
+        participation_evidence: { ...evidence, applied_player_count: 0, ...state.counts },
+      };
+      const { unmount } = render(
+        <LanguageProvider initialLanguage={language}>
+          <ParticipationEvidence view={view} />
+        </LanguageProvider>,
+      );
+      const detail = screen.getByTestId("participation-evidence");
+      expect(detail).toHaveTextContent(state.text);
+      for (const other of sentences.filter((sentence) => sentence !== state.text)) {
+        expect(detail).not.toHaveTextContent(other);
+      }
+      unmount();
+    }
+  },
+);
+
+it.each(["tr", "en"] as const)(
   "separates source availability records from no applied coach news and names the evidence context in %s",
   (language) => {
     const view = {
@@ -133,10 +184,11 @@ it.each(["tr", "en"] as const)(
     expect(detail).toHaveTextContent(
       language === "tr" ? "Değerlendirilen hoca açıklaması: 0" : "Coach statements considered: 0",
     );
+    // No statement was read at all: the page says that, not that none was applied.
     expect(detail).toHaveTextContent(
       language === "tr"
-        ? "Bu tahmine uygulanmış hoca açıklaması yok."
-        : "No coach statement was applied to this forecast.",
+        ? "Bu hafta değerlendirilecek hoca açıklaması okunmadı."
+        : "No coach statement was read for this week.",
     );
     expect(detail.querySelector("time")).toHaveAttribute("datetime", evidence.as_of);
     expect(detail.querySelector("time")).toHaveTextContent("UTC");

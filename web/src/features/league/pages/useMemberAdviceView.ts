@@ -9,7 +9,14 @@ import {
   sameAdviceRequest,
   useAdviceJob,
   type AdviceJob,
+  type ComputePhase,
 } from "../advice/useAdviceJob";
+
+/** The same attempt, without the earlier answer it carried. */
+function withoutEarlier(state: ComputePhase): ComputePhase {
+  if (state.phase === "idle" || state.phase === "done") return state;
+  return { ...state, earlier: null };
+}
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { LeagueMemberViewProps, ShownAdvice } from "./memberPageTypes";
 
@@ -108,21 +115,36 @@ export function useMemberAdviceView(
   const plainOnly = selection.computable
     ? true
     : !evidenceOn && selection.top100.weight === 0 && selection.chip.chip === null;
-  const finished = plainOnly && current?.phase === "done" ? current : null;
+  // The answer this same selection already received stays on the page while a later
+  // attempt runs, and after one that fails or is refused: a second request that does not
+  // succeed is not a reason to take the first answer away.
+  const finished =
+    plainOnly && current?.phase === "done"
+      ? { envelope: current.envelope, source: current.source }
+      : null;
+  const earlier =
+    plainOnly && current && current.phase !== "done" ? (current.earlier ?? null) : null;
   const waiting = plainOnly && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
   // A computed answer is held to the squad on screen exactly as a published one is: a
   // plan solved from another capture is not shown beside this one's squad.
-  const computedSnapshot = finished?.envelope.payload.source_snapshot_id;
-  const computedElsewhere =
-    // Only a build with a compute service holds its answers to the capture; a static
-    // build has none to hold, and its injected clients answer as they always have.
-    (computeService !== "static" || selection.computable !== undefined) &&
-    finished != null &&
-    computedSnapshot != null &&
-    view.source_snapshot_id != null &&
-    computedSnapshot !== view.source_snapshot_id;
-  const computed = computedElsewhere ? null : finished;
+  // Only a build with a compute service holds its answers to the capture; a static
+  // build has none to hold, and its injected clients answer as they always have.
+  const heldToCapture = computeService !== "static" || selection.computable !== undefined;
+  const fromOtherCapture = (answer: { envelope: LeagueViewEnvelope<EntryAdvice> } | null) => {
+    const snapshot = answer?.envelope.payload.source_snapshot_id;
+    return (
+      heldToCapture &&
+      snapshot != null &&
+      view.source_snapshot_id != null &&
+      snapshot !== view.source_snapshot_id
+    );
+  };
+  const computedElsewhere = fromOtherCapture(finished);
+  // An earlier answer from another capture is dropped, not reported: the attempt that
+  // is running is what the panel describes.
+  const earlierKept = earlier !== null && !fromOtherCapture(earlier) ? earlier : null;
+  const computed = computedElsewhere ? null : (finished ?? earlierKept);
   let rejectedContext = false;
   let rejectedUnreadable = false;
   if (advice && selectionAvailable) {
@@ -165,10 +187,15 @@ export function useMemberAdviceView(
     }
   }
   rejectedContext = rejectedContext || computedElsewhere;
-  // The panel must not announce a plan the card refuses to show.
+  // The panel must not announce a plan the card refuses to show, and it must not carry
+  // an earlier selection's state for the one render before the reset lands.
   const panelJob: AdviceJob = computedElsewhere
     ? { ...job, state: { phase: "failed", request, reason: ANSWER_OTHER_CAPTURE } }
-    : job;
+    : job.state.phase !== "idle" && !sameAdviceRequest(job.state.request, request)
+      ? { ...job, state: { phase: "idle" } }
+      : earlier !== null && earlierKept === null
+        ? { ...job, state: withoutEarlier(job.state) }
+        : job;
   let shown: ShownAdvice | null = null;
   if (computed) {
     shown = {
