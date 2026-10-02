@@ -1,3 +1,4 @@
+import { isDecisionInformation, type DecisionInformation } from "./informationFacts";
 /**
  * What the compute service will answer right now: `league_capabilities_v1`, checked.
  *
@@ -26,6 +27,7 @@ export interface StrategyCapability {
 }
 
 export interface AdviceCapabilities {
+  decisionInformation?: DecisionInformation;
   leagueId: number;
   captureSnapshotId: string;
   season: string;
@@ -108,7 +110,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       const strategy = value.chips.strategy;
       if (
         !record(strategy) ||
-        strategy.version !== "model_opportunity_reservation_v1" ||
+        (strategy.version !== "model_opportunity_reservation_v1" &&
+          strategy.version !== "model_opportunity_reservation_v2") ||
         !Array.isArray(strategy.windows) ||
         !strategy.windows.every(isWindow)
       )
@@ -140,7 +143,15 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
     (!record(value.preferences) || typeof value.preferences.available !== "boolean")
   )
     throw new AdviceCapabilitiesError("Invalid preference capabilities.");
+  if (
+    value.decision_information !== undefined &&
+    !isDecisionInformation(value.decision_information)
+  )
+    throw new AdviceCapabilitiesError("Invalid decision information.");
   return {
+    ...(value.decision_information === undefined
+      ? {}
+      : { decisionInformation: value.decision_information as DecisionInformation }),
     ...(value.preferences === undefined
       ? {}
       : { preferences: record(value.preferences) && value.preferences.available === true }),

@@ -1,5 +1,7 @@
+import type { DecisionInformation, OfficialInformation } from "../advice/informationFacts";
 import type { PlayerView } from "../../../data/schema";
 import type { PlayMode, WindowSize } from "../../../lib/decisionVocabulary";
+import type { Top100Weight } from "../advice/top100";
 
 /**
  * The strategies the producer computes for a league member: the catalogue's computable
@@ -384,6 +386,43 @@ export interface EntryAdviceIndex {
  * it pays, the chip it plays, the free transfers around it and the planner's expected
  * points for that week's eleven (captain doubled, before hits).
  */
+export interface AdviceLineupExpectation {
+  version: "expected_lineup_v1";
+  expected_net_points: number;
+  starting_points: number;
+  autosub_points: number;
+  captain_bonus_points: number;
+  vice_bonus_points: number;
+  bench_boost_points: number;
+  assumptions: string[];
+}
+
+export interface AdviceParticipationEvidence {
+  version: "football_participation_evidence_v1";
+  statement_outcomes?: {
+    player_id: number;
+    disposition: string;
+    applied: boolean;
+    reason: string;
+    source_url: string | null;
+    source_published_at: string | null;
+  }[];
+  as_of: string | null;
+  gameweek: number | null;
+  applied_player_count: number;
+  unapplied_statement_count: number;
+  captured_percentage_count: number;
+  manager_statement_count: number;
+  assumptions: string[];
+}
+
+export interface AdviceLineup<Player = AdvicePlayer> {
+  starting_xi: Player[];
+  captain: Player;
+  vice_captain: Player;
+  bench: Player[];
+}
+
 export interface AdvicePlanWeek {
   gameweek: number;
   transfers_in: AdvicePlayer[];
@@ -393,6 +432,8 @@ export interface AdvicePlanWeek {
   free_transfers_before: number;
   free_transfers_after: number;
   expected_points: number;
+  lineup_expectation?: AdviceLineupExpectation;
+  lineup?: AdviceLineup;
 }
 
 export interface EntryAdvice {
@@ -473,10 +514,12 @@ export interface EntryAdvice {
   evidence?: AdviceEvidence;
   /** Present on a Top 100 weighted document only. */
   top100?: AdviceTop100;
+  /** Selection weight when no paired setting-zero cost or change was measured. */
+  selection_top100_weight?: Top100Weight;
   /** Present only on a document solved with a chip the member chose. */
   chip_choice?: AdviceChipChoice;
   chip_strategy?: {
-    version: "model_opportunity_reservation_v1";
+    version: "model_opportunity_reservation_v1" | "model_opportunity_reservation_v2";
     mode: "auto" | "manual";
     requested_chip: "auto" | "bboost" | "3xc" | "wildcard" | "freehit";
     selected_chip: "bboost" | "3xc" | "wildcard" | "freehit" | null;
@@ -521,7 +564,12 @@ export interface EntryAdvice {
    * published before the producer carried them.
    */
   expected_own_points?: number | null;
+  /** Expected official scoring on the base forecast, including autosubs and vice recovery. */
+  lineup_expectation?: AdviceLineupExpectation;
   captain?: AdvicePlayer | null;
+  participation_evidence?: AdviceParticipationEvidence;
+  official_information?: OfficialInformation;
+  decision_information?: DecisionInformation;
   vice_captain?: AdvicePlayer | null;
   starting_xi?: AdvicePlayer[] | null;
   bench?: AdvicePlayer[] | null;
@@ -532,6 +580,39 @@ export interface EntryAdvice {
    * repeated over the fixture calendar, among others). The moves and the lineup
    * above are the first week's. Absent on one-week documents.
    */
+  information_review?: {
+    version: "football_information_review_v1";
+    status: "compared" | "baseline_retained";
+    reason: string;
+    source_snapshot_id: string;
+    captured_at_utc: string;
+    player_name: string | null;
+    source_playing_chance_percent: number | null;
+    information_gameweek: number | null;
+    candidates: {
+      selected: boolean;
+      baseline: boolean;
+      transfers_in: string[];
+      transfers_out: string[];
+      chip: string | null;
+      expected_net_points: number | null;
+      first_lineup?: AdviceLineup<string>;
+      branches: {
+        state: "eligible" | "unavailable";
+        expected_net_points: number | null;
+        hit_points: number;
+        weeks: {
+          gameweek: number;
+          transfers_in: string[];
+          transfers_out: string[];
+          chip: string | null;
+          bank_tenths: number;
+          free_transfers: number;
+          lineup?: AdviceLineup<string>;
+        }[];
+      }[];
+    }[];
+  };
   plan_weeks?: AdvicePlanWeek[] | null;
   stated_limits?: string[] | null;
   data_quality: EntryDataQuality;

@@ -1,3 +1,4 @@
+import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -438,12 +439,18 @@ function LeagueMemberContent({
               than making new ones: an open "Nasıl hesaplandı?" stays open. */}
           {layout === "phone" ? [honesty, squadArea] : [squadArea, honesty]}
           {!adviceLoading && shown ? (
-            <AdviceDetails
-              shown={shown}
-              squad={squad}
-              rivalSquad={rivalSquad}
-              windowControl={windowControl}
-            />
+            <>
+              <NewInformationNotice
+                view={shown.envelope.payload}
+                latest={capabilities?.decisionInformation}
+              />
+              <AdviceDetails
+                shown={shown}
+                squad={squad}
+                rivalSquad={rivalSquad}
+                windowControl={windowControl}
+              />
+            </>
           ) : null}
         </section>
 

@@ -105,13 +105,14 @@ def advise_chip_strategy(
         window=request.window,
         weeks=shown,
         optimality_gap_published=False,
+        base_horizon=base,
     )
     first = shown[0]
     choice = {
         int(str(row["player_id"])): float(str(row["expected_points"]))
         for _, row in chosen.table.loc[chosen.table.gameweek.eq(request.gameweek)].iterrows()
     }
-    if top100_weight or first.chip in ("3xc", "bboost"):
+    if first.lineup_expectation is None and (top100_weight or first.chip in ("3xc", "bboost")):
         _rows_on_chip_basis(
             payload,
             picks,

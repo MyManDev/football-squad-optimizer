@@ -26,6 +26,7 @@ rule; refusing names the problem where someone can decide it.
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -33,6 +34,9 @@ from typing import Final
 
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+    LEGACY_ROTATION_DISPOSITIONS,
+    PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     PUBLISHED_PRECISIONS,
     ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ROTATION_DISPOSITIONS,
@@ -40,12 +44,14 @@ from squadopt.data.sources.club_news import (
     ClubNewsError,
     RawDocument,
 )
+from squadopt.data.sources.club_news_metadata import PublicationMetadata, publication_metadata
+from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
 from squadopt.data.timestamps import normalize_utc_timestamp
 
 #: This parser's own contract, separate from the response format's. The response format is
 #: what a model is asked to produce; this is what the parser produces from it, and the two
 #: can move independently.
-CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v1"
+CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v3"
 
 #: Keys a claim must carry. ``paraphrase`` is required and then discarded -- see the module
 #: docstring. A response missing any of these is a different format, not a sparse one.
@@ -93,6 +99,11 @@ class ParsedClaim:
     span_end: int
     published_at_utc: str | None
     published_precision: str
+    fixture_scope: str = "unspecified"
+    scope_verified: bool = False
+    publication_verified: bool = False
+    publication_source: str | None = None
+    publication_source_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,6 +249,45 @@ def _fetched_bytes(documents: Sequence[RawDocument]) -> dict[str, bytes]:
     return indexed
 
 
+def _require_explicit_full_match_limit(quote: bytes) -> None:
+    """A conservative source gate, not a general language-understanding claim.
+
+    The new label must carry a clear next-league-match inability in its own cited
+    span. Unrecognized wording remains refused; managed minutes never implies it.
+    Existing labels and source-role handling do not pass through this gate.
+    """
+    text = " ".join(quote.decode("utf-8").casefold().replace("\u2019", "'").split())
+    scope = re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game)\b", text)
+    uncertainty = re.search(
+        r"\b(?:if|unless|might|may|could|unlikely|perhaps|possibly)\b"
+        r"|\b(?:not saying|did not say|didn't say|not true|no longer|not the case)\b",
+        text,
+    )
+    inability = re.search(
+        r"\b(?:cannot|can't|will not(?: be able to)?|won't(?: be able to)?|is unable to) "
+        r"(?:complete|finish|play|last) (?:the )?"
+        r"(?:(?:full|whole|entire) (?:(?:upcoming|next) )?(?:(?:premier )?league )?"
+        r"(?:match|game)|(?:full )?(?:90|ninety) minutes)\b",
+        text,
+    )
+    if scope is None or inability is None or uncertainty is not None:
+        raise ClubNewsError(
+            "The full-match-unavailable claim needs an explicit, unconditional quoted "
+            "inability to complete the upcoming league match; vague limits are not enough."
+        )
+
+
+def _source_publications(documents: Sequence[RawDocument]) -> dict[str, PublicationMetadata]:
+    indexed: dict[str, PublicationMetadata] = {}
+    for document in documents:
+        metadata = publication_metadata(document.content, document.content_type, document.final_url)
+        for url in (document.requested_url, document.final_url):
+            if url in indexed and indexed[url] != metadata:
+                raise ClubNewsError("One cited URL has conflicting held publication metadata.")
+            indexed[url] = metadata
+    return indexed
+
+
 def parse_claim_response(
     response: ClaimResponse, documents: Sequence[RawDocument]
 ) -> tuple[ParsedClaim, ...]:
@@ -260,14 +310,28 @@ def parse_claim_response(
         )
     document = _object(response.text)
     version = document.get("contract_version")
-    if version != ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION:
+    if version not in (
+        LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+        PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+        ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+    ):
         raise ClubNewsError(
             f"The response declares contract {version!r}, not "
             f"{ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION!r}. A response stored under one "
             "version is not readable under another."
         )
+    dispositions = (
+        LEGACY_ROTATION_DISPOSITIONS
+        if version == LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+        else ROTATION_DISPOSITIONS
+    )
     datelines = _declared_datelines(document)
     available = _fetched_bytes(documents)
+    publications = (
+        _source_publications(documents)
+        if version == ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+        else {}
+    )
 
     claims: list[ParsedClaim] = []
     seen: dict[tuple[str, str], str] = {}
@@ -281,7 +345,7 @@ def parse_claim_response(
         _text(record, "paraphrase", f"The claim about {player_name!r}")
         disposition = _one_of(
             _text(record, "disposition", f"The claim about {player_name!r}"),
-            ROTATION_DISPOSITIONS,
+            dispositions,
             f"The disposition for {player_name!r}",
         )
         speaker = _one_of(
@@ -321,6 +385,32 @@ def parse_claim_response(
                 f"{source_url!r}, which holds {len(content)} bytes. A span outside the bytes "
                 "it cites is an unresolvable citation."
             )
+        if disposition == "stated_full_match_unavailable":
+            _require_explicit_full_match_limit(content[span_start:span_end])
+        scope, scope_verified = "unspecified", False
+        publication_verified = False
+        publication_source = publication_digest = None
+        if version == ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION:
+            declared_scope = _one_of(
+                _text(record, "fixture_scope", "A claim"), FIXTURE_SCOPES, "fixture_scope"
+            )
+            scope, checked = verified_fixture_scope(
+                content[span_start:span_end], disposition, player_name=player_name
+            )
+            scope_verified = checked and scope == declared_scope
+            if scope != declared_scope:
+                scope = "ambiguous"
+            metadata = publications[source_url]
+            publication_verified = metadata.verified and (
+                dateline.published_at_utc == metadata.published_at_utc
+                and dateline.published_precision == metadata.published_precision
+            )
+            # The V3 date is always the source fact, even when the model disagrees.
+            # Never preserve a model-only instant as an observed source date.
+            dateline = _Dateline(metadata.published_at_utc, metadata.published_precision)
+            if metadata.verified:
+                publication_source = metadata.source
+                publication_digest = metadata.source_sha256
         claims.append(
             ParsedClaim(
                 player_name=player_name,
@@ -333,6 +423,11 @@ def parse_claim_response(
                 span_end=span_end,
                 published_at_utc=dateline.published_at_utc,
                 published_precision=dateline.published_precision,
+                fixture_scope=scope,
+                scope_verified=scope_verified,
+                publication_verified=publication_verified,
+                publication_source=publication_source,
+                publication_source_sha256=publication_digest,
             )
         )
     return tuple(claims)

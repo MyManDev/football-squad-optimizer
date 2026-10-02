@@ -19,6 +19,11 @@ from squadopt.optimization import (
     SolverStatus,
     optimize_squad,
 )
+from squadopt.planning.lineup_utility import (
+    expected_week_utility,
+    improve_plan_lineups,
+    rescore_expected_week,
+)
 from squadopt.planning.models import (
     ChipAvailability,
     ChipUseWindow,
@@ -28,8 +33,9 @@ from squadopt.planning.models import (
     TransferPlanResult,
 )
 from squadopt.planning.optimizer import optimize_transfer_plan
+from squadopt.planning.policy_seed import forecast_policy_seed
 
-CHIP_STRATEGY_VERSION = "model_opportunity_reservation_v1"
+CHIP_STRATEGY_VERSION = "model_opportunity_reservation_v2"
 CHIP_STRATEGY_LIMITS = (
     "Future chip value is an approximation from this capture's forecast opportunities, "
     "not a measured season-long advantage.",
@@ -37,6 +43,10 @@ CHIP_STRATEGY_LIMITS = (
     "future injuries, transfers and chip competition can change it.",
     "Wildcard and Free Hit tail opportunities use one-week rebuild gains; "
     "long-term Wildcard effects beyond the forecast are unmeasured.",
+)
+EXPECTED_CHIP_LIMIT = (
+    "Chip and no-chip candidates use the same expected lineup score, including autosubs "
+    "and vice-captain cover. Automatic chip plans do not yet branch on future news."
 )
 
 
@@ -71,13 +81,19 @@ def optimize_chip_strategy(
     linearization_level: int | None = None,
     preferences: DecisionPreferences | None = None,
     protect_hold: bool = False,
+    expected_lineups: bool = False,
 ) -> TransferPlanResult:
     """Price remaining rights from the selected model, then optimize jointly.
 
     Requires proved reference plans: a solver gap must not become a chip opportunity.
     The final plan can be FEASIBLE, and retains its objective-scale proof gap.
     Existing fixed holding values are deliberately refused rather than stacked.
+    Optional expected-lineup scoring compares the complete chip proposal and its
+    no-chip control on the same autosub/captain basis, including dated reserves.
+    These are nominal forecast paths; automatic chips do not yet branch on news.
     """
+    if expected_lineups and "appearance_probability" not in horizon.table:
+        raise ValueError("Expected chip scoring requires appearance probabilities.")
     if transfer.chip_holding_value_points or transfer.banked_transfer_value_points:
         raise ValueError("Chip strategy derives its own continuation values.")
     if any(
@@ -106,26 +122,47 @@ def optimize_chip_strategy(
     )
     if chips.available and control.solver_status is not SolverStatus.OPTIMAL:
         raise SolverExecutionError("Chip opportunity reference must be proved optimal.")
+    reference_status = control.solver_status.name
+    if expected_lineups:
+        control = improve_plan_lineups(control, optimization, transfer)
     samples: dict[str, list[float]] = {name: [] for name in chips.available}
     probe_statuses: list[str] = []
     for week in control.weeks:
         # These are the same forecast units as the allocation objective, including
         # a selected Top100 utility. They are never published as raw expected points.
         if "3xc" in samples:
-            samples["3xc"].append(max(0.0, float(week.captain["expected_points"])))
+            gain = float(week.captain["expected_points"])
+            if expected_lineups:
+                boosted = rescore_expected_week(replace(week, chip="3xc"))
+                gain = expected_week_utility(boosted, transfer) - expected_week_utility(
+                    week, transfer
+                )
+            samples["3xc"].append(max(0.0, gain))
         if "bboost" in samples:
-            samples["bboost"].append(
-                max(0.0, (1 - optimization.bench_weight) * week.projected_bench_points)
-            )
+            gain = (1 - optimization.bench_weight) * week.projected_bench_points
+            if expected_lineups:
+                boosted = rescore_expected_week(replace(week, chip="bboost"))
+                gain = expected_week_utility(boosted, transfer) - expected_week_utility(
+                    week, transfer
+                )
+            samples["bboost"].append(max(0.0, gain))
         if "wildcard" in samples or "freehit" in samples:
             table = horizon.table.loc[horizon.table.gameweek.eq(week.gameweek)].copy()
             table["price_tenths"] = table["buy_price_tenths"]
+            # This probe starts after the control's transfers. A player bought or
+            # bought again has a new acquisition lot; the original horizon sale
+            # path no longer describes that holding's liquidation value.
+            sale_prices = week.selected_squad.set_index("player_id").sell_price_tenths
+            held_mask = table.player_id.isin(sale_prices.index)
+            table.loc[held_mask, "sell_price_tenths"] = (
+                table.loc[held_mask, "player_id"].map(sale_prices).astype("int64")
+            )
             held = table.loc[table.player_id.isin(week.selected_squad.player_id)]
             # Probe in the post-control state; use conservative sell proceeds, not
             # the roster's full purchase price when it contains price gains.
             budget = week.bank_after_tenths + int(held.sell_price_tenths.sum())
             rebuilt: TransferPlanResult | OptimizationResult
-            if preferences is not None and preferences.active:
+            if expected_lineups or (preferences is not None and preferences.active):
                 # A rebuild opportunity must obey the same human constraints as
                 # the final plan. A one-week wildcard removes transfer costs while
                 # retaining the captured bank and sale values.
@@ -151,7 +188,15 @@ def optimize_chip_strategy(
                 raise SolverExecutionError("Chip rebuild reference must be proved optimal.")
             probe_statuses.append(rebuilt.solver_status.name)
             current = week.projected_score + optimization.bench_weight * week.projected_bench_points
-            gain = max(0.0, rebuilt.objective_value - current)
+            rebuilt_value = rebuilt.objective_value
+            if expected_lineups:
+                assert isinstance(rebuilt, TransferPlanResult)
+                rebuilt = improve_plan_lineups(rebuilt, optimization, transfer)
+                rebuilt_value = expected_week_utility(rebuilt.weeks[0], transfer)
+                current = expected_week_utility(week, transfer) + (
+                    week.paid_transfer_count * transfer.transfer_hit_cost_points
+                )
+            gain = max(0.0, rebuilt_value - current)
             for name in ("wildcard", "freehit"):
                 if name in samples:
                     samples[name].append(gain)
@@ -191,6 +236,52 @@ def optimize_chip_strategy(
         if chips.available
         else control
     )
+    comparison: dict[str, object] = {}
+    if expected_lineups and plan.has_solution:
+        plan = improve_plan_lineups(plan, optimization, transfer)
+
+        def utility(candidate: TransferPlanResult) -> float:
+            return sum(
+                transfer.horizon_discount_factor**i * expected_week_utility(week, transfer)
+                for i, week in enumerate(candidate.weeks)
+            ) + float(str(candidate.diagnostics.get("terminal_chip_holding_value", 0)))
+
+        menu = [("chip_proposal", plan)]
+        if chips.available and not any(week in horizon.gameweeks for week in chips.forced):
+            # The no-chip control must receive the same dated unused-right value.
+            # Only rights change; forecast_policy_seed independently verifies that
+            # all its existing resource decisions and its chip schedule remain legal.
+            retained = forecast_policy_seed(
+                control,
+                horizon,
+                horizon,
+                optimization,
+                transfer,
+                target_chips=availability,
+            )
+            menu.insert(0, ("no_chip_control", retained))
+        chosen = max(range(len(menu)), key=lambda i: (utility(menu[i][1]), -i))
+        comparison = {
+            "basis": "expected_lineup_selection_utility_with_chip_reserve",
+            "chosen": menu[chosen][0],
+            "candidates": [{"proposal": label, "utility": utility(p)} for label, p in menu],
+            "news_recourse": False,
+        }
+        # Preserve the completed final search diagnostics even when its complete
+        # no-chip control wins. Its old surrogate optimum is not the common score.
+        plan = replace(
+            menu[chosen][1],
+            diagnostics={
+                **plan.diagnostics,
+                **menu[chosen][1].diagnostics,
+                "proof_scope": "bounded_chip_menu_with_expected_lineup_selection",
+                "solver_status_name": "FEASIBLE",
+                "best_objective_bound": None,
+                "absolute_optimality_gap": None,
+                "relative_optimality_gap": None,
+            },
+            solver_status=SolverStatus.FEASIBLE,
+        )
     return replace(
         plan,
         diagnostics={
@@ -201,9 +292,13 @@ def optimize_chip_strategy(
                 "basis": "selection_utility",
                 "reservations": reservations,
                 "samples": samples,
-                "reference_solver_status": control.solver_status.name,
+                "reference_solver_status": reference_status,
                 "rebuild_solver_statuses": probe_statuses,
-                "limits": list(CHIP_STRATEGY_LIMITS),
+                "limits": [
+                    *CHIP_STRATEGY_LIMITS,
+                    *([EXPECTED_CHIP_LIMIT] if expected_lineups else []),
+                ],
+                **({"expected_lineup_comparison": comparison} if expected_lineups else {}),
             },
         },
     )

@@ -7,6 +7,7 @@ citation and from nothing else; a source without its evidence (or the reverse) i
 
 import hashlib
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,14 @@ def _word(player_id: int, disposition: str) -> ManagerWord:
         source_url="https://club.example/arsenal/news",
         fetched_at_utc="2026-09-12T14:05:00Z",
         words="He will not travel.",
+        source_sha256="a" * 64,
+        span_start=0,
+        span_end=19,
+        fixture_scope="upcoming_premier_league",
+        scope_verified=True,
+        publication_verified=True,
+        publication_source="text_published",
+        publication_source_sha256="b" * 64,
     )
 
 
@@ -74,7 +83,8 @@ def test_the_rule_is_declared_over_the_whole_vocabulary() -> None:
         "stated_expected_absent": "not_starting",
         "stated_rotation_risk": "not_captain",
         "stated_returning_from_injury": None,
-        "stated_minutes_limited": "not_captain",
+        "stated_minutes_limited": None,
+        "stated_full_match_unavailable": None,
         "ambiguous": None,
     }
 
@@ -161,9 +171,15 @@ def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
     assert resolved.club == "Arsenal"
     assert resolved.source_url == arsenal.final_url
     assert resolved.speaker == "the manager"
+    assert (resolved.source_sha256, resolved.span_start, resolved.span_end) == (digest, start, end)
     unresolved = words.words[1]
     assert unresolved.words is None and unresolved.club is None and unresolved.source_url is None
-    assert unresolved.role == "not_captain"
+    assert unresolved.role is None
+    assert (unresolved.source_sha256, unresolved.span_start, unresolved.span_end) == (
+        None,
+        None,
+        None,
+    )
 
 
 def test_covered_is_what_the_capture_recorded_and_not_what_was_read(
@@ -291,7 +307,7 @@ def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_rea
 ) -> None:
     """The fixture's captain line carries a per cent sign. The source said it, but the rule
     about what a member page shows covers every sentence on it, so the words are withheld
-    and the status says why; the constraint itself still stands."""
+    and the status says why; legacy unscoped wording cannot constrain a decision."""
 
     documents, kind, label = documents_from_source(FIXTURE)
     sentence = b'Asked about the captain, he said: "Odegaard is at 80% and we will see."'
@@ -309,10 +325,13 @@ def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_rea
     (word,) = words.words
     assert word.words is None
     assert word.words_status == WORDS_WITHHELD_FIGURE
-    assert word.role == "not_captain"
+    assert word.source_sha256 == table.iloc[0].rotation_claim_source_sha256
+    assert word.span_start == table.iloc[0].rotation_claim_span_start
+    assert word.span_end == table.iloc[0].rotation_claim_span_end
+    assert word.role is None
     assert word.source_url is not None
     exclusion = words.exclusion()
-    assert exclusion is not None and exclusion.not_captain == frozenset({11})
+    assert exclusion is None
 
 
 def test_a_quote_that_cannot_be_cut_is_unresolved_not_withheld() -> None:
@@ -466,3 +485,24 @@ def test_the_quote_screen_withholds_every_form_the_pages_may_not_show(quote: str
 )
 def test_the_quote_screen_leaves_plain_statements_alone(quote: str) -> None:
     assert not module.QUOTE_WITHHELD_PATTERN.search(quote)
+
+
+def test_unresolved_or_partial_provenance_cannot_claim_a_verified_span():
+    with pytest.raises(ManagerWordsError, match="resolved complete byte span"):
+        replace(_word(1, "stated_expected_absent"), span_end=None)
+    with pytest.raises(ManagerWordsError, match="resolved complete byte span"):
+        replace(
+            _word(1, "stated_expected_absent"),
+            words=None,
+            source_sha256="a" * 64,
+            span_start=0,
+            span_end=5,
+        )
+
+
+def test_a_byte_span_cutting_through_utf8_is_not_verified():
+    documents, _, _ = documents_from_source(FIXTURE)
+    source = replace(documents[0], content="é".encode(), readable="é".encode(), byte_length=2)
+    digest = hashlib.sha256(source.readable).hexdigest()
+    document, words = module._resolve((source,), digest, 0, 1)
+    assert document == source and words is None

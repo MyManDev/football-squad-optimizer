@@ -153,9 +153,13 @@ def _answer_about(documents: Sequence[RawDocument]) -> str:
     served = {url for document in documents for url in (document.requested_url, document.final_url)}
     return json.dumps(
         {
-            "contract_version": fixture["contract_version"],
+            "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
             "documents": [entry for entry in fixture["documents"] if entry["url"] in served],
-            "claims": [entry for entry in fixture["claims"] if entry["source_url"] in served],
+            "claims": [
+                {**entry, "fixture_scope": "unspecified"}
+                for entry in fixture["claims"]
+                if entry["source_url"] in served
+            ],
         },
         ensure_ascii=False,
     )
@@ -330,6 +334,8 @@ def test_a_registered_page_becomes_an_evidence_table_and_replays_without_either_
     assert host.requested, "the first pass really did go through the fetch adapter"
     assert _digest(tmp_path / "first" / "table.csv") == _digest(tmp_path / "second" / "table.csv")
     pd.testing.assert_frame_equal(first, second)
+    # Replaying old quotes in the current response shape grants no new fixture attestation.
+    assert not first["rotation_claim_scope_verified"].any()
     assert refused, "the declared club nobody served must be reported, not dropped"
 
 

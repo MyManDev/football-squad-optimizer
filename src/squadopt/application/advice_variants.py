@@ -52,6 +52,7 @@ from squadopt.application.advice import (
     window_stated_limits,
 )
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
+from squadopt.application.lineup_publication import expected_week_points
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.top100_weight import (
     TOP100_PRICE_BASIS,
@@ -134,7 +135,7 @@ def _rebased_weeks(
 
 def _window_total(weeks: tuple[PlanningWeekResult, ...]) -> float:
     total = math.fsum(
-        float(week.projected_score) - float(week.transfer_hit_points) for week in weeks
+        expected_week_points(week) - float(week.transfer_hit_points) for week in weeks
     )
     if not math.isfinite(total):
         raise EntryError("A window must score to finite base points.")
@@ -299,6 +300,7 @@ def advise_window_with_top100(
         weeks=weeks,
         optimality_gap_published=False,
         choice_points=base_points(weighted_projection(projection, counts.counts, weight)),
+        base_horizon=base,
     )
     _limits(payload, TOP100_LIMIT.format(weight=weight), TOP100_WINDOW_LIMIT)
     note = _price(payload, control_payload=control_payload, selected_total=_window_total(weeks))
@@ -492,6 +494,9 @@ def advise_rival_window(
         for move in moves if isinstance(moves, list) else []:
             if move.get("reason_code") == "window_value":
                 move["reason_code"] = "mode_tradeoff"
+        # The selected plan holds this rival band, but the pure-points alternatives
+        # were not solved under it. Do not publish those as rival-feasible choices.
+        payload.pop("information_review", None)
         payload["stated_limits"] = window_stated_limits(projection)
         payload.pop("top100", None)
         rows = payload.get("plan_weeks")

@@ -694,12 +694,32 @@ const en = {
     statedLimitUnknown:
       "No translated explanation is available for this published window assumption.",
     statedLimits: {
+      "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
+        "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.",
+      "Experimental football model; independent predictive superiority is unverified.":
+        "Experimental football model; independent predictive superiority is unverified.",
+      "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.":
+        "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.",
+      "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
+        "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
+      "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
+        "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.",
+      "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
+        "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.",
+      "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
+        "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
+      "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
+        "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.",
       "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
         "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
         "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
         "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+      "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.":
+        "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.",
+      "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.":
+        "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
         "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
       "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
@@ -1791,12 +1811,32 @@ const tr: MessageSchema<typeof en> = {
     // Only exact published limit keys receive these reviewed explanations.
     statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
+      "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
+        "Gelecek her maçın tahmini, kayıtlı geçmiş verilerinden ayrı hesaplanır; maçsız haftalarda yalnız o haftanın puanı sıfırdır. Gelecekteki maç sonuçları veya sakatlık güncellemeleri varsayılmaz.",
+      "Experimental football model; independent predictive superiority is unverified.":
+        "Deneysel futbol modelinin daha başarılı tahminler ürettiği bağımsız olarak doğrulanmadı.",
+      "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.":
+        "Önceki futbol tahminleri, bir oyuncunun yokluğunu sonraki haftalara da taşımış olabilir. Oyuncunun oynadığı durumdaki puan tahmini bilinmeden bu güncelleme o değerleri geri yüklemez.",
+      "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
+        "Tam planlar, beklenen otomatik değişiklik puanları ve kaptan oynamazsa yardımcı kaptanın ek puanı dahil edilerek karşılaştırılır. Sınırlı arama, mümkün olan en iyi planı veya gelecekteki başarıyı kanıtlamaz.",
+      "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
+        "Bu deneysel plan, bir sonraki karar gününden önce gelebilecek iki bilgi durumunda bugünkü hamleleri karşılaştırır. Sonraki transferler koşula bağlıdır. Haberin ne zaman netleşeceği bir varsayımdır; ölçülmüş iyileşme tahmini değildir.",
+      "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
+        "Bilgi karşılaştırması ortak hesaplama bütçesinde tamamlanamadı; tam başlangıç planı korunuyor.",
+      "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
+        "Bu deneysel plan, hafta hafta kurulan başlangıç planını tüm pencereyi birlikte arayan yöntemle karşılaştırır. Başlangıç planı ancak pencerenin tamamı için geçerliliği doğrulanırsa korunur. Gelecekteki başarısı henüz ölçülmedi.",
+      "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
+        "Hafta hafta başlangıç planı tamamlanamadı; bu sonuç kalan bütçeyle standart pencere aramasından üretildi.",
       "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
         "Futbol modeli her kulübün tahmin edilen gol ve asistlerini, oynayabilirlik uygulanmadan önce kulübün bütün oyuncuları arasında paylaştırır. Oynayabilirliğin, veri kesitinde oynayamaz ya da şüpheli görünen bir oyuncudan düşürdüğü kısım takım arkadaşlarına aktarılmaz; bu yüzden eksik oyuncusu olan bir kulüpte oyunculara toplamda, modelin kulüp için tahmin ettiğinden daha az gol ve asist yazılır.",
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
         "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için veri kesitindeki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
         "Oynayabilirlik bir kez, veri kesitinden uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
+      "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.":
+        "Her hafta bir transfer; birikmiş en az iki ücretsiz hakkın varsa ikisini kullanarak iki transfer yapılabilir. Wildcard ve Free Hit haftalarında kadro yeniden kurulabilir; tek haftalık planda bu sınır yoktur.",
+      "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.":
+        "Çipli ve çipsiz adaylar, otomatik yedek değişimi ve yardımcı kaptan katkısı dahil aynı beklenen ilk 11 puanıyla karşılaştırılır. Otomatik çip planları henüz gelecekteki haber durumlarına göre dallanmaz.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
         "Pencere içindeki her hafta, ilki dahil, bir transferle sınırlıdır (wildcard haftası hariç); bir haftalık planda böyle bir sınır yoktur.",
       "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":

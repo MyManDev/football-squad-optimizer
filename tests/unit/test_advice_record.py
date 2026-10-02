@@ -1309,3 +1309,59 @@ def test_the_record_keeps_an_absent_budget_flag_absent_rather_than_false() -> No
     assert _flag({key: 1}, key) is None
     assert _flag({key: False}, key) is False
     assert _flag({key: True}, key) is True
+
+
+def test_private_planning_evidence_keeps_only_available_published_facts():
+    payload = {
+        "plan_weeks": [
+            {"gameweek": 6, "transfers_in": [], "transfers_out": []},
+            {
+                "gameweek": 7,
+                "transfers_in": [{"player_id": 999}],
+                "transfers_out": [{"player_id": 998}],
+                "free_transfers_before": 2,
+            },
+        ],
+        "preferences": {"keep_players": [10], "no_hits": True},
+        "preferences_scope": "all_selected_weeks",
+        "selection_top100_weight": 20,
+        "chip_strategy": {"mode": "auto", "top100_weight": 20, "selected_chip": None},
+    }
+    original = json.dumps(payload, sort_keys=True)
+    advice = PublishedAdvice("saf-puan", 3, None, "window.json", payload, original.encode())
+    record = _advice_document(advice)
+    evidence = record["planning_evidence"]
+    assert evidence["fields"] == payload
+    assert evidence["solver_replay_complete"] is False
+    assert evidence["internal_search_alternatives_recorded"] is False
+    assert advice.raw == original.encode()
+    assert json.dumps(payload, sort_keys=True) == original
+    assert "planning_evidence" not in payload
+    assert advice_records._player_ids(record) == {998, 999}
+    payload["preferences"]["keep_players"].append(11)
+    assert evidence["fields"]["preferences"]["keep_players"] == [10]
+    assert "starting_xi" not in evidence["fields"]["plan_weeks"][1]
+
+
+def test_missing_planning_evidence_is_unknown_and_old_records_remain_readable(tmp_path):
+    plain = _advice_document(PublishedAdvice("saf-puan", 1, None, "plain.json", {}, b"{}"))
+    assert plain.get("planning_evidence") is None
+    assert "planning_evidence" not in plain
+    legacy = _bare_record()
+    record_member_advice(tmp_path, legacy)
+    assert load_member_advice_record(tmp_path, SEASON, 2, 101, CAPTURE) == legacy
+
+
+def test_changed_planning_evidence_is_not_silently_overwritten(tmp_path):
+    original = _bare_record()
+    original["advice"] = [{}]
+    original["advice"][0]["planning_evidence"] = {
+        "scope": "published_payload_only",
+        "fields": {"selection_top100_weight": 20},
+    }
+    record_member_advice(tmp_path, original)
+    changed = json.loads(json.dumps(original))
+    changed["advice"][0]["planning_evidence"]["fields"]["selection_top100_weight"] = 50
+    with pytest.raises(AdviceRecordError, match="planning_evidence"):
+        record_member_advice(tmp_path, changed)
+    assert load_member_advice_record(tmp_path, SEASON, 2, 101, CAPTURE) == original

@@ -320,7 +320,7 @@
               ]
             },
             "version": {
-              "const": "model_opportunity_reservation_v1"
+              "const": "model_opportunity_reservation_v2"
             }
           },
           "required": [
@@ -355,6 +355,43 @@
             "partial",
             "empty"
           ]
+        },
+        "decision_information": {
+          "additionalProperties": false,
+          "properties": {
+            "coach_news_bound": {
+              "type": "boolean"
+            },
+            "minute_components_bound": {
+              "type": "boolean"
+            },
+            "observed_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "revision": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "source_snapshot_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "version": {
+              "const": "football_decision_information_v1"
+            }
+          },
+          "required": [
+            "version",
+            "revision",
+            "source_snapshot_id",
+            "observed_at",
+            "coach_news_bound",
+            "minute_components_bound"
+          ],
+          "type": "object"
         },
         "entry_id": {
           "minimum": 1,
@@ -503,9 +540,312 @@
           "minimum": 1,
           "type": "integer"
         },
+        "information_review": {
+          "additionalProperties": false,
+          "properties": {
+            "candidates": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "baseline": {
+                    "type": "boolean"
+                  },
+                  "branches": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "expected_net_points": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "hit_points": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "state": {
+                          "enum": [
+                            "eligible",
+                            "unavailable"
+                          ]
+                        },
+                        "weeks": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "bank_tenths": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "chip": {
+                                "enum": [
+                                  null,
+                                  "bboost",
+                                  "3xc",
+                                  "wildcard",
+                                  "freehit"
+                                ]
+                              },
+                              "free_transfers": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "gameweek": {
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "lineup": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "bench": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                  },
+                                  "captain": {
+                                    "type": "string"
+                                  },
+                                  "starting_xi": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "maxItems": 11,
+                                    "minItems": 11,
+                                    "type": "array"
+                                  },
+                                  "vice_captain": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "starting_xi",
+                                  "captain",
+                                  "vice_captain",
+                                  "bench"
+                                ],
+                                "type": "object"
+                              },
+                              "transfers_in": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "transfers_out": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "gameweek",
+                              "transfers_in",
+                              "transfers_out",
+                              "chip",
+                              "bank_tenths",
+                              "free_transfers"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 4,
+                          "minItems": 2,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "expected_net_points",
+                        "hit_points",
+                        "weeks"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "chip": {
+                    "enum": [
+                      null,
+                      "bboost",
+                      "3xc",
+                      "wildcard",
+                      "freehit"
+                    ]
+                  },
+                  "expected_net_points": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "first_lineup": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bench": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 4,
+                        "minItems": 4,
+                        "type": "array"
+                      },
+                      "captain": {
+                        "type": "string"
+                      },
+                      "starting_xi": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 11,
+                        "minItems": 11,
+                        "type": "array"
+                      },
+                      "vice_captain": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "starting_xi",
+                      "captain",
+                      "vice_captain",
+                      "bench"
+                    ],
+                    "type": "object"
+                  },
+                  "selected": {
+                    "type": "boolean"
+                  },
+                  "transfers_in": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "transfers_out": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "selected",
+                  "baseline",
+                  "transfers_in",
+                  "transfers_out",
+                  "chip",
+                  "expected_net_points",
+                  "branches"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "captured_at_utc": {
+              "type": "string"
+            },
+            "information_gameweek": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "player_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "source_playing_chance_percent": {
+              "enum": [
+                null,
+                25,
+                50,
+                75
+              ]
+            },
+            "source_snapshot_id": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "compared",
+                "baseline_retained"
+              ]
+            },
+            "version": {
+              "const": "football_information_review_v1"
+            }
+          },
+          "required": [
+            "version",
+            "status",
+            "reason",
+            "source_snapshot_id",
+            "captured_at_utc",
+            "player_name",
+            "source_playing_chance_percent",
+            "information_gameweek",
+            "candidates"
+          ],
+          "type": "object"
+        },
         "league_id": {
           "minimum": 1,
           "type": "integer"
+        },
+        "lineup_expectation": {
+          "additionalProperties": false,
+          "properties": {
+            "assumptions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "autosub_points": {
+              "type": "number"
+            },
+            "bench_boost_points": {
+              "type": "number"
+            },
+            "captain_bonus_points": {
+              "type": "number"
+            },
+            "expected_net_points": {
+              "type": "number"
+            },
+            "starting_points": {
+              "type": "number"
+            },
+            "version": {
+              "const": "expected_lineup_v1"
+            },
+            "vice_bonus_points": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "version",
+            "expected_net_points",
+            "starting_points",
+            "autosub_points",
+            "captain_bonus_points",
+            "vice_bonus_points",
+            "bench_boost_points",
+            "assumptions"
+          ],
+          "type": "object"
         },
         "missing_fields": {
           "items": {
@@ -635,6 +975,114 @@
           },
           "type": "array"
         },
+        "official_information": {
+          "additionalProperties": false,
+          "properties": {
+            "declared_team_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "gameweek": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "observed_at": {
+              "type": "string"
+            },
+            "player_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "players": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "news_state": {
+                    "enum": [
+                      "present",
+                      "cleared",
+                      "not_reported"
+                    ]
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "source_added_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_chance_percent": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "team_name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "name",
+                  "team_name",
+                  "status",
+                  "source_chance_percent",
+                  "source_added_at",
+                  "news_state"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "revision": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "season": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "source_snapshot_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "source_url": {
+              "const": "https://fantasy.premierleague.com/"
+            },
+            "team_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "const": "fpl_information_v1"
+            }
+          },
+          "required": [
+            "version",
+            "season",
+            "gameweek",
+            "source_snapshot_id",
+            "observed_at",
+            "revision",
+            "source_url",
+            "player_count",
+            "team_count",
+            "declared_team_count",
+            "players"
+          ],
+          "type": "object"
+        },
         "optimality_gap": {
           "type": [
             "number",
@@ -649,6 +1097,102 @@
         },
         "overlap_target": {
           "type": "number"
+        },
+        "participation_evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "applied_player_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "as_of": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "assumptions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "captured_percentage_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "gameweek": {
+              "minimum": 1,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "manager_statement_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "statement_outcomes": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "applied": {
+                    "type": "boolean"
+                  },
+                  "disposition": {
+                    "type": "string"
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "source_published_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "disposition",
+                  "applied",
+                  "reason",
+                  "source_url",
+                  "source_published_at"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "unapplied_statement_count": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "version": {
+              "const": "football_participation_evidence_v1"
+            }
+          },
+          "required": [
+            "version",
+            "as_of",
+            "gameweek",
+            "applied_player_count",
+            "unapplied_statement_count",
+            "captured_percentage_count",
+            "manager_statement_count",
+            "assumptions"
+          ],
+          "type": "object"
         },
         "plan_kind": {
           "enum": [
@@ -682,6 +1226,215 @@
               "gameweek": {
                 "minimum": 1,
                 "type": "integer"
+              },
+              "lineup": {
+                "additionalProperties": false,
+                "properties": {
+                  "bench": {
+                    "items": {
+                      "properties": {
+                        "expected_points": {
+                          "type": "number"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "player_id": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "position": {
+                          "enum": [
+                            "GK",
+                            "DEF",
+                            "MID",
+                            "FWD"
+                          ]
+                        },
+                        "short_name": {
+                          "type": "string"
+                        },
+                        "team": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "player_id",
+                        "name",
+                        "short_name",
+                        "position",
+                        "team"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                  },
+                  "captain": {
+                    "properties": {
+                      "expected_points": {
+                        "type": "number"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "player_id": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "position": {
+                        "enum": [
+                          "GK",
+                          "DEF",
+                          "MID",
+                          "FWD"
+                        ]
+                      },
+                      "short_name": {
+                        "type": "string"
+                      },
+                      "team": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "player_id",
+                      "name",
+                      "short_name",
+                      "position",
+                      "team"
+                    ],
+                    "type": "object"
+                  },
+                  "starting_xi": {
+                    "items": {
+                      "properties": {
+                        "expected_points": {
+                          "type": "number"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "player_id": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "position": {
+                          "enum": [
+                            "GK",
+                            "DEF",
+                            "MID",
+                            "FWD"
+                          ]
+                        },
+                        "short_name": {
+                          "type": "string"
+                        },
+                        "team": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "player_id",
+                        "name",
+                        "short_name",
+                        "position",
+                        "team"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 11,
+                    "minItems": 11,
+                    "type": "array"
+                  },
+                  "vice_captain": {
+                    "properties": {
+                      "expected_points": {
+                        "type": "number"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "player_id": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "position": {
+                        "enum": [
+                          "GK",
+                          "DEF",
+                          "MID",
+                          "FWD"
+                        ]
+                      },
+                      "short_name": {
+                        "type": "string"
+                      },
+                      "team": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "player_id",
+                      "name",
+                      "short_name",
+                      "position",
+                      "team"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "starting_xi",
+                  "captain",
+                  "vice_captain",
+                  "bench"
+                ],
+                "type": "object"
+              },
+              "lineup_expectation": {
+                "additionalProperties": false,
+                "properties": {
+                  "assumptions": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "autosub_points": {
+                    "type": "number"
+                  },
+                  "bench_boost_points": {
+                    "type": "number"
+                  },
+                  "captain_bonus_points": {
+                    "type": "number"
+                  },
+                  "expected_net_points": {
+                    "type": "number"
+                  },
+                  "starting_points": {
+                    "type": "number"
+                  },
+                  "version": {
+                    "const": "expected_lineup_v1"
+                  },
+                  "vice_bonus_points": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "version",
+                  "expected_net_points",
+                  "starting_points",
+                  "autosub_points",
+                  "captain_bonus_points",
+                  "vice_bonus_points",
+                  "bench_boost_points",
+                  "assumptions"
+                ],
+                "type": "object"
               },
               "transfer_hit_points": {
                 "type": "number"

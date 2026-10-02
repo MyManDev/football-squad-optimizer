@@ -7,6 +7,7 @@ switch is not offered. None of them stops the backend.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -21,6 +22,8 @@ from squadopt.application.top100_weight import (
     Top100InputsRefused,
 )
 from squadopt.application.weekly_plan import evidence_artifact, rotation_artifact
+from squadopt.data.snapshots import write_snapshot
+from squadopt.data.sources.club_news import CLUB_NEWS_SOURCE
 from squadopt.platform.advice_switches import (
     AdviceSwitchInputs,
     discovery_signature,
@@ -31,7 +34,10 @@ from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError
 SEASON = "2026-27"
 CAPTURE = "fpl-live-20260826T083133Z-d45f1bea8b68"
 INPUTS: Any = SimpleNamespace(
-    season=SEASON, snapshot_id=CAPTURE, deadline=SimpleNamespace(gameweek=3)
+    season=SEASON,
+    snapshot_id=CAPTURE,
+    deadline=SimpleNamespace(gameweek=3),
+    official_information=None,
 )
 
 
@@ -139,7 +145,18 @@ def _rotation(root: Path, *, capture: str = CAPTURE, sha: object = "7" * 64) -> 
     table, manifest = rotation_artifact(root / "rotation", SEASON, 3, capture)
     table.parent.mkdir(parents=True, exist_ok=True)
     table.write_text("rows", encoding="utf-8")
-    manifest.write_text(json.dumps({"table_sha256": sha}), encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "table_sha256": sha,
+                "season": SEASON,
+                "target_gameweek": 3,
+                "roster_snapshot_id": CAPTURE,
+                "source_snapshot_ids": [CAPTURE],
+            }
+        ),
+        encoding="utf-8",
+    )
     return table
 
 
@@ -234,3 +251,152 @@ def test_the_two_roots_are_optional_configuration() -> None:
     assert configured.club_news_source == Path("/repo/data/sample/club_news_v1.fixture.json")
     with pytest.raises(BackendConfigError):
         BackendConfig.from_environment({})
+
+
+def _news_source(tmp_path: Path) -> Path:
+    root = tmp_path / "snapshots"
+    snapshot = write_snapshot(
+        root,
+        source=CLUB_NEWS_SOURCE,
+        captured_at_utc="2026-08-25T12:00:00Z",
+        payloads={"index.json": b"{}"},
+    )
+    # These tests isolate discovery; the existing loader tests verify document/quote content.
+    return root / snapshot.snapshot_id
+
+
+def _bind_real_source(table: Path, source: Path, **overrides: Any) -> None:
+    path = table.with_suffix(".manifest.json")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["source_snapshot_ids"] = [CAPTURE, source.name]
+    document.update(overrides)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def test_real_news_uses_verified_news_capture_name_and_exact_source_binding(tmp_path, monkeypatch):
+    source = _news_source(tmp_path)
+    table = _rotation(tmp_path, capture=source.name)
+    _bind_real_source(table, source)
+    seen = []
+
+    def load(path, **kwargs):
+        seen.append(path)
+        return replace(_words(), source_kind="club_news_capture", source_label=source.name)
+
+    monkeypatch.setattr(module, "load_manager_words", load)
+    found = _load(tmp_path, club_news_source=source, snapshot_root=source.parent)
+    assert found.manager_words is not None
+    assert found.rotation_table_sha256 == "7" * 64
+    assert seen == [table]
+    assert table.name != rotation_artifact(tmp_path / "rotation", SEASON, 3, CAPTURE)[0].name
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"roster_snapshot_id": "another-decision"},
+        {"season": "2025-26"},
+        {"target_gameweek": 2},
+        {"source_snapshot_ids": [CAPTURE, "another-news-capture"]},
+        {"source_snapshot_ids": [CAPTURE]},
+    ],
+)
+def test_real_news_manifest_mismatch_is_refused_before_loading_words(
+    tmp_path, monkeypatch, changes
+):
+    source = _news_source(tmp_path)
+    table = _rotation(tmp_path, capture=source.name)
+    _bind_real_source(table, source, **changes)
+    monkeypatch.setattr(
+        module, "load_manager_words", lambda *a, **k: pytest.fail("unbound words were loaded")
+    )
+    found = _load(tmp_path, club_news_source=source, snapshot_root=source.parent)
+    assert found.manager_words is None and found.rotation_table_sha256 is None
+    assert any("managers_word" in note for note in found.notes)
+
+
+def test_same_named_directory_outside_configured_snapshot_root_is_refused(tmp_path, monkeypatch):
+    source = _news_source(tmp_path)
+    shadow = tmp_path / "shadow" / source.name
+    shadow.mkdir(parents=True)
+    monkeypatch.setattr(
+        module, "load_manager_words", lambda *a, **k: pytest.fail("wrong path read")
+    )
+    found = _load(tmp_path, club_news_source=shadow, snapshot_root=source.parent)
+    assert found.manager_words is None
+    assert any("outside its snapshot root" in note for note in found.notes)
+
+
+def test_capture_payload_tamper_is_refused_before_artifact_discovery(tmp_path, monkeypatch):
+    source = _news_source(tmp_path)
+    table = _rotation(tmp_path, capture=source.name)
+    _bind_real_source(table, source)
+    (source / "payloads" / "index.json").write_text("tampered", encoding="utf-8")
+    monkeypatch.setattr(
+        module, "load_manager_words", lambda *a, **k: pytest.fail("tampered source read")
+    )
+    assert (
+        _load(tmp_path, club_news_source=source, snapshot_root=source.parent).manager_words is None
+    )
+
+
+@pytest.mark.parametrize("legacy_version", [2, 3])
+def test_current_v4_writer_keeps_legacy_lookup_and_signature(tmp_path, monkeypatch, legacy_version):
+    source = tmp_path / "club_news_v1.fixture.json"
+    source.write_text("{}", encoding="utf-8")
+    legacy = (
+        tmp_path
+        / "rotation"
+        / f"rotation_evidence_v{legacy_version}_{SEASON}_gw03_{CAPTURE[-12:]}.csv"
+    )
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("rows", encoding="utf-8")
+    legacy.with_suffix(".manifest.json").write_text(
+        json.dumps(
+            {
+                "table_sha256": "7" * 64,
+                "roster_snapshot_id": CAPTURE,
+                "source_snapshot_ids": [CAPTURE],
+                "season": SEASON,
+                "target_gameweek": 3,
+            }
+        ),
+        encoding="utf-8",
+    )
+    seen = []
+
+    def load(path, **kwargs):
+        seen.append(path)
+        return _words()
+
+    monkeypatch.setattr(module, "load_manager_words", load)
+    assert _load(tmp_path, club_news_source=source).manager_words is not None
+    assert seen == [legacy]
+    signature = discovery_signature(
+        artifact_root=tmp_path,
+        club_news_source=source,
+        season=SEASON,
+        gameweek=3,
+        capture_snapshot_id=CAPTURE,
+    )
+    assert any(entry[0] == legacy.name for entry in signature)
+    current, _ = rotation_artifact(tmp_path / "rotation", SEASON, 3, CAPTURE)
+    assert current.name.startswith("rotation_evidence_v4_")
+    current.write_text("partial current artifact", encoding="utf-8")
+    # A broken current artifact must be reported, not hidden by falling back to a legacy artifact.
+    assert _load(tmp_path, club_news_source=source).manager_words is None
+    assert seen == [legacy]
+
+
+def test_real_capture_payload_stat_changes_discovery_signature(tmp_path):
+    source = _news_source(tmp_path)
+    kwargs = dict(
+        artifact_root=tmp_path,
+        club_news_source=source,
+        season=SEASON,
+        gameweek=3,
+        capture_snapshot_id=CAPTURE,
+    )
+    before = discovery_signature(**kwargs)
+    (source / "payloads" / "index.json").write_text("a changed payload", encoding="utf-8")
+    assert discovery_signature(**kwargs) != before

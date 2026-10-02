@@ -17,7 +17,7 @@ records which chip was played so the season's second half knows what is left.
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Final, TypedDict
 
@@ -26,6 +26,7 @@ import pandas as pd
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
+from squadopt.live.football_observations import availability_observations
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import TRANSFER_HIT_POINTS, SeasonRules, chip_availability_for
 from squadopt.optimization import OptimizationConfig, SolverStatus
@@ -44,6 +45,9 @@ from squadopt.planning import (
     spending_power,
 )
 from squadopt.planning.chip_strategy import optimize_chip_strategy
+from squadopt.planning.expected_window import optimize_expected_window
+from squadopt.planning.guarded import optimize_guarded_window
+from squadopt.planning.observed import optimize_observed_window
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 # Free transfers a manager holds for the second deadline: the game grants one after the
@@ -827,10 +831,13 @@ def plan_transfer_horizon(
     depend on an unversioned forecast.
 
     A one-week horizon reuses the uncapped operational transfer policy exactly. Longer
-    horizons default to at most one transfer per gameweek. That is the measured rolling
+    horizons default to at most one transfer per gameweek. Bounded experimental
+    football also admits two moves when both use banked free transfers. The base
+    one-transfer cap is the measured rolling
     discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
     churned, while the cap removed the mechanism. Callers may provide another explicit
-    policy, whose configuration fingerprint remains in the result.
+    policy. Multiweek sale accounting always uses the captured season fee, including
+    with an explicit policy; the effective configuration fingerprint is in the result.
 
     Chips are not offered unless the caller names them in ``chips``. A finite horizon
     values a chip inside the horizon only — its option value after the last week is
@@ -930,6 +937,16 @@ def plan_transfer_horizon(
         if transfer_config is None
         else transfer_config
     )
+    if len(projection_horizon.target_gameweeks) > 1:
+        # Initial lots retain the captured sell values, including unknown member
+        # purchase bases. A subsequent purchase starts a new lot at its actual
+        # planned buy price, even though captured market prices stay flat.
+        if (
+            planning_policy.acquisition_sell_on_fee is not None
+            and planning_policy.acquisition_sell_on_fee != fee
+        ):
+            raise DataSourceError("Planning sale fee differs from captured season rules.")
+        planning_policy = replace(planning_policy, acquisition_sell_on_fee=fee)
     state = InitialSquadState(
         held.squad_player_ids,
         bank_tenths=budget.bank_tenths,
@@ -943,8 +960,70 @@ def plan_transfer_horizon(
         raise DataSourceError(
             "Automatic chip strategy currently supports the pure-points path only."
         )
+    bounded_football = (
+        projection_horizon.model_name == "fixture_football_candidate"
+        and len(projection_horizon.target_gameweeks) in (3, 5)
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 2
+        and first_week_overlap is None
+        and first_week_transfer_cap is None
+        and first_week_exclusion is None
+    )
+    guarded_football = bounded_football and not chip_strategy
+    if bounded_football and transfer_config is None:
+        planning_policy = replace(planning_policy, allow_two_free_transfers=True)
+    expected_lineups = (
+        guarded_football
+        and "appearance_probability" in planning_table
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 5
+    )
+    information = None
+    if (
+        guarded_football
+        and settings.solver_deterministic_time_limit is not None
+        and settings.solver_deterministic_time_limit >= 5
+    ):
+        information = availability_observations(
+            PlanningHorizon(planning_table),
+            state,
+            inputs.availability,
+            model_version=projection_horizon.model_version,
+            source_snapshot_id=inputs.snapshot_id,
+            captured_at_utc=inputs.captured_at_utc,
+            deadline_utc=inputs.deadline.deadline_utc,
+        )
     plan = (
-        optimize_chip_strategy(
+        optimize_observed_window(
+            PlanningHorizon(planning_table),
+            state,
+            information.nodes,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+            expected_lineups=expected_lineups,
+        )
+        if information is not None and information.nodes
+        else optimize_expected_window(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+        )
+        if expected_lineups
+        else optimize_guarded_window(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            chips=chips,
+            preferences=preferences,
+        )
+        if guarded_football
+        else optimize_chip_strategy(
             PlanningHorizon(planning_table),
             state,
             settings,
@@ -953,6 +1032,7 @@ def plan_transfer_horizon(
             linearization_level=linearization_level,
             preferences=preferences,
             protect_hold=True,
+            expected_lineups=bounded_football and "appearance_probability" in planning_table,
         )
         if chip_strategy
         else optimize_transfer_plan(
@@ -969,6 +1049,22 @@ def plan_transfer_horizon(
             protect_hold=True,
         )
     )
+    if information is not None:
+        plan = replace(
+            plan,
+            diagnostics={
+                **plan.diagnostics,
+                "availability_information": {
+                    "version": information.contract_version,
+                    "reason": information.reason,
+                    "source_snapshot_id": information.source_snapshot_id,
+                    "captured_at_utc": information.captured_at_utc,
+                    "player_id": information.player_id,
+                    "probability": information.stated_probability,
+                    "gameweek": information.information_gameweek,
+                },
+            },
+        )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
         relative_gap = plan.diagnostics.get("relative_optimality_gap")

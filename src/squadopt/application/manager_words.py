@@ -11,7 +11,7 @@ member reads the source rather than a paraphrase of ours.
 The rule is declared here, not measured anywhere:
 
 - ``stated_expected_absent``: not in the eleven, and so not captain;
-- ``stated_rotation_risk`` and ``stated_minutes_limited``: not captain;
+- verified ``stated_rotation_risk``: not captain; vague managed minutes constrain nothing;
 - everything else (expected to start, returning from injury, ambiguous, not addressed,
   no statement) constrains nothing.
 
@@ -27,8 +27,9 @@ import hashlib
 import json
 import logging
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from numbers import Integral
 from pathlib import Path
 from typing import Final
 
@@ -36,18 +37,30 @@ import pandas as pd
 
 from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import read_snapshot
-from squadopt.data.sources.club_news import FixtureClubNewsProvider, RawDocument
+from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
+from squadopt.data.sources.club_news import CLUB_NEWS_SOURCE, FixtureClubNewsProvider, RawDocument
 from squadopt.data.sources.club_news_capture import read_captured_documents
+from squadopt.data.sources.club_news_metadata import PUBLICATION_SOURCES, publication_metadata
+from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
+from squadopt.data.sources.fpl_live import (
+    BOOTSTRAP_PAYLOAD,
+    FIXTURES_PAYLOAD,
+    fixture_snapshot,
+    short_name_roster,
+    team_codes,
+    team_names,
+)
+from squadopt.data.timestamps import as_instant
+from squadopt.features.rotation_evidence import claim_fixture_calendar, claim_targets_next_fixture
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.planning import FirstWeekExclusion
 
-MANAGERS_WORD_RULE_VERSION: Final = "managers_word_rule_v1"
+MANAGERS_WORD_RULE_VERSION: Final = "managers_word_rule_v2"
 MANAGERS_WORD_FILE: Final = "hoca-sozu.json"
 """The file name of the switched-on plan beside a member's one-week baseline."""
 NOT_STARTING_DISPOSITIONS: Final[frozenset[str]] = frozenset({"stated_expected_absent"})
 NOT_CAPTAIN_DISPOSITIONS: Final[frozenset[str]] = frozenset(
-    {"stated_expected_absent", "stated_rotation_risk", "stated_minutes_limited"}
+    {"stated_expected_absent", "stated_rotation_risk"}
 )
 SOURCE_SYNTHETIC_FIXTURE: Final = "synthetic_fixture"
 #: What a quote may not carry onto a member page. The Python copy guard
@@ -124,17 +137,72 @@ class ManagerWord:
     words: str | None
     """The cited span, decoded; ``None`` when unresolved or withheld (``words_status``)."""
     words_status: str = WORDS_SHOWN
+    # Internal provenance retained only after the held source span resolves.
+    source_sha256: str | None = None
+    span_start: int | None = None
+    span_end: int | None = None
+    fixture_scope: str = "unspecified"
+    scope_verified: bool = False
+    publication_verified: bool = False
+    publication_source: str | None = None
+    publication_source_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if self.words is None and self.words_status == WORDS_SHOWN:
             object.__setattr__(self, "words_status", WORDS_UNRESOLVED)
         if self.words is not None and self.words_status != WORDS_SHOWN:
             raise ManagerWordsError("Words are either shown or withheld, never both.")
+        provenance = (self.source_sha256, self.span_start, self.span_end)
+        if any(value is not None for value in provenance) and (
+            self.words_status == WORDS_UNRESOLVED
+            or not isinstance(self.source_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", self.source_sha256) is None
+            or isinstance(self.span_start, bool)
+            or not isinstance(self.span_start, Integral)
+            or isinstance(self.span_end, bool)
+            or not isinstance(self.span_end, Integral)
+            or not 0 <= self.span_start < self.span_end
+        ):
+            raise ManagerWordsError("Source provenance requires one resolved complete byte span.")
+        if (
+            self.fixture_scope not in FIXTURE_SCOPES
+            or type(self.scope_verified) is not bool
+            or type(self.publication_verified) is not bool
+        ):
+            raise ManagerWordsError("Claim attestation requires a known scope and boolean flags.")
+        if (self.scope_verified or self.publication_verified) and any(
+            value is None for value in provenance
+        ):
+            raise ManagerWordsError("Claim attestation requires a resolved complete source span.")
+        if self.scope_verified and self.fixture_scope != "upcoming_premier_league":
+            raise ManagerWordsError("Only explicit upcoming league scope can be verified.")
+        if self.publication_verified and (
+            self.publication_source not in PUBLICATION_SOURCES
+            or not isinstance(self.publication_source_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", self.publication_source_sha256) is None
+            or self.published_at_utc is None
+            or self.published_precision not in ("instant", "day")
+        ):
+            raise ManagerWordsError(
+                "Verified publication requires an explicit source date and digest."
+            )
 
     @property
     def role(self) -> str | None:
         """What the rule makes of it: ``not_starting``, ``not_captain`` or ``None``."""
 
+        if not (
+            self.scope_verified
+            and self.publication_verified
+            and self.published_precision == "instant"
+            and self.fetched_at_utc
+        ):
+            return None
+        try:
+            if as_instant(str(self.published_at_utc)) > as_instant(self.fetched_at_utc):
+                return None
+        except (DataError, ValueError, TypeError):
+            return None
         if self.disposition in NOT_STARTING_DISPOSITIONS:
             return "not_starting"
         if self.disposition in NOT_CAPTAIN_DISPOSITIONS:
@@ -222,7 +290,11 @@ def _resolve(
                 return document, None
             if not 0 <= first < last <= len(candidate):
                 return document, None
-            return document, candidate[first:last].decode("utf-8", errors="replace").strip()
+            try:
+                words = candidate[first:last].decode("utf-8").strip()
+            except UnicodeDecodeError:
+                return document, None
+            return document, words or None
     return None, None
 
 
@@ -305,6 +377,7 @@ def manager_words_from_artifact(
     documents: Sequence[RawDocument],
     source_kind: str,
     source_label: str,
+    snapshot_root: Path | None = None,
 ) -> ManagerWords:
     """Read a verified evidence artifact into the statements the rule can act on."""
 
@@ -318,6 +391,7 @@ def manager_words_from_artifact(
         )
     clubs = _covered(table, table_path)
     source_check = _require_the_coded_documents(table, table_path, documents, source_label)
+    target_basis = _decision_fixture_basis(table, snapshot_root)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
         disposition = _text(row.get("rotation_disposition"))
@@ -329,7 +403,43 @@ def manager_words_from_artifact(
             row.get("rotation_claim_span_start"),
             row.get("rotation_claim_span_end"),
         )
-        status = WORDS_SHOWN if cited is not None else WORDS_UNRESOLVED
+        resolved = cited is not None
+        scope = _text(row.get("rotation_claim_fixture_scope")) or "unspecified"
+        player = (
+            target_basis[1].get(int(str(row["player_id"]))) if target_basis is not None else None
+        )
+        checked_scope = (
+            verified_fixture_scope(
+                cited.encode(), disposition, player_name=player[2] if player else None
+            )
+            if cited
+            else ("unspecified", False)
+        )
+        scope_verified = row.get("rotation_claim_scope_verified") is True and checked_scope == (
+            scope,
+            True,
+        )
+        if scope_verified:
+            scope_verified = target_basis is not None and _targets_decision(
+                row, document, target_basis
+            )
+        publication_source = _text(row.get("rotation_claim_publication_source"))
+        publication_digest = _text(row.get("rotation_claim_publication_source_sha256"))
+        metadata = (
+            publication_metadata(document.content, document.content_type, document.final_url)
+            if document is not None and resolved
+            else None
+        )
+        publication_verified = (
+            row.get("rotation_claim_publication_verified") is True
+            and metadata is not None
+            and metadata.verified
+            and metadata.published_at_utc == _text(row.get("rotation_claim_published_at_utc"))
+            and metadata.published_precision == _text(row.get("rotation_claim_published_precision"))
+            and metadata.source == publication_source
+            and metadata.source_sha256 == publication_digest
+        )
+        status = WORDS_SHOWN if resolved else WORDS_UNRESOLVED
         if cited is not None and QUOTE_WITHHELD_PATTERN.search(cited):
             cited, status = None, WORDS_WITHHELD_FIGURE
         words.append(
@@ -344,6 +454,14 @@ def manager_words_from_artifact(
                 fetched_at_utc=None if document is None else document.fetched_at_utc,
                 words=cited,
                 words_status=status,
+                source_sha256=_text(row.get("rotation_claim_source_sha256")) if resolved else None,
+                span_start=int(str(row["rotation_claim_span_start"])) if resolved else None,
+                span_end=int(str(row["rotation_claim_span_end"])) if resolved else None,
+                fixture_scope=scope,
+                scope_verified=scope_verified,
+                publication_verified=publication_verified,
+                publication_source=publication_source,
+                publication_source_sha256=publication_digest,
             )
         )
     return ManagerWords(
@@ -356,6 +474,26 @@ def manager_words_from_artifact(
         words=tuple(sorted(words, key=lambda word: word.player_id)),
         source_check=source_check,
     )
+
+
+def _club_news_snapshot(source: Path, snapshot_root: Path | None) -> CapturedSnapshot:
+    root = Path(snapshot_root) if snapshot_root is not None else source.parent
+    if source.resolve() != (root / source.name).resolve():
+        raise ManagerWordsError("Configured club-news capture is outside its snapshot root.")
+    snapshot = read_snapshot(root, source.name)
+    if snapshot.metadata.source != CLUB_NEWS_SOURCE:
+        raise ManagerWordsError("Configured capture is not a club-news capture.")
+    return snapshot
+
+
+def club_news_capture_id(source: Path, *, snapshot_root: Path | None = None) -> str | None:
+    """Validate a configured capture's identity; a fixture file has no news capture ID."""
+    source = Path(source)
+    if source.is_file():
+        return None
+    if source.is_dir():
+        return _club_news_snapshot(source, snapshot_root).metadata.snapshot_id
+    raise ManagerWordsError("Configured club-news source is missing.")
 
 
 def documents_from_source(
@@ -375,9 +513,12 @@ def documents_from_source(
         synthetic = json.loads(path.read_text(encoding="utf-8")).get("synthetic") is True
         return documents, SOURCE_SYNTHETIC_FIXTURE if synthetic else SOURCE_FIXTURE_FILE, path.name
     if path.is_dir():
-        root = Path(snapshot_root) if snapshot_root is not None else path.parent
-        snapshot = read_snapshot(root, path.name)
-        return read_captured_documents(snapshot), SOURCE_CLUB_NEWS_CAPTURE, path.name
+        snapshot = _club_news_snapshot(path, snapshot_root)
+        return (
+            read_captured_documents(snapshot),
+            SOURCE_CLUB_NEWS_CAPTURE,
+            snapshot.metadata.snapshot_id,
+        )
     raise ManagerWordsError(f"No club-news source at {path}: not a fixture file, not a capture.")
 
 
@@ -392,7 +533,73 @@ def load_manager_words(
         raise ManagerWordsError(f"No manifest beside {table.name}: expected {manifest.name}.")
     documents, kind, label = documents_from_source(club_news_source, snapshot_root=snapshot_root)
     return manager_words_from_artifact(
-        table, manifest, documents=documents, source_kind=kind, source_label=label
+        table,
+        manifest,
+        documents=documents,
+        source_kind=kind,
+        source_label=label,
+        snapshot_root=(snapshot_root or club_news_source.parent)
+        if club_news_source.is_dir()
+        else snapshot_root,
+    )
+
+
+def _decision_fixture_basis(
+    table: pd.DataFrame,
+    snapshot_root: Path | None,
+) -> tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str] | None:
+    """Read only the exact immutable decision named by the checked manifest."""
+    if (
+        snapshot_root is None
+        or "rotation_claim_scope_verified" not in table
+        or not table.rotation_claim_scope_verified.fillna(False).any()
+    ):
+        return None
+    try:
+        snapshot = read_snapshot(snapshot_root, str(table.attrs["roster_snapshot_id"]))
+        captured = snapshot.metadata.captured_at_utc
+        if set(table.captured_at_utc.astype(str)) != {captured}:
+            return None
+        bootstrap = snapshot.payloads[BOOTSTRAP_PAYLOAD]
+        calendar = fixture_snapshot(
+            snapshot.payloads[FIXTURES_PAYLOAD],
+            bootstrap,
+            season=str(table.season.iloc[0]),
+            snapshot_id=snapshot.metadata.snapshot_id,
+            captured_at_utc=captured,
+        )
+        calendar = claim_fixture_calendar(calendar, snapshot.payloads[FIXTURES_PAYLOAD], bootstrap)
+        codes, names = team_codes(bootstrap), team_names(bootstrap)
+        by_name = {name: codes[identifier] for identifier, name in names.items()}
+        players = {
+            int(str(row.player_id)): (
+                str(row.team_name),
+                by_name[str(row.team_name)],
+                str(row.web_name),
+            )
+            for row in short_name_roster(bootstrap).itertuples()
+        }
+        return calendar, players, captured
+    except (DataError, KeyError, ValueError, OSError):
+        return None
+
+
+def _targets_decision(
+    row: Mapping[Hashable, object],
+    document: RawDocument | None,
+    basis: tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str],
+) -> bool:
+    calendar, players, captured = basis
+    player = players.get(int(str(row["player_id"])))
+    if document is None or player is None or player[0] != document.club:
+        return False
+    return claim_targets_next_fixture(
+        calendar,
+        team_code=player[1],
+        target_gameweek=int(str(row["target_gameweek"])),
+        captured_at_utc=captured,
+        published_at_utc=_text(row.get("rotation_claim_published_at_utc")),
+        published_precision=_text(row.get("rotation_claim_published_precision")) or "unknown",
     )
 
 
@@ -413,6 +620,7 @@ __all__ = [
     "ManagerWord",
     "ManagerWords",
     "ManagerWordsError",
+    "club_news_capture_id",
     "documents_from_source",
     "load_manager_words",
     "manager_words_from_artifact",

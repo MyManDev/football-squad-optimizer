@@ -19,10 +19,14 @@ model actually produces and none of them can be derived from a correct answer.
 import json
 from typing import Any
 
-from squadopt.data.sources.club_news import ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+from squadopt.data.sources.club_news import (
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION as ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+)
 from squadopt.data.sources.club_news_coding import (
     CODING_FIXTURE_CONTRACT_VERSION,
-    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+)
+from squadopt.data.sources.club_news_coding import (
+    LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION as ROTATION_CLAIM_CODING_CONTRACT_VERSION,
 )
 from tests.fixtures.synthetic_club_news import make_club_news_fixture
 

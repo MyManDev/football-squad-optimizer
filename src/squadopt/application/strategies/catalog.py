@@ -59,6 +59,9 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # published beside ``moves`` and no move row carries it.
         "transfer_hit_points",
         "expected_own_points",
+        # Expected point contributions from starters, autosubs, captain/vice and chips,
+        # with actual hits and stated scoring assumptions; no distribution or ranking.
+        "lineup_expectation",
         # What the plan is worth against keeping the fifteen already held, on the same
         # basis as ``expected_own_points`` and as every move row: the eleven with the
         # captain doubled, before the week's hit charge. A difference between two
@@ -389,6 +392,7 @@ _BASELINE_PUBLISHES: Final = frozenset(
         "moves",
         "transfer_hit_points",
         "expected_own_points",
+        "lineup_expectation",  # optional expected-points breakdown on supported windows
         # What the plan is worth against holding the squad, on the same basis as
         # ``expected_own_points`` and as every move row. Every strategy publishes it:
         # the question it answers, whether the plan is worth making at all, does not

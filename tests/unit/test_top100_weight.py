@@ -14,7 +14,13 @@ from typing import Any
 import pandas as pd
 import pytest
 import tests.unit.test_live_transfers as world_module
-from tests.unit.test_league_views import _legal_squad, _member_picks, _Provider, _world_context
+from tests.unit.test_league_views import (
+    _legal_squad,
+    _member_picks,
+    _Provider,
+    _verified_manager_word,
+    _world_context,
+)
 
 import squadopt.application.top100_weight as top100_module
 from squadopt.application.advice import (
@@ -31,7 +37,7 @@ from squadopt.application.lineup_publication import (
     best_eleven_basis,
     best_eleven_points_under,
 )
-from squadopt.application.manager_words import ManagerWord, ManagerWords
+from squadopt.application.manager_words import ManagerWords
 from squadopt.application.strategies.catalog import (
     FORBIDDEN_FIELD_PATTERN,
     FORBIDDEN_TEXT_PATTERN,
@@ -163,21 +169,9 @@ def _words(player: int) -> ManagerWords:
         gameweek=2,
         source_kind="synthetic_fixture",
         source_label="club_news_v1.fixture.json",
-        evidence_table="rotation_evidence_v2_2026-27_gw02.csv",
+        evidence_table="rotation_evidence_v4_2026-27_gw02.csv",
         clubs_covered=("Club 1",),
-        words=(
-            ManagerWord(
-                player_id=player,
-                disposition="stated_expected_absent",
-                speaker="the manager",
-                published_at_utc="2026-08-21T10:00:00Z",
-                published_precision="instant",
-                club="Club 1",
-                source_url="https://club.example/club-1/news",
-                fetched_at_utc="2026-08-22T11:00:00Z",
-                words="He will not travel.",
-            ),
-        ),
+        words=(_verified_manager_word(player, "stated_expected_absent"),),
     )
 
 

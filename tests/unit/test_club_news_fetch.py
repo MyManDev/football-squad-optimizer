@@ -1424,6 +1424,81 @@ def test_the_link_rule_keeps_same_origin_links_under_the_page_in_page_order() ->
     assert article_links(SOURCE, index) == (ARTICLE_ONE, ARTICLE_TWO, PRIVATE)
 
 
+def test_availability_links_get_the_existing_budget_before_other_content() -> None:
+    links = [
+        ("shop/new-kit", "New kit"),
+        ("academy/match-preview", "Match preview"),
+        ("club-announcement", "Club announcement"),
+        ("women/team-news", "Team news"),
+        ("latest-briefing", "<span>Team</span> news before Saturday"),
+        ("press-conference", "Press conference"),
+        ("tickets/saturday", "Tickets"),
+        ("academy-graduate-injury-update", "Academy graduate returns to first-team training"),
+    ]
+    markup = "".join(f"<a href='/team-news/{path}'>{text}</a>" for path, text in links)
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(markup.encode())})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+    expected = [4, 5, 7, 2, 0, 1, 3, 6]
+    assert article_links(SOURCE, index) == tuple(
+        f"https://club.example/team-news/{links[i][0]}" for i in expected
+    )
+
+
+def test_link_priority_uses_own_title_and_does_not_weaken_origin_or_path_rules() -> None:
+    markup = (
+        "<a href='/team-news/unknown'>Report</a>"
+        "<p>Injury update outside the link must not promote the previous report.</p>"
+        "<a href='/team-news/photo'><img alt='Shop: new kit'></a>"
+        "<a href='/team-news/update' title='Fitness update'>Read more</a>"
+        "<a href='/team-news/young' aria-label='U21s: injury update'>News</a>"
+        "<a href='/team-news/women-story' title='Team news'>Update</a>"
+        "<a href='https://other.example/team-news/injuries'>First team injury update</a>"
+        "<a href='/team-news/../injuries'>First team injury update</a>"
+        "<a href='/tickets/injury-update'>First team injury update</a>"
+    )
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(markup.encode())})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+    assert article_links(SOURCE, index) == tuple(
+        f"https://club.example/team-news/{path}"
+        for path in ("update", "unknown", "photo", "young", "women-story")
+    )
+
+
+def test_repeated_link_can_gain_a_label_without_an_extra_request() -> None:
+    markup = (
+        "<a href='/team-news/unknown'>Unknown</a>"
+        "<a href='/team-news/update'><img alt=''></a>"
+        "<a href='/team-news/update#more'>Injury update</a>"
+        "<a href='/team-news/second-update' title='Medical update'>Read</a>"
+    )
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(markup.encode())})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+    assert article_links(SOURCE, index) == tuple(
+        f"https://club.example/team-news/{path}" for path in ("update", "second-update", "unknown")
+    )
+
+
+def test_team_news_beyond_ten_commercial_links_is_fetched_within_the_same_cap() -> None:
+    paths = [f"shop/item-{i}" for i in range(MAXIMUM_ARTICLES_PER_HOST)]
+    paths.extend(["injury-update", "club-statement"])
+    urls = [f"https://club.example/team-news/{path}" for path in paths]
+    markup = "".join(f"<a href='{url}'>Read</a>" for url in urls)
+    replies = {
+        ROBOTS: _allowing_robots(),
+        PAGE: _Reply(markup.encode()),
+        **{url: _Reply(b"<p>Captured article.</p>", final_url=url) for url in urls},
+    }
+    opener = _Opener(replies)
+    documents, refused = fetch_registered_documents(
+        (SOURCE,), opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+    articles = [doc.requested_url for doc in documents if doc.requested_url != PAGE]
+    assert refused == ()
+    assert len(articles) == MAXIMUM_ARTICLES_PER_HOST
+    assert articles[:2] == urls[-2:]
+    assert len(opener.requested) == MAXIMUM_ARTICLES_PER_HOST + 2  # robots + index
+
+
 def test_a_failed_article_costs_the_article_and_not_the_club() -> None:
     """The registered page was read, so the club is read; the article is named as missing."""
 

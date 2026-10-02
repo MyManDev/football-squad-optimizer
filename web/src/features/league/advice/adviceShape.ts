@@ -1,3 +1,4 @@
+import { isDecisionInformation, isOfficialInformation } from "./informationFacts";
 /** Runtime counterpart of docs/contracts/advice_read_v1.schema.json. */
 import { checkedPreferences } from "./decisionPreferences";
 
@@ -81,17 +82,77 @@ const move: Predicate = (value) =>
       "top100_preference",
     ),
   });
-const planWeek: Predicate = (value) =>
+const lineupExpectation: Predicate = (value) =>
+  record(value) &&
+  Object.keys(value).length === 8 &&
   fields(value, {
-    gameweek: identity,
-    transfers_in: array(player),
-    transfers_out: array(player),
-    transfer_hit_points: finite,
-    chip,
-    free_transfers_before: integer,
-    free_transfers_after: integer,
-    expected_points: finite,
+    version: oneOf("expected_lineup_v1"),
+    expected_net_points: finite,
+    starting_points: finite,
+    autosub_points: finite,
+    captain_bonus_points: finite,
+    vice_bonus_points: finite,
+    bench_boost_points: finite,
+    assumptions: array(text),
   });
+const lineup =
+  (member: Predicate): Predicate =>
+  (value) =>
+    record(value) &&
+    Object.keys(value).length === 4 &&
+    fields(value, {
+      starting_xi: (players) =>
+        Array.isArray(players) && players.length === 11 && players.every(member),
+      captain: member,
+      vice_captain: member,
+      bench: (players) => Array.isArray(players) && players.length === 4 && players.every(member),
+    });
+const planWeek: Predicate = (value) =>
+  fields(
+    value,
+    {
+      gameweek: identity,
+      transfers_in: array(player),
+      transfers_out: array(player),
+      transfer_hit_points: finite,
+      chip,
+      free_transfers_before: integer,
+      free_transfers_after: integer,
+      expected_points: finite,
+    },
+    { lineup_expectation: lineupExpectation, lineup: lineup(player) },
+  );
+const participationEvidence: Predicate = (value) =>
+  record(value) &&
+  Object.keys(value).length === (value.statement_outcomes === undefined ? 8 : 9) &&
+  fields(
+    value,
+    {
+      version: oneOf("football_participation_evidence_v1"),
+      as_of: nullable(text),
+      gameweek: nullable(identity),
+      applied_player_count: integer,
+      unapplied_statement_count: integer,
+      captured_percentage_count: integer,
+      manager_statement_count: integer,
+      assumptions: array(text),
+    },
+    {
+      statement_outcomes: array(
+        (row) =>
+          record(row) &&
+          Object.keys(row).length === 6 &&
+          fields(row, {
+            player_id: identity,
+            disposition: text,
+            applied: oneOf(true, false),
+            reason: text,
+            source_url: nullable(text),
+            source_published_at: nullable(text),
+          }),
+      ),
+    },
+  );
 const alternative: Predicate = (value) =>
   fields(
     value,
@@ -141,7 +202,7 @@ const chipChoice: Predicate = (value) =>
 
 const chipStrategy: Predicate = (value) =>
   fields(value, {
-    version: oneOf("model_opportunity_reservation_v1"),
+    version: oneOf("model_opportunity_reservation_v1", "model_opportunity_reservation_v2"),
     mode: oneOf("auto", "manual"),
     requested_chip: oneOf("auto", "bboost", "3xc", "wildcard", "freehit"),
     selected_chip: chip,
@@ -163,6 +224,55 @@ const chipStrategy: Predicate = (value) =>
     limits: array(text),
   });
 
+const informationReview: Predicate = (value) =>
+  fields(value, {
+    version: oneOf("football_information_review_v1"),
+    status: oneOf("compared", "baseline_retained"),
+    reason: text,
+    source_snapshot_id: text,
+    captured_at_utc: text,
+    player_name: nullable(text),
+    source_playing_chance_percent: oneOf(null, 25, 50, 75),
+    information_gameweek: nullable(identity),
+    candidates: array((candidate) =>
+      fields(
+        candidate,
+        {
+          selected: oneOf(true, false),
+          baseline: oneOf(true, false),
+          transfers_in: array(text),
+          transfers_out: array(text),
+          chip,
+          expected_net_points: nullable(finite),
+          branches: array((branch) =>
+            fields(branch, {
+              state: oneOf("eligible", "unavailable"),
+              expected_net_points: nullable(finite),
+              hit_points: finite,
+              weeks: array((week) =>
+                fields(
+                  week,
+                  {
+                    gameweek: identity,
+                    transfers_in: array(text),
+                    transfers_out: array(text),
+                    chip,
+                    bank_tenths: integer,
+                    free_transfers: integer,
+                  },
+                  { lineup: lineup(text) },
+                ),
+              ),
+            }),
+          ),
+        },
+        {
+          first_lineup: lineup(text),
+        },
+      ),
+    ),
+  });
+
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
@@ -180,6 +290,11 @@ export function isAdvicePayload(value: unknown): boolean {
     {
       source_snapshot_id: nullable(text),
       prediction_model: predictionModel,
+      information_review: informationReview,
+      lineup_expectation: lineupExpectation,
+      participation_evidence: participationEvidence,
+      official_information: isOfficialInformation,
+      decision_information: isDecisionInformation,
       preferences,
       preferences_scope: oneOf("all_selected_weeks"),
       selection_top100_weight: oneOf(0, 5, 10, 20, 30, 40, 50),

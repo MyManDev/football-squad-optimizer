@@ -1,3 +1,4 @@
+import { OfficialInformationCard } from "../advice/OfficialInformationCard";
 import { useId, type CSSProperties } from "react";
 
 import { Badge } from "../../../design/components/Badge";
@@ -9,6 +10,11 @@ import { CHIP_COPY, chipLimit, chipRescores, type ChipCopy } from "../advice/chi
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { publishedPrice } from "../advice/publishedPrice";
+import { InformationReview } from "../advice/InformationReview";
+import { ExpectedLineup } from "../advice/ExpectedLineup";
+import { expectedLineupLabel } from "../advice/expectedLineupLabel";
+import { ParticipationEvidence } from "../advice/ParticipationEvidence";
+import { WeekLineup } from "../advice/WeekLineup";
 import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
@@ -413,6 +419,10 @@ export function AdviceDetails({
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <EvidenceSection view={view} priced={priced} />
       <Top100Section view={view} priced={priced} />
+      <ExpectedLineup view={view} />
+      <ParticipationEvidence view={view} />
+      <OfficialInformationCard view={view} />
+      <InformationReview view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
       <StatedLimits view={view} />
@@ -1018,6 +1028,12 @@ function WindowSection({ view }: { view: EntryAdvice }) {
           ))}
         </tbody>
       </table>
+      {weeks.map(
+        (week) =>
+          week.lineup && (
+            <WeekLineup key={week.gameweek} gameweek={week.gameweek} lineup={week.lineup} />
+          ),
+      )}
     </section>
   );
 }
@@ -1065,6 +1081,18 @@ function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean 
         </p>
       )}
       <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
+      {evidence.clubs_covered.length > 0 ? (
+        <div>
+          <p className={styles.muted}>{copy.coveredClubs}</p>
+          <ul className={styles.assumptionList} aria-label={copy.coveredClubs}>
+            {evidence.clubs_covered.map((club) => (
+              <li key={club}>{club}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className={styles.muted}>{copy.noCoveredClubs}</p>
+      )}
       {evidence.binding === undefined ? null : (
         <p className={styles.muted}>
           {evidence.binding ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
@@ -1270,12 +1298,14 @@ function LineupSection({
       {/* The total as the pitch's heading prints it, so switching views keeps the figure. */}
       {finiteNumber(view.expected_own_points) ? (
         <p className={lineup.own}>
-          {chipBasis !== null
-            ? CHIP_COPY[language].expectedOwnPoints(
-                figure(view.expected_own_points, locale),
-                chipBasis,
-              )
-            : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
+          {view.lineup_expectation
+            ? expectedLineupLabel(figure(view.expected_own_points, locale), language)
+            : chipBasis !== null
+              ? CHIP_COPY[language].expectedOwnPoints(
+                  figure(view.expected_own_points, locale),
+                  chipBasis,
+                )
+              : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
         </p>
       ) : null}
       <dl className={lineup.armband}>

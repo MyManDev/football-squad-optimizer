@@ -8,6 +8,10 @@ pricing plan, the pure-points window at setting 0, the strategy's own document a
 calls the producer the batch calls, with the same arguments. Nothing about advice is
 decided here; for the same inputs the payload is the batch's payload.
 
+Experimental football windows use one budget for the requested Top 100 setting. They
+state base-model points and the setting's source, without an unmeasured comparison to
+a second plan at setting 0.
+
 A plain request, no setting and no word, on a combination ``advise_entry`` answers is
 ``advise_entry``'s own payload, byte for byte.
 
@@ -23,6 +27,7 @@ from dataclasses import dataclass, replace
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
+    TOP100_LIMIT,
     AdviseEntryRequest,
     HorizonBuilder,
     _requested_picks,
@@ -40,6 +45,7 @@ from squadopt.application.advice_capabilities import (
 from squadopt.application.advice_chip_strategy import advise_chip_strategy
 from squadopt.application.advice_chips import advise_with_chip, member_chip_menu
 from squadopt.application.advice_variants import (
+    TOP100_WINDOW_LIMIT,
     advise_rival_window,
     advise_rival_with_top100,
     advise_window_with_top100,
@@ -253,11 +259,21 @@ def advise_menu_entry(
         )
     _require_capture(request, inputs, rules)
     plain = request.entry_request()
-    if request.preferences.active or (
-        request.chip is not None
-        and (request.chip == "auto" or request.window != 1 or request.top100_weight)
+    football_weighted_window = (
+        projection.diagnostics.get("model_name") == "fixture_football_candidate"
+        and request.strategy == COMPUTED_MODE
+        and request.window in (3, 5)
+        and request.top100_weight > 0
+    )
+    if (
+        football_weighted_window
+        or request.preferences.active
+        or (
+            request.chip is not None
+            and (request.chip == "auto" or request.window != 1 or request.top100_weight)
+        )
     ):
-        return advise_chip_strategy(
+        payload = advise_chip_strategy(
             plain,
             chip=request.chip,
             top100_weight=request.top100_weight,
@@ -269,6 +285,18 @@ def advise_menu_entry(
             counts=top100_counts,
             preferences=request.preferences,
         )
+        if football_weighted_window:
+            assert top100_counts is not None
+            payload["selection_top100_source"] = top100_counts.source_record()
+            limits = payload.get("stated_limits")
+            assert isinstance(limits, list)
+            for sentence in (
+                TOP100_LIMIT.format(weight=request.top100_weight),
+                TOP100_WINDOW_LIMIT,
+            ):
+                if sentence not in limits:
+                    limits.append(sentence)
+        return payload
     if request.chip is not None:
         held_chips = held_member_chips(plain, provider=provider, inputs=inputs, rules=rules)
         if held_chips is None or request.chip not in held_chips:

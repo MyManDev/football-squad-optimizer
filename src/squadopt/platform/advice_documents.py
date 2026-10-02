@@ -1,15 +1,15 @@
 """The public read contracts: what the advice route and the league route may serve.
 
-The cache stores bytes and the api serves them verbatim — that is the design, and it
+The cache stores bytes and the api serves them verbatim â€” that is the design, and it
 is exactly why the boundary needs its own contract: without one, a cache writer or a
 corrupted disk entry could make the api publish arbitrary JSON while the route claims
 a versioned answer. These schemas are that contract, committed beside the other wire
 schemas, validated **at read** (a corrupted entry is an internal error, never a
 published document) and by the compute adapter at write when the composition root
-lands — the worker itself stays ignorant of document semantics by design.
+lands â€” the worker itself stays ignorant of document semantics by design.
 
-The advice document is the league tree's own envelope — the same
-``provisional_league_ui_v1`` bytes the static site serves — so the two distribution
+The advice document is the league tree's own envelope â€” the same
+``provisional_league_ui_v1`` bytes the static site serves â€” so the two distribution
 paths cannot drift apart. The payload keeps ``additionalProperties`` open because the
 producer grows honest fields (``solver_status`` arrived that way); the required core
 and its types are the contract.
@@ -25,6 +25,7 @@ from typing import Any, Final
 import jsonschema
 
 from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
+from squadopt.contracts.information import decision_information_schema, official_information_schema
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import preferences_schema
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
@@ -40,6 +41,170 @@ LEAGUE_CAPABILITIES_SCHEMA_PATH: Final = (
 
 class AdviceDocumentError(ValueError):
     """Bytes that claim to be a versioned advice answer, and are not."""
+
+
+def lineup_expectation_schema() -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "version": {"const": "expected_lineup_v1"},
+        **{
+            name: {"type": "number"}
+            for name in (
+                "expected_net_points",
+                "starting_points",
+                "autosub_points",
+                "captain_bonus_points",
+                "vice_bonus_points",
+                "bench_boost_points",
+            )
+        },
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": fields,
+        "required": list(fields),
+    }
+
+
+def participation_evidence_schema() -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "version": {"const": "football_participation_evidence_v1"},
+        "as_of": {"type": ["string", "null"]},
+        "gameweek": {"type": ["integer", "null"], "minimum": 1},
+        **{
+            name: {"type": "integer", "minimum": 0}
+            for name in (
+                "applied_player_count",
+                "unapplied_statement_count",
+                "captured_percentage_count",
+                "manager_statement_count",
+            )
+        },
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            **fields,
+            "statement_outcomes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "player_id": {"type": "integer", "minimum": 1},
+                        "disposition": {"type": "string"},
+                        "applied": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                        "source_url": {"type": ["string", "null"]},
+                        "source_published_at": {"type": ["string", "null"]},
+                    },
+                    "required": [
+                        "player_id",
+                        "disposition",
+                        "applied",
+                        "reason",
+                        "source_url",
+                        "source_published_at",
+                    ],
+                },
+            },
+        },
+        "required": list(fields),
+    }
+
+
+def lineup_decision_schema(player: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "starting_xi": {"type": "array", "items": player, "minItems": 11, "maxItems": 11},
+            "captain": player,
+            "vice_captain": player,
+            "bench": {"type": "array", "items": player, "minItems": 4, "maxItems": 4},
+        },
+        "required": ["starting_xi", "captain", "vice_captain", "bench"],
+    }
+
+
+def information_review_schema() -> dict[str, Any]:
+    names = {"type": "array", "items": {"type": "string"}}
+    nullable = {"type": ["number", "null"]}
+    chip = {"enum": [None, "bboost", "3xc", "wildcard", "freehit"]}
+    week = {
+        "gameweek": {"type": "integer", "minimum": 1},
+        "transfers_in": names,
+        "transfers_out": names,
+        "chip": chip,
+        "bank_tenths": {"type": "integer", "minimum": 0},
+        "free_transfers": {"type": "integer", "minimum": 0},
+        "lineup": lineup_decision_schema({"type": "string"}),
+    }
+    branch = {
+        "state": {"enum": ["eligible", "unavailable"]},
+        "expected_net_points": nullable,
+        "hit_points": {"type": "number", "minimum": 0},
+        "weeks": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 4,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": week,
+                "required": [name for name in week if name != "lineup"],
+            },
+        },
+    }
+    candidate = {
+        "selected": {"type": "boolean"},
+        "baseline": {"type": "boolean"},
+        "transfers_in": names,
+        "transfers_out": names,
+        "chip": chip,
+        "expected_net_points": nullable,
+        "first_lineup": lineup_decision_schema({"type": "string"}),
+        "branches": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": branch,
+                "required": list(branch),
+            },
+        },
+    }
+    fields = {
+        "version": {"const": "football_information_review_v1"},
+        "status": {"enum": ["compared", "baseline_retained"]},
+        "reason": {"type": "string"},
+        "source_snapshot_id": {"type": "string"},
+        "captured_at_utc": {"type": "string"},
+        "player_name": {"type": ["string", "null"]},
+        "source_playing_chance_percent": {"enum": [None, 25, 50, 75]},
+        "information_gameweek": {"type": ["integer", "null"]},
+        "candidates": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": candidate,
+                "required": [name for name in candidate if name != "first_lineup"],
+            },
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": fields,
+        "required": list(fields),
+    }
 
 
 def advice_read_schema() -> dict[str, Any]:
@@ -69,6 +234,8 @@ def advice_read_schema() -> dict[str, Any]:
             "free_transfers_before": {"type": "integer", "minimum": 0},
             "free_transfers_after": {"type": "integer", "minimum": 0},
             "expected_points": {"type": "number"},
+            "lineup_expectation": lineup_expectation_schema(),
+            "lineup": lineup_decision_schema(player),
         },
         "required": [
             "gameweek",
@@ -266,6 +433,10 @@ def advice_read_schema() -> dict[str, Any]:
                 "required": ["chip", "gain_vs_no_chip", "basis"],
             },
             "expected_own_points": nullable_number,
+            "lineup_expectation": lineup_expectation_schema(),
+            "participation_evidence": participation_evidence_schema(),
+            "official_information": official_information_schema(),
+            "decision_information": decision_information_schema(),
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
             "expected_gain_vs_hold": nullable_number,
@@ -276,6 +447,7 @@ def advice_read_schema() -> dict[str, Any]:
             "bench": {"type": ["array", "null"], "items": player},
             "chip": chip,
             "plan_weeks": {"type": ["array", "null"], "items": plan_week},
+            "information_review": information_review_schema(),
             "stated_limits": {"type": ["array", "null"], "items": {"type": "string"}},
             "squad_basis": {"type": "string"},
             "plan_kind": {"enum": ["within_free_transfers", "with_hits"]},
@@ -454,6 +626,7 @@ def league_capabilities_schema() -> dict[str, Any]:
                 "required": ["available", "weights"],
                 "additionalProperties": False,
             },
+            "decision_information": decision_information_schema(),
             "models": {
                 "type": "array",
                 "items": {"enum": list(PREDICTION_MODELS)},

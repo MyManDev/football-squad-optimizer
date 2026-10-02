@@ -41,6 +41,9 @@ from typing import Final
 
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+    LEGACY_ROTATION_DISPOSITIONS,
+    PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     PUBLISHED_PRECISIONS,
     ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ROTATION_DISPOSITIONS,
@@ -49,6 +52,9 @@ from squadopt.data.sources.club_news import (
     RawDocument,
     RosterPlayer,
 )
+from squadopt.data.sources.club_news_metadata import publication_metadata
+from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 #: The coding fixture's own contract, separate from the coding format's: the fixture carries
 #: a good response and the ones the locator must refuse, and its shape can change without
@@ -58,7 +64,9 @@ CODING_FIXTURE_CONTRACT_VERSION: Final = "club_news_coding_fixture_v1"
 #: The format the prompt asks for: the parser's format with ``quote`` in place of
 #: ``span_start``/``span_end``. Bumped whenever the prompt or the schema below moves, because
 #: a response stored under one version was produced by a different question.
-ROTATION_CLAIM_CODING_CONTRACT_VERSION: Final = "rotation_claim_coding_v1"
+LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION: Final = "rotation_claim_coding_v1"
+PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION: Final = "rotation_claim_coding_v2"
+ROTATION_CLAIM_CODING_CONTRACT_VERSION: Final = "rotation_claim_coding_v3"
 
 #: The model this lane is written against. Recorded, not defaulted: a response coded by a
 #: different model is a different measurement and the manifest has to be able to say so.
@@ -105,7 +113,7 @@ MAXIMUM_USER_CONTENT_BYTES: Final = CODING_CONTEXT_TOKENS * CODING_BYTES_PER_TOK
 #: distinguishable from a model listing two sentences about the same man. The ban on
 #: percentages, likelihoods and scores is the lane's: there is no probability in this
 #: pipeline, not even internally, so there is nowhere for one to be written down.
-SYSTEM_PROMPT: Final = """\
+LEGACY_SYSTEM_PROMPT: Final = """\
 You are coding football club announcements into a fixed, closed set of statements about \
 whether named players are expected to play. You are not predicting anything and you are not \
 being asked to. You report only what the supplied documents say.
@@ -167,6 +175,78 @@ If the documents support no claim at all, return the object with an empty claims
 empty answer is a real answer; a guess is not.
 """
 
+
+# Preserve the V1 prompt byte for byte for old capture replay and its pinned hash.
+PREVIOUS_SYSTEM_PROMPT: Final = LEGACY_SYSTEM_PROMPT.replace(
+    "rotation_claim_coding_v1 format", "rotation_claim_coding_v2 format"
+).replace(
+    '- "stated_minutes_limited"',
+    '- "stated_full_match_unavailable" -- use only when the quoted source explicitly says '
+    "the player cannot complete or play the full upcoming league match. The quote must "
+    "identify the next league match and the inability to finish it. This is not a chance "
+    "of starting and does not mean he is absent. Vague managed minutes, limited involvement, "
+    "rotation risk, fitness concerns, a past match or an unspecified future match do not "
+    "qualify; keep the existing minutes-limited or ambiguous label instead.\n"
+    '- "stated_minutes_limited"',
+)
+
+SYSTEM_PROMPT: Final = (
+    PREVIOUS_SYSTEM_PROMPT.replace(
+        "rotation_claim_coding_v2 format", "rotation_claim_coding_v3 format"
+    )
+    + """
+For publication dates, copy the supplied Source publication metadata value and precision
+exactly. It was extracted from the held document's explicit publication fields. If it is
+unknown, report unknown and null; never substitute a fetch time, update time, URL date,
+or a date inferred from prose. This metadata is not part of a quotable document span.
+
+Every claim must also carry fixture_scope, one of: upcoming_premier_league,
+other_competition, past, ambiguous, unspecified. Use upcoming_premier_league only if the
+quoted span itself explicitly refers to the next or upcoming Premier League/league match.
+A cup match, international duty, a previous match, conflicting competitions, a conditional
+absence, or an unclear match reference must not become a current league absence. If the
+quote does not identify the match, use unspecified. The parser checks the quoted words;
+your scope declaration alone cannot authorize a change. Preserve the original quote.
+"""
+)
+
+
+def system_prompt(contract_version: str = ROTATION_CLAIM_CODING_CONTRACT_VERSION) -> str:
+    """The exact frozen question for a supported captured coding contract."""
+    if contract_version == LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+        return LEGACY_SYSTEM_PROMPT
+    if contract_version == PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+        return PREVIOUS_SYSTEM_PROMPT
+    if contract_version == ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+        return SYSTEM_PROMPT
+    raise ClubNewsError("Unsupported coding prompt contract version.")
+
+
+def require_requested_coding_contract(
+    response: ClaimResponse,
+    *,
+    requested_contract_version: str = ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+) -> None:
+    """Validate a new response before recording the question it answered.
+
+    Replay deliberately accepts older contracts; a newly requested V2 answer may
+    not silently use that compatibility path. Keep its text untouched on success.
+    """
+    system_prompt(requested_contract_version)
+    try:
+        document = json.loads(response.text)
+    except (ValueError, RecursionError):
+        raise ClubNewsError("New coding response is not valid JSON.") from None
+    if (
+        not isinstance(document, dict)
+        or document.get("contract_version") != requested_contract_version
+    ):
+        raise ClubNewsError(
+            "New coding response does not declare the requested coding contract; "
+            "refused without retry."
+        )
+
+
 _CODING_CLAIM_KEYS: Final[tuple[str, ...]] = (
     "player_name",
     "team_name",
@@ -185,7 +265,9 @@ CODING_DISPOSITIONS: Final[tuple[str, ...]] = tuple(
 )
 
 
-def response_schema() -> dict[str, object]:
+def response_schema(
+    contract_version: str = ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+) -> dict[str, object]:
     """The JSON Schema the request enforces, built from the vocabularies it must agree with.
 
     Generated rather than written out, so the enumerations cannot drift from the tuples the
@@ -197,6 +279,17 @@ def response_schema() -> dict[str, object]:
     :func:`locate_claim_response` and the parser are for.
     """
 
+    system_prompt(contract_version)  # Refuse an unknown contract before constructing a schema.
+    dispositions = (
+        tuple(value for value in LEGACY_ROTATION_DISPOSITIONS if value != "not_addressed")
+        if contract_version == LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+        else CODING_DISPOSITIONS
+    )
+    scope_fields = (
+        {"fixture_scope": {"type": "string", "enum": list(FIXTURE_SCOPES)}}
+        if contract_version == ROTATION_CLAIM_CODING_CONTRACT_VERSION
+        else {}
+    )
     return {
         "type": "object",
         "additionalProperties": False,
@@ -204,7 +297,7 @@ def response_schema() -> dict[str, object]:
         "properties": {
             "contract_version": {
                 "type": "string",
-                "enum": [ROTATION_CLAIM_CODING_CONTRACT_VERSION],
+                "enum": [contract_version],
             },
             "documents": {
                 "type": "array",
@@ -227,15 +320,16 @@ def response_schema() -> dict[str, object]:
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": list(_CODING_CLAIM_KEYS),
+                    "required": [*_CODING_CLAIM_KEYS, *scope_fields],
                     "properties": {
                         "player_name": {"type": "string"},
                         "team_name": {"type": "string"},
-                        "disposition": {"type": "string", "enum": list(CODING_DISPOSITIONS)},
+                        "disposition": {"type": "string", "enum": list(dispositions)},
                         "speaker": {"type": "string", "enum": list(CLAIM_SPEAKERS)},
                         "source_url": {"type": "string"},
                         "quote": {"type": "string"},
                         "paraphrase": {"type": "string"},
+                        **scope_fields,
                     },
                 },
             },
@@ -243,7 +337,11 @@ def response_schema() -> dict[str, object]:
     }
 
 
-def coding_prompt_sha256(model_identifier: str = CODING_MODEL_IDENTIFIER) -> str:
+def coding_prompt_sha256(
+    model_identifier: str = CODING_MODEL_IDENTIFIER,
+    *,
+    contract_version: str = ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+) -> str:
     """Fingerprint the instrument: the contract, the frozen prompt, the schema and the model.
 
     Canonical JSON with sorted keys, because a digest that moved when a dictionary happened
@@ -257,17 +355,22 @@ def coding_prompt_sha256(model_identifier: str = CODING_MODEL_IDENTIFIER) -> str
     """
 
     envelope = {
-        "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+        "contract_version": contract_version,
         "effort": CODING_EFFORT,
         "model_identifier": model_identifier,
-        "system_prompt": SYSTEM_PROMPT,
-        "response_schema": response_schema(),
+        "system_prompt": system_prompt(contract_version),
+        "response_schema": response_schema(contract_version),
     }
     canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def build_user_content(documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]) -> str:
+def build_user_content(
+    documents: Sequence[RawDocument],
+    roster: Sequence[RosterPlayer],
+    *,
+    target_context: Mapping[str, object] | None = None,
+) -> str:
     """Lay out one call's documents and roster, deterministically.
 
     Deterministic in the strong sense: the same documents and roster produce the same bytes,
@@ -291,7 +394,34 @@ def build_user_content(documents: Sequence[RawDocument], roster: Sequence[Roster
     if not roster:
         raise ClubNewsError("Nothing to code against: the roster is empty.")
 
-    parts: list[str] = ["# Roster", ""]
+    parts: list[str] = []
+    if target_context is not None:
+        if set(target_context) != {"season", "gameweek", "deadline", "as_of"}:
+            raise ClubNewsError("Target context requires season, gameweek, deadline and as_of.")
+        season, gameweek = target_context["season"], target_context["gameweek"]
+        if (
+            not isinstance(season, str)
+            or not season.strip()
+            or type(gameweek) is not int
+            or not 1 <= gameweek <= 38
+        ):
+            raise ClubNewsError("Target context requires a season and a gameweek from 1 to 38.")
+        deadline = normalize_utc_timestamp(target_context["deadline"], label="target deadline")
+        as_of = normalize_utc_timestamp(target_context["as_of"], label="target as_of")
+        if as_instant(as_of) >= as_instant(deadline):
+            raise ClubNewsError("Target as_of must precede the decision deadline.")
+        parts.extend(
+            [
+                "# Decision context (not source evidence)",
+                json.dumps(
+                    {"season": season, "gameweek": gameweek, "deadline": deadline, "as_of": as_of},
+                    sort_keys=True,
+                ),
+                "This context cannot supply a fixture reference absent from the quoted source.",
+                "",
+            ]
+        )
+    parts.extend(["# Roster", ""])
     for player in sorted(roster, key=lambda entry: (entry.team_name, entry.web_name)):
         parts.append(f"- {player.web_name} ({player.team_name})")
     parts.append("")
@@ -307,6 +437,18 @@ def build_user_content(documents: Sequence[RawDocument], roster: Sequence[Roster
             ) from error
         parts.append("")
         parts.append(f"## {document.final_url}")
+        metadata = publication_metadata(document.content, document.content_type, document.final_url)
+        parts.append(
+            "Source publication metadata (not document text): "
+            + json.dumps(
+                {
+                    "published_at_utc": metadata.published_at_utc,
+                    "published_precision": metadata.published_precision,
+                    "source": metadata.source,
+                },
+                sort_keys=True,
+            )
+        )
         parts.append("")
         parts.append(text)
     content = "\n".join(parts) + "\n"
@@ -461,7 +603,12 @@ def _located_entries(
     dropped: list[UnlocatableClaim] = []
     for entry in _list(document, "claims"):
         record = _mapping(entry, "A coded claim")
-        missing = [key for key in _CODING_CLAIM_KEYS if key not in record]
+        keys = _CODING_CLAIM_KEYS + (
+            ("fixture_scope",)
+            if document["contract_version"] == ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            else ()
+        )
+        missing = [key for key in keys if key not in record]
         if missing:
             raise ClubNewsError(f"A coded claim is missing required field(s) {missing!r}.")
         player_name = _text(record, "player_name", "A coded claim")
@@ -498,6 +645,11 @@ def _located_entries(
                 "span_start": span_start,
                 "span_end": span_end,
                 "paraphrase": _text(record, "paraphrase", label),
+                **(
+                    {"fixture_scope": _text(record, "fixture_scope", label)}
+                    if "fixture_scope" in keys
+                    else {}
+                ),
             }
         )
     return located, dropped
@@ -510,7 +662,13 @@ def _response_of(
 
     parsed_text = json.dumps(
         {
-            "contract_version": ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+            "contract_version": (
+                LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+                if document["contract_version"] == LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+                else PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+                if document["contract_version"] == PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+                else ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+            ),
             "documents": _list(document, "documents"),
             "claims": list(located),
         },
@@ -537,7 +695,11 @@ def _coding_document(
         )
     document = _object(response.text)
     version = document.get("contract_version")
-    if version != ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+    if version not in (
+        LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+        PREVIOUS_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+        ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    ):
         raise ClubNewsError(
             f"The coding response declares contract {version!r}, not "
             f"{ROTATION_CLAIM_CODING_CONTRACT_VERSION!r}. A response produced under one "
@@ -693,6 +855,8 @@ __all__ = [
     "CODING_EFFORT",
     "CODING_FIXTURE_CONTRACT_VERSION",
     "CODING_MODEL_IDENTIFIER",
+    "LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION",
+    "LEGACY_SYSTEM_PROMPT",
     "MAXIMUM_USER_CONTENT_BYTES",
     "ROTATION_CLAIM_CODING_CONTRACT_VERSION",
     "SYSTEM_PROMPT",
@@ -704,5 +868,7 @@ __all__ = [
     "locate_claim_response",
     "locate_claims_reporting",
     "locate_quote",
+    "require_requested_coding_contract",
     "response_schema",
+    "system_prompt",
 ]

@@ -55,6 +55,7 @@ from squadopt.application.advice_menu import (
     MenuRequest,
     advise_menu_entry,
 )
+from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, participation_summary
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
@@ -121,6 +122,21 @@ DEFAULT_MAX_ATTEMPTS: Final = 3
 # The longest wait after rounds that keep raising: a lasting fault is retried and logged
 # once a minute rather than every idle, and a passing one costs at most this much.
 DEFAULT_MAX_BACKOFF_SECONDS: Final = 60.0
+
+
+def _advice_player_ids(value: object) -> set[int]:
+    """Only named decision players are included in a public information card."""
+    found: set[int] = set()
+    if isinstance(value, dict):
+        code = value.get("player_id")
+        if isinstance(code, int) and not isinstance(code, bool):
+            found.add(code)
+        for item in value.values():
+            found.update(_advice_player_ids(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(_advice_player_ids(item))
+    return found
 
 
 def _utc_now() -> datetime:
@@ -342,16 +358,31 @@ def build_advice_compute(
                 "No plan was found for this selection from this capture.",
             ) from error
         if football is not None:
+            advice["decision_information"] = capture.switches.decision_information(
+                capture.inputs.snapshot_id
+            )
             advice["prediction_model"] = {
                 "id": "football",
                 "version": football.horizon.model_version,
                 "experimental": True,
                 "fingerprint": football.fingerprint,
             }
+            participation = participation_summary(projection.diagnostics)
+            if participation is not None:
+                advice["participation_evidence"] = participation
+            participation_assumptions = (
+                participation.get("assumptions", []) if participation is not None else []
+            )
             existing_limits = advice.get("stated_limits")
             advice["stated_limits"] = [
                 *(existing_limits if isinstance(existing_limits, list) else []),
                 "Experimental football model; independent predictive superiority is unverified.",
+                *(
+                    [INHERITED_ZERO_LIMIT]
+                    if isinstance(participation_assumptions, list)
+                    and "future_values_not_recovered" in participation_assumptions
+                    else []
+                ),
                 # Only the version that splits attacking shares before availability.
                 *(
                     [SHARES_BEFORE_AVAILABILITY_LIMIT]
@@ -359,6 +390,12 @@ def build_advice_compute(
                     else []
                 ),
             ]
+        if capture.inputs.official_information is not None:
+            # Statement outcomes may name a player outside the chosen squad. Include
+            # those public decisions before selecting the matching official facts.
+            advice["official_information"] = capture.inputs.official_information.public_record(
+                _advice_player_ids(advice)
+            )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

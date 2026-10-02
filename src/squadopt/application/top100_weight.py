@@ -242,7 +242,7 @@ def rebased_week(week: PlanningWeekResult, points: Mapping[int, float]) -> Plann
     captain["expected_points"] = points[int(str(captain["player_id"]))]
     starting_xi = _rebased(week.starting_xi, points)
     bench = _rebased(week.bench, points)
-    return replace(
+    rebased = replace(
         week,
         selected_squad=_rebased(week.selected_squad, points),
         starting_xi=starting_xi,
@@ -256,6 +256,11 @@ def rebased_week(week: PlanningWeekResult, points: Mapping[int, float]) -> Plann
         ),
         projected_bench_points=float(bench["expected_points"].sum()),
     )
+    if week.lineup_expectation is not None:
+        from squadopt.planning.lineup_utility import rescore_expected_week
+
+        return rescore_expected_week(rebased)
+    return rebased
 
 
 def decision_changed(

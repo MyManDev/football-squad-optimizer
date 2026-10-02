@@ -38,6 +38,7 @@ from squadopt.application.advice import (
     advise_with_top100,
 )
 from squadopt.application.advice_menu import ManagersWordNotSolved
+from squadopt.application.manager_words import MANAGERS_WORD_RULE_VERSION
 from squadopt.application.weekly_plan import rotation_artifact
 from squadopt.data.snapshots import write_snapshot
 from squadopt.platform.advice_cache import FileAdviceCache
@@ -1511,8 +1512,187 @@ def _served_bytes(backend: Any, advice: dict[str, Any], captured_at_utc: str) ->
     return json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+@pytest.mark.parametrize("outcome_kind", ["legacy", "empty", "mixed"])
+def test_worker_publishes_official_facts_for_decisions_and_statement_outcomes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    outcome_kind: str,
+) -> None:
+    """Exercise real capture, job, worker validation and cache without another planner solve.
+
+    The selected legal roles are a frozen producer result. Publication must include
+    a named source outcome even when that player was left out of those roles.
+    """
+    from tests.unit.test_advice_read import _valid_advice_document
+    from tests.unit.test_live_football_model import _forecast
+
+    from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
+    from squadopt.platform.advice_switches import AdviceSwitchInputs
+
+    original_elements = world_module._elements
+
+    def elements(*args, **kwargs):
+        rows = original_elements(*args, **kwargs)
+        changes = {
+            1001: ("d", 75, "Private synthetic editorial", "2026-08-26T10:00:00Z"),
+            1002: ("i", 0, "Private synthetic absence", "2026-08-26T11:00:00Z"),
+            1005: ("a", None, "", "2026-08-26T12:00:00Z"),
+        }
+        for row in rows:
+            if row["code"] in changes:
+                status, chance, news, added = changes[row["code"]]
+                row.update(
+                    status=status, chance_of_playing_next_round=chance, news=news, news_added=added
+                )
+        return rows
+
+    monkeypatch.setattr(world_module, "_elements", elements)
+    artifacts = tmp_path / "artifacts"
+    world = _deployment(tmp_path, monkeypatch, artifact_root=artifacts)
+    backend = world["backend"]
+    identity = backend.contexts.identity()
+    assert identity.inputs.official_information is not None
+    path = football_artifact_path(artifacts, world["snapshot_id"])
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(_forecast(identity.inputs)), encoding="utf-8")
+    football = read_football_forecast(path, identity.inputs)
+    outcomes = [
+        {
+            "player_id": 1002,
+            "disposition": "stated_expected_absent",
+            "applied": True,
+            "reason": "explicit_absence",
+            "source_url": "https://club.example/absence",
+            "source_published_at": "2026-08-26T11:00:00Z",
+        },
+        {
+            "player_id": 1005,
+            "disposition": "stated_minutes_limited",
+            "applied": False,
+            "reason": "categorical_statement_has_no_probability",
+            "source_url": "https://club.example/minutes",
+            "source_published_at": "2026-08-26T12:00:00Z",
+        },
+    ]
+    audit = {
+        "as_of": identity.inputs.captured_at_utc,
+        "gameweek": 2,
+        "captured_percentages": [{"player_id": 1001, "evidence": [{}]}],
+        "manager_statements": [],
+        "unapplied_statements": [],
+        "source_fingerprint": "private-audit-identity",
+    }
+    if outcome_kind != "legacy":
+        audit["statement_outcomes"] = outcomes if outcome_kind == "mixed" else []
+    football = replace(
+        football,
+        projection=replace(
+            football.projection,
+            diagnostics={**football.projection.diagnostics, "participation_evidence": audit},
+        ),
+    )
+    capture = backend.contexts.capture(identity.context)
+    capture = replace(
+        capture,
+        switches=AdviceSwitchInputs(
+            football=football,
+            official_information=identity.inputs.official_information,
+        ),
+    )
+    monkeypatch.setattr(
+        backend.contexts,
+        "capture",
+        lambda context: capture if context == identity.context else None,
+    )
+    frame = football.projection.table.set_index("player_id")
+
+    def player(code):
+        row = frame.loc[code]
+        return {
+            "player_id": code,
+            "name": str(row["name"]),
+            "short_name": str(row["name"]),
+            "position": str(row["position"]),
+            "team": "Synthetic club",
+            "expected_points": float(row["expected_points"]),
+        }
+
+    produced = json.loads(_valid_advice_document(ENTRY_ID))["payload"]
+    produced.update(
+        gameweek=2,
+        league_id=LEAGUE_ID,
+        source_snapshot_id=world["snapshot_id"],
+        starting_xi=[player(code) for code in STARTING_ELEVEN],
+        bench=[player(code) for code in BENCH],
+        captain=player(1004),
+        vice_captain=player(1006),
+        expected_own_points=37.25,
+    )
+    calls = []
+
+    def producer(request, **kwargs):
+        calls.append(request)
+        assert kwargs["projection"] is football.projection
+        return json.loads(json.dumps(produced))
+
+    monkeypatch.setattr(worker_module, "advise_menu_entry", producer)
+    checked = []
+    validator = worker_module.validate_advice_document
+
+    def validate(raw):
+        validator(raw)
+        checked.append(json.loads(raw))
+
+    monkeypatch.setattr(worker_module, "validate_advice_document", validate)
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    request = {"strategy": "saf-puan", "window": 1, "model": "football"}
+    accepted = client.post(route, json=request)
+    assert accepted.status_code == 202, accepted.text
+    job = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache),
+        at_utc="2026-09-01T10:01:00Z",
+    )
+    assert job is not None and job.status == "completed", None if job is None else job.error
+    served = client.get(route, params=request)
+    assert served.status_code == 200, served.text
+    assert len(calls) == len(checked) == 1
+    assert checked[0] == served.json()
+    result = served.json()["payload"]
+    public = result["official_information"]
+    selected = {row["player_id"] for row in public["players"]}
+    assert selected == set(SQUAD_CODES) | ({1002, 1005} if outcome_kind == "mixed" else set())
+    facts = {row["player_id"]: row for row in public["players"]}
+    assert facts[1001]["source_chance_percent"] == 75
+    assert public["source_snapshot_id"] == world["snapshot_id"]
+    assert public["observed_at"] == identity.inputs.captured_at_utc
+    assert public["player_count"] == len(identity.inputs.players)
+    summary = result["participation_evidence"]
+    assert summary["captured_percentage_count"] == 1
+    if outcome_kind == "mixed":
+        assert facts[1002]["source_chance_percent"] == 0
+        assert facts[1005]["source_chance_percent"] is None
+        assert facts[1005]["news_state"] == "cleared"
+        assert summary["statement_outcomes"] == outcomes
+        assert (
+            summary["applied_player_count"],
+            summary["unapplied_statement_count"],
+            summary["manager_statement_count"],
+        ) == (1, 1, 2)
+    elif outcome_kind == "empty":
+        assert summary["statement_outcomes"] == []
+    else:
+        assert "statement_outcomes" not in summary
+    assert result["expected_own_points"] == produced["expected_own_points"]
+    assert result["starting_xi"] == produced["starting_xi"]
+    assert "Private synthetic" not in served.text
+    assert "private-audit-identity" not in served.text
+
+
 def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str, Any]) -> None:
-    """The default path through ``advise_menu_entry`` moves no byte of what is served."""
+    """The worker preserves the producer decision and adds the held official facts."""
 
     backend = running["backend"]
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
@@ -1534,6 +1714,10 @@ def test_a_plain_request_is_cached_as_advise_entrys_own_bytes(running: dict[str,
         projection=capture.projection,
         rules=capture.rules,
         horizon_builder=capture.horizon_builder,
+    )
+    assert capture.inputs.official_information is not None
+    expected["official_information"] = capture.inputs.official_information.public_record(
+        worker_module._advice_player_ids(expected)
     )
     assert backend.cache.get(job.cache_key) == _served_bytes(
         backend, expected, capture.inputs.captured_at_utc
@@ -1684,6 +1868,10 @@ def test_a_member_asks_for_a_top100_setting_and_gets_it(
         projection=capture.projection,
         rules=capture.rules,
     ).payload
+    assert capture.inputs.official_information is not None
+    direct["official_information"] = capture.inputs.official_information.public_record(
+        worker_module._advice_player_ids(direct)
+    )
     assert payload == json.loads(json.dumps(direct))
 
 
@@ -1757,8 +1945,25 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     )
     table.parent.mkdir(parents=True)
     table.write_text("rows", encoding="utf-8")
-    manifest.write_text(json.dumps({"table_sha256": "7" * 64}), encoding="utf-8")
-    words = top100_tests._words(STARTING_ELEVEN[-1])
+    # This is the valid fixture-source branch: its only contributing capture is
+    # the exact decision capture, and the resolved words name that configured file.
+    manifest.write_text(
+        json.dumps(
+            {
+                "table_sha256": "7" * 64,
+                "season": SEASON,
+                "target_gameweek": 2,
+                "roster_snapshot_id": running["snapshot_id"],
+                "source_snapshot_ids": [running["snapshot_id"]],
+            }
+        ),
+        encoding="utf-8",
+    )
+    words = replace(
+        top100_tests._words(STARTING_ELEVEN[-1]),
+        source_label=fixture.name,
+        evidence_table=table.name,
+    )
     monkeypatch.setattr(switches_module, "load_manager_words", lambda *_a, **_k: words)
 
     client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
@@ -1773,7 +1978,7 @@ def test_a_member_switches_the_managers_word_on_and_gets_it(
     job = backend.queue.load(accepted.json()["job_id"])
     assert backend.job_specs.get(job.cache_key).switches == {
         "managers_word": {
-            "rule_version": "managers_word_rule_v1",
+            "rule_version": MANAGERS_WORD_RULE_VERSION,
             "rotation_table_sha256": "7" * 64,
             "source_kind": words.source_kind,
             "source_label": words.source_label,

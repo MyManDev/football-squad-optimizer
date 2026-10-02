@@ -13,6 +13,7 @@ agreement, the round trip below fails instead of the pair drifting quietly.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -20,8 +21,8 @@ from tests.fixtures.synthetic_club_news_coding import make_club_news_coding_fixt
 
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
+    LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     PUBLISHED_PRECISIONS,
-    ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ROTATION_DISPOSITIONS,
     ClaimResponse,
     ClubNewsError,
@@ -36,6 +37,7 @@ from squadopt.data.sources.club_news_coding import (
     CODING_DISPOSITIONS,
     CODING_EFFORT,
     CODING_MODEL_IDENTIFIER,
+    LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     MAXIMUM_USER_CONTENT_BYTES,
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     SYSTEM_PROMPT,
@@ -123,7 +125,10 @@ def test_the_located_response_declares_the_parsers_contract() -> None:
 
     located = locate_claim_response(_coding_fixture().response(), _documents())
 
-    assert json.loads(located.text)["contract_version"] == ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+    assert (
+        json.loads(located.text)["contract_version"]
+        == LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+    )
 
 
 def test_the_located_response_carries_no_quote() -> None:
@@ -152,9 +157,9 @@ def test_the_model_identity_travels_through_unchanged() -> None:
     assert located.model_version == response.model_version
 
 
-@pytest.mark.parametrize("index", range(5))
-def test_every_declared_unlocatable_response_is_refused(index: int) -> None:
-    """Each hazard the fixture documents is still caught, and says which one is not."""
+@pytest.mark.parametrize("index", (0, 1, 2, 4))
+def test_legacy_fixture_citation_and_shape_hazards_are_still_refused(index: int) -> None:
+    """Only the historical future-version case gained support; citation guards did not."""
 
     cases = _coding_fixture().unlocatable_responses()
     case = cases[index]
@@ -163,8 +168,40 @@ def test_every_declared_unlocatable_response_is_refused(index: int) -> None:
         locate_claim_response(case.response, _documents())
 
 
-def test_the_fixture_documents_five_hazards() -> None:
-    """A parametrised test that silently ran over an empty list would pass forever."""
+def test_formerly_future_fixture_version_is_now_readable_without_rewriting_it() -> None:
+    """The frozen V1 fixture called V2 unknown; the current replay reader supports it."""
+
+    response = _coding_fixture().unlocatable_responses()[3].response
+    original = response.text
+    assert json.loads(original)["contract_version"] == "rotation_claim_coding_v2"
+    documents = _documents()
+    claims = parse_claim_response(locate_claim_response(response, documents), documents)
+    baseline = parse_claim_response(
+        locate_claim_response(_coding_fixture().response(), documents), documents
+    )
+    assert len(claims) == 1
+    expected = next(
+        claim
+        for claim in baseline
+        if (claim.player_name, claim.team_name) == (claims[0].player_name, claims[0].team_name)
+    )
+    assert claims[0] == expected
+    assert response.text == original
+
+
+def test_a_truly_unsupported_coding_version_is_still_refused() -> None:
+    """Mutate a copy, keeping the old fixture's historically unknown V2 bytes intact."""
+
+    response = _coding_fixture().unlocatable_responses()[3].response
+    document = json.loads(response.text)
+    document["contract_version"] = "rotation_claim_coding_v99"
+    unknown = replace(response, text=json.dumps(document))
+    with pytest.raises(ClubNewsError, match="declares contract 'rotation_claim_coding_v99'"):
+        locate_claim_response(unknown, _documents())
+
+
+def test_the_fixture_documents_five_original_hazards() -> None:
+    """Keep all frozen historical cases; the V2 case now has an explicit acceptance test."""
 
     cases = _coding_fixture().unlocatable_responses()
 
@@ -264,7 +301,10 @@ def test_a_response_that_is_not_json_is_refused_rather_than_read_as_prose() -> N
 def test_the_prompt_digest_is_pinned() -> None:
     """The instrument is frozen, and this is what says so out loud."""
 
-    assert coding_prompt_sha256() == PINNED_PROMPT_SHA256
+    assert (
+        coding_prompt_sha256(contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION)
+        == PINNED_PROMPT_SHA256
+    )
 
 
 def test_the_prompt_digest_is_stable_across_calls() -> None:
@@ -340,7 +380,7 @@ def test_the_contract_names_the_model_and_the_effort_it_was_written_against() ->
 
     assert CODING_MODEL_IDENTIFIER == "claude-opus-5"
     assert CODING_EFFORT == "high"
-    assert ROTATION_CLAIM_CODING_CONTRACT_VERSION == "rotation_claim_coding_v1"
+    assert ROTATION_CLAIM_CODING_CONTRACT_VERSION == "rotation_claim_coding_v3"
 
 
 def test_the_user_content_is_deterministic() -> None:
@@ -528,5 +568,6 @@ def test_the_input_budget_does_not_move_the_prompt_digest() -> None:
     """
 
     assert (
-        coding_prompt_sha256() == "e755c70b96cef2dda4523d04e46292913bf3f8638d6b39261ee4ebd144ffbf5d"
+        coding_prompt_sha256(contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION)
+        == "e755c70b96cef2dda4523d04e46292913bf3f8638d6b39261ee4ebd144ffbf5d"
     )

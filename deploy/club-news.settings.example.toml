@@ -1,0 +1,19 @@
+# Copy to a private location outside Git and web/public.
+# The acquisition process reads this file; the browser and advice API do not.
+[llm]
+provider = "openai"
+model = "YOUR_MODEL_ID"
+api_key_env = "OPENAI_API_KEY"
+response_format = "json_schema"
+max_completion_tokens = 16000
+
+# Alternatively remove api_key_env and put api_key in the PRIVATE copy only.
+# Never pass the key as a command-line argument or put it in this tracked example.
+
+# For a compatible service, change provider, model, key reference and endpoint together:
+# provider = "openai-compatible"
+# model = "YOUR_SERVICE_MODEL_ID"
+# api_key_env = "MY_NEWS_PROVIDER_KEY"
+# base_url = "https://your-provider.example/v1"
+# response_format = "json_object"  # only if the service lacks strict json_schema
+# allow_local_http = false

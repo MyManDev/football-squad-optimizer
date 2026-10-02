@@ -29,6 +29,7 @@ import pandas as pd
 
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import CapturedSnapshot
+from squadopt.data.sources.fpl_information import FplInformation, captured_fpl_information
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     GameweekDeadline,
@@ -394,6 +395,7 @@ class RecommendationInputs:
     deadline: GameweekDeadline
     players: pd.DataFrame
     availability: pd.DataFrame
+    official_information: FplInformation | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -449,6 +451,13 @@ def read_inputs(
         deadline=deadline,
         players=player_snapshot(bootstrap),
         availability=availability_snapshot(bootstrap),
+        official_information=captured_fpl_information(
+            bootstrap,
+            season=season,
+            gameweek=deadline.gameweek,
+            snapshot_id=snapshot.metadata.snapshot_id,
+            observed_at=snapshot.metadata.captured_at_utc,
+        ),
     )
 
 

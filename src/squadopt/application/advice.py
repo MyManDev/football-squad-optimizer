@@ -40,10 +40,14 @@ from squadopt.application.entries import (
     EntryPicksProvider,
     held_squad_from_picks,
 )
+from squadopt.application.football_information import information_review_payload
 from squadopt.application.lineup_publication import advice_player as _advice_player
 from squadopt.application.lineup_publication import (
     best_eleven_basis,
     best_eleven_points_under,
+    expected_week_points,
+    lineup_decision_fields,
+    lineup_expectation_fields,
 )
 from squadopt.application.lineup_publication import best_eleven_points as best_eleven_points
 from squadopt.application.lineup_publication import lineup_fields as lineup_fields
@@ -89,6 +93,8 @@ from squadopt.planning import (
     TransferPlanningError,
     TransferPlanResult,
 )
+from squadopt.planning.guarded import GUARDED_FALLBACK_LIMIT, GUARDED_PLAN_LIMIT
+from squadopt.planning.observed import OBSERVED_FALLBACK_LIMIT, OBSERVED_WINDOW_LIMIT
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
@@ -119,6 +125,10 @@ WINDOW_WALL_CEILING_SECONDS = 1800.0
 #: fifteen five-week plans are proved. The one-week plan, the system's own horizon path
 #: and every measurement runner do not pass it and solve as they always did.
 WINDOW_LINEARIZATION_LEVEL = 2
+EXPECTED_LINEUP_PLAN_LIMIT = (
+    "Complete plans are compared using expected automatic substitutions and vice-captain "
+    "recovery. The limited search does not prove the best possible plan or future performance."
+)
 
 #: Builds the projection horizon for the requested consecutive gameweeks from the one
 #: capture the advice is answered from. Bound by the caller (``member_horizon_builder``)
@@ -749,6 +759,14 @@ WINDOW_TOP100_LIMIT: str = (
 #: What a three- or five-week window assumes, stated in the payload beside the plan so
 #: the reader gets the limits with the answer. Every sentence names a mechanism the code
 #: applies; none of them is softened.
+WINDOW_TRANSFER_CAP_LIMIT = (
+    "Every week inside the window, the first included, is capped at one transfer "
+    "(a wildcard week excepted); the one-week plan has no such cap."
+)
+WINDOW_FREE_PAIR_LIMIT = (
+    "Each week allows one transfer, or up to two when both use banked free transfers. "
+    "Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap."
+)
 WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "The first week's projection is repeated over the later weeks, rescaled by each "
     "club's fixture count in that week relative to its count in the first week, from "
@@ -756,8 +774,7 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "the way through, and the later weeks are not projected separately.",
     "Availability is applied once, from the capture: injuries, rotation and "
     "suspensions after it are not seen.",
-    "Every week inside the window, the first included, is capped at one transfer "
-    "(a wildcard week excepted); the one-week plan has no such cap.",
+    WINDOW_TRANSFER_CAP_LIMIT,
     WINDOW_TOP100_LIMIT,
     "Prices are held at the captured values; no price change is modelled.",
     NO_CHIP_LIMIT,
@@ -908,6 +925,7 @@ def window_payload(
     optimality_gap_published: bool = True,
     move_reason: Callable[[int | None, int | None], str] | None = None,
     choice_points: Mapping[int, float] | None = None,
+    base_horizon: ProjectionHorizon | None = None,
 ) -> dict[str, object]:
     """The published shape of a solved window: the first week as a one-week card, the
     whole window in ``plan_weeks``.
@@ -936,6 +954,39 @@ def window_payload(
         choice=choice_points,
         expected_total=_published_total(lineup_fields(first)),
     )
+    if first.lineup_expectation is not None:
+        # The legacy held-squad calculation has no autosubs or vice recovery.
+        # A difference between these two scoring bases is not a measured gain.
+        gain_vs_hold = None
+        for move in moves:
+            move["expected_points_delta"] = None
+    limits = window_stated_limits(projection)
+    if (
+        plan.diagnostics.get("allow_two_free_transfers") is True
+        and plan.diagnostics.get("max_transfers_per_gameweek") == 1
+    ):
+        limits = [
+            WINDOW_FREE_PAIR_LIMIT if text == WINDOW_TRANSFER_CAP_LIMIT else text for text in limits
+        ]
+    construction = plan.diagnostics.get("sequential_incumbent")
+    if first.lineup_expectation is not None:
+        limits.append(EXPECTED_LINEUP_PLAN_LIMIT)
+    elif isinstance(construction, dict):
+        limits.append(
+            GUARDED_PLAN_LIMIT
+            if construction.get("seed_completed") is True
+            else GUARDED_FALLBACK_LIMIT
+        )
+    information = information_review_payload(
+        plan, projection, base_horizon=base_horizon, weighted=weeks is not None
+    )
+    observed = plan.diagnostics.get("observed_window")
+    if isinstance(observed, dict):
+        limits.append(
+            OBSERVED_WINDOW_LIMIT
+            if observed.get("status") == "compared"
+            else OBSERVED_FALLBACK_LIMIT
+        )
     return {
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
@@ -956,7 +1007,12 @@ def window_payload(
         "rival_label": None,
         # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
         # the plan it found with the measured bound gap beside it.
-        "solver_status": plan.solver_status.name,
+        "solver_status": (
+            "FEASIBLE"
+            if information is not None and information["status"] == "compared"
+            else plan.solver_status.name
+        ),
+        **({"information_review": information} if information is not None else {}),
         "optimality_gap": float(str(raw_gap)) if raw_gap is not None else None,
         # Which budget stopped the search. This path already refuses a plan the clock cut
         # short, so the flag published here is always false; it is published anyway, because
@@ -966,8 +1022,8 @@ def window_payload(
             plan.solver_status, plan.diagnostics
         ),
         **lineup_fields(first),
-        # One row per gameweek. ``expected_points`` is the planner's projected score
-        # for that week's eleven with the captain's multiplier, before hits.
+        # One row per gameweek. Expected-lineup metadata includes autosubs and vice
+        # recovery; legacy weeks use the eleven and captain. Both totals are before hits.
         "plan_weeks": [
             {
                 "gameweek": int(week.gameweek),
@@ -977,11 +1033,19 @@ def window_payload(
                 "chip": week.chip,
                 "free_transfers_before": int(week.free_transfers_before),
                 "free_transfers_after": int(week.free_transfers_for_next_gameweek),
-                "expected_points": float(week.projected_score),
+                "expected_points": expected_week_points(week),
+                **(
+                    {
+                        "lineup_expectation": lineup_expectation_fields(week),
+                        "lineup": lineup_decision_fields(week),
+                    }
+                    if week.lineup_expectation is not None
+                    else {}
+                ),
             }
             for week in shown
         ],
-        "stated_limits": window_stated_limits(projection),
+        "stated_limits": limits,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
         # Which squad the advice stands on: the captured week's own, or the one held
