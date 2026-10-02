@@ -109,11 +109,10 @@ def captured_fpl_information(
     Older minimal captures have no editorial columns and return None. Once all editorial
     columns are declared, malformed identities, timestamps and percentages fail closed.
 
-    A well-formed stamp later than the observation is not carried, and nothing else about
-    the row changes. The note was in the bytes we held, so it was known at the observation;
-    only the source's own instant for it cannot be, which means the source's clock ran ahead
-    of ours. This is read inside every member's advice, so one such row must not stop all
-    of them.
+    A well-formed stamp later than the observation is not carried; nothing else about the
+    row changes. The note was in the bytes we held, so we knew it at the observation, and a
+    later stamp only shows that the source's clock ran ahead of ours. This is read inside
+    every member's advice, so one such row must not stop all of them.
     """
     raw = json.loads(bootstrap)
     elements = raw.get("elements", [])
