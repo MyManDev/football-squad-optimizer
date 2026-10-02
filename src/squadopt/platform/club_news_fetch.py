@@ -56,7 +56,6 @@ three clocks.
 import html.parser
 import http.client
 import json
-import re
 import time
 import urllib.error
 import urllib.parse
@@ -71,6 +70,7 @@ from typing import Any, Final
 
 from squadopt.data.sources.club_news import ClubNewsError, RawDocument
 from squadopt.data.sources.club_news_readable import ReadableTextError, extract_readable_text
+from squadopt.data.sources.club_news_selection import article_priority
 
 # One program, one identity. Imported rather than restated: a second user-agent string
 # would make us two callers to anyone reading their logs, and the politeness policy this
@@ -830,32 +830,7 @@ class _LinkReader(html.parser.HTMLParser):
 
 
 def _article_priority(relative_path: str, label: str) -> int:
-    """A declared discovery heuristic, never a claim about the article's actual content.
-
-    Clear other-team or commercial categories are demoted, not removed. In particular,
-    merely mentioning an academy graduate does not make a first-team injury story an
-    academy story. Only path categories, slug prefixes or explicit title prefixes count.
-    """
-    decoded = urllib.parse.unquote(relative_path).casefold()
-    words = re.sub(r"[^a-z0-9]+", " ", f"{decoded} {label.casefold()}").strip()
-    category_prefix = (
-        r"(?:women(?:s)?|ladies|u(?:18|19|21|23)s?|under[- ]?(?:18|19|21|23)s?|"
-        r"tickets?|shop|hospitality)"
-    )
-    categories = rf"(?:academy|youth|{category_prefix})"
-    if (
-        re.search(rf"(?:^|/){categories}(?:/|$)", decoded)
-        or re.search(rf"(?:^|/){category_prefix}[-_]", decoded)
-        or re.match(rf"\s*{categories}(?:\s*:|\s*\||\s*[-\u2013\u2014])", label, re.IGNORECASE)
-    ):
-        return 2
-    if re.search(
-        r"\b(?:injur(?:y|ies)|fitness|team news|first team|pre match|press conference|"
-        r"match preview|medical update|fit for|squad update)\b",
-        words,
-    ):
-        return 0
-    return 1
+    return article_priority(urllib.parse.unquote(relative_path), label)
 
 
 def _printable_ascii(url: str) -> bool:
@@ -869,7 +844,7 @@ def _has_dot_segment(path: str) -> bool:
     return "." in segments or ".." in segments
 
 
-def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
+def _ranked_article_links(source: ClubSource, index: RawDocument) -> dict[str, int]:
     """The article URLs a registered page links to, under the one rule this lane follows.
 
     A link counts when
@@ -903,18 +878,18 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
 
     media_type = index.content_type.split(";", 1)[0].strip().lower()
     if media_type not in _INDEX_MEDIA_TYPES:
-        return ()
+        return {}
     try:
         markup = index.content.decode("utf-8")
     except UnicodeDecodeError:
-        return ()
+        return {}
     reader = _LinkReader()
     reader.feed(markup)
     reader.close()
 
     registered = urllib.parse.urlsplit(source.url)
     if not registered.path.strip("/"):
-        return ()
+        return {}
     prefix = f"{registered.path.rstrip('/')}/"
     links: dict[str, int] = {}
     for href, labels in reader.links:
@@ -940,7 +915,36 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
             # A duplicate card may provide a useful heading after an empty image
             # link. Keep its earliest position but consider its most useful label.
             links[url] = min(priority, links.get(url, priority))
+    return links
+
+
+def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
+    """Return same-origin registered articles in content-priority and page order."""
+    links = _ranked_article_links(source, index)
     return tuple(sorted(links, key=links.__getitem__))
+
+
+def registered_article_url(source: ClubSource, url: str) -> str | None:
+    """Validate an externally discovered referral under the same registered path boundary."""
+    try:
+        registered = urllib.parse.urlsplit(source.url)
+        target = urllib.parse.urlsplit(url)
+    except ValueError:
+        return None
+    prefix = registered.path.rstrip("/") + "/"
+    if (
+        not registered.path.strip("/")
+        or target.scheme != registered.scheme
+        or target.netloc.lower() != registered.netloc.lower()
+        or not target.path.startswith(prefix)
+        or len(target.path) <= len(prefix)
+        or _has_dot_segment(target.path)
+        or not _printable_ascii(url)
+    ):
+        return None
+    return urllib.parse.urlunsplit(
+        (registered.scheme, registered.netloc, target.path, target.query, "")
+    )
 
 
 def _follow_articles(
@@ -953,6 +957,7 @@ def _follow_articles(
     sleeper: Callable[[float], None],
     check_robots: bool,
     manners: HostManners,
+    additional_urls: Sequence[str] = (),
 ) -> tuple[list[RawDocument], list[tuple[str, str]]]:
     """Read the articles one registered page links to, within the host's budget for the run.
 
@@ -973,7 +978,15 @@ def _follow_articles(
     def _refuse(reason: str) -> None:
         refused.append((source.club, f"An article linked from {source.url} was not read: {reason}"))
 
-    for url in article_links(source, index):
+    referred = tuple(
+        valid
+        for url in additional_urls
+        if (valid := registered_article_url(source, url)) is not None
+    )
+    ranked = _ranked_article_links(source, index)
+    for url in referred:
+        ranked.setdefault(url, _article_priority(urllib.parse.urlsplit(url).path, ""))
+    for url in sorted(ranked, key=ranked.__getitem__):
         address = _address_of(url)
         if address in claimed:
             continue
@@ -1025,6 +1038,7 @@ def fetch_registered_documents(
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
     articles_per_host: int = MAXIMUM_ARTICLES_PER_HOST,
+    additional_article_urls: Mapping[str, Sequence[str]] | None = None,
 ) -> tuple[tuple[RawDocument, ...], tuple[tuple[str, str], ...]]:
     """Read every registered source and the articles it links to, and why the rest was not.
 
@@ -1071,6 +1085,7 @@ def fetch_registered_documents(
             sleeper=sleeper,
             check_robots=check_robots,
             manners=manners,
+            additional_urls=(additional_article_urls or {}).get(source.url, ()),
         )
         documents.extend(articles)
         refused.extend(article_refusals)
@@ -1095,6 +1110,7 @@ __all__ = [
     "fetch_registered_documents",
     "load_club_sources",
     "read_url",
+    "registered_article_url",
     "require_current_reading",
     "robots_allows",
 ]

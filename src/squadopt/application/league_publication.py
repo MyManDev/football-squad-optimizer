@@ -22,6 +22,7 @@ from squadopt.application.league_views import (
 )
 from squadopt.application.manager_words import ManagerWords, load_manager_words
 from squadopt.application.mode_selection import build_mode_paths
+from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.application.top100_weight import (
     Top100Counts,
     Top100InputsRefused,
@@ -82,6 +83,13 @@ class LeaguePublicationRequest:
     #: beside it). With it, every member gets the Top 100 influence menu; a table the
     #: handoff's own gate refuses turns the menu off with the reason, never the publish.
     top100_evidence: Path | None = None
+    #: Explicit prospective inputs; current-season rows come from the named capture.
+    #: None preserves the existing archive policy.
+    training_seasons: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if self.training_seasons is not None:
+            explicit_archive_seasons(self.training_seasons)
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +182,8 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
 
     snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
     season = request.season or infer_season(snapshot)
+    if request.training_seasons is not None:
+        explicit_archive_seasons(request.training_seasons, current_season=season)
     inputs = read_inputs(snapshot, season=season, gameweek=request.gameweek)
     registry = EntryRegistry.load(Path(request.registry_path))
     if not registry.entries:
@@ -287,7 +297,14 @@ def publish_prepared_league(
 
     request = prepared.request
     snapshot, inputs, season = prepared.snapshot, prepared.inputs, prepared.season
-    panel = build_panel(request.archive_root)
+    panel = (
+        build_panel(
+            request.archive_root,
+            seasons=explicit_archive_seasons(request.training_seasons, current_season=season),
+        )
+        if request.training_seasons is not None
+        else build_panel(request.archive_root)
+    )
     in_season = read_projection_handoff(request.handoff_path) if request.handoff_path else None
     projection = project(inputs, panel, in_season=in_season)
     mode_paths = None

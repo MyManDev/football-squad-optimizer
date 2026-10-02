@@ -219,7 +219,34 @@ const isSourceAvailability = ({ at, text }: { at: string; text: string }) =>
   at.startsWith("features/league/advice/InformationReview.tsx:") &&
   SOURCE_AVAILABILITY_COPY.some((label) => label === text);
 
+// Conditional scenario bounds are explicitly denied the meaning of an outcome CI.
+// Role explanations have no exception: modeled role probabilities remain internal.
+const SCENARIO_DENIALS: Record<string, readonly string[]> = {
+  "features/league/advice/InformationReview.tsx": [
+    "Bu aralık maç sonucu için bir güven aralığı değildir. Haberin ne zaman geleceğine olasılık atanmadı; banka ve kalan transfere ek puan yazılmadı.",
+    "This is not a confidence interval for match outcomes. No news-arrival probability or extra point value for bank/free transfers was assigned.",
+  ],
+};
+const isScenarioDenial = ({ at, text }: { at: string; text: string }) =>
+  Object.entries(SCENARIO_DENIALS).some(
+    ([path, labels]) => at.startsWith(`${path}:`) && labels.includes(text),
+  );
+
 describe("every string a production component writes inline", () => {
+  it("limits scenario denials to their exact surface without a role-estimate exception", () => {
+    expect(
+      INLINE.filter(isScenarioDenial)
+        .map(({ text }) => text)
+        .sort(),
+    ).toEqual(Object.values(SCENARIO_DENIALS).flat().sort());
+    expect(isScenarioDenial({ at: "elsewhere.tsx:1", text: "%" })).toBe(false);
+    expect(isScenarioDenial({ at: "features/league/advice/RoleForecast.tsx:1", text: "%" })).toBe(
+      false,
+    );
+    for (const path of Object.keys(SCENARIO_DENIALS)) {
+      expect(isScenarioDenial({ at: `${path}:1`, text: "Win probability 80%" })).toBe(false);
+    }
+  });
   it("only exempts the captured availability labels and marker", () => {
     expect(
       INLINE.filter(isSourceAvailability)
@@ -244,7 +271,9 @@ describe("every string a production component writes inline", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const offenders = INLINE.filter((entry) => !isSourceAvailability(entry))
+    const offenders = INLINE.filter(
+      (entry) => !isSourceAvailability(entry) && !isScenarioDenial(entry),
+    )
       .filter(({ text }) => AS_A_CHANCE.test(text))
       .map(({ at, text }) => `${at}: ${text}`);
     expect(offenders).toEqual([]);

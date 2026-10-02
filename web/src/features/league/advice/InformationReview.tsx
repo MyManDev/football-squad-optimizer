@@ -32,6 +32,12 @@ const COPY = {
     captain: "Kaptan",
     vice: "Yardımcı kaptan",
     bench: "Yedek sırası",
+    range: "Hesaplanan haber senaryolarındaki puan aralığı",
+    gap: "Başlangıç planına göre senaryo farkı",
+    resources: "Bu ilk hamleden sonra",
+    rangeLimit:
+      "Bu aralık maç sonucu için bir güven aralığı değildir. Haberin ne zaman geleceğine olasılık atanmadı; banka ve kalan transfere ek puan yazılmadı.",
+    dominates: "Karşılaştırılan tüm haber senaryolarında başlangıç planından geri kalmıyor.",
     fallback: "Bu karşılaştırma tamamlanamadı. Tam ve geçerli başlangıç planı korunuyor.",
     single:
       "Farklı ve geçerli bir ilk hamle bulunamadı. Farklı bir ilk hamle karşılaştırması yapılmadı; başlangıç planı korunuyor.",
@@ -67,6 +73,12 @@ const COPY = {
     captain: "Captain",
     vice: "Vice-captain",
     bench: "Bench order",
+    range: "Point range across the computed news scenarios",
+    gap: "Scenario difference from the baseline",
+    resources: "After this first action",
+    rangeLimit:
+      "This is not a confidence interval for match outcomes. No news-arrival probability or extra point value for bank/free transfers was assigned.",
+    dominates: "No worse than the baseline in every compared news scenario.",
     fallback: "This comparison could not be completed. The complete feasible baseline is retained.",
     single:
       "No distinct feasible first action was found. No distinct first-action comparison was made; the baseline plan is retained.",
@@ -136,6 +148,28 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
                 {copy.expected}:{" "}
                 <strong className="num">{net(candidate.expected_net_points)}</strong>
               </p>
+              {review.comparison?.candidates
+                .filter((row) => row.index === index)
+                .map((row) => (
+                  <div key={row.index} data-testid="policy-comparison">
+                    <p>
+                      {copy.range}:{" "}
+                      <strong className="num">
+                        {net(row.scenario_min)} – {net(row.scenario_max)}
+                      </strong>
+                    </p>
+                    <p>
+                      {copy.gap}: {net(row.minimum_gap_vs_baseline)} –{" "}
+                      {net(row.maximum_gap_vs_baseline)}
+                    </p>
+                    <p>
+                      {copy.resources}: {row.first_state.free_transfers} {copy.ft} · {copy.bank}:{" "}
+                      {points(row.first_state.bank_tenths / 10, 1, locale)}
+                    </p>
+                    {row.dominates_baseline && <p>{copy.dominates}</p>}
+                    <p className={styles.honesty}>{copy.rangeLimit}</p>
+                  </div>
+                ))}
               {candidate.branches.map((branch) => (
                 <details key={branch.state}>
                   <summary>

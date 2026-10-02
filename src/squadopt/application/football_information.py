@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from squadopt.live.recommendation import Projection
 from squadopt.planning import ProjectionHorizon, TransferPlanResult
+from squadopt.planning.policy_comparison import PolicyComparisonInput, compare_completed_policies
 
 
 def information_review_payload(
@@ -108,6 +109,29 @@ def information_review_payload(
                     "branches": branches,
                 }
             )
+    comparison = None
+    if compared and review is not None:
+        completed = []
+        for raw, shown in zip(review["candidates"], candidates, strict=True):
+            state = raw["branches"][0].get("first_action", {})
+            if not {"bank", "ft"}.issubset(state) or any(
+                branch["expected_net_points"] is None for branch in shown["branches"]
+            ):
+                break
+            completed.append(
+                PolicyComparisonInput(
+                    branch_values={
+                        branch["state"]: float(branch["expected_net_points"])
+                        for branch in shown["branches"]
+                    },
+                    transfer_count=len(shown["transfers_in"]),
+                    chip=shown["chip"],
+                    bank_tenths=int(state["bank"]),
+                    free_transfers=int(state["ft"]),
+                )
+            )
+        if completed and len(completed) == len(candidates):
+            comparison = compare_completed_policies(completed, basis="expected_own_points")
     return {
         "version": "football_information_review_v1",
         "status": "compared" if compared else "baseline_retained",
@@ -124,4 +148,5 @@ def information_review_payload(
         ),
         "information_gameweek": information.get("gameweek"),
         "candidates": candidates,
+        **({"comparison": comparison} if comparison is not None else {}),
     }

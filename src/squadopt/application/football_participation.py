@@ -14,6 +14,7 @@ from squadopt.application.football_context import (
     FULL_MATCH_UNAVAILABLE,
     manager_word_attestation_reason,
 )
+from squadopt.application.football_roles import bind_role_absences, fixture_role_estimates
 from squadopt.application.manager_words import (
     SOURCE_CHECK_CITED_DOCUMENTS_HELD,
     WORDS_UNRESOLVED,
@@ -192,6 +193,7 @@ def _minute_updates(
         "reason": basis_reason or ("missing_components" if basis is None else None),
         "components_fingerprint": None if basis is None else basis.companion["fingerprint"],
         "forecast_fingerprint": football.fingerprint,
+        "role_estimates": fixture_role_estimates(basis, inputs),
     }
     if not minute_news:
         return base, news, [], [], metadata
@@ -338,6 +340,14 @@ def _minute_updates(
         intervention_contract=intervention.contract_version,
         assumptions=list(intervention.assumptions),
         affected_player_count=int(mask.sum()),
+        role_estimates=fixture_role_estimates(
+            basis,
+            inputs,
+            revised_rows=intervention.fixture_rows,
+            applied_fixtures={
+                (item.player_id, fixture) for item in accepted for fixture in item.fixture_ids
+            },
+        ),
     )
     return updated, ordinary_news, blocked_audit + minute_audit, withheld, metadata
 
@@ -577,6 +587,8 @@ def bind_football_participation(
             ).any()
         ),
     }
+    role_estimates = minute_metadata.get("role_estimates", [])
+    assert isinstance(role_estimates, list)
     projection = replace(
         football.projection,
         table=adjusted.loc[first_mask].copy(),
@@ -586,7 +598,11 @@ def bind_football_participation(
                 first_mask & adjusted.appearance_probability.eq(0), "player_id"
             ]
         ),
-        diagnostics={**football.projection.diagnostics, "participation_evidence": audit},
+        diagnostics={
+            **football.projection.diagnostics,
+            "participation_evidence": audit,
+            "fixture_role_estimates": bind_role_absences(role_estimates, result.table),
+        },
     )
     return replace(
         football, horizon=replace(football.horizon, table=adjusted), projection=projection

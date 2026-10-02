@@ -104,6 +104,13 @@ def main() -> int:
     parser.add_argument("--out", default="web/public")
     parser.add_argument("--season")
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
+    parser.add_argument(
+        "--training-season",
+        action="append",
+        dest="training_seasons",
+        help="Explicit prospective inputs; repeat allowed archive seasons and 2026-27 for "
+        "captured current history. Omit to preserve the existing archive policy.",
+    )
     parser.add_argument("--registry", default=str(REGISTRY_PATH))
     parser.add_argument(
         "--in-season-projection",
@@ -149,7 +156,7 @@ def main() -> int:
     parser.add_argument(
         "--rotation-evidence",
         type=Path,
-        help="this week's rotation evidence table (rotation_evidence_v2 csv, its manifest "
+        help="this week's rotation evidence table (rotation_evidence_v4 csv, its manifest "
         "beside it); with --club-news-source, the manager's word is solved for every "
         "member as a switchable, priced constraint",
     )
@@ -191,6 +198,11 @@ def main() -> int:
             rotation_evidence=arguments.rotation_evidence,
             club_news_source=arguments.club_news_source,
             top100_evidence=arguments.top100_evidence,
+            training_seasons=(
+                tuple(arguments.training_seasons)
+                if arguments.training_seasons is not None
+                else None
+            ),
         )
         prepared = prepare_league_publication(request)
         _capture_note(prepared)

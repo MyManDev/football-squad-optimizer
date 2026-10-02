@@ -25,7 +25,9 @@ from typing import Any, Final
 import jsonschema
 
 from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
+from squadopt.contracts.football_explanations import policy_comparison_schema, role_forecast_schema
 from squadopt.contracts.information import decision_information_schema, official_information_schema
+from squadopt.contracts.injuries import official_injuries_schema
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import preferences_schema
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
@@ -202,7 +204,7 @@ def information_review_schema() -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "properties": fields,
+        "properties": {**fields, "comparison": policy_comparison_schema()},
         "required": list(fields),
     }
 
@@ -272,7 +274,13 @@ def advice_read_schema() -> dict[str, Any]:
                 "type": "object",
                 "properties": {
                     "id": {"const": "football"},
-                    "version": {"enum": ["football_team_share_v1", "football_contextual_v3"]},
+                    "version": {
+                        "enum": [
+                            "football_team_share_v1",
+                            "football_contextual_v3",
+                            "football_joint_role_minutes_v1",
+                        ]
+                    },
                     "experimental": {"const": True},
                     "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
                 },
@@ -435,7 +443,9 @@ def advice_read_schema() -> dict[str, Any]:
             "expected_own_points": nullable_number,
             "lineup_expectation": lineup_expectation_schema(),
             "participation_evidence": participation_evidence_schema(),
+            "role_forecast": role_forecast_schema(),
             "official_information": official_information_schema(),
+            "official_injuries": official_injuries_schema(),
             "decision_information": decision_information_schema(),
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.

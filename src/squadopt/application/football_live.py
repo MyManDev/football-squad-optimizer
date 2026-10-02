@@ -29,7 +29,12 @@ from squadopt.live.football_artifact import (
 )
 from squadopt.live.football_horizon import build_football_horizon
 from squadopt.prediction.availability import apply_availability
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, FixtureFootballModel
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+    FixtureFootballModel,
+    JointRoleFootballModel,
+)
 from squadopt.prediction.football_components import (
     COMPONENT_LIMITATIONS,
     FIXTURE_COMPONENTS_CONTRACT,
@@ -43,11 +48,12 @@ from squadopt.prediction.football_contextual import (
 from squadopt.prediction.football_features import football_features
 
 
-def causal_training(history: pd.DataFrame) -> pd.DataFrame:
+def causal_training(history: pd.DataFrame, *, prior_only_season: str | None = None) -> pd.DataFrame:
+    prior_season = ARCHIVE_SEASONS[0] if prior_only_season is None else prior_only_season
     parts = []
     for (season, week), target in history.groupby(["season", "GW"], sort=True):
         season, week = str(season), int(str(week))
-        if season == ARCHIVE_SEASONS[0]:
+        if season == prior_season:
             continue  # first season supplies historical priors only, as measured
         cutoff = target.kickoff.min()
         earlier = (history.season < season) | (history.season.eq(season) & history.GW.lt(week))
@@ -129,11 +135,16 @@ def _forecast_and_components(
     manager_words: ManagerWords | None,
     gameweeks: Sequence[int] | None,
     training_seasons: Sequence[str] | None,
+    role_minutes: bool = False,
 ) -> tuple[dict[str, Any], pd.DataFrame, RecommendationInputs]:
     """One producer call: the served document, the per-fixture components and the inputs."""
 
     if not isinstance(contextual, bool):
         raise ValueError("contextual must be a boolean.")
+    if not isinstance(role_minutes, bool) or (role_minutes and contextual):
+        raise ValueError("role_minutes must be boolean and cannot be combined with contextual.")
+    if role_minutes and training_seasons is None:
+        raise ValueError("Joint role minutes require an explicit training-season allowlist.")
     if manager_words is not None and not contextual:
         raise ValueError("Manager context requires the contextual candidate.")
     season = infer_season(snapshot)
@@ -141,6 +152,10 @@ def _forecast_and_components(
     cutoff = pd.Timestamp(inputs.captured_at_utc)
     first = int(inputs.deadline.gameweek)
     archives, include_current = _training_sources(training_seasons, season)
+    if role_minutes and (archives != ("2022-23", "2023-24", "2024-25") or not include_current):
+        raise ValueError(
+            "Joint role minutes require exactly 2022-23, 2023-24, 2024-25 and the captured season."
+        )
     history = (
         archive_history(archive_root)
         if training_seasons is None
@@ -158,10 +173,17 @@ def _forecast_and_components(
             history = pd.concat([history, current], ignore_index=True)
     if history.empty:
         raise ValueError("The selected training seasons contain no usable history.")
-    training = causal_training(history)
+    prior_season = str(history.season.min()) if role_minutes else next(iter(ARCHIVE_SEASONS), "")
+    training = (
+        causal_training(history, prior_only_season=prior_season)
+        if role_minutes
+        else causal_training(history)
+    )
     model = (
         ContextualFootballModel(training, history, cutoff=cutoff)
         if contextual
+        else JointRoleFootballModel(training, history, cutoff=cutoff)
+        if role_minutes
         else FixtureFootballModel(training, history, cutoff=cutoff)
     )
     boot = json.loads(snapshot.payloads[BOOTSTRAP_PAYLOAD])
@@ -191,9 +213,15 @@ def _forecast_and_components(
         ignore_index=True,
     )
     context_audit: list[dict[str, Any]] = []
+    takers = (
+        captured_taker_priorities(snapshot.payloads[BOOTSTRAP_PAYLOAD])
+        if contextual or role_minutes
+        else None
+    )
     if contextual:
+        assert takers is not None
         roster = roster.merge(
-            captured_taker_priorities(snapshot.payloads[BOOTSTRAP_PAYLOAD]),
+            takers,
             on="player_id",
             how="left",
             validate="one_to_one",
@@ -238,7 +266,11 @@ def _forecast_and_components(
             hashes[f"{prior}/{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
     document = {
         "contract_version": ARTIFACT_CONTRACT,
-        "model_version": CONTEXTUAL_MODEL_VERSION if contextual else FOOTBALL_MODEL_VERSION,
+        "model_version": CONTEXTUAL_MODEL_VERSION
+        if contextual
+        else JOINT_ROLE_MODEL_VERSION
+        if role_minutes
+        else FOOTBALL_MODEL_VERSION,
         "season": season,
         "gameweek": first,
         "source_snapshot_id": inputs.snapshot_id,
@@ -263,16 +295,26 @@ def _forecast_and_components(
             "archive_seasons_read": list(archives),
             "captured_history_included": include_current,
             "captured_history_season": season if include_current else None,
-            "prior_only_seasons": [ARCHIVE_SEASONS[0]]
-            if ARCHIVE_SEASONS and ARCHIVE_SEASONS[0] in archives
-            else [],
+            "prior_only_seasons": [prior_season] if prior_season in set(history.season) else [],
             "history_rows_by_season": _season_counts(history),
             "supervised_rows_by_season": _season_counts(training),
         }
+    if role_minutes:
+        assert isinstance(model, JointRoleFootballModel)
+        document["role_metadata"] = model.role_metadata
+        document["training_selection"]["prior_policy"] = "first_selected_usable_season_prior_only"
+        document["limitations"].append(
+            "Start and substitute probabilities are development estimates, "
+            "not independently calibrated."
+        )
     if contextual:
         document["availability_application"] = "before_team_shares_v1"
         document["projection_contract"] = horizon.contract_version
         document["manager_context"] = context_audit
+    if contextual or role_minutes:
+        assert takers is not None
+        # Source facts only: ranks do not identify event-channel intensities and
+        # must not change the joint role model's roster, features or predictions.
         document["taker_priorities"] = {
             "source_snapshot_id": inputs.snapshot_id,
             "captured_at_utc": inputs.captured_at_utc,
@@ -282,9 +324,17 @@ def _forecast_and_components(
                     "player_id": int(row["player_id"]),
                     **{key: None if pd.isna(row[key]) else int(row[key]) for key in TAKER_FIELDS},
                 }
-                for row in roster[["player_id", *TAKER_FIELDS]].to_dict("records")
+                for row in (roster[["player_id", *TAKER_FIELDS]] if contextual else takers).to_dict(
+                    "records"
+                )
             ],
         }
+        if role_minutes:
+            document["limitations"].append(
+                "Captured penalty and set-piece priorities are source facts only; "
+                "separate event-channel rates are not estimated."
+            )
+    if contextual:
         document["limitations"].extend(
             [
                 "Joint intensity uncertainty is a moment-matched working approximation.",
@@ -304,6 +354,7 @@ def produce_football_forecast(
     manager_words: ManagerWords | None = None,
     gameweeks: Sequence[int] | None = None,
     training_seasons: Sequence[str] | None = None,
+    role_minutes: bool = False,
 ) -> dict[str, Any]:
     document, _components, _inputs = _forecast_and_components(
         snapshot,
@@ -312,6 +363,7 @@ def produce_football_forecast(
         manager_words=manager_words,
         gameweeks=gameweeks,
         training_seasons=training_seasons,
+        role_minutes=role_minutes,
     )
     return document
 
@@ -322,14 +374,16 @@ def produce_football_components(
     *,
     gameweeks: Sequence[int] | None = None,
     training_seasons: Sequence[str] | None = None,
+    role_minutes: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """The served v1 document and its per-fixture components, from one producer call.
+    """The served football document and per-fixture components, from one producer call.
 
     The first document is exactly what ``produce_football_forecast`` returns for the same
     arguments. The second is ``football_fixture_components_v1``: every scheduled player-fixture's
     model outputs, bound to the first by its fingerprint. The capture's availability is carried
     once in its header, as the multiplier ``apply_availability`` gives each player and the rule
-    that gave it, and applied to no row. v1 only: the contextual model conditions its team
+    that gave it, and applied to no row. Both v1 and joint role minutes retain this rule;
+    the contextual model conditions its team
     components on availability and is not this contract.
     """
 
@@ -340,6 +394,7 @@ def produce_football_components(
         manager_words=None,
         gameweeks=gameweeks,
         training_seasons=training_seasons,
+        role_minutes=role_minutes,
     )
     roster = [int(player) for player in inputs.players.player_id]
     unit = pd.DataFrame({"player_id": roster, "expected_points": [1.0] * len(roster)})
@@ -373,5 +428,7 @@ def produce_football_components(
     }
     if "training_selection" in document:
         companion["training_selection"] = json.loads(json.dumps(document["training_selection"]))
+    if "role_metadata" in document:
+        companion["role_metadata"] = json.loads(json.dumps(document["role_metadata"]))
     companion["fingerprint"] = forecast_digest(companion)
     return document, companion

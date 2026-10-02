@@ -1,8 +1,9 @@
-# `rotation_evidence_v2` — the contract
+# `rotation_evidence_v4` — the contract
 
 The sibling of `phase_b_evidence_contract.md`, for the rotation lane. One CSV and one
-manifest per decision week, written exactly once, read by the member-facing card and by the
-owner's lane. This document is the contract; `src/squadopt/features/rotation_evidence.py` is
+manifest per decision capture and news source, written exactly once, read by the
+member-facing card and by the owner's lane. This document is the contract;
+`src/squadopt/features/rotation_evidence.py` is
 its implementation and `rotation_evidence_artifact.py` is what refuses a pair that does not
 keep it.
 
@@ -13,15 +14,13 @@ and the committed half is this document.
 
 ## The three rules the table exists to keep
 
-**1. The claim is categorical.** `rotation_disposition` is one of eight declared values or it
-is missing. There is no probability, likelihood, chance, score, confidence or `p_start`
-column, and there will not be one: a generated number of that kind is forbidden on a
-member-facing surface in either language *and* is an unmeasured claim besides. A `confidence`
-column is a probability wearing a different hat, which is why it sits in the forbidden set
-beside the obvious names — and why that set is checked against the schema at **import time**,
-not only against a table at export time.
+**1. The model claim is categorical.** `rotation_disposition` is one of nine declared values
+or is missing. This table adds no generated probability, confidence or score. The separately
+named `feed_chance_of_playing_next_round` preserves the official feed's stated value; it is
+not a model estimate or a calibration result. Forbidden generated field names are checked
+against the schema at import time and on artifact read.
 
-**2. The citation is a pointer, not a quote.** Columns 18-20 carry the source document's
+**2. The citation is a pointer, not a quote.** Columns 19-21 carry the source document's
 SHA-256 and a byte span into it. The card resolves them against the locally held snapshot
 bytes when it renders. That is how a member reads the manager's own words while this table
 carries none of them, and how the words shown are provably the words captured: the digest is
@@ -29,8 +28,8 @@ checked before the offsets, so a document that has changed since resolves to not
 than to different words presented as the source's own.
 
 **3. Absent is not zero, and it is not False.** Every column below states what its absence
-means. Two flags are never absent at all, because each separates "did not happen" from "was
-not observed", and a missing value would collapse the distinction it exists to keep.
+means. Observation and attestation flags are never absent, because a missing value would
+collapse "did not happen" and "was not verified".
 
 ## Completeness
 
@@ -42,21 +41,16 @@ was not observed for him. A table with a player quietly missing would look compl
 
 ## The chain is frozen before the decision
 
-Every club document must have been fetched **strictly before** the decision capture was
-taken. A week that breaks that is refused, not published with a caveat.
+Every club document must have been fetched **strictly before** the decision capture. For a
+captured source, the completed news capture must also precede that decision: the acquisition
+writer stamps it after coding, and the exporter compares its timestamp before building the
+table. The manifest records `club_news_snapshot_id` and `club_news_captured_at_utc`; the
+artifact reader checks the completed-capture ordering again, including when there are zero
+claims. A synthetic fixture has no provider call and does not acquire that provenance.
 
-This is a rule about the *method*, which is why no column records it. `timing_verified`
-(column 8) is a fact about a claim — every instant it rests on is earlier than the deadline.
-This is a fact about the order things happened in: if the club bytes were fetched after the
-capture was taken, then whoever fetched them could have looked at the capture first, noticed
-a player who looked wrong, and gone hunting for words about him. That is not partially true
-on some rows, so the build refuses.
-
-**What the refusal does not cover.** The model's own call instant. A response carries no
-timestamp, and the club-news capture reaches the builder as an identifier rather than as a
-snapshot, so there is nothing to compare. That half closes where the response is written
-into a capture with its own stamped instant — until then, this document says so rather than
-letting a reader assume the check is stronger than it is.
+`timing_verified` separately says the decision capture, fetch instants and any exact claim
+publication instant are strictly before the decision deadline. It does not make a day-only
+dateline exact or establish that a statement applies to this fixture.
 
 ## Columns, in the one order they are ever written or read
 
@@ -76,37 +70,76 @@ letting a reader assume the check is stronger than it is.
 | 12 | `feed_news_added_utc` | string | the player has never been flagged |
 | 13 | `feed_scout_risk_count` | Int64 | the field was absent from the payload → refuse. `0` means present and empty |
 | 14 | `feed_scout_news_link_present` | boolean | field absent → refuse |
-| 15 | `club_source_covered` | boolean | **never absent.** False = no document was read for this player's club this week |
-| 16 | `rotation_claim_observed` | boolean | **never absent.** False = the process ran and produced no disposition for him |
-| 17 | `rotation_claim_unresolved` | boolean | **never absent.** True = a claim was made about him and its citation could not be verified |
+| 15 | `club_source_covered` | boolean | **never absent.** False = the club did not retain read-and-coded coverage; see the coverage rules below |
+| 16 | `rotation_claim_observed` | boolean | **never absent.** False = no resolved disposition is carried for him; read with columns 15 and 17 |
+| 17 | `rotation_claim_unresolved` | boolean | **never absent.** True = an unverified citation or conflicting claims resolved to this player |
 | 18 | `rotation_disposition` | string, closed | missing **only** where column 16 is False |
-| 19 | `rotation_claim_source_sha256` | string | no claim, or the claim came from the feed alone |
+| 19 | `rotation_claim_source_sha256` | string | no observed claim |
 | 20 | `rotation_claim_span_start` | Int64 | no located sentence |
 | 21 | `rotation_claim_span_end` | Int64 | no located sentence. 20-21 are byte offsets into the hashed source bytes |
-| 22 | `rotation_claim_published_at_utc` | string | **the source carried no dateline.** Never substituted with the fetch instant |
-| 23 | `rotation_claim_published_precision` | string, closed | `instant` / `day` / `unknown` |
-| 24 | `rotation_claim_speaker` | string, closed | `manager` / `club_official` / `club_statement` / `unattributed`. Never a person's name |
-| 25 | `model_identifier` | string | no model was involved in this row |
-| 26 | `prompt_sha256` | string | no model was involved |
+| 22 | `rotation_claim_published_at_utc` | string | no claim or no admitted publication date. Never substituted with the fetch instant |
+| 23 | `rotation_claim_published_precision` | string, closed | no claim; otherwise `instant` / `day` / `unknown` |
+| 24 | `rotation_claim_speaker` | string, closed | no claim; otherwise `manager` / `club_official` / `club_statement` / `unattributed`. Never a person's name |
+| 25 | `model_identifier` | string | no model instrument recorded; otherwise repeated across the roster, not evidence that this player was mentioned |
+| 26 | `prompt_sha256` | string | no model instrument recorded |
 | 27 | `model_response_sha256` | string | no model was involved, or it said nothing about him. **This player's club's** response — see below |
-| 28 | `model_evidence_observed` | boolean | **never absent.** False = the model produced no disposition for him at all |
+| 28 | `model_evidence_observed` | boolean | **never absent.** False = no resolved model disposition is carried for him |
 | 29 | `fixture_context_midweek` | boolean | **never absent** — the calendar could not answer, so the build refused instead |
+| 30 | `rotation_claim_fixture_scope` | string, closed | no observed claim |
+| 31 | `rotation_claim_scope_verified` | boolean | **never absent.** False = no verified binding to the target decision's next league fixture |
+| 32 | `rotation_claim_publication_verified` | boolean | **never absent.** False = the stated date was not verified against held source metadata |
+| 33 | `rotation_claim_publication_source` | string, closed | no verified metadata source recorded |
+| 34 | `rotation_claim_publication_source_sha256` | string | no recorded publication metadata source; present together with column 33 |
 
-## Four states, not three
+V4 has exactly these 34 columns. The reader also accepts the 29-column V2 and V3 table
+contracts with the supported export manifest contract. V2 retains its eight-value
+disposition vocabulary; V3 adds `stated_full_match_unavailable`. Legacy rows do not acquire
+V4 attestations merely by being read.
 
-Columns 15, 16 and 17 are read together, and the reason column 17 exists is that without it
-the fourth state was indistinguishable from the second:
+### Source attestation is separate from a located citation
+
+`rotation_claim_fixture_scope` is `upcoming_premier_league`, `other_competition`, `past`,
+`ambiguous` or `unspecified`. Only the first can have `scope_verified=True`. The current
+finite English source check requires explicit unconditional wording. Absence, full-match
+inability and rotation-risk restrictions must name the player and the relevant predicate
+in the same complete cited clause. Unsupported aliases, pronouns, training-only wording,
+other competitions, past matches and uncertain statements do not authorize those changes.
+
+The builder also checks the captured club calendar: the target week must have one dated
+fixture still ahead of the decision, and it must be the first club fixture after the exact
+publication instant. An intervening fixture, an ambiguous double gameweek or a relevant
+undated fixture leaves the statement unbound. Unassigned fixtures (`event=null`) participate
+in this attestation check even though they are not projection rows.
+
+Publication attestation comes from explicit held publication metadata, never fetch time,
+HTTP `Last-Modified` or an invented time. Its closed sources are `html_publication_meta`,
+`html_publication_time`, `jsonld_datePublished`, `text_published`, `feed_published` and
+`consistent_publication_fields`. The date, precision, source and digest are retained. A
+verified day-only date remains day-only and cannot authorize an exact-time intervention.
+
+The artifact reader validates these fields' shape. The manager-word consumer independently
+resolves the citation, recomputes source publication and scope, and checks the decision
+calendar before granting a role constraint. Numeric participation/minute consumers apply
+their own explicit-label, timing and forecast-basis checks. Neither a located quote nor an
+LLM disposition alone establishes absence, a start forecast or a minute allocation.
+
+## Read the coverage and claim flags together
+
+Columns 15, 16 and 17 distinguish these common cases:
 
 | | `club_source_covered` | `rotation_claim_observed` | `rotation_claim_unresolved` |
 | --- | --- | --- | --- |
-| his club was never read | False | False | False |
-| read, and nothing was said about him | True | False | False |
-| something was said, the citation could not be verified | True | False | **True** |
+| his club was not read and coded | False | False | False |
+| read and coded, with no resolved or unresolved claim about him | True | False | False |
+| an unresolved claim about him, with other coverage retained | True | False | **True** |
 | something was said and it was located | True | True | False |
 
-The third row is a **source error**: the model wrote about him and the quote it gave could not
-be found in the bytes it cites, so no disposition is carried. Before column 17 he appeared as
-the second row, which asserts a silence that never happened.
+The third row records an unresolved claim: its citation could not be verified, or conflicting
+claims resolved to the same player. No disposition is carried. Conflicting player IDs are
+also recorded in `players_with_conflicting_claims`; they are not a quiet-source result.
+The flags are independent: when all a club's citations fail, coverage is False while the
+affected players can still have unresolved=True. A retained claim can also coexist with a
+separate unverified citation, so observed and unresolved need not be mutually exclusive.
 
 One unverifiable citation costs one claim. A club whose *every* claim lost its citation is
 dropped from `clubs_covered` — nothing it said survives into evidence, so calling it covered
@@ -119,11 +152,10 @@ A club may register more than one page — team news and an injury table are oft
 so "his club was read" and "all of his club's pages were read" stopped being one statement.
 The answer this contract gives:
 
-**Covered means at least one of that club's registered pages was read.** Column 15 keeps its
-meaning exactly, and the reason is the fetcher's own rule: one club failing does not fail the
-week, and by the same token one *page* failing must not cost a club its coverage. A player
-whose club published team news that was read is a player something was read about, whatever
-happened to the club's second page.
+**Covered means at least one registered page was read and the club was coded**, subject to
+the all-citations-refused rule above. It does not mean every registered page was read or that
+the source said something actionable about every player. A successful zero-claim response
+remains distinct from an uncoded club or a response whose claims were all refused.
 
 **Fully covered is a different question, and the manifest answers it.**
 `clubs_partially_covered` names the covered clubs at least one of whose registered pages was
@@ -147,40 +179,35 @@ payloads alone, a club whose second page was refused is indistinguishable from a
 only ever registered one — both arrive with one document. Only the run that read the registry
 knows which it was, so it writes it down while it still knows.
 
-This moved the export contract to `rotation_evidence_export_v2`. **The table's own version did
-not move**: no column changed, because partial coverage is a club-level fact and the manifest
-is where club-level facts live. A capture written before the field carries no
-`clubs_partially_covered`, and an absent list reads as empty rather than as a refusal — those
-weeks allowed one page per club, so no club could be partly read.
-
-The contract moved again, to `rotation_evidence_export_v3`, when the manifest gained
-`provider`. The table's version did not move for the same reason, and the capture layout's
-version did not move either: `provider` joined the response index as an optional key that an
-older capture reads as `None`, so a week captured before the field stays readable and says
-the true thing about itself rather than a guessed one.
+The current pair contract is `rotation_evidence_export_v3`, independently of the table's V4
+schema. Its manifest requires `clubs_partially_covered`; older *news captures* can omit the
+capture field and the capture reader supplies an empty list. Optional provider provenance
+remains unknown for captures or manifests that did not record it.
 
 ### `rotation_disposition`, in full
 
 `not_addressed`, `no_statement`, `stated_expected_to_start`, `stated_expected_absent`,
-`stated_rotation_risk`, `stated_returning_from_injury`, `stated_minutes_limited`, `ambiguous`.
+`stated_rotation_risk`, `stated_returning_from_injury`, `stated_minutes_limited`, `ambiguous`,
+`stated_full_match_unavailable`.
 
 A closed list, deliberately. It cannot invent a nuance the source did not have, and it cannot
 become a number.
 
-### Why 16 and 27 are both here
+### Why 16 and 28 are both here
 
 They are computed independently and they agree on every row today, because the model is
 currently the only source of a disposition. They are kept apart because a later feed-derived
-disposition would set 16 without 27, and a table that had aliased them could not say so.
+disposition would set 16 without 28, and a table that had aliased them could not say so.
 
 ### Provenance is per club, and the instrument is not
 
-A model is called once per club, so a week holds as many responses as clubs it read. Column 26
-is the digest of **that player's club's** response. A single digest written across every row
-would give an Arsenal player a citation into bytes that never mentioned him — and the digest
+A response is associated with each coded club; this is not a count of paid calls. An unchanged
+request can reuse a captured response, and a synthetic response can cover several clubs.
+Column 27 is the digest of **that player's club's** response. A single digest written across
+every row would give an Arsenal player a citation into bytes that never mentioned him — and the digest
 would verify, which is the worst kind of wrong.
 
-Columns 24 and 25 stay single-valued. Which model answered and which question it was asked are
+Columns 25 and 26 stay single-valued. Which model answered and which question it was asked are
 facts about the instrument, not about a club, and the manifest states one of each. A week
 answered by two models, served by two model versions, or asked under two prompts is therefore
 **refused** rather than recorded: it is a mixture the manifest cannot express, and a week whose
@@ -188,9 +215,8 @@ claims came from somewhere other than the model the manifest names is not a week
 check. Same reasoning as the coding call's refusal to declare a fallback model.
 
 The manifest's `response_sha256s` lists every response the week holds, sorted and without
-repeats. Deduplicated because one response can legitimately cover several clubs — the fixture
-provider answers once for all of them — and listing the same digest twice would imply a second
-call there never was.
+repeats. One response can legitimately cover several clubs, and separate calls can return
+identical bytes; this list identifies response content, not call count.
 
 A claim placed on a player whose club has no recorded response refuses the whole week, naming
 every such club at once. A disposition whose response cannot be named is traceable to no bytes
@@ -205,8 +231,7 @@ a two-state reading would merge them.
 
 ## Manifest
 
-Every field is required on read; a missing one refuses the pair, because the manifest is what
-makes the table checkable and one with a hole in it checks less than it claims.
+These fields are required on read; a missing one refuses the pair:
 
 `contract_version`, `artifact_contract_version`, `season`, `target_gameweek`,
 `deadline_timestamp_utc`, `generated_at_utc`, `repository_commit`, `table_file`,
@@ -216,13 +241,21 @@ makes the table checkable and one with a hole in it checks less than it claims.
 `model_version`, `prompt_sha256`, `response_sha256s`, `claims_coded`, `claims_ambiguous`,
 `players_not_addressed`.
 
-`provider` is written beside them and is the one field not required on read, though it is read: an artifact that names an adapter carries it into the table's attributes, and one written before the field existed reads as `null` rather than being refused. It names the
-adapter the week was asked through, which `model_identifier` does not pin: a fake adapter can
-report any model name, and one vendor's identifier can be served through another's compatible
-endpoint. It is `null` where nothing recorded it, which is what a fixture week and a capture
-written before the field both are, and demanding it would refuse weeks already on disk that a
-club-page fetch cannot produce again. Where clubs disagree about it the week is refused, for
-the same reason two models or two prompts are: the manifest states one instrument.
+`provider` is optional on read and remains `null` if unrecorded; it identifies the adapter,
+not the model or endpoint by inference. Clubs must agree on the recorded provider, model,
+model version and prompt. The capture retains any request/reuse provenance; the rotation
+manifest's response digests alone do not establish how many provider calls were made.
+
+Current exports also write `club_news_source_kind` (`capture` or `fixture`) and
+`players_with_conflicting_claims`. Captured sources write the paired
+`club_news_snapshot_id` and `club_news_captured_at_utc` fields. A partial binding is refused.
+V4 capture evidence must carry the binding, including a genuinely quiet response. Legacy
+manifests retain their existing read checks without gaining this completed-call guarantee.
+
+For a bound capture, `claims_coded` must equal the table's observed-claim count. Every observed
+row must name the news capture; a zero-claim table names only the decision capture in its row
+sources while still naming the completed news capture in the manifest. This permits quiet
+coverage to be checked without pretending those claims exist.
 
 **One check is weaker than Phase B's, and named rather than hidden.** `source_snapshot_ids`
 varies by row here: a player nobody wrote about was read from the decision capture alone.
@@ -243,20 +276,22 @@ The last group matters as much as the first.
 The CSV is completed and fsynced in a sibling temporary file, then published with a
 no-overwrite hard link; a losing writer compares its own bytes with the winner's and reports a
 replay when they agree. The manifest goes through the same writer as every other measurement
-document, where a replay may differ by the wall clock and nothing else. An artifact with
-different content under the same name is refused, never overwritten. The export refuses a
-dirty working tree, so the commit it records actually reproduces the bytes.
+document, where a replay may differ by `generated_at_utc` and nothing else. An artifact with
+different content under the same name is refused, never overwritten. The export CLI refuses
+a dirty working tree; the application function receives its repository commit from its caller.
+The two files are individually immutable, not a transactional pair; consumers require both.
 
-The name is `rotation_evidence_v2_<season>_gw<NN>_<capture digest>`, so a rehearsal earlier in
-the week is a different artifact from the real run rather than a silent overwrite of it. The
-digest is the capture the claims came from; while the synthetic fixture stands in for a live
-source the claims are fixed, so the decision capture is what varies and names the file
-instead. The manifest records both, so which one named it is never a guess.
+For captured news the default stem is
+`rotation_evidence_v4_<season>_gw<NN>_<news suffix>_decision_<decision suffix>`.
+Each suffix is the final 12 characters of its capture ID. Synthetic fixtures instead use
+`rotation_evidence_v4_<season>_gw<NN>_<decision suffix>`. Explicit `table_name` overrides the
+stem but not content checks. The decision suffix prevents two decisions using the same news
+capture from colliding; full identities remain in the manifest and row provenance.
 
 ## `fixture_context_midweek`, and the refusal behind it
 
-True when the player's club has a kickoff in the four days before the deadline. This is the
-first consumer of the captured `kickoff_time_utc`, which the fixture contract makes nullable
+True when the player's club has a kickoff in the four days before the deadline. It uses
+captured `kickoff_time_utc`, which the fixture contract makes nullable
 precisely because a fixture can be assigned to a gameweek before its time is confirmed.
 
 So coverage is checked before the answer is given: if any fixture in the target gameweek or the
@@ -267,31 +302,19 @@ The column is derived here and is **not** added to `FIXTURE_COLUMNS`, which reje
 the fixture contract does not define — a derived quantity belongs in the step that aggregates,
 not in the stored table.
 
-## Three clocks, and the one that is unbounded
+## Source, provider and artifact clocks
 
-`captured_at_utc` bounds the capture. `generated_at_utc` bounds the artifact. A model has a
-third that neither covers: what it knew at call time, from training data of any vintage.
-**Nothing can bound that, and this document does not pretend otherwise.**
+Source publication, document fetch, completed news capture, decision capture and artifact
+generation are distinct timestamps. `generated_at_utc` is the export wall clock, not the
+publication or decision time. The completed news capture bounds the finished acquisition and
+coding process; it is not a provider-signed per-call timestamp. Reused responses retain their
+capture provenance and must still pass the decision binding.
 
-What the manifest can do, and does, is record the exact prompt digest, the model identifier and
-version, and every source document digest, so that *"the claim is traceable to bytes we
-captured at time T"* is checkable rather than asserted.
-
-The ordering rule above is what bounds the first two clocks against each other; it does not
-touch the third, and nothing can.
-
-A related limit, stated for the same reason: a `day`-precision dateline is **not** compared
-against the deadline. It names a calendar day and no time, so testing it against an instant
-would require inventing one, and the invented time would decide the answer. Such a row's
-`timing_verified` rests on the capture and fetch instants, which are ours and are exact.
-
-## Two unverified field names
-
-`scout_risks` and `scout_news_link` (columns 13-14) are read under those names on the strength
-of the lane brief; no capture has been read here to confirm them. The refusal in column 13-14's
-"absent means" is what keeps that honest — if the source spells them differently, the first
-real capture stops with the names it was looking for rather than quietly reporting that nobody
-has any risks.
+None of these checks verifies the model's training-data cutoff or prevents a model from
+having unrelated prior knowledge. Traceable held bytes, exact quote offsets, instrument
+identity and conservative source checks limit what this lane can act on; they do not prove
+forecast calibration. A `day`-precision dateline is never converted to an instant: its row's
+`timing_verified` can rest on exact capture/fetch times while the intervention remains gated.
 
 ## The model call
 
