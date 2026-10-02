@@ -289,7 +289,7 @@ def test_reader_refuses_postseal_tampering(case, damage):
         read(case)
 
 
-def add_quiet_news(case, tmp_path):
+def add_quiet_news(case, tmp_path, table_name="rotation-bundle"):
     response = _response()
     raw = json.loads(response.text)
     raw["claims"] = []
@@ -315,7 +315,7 @@ def add_quiet_news(case, tmp_path):
             None,
             tmp_path / "rotation",
             club_news_snapshot=news.snapshot_id,
-            table_name="rotation-bundle",
+            table_name=table_name,
         ),
         repository_commit="0" * 40,
     )
@@ -329,6 +329,61 @@ def test_quiet_news_still_requires_and_preserves_exact_capture_binding(case, tmp
     assert result.news_capture_id == case["news_capture_id"]
     assert "rotation_table" in result.files
     assert read(case).fingerprint == result.fingerprint
+
+
+@pytest.mark.parametrize("stem", ["my.table", "rotation bundle"])
+def test_a_rotation_name_the_reader_refuses_is_refused_before_the_marker(case, tmp_path, stem):
+    """The seal validates what the reader validates, or a marker is written that no read accepts."""
+
+    # The export takes the operator's table name as given; the bundle's reader does not.
+    outputs = add_quiet_news(case, tmp_path, table_name=stem)
+    assert Path(outputs["table_path"]).name == stem + ".csv"
+
+    # The message is the reader's own; the previous seal raised it too, from the read-back
+    # after the marker was written. What this test holds is the two lines after it.
+    with pytest.raises(ValueError, match="Invalid sealed rotation filename"):
+        bundle.seal_football_bundle(**case)
+    assert not marker(case).exists()
+    assert not (marker(case).parent / (case["snapshot_id"] + ".bundle")).exists()
+    # The same capture and news seal once the pair carries a name the reader accepts.
+    accepted = export_rotation_evidence(
+        RotationExportRequest(
+            "2026-27",
+            6,
+            "2026-09-23T12:00:00Z",
+            case["snapshot_id"],
+            case["snapshot_root"],
+            None,
+            tmp_path / "accepted",
+            club_news_snapshot=case["news_capture_id"],
+            table_name="rotation-bundle",
+        ),
+        repository_commit="0" * 40,
+    )
+    case["rotation_table_path"] = accepted["table_path"]
+    assert "rotation_table" in bundle.seal_football_bundle(**case).files
+
+
+@pytest.mark.parametrize("stem", ["handoff", "site"])
+def test_a_reserved_rotation_name_is_refused_by_the_seal_and_by_the_reader(case, tmp_path, stem):
+    add_quiet_news(case, tmp_path, table_name=stem)
+    case["rotation_table_path"] = Path(case["rotation_table_path"]).with_suffix(".json")
+    with pytest.raises(ValueError, match="Reserved rotation artifact filename"):
+        bundle.seal_football_bundle(**case)
+    assert not marker(case).exists()
+
+    # A marker written by hand that names a reserved file is not a readable bundle.
+    sealed = bundle.seal_football_bundle(
+        **{**case, "rotation_table_path": None, "news_capture_id": None}
+    )
+    record = json.loads(sealed.marker_path.read_bytes())
+    record["files"]["rotation_table"] = {
+        "path": case["snapshot_id"] + ".bundle/" + stem + ".json",
+        "sha256": record["files"]["handoff"]["sha256"],
+    }
+    sealed.marker_path.write_bytes(json.dumps(record).encode("utf-8"))
+    with pytest.raises(ValueError, match="Invalid sealed rotation filename"):
+        read(case)
 
 
 def test_news_without_rotation_is_not_a_ready_bundle(case):
