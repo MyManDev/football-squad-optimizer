@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-22T22:04:06Z",
+  "generated_at_utc": "2026-10-02T16:56:19Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
+    "source_snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
     "moves": [
       {
         "move_id": "gw06-1",
@@ -21,24 +21,24 @@
           "team": "Newcastle"
         },
         "player_in": {
-          "player_id": 487838,
-          "name": "Lewis Hall",
-          "short_name": "Hall",
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
           "position": "DEF",
-          "team": "Newcastle"
+          "team": "Brighton"
         },
-        "expected_points_delta": 3.315650743453517,
+        "expected_points_delta": 3.3471977288580277,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 3.315650743453517,
+    "expected_gain_vs_hold": 3.3471977288580277,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 58.67636116773596,
+    "expected_own_points": 58.70790815314041,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -53,7 +53,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.34884146494046
+      "expected_points": 6.348841464940458
     },
     "starting_xi": [
       {
@@ -62,15 +62,15 @@
         "short_name": "Dubravka",
         "position": "GK",
         "team": "Spurs",
-        "expected_points": 0.08206076680465303
+        "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 487838,
-        "name": "Lewis Hall",
-        "short_name": "Hall",
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
         "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 3.3156507434535207
+        "team": "Brighton",
+        "expected_points": 3.347197728858024
       },
       {
         "player_id": 146426,
@@ -78,7 +78,7 @@
         "short_name": "Ajayi",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.8741759185724285
+        "expected_points": 2.87417591857242
       },
       {
         "player_id": 199798,
@@ -86,7 +86,7 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 2.6329333748184625
+        "expected_points": 2.6329333748184527
       },
       {
         "player_id": 219924,
@@ -94,7 +94,7 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.4616547540334857
+        "expected_points": 2.4616547540334794
       },
       {
         "player_id": 247348,
@@ -102,7 +102,7 @@
         "short_name": "Mej\u00eda",
         "position": "DEF",
         "team": "Nott'm Forest",
-        "expected_points": 2.1992754442560045
+        "expected_points": 2.1992754442560014
       },
       {
         "player_id": 141746,
@@ -110,7 +110,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.34884146494046
+        "expected_points": 6.348841464940458
       },
       {
         "player_id": 223340,
@@ -118,7 +118,7 @@
         "short_name": "Saka",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 5.325630193013578
+        "expected_points": 5.3256301930135725
       },
       {
         "player_id": 153366,
@@ -126,7 +126,7 @@
         "short_name": "Reed",
         "position": "MID",
         "team": "Fulham",
-        "expected_points": 0.0996249539122667
+        "expected_points": 0.09962495391226733
       },
       {
         "player_id": 223094,
@@ -142,7 +142,7 @@
         "short_name": "Calvert-Lewin",
         "position": "FWD",
         "team": "Leeds",
-        "expected_points": 3.2079631514265685
+        "expected_points": 3.2079631514265645
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.937285604836282
+        "expected_points": 3.937285604836277
       },
       {
         "player_id": 502500,
@@ -160,7 +160,7 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.730674624768085
+        "expected_points": 3.7306746247680795
       },
       {
         "player_id": 540324,
@@ -168,7 +168,7 @@
         "short_name": "Belloumi",
         "position": "MID",
         "team": "Hull City",
-        "expected_points": 3.367338042076787
+        "expected_points": 3.3673380420767858
       },
       {
         "player_id": 577725,
@@ -176,11 +176,12 @@
         "short_name": "King",
         "position": "MID",
         "team": "Fulham",
-        "expected_points": 3.095511723129681
+        "expected_points": 3.0955117231296767
       }
     ],
     "chip": "bboost",
     "stated_limits": [
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.",
       "The chip is in this plan because the member chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now."
     ],
     "data_quality": "partial",
@@ -192,7 +193,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 4.091264077617325,
+      "gain_vs_no_chip": 4.079861246913744,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

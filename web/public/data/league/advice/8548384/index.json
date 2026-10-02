@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-22T22:04:06Z",
+  "generated_at_utc": "2026-10-02T16:56:19Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -9,8 +9,16 @@
     "entry_id": 8548384,
     "window": 1,
     "evidence": {
-      "available": false,
-      "reason": "no_evidence_this_run"
+      "available": true,
+      "path": "advice/8548384/saf-puan/1/hoca-sozu.json",
+      "applied_count": 0,
+      "source_kind": "club_news_capture",
+      "source_label": "club-news-20261001T233157Z-0e6a493de61a",
+      "clubs_covered": [
+        "Liverpool"
+      ],
+      "rule_version": "managers_word_rule_v2",
+      "binding": false
     },
     "top100": {
       "available": false,
@@ -40,7 +48,7 @@
       "league_id": 352490,
       "entry_id": 8548384,
       "gameweek": 6,
-      "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
+      "source_snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
       "squad_player_ids": [
         154561,
         477424,
@@ -83,7 +91,7 @@
             "holding_value": 12.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 3.1979937569219388,
+            "gain_this_week": 2.6945808369267468,
             "threshold_this_week": 9.176470588235293,
             "reservation_allows_this_week": true,
             "points_at_gameweek": null,
@@ -98,7 +106,7 @@
             "holding_value": 15.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 3.1979937569219388,
+            "gain_this_week": 2.6945808369267468,
             "threshold_this_week": 11.470588235294118,
             "reservation_allows_this_week": true,
             "points_at_gameweek": null,
@@ -113,12 +121,12 @@
             "holding_value": 20.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 4.77193891565981,
+            "gain_this_week": 4.790329720257503,
             "threshold_this_week": 14.444444444444445,
             "reservation_allows_this_week": true,
             "points_at_gameweek": {
               "gameweek": 15,
-              "estimated_gain": 5.11036713344136,
+              "estimated_gain": 5.128757938039076,
               "threshold": 4.444444444444445,
               "player_ids": [
                 67089,
