@@ -262,3 +262,12 @@ def test_the_declared_expectation_is_the_committed_analogue() -> None:
     for sentence, holds in stated.items():
         assert holds, sentence
         assert sentence in text, sentence
+
+
+def test_the_index_entry_names_the_two_readings_and_no_other_gameweek() -> None:
+    index = (Path(__file__).resolve().parents[2] / "docs" / "measurements_index.md").read_text(
+        encoding="utf-8"
+    )
+    (entry,) = [line for line in index.splitlines() if "planner_policy_chain_prereg.md" in line]
+    assert "GW20" in entry and "GW38" in entry
+    assert set(re.findall(r"GW\d+", entry)) == {"GW20", "GW38"}

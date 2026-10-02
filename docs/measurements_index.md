@@ -292,4 +292,4 @@ was written.
 `rotation_evidence_prereg.md` · `football_prospective_prereg.md` · `availability_transitions_prereg.md`
 
 - [Frozen football window totals](research/football_window_totals.md): paired 1/3/5-week player sums from saved development forecasts; no model promotion.
-- [Planner policy chain protocol](research/planner_policy_chain_prereg.md): a prospective, stateful comparison of the routed multi-week planner, the full-window solver it replaced and the one-week path on realized points, over constructed squads with known purchase lots; read after GW12, GW20 and GW38; no record yet.
+- [Planner policy chain protocol](research/planner_policy_chain_prereg.md): a prospective, stateful comparison of the routed multi-week planner, the full-window solver it replaced and the one-week path on realized points, over constructed squads with known purchase lots; read after GW20 (interim, no verdict) and GW38 (final); no record yet.
