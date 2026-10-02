@@ -7,6 +7,7 @@ import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
 import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
 import { CHIP_COPY, chipLimit, chipRescores, type ChipCopy } from "../advice/chipCopy";
+import { shownLimits } from "../advice/hiddenLimits";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { publishedPrice } from "../advice/publishedPrice";
@@ -914,21 +915,14 @@ function RivalPlayers({
   );
 }
 
-/** The producer's sentence that no chip was offered to the solver. Not shown to the member. */
-const NO_CHIP_LIMIT =
-  "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.";
-
 /**
- * What the producer says this plan assumes, in its own sentences. It used to hang inside
- * the window section, which meant a one-week document could publish a limit and show it
- * to nobody: the one sentence that holds for every plan on this path is that no chip was
- * ever offered to the solver, and without it a blank chip line reads as a chip that was
- * weighed and turned down.
+ * What the producer says this plan assumes, in its own sentences, less the ones the page
+ * does not list (hiddenLimits.ts). With none left to show, the heading is left out too.
  */
 function StatedLimits({ view }: { view: EntryAdvice }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const limits = (view.stated_limits ?? []).filter((sentence) => sentence !== NO_CHIP_LIMIT);
+  const limits = shownLimits(view.stated_limits);
   if (limits.length === 0) return null;
   const weeks = view.plan_weeks?.length ?? 1;
   const label = weeks > 1 ? copy.windowLimitsLabel : copy.planLimitsLabel;
