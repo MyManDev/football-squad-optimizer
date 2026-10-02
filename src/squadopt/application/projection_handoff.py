@@ -30,12 +30,13 @@ Nothing is fetched. The capture is already on disk.
 """
 
 import hashlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Final
 
 import pandas as pd
 
+from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.contracts import OPTIONAL_COLUMNS
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -183,13 +184,19 @@ def _component_table(
     deadline_utc: str,
     fallback: pd.DataFrame,
     include_components: bool = False,
+    training_seasons: Sequence[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
-    training_panel = build_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
-    training_fixtures = build_fixture_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
+    archives = (
+        COMPONENT_TRAINING_SEASONS
+        if training_seasons is None
+        else explicit_archive_seasons(training_seasons, current_season=season)
+    )
+    training_panel = build_panel(archive_root, seasons=archives)
+    training_fixtures = build_fixture_panel(archive_root, seasons=archives)
     training_team_codes = pd.concat(
         [
             load_team_codes(archive_root, training_season).assign(season=training_season)
-            for training_season in COMPONENT_TRAINING_SEASONS
+            for training_season in archives
         ],
         ignore_index=True,
     )
@@ -197,7 +204,7 @@ def _component_table(
         training_panel,
         training_fixtures,
         training_team_codes,
-        seasons=COMPONENT_TRAINING_SEASONS,
+        seasons=archives,
         config=COMPONENT_FEATURE_CONFIG,
     )
     models = fit_component_models(training, feature_columns=component_feature_columns())
@@ -271,7 +278,7 @@ def _component_table(
     diagnostics: dict[str, object] = {
         **dict(snapshot.diagnostics),
         "component_fingerprint": snapshot.component_fingerprint,
-        "component_training_seasons": list(COMPONENT_TRAINING_SEASONS),
+        "component_training_seasons": list(archives),
         "component_training_rows": len(training),
         "component_training_appearance_rows": models.appearance_rows,
         "component_training_conditional_rows": models.conditional_rows,
@@ -355,6 +362,7 @@ def build(
     evidence_manifest_path: Path | None = None,
     control_only: bool = False,
     development_only: bool = False,
+    training_seasons: Sequence[str] | None = None,
     dry_run: bool = False,
     writer: Callable[[Path, InSeasonProjection], Path] = write_projection_handoff,
 ) -> tuple[InSeasonProjection, Path | None, dict[str, object]]:
@@ -362,15 +370,20 @@ def build(
 
     ``development_only`` restricts all historical inputs to the frozen component training
     seasons for prospective 2026-27 in-season preparation. In particular, the legacy
-    fallback cannot use the withheld season's carry-over in this mode.
+    fallback cannot use the withheld season's carry-over in this mode. An explicit
+    ``training_seasons`` selection takes precedence and restricts both component
+    fitting and fallback reads; current captured history remains scoring evidence.
     """
 
+    archives = None if training_seasons is None else explicit_archive_seasons(training_seasons)
     identifier = _latest_snapshot_id(snapshot_root) if snapshot_id is None else snapshot_id
     snapshot = read_snapshot(snapshot_root, identifier)
     bootstrap = snapshot.payloads[BOOTSTRAP_PAYLOAD]
     fixtures = snapshot.payloads[FIXTURES_PAYLOAD]
     captured_at = snapshot.metadata.captured_at_utc
     season = infer_season(snapshot)
+    if training_seasons is not None:
+        explicit_archive_seasons(training_seasons, current_season=season)
 
     # The deadline this capture is open for, read from the capture rather than supplied,
     # for the same reason the season is: a hand-passed gameweek can be the wrong one, and
@@ -384,7 +397,7 @@ def build(
             raise SystemExit(f"Capture {identifier} publishes no gameweek {gameweek} deadline.")
         target_deadline = matches[0]
     target = target_deadline.gameweek
-    if development_only and (season != "2026-27" or target <= 1):
+    if (development_only or training_seasons is not None) and (season != "2026-27" or target <= 1):
         raise SystemExit("--development-only requires a 2026-27 in-season capture target.")
     # The in-season sample is every gameweek before the target, and the calendar alone is
     # not evidence that they were played: a capture taken mid-gameweek has a target whose
@@ -413,11 +426,12 @@ def build(
 
     roster = player_snapshot(bootstrap)
     history = in_season_totals(bootstrap, fixtures, captured_at_utc=captured_at)
-    panel = (
-        build_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
-        if development_only
-        else build_panel(archive_root)
-    )
+    if archives is not None:
+        panel = build_panel(archive_root, seasons=archives)
+    elif development_only:
+        panel = build_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
+    else:
+        panel = build_panel(archive_root)
     carried = carry_over_as_of(panel, target_season=season)
     # The opening control's own output, used only where a player has neither an in-season
     # record nor a carried one, so both paths price such a player identically by
@@ -444,7 +458,17 @@ def build(
     model_version = IN_SEASON_MODEL_VERSION
     feature_contract_version = IN_SEASON_FEATURE_CONTRACT_VERSION
     diagnostics = dict(blend.diagnostics)
-    if development_only:
+    if archives is not None:
+        assert training_seasons is not None
+        diagnostics["fallback_training_seasons"] = list(archives)
+        diagnostics["training_selection"] = {
+            "contract_version": "prospective_training_selection_v1",
+            "allowed_seasons": sorted(training_seasons),
+            "archive_seasons_read": list(archives),
+            "captured_history_season": season,
+            "captured_history_role": "scoring_and_fallback_only",
+        }
+    elif development_only:
         diagnostics["fallback_training_seasons"] = list(COMPONENT_TRAINING_SEASONS)
     evidence_fingerprint: str | None = None
     # The base projection first — the component model when the capture carries settled
@@ -481,6 +505,11 @@ def build(
                     captured_at_utc=captured_at,
                     deadline_utc=target_deadline.deadline_utc,
                     fallback=blend.table,
+                    **(
+                        {"training_seasons": training_seasons}
+                        if training_seasons is not None
+                        else {}
+                    ),
                 )
             except IncompleteLiveHistoryError as error:
                 diagnostics.update(

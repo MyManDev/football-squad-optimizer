@@ -6,6 +6,7 @@ join under test is the join that will run in production; only the bytes are ours
 """
 
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -98,6 +99,31 @@ def _players_of(club: str) -> tuple[int, ...]:
     return tuple(
         int(entry["player_id"]) for entry in roster_entries() if entry["team_name"] == club
     )
+
+
+def test_conflicting_resolved_claims_quarantine_only_that_player(provider, claims):
+    base = _build(provider, claims)
+    selected = next(claim for claim in claims if claim.disposition == "stated_expected_absent")
+    competing = replace(selected, disposition="stated_rotation_risk")
+    result = _build(provider, (*claims, competing, selected))
+    conflicts = result.attrs["players_with_conflicting_claims"]
+    assert len(conflicts) == 1
+    affected = result.loc[result.player_id.isin(conflicts)]
+    assert affected.rotation_claim_unresolved.all()
+    assert not affected.rotation_claim_observed.any()
+    assert affected.rotation_disposition.isna().all()
+    assert dict(result.attrs["claims_unresolved"])["conflicting_player_claims"] == 3
+    pd.testing.assert_frame_equal(
+        base.loc[~base.player_id.isin(conflicts)],
+        result.loc[~result.player_id.isin(conflicts)],
+    )
+
+
+def test_repeated_identical_citation_does_not_create_a_conflict(provider, claims):
+    base = _build(provider, claims)
+    result = _build(provider, (*claims, *claims))
+    assert result.attrs["players_with_conflicting_claims"] == ()
+    pd.testing.assert_frame_equal(base, result)
 
 
 @pytest.fixture(name="table")

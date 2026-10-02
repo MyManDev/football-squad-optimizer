@@ -331,7 +331,12 @@ def rotation_source_capture(decision_snapshot: str, club_news_snapshot: str | No
 
 
 def rotation_artifact(
-    root: Path, season: str, gameweek: int, snapshot_id: str
+    root: Path,
+    season: str,
+    gameweek: int,
+    snapshot_id: str,
+    *,
+    decision_snapshot_id: str | None = None,
 ) -> tuple[Path, Path]:
     """The rotation table and manifest one capture's export writes.
 
@@ -349,6 +354,9 @@ def rotation_artifact(
     # bump would leave this looking for last version's file while the export writes the new
     # one, and the reuse check would silently stop finding anything.
     name = f"{ROTATION_EVIDENCE_CONTRACT_VERSION}_{season}_gw{gameweek:02d}_{snapshot_id[-12:]}"
+    if decision_snapshot_id is not None and decision_snapshot_id != snapshot_id:
+        _require_capture_name(decision_snapshot_id, "decision_snapshot_id")
+        name += f"_decision_{decision_snapshot_id[-12:]}"
     return root / f"{name}.csv", root / f"{name}.manifest.json"
 
 

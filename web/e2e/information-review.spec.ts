@@ -79,6 +79,43 @@ function expectedAnswer(window: 3 | 5) {
       lineup: names(roles(index + 1 + stateIndex)),
     }));
   });
+  // Two legal captain choices, with identical resources and future continuations.
+  // The certain outfield captain adds 4 instead of 3 captain + 2 vice points.
+  // Its first-week score is one lower in both synthetic news branches.
+  const alternative = structuredClone(candidate);
+  alternative.selected = false;
+  alternative.baseline = false;
+  alternative.first_lineup = {
+    ...names(first),
+    captain: first.vice_captain.name,
+    vice_captain: first.captain.name,
+  };
+  alternative.expected_net_points = candidate.expected_net_points - 1;
+  alternative.branches.forEach((branch) => {
+    branch.expected_net_points = branch.expected_net_points! - 1;
+  });
+  review.candidates.push(alternative);
+  review.comparison = {
+    version: "completed_policy_comparison_v1",
+    basis: "expected_own_points",
+    baseline_index: 0,
+    scenario_ids: ["eligible", "unavailable"],
+    news_arrival_probability: null,
+    scope: "supplied_conditional_scenarios_only",
+    terminal_resource_value_added: false,
+    candidates: review.candidates.map((policy, index) => ({
+      index,
+      action_kind: "hold",
+      first_state: { bank_tenths: 5, free_transfers: 2 },
+      scenario_min: Math.min(...policy.branches.map((branch) => branch.expected_net_points!)),
+      scenario_max: Math.max(...policy.branches.map((branch) => branch.expected_net_points!)),
+      branch_gaps_vs_baseline: { eligible: -index, unavailable: -index },
+      minimum_gap_vs_baseline: -index,
+      maximum_gap_vs_baseline: -index,
+      dominates_baseline: index === 0,
+      dominated_by: index === 0 ? [] : [0],
+    })),
+  };
   answer.payload = {
     ...answer.payload,
     ...first,
@@ -103,9 +140,49 @@ function expectedAnswer(window: 3 | 5) {
     })),
     prediction_model: {
       id: "football",
-      version: "football_team_share_v1",
+      version: "football_joint_role_minutes_v1",
       experimental: true,
       fingerprint: "a".repeat(64),
+    },
+    role_forecast: {
+      version: "football_role_forecast_v1",
+      model_version: "football_joint_role_minutes_v1",
+      calibration: "not_independently_verified",
+      scope: "current_gameweek_fixtures",
+      rows: [
+        {
+          player_id: first.captain.player_id,
+          name: first.captain.name,
+          fixture_id: 101,
+          gameweek: answer.payload.gameweek,
+          kickoff: "2026-09-05T14:00:00Z",
+          status: "fitted_known_start_labels",
+          start_probability: 0.4,
+          cameo_probability: 0.1,
+          zero_probability: 0.5,
+          unknown_role_probability: 0,
+          expected_minutes: 34,
+          sixty_minute_probability: 0.4,
+          captured_eligibility_multiplier: 0.5,
+          news_applied: false,
+        },
+        {
+          player_id: first.vice_captain.player_id,
+          name: first.vice_captain.name,
+          fixture_id: 102,
+          gameweek: answer.payload.gameweek,
+          kickoff: "2026-09-05T16:30:00Z",
+          status: "unavailable_no_known_start_labels",
+          start_probability: null,
+          cameo_probability: null,
+          zero_probability: 0,
+          unknown_role_probability: 1,
+          expected_minutes: 60,
+          sixty_minute_probability: 0.7,
+          captured_eligibility_multiplier: 1,
+          news_applied: false,
+        },
+      ],
     },
     selection_top100_weight: 20,
     information_review: review,
@@ -128,6 +205,8 @@ function expectedAnswer(window: 3 | 5) {
     ],
   };
   delete answer.payload.expected_points_cost;
+  // No permission to redistribute central PL injury rows: absent in this release fixture.
+  delete answer.payload.official_injuries;
   return answer;
 }
 
@@ -149,6 +228,7 @@ for (const [window, width] of [
     const answer = expectedAnswer(window);
     expect(isAdvicePayload(answer.payload)).toBe(true);
     const reads: string[] = [];
+    const writes: string[] = [];
     await page.route("**/api/v1/**", async (route) => {
       const url = route.request().url();
       const headers = {
@@ -161,6 +241,7 @@ for (const [window, width] of [
         return;
       }
       if (url.includes("/advice?")) reads.push(url);
+      if (route.request().method() === "POST") writes.push(url);
       const body = url.endsWith("/capabilities")
         ? {
             contract_version: "league_capabilities_v1",
@@ -188,6 +269,20 @@ for (const [window, width] of [
     await expect(region).toBeVisible();
     await expect(region).toContainText("kesin gelecek transfer tahmini değildir");
     await expect(region).toContainText("Top100 ağırlığı puan kazancı değildir");
+    const selected = region.locator(":scope > details[open]");
+    const comparison = selected.getByTestId("policy-comparison");
+    const format = (value: number) => value.toFixed(1).replace(".", ",");
+    const expectedComparison = answer.payload.information_review!.comparison!.candidates[0]!;
+    await expect(region).toContainText("Kaynakta belirtilen oynama ihtimali: 50%");
+    await expect(comparison).toContainText(
+      `Hesaplanan haber senaryolarındaki puan aralığı: ${format(expectedComparison.scenario_min)} – ${format(expectedComparison.scenario_max)}`,
+    );
+    await expect(comparison).toContainText("Başlangıç planına göre senaryo farkı: 0,0 – 0,0");
+    await expect(comparison).toContainText("maç sonucu için bir güven aralığı değildir");
+    await expect(comparison).toContainText("Haberin ne zaman geleceğine olasılık atanmadı");
+    await expect(comparison).toContainText("banka ve kalan transfere ek puan yazılmadı");
+    await expect(page.getByTestId("official-injuries")).toHaveCount(0);
+    const selectedUrl = page.url();
     const breakdown = page.getByTestId("lineup-expectation");
     await expect(breakdown).toContainText("İlk 11: 43,0");
     await expect(breakdown).toContainText("Otomatik değişikliklerden gelen puan: 1,0");
@@ -206,6 +301,15 @@ for (const [window, width] of [
       answer.payload.participation_evidence!.as_of!,
     );
     await expect(participation).toContainText("Uygulanamayan açıklama: 1");
+    const role = participation.getByTestId("role-forecast");
+    await role.locator(":scope > summary").click();
+    await expect(role).toContainText("İlk 11: 40% · Sonradan girer: 10% · Oynamaz: 50%");
+    await expect(role).toContainText("Beklenen dakika: 34,0 · 60 dakikaya ulaşır: 40%");
+    await expect(role).toContainText("FPL yüzdesi ilk 11 garantisi değildir");
+    await expect(role).toContainText("FPL oynayabilirliği bir kez uygulanır");
+    await expect(role).toContainText("Bağımsız doğruluk ölçümü henüz tamamlanmış değildir");
+    await expect(role).toContainText("İlk 11 bilgisi için yeterli kayıt yok");
+    await expect(role).toContainText("İlk 11: — · Sonradan girer: — · Oynamaz: 0%");
     const nominal = page.getByRole("region", { name: `${window} haftalık pencere`, exact: true });
     const weeks = answer.payload.plan_weeks!;
     for (const [index, week] of weeks.entries()) {
@@ -226,7 +330,7 @@ for (const [window, width] of [
     }
     const candidate = answer.payload.information_review!.candidates[0]!;
     for (const branch of candidate.branches) {
-      const summary = region.getByText(
+      const summary = selected.getByText(
         branch.state === "eligible" ? "Oynayabilir bilgisi gelirse" : "Oynayamaz bilgisi gelirse",
         { exact: true },
       );
@@ -247,6 +351,11 @@ for (const [window, width] of [
     await expect(page.getByRole("radio", { name: "20", exact: true })).toBeChecked();
     await expect(page.getByRole("radio", { name: new RegExp(`^${window} `) })).toBeChecked();
     await expect(page).toHaveURL(/top100=20/);
+    expect(page.url()).toBe(selectedUrl);
+    expect(writes).toEqual([]);
+    await expect(selected.locator(":scope > summary")).toContainText("Başlangıç planı");
+    await expect(selected).toContainText(`Kaptan: ${answer.payload.captain!.name}`);
+    await expect(region.locator(":scope > details").nth(1)).not.toHaveAttribute("open");
     expect(
       reads.some((url) => {
         const query = new URL(url).searchParams;

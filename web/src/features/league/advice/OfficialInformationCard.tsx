@@ -3,6 +3,7 @@ import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
 import type { DecisionInformation } from "./informationFacts";
 import styles from "../pages/LeagueMemberPage.module.css";
+import { OfficialInjuryCard } from "./OfficialInjuryCard";
 
 const COPY = {
   tr: {
@@ -88,7 +89,7 @@ export function NewInformationNotice({
 export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
   const { language, locale } = useLanguage();
   const feed = view.official_information;
-  if (!feed) return null;
+  if (!feed) return <OfficialInjuryCard data={view.official_injuries} />;
   const copy = COPY[language];
   const flagged = feed.players.filter(
     (p) =>
@@ -141,6 +142,12 @@ export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
           ))}
         </ul>
       )}
+      <OfficialInjuryCard
+        data={view.official_injuries}
+        playerNames={Object.fromEntries(
+          feed.players.map((player) => [player.player_id, player.name]),
+        )}
+      />
     </details>
   );
 }

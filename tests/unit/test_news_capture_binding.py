@@ -162,18 +162,29 @@ def test_a_different_configured_capture_cannot_consume_the_quiet_binding(tmp_pat
         )
 
 
-@pytest.mark.parametrize("mode,admitted", [("claims", True), ("quiet", False)])
-def test_legacy_capture_manifest_retains_strict_row_source_binding(tmp_path, mode, admitted):
+@pytest.mark.parametrize("mode", ["claims", "quiet"])
+def test_v4_capture_manifest_cannot_strip_both_capture_binding_fields(tmp_path, mode):
     state = case(tmp_path, mode)
     result = publish_case(state)
     manifest = read_manifest(result)
     for field in BINDING_FIELDS:
         del manifest[field]
     write_manifest(result, manifest)
-    # Legacy files remain readable, but decision-only sources cannot prove which
-    # real news capture produced a quiet reading.
-    read_rotation_evidence_artifact(result["table_path"], result["manifest_path"])
-    assert (load_case(state).manager_words is not None) is admitted
+    with pytest.raises(DataError, match="capture binding"):
+        read_rotation_evidence_artifact(result["table_path"], result["manifest_path"])
+    assert load_case(state).manager_words is None
+
+
+def test_v4_consumer_refuses_unbound_capture_even_when_origin_kind_was_stripped(tmp_path):
+    state = case(tmp_path)
+    result = publish_case(state)
+    manifest = read_manifest(result)
+    for field in (*BINDING_FIELDS, "club_news_source_kind"):
+        manifest.pop(field)
+    with pytest.raises(ValueError, match="must bind"):
+        _rotation_manifest_binding(
+            manifest, state[1], state[3].name, news_captured_at_utc=NEWS_CAPTURED_AT
+        )
 
 
 def test_actual_claim_rows_cannot_hide_behind_zero_claim_metadata(tmp_path):

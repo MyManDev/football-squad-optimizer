@@ -1,4 +1,5 @@
 import type { DecisionInformation, OfficialInformation } from "../advice/informationFacts";
+import type { OfficialInjuryFacts } from "../advice/officialInjuryFacts";
 import type { PlayerView } from "../../../data/schema";
 import type { PlayMode, WindowSize } from "../../../lib/decisionVocabulary";
 import type { Top100Weight } from "../advice/top100";
@@ -437,6 +438,28 @@ export interface AdvicePlanWeek {
 }
 
 export interface EntryAdvice {
+  role_forecast?: {
+    version: "football_role_forecast_v1";
+    model_version: "football_joint_role_minutes_v1";
+    calibration: "not_independently_verified";
+    scope: "current_gameweek_fixtures";
+    rows: {
+      player_id: number;
+      name: string;
+      fixture_id: number;
+      gameweek: number;
+      kickoff: string;
+      status: "fitted_known_start_labels" | "unavailable_no_known_start_labels";
+      start_probability: number | null;
+      cameo_probability: number | null;
+      zero_probability: number;
+      unknown_role_probability: number;
+      expected_minutes: number;
+      sixty_minute_probability: number;
+      captured_eligibility_multiplier: number;
+      news_applied: boolean;
+    }[];
+  };
   prediction_model?: {
     id: "football";
     version: string;
@@ -519,7 +542,10 @@ export interface EntryAdvice {
   /** Present only on a document solved with a chip the member chose. */
   chip_choice?: AdviceChipChoice;
   chip_strategy?: {
-    version: "model_opportunity_reservation_v1" | "model_opportunity_reservation_v2";
+    version:
+      | "model_opportunity_reservation_v1"
+      | "model_opportunity_reservation_v2"
+      | "dated_joint_opportunity_v3";
     mode: "auto" | "manual";
     requested_chip: "auto" | "bboost" | "3xc" | "wildcard" | "freehit";
     selected_chip: "bboost" | "3xc" | "wildcard" | "freehit" | null;
@@ -569,6 +595,7 @@ export interface EntryAdvice {
   captain?: AdvicePlayer | null;
   participation_evidence?: AdviceParticipationEvidence;
   official_information?: OfficialInformation;
+  official_injuries?: OfficialInjuryFacts;
   decision_information?: DecisionInformation;
   vice_captain?: AdvicePlayer | null;
   starting_xi?: AdvicePlayer[] | null;
@@ -589,6 +616,27 @@ export interface EntryAdvice {
     player_name: string | null;
     source_playing_chance_percent: number | null;
     information_gameweek: number | null;
+    comparison?: {
+      version: "completed_policy_comparison_v1";
+      basis: "expected_own_points";
+      baseline_index: number;
+      scenario_ids: string[];
+      news_arrival_probability: null;
+      scope: "supplied_conditional_scenarios_only";
+      terminal_resource_value_added: false;
+      candidates: {
+        index: number;
+        action_kind: "hold" | "move" | "chip";
+        first_state: { bank_tenths: number; free_transfers: number };
+        scenario_min: number;
+        scenario_max: number;
+        branch_gaps_vs_baseline: Record<string, number>;
+        minimum_gap_vs_baseline: number;
+        maximum_gap_vs_baseline: number;
+        dominates_baseline: boolean;
+        dominated_by: number[];
+      }[];
+    };
     candidates: {
       selected: boolean;
       baseline: boolean;

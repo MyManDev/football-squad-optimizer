@@ -207,9 +207,10 @@ def test_partly_covered_never_names_a_club_that_is_not_covered() -> None:
 def test_articles_are_coded_with_their_club_and_a_missing_one_narrows_nothing() -> None:
     """A followed article is a document of the registered page's club, not a registered page.
 
-    So it reaches the club's one call beside the index, and when one cannot be read the club
-    stays fully covered: partial coverage is about the pages the registry declared, and the
-    articles an index links to are a capped sample, never a list the week declared.
+    The index is retained as evidence while the article alone reaches the club's call.
+    When another article cannot be read the club stays fully covered: partial coverage is
+    about the pages the registry declared. Linked articles are a capped sample, never a
+    list the week declared.
     """
 
     read = f"{ARSENAL}/saka-fit"
@@ -233,7 +234,9 @@ def test_articles_are_coded_with_their_club_and_a_missing_one_narrows_nothing() 
     week = _acquire(sources=SOURCES[:1], opener=_open, provider=_Recording())
 
     assert [document.requested_url for document in week.documents] == [ARSENAL, read]
-    assert coded == [[ARSENAL, read]]
+    assert coded == [[read]]
+    assert week.document_selection is not None
+    assert week.document_selection.decisions[0].reason == "discovery_index_with_selected_articles"
     assert week.clubs_covered == ("Arsenal",)
     assert week.clubs_partially_covered == ()
     assert [club for club, _reason in week.refused_pages] == ["Arsenal"]

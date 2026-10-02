@@ -25,11 +25,12 @@ convenience branch in this command would be the one place that quietly merged th
 """
 
 import argparse
+import json
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -47,6 +48,7 @@ from squadopt.data.sources.club_news_capture import (
     read_captured_responses,
     write_club_news_capture,
 )
+from squadopt.data.sources.club_news_selection import DocumentSelection, select_coding_documents
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     gameweek_deadlines,
@@ -72,6 +74,10 @@ from squadopt.platform.club_news_provider import (
     build_coding_provider,
     check_coding_provider,
     code_week_by_club,
+)
+from squadopt.platform.official_injury_capture import (
+    read_official_injury_capture,
+    registered_details_links,
 )
 
 REPOSITORY_ROOT = Path.cwd()
@@ -108,6 +114,7 @@ class AcquiredWeek:
     refused_pages: tuple[tuple[str, str], ...]
     refused_coding: tuple[tuple[str, str], ...]
     reused_clubs: tuple[str, ...] = ()
+    document_selection: DocumentSelection | None = None
 
 
 def _coverage(
@@ -155,6 +162,7 @@ def acquire_week(
     check_robots: bool = True,
     max_calls: int | None = None,
     previous: Sequence[CodedClub] = (),
+    additional_article_urls: Mapping[str, Sequence[str]] | None = None,
 ) -> AcquiredWeek:
     """Read the registered pages, code them club by club, and report what happened.
 
@@ -165,7 +173,12 @@ def acquire_week(
     """
 
     documents, refused_pages = fetch_registered_documents(
-        sources, opener=opener, now=now, sleeper=sleeper, check_robots=check_robots
+        sources,
+        opener=opener,
+        now=now,
+        sleeper=sleeper,
+        check_robots=check_robots,
+        additional_article_urls=additional_article_urls,
     )
     coded, refused_coding = code_week_by_club(
         provider, config, documents, roster, max_calls=max_calls, previous=previous
@@ -180,6 +193,12 @@ def acquire_week(
         refused_pages=refused_pages,
         refused_coding=refused_coding,
         reused_clubs=tuple(entry.club for entry in coded if any(entry is old for old in previous)),
+        document_selection=select_coding_documents(
+            documents,
+            as_of=str(config.target_context["as_of"])
+            if config.target_context and "as_of" in config.target_context
+            else None,
+        ),
     )
 
 
@@ -231,6 +250,11 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
         "--previous-news-capture",
         type=Path,
         help="optional earlier capture directory for unchanged evidence reuse",
+    )
+    parser.add_argument(
+        "--official-injury-capture",
+        type=Path,
+        help="held official league injury capture; referrals remain inside selected registry paths",
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="fetch and code, but write nothing")
@@ -304,6 +328,21 @@ def main(
             "deadline": deadline.deadline_utc,
             "as_of": as_of,
         }
+        referrals = None
+        if arguments.official_injury_capture is not None:
+            central_path = arguments.official_injury_capture
+            central = read_official_injury_capture(
+                read_snapshot(central_path.parent, central_path.name)
+            )
+            age = as_instant(as_of) - as_instant(central.observed_at)
+            if central.season != target_context["season"] or not timedelta(0) <= age <= timedelta(
+                days=7
+            ):
+                raise ClubNewsError(
+                    "Official injury referrals must be from this season "
+                    "and a current prior capture."
+                )
+            referrals = registered_details_links(central, sources)
         previous: tuple[CodedClub, ...] = ()
         if arguments.previous_news_capture is not None:
             prior_path = arguments.previous_news_capture
@@ -327,6 +366,7 @@ def main(
             sleeper=sleeper,
             max_calls=arguments.max_model_calls,
             previous=previous,
+            additional_article_urls=referrals,
         )
     except (ClubNewsError, DataError, OSError, ValueError) as error:
         print(f"Refused: {error}")
@@ -334,7 +374,15 @@ def main(
 
     print(f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared")
     print(f"Read          {len(week.documents)} documents")
+    if week.document_selection is not None:
+        print(f"Selected      {len(week.document_selection.documents)} documents for coding")
+        for decision in week.document_selection.decisions:
+            if not decision.selected:
+                print(f"  unselected  {decision.club}: {decision.reason}; {decision.source_url}")
     print(f"Coded         {len(week.coded)} clubs, provider {config.provider!r}")
+    claims = [json.loads(entry.response.text).get("claims") for entry in week.coded]
+    claim_count = sum(len(rows) for rows in claims if isinstance(rows, list))
+    print(f"Raw claims    {claim_count}; source validation occurs during export")
     print(f"Reused        {len(week.reused_clubs)} unchanged club responses")
     print(f"Call budget   {arguments.max_model_calls}; no automatic provider retry")
     print(f"Covered       {len(week.clubs_covered)} clubs")

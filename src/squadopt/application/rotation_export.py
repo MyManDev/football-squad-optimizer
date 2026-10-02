@@ -253,19 +253,29 @@ def _inputs_from_fixture(fixture_path: Path) -> _ClubNewsInputs:
     )
 
 
-def _artifact_name(*, season: str, target_gameweek: int, distinguishing_snapshot: str) -> str:
+def _artifact_name(
+    *,
+    season: str,
+    target_gameweek: int,
+    distinguishing_snapshot: str,
+    decision_snapshot_id: str | None = None,
+) -> str:
     """The stem, built so a rehearsal is a different artifact from the real run.
 
     The digest is the capture the *claims* came from, because that is what a second run
     within one week actually changes. While the fixture stands in for a live source the
     claims are fixed, so the decision capture is what varies and is used instead; either
-    way the manifest records both, so which one named the file is never a guess.
+    way the manifest records both. When news and decision captures differ, a decision
+    suffix prevents reusing that news for a later capture from colliding with this pair.
     """
 
-    return (
+    name = (
         f"{CONTRACT_VERSION}_{season}_gw{target_gameweek:02d}"
         f"_{distinguishing_snapshot[-_NAME_DIGEST_CHARACTERS:]}"
     )
+    if decision_snapshot_id is not None and decision_snapshot_id != distinguishing_snapshot:
+        name += f"_decision_{decision_snapshot_id[-_NAME_DIGEST_CHARACTERS:]}"
+    return name
 
 
 def _publish_once(payload: bytes, destination: Path) -> str:
@@ -348,6 +358,7 @@ def _manifest(
         "roster_size": attrs["roster_size"],
         "roster_snapshot_id": attrs["roster_snapshot_id"],
         "source_snapshot_ids": list(attrs["source_snapshot_ids"]),
+        "club_news_source_kind": "capture" if news_capture_id is not None else "fixture",
         "clubs_declared": list(attrs["clubs_declared"]),
         "clubs_covered": list(attrs["clubs_covered"]),
         "clubs_partially_covered": list(attrs["clubs_partially_covered"]),
@@ -360,6 +371,7 @@ def _manifest(
         "response_sha256s": list(attrs["response_sha256s"]),
         "claims_coded": attrs["claims_coded"],
         "claims_ambiguous": attrs["claims_ambiguous"],
+        "players_with_conflicting_claims": list(attrs.get("players_with_conflicting_claims", ())),
         "players_not_addressed": attrs["players_not_addressed"],
         **(
             {
@@ -402,6 +414,7 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         season=arguments.season,
         target_gameweek=arguments.target_gameweek,
         distinguishing_snapshot=arguments.club_news_snapshot or decision.metadata.snapshot_id,
+        decision_snapshot_id=decision.metadata.snapshot_id,
     )
     table_path = arguments.output_dir / f"{name}.csv"
     manifest_path = arguments.output_dir / f"{name}.manifest.json"

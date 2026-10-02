@@ -1,4 +1,4 @@
-"""Read a ``rotation_evidence_v2`` pair, or refuse it.
+"""Read a ``rotation_evidence_v4`` pair or a supported legacy pair, or refuse it.
 
 The owner's lane reads this instead of raw captures, so everything the table asserts about
 itself is checked here before a single row is returned: the digest, the manifest's required
@@ -168,6 +168,15 @@ def _optional_name(manifest: Mapping[str, object], key: str) -> str | None:
     return value
 
 
+def _conflicting_player_ids(manifest: Mapping[str, object]) -> tuple[int, ...]:
+    value = manifest.get("players_with_conflicting_claims", [])
+    if not isinstance(value, list) or any(type(item) is not int or item <= 0 for item in value):
+        raise DataValidationError("Conflicting player IDs must be a list of positive integers.")
+    if len(value) != len(set(value)):
+        raise DataValidationError("Conflicting player IDs must be unique.")
+    return tuple(value)
+
+
 def _whole_number(manifest: Mapping[str, object], key: str) -> int:
     value = manifest.get(key)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -193,6 +202,12 @@ def _validate_news_binding(manifest: Mapping[str, object], table: pd.DataFrame) 
     """
     fields = ("club_news_snapshot_id", "club_news_captured_at_utc")
     if not any(key in manifest for key in fields):
+        if manifest.get("contract_version") == CONTRACT_VERSION and (
+            manifest.get("club_news_source_kind") == "capture"
+            or manifest.get("provider") is not None
+            or any(source.startswith("club-news-") for source in _row_sources(table))
+        ):
+            raise DataValidationError("V4 capture evidence requires a club-news capture binding.")
         return
     news_id = _optional_name(manifest, fields[0])
     news_at = _optional_name(manifest, fields[1])
@@ -465,6 +480,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "response_sha256s": _string_list(manifest, "response_sha256s"),
             "claims_coded": manifest["claims_coded"],
             "claims_ambiguous": manifest["claims_ambiguous"],
+            "players_with_conflicting_claims": _conflicting_player_ids(manifest),
             "players_not_addressed": manifest["players_not_addressed"],
         }
     )

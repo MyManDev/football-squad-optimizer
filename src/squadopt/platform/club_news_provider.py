@@ -57,6 +57,10 @@ from squadopt.data.sources.club_news_coding import (
     coding_prompt_sha256,
     require_requested_coding_contract,
 )
+from squadopt.data.sources.club_news_selection import (
+    SELECTION_POLICY_VERSION,
+    select_coding_documents,
+)
 
 # Eager, and the laziness that matters is kept where it belongs. Registration needs the name
 # when this module is imported, so deferring the class while importing its constants would
@@ -353,6 +357,7 @@ def coding_input_fingerprint(
     value = {
         "provider": config.provider,
         "model": config.model_identifier,
+        "selection_policy": SELECTION_POLICY_VERSION,
         "prompt": coding_prompt_sha256(config.model_identifier),
         "target": target,
         "instrument": {
@@ -422,13 +427,23 @@ def code_week_by_club(
         isinstance(max_calls, bool) or not isinstance(max_calls, int) or max_calls < 0
     ):
         raise ClubNewsProviderError("Call budget must be a nonnegative integer.")
+    selected = select_coding_documents(
+        documents,
+        as_of=str(config.target_context["as_of"])
+        if config.target_context and "as_of" in config.target_context
+        else None,
+    )
     by_club: dict[str, list[RawDocument]] = {}
-    for document in documents:
+    for document in selected.documents:
         by_club.setdefault(document.club, []).append(document)
 
     prompt_sha256 = coding_prompt_sha256(config.model_identifier)
     coded: list[CodedClub] = []
-    refused: list[tuple[str, str]] = []
+    refused: list[tuple[str, str]] = [
+        (club, "No current first-team document selected for coding.")
+        for club in dict.fromkeys(d.club for d in documents)
+        if club not in by_club
+    ]
     previous_by_club = {item.club: item for item in previous}
     attempted = 0
     for club, club_documents in by_club.items():

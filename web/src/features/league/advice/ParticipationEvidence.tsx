@@ -1,4 +1,5 @@
 import { StatementOutcomes } from "./StatementOutcomes";
+import { RoleForecast } from "./RoleForecast";
 import { useLanguage } from "../../../i18n/context";
 import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
@@ -82,7 +83,7 @@ const COPY = {
 export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();
   const evidence = view.participation_evidence;
-  if (!evidence) return null;
+  if (!evidence) return <RoleForecast view={view} />;
   const copy = COPY[language];
   const asOf =
     evidence.as_of && !Number.isNaN(new Date(evidence.as_of).getTime()) ? evidence.as_of : null;
@@ -117,6 +118,7 @@ export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
       </ul>
       {evidence.applied_player_count === 0 && <p>{copy.noneApplied}</p>}
       <StatementOutcomes view={view} />
+      <RoleForecast view={view} />
       <ul className={styles.assumptionList}>
         {assumptions.map((assumption) => (
           <li key={assumption}>{assumption}</li>

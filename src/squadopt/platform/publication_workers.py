@@ -22,6 +22,7 @@ from squadopt.application.league_views import (
     render_member,
 )
 from squadopt.application.manager_words import load_manager_words
+from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
@@ -49,7 +50,14 @@ def _worker_init(
     snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
     season = season or infer_season(snapshot)
     inputs = read_inputs(snapshot, season=season, gameweek=gameweek)
-    panel = build_panel(Path(archive_root))
+    panel = (
+        build_panel(
+            Path(archive_root),
+            seasons=explicit_archive_seasons(request.training_seasons, current_season=season),
+        )
+        if request is not None and request.training_seasons is not None
+        else build_panel(Path(archive_root))
+    )
     in_season = read_projection_handoff(Path(handoff)) if handoff else None
     projection = project(inputs, panel, in_season=in_season)
     # The same gate the parent ran, on the same capture and handoff: a table the parent

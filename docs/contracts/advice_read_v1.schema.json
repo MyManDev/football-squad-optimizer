@@ -320,7 +320,7 @@
               ]
             },
             "version": {
-              "const": "model_opportunity_reservation_v2"
+              "const": "dated_joint_opportunity_v3"
             }
           },
           "required": [
@@ -751,6 +751,125 @@
             "captured_at_utc": {
               "type": "string"
             },
+            "comparison": {
+              "additionalProperties": false,
+              "properties": {
+                "baseline_index": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "basis": {
+                  "const": "expected_own_points"
+                },
+                "candidates": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "action_kind": {
+                        "enum": [
+                          "hold",
+                          "move",
+                          "chip"
+                        ]
+                      },
+                      "branch_gaps_vs_baseline": {
+                        "additionalProperties": {
+                          "type": "number"
+                        },
+                        "type": "object"
+                      },
+                      "dominated_by": {
+                        "items": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "dominates_baseline": {
+                        "type": "boolean"
+                      },
+                      "first_state": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bank_tenths": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "free_transfers": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "bank_tenths",
+                          "free_transfers"
+                        ],
+                        "type": "object"
+                      },
+                      "index": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "maximum_gap_vs_baseline": {
+                        "type": "number"
+                      },
+                      "minimum_gap_vs_baseline": {
+                        "type": "number"
+                      },
+                      "scenario_max": {
+                        "type": "number"
+                      },
+                      "scenario_min": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "index",
+                      "action_kind",
+                      "first_state",
+                      "scenario_min",
+                      "scenario_max",
+                      "minimum_gap_vs_baseline",
+                      "maximum_gap_vs_baseline",
+                      "branch_gaps_vs_baseline",
+                      "dominates_baseline",
+                      "dominated_by"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "news_arrival_probability": {
+                  "type": "null"
+                },
+                "scenario_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "scope": {
+                  "const": "supplied_conditional_scenarios_only"
+                },
+                "terminal_resource_value_added": {
+                  "const": false
+                },
+                "version": {
+                  "const": "completed_policy_comparison_v1"
+                }
+              },
+              "required": [
+                "version",
+                "basis",
+                "baseline_index",
+                "scenario_ids",
+                "news_arrival_probability",
+                "scope",
+                "terminal_resource_value_added",
+                "candidates"
+              ],
+              "type": "object"
+            },
             "information_gameweek": {
               "type": [
                 "integer",
@@ -1080,6 +1199,148 @@
             "team_count",
             "declared_team_count",
             "players"
+          ],
+          "type": "object"
+        },
+        "official_injuries": {
+          "additionalProperties": false,
+          "properties": {
+            "contract_version": {
+              "const": "official_pl_injuries_v1"
+            },
+            "facts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "club": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "details_urls": {
+                    "items": {
+                      "pattern": "^https://[^/@\\s]+(?:/[^\\s]*)?$",
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "injury": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "source_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "club",
+                  "injury",
+                  "source_date",
+                  "details_urls"
+                ],
+                "type": "object"
+              },
+              "maxItems": 200,
+              "type": "array"
+            },
+            "incomplete_clubs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "limit": {
+              "const": "Editorial injury rows do not establish absence, expected minutes, or complete squad health."
+            },
+            "listed_rows": {
+              "maximum": 200,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "mapped_rows": {
+              "maximum": 200,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "missing_clubs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "observed_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "received_clubs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "roster_clubs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "season": {
+              "pattern": "^20[0-9]{2}-[0-9]{2}$",
+              "type": "string"
+            },
+            "source_updated_at": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_url": {
+              "const": "https://www.premierleague.com/en/latest-player-injuries"
+            },
+            "unknown_source_clubs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "contract_version",
+            "season",
+            "source_url",
+            "source_updated_at",
+            "observed_at",
+            "roster_clubs",
+            "received_clubs",
+            "missing_clubs",
+            "incomplete_clubs",
+            "unknown_source_clubs",
+            "listed_rows",
+            "mapped_rows",
+            "facts",
+            "limit"
           ],
           "type": "object"
         },
@@ -1551,7 +1812,8 @@
             "version": {
               "enum": [
                 "football_team_share_v1",
-                "football_contextual_v3"
+                "football_contextual_v3",
+                "football_joint_role_minutes_v1"
               ]
             }
           },
@@ -1605,6 +1867,132 @@
             "string",
             "null"
           ]
+        },
+        "role_forecast": {
+          "additionalProperties": false,
+          "properties": {
+            "calibration": {
+              "const": "not_independently_verified"
+            },
+            "model_version": {
+              "const": "football_joint_role_minutes_v1"
+            },
+            "rows": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "cameo_probability": {
+                    "anyOf": [
+                      {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "captured_eligibility_multiplier": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "expected_minutes": {
+                    "maximum": 120,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "fixture_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "gameweek": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "kickoff": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "news_applied": {
+                    "type": "boolean"
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sixty_minute_probability": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "start_probability": {
+                    "anyOf": [
+                      {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "enum": [
+                      "fitted_known_start_labels",
+                      "unavailable_no_known_start_labels"
+                    ]
+                  },
+                  "unknown_role_probability": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "zero_probability": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "name",
+                  "fixture_id",
+                  "gameweek",
+                  "kickoff",
+                  "status",
+                  "start_probability",
+                  "cameo_probability",
+                  "zero_probability",
+                  "unknown_role_probability",
+                  "sixty_minute_probability",
+                  "captured_eligibility_multiplier",
+                  "expected_minutes",
+                  "news_applied"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "scope": {
+              "const": "current_gameweek_fixtures"
+            },
+            "version": {
+              "const": "football_role_forecast_v1"
+            }
+          },
+          "required": [
+            "version",
+            "model_version",
+            "calibration",
+            "scope",
+            "rows"
+          ],
+          "type": "object"
         },
         "season": {
           "type": "string"

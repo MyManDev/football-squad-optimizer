@@ -1,8 +1,8 @@
 """The manager's word, as a constraint the member switches on.
 
-Model-sourced club news enters advice the one way this repository allows it to: as a
-declared constraint with a price, never as a projection input (the 8 September decision,
-``docs/rotation_evidence_contract.md``). The evidence table states, per roster player, what
+This module applies model-coded club news as a declared constraint with a price,
+not as a projection input. The separately authorized football participation and minute
+consumers have their own gates. The evidence table states, per roster player, what
 the club's own page said and how the model coded it, categorically. This module turns the
 dispositions that name an absence or a doubt into a ``FirstWeekExclusion``, and carries the
 manager's own words beside it, resolved from the captured bytes by digest and span, so the
