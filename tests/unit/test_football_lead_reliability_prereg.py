@@ -119,7 +119,7 @@ def test_the_interval_uses_the_policy_values_the_protocol_states() -> None:
 def test_the_roster_is_decided_before_the_decision_instant() -> None:
     rule = _section("Decision instant, fit and roster")
     assert "gameweek o - 1 or o - 2 of the same season" in rule
-    assert "at least three hours before the decision instant" in rule
+    assert "more than three hours before the decision instant" in rule
     assert "Nothing after the decision instant decides who is in the roster" in rule
     assert "does not use it" in rule
 

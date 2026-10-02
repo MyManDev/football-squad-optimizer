@@ -58,16 +58,16 @@ only, from one to fourteen weeks ahead.
 
 - The **decision instant** of an origin is the earliest `kickoff` of the archive's rows of
   that gameweek, less 90 minutes, as in `scripts/measure_football_contextual.py`.
-- The **history** of a fit is the selected archive's rows whose kickoff is at least three
-  hours before the decision instant.
+- The **history** of a fit is the selected archive's rows whose kickoff is more than three
+  hours before the decision instant, the rule `causal_training` applies to its own features.
 - The **training rows** are `causal_training` of the selected archive, computed once. Each
-  fit keeps the rows whose kickoff is at least three hours before its decision instant. That
+  fit keeps the rows whose kickoff is more than three hours before its decision instant. That
   is the same set `causal_training` returns on the fit's own history: each row's features are
   computed at its own gameweek's first kickoff, from history settled before it.
 - The **model** is `FixtureFootballModel` from `src/squadopt/prediction/football.py`,
   unchanged, fitted with `cutoff` at the decision instant. No setting is tuned.
 - The **roster** of an origin o is every player with an archive row in gameweek o - 1 or
-  o - 2 of the same season whose kickoff is at least three hours before the decision instant.
+  o - 2 of the same season whose kickoff is more than three hours before the decision instant.
   The club, position, name, team and price (`value`) come from that player's latest such
   row.
   - Two weeks, so that a club's single blank week does not remove its players.
