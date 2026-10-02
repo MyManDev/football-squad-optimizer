@@ -312,6 +312,18 @@ def check_coding_provider(
     """Offline configuration/dependency check; never authenticates or creates a client."""
     config = resolve_provider_config(environ, settings_file=settings_file)
     validate_provider_config(config)
+    require_provider_dependency(config)
+    return config
+
+
+def require_provider_dependency(config: CodingProviderConfig) -> None:
+    """Refuse a provider whose client library is not installed, without importing it.
+
+    The adapters refuse the same thing when they are built. This is the check for a caller
+    that builds its adapter later than it wants the refusal: the acquisition command builds
+    after the pages are read, and a missing library is a reason to read none of them.
+    """
+
     dependency = {
         DEFAULT_PROVIDER: "anthropic",
         GEMINI_PROVIDER: "httpx2",
@@ -322,7 +334,6 @@ def check_coding_provider(
         raise ClubNewsProviderError(
             "The selected provider needs the project's llm extra installed."
         )
-    return config
 
 
 def build_coding_provider(
@@ -585,6 +596,7 @@ __all__ = [
     "coding_as_of",
     "register_provider",
     "registered_providers",
+    "require_provider_dependency",
     "resolve_provider_config",
     "validate_provider_config",
 ]

@@ -10,6 +10,7 @@ under ``tmp_path``.
 """
 
 import json
+import urllib.error
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -80,6 +81,34 @@ class _Clock:
         return moment
 
 
+class _Timeline:
+    """A clock that stands still until a page is requested, then moves by ``per_page``.
+
+    The run's start is read before any page is asked for, so it is always ``start``. An
+    observation taken before the fetch would be ``start`` as well, which is what lets a test
+    tell the two apart.
+    """
+
+    def __init__(self, start: datetime, per_page: timedelta) -> None:
+        self.now = start
+        self._per_page = per_page
+        self.pages: list[str] = []
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def opener(self, published: str | None = None) -> Any:
+        inner = _opener(published)
+
+        def _open(request: Any, timeout: float) -> _Reply:
+            if not request.full_url.endswith("/robots.txt"):
+                self.pages.append(request.full_url)
+                self.now = self.now + self._per_page
+            return inner(request, timeout)  # type: ignore[no-any-return]
+
+        return _open
+
+
 def _article(published: str | None) -> bytes:
     meta = (
         ""
@@ -143,6 +172,10 @@ def _week(published: str | None, clock: _Clock, seen: list[str]) -> Any:
     )
 
 
+def _refuse(url: str) -> Any:
+    raise urllib.error.HTTPError(url, 503, "Unavailable", {}, None)  # type: ignore[arg-type]
+
+
 # --- the observation is taken after the fetch -------------------------------
 
 
@@ -198,10 +231,27 @@ def test_a_future_or_stale_article_is_turned_away_for_its_own_reason(
     assert ARTICLE not in {d.requested_url for d in week.document_selection.documents}
 
 
-def test_what_is_coded_is_exactly_what_is_reported_as_selected() -> None:
-    """One selection, used twice, rather than two selections that happen to agree."""
+def test_what_is_coded_is_exactly_what_is_reported_as_selected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One selection, made once and handed on, rather than two that happen to agree."""
 
+    from squadopt.platform import club_news_acquire, club_news_provider
+
+    made: list[str | None] = []
+    real = club_news_acquire.select_coding_documents
+
+    def _counted(documents: Sequence[RawDocument], *, as_of: str | None = None) -> Any:
+        made.append(as_of)
+        return real(documents, as_of=as_of)
+
+    def _never(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("The coding stage selected the documents a second time.")
+
+    monkeypatch.setattr(club_news_acquire, "select_coding_documents", _counted)
+    monkeypatch.setattr(club_news_provider, "select_coding_documents", _never)
     coded: list[list[str]] = []
+    seen: list[str] = []
 
     class _Recording(_Provider):
         def code(
@@ -216,28 +266,102 @@ def test_what_is_coded_is_exactly_what_is_reported_as_selected() -> None:
         opener=_opener(_text(STARTED + timedelta(seconds=30))),
         now=_Clock(),
         sleeper=lambda _: None,
-        bind_coding=_binder([], _Recording()),
+        bind_coding=_binder(seen, _Recording()),
     )
 
+    assert made == seen == [week.coding_observed_at]
     assert week.document_selection is not None
     reported = [document.requested_url for document in week.document_selection.documents]
     assert [url for call in coded for url in call] == reported
 
 
-def test_the_coding_side_is_given_one_way_or_the_other() -> None:
-    common: dict[str, Any] = {
-        "sources": SOURCES[:1],
-        "roster": ROSTER,
-        "opener": _opener(None),
-        "now": _Clock(),
-        "sleeper": lambda _: None,
+def test_a_page_stamped_later_than_the_observation_stops_the_week(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The order of the two instants is checked, not assumed."""
+
+    from squadopt.platform import club_news_acquire
+
+    read = acquire_week(
+        sources=SOURCES[:1],
+        roster=ROSTER,
+        opener=_opener(None),
+        now=lambda: STARTED + timedelta(hours=1),
+        sleeper=lambda _: None,
+        provider=_Provider(),
+        config=CONFIG,
+    ).documents
+    assert read
+    monkeypatch.setattr(club_news_acquire, "fetch_registered_documents", lambda *a, **k: (read, ()))
+    seen: list[str] = []
+
+    with pytest.raises(ClubNewsError, match="the clock went backwards"):
+        acquire_week(
+            sources=SOURCES[:1],
+            roster=ROSTER,
+            opener=_opener(None),
+            now=lambda: STARTED + timedelta(minutes=30),
+            sleeper=lambda _: None,
+            bind_coding=_binder(seen),
+        )
+    assert seen == []
+
+
+def test_nothing_is_observed_or_built_when_no_page_could_be_read() -> None:
+    seen: list[str] = []
+
+    def _open(request: Any, timeout: float) -> _Reply:
+        if request.full_url.endswith("/robots.txt"):
+            return _Reply(request.full_url, b"User-agent: *\nAllow: /\n")
+        return _refuse(request.full_url)  # type: ignore[no-any-return]
+
+    week = acquire_week(
+        sources=SOURCES,
+        roster=ROSTER,
+        opener=_open,
+        now=_Clock(),
+        sleeper=lambda _: None,
+        bind_coding=_binder(seen),
+    )
+
+    assert seen == []
+    assert week.coding_observed_at is None
+    assert week.documents == () and week.coded == ()
+    assert week.clubs_declared == ("Arsenal", "Man Utd")
+    assert {club for club, _reason in week.refused_pages} == {"Arsenal", "Man Utd"}
+
+
+@pytest.mark.parametrize(
+    "given",
+    [
+        (),
+        ("provider",),
+        ("config",),
+        ("provider", "bind_coding"),
+        ("config", "bind_coding"),
+        ("provider", "config", "bind_coding"),
+    ],
+)
+def test_the_coding_side_is_given_one_way_or_the_other(given: tuple[str, ...]) -> None:
+    """A provider with its configuration, or a binder: any other combination is refused."""
+
+    available: dict[str, Any] = {
+        "provider": _Provider(),
+        "config": CONFIG,
+        "bind_coding": _binder([]),
     }
+    requested: list[str] = []
     with pytest.raises(ClubNewsError, match="not both"):
-        acquire_week(**common)
-    with pytest.raises(ClubNewsError, match="not both"):
-        acquire_week(**common, provider=_Provider(), config=CONFIG, bind_coding=_binder([]))
-    with pytest.raises(ClubNewsError, match="not both"):
-        acquire_week(**common, provider=_Provider())
+        acquire_week(
+            sources=SOURCES[:1],
+            roster=ROSTER,
+            opener=_opener(None, requested),
+            now=_Clock(),
+            sleeper=lambda _: None,
+            **{name: available[name] for name in given},
+        )
+    # Refused before any page is asked for.
+    assert requested == []
 
 
 # --- the command ------------------------------------------------------------
@@ -356,19 +480,22 @@ def test_a_deadline_that_passes_during_the_download_stops_the_week(
     register_provider(name, _factory)
     roster_id = _roster_snapshot(tmp_path / "snapshots", later_deadline=later_deadline)
     before = sorted(path.name for path in (tmp_path / "snapshots").rglob("*") if path.is_dir())
-    # Open at the start, closed by the time the pages are in: each reading is an hour on.
-    clock = _Clock(datetime(2026, 9, 12, 17, 0, tzinfo=UTC), timedelta(hours=1))
+    # Open at the start, half an hour before the deadline, and closed once the pages are
+    # in: the clock moves twenty minutes with each page and not otherwise, so an observation
+    # taken before the fetch would still see the week open.
+    clock = _Timeline(datetime(2026, 9, 12, 17, 0, tzinfo=UTC), timedelta(minutes=20))
 
     code = main(
         _command(tmp_path, roster_id),
         environ=_environment(name),
-        opener=_opener(None),
+        opener=clock.opener(),
         now=clock,
         sleeper=lambda _: None,
     )
 
     printed = capsys.readouterr().out
     assert code == 1
+    assert len(clock.pages) >= 3
     assert printed.startswith("Refused:")
     assert f"gameweek {TARGET_GAMEWEEK} deadline {DEADLINE} passed" in printed
     assert expected in printed
@@ -377,25 +504,86 @@ def test_a_deadline_that_passes_during_the_download_stops_the_week(
     assert after == before
 
 
-def test_a_clock_that_runs_backwards_stops_the_week(
+def test_an_observation_earlier_than_the_start_of_the_run_stops_the_week(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """The clock steps back while the pages are read; the week is not coded."""
+
     built: list[CodingProviderConfig] = []
     name = "fake-backwards-clock"
     register_provider(name, lambda config: built.append(config) or _Provider())
     roster_id = _roster_snapshot(tmp_path / "snapshots")
+    clock = _Timeline(STARTED, timedelta(seconds=-1))
 
     code = main(
         _command(tmp_path, roster_id),
         environ=_environment(name),
-        opener=_opener(None),
-        now=_Clock(STARTED, timedelta(seconds=-1)),
+        opener=clock.opener(),
+        now=clock,
         sleeper=lambda _: None,
     )
 
     printed = capsys.readouterr().out
     assert code == 1
+    assert clock.pages
     assert "the clock went backwards" in printed
+    assert built == []
+
+
+def test_a_missing_client_library_refuses_before_any_page_is_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The adapter is built after the fetch, so its library is checked before it."""
+
+    from squadopt.platform import club_news_provider
+
+    monkeypatch.setattr(club_news_provider.importlib.util, "find_spec", lambda _name: None)
+    roster_id = _roster_snapshot(tmp_path / "snapshots")
+    requested: list[str] = []
+
+    code = main(
+        _command(tmp_path, roster_id),
+        environ={
+            PROVIDER_ENVIRONMENT_VARIABLE: "gemini",
+            KEY_ENVIRONMENT_VARIABLE: "not-a-real-key",
+        },
+        opener=_opener(None, requested),
+        now=_Clock(),
+        sleeper=lambda _: None,
+    )
+
+    printed = capsys.readouterr().out
+    assert code == 1
+    assert printed.startswith("Refused:")
+    assert "llm extra" in printed
+    assert requested == []
+
+
+def test_the_command_says_nothing_was_observed_when_no_page_could_be_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    built: list[CodingProviderConfig] = []
+    name = "fake-nothing-read"
+    register_provider(name, lambda config: built.append(config) or _Provider())
+    roster_id = _roster_snapshot(tmp_path / "snapshots")
+
+    def _open(request: Any, timeout: float) -> _Reply:
+        if request.full_url.endswith("/robots.txt"):
+            return _Reply(request.full_url, b"User-agent: *\nAllow: /\n")
+        return _refuse(request.full_url)  # type: ignore[no-any-return]
+
+    code = main(
+        _command(tmp_path, roster_id),
+        environ=_environment(name),
+        opener=_open,
+        now=_Clock(),
+        sleeper=lambda _: None,
+    )
+
+    printed = capsys.readouterr().out
+    assert code == 1
+    assert "Observed" not in printed
+    assert "Nothing was coded, so there is no week to capture." in printed
     assert built == []
 
 

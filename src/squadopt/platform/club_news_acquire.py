@@ -94,6 +94,7 @@ from squadopt.platform.club_news_provider import (
     check_coding_provider,
     code_week_by_club,
     coding_as_of,
+    require_provider_dependency,
     resolve_provider_config,
     validate_provider_config,
 )
@@ -231,8 +232,29 @@ def acquire_week(
     )
     observed_at: str | None = None
     if bind_coding is not None:
-        # After the fetch, never before: every page in hand was read at or before this.
+        if not documents:
+            # Nothing was read, so there is nothing to observe and no adapter to build.
+            declared, _covered, _partial = _coverage(sources, documents, ())
+            return AcquiredWeek(
+                documents=(),
+                coded=(),
+                clubs_declared=declared,
+                clubs_covered=(),
+                clubs_partially_covered=(),
+                refused_pages=refused_pages,
+                refused_coding=(),
+            )
+        # After the fetch, never before. The order is checked rather than assumed: a page
+        # stamped later than the instant the coding looks from would be read "in the future"
+        # of its own selection, so the week stops.
         observed_at = _instant_text(now())
+        late = [d for d in documents if as_instant(d.fetched_at_utc) > as_instant(observed_at)]
+        if late:
+            raise ClubNewsError(
+                f"The coding observation {observed_at} is earlier than {len(late)} page "
+                f"read(s), the latest at {max(d.fetched_at_utc for d in late)}; the clock "
+                "went backwards, so nothing was coded."
+            )
         provider, config = bind_coding(observed_at)
     if provider is None or config is None:  # pragma: no cover - excluded by the check above
         raise ClubNewsError("No coding provider was given.")
@@ -416,10 +438,12 @@ def main(
                 replace(entry, reused_from_snapshot=prior.metadata.snapshot_id)
                 for entry in read_captured_responses(prior)
             )
-        # Resolved and checked before any page is fetched, so a missing key or an unlisted
-        # model refuses with nothing read. The adapter itself is built after the fetch.
+        # Resolved and checked before any page is fetched, so a missing key, an unlisted
+        # model or a client library that is not installed refuses with nothing read. The
+        # adapter itself is built after the fetch.
         resolved = resolve_provider_config(environ, settings_file=arguments.settings_file)
         validate_provider_config(resolved)
+        require_provider_dependency(resolved)
 
         def _bind(observed_at: str) -> tuple[ClubNewsProvider, CodingProviderConfig]:
             if as_instant(observed_at) < as_instant(as_of):
@@ -465,10 +489,11 @@ def main(
     config = resolved
     print(f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared")
     print(f"Read          {len(week.documents)} documents")
-    print(
-        f"Observed      {week.coding_observed_at}, after the last page was read, for "
-        f"gameweek {deadline.gameweek} (deadline {deadline.deadline_utc})"
-    )
+    if week.coding_observed_at is not None:
+        print(
+            f"Observed      {week.coding_observed_at}, after the last page was read, for "
+            f"gameweek {deadline.gameweek} (deadline {deadline.deadline_utc})"
+        )
     if week.document_selection is not None:
         print(f"Selected      {len(week.document_selection.documents)} documents for coding")
         for decision in week.document_selection.decisions:
