@@ -88,10 +88,14 @@ intervals to include zero. These are stated priors, and no clause reads them.
    through GW38.
 2. It binds from the commit that merges it. The first chain week is the first gameweek whose
    deadline falls after the later of two merges: this document's, and that of the runner
-   `scripts/measure_planner_policy_chain.py`. The target is GW6, whose deadline the bootstrap of
+   `scripts/measure_planner_policy_chain.py`. A merge is the commit on develop's first-parent
+   line that added the file, compared with its first parent: the squash commit, or a merge
+   commit, never the feature commit that wrote it. Its instant is that commit's committer
+   instant. The target is GW6, whose deadline the bootstrap of
    capture `fpl-live-20260922T214539Z-364991a4f832` puts at 2026-10-10T10:00:00Z. The owner's
    answer on #632 (5948324329) holds GW6 to two dates: this document merged by 6 October and the
-   runner by 8 October. If either misses its date, the first chain week is GW7, or the first
+   runner by 8 October, each by the end of that day in UTC (before 2026-10-07T00:00:00Z and
+   2026-10-09T00:00:00Z). If either misses its date, the first chain week is GW7, or the first
    deadline after the later merge when that is later still. The reading dates do not move, so a
    later start leaves fewer weeks to read. A first chain week fixed before any of its inputs
    exist cannot be chosen after its outcome is seen, and an earlier week is never relabelled as
@@ -144,7 +148,9 @@ intervals to include zero. These are stated priors, and no clause reads them.
 7. The season rules are `read_season_rules` in `src/squadopt/live/rules.py`, on the same
    capture.
 8. The decision step uses no archive, no handoff, no member or entry payload and nothing
-   captured after the week's deadline. `read_snapshot` verifies every payload of a capture,
+   captured after the week's deadline enters a decision. Later captures are read only for the
+   deadlines they state (rule 5) and for the inventory each receipt lists; no outcome they carry
+   is read. `read_snapshot` verifies every payload of a capture,
    including entry picks and earlier live payloads a capture may carry; the decision step reads
    none of them. The served forecast was fitted by its producer on settled history, including
    settled 2026-27 weeks before the capture; the chain neither fits nor reads that history.
@@ -395,9 +401,11 @@ intervals to include zero. These are stated priors, and no clause reads them.
     announces each run on the tracking issue.
 40. Who runs the decision step and the scorer, and on which machine, was asked on #632 as
     Question PC1. The owner answered on 2026-10-02 (5948324329): the owner runs both on the
-    owner's machine, which writes the football artifacts and keeps the captures. The first
-    computation comes after the 9 to 11 October freeze, from GW6's decision capture and served
-    forecast, and reads no match outcome. Another operator or machine needs a new Answer, and
+    owner's machine, which writes the football artifacts and keeps the captures. No decision is
+    computed before 2026-10-11T10:00:00Z, the end of the 9 to 11 October freeze: the runner
+    refuses an earlier run before it takes its lock, reads its inventory, writes or solves. The
+    first computation reads GW6's decision capture and served forecast and no match outcome.
+    Another operator or machine needs a new Answer, and
     silence is not one; any other machine copies its inputs as rule 6 says. However late a
     decision is computed, the chain starts at its first chain week and decides weeks in order,
     each from its own capture and artifact if both are still on disk with a write time before
