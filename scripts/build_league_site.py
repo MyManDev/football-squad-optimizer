@@ -198,10 +198,10 @@ def main() -> int:
             rotation_evidence=arguments.rotation_evidence,
             club_news_source=arguments.club_news_source,
             top100_evidence=arguments.top100_evidence,
-            **(
-                {"training_seasons": tuple(arguments.training_seasons)}
+            training_seasons=(
+                tuple(arguments.training_seasons)
                 if arguments.training_seasons is not None
-                else {}
+                else None
             ),
         )
         prepared = prepare_league_publication(request)

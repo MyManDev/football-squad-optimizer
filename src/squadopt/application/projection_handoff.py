@@ -505,11 +505,7 @@ def build(
                     captured_at_utc=captured_at,
                     deadline_utc=target_deadline.deadline_utc,
                     fallback=blend.table,
-                    **(
-                        {"training_seasons": training_seasons}
-                        if training_seasons is not None
-                        else {}
-                    ),
+                    training_seasons=training_seasons,
                 )
             except IncompleteLiveHistoryError as error:
                 diagnostics.update(
