@@ -443,7 +443,17 @@ export function MemberDecisionControls({
         ))}
       </div>
       <p className={styles.note}>{top100Note}</p>
-      {top100Applies || top100Computable ? <p className={styles.note}>{top100Copy.help}</p> : null}
+      {/* The arithmetic of the weight is for the member who wants it. It waits closed so the
+          card reads as a choice of settings and not as a paragraph to get through first. */}
+      {top100Applies || top100Computable ? (
+        <details className={styles.notes}>
+          <summary>
+            <DisclosureIcon className={styles.notesIcon} />
+            {top100Copy.helpTitle}
+          </summary>
+          <p className={styles.note}>{top100Copy.help}</p>
+        </details>
+      ) : null}
     </fieldset>
   );
 

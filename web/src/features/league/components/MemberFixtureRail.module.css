@@ -253,13 +253,6 @@
   color: var(--color-text-muted);
 }
 
-.legend {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-}
-
 /* ---- A column of its own, 1180 px and wider ---- */
 
 .rail[data-placement="column"] {

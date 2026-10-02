@@ -185,7 +185,7 @@ export function AdviceRequestPanel({
             )}
           </p>
         ) : null}
-        <p className={styles.note}>{isSelf ? copy.computeBodySelf : copy.computeBodyOther}</p>
+        {isSelf ? <p className={styles.note}>{copy.computeBodySelf}</p> : null}
       </div>
     </>
   );
