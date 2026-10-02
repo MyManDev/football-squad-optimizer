@@ -418,6 +418,35 @@ def coding_input_fingerprint(
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+@dataclass(frozen=True, slots=True)
+class WeekCoding:
+    """One week's coding: the answers, the refusals, and how many requests were sent.
+
+    ``calls_attempted`` counts calls to the provider that were begun, whether they came
+    back as an answer or as an error. A reused answer, a club stopped by the budget and a
+    club refused before its call began attempted none.
+
+    ``refusal_kinds`` names, club by club and in the order of ``refused``, which of four
+    different things a refusal was. The sentence in ``refused`` is for a person; the kind is
+    for a report that must not mix them.
+    """
+
+    coded: tuple[CodedClub, ...]
+    refused: tuple[tuple[str, str], ...]
+    calls_attempted: int
+    refusal_kinds: tuple[tuple[str, str], ...] = ()
+
+
+#: No document of the club was selected for coding, so there was nothing to ask about.
+REFUSAL_NOTHING_SELECTED: Final = "nothing_selected"
+#: The run's call budget was spent before this club's turn. No call was attempted.
+REFUSAL_BUDGET: Final = "budget_stopped"
+#: The club's input was refused before any call was attempted.
+REFUSAL_BEFORE_CALL: Final = "refused_before_call"
+#: A call was attempted and did not produce a usable answer.
+REFUSAL_CALL_FAILED: Final = "call_failed"
+
+
 def code_week_by_club(
     provider: ClubNewsProvider,
     config: CodingProviderConfig,
@@ -428,6 +457,30 @@ def code_week_by_club(
     previous: Sequence[CodedClub] = (),
     selection: DocumentSelection | None = None,
 ) -> tuple[tuple[CodedClub, ...], tuple[tuple[str, str], ...]]:
+    """What :func:`code_week` coded and refused, without its count of requests."""
+
+    week = code_week(
+        provider,
+        config,
+        documents,
+        roster,
+        max_calls=max_calls,
+        previous=previous,
+        selection=selection,
+    )
+    return week.coded, week.refused
+
+
+def code_week(
+    provider: ClubNewsProvider,
+    config: CodingProviderConfig,
+    documents: Sequence[RawDocument],
+    roster: Sequence[RosterPlayer],
+    *,
+    max_calls: int | None = None,
+    previous: Sequence[CodedClub] = (),
+    selection: DocumentSelection | None = None,
+) -> WeekCoding:
     """Code a week one club at a time, returning what was coded and why the rest was not.
 
     ``selection`` is the caller's own selection of these documents, when it has already made
@@ -484,9 +537,11 @@ def code_week_by_club(
         for club in dict.fromkeys(d.club for d in documents)
         if club not in by_club
     ]
+    kinds: list[tuple[str, str]] = [(club, REFUSAL_NOTHING_SELECTED) for club, _ in refused]
     previous_by_club = {item.club: item for item in previous}
     attempted = 0
     for club, club_documents in by_club.items():
+        called = False
         try:
             fingerprint = coding_input_fingerprint(config, club_documents, roster)
             held = previous_by_club.get(club)
@@ -503,12 +558,15 @@ def code_week_by_club(
                 continue
             if max_calls is not None and attempted >= max_calls:
                 refused.append((club, "Call budget exhausted; no model request was sent."))
+                kinds.append((club, REFUSAL_BUDGET))
                 continue
             attempted += 1
+            called = True
             response = provider.code(club_documents, roster)
             require_requested_coding_contract(response)
         except ClubNewsError as error:
             refused.append((club, str(error)))
+            kinds.append((club, REFUSAL_CALL_FAILED if called else REFUSAL_BEFORE_CALL))
             continue
         coded.append(
             CodedClub(
@@ -535,7 +593,7 @@ def code_week_by_club(
                 ),
             )
         )
-    return tuple(coded), tuple(refused)
+    return WeekCoding(tuple(coded), tuple(refused), attempted, tuple(kinds))
 
 
 def _anthropic(config: CodingProviderConfig) -> ClubNewsProvider:
@@ -586,12 +644,18 @@ __all__ = [
     "KEY_ENVIRONMENT_VARIABLE",
     "MODEL_ENVIRONMENT_VARIABLE",
     "PROVIDER_ENVIRONMENT_VARIABLE",
+    "REFUSAL_BEFORE_CALL",
+    "REFUSAL_BUDGET",
+    "REFUSAL_CALL_FAILED",
+    "REFUSAL_NOTHING_SELECTED",
     "VENDOR_KEY_VARIABLES",
     "ClubNewsProviderError",
     "CodingProviderConfig",
+    "WeekCoding",
     "bind_coding_provider",
     "build_coding_provider",
     "check_coding_provider",
+    "code_week",
     "code_week_by_club",
     "coding_as_of",
     "register_provider",

@@ -5,11 +5,19 @@ and selected sources, documents received, and model responses. It does not inspe
 quality, validate claims, or establish that a club published no relevant news.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from squadopt.data.sources.club_news import RawDocument
+from squadopt.data.sources.club_news_metadata import publication_metadata
+from squadopt.data.sources.club_news_selection import DocumentSelection
 from squadopt.platform.club_news_fetch import ClubSource
+from squadopt.platform.club_news_provider import (
+    REFUSAL_BEFORE_CALL,
+    REFUSAL_BUDGET,
+    REFUSAL_CALL_FAILED,
+    REFUSAL_NOTHING_SELECTED,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,4 +198,168 @@ def format_club_news_coverage(report: ClubNewsCoverageReport) -> str:
     return "\n".join(lines)
 
 
-__all__ = ["ClubNewsCoverageReport", "build_club_news_coverage", "format_club_news_coverage"]
+@dataclass(frozen=True, slots=True)
+class CodingStageReport:
+    """What the coding stage did with the documents that were read, one outcome per place.
+
+    Every list is in roster order and names league clubs only. A club appears in exactly
+    one of the answer lists or one of the refusal lists, never in two.
+
+    A *dated article* is a selected document whose own held fields state a publication time
+    verifiably. It is the only evidence this report has that a page is an article: a page
+    reached by a link, or a registered page, can equally be a news index or navigation
+    text, and is not called an article here because of its address.
+    """
+
+    selected_document_count: int
+    dated_article_count: int
+    documents_freshly_coded: int
+    documents_reused: int
+    dated_article_clubs: tuple[str, ...]
+    no_dated_article_clubs: tuple[str, ...]
+    answered_clubs: tuple[str, ...]
+    empty_answer_clubs: tuple[str, ...]
+    unreadable_answer_clubs: tuple[str, ...]
+    reused_clubs: tuple[str, ...]
+    call_failed_clubs: tuple[str, ...]
+    budget_stopped_clubs: tuple[str, ...]
+    refused_before_call_clubs: tuple[str, ...]
+    nothing_selected_clubs: tuple[str, ...]
+    raw_claim_count: int
+    model_calls_attempted: int
+
+
+_REFUSAL_KINDS = (
+    REFUSAL_CALL_FAILED,
+    REFUSAL_BUDGET,
+    REFUSAL_BEFORE_CALL,
+    REFUSAL_NOTHING_SELECTED,
+)
+
+
+def build_coding_stage_report(
+    *,
+    roster_clubs: Sequence[str],
+    selection: DocumentSelection,
+    raw_claims: Mapping[str, int | None],
+    reused_clubs: Sequence[str],
+    refusal_kinds: Sequence[tuple[str, str]],
+    model_calls_attempted: int,
+) -> CodingStageReport:
+    """Describe the coding stage from the one selection it used and its own outcomes.
+
+    ``raw_claims`` names every coded club with the number of claims its answer states, or
+    ``None`` for an answer that carries no list of claims. ``reused_clubs`` are the coded
+    clubs whose answer came from an earlier capture. ``refusal_kinds`` is the coding stage's
+    own list of which kind each refusal was. A club may not be both coded and refused, a
+    reused club must be coded, and a coded club must have a selected document: an answer
+    with nothing selected behind it is not an answer this run can describe.
+    """
+
+    roster = _names(roster_clubs, "Snapshot teams")
+    league = tuple(club for club in roster if club != "Example FC")
+    league_set = set(league)
+
+    def ordered(names: set[str]) -> tuple[str, ...]:
+        return tuple(club for club in league if club in names)
+
+    coded = set(raw_claims)
+    if any(
+        count is not None and (type(count) is not int or count < 0) for count in raw_claims.values()
+    ):
+        raise ValueError("Claim counts must be nonnegative integers, or None for no claims list.")
+    reused = set(_names(reused_clubs, "Reused clubs"))
+    if reused - coded:
+        raise ValueError("A reused response must belong to a coded club.")
+    kind_of: dict[str, str] = {}
+    for club, kind in refusal_kinds:
+        if kind not in _REFUSAL_KINDS:
+            raise ValueError(f"Unknown coding refusal kind {kind!r}.")
+        if club in kind_of or club in coded:
+            raise ValueError("A club has exactly one coding outcome.")
+        kind_of[club] = kind
+    if type(model_calls_attempted) is not int or model_calls_attempted < 0:
+        raise ValueError("Model calls attempted must be a nonnegative integer.")
+
+    chosen = [document for document in selection.documents if document.club in league_set]
+    with_selection = {document.club for document in selection.documents}
+    if coded - with_selection:
+        raise ValueError("A coded club must have a document selected for coding.")
+    dated = [
+        document
+        for document in chosen
+        if publication_metadata(
+            document.content, document.content_type, source_url=document.final_url
+        ).verified
+    ]
+    dated_clubs = {document.club for document in dated} & coded
+    empty = {club for club, count in raw_claims.items() if count == 0}
+    unreadable = {club for club, count in raw_claims.items() if count is None}
+
+    def of_kind(kind: str) -> tuple[str, ...]:
+        return ordered({club for club, found in kind_of.items() if found == kind})
+
+    return CodingStageReport(
+        selected_document_count=len(chosen),
+        dated_article_count=len(dated),
+        documents_freshly_coded=sum(d.club in coded - reused for d in chosen),
+        documents_reused=sum(d.club in reused for d in chosen),
+        dated_article_clubs=ordered(dated_clubs),
+        no_dated_article_clubs=ordered(coded - dated_clubs),
+        answered_clubs=ordered(coded - reused),
+        empty_answer_clubs=ordered(empty),
+        unreadable_answer_clubs=ordered(unreadable),
+        reused_clubs=ordered(reused),
+        call_failed_clubs=of_kind(REFUSAL_CALL_FAILED),
+        budget_stopped_clubs=of_kind(REFUSAL_BUDGET),
+        refused_before_call_clubs=of_kind(REFUSAL_BEFORE_CALL),
+        nothing_selected_clubs=of_kind(REFUSAL_NOTHING_SELECTED),
+        raw_claim_count=sum(
+            count for club, count in raw_claims.items() if count and club in league_set
+        ),
+        model_calls_attempted=model_calls_attempted,
+    )
+
+
+def format_coding_stage(report: CodingStageReport) -> str:
+    """Render the coding stage for an operator, one outcome to a line."""
+
+    def line(label: str, clubs: Sequence[str]) -> str:
+        return f"{label}: {len(clubs)} [{', '.join(clubs)}]"
+
+    return "\n".join(
+        [
+            f"Selected for coding: {report.selected_document_count} documents, of which "
+            f"{report.dated_article_count} dated articles.",
+            f"Documents behind new answers: {report.documents_freshly_coded}; behind reused "
+            f"answers: {report.documents_reused}.",
+            line("Coded with a dated article", report.dated_article_clubs),
+            line("Coded with no dated article", report.no_dated_article_clubs),
+            line("Answered in this run", report.answered_clubs),
+            line("Answer reused from an earlier capture", report.reused_clubs),
+            line("Answer with no claims", report.empty_answer_clubs),
+            line("Answer without a claims list", report.unreadable_answer_clubs),
+            line("Call attempted and failed", report.call_failed_clubs),
+            line("Stopped by the call budget, no call attempted", report.budget_stopped_clubs),
+            line("Refused before a call was attempted", report.refused_before_call_clubs),
+            line("No document selected for coding", report.nothing_selected_clubs),
+            f"Model calls attempted: {report.model_calls_attempted}.",
+            f"Raw claims: {report.raw_claim_count}, as the model stated them. How many apply "
+            "is not known here; each is checked against its source at export.",
+            "A dated article is a selected page whose own fields state a publication time "
+            "verifiably. Any other page, registered or reached by a link, can be a news "
+            "index or navigation text and is not called an article here.",
+            "An answer with no claims is a successful empty answer. It is not a player "
+            "update, not a failed call, and not a statement that the club published nothing.",
+        ]
+    )
+
+
+__all__ = [
+    "ClubNewsCoverageReport",
+    "CodingStageReport",
+    "build_club_news_coverage",
+    "build_coding_stage_report",
+    "format_club_news_coverage",
+    "format_coding_stage",
+]

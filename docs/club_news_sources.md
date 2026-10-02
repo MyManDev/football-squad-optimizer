@@ -263,6 +263,44 @@ search of the website. The current reader follows at most ten same-origin links 
 under the registered path, and performs no JavaScript discovery. Its RSS/Atom support reads
 item text; it does not follow item links, so a headline-only feed is not a full article feed.
 
+A second block describes the coding stage, one outcome to a line:
+
+| Line | What it counts |
+| --- | --- |
+| `Selected for coding` | documents selected for coding, and how many of them are dated articles |
+| `Documents behind new answers` / `behind reused answers` | selected documents of clubs answered in this run, and of clubs whose answer was reused |
+| `Coded with a dated article` / `with no dated article` | coded clubs with, and without, a selected dated article |
+| `Answered in this run` | coded clubs whose answer came from a call in this run |
+| `Answer reused from an earlier capture` | coded clubs whose answer was reused |
+| `Answer with no claims` | coded clubs whose answer states an empty list of claims |
+| `Answer without a claims list` | coded clubs whose answer carries no list of claims at all |
+| `Call attempted and failed` | read clubs whose call was begun and gave no usable answer |
+| `Stopped by the call budget, no call attempted` | read clubs the budget did not reach |
+| `Refused before a call was attempted` | read clubs whose input was refused while the question was built |
+| `No document selected for coding` | read clubs with nothing selected |
+| `Model calls attempted` | calls begun in this run, answered or failed |
+| `Raw claims` | claims as the model stated them, before any is checked against its source |
+
+A dated article is a selected page whose own held fields state a publication time
+verifiably. That is the only evidence the report has that a page is an article: a registered
+page, or a page reached by following a link, can be a news index or navigation text, and is
+not called an article because of its address. A club coded with no dated article is therefore
+not reported as having had an article body read.
+
+Each read club has exactly one coding outcome. An answer with no claims is a successful
+empty answer, an answer without a claims list is not one, and neither is the same as a call
+that failed, a club the budget did not reach or a club with nothing selected. A document that
+was read and not selected is listed as unselected with its reason. How many claims apply is
+not known at acquisition; each is checked against its source at export. A call is counted
+when it is begun, so a failed call spends budget, and a reused answer, a budget stop and a
+refusal before the call count none. The counts are printed by the command; the capture
+format is unchanged and does not store them.
+
+Proposing a new club follows the existing order and is not started by a coverage number:
+the source's reading is written by whoever maintains this record, a real article body is
+read through the direct reader, and the access and use terms are current, before the
+registry changes. No club was added with this report.
+
 Palace is now registered after the direct-reader check below, a recorded terms reading
 and explicit approval of the configuration change. Its existing discovery and size limits
 remain in force. Man City and Brentford remain technical candidates with the restrictions

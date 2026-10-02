@@ -79,7 +79,9 @@ from squadopt.data.timestamps import as_instant
 from squadopt.live.recommendation import season_from_bootstrap
 from squadopt.platform.club_news_coverage import (
     build_club_news_coverage,
+    build_coding_stage_report,
     format_club_news_coverage,
+    format_coding_stage,
 )
 from squadopt.platform.club_news_fetch import (
     ClubSource,
@@ -92,7 +94,7 @@ from squadopt.platform.club_news_provider import (
     CodingProviderConfig,
     bind_coding_provider,
     check_coding_provider,
-    code_week_by_club,
+    code_week,
     coding_as_of,
     require_provider_dependency,
     resolve_provider_config,
@@ -140,6 +142,10 @@ class AcquiredWeek:
     document_selection: DocumentSelection | None = None
     #: The instant the coding looked from, when this run took one after the fetch.
     coding_observed_at: str | None = None
+    #: Calls to the provider begun in this run, answered or failed.
+    model_calls_attempted: int = 0
+    #: Which kind of refusal each entry of ``refused_coding`` was, in the same order.
+    coding_refusal_kinds: tuple[tuple[str, str], ...] = ()
 
 
 def _coverage(
@@ -259,7 +265,7 @@ def acquire_week(
     if provider is None or config is None:  # pragma: no cover - excluded by the check above
         raise ClubNewsError("No coding provider was given.")
     selection = select_coding_documents(documents, as_of=coding_as_of(config))
-    coded, refused_coding = code_week_by_club(
+    coding = code_week(
         provider,
         config,
         documents,
@@ -268,6 +274,7 @@ def acquire_week(
         previous=previous,
         selection=selection,
     )
+    coded, refused_coding = coding.coded, coding.refused
     declared, covered, partial = _coverage(sources, documents, coded)
     return AcquiredWeek(
         documents=documents,
@@ -280,6 +287,8 @@ def acquire_week(
         reused_clubs=tuple(entry.club for entry in coded if any(entry is old for old in previous)),
         document_selection=selection,
         coding_observed_at=observed_at,
+        model_calls_attempted=coding.calls_attempted,
+        coding_refusal_kinds=coding.refusal_kinds,
     )
 
 
@@ -352,6 +361,18 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _raw_claim_count(entry: CodedClub) -> int | None:
+    """How many claims one coded answer states, before any is checked against its source.
+
+    ``None`` when the answer carries no list of claims at all. That is not an empty answer:
+    an answer that states nothing says so with an empty list, and one without the list
+    cannot be read as either.
+    """
+
+    rows = json.loads(entry.response.text).get("claims")
+    return len(rows) if isinstance(rows, list) else None
 
 
 def main(
@@ -500,11 +521,14 @@ def main(
             if not decision.selected:
                 print(f"  unselected  {decision.club}: {decision.reason}; {decision.source_url}")
     print(f"Coded         {len(week.coded)} clubs, provider {config.provider!r}")
-    claims = [json.loads(entry.response.text).get("claims") for entry in week.coded]
-    claim_count = sum(len(rows) for rows in claims if isinstance(rows, list))
+    raw_claims = {entry.club: _raw_claim_count(entry) for entry in week.coded}
+    claim_count = sum(count or 0 for count in raw_claims.values())
     print(f"Raw claims    {claim_count}; source validation occurs during export")
     print(f"Reused        {len(week.reused_clubs)} unchanged club responses")
-    print(f"Call budget   {arguments.max_model_calls}; no automatic provider retry")
+    print(
+        f"Call budget   {arguments.max_model_calls}; {week.model_calls_attempted} attempted; "
+        "no automatic provider retry"
+    )
     print(f"Covered       {len(week.clubs_covered)} clubs")
     print(f"Partly read   {len(week.clubs_partially_covered)} clubs")
     print(
@@ -522,6 +546,19 @@ def main(
             )
         )
     )
+    if week.document_selection is not None:
+        print(
+            format_coding_stage(
+                build_coding_stage_report(
+                    roster_clubs=league_clubs,
+                    selection=week.document_selection,
+                    raw_claims=raw_claims,
+                    reused_clubs=week.reused_clubs,
+                    refusal_kinds=week.coding_refusal_kinds,
+                    model_calls_attempted=week.model_calls_attempted,
+                )
+            )
+        )
     for club, reason in (*week.refused_pages, *week.refused_coding):
         print(f"  refused     {club}: {reason}")
     if not week.coded:
