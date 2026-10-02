@@ -6,8 +6,7 @@ import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
 import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
-import { CHIP_COPY, chipLimit, chipRescores, type ChipCopy } from "../advice/chipCopy";
-import { shownLimits } from "../advice/hiddenLimits";
+import { CHIP_COPY, chipRescores, type ChipCopy } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { publishedPrice } from "../advice/publishedPrice";
@@ -16,7 +15,7 @@ import { ExpectedLineup } from "../advice/ExpectedLineup";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
 import { ParticipationEvidence } from "../advice/ParticipationEvidence";
 import { WeekLineup } from "../advice/WeekLineup";
-import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
+import { TOP100_COPY } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
 import { PointsUnit } from "../components/PointsUnit";
@@ -427,7 +426,6 @@ export function AdviceDetails({
       <InformationReview view={view} />
       <ChipChoiceSection view={view} />
       <ChipStrategySection view={view} />
-      <StatedLimits view={view} />
       <WindowComparison view={view} control={windowControl?.payload ?? null} />
       <WindowSection view={view} />
     </div>
@@ -896,7 +894,6 @@ function RivalPlayers({
   return (
     <section className={styles.lineup} aria-label={copy.rivalPlayersTitle}>
       <h3 className={styles.lineupTitle}>{copy.rivalPlayersTitle}</h3>
-      <p className={styles.honesty}>{copy.rivalPlayersBasis}</p>
       {comparison ? (
         <dl>
           {(["shared", "recommendedOnly", "rivalOnly"] as const).map((kind) => (
@@ -911,43 +908,6 @@ function RivalPlayers({
       ) : (
         <p className={styles.muted}>{copy.rivalPlayersUnavailable}</p>
       )}
-    </section>
-  );
-}
-
-/**
- * What the producer says this plan assumes, in its own sentences, less the ones the page
- * does not list (hiddenLimits.ts). With none left to show, the heading is left out too.
- */
-function StatedLimits({ view }: { view: EntryAdvice }) {
-  const { language, messages } = useLanguage();
-  const copy = messages.leagueMembers;
-  const limits = shownLimits(view.stated_limits);
-  if (limits.length === 0) return null;
-  const weeks = view.plan_weeks?.length ?? 1;
-  const label = weeks > 1 ? copy.windowLimitsLabel : copy.planLimitsLabel;
-  return (
-    <section className={styles.lineup} aria-label={label}>
-      <h3 className={styles.lineupTitle}>{label}</h3>
-      <ul className={styles.limits}>
-        {limits.map((sentence) => {
-          const weight = top100LimitWeight(sentence);
-          const chipSentence = chipLimit(CHIP_COPY[language], sentence);
-          return (
-            <li key={sentence}>
-              {chipSentence !== null
-                ? chipSentence
-                : weight !== null
-                  ? TOP100_COPY[language].limit(weight)
-                  : variantLimit(TOP100_COPY[language], sentence) !== null
-                    ? variantLimit(TOP100_COPY[language], sentence)
-                    : Object.hasOwn(copy.statedLimits, sentence)
-                      ? copy.statedLimits[sentence]
-                      : copy.statedLimitUnknown}
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }
@@ -1166,12 +1126,7 @@ function Top100Section({ view, priced }: { view: EntryAdvice; priced: boolean })
         {copy.weightLine(top100.weight)}{" "}
         {top100.changed ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
       </p>
-      <p className={styles.honesty}>{copy.honesty}</p>
-      <p className={styles.muted}>{copy.notStart}</p>
       <p className={styles.muted}>{copy.saturation}</p>
-      {view.moves.some((move) => (move.expected_points_delta ?? 0) < 0) ? (
-        <p className={styles.muted}>{copy.negativeRow}</p>
-      ) : null}
     </section>
   );
 }
@@ -1202,8 +1157,6 @@ function ChipStrategySection({ view }: { view: EntryAdvice }) {
       </p>
       {strategy.mode === "auto" && (
         <>
-          <p className={styles.honesty}>{copy.autoHonesty}</p>
-          <p>{copy.autoFuture}</p>
           <ul>
             {strategy.reservations.map((reservation) => (
               <li key={`${reservation.chip}-${reservation.first_gameweek}`}>
@@ -1251,7 +1204,6 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
         </p>
       ) : null}
       {unproven ? <p className={styles.muted}>{copy.unproven}</p> : null}
-      <p className={styles.honesty}>{copy.honesty}</p>
       {choice.chip === "freehit" ? <p className={styles.muted}>{copy.freeHit}</p> : null}
     </section>
   );
@@ -1460,7 +1412,7 @@ function LineupRow({
 }
 
 function WindowComparison({ view, control }: { view: EntryAdvice; control: EntryAdvice | null }) {
-  const { locale, language, messages } = useLanguage();
+  const { locale, language } = useLanguage();
   const copy = TOP100_COPY[language];
   if (
     !control ||
@@ -1514,8 +1466,6 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
           <dd className="num">{points(pure, 1, locale)}</dd>
         </div>
       </dl>
-      <p className={styles.honesty}>{copy.windowComparisonBasis}</p>
-      <p className={styles.honesty}>{messages.leagueMembers.windowLimits}</p>
     </section>
   );
 }

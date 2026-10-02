@@ -110,12 +110,13 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const text = section(container);
     expect(text).toContain(TOP100_COPY.tr.weightLine(20));
     expect(text).toContain(TOP100_COPY.tr.changed);
-    expect(text).toContain(TOP100_COPY.tr.honesty);
-    expect(text).toContain(TOP100_COPY.tr.notStart);
+    // The setting, what it did and its price; no caveat under them and no limit listed.
+    expect(text).not.toContain(TOP100_COPY.tr.honesty);
+    expect(text).not.toContain(TOP100_COPY.tr.notStart);
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.cost("0,4"));
     expect(page).not.toContain(TOP100_COPY.tr.costAtMost("0,4"));
-    expect(page).toContain(TOP100_COPY.tr.limit(20));
+    expect(page).not.toContain(TOP100_COPY.tr.limit(20));
     expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
   });
 
@@ -243,7 +244,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(container.textContent).toContain(TOP100_COPY.en.moveReason);
   });
 
-  it("prices a strategy and the setting together, and reads the window's limits back", () => {
+  it("prices a strategy and the setting together, and lists no limits", () => {
     const base = mockEntryAdviceIndex(ENTRY).payload;
     const rival = base.default_rival_entry_id!;
     const target = { strategy: "ortak-koru", window: 3, rivalEntryId: rival };
@@ -299,9 +300,9 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.strategyCostAtMost("12,5"));
     expect(page).not.toContain(TOP100_COPY.tr.strategyCost("12,5"));
-    expect(page).toContain(TOP100_COPY.tr.limit(20));
+    expect(page).not.toContain(TOP100_COPY.tr.limit(20));
     for (const sentence of Object.values(TOP100_COPY.tr.variantLimits)) {
-      expect(page).toContain(sentence);
+      expect(page).not.toContain(sentence);
     }
     expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
     expect(section(container)).toContain(TOP100_COPY.tr.weightLine(20));
