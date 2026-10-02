@@ -108,7 +108,15 @@ export function useMemberAdviceView(
   const plainOnly = selection.computable
     ? true
     : !evidenceOn && selection.top100.weight === 0 && selection.chip.chip === null;
-  const finished = plainOnly && current?.phase === "done" ? current : null;
+  // The answer this same selection already received stays on the page while a later
+  // attempt runs, and after one that fails or is refused: a second request that does not
+  // succeed is not a reason to take the first answer away.
+  const finished =
+    plainOnly && current
+      ? current.phase === "done"
+        ? { envelope: current.envelope, source: current.source }
+        : (current.earlier ?? null)
+      : null;
   const waiting = plainOnly && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
   // A computed answer is held to the squad on screen exactly as a published one is: a
@@ -165,10 +173,13 @@ export function useMemberAdviceView(
     }
   }
   rejectedContext = rejectedContext || computedElsewhere;
-  // The panel must not announce a plan the card refuses to show.
+  // The panel must not announce a plan the card refuses to show, and it must not carry
+  // an earlier selection's state for the one render before the reset lands.
   const panelJob: AdviceJob = computedElsewhere
     ? { ...job, state: { phase: "failed", request, reason: ANSWER_OTHER_CAPTURE } }
-    : job;
+    : job.state.phase !== "idle" && !sameAdviceRequest(job.state.request, request)
+      ? { ...job, state: { phase: "idle" } }
+      : job;
   let shown: ShownAdvice | null = null;
   if (computed) {
     shown = {
