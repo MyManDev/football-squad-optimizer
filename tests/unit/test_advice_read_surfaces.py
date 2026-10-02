@@ -29,6 +29,8 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "information_review",  # conditional actions and source playing chance; no rank odds
         "prediction_model",  # provenance: selected experimental forecast version and digest
         "participation_evidence",  # provenance: source record counts and update assumptions
+        "official_information",  # provenance: source-stated facts, not calibrated predictions
+        "decision_information",  # provenance: bound inputs, for explicit recalculation
         "preferences",  # inputs: canonical user constraints applied by the producer
         "preferences_scope",  # inputs: these constraints bind every selected week
         "selection_top100_weight",  # inputs: selection weight, not a measured points cost

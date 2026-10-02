@@ -480,6 +480,9 @@ class AdviceReadStore:
         }
         if inputs.football is not None:
             document["models"] = list(PREDICTION_MODELS)
+            document["decision_information"] = inputs.decision_information(
+                context.capture_snapshot_id
+            )
         validate_league_capabilities(document)
         return document
 

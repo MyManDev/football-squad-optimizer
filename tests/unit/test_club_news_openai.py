@@ -144,6 +144,7 @@ def test_explicit_json_object_keeps_prompt_and_local_citation_contract() -> None
                 "source_url": DOCUMENTS[0].final_url,
                 "quote": SOURCE.decode(),
                 "paraphrase": "He will not travel.",
+                "fixture_scope": "unspecified",
             }
         ],
     }

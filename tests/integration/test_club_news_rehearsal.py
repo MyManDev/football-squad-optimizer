@@ -142,7 +142,11 @@ class _RehearsalProvider:
                 {
                     "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
                     "documents": [e for e in fixture["documents"] if e["url"] in served],
-                    "claims": [e for e in fixture["claims"] if e["source_url"] in served],
+                    "claims": [
+                        {**e, "fixture_scope": "unspecified"}
+                        for e in fixture["claims"]
+                        if e["source_url"] in served
+                    ],
                 },
                 ensure_ascii=False,
             ),
@@ -273,6 +277,7 @@ def test_a_week_is_acquired_and_exported_without_a_key(
     manifest = json.loads((output / "table.manifest.json").read_text(encoding="utf-8"))
 
     assert len(table) == manifest["roster_size"]
+    assert not table["rotation_claim_scope_verified"].any()
     # The record names what answered, which is the whole reason genericity is about wiring.
     assert manifest["model_identifier"] == REHEARSAL_MODEL
     # And which adapter was asked. It is not recoverable from the model identifier: this fake

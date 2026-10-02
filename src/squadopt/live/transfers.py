@@ -831,7 +831,9 @@ def plan_transfer_horizon(
     depend on an unversioned forecast.
 
     A one-week horizon reuses the uncapped operational transfer policy exactly. Longer
-    horizons default to at most one transfer per gameweek. That is the measured rolling
+    horizons default to at most one transfer per gameweek. Bounded experimental
+    football also admits two moves when both use banked free transfers. The base
+    one-transfer cap is the measured rolling
     discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
     churned, while the cap removed the mechanism. Callers may provide another explicit
     policy. Multiweek sale accounting always uses the captured season fee, including
@@ -958,16 +960,18 @@ def plan_transfer_horizon(
         raise DataSourceError(
             "Automatic chip strategy currently supports the pure-points path only."
         )
-    guarded_football = (
+    bounded_football = (
         projection_horizon.model_name == "fixture_football_candidate"
         and len(projection_horizon.target_gameweeks) in (3, 5)
         and settings.solver_deterministic_time_limit is not None
         and settings.solver_deterministic_time_limit >= 2
-        and not chip_strategy
         and first_week_overlap is None
         and first_week_transfer_cap is None
         and first_week_exclusion is None
     )
+    guarded_football = bounded_football and not chip_strategy
+    if bounded_football and transfer_config is None:
+        planning_policy = replace(planning_policy, allow_two_free_transfers=True)
     expected_lineups = (
         guarded_football
         and "appearance_probability" in planning_table
@@ -1028,6 +1032,7 @@ def plan_transfer_horizon(
             linearization_level=linearization_level,
             preferences=preferences,
             protect_hold=True,
+            expected_lineups=bounded_football and "appearance_probability" in planning_table,
         )
         if chip_strategy
         else optimize_transfer_plan(

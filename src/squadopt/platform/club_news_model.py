@@ -188,6 +188,8 @@ class AnthropicClubNewsProvider:
         client: CodingClient | None = None,
         api_key: str | None = None,
         model_identifier: str = CODING_MODEL_IDENTIFIER,
+        target_context: Mapping[str, object] | None = None,
+        max_transport_retries: int = MAX_TRANSPORT_RETRIES,
     ) -> None:
         """Build a client, or accept one.
 
@@ -203,6 +205,12 @@ class AnthropicClubNewsProvider:
         and so the recorded identifier is the one that was actually asked.
         """
 
+        if (
+            type(max_transport_retries) is not int
+            or not 0 <= max_transport_retries <= MAX_TRANSPORT_RETRIES
+        ):
+            raise ClubNewsModelError("Transport retries must be an integer from zero to four.")
+        self._target_context = target_context
         self._model_identifier = model_identifier
         self._api_key = "" if api_key is None else _checked_key(api_key)
         if client is not None:
@@ -220,7 +228,7 @@ class AnthropicClubNewsProvider:
             ) from error
         self._client = anthropic.Anthropic(
             api_key=api_key,
-            max_retries=MAX_TRANSPORT_RETRIES,
+            max_retries=max_transport_retries,
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
 
@@ -249,7 +257,7 @@ class AnthropicClubNewsProvider:
         snapshot, and "which model produced this claim" has to survive that.
         """
 
-        user_content = build_user_content(documents, roster)
+        user_content = build_user_content(documents, roster, target_context=self._target_context)
         try:
             message = self._client.messages.create(
                 model=self._model_identifier,

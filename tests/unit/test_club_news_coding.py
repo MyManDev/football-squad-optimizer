@@ -173,7 +173,7 @@ def test_formerly_future_fixture_version_is_now_readable_without_rewriting_it() 
 
     response = _coding_fixture().unlocatable_responses()[3].response
     original = response.text
-    assert json.loads(original)["contract_version"] == ROTATION_CLAIM_CODING_CONTRACT_VERSION
+    assert json.loads(original)["contract_version"] == "rotation_claim_coding_v2"
     documents = _documents()
     claims = parse_claim_response(locate_claim_response(response, documents), documents)
     baseline = parse_claim_response(
@@ -380,7 +380,7 @@ def test_the_contract_names_the_model_and_the_effort_it_was_written_against() ->
 
     assert CODING_MODEL_IDENTIFIER == "claude-opus-5"
     assert CODING_EFFORT == "high"
-    assert ROTATION_CLAIM_CODING_CONTRACT_VERSION == "rotation_claim_coding_v2"
+    assert ROTATION_CLAIM_CODING_CONTRACT_VERSION == "rotation_claim_coding_v3"
 
 
 def test_the_user_content_is_deterministic() -> None:

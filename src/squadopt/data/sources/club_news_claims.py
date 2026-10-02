@@ -36,6 +36,7 @@ from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
     LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     LEGACY_ROTATION_DISPOSITIONS,
+    PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     PUBLISHED_PRECISIONS,
     ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ROTATION_DISPOSITIONS,
@@ -43,12 +44,14 @@ from squadopt.data.sources.club_news import (
     ClubNewsError,
     RawDocument,
 )
+from squadopt.data.sources.club_news_metadata import PublicationMetadata, publication_metadata
+from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
 from squadopt.data.timestamps import normalize_utc_timestamp
 
 #: This parser's own contract, separate from the response format's. The response format is
 #: what a model is asked to produce; this is what the parser produces from it, and the two
 #: can move independently.
-CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v2"
+CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v3"
 
 #: Keys a claim must carry. ``paraphrase`` is required and then discarded -- see the module
 #: docstring. A response missing any of these is a different format, not a sparse one.
@@ -96,6 +99,11 @@ class ParsedClaim:
     span_end: int
     published_at_utc: str | None
     published_precision: str
+    fixture_scope: str = "unspecified"
+    scope_verified: bool = False
+    publication_verified: bool = False
+    publication_source: str | None = None
+    publication_source_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +277,17 @@ def _require_explicit_full_match_limit(quote: bytes) -> None:
         )
 
 
+def _source_publications(documents: Sequence[RawDocument]) -> dict[str, PublicationMetadata]:
+    indexed: dict[str, PublicationMetadata] = {}
+    for document in documents:
+        metadata = publication_metadata(document.content, document.content_type, document.final_url)
+        for url in (document.requested_url, document.final_url):
+            if url in indexed and indexed[url] != metadata:
+                raise ClubNewsError("One cited URL has conflicting held publication metadata.")
+            indexed[url] = metadata
+    return indexed
+
+
 def parse_claim_response(
     response: ClaimResponse, documents: Sequence[RawDocument]
 ) -> tuple[ParsedClaim, ...]:
@@ -293,6 +312,7 @@ def parse_claim_response(
     version = document.get("contract_version")
     if version not in (
         LEGACY_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+        PREVIOUS_ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
         ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
     ):
         raise ClubNewsError(
@@ -307,6 +327,11 @@ def parse_claim_response(
     )
     datelines = _declared_datelines(document)
     available = _fetched_bytes(documents)
+    publications = (
+        _source_publications(documents)
+        if version == ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION
+        else {}
+    )
 
     claims: list[ParsedClaim] = []
     seen: dict[tuple[str, str], str] = {}
@@ -362,6 +387,30 @@ def parse_claim_response(
             )
         if disposition == "stated_full_match_unavailable":
             _require_explicit_full_match_limit(content[span_start:span_end])
+        scope, scope_verified = "unspecified", False
+        publication_verified = False
+        publication_source = publication_digest = None
+        if version == ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION:
+            declared_scope = _one_of(
+                _text(record, "fixture_scope", "A claim"), FIXTURE_SCOPES, "fixture_scope"
+            )
+            scope, checked = verified_fixture_scope(
+                content[span_start:span_end], disposition, player_name=player_name
+            )
+            scope_verified = checked and scope == declared_scope
+            if scope != declared_scope:
+                scope = "ambiguous"
+            metadata = publications[source_url]
+            publication_verified = metadata.verified and (
+                dateline.published_at_utc == metadata.published_at_utc
+                and dateline.published_precision == metadata.published_precision
+            )
+            # The V3 date is always the source fact, even when the model disagrees.
+            # Never preserve a model-only instant as an observed source date.
+            dateline = _Dateline(metadata.published_at_utc, metadata.published_precision)
+            if metadata.verified:
+                publication_source = metadata.source
+                publication_digest = metadata.source_sha256
         claims.append(
             ParsedClaim(
                 player_name=player_name,
@@ -374,6 +423,11 @@ def parse_claim_response(
                 span_end=span_end,
                 published_at_utc=dateline.published_at_utc,
                 published_precision=dateline.published_precision,
+                fixture_scope=scope,
+                scope_verified=scope_verified,
+                publication_verified=publication_verified,
+                publication_source=publication_source,
+                publication_source_sha256=publication_digest,
             )
         )
     return tuple(claims)

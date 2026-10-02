@@ -8,7 +8,7 @@ import pytest
 
 from squadopt.data.errors import InvalidValueError
 from squadopt.data.snapshots import read_snapshot
-from squadopt.data.sources.club_news import ClaimResponse, RawDocument
+from squadopt.data.sources.club_news import ClaimResponse, RawDocument, RosterPlayer
 from squadopt.data.sources.club_news_capture import (
     INDEX_PAYLOAD,
     CodedClub,
@@ -16,6 +16,7 @@ from squadopt.data.sources.club_news_capture import (
     read_captured_responses,
     write_club_news_capture,
 )
+from squadopt.data.sources.club_news_coding import ROTATION_CLAIM_CODING_CONTRACT_VERSION
 from squadopt.platform.club_news_provider import CodingProviderConfig, code_week_by_club
 
 SETTINGS = {
@@ -111,13 +112,25 @@ def test_provider_records_settings_but_not_key_or_private_endpoint():
 
     class Provider:
         def code(self, documents, roster):
-            return coded.response
+            # Archived v2 stays readable above; a new call must answer the current question.
+            return replace(
+                coded.response,
+                text=json.dumps(
+                    {
+                        "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+                        "documents": [],
+                        "claims": [],
+                    }
+                ),
+            )
 
     endpoint = "https://private.example/v1"
     config = CodingProviderConfig(
         "openai-compatible", "chosen-model", "synthetic-secret", endpoint, "json_object", 1234
     )
-    values, refused = code_week_by_club(Provider(), config, (document,), ())
+    values, refused = code_week_by_club(
+        Provider(), config, (document,), (RosterPlayer(1, "Synthetic Player", document.club),)
+    )
     assert not refused
     record = values[0].request_configuration
     assert record == {

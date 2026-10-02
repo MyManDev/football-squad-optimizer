@@ -29,8 +29,10 @@ alternative is a silent wrong answer rather than a missing one:
 its articles and carries almost none of their words, so a run that read only the index read
 headlines. From a registered HTML page the reader follows links that stay on the registered
 origin and sit under the registered page's own path (``/news`` leads to ``/news/...``, even
-when a same-origin redirect served the page at another path), in the order the page lists
-them, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per host per run. A link whose printed or
+when a same-origin redirect served the page at another path). Explicit team-news, injury
+and pre-match links are preferred within the same host budget, with the page's order
+retained within each priority, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per host per run.
+A link whose printed or
 resolved path has a ``.`` or ``..`` segment is skipped rather than resolved. Each article is
 asked of the same ``robots.txt``, waited for under the same interval and judged by the same
 refusals as a registered page, and is stored as its own document with its own readable text.
@@ -54,6 +56,7 @@ three clocks.
 import html.parser
 import http.client
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -113,9 +116,9 @@ PER_ORIGIN_DELAY_SECONDS: Final = 1.0
 
 #: The most article pages one run requests from one host, across every registered page that
 #: host serves. Declared, not measured: it is the number of requests this lane is willing to
-#: add to a club's server twice a week, and each one also waits the interval above. Links are
-#: taken in the order the page lists them, so which articles the cap keeps is the page's own
-#: order and not a choice made here. A link that ``robots.txt`` disallows costs no request and
+#: add to a club's server twice a week, and each one also waits the interval above. Explicit
+#: first-team availability and pre-match links are preferred; equal priorities keep the
+#: page's order. A link that ``robots.txt`` disallows costs no request and
 #: does not count against it.
 MAXIMUM_ARTICLES_PER_HOST: Final = 10
 
@@ -794,7 +797,7 @@ def fetch_club_document(
 
 
 class _LinkReader(html.parser.HTMLParser):
-    """Collect the ``href`` of every ``<a>`` on a page, in the order the page lists them.
+    """Collect links and their own printed labels, without borrowing nearby article text.
 
     Attribute values arrive with character references already resolved, so ``&amp;`` in a
     query string is the ``&`` a browser would send.
@@ -802,15 +805,57 @@ class _LinkReader(html.parser.HTMLParser):
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.hrefs: list[str] = []
+        self.links: list[tuple[str, list[str]]] = []
+        self._active: int | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag != "a":
-            return
-        for name, value in attrs:
-            if name == "href" and value:
-                self.hrefs.append(value)
-                return
+        attributes = dict(attrs)
+        if tag == "a":
+            self._active = None
+            href = attributes.get("href")
+            if href:
+                label = [attributes.get("title") or "", attributes.get("aria-label") or ""]
+                self.links.append((href, label))
+                self._active = len(self.links) - 1
+        elif tag == "img" and self._active is not None:
+            self.links[self._active][1].append(attributes.get("alt") or "")
+
+    def handle_data(self, data: str) -> None:
+        if self._active is not None:
+            self.links[self._active][1].append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a":
+            self._active = None
+
+
+def _article_priority(relative_path: str, label: str) -> int:
+    """A declared discovery heuristic, never a claim about the article's actual content.
+
+    Clear other-team or commercial categories are demoted, not removed. In particular,
+    merely mentioning an academy graduate does not make a first-team injury story an
+    academy story. Only path categories, slug prefixes or explicit title prefixes count.
+    """
+    decoded = urllib.parse.unquote(relative_path).casefold()
+    words = re.sub(r"[^a-z0-9]+", " ", f"{decoded} {label.casefold()}").strip()
+    category_prefix = (
+        r"(?:women(?:s)?|ladies|u(?:18|19|21|23)s?|under[- ]?(?:18|19|21|23)s?|"
+        r"tickets?|shop|hospitality)"
+    )
+    categories = rf"(?:academy|youth|{category_prefix})"
+    if (
+        re.search(rf"(?:^|/){categories}(?:/|$)", decoded)
+        or re.search(rf"(?:^|/){category_prefix}[-_]", decoded)
+        or re.match(rf"\s*{categories}(?:\s*:|\s*\||\s*[-\u2013\u2014])", label, re.IGNORECASE)
+    ):
+        return 2
+    if re.search(
+        r"\b(?:injur(?:y|ies)|fitness|team news|first team|pre match|press conference|"
+        r"match preview|medical update|fit for|squad update)\b",
+        words,
+    ):
+        return 0
+    return 1
 
 
 def _printable_ascii(url: str) -> bool:
@@ -847,7 +892,10 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
       re-encoding is skipped rather than rewritten into an address the page did not print.
 
     The fragment is dropped, since it names a place in a page and not a page; a repeated link
-    is kept once; the page's order is kept. The URL is spelled with the registered origin's
+    is kept once. Explicit availability and match-preview links rank first, unclassified
+    links next, and clear other-team/commercial categories last; page order breaks ties.
+    Unknown labels remain eligible and no priority loosens the safety checks above.
+    The URL is spelled with the registered origin's
     own scheme and host, so every request this run makes to a host names it one way. Only an
     HTML page is read for links, and a page registered at the root of its host has no path
     for an article to be under, so nothing is followed from it.
@@ -868,8 +916,8 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
     if not registered.path.strip("/"):
         return ()
     prefix = f"{registered.path.rstrip('/')}/"
-    links: list[str] = []
-    for href in reader.hrefs:
+    links: dict[str, int] = {}
+    for href, labels in reader.links:
         printed = href.strip()
         try:
             printed_path = urllib.parse.urlsplit(printed).path
@@ -887,9 +935,12 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
         url = urllib.parse.urlunsplit(
             (registered.scheme, registered.netloc, parts.path, parts.query, "")
         )
-        if _printable_ascii(url) and url not in links:
-            links.append(url)
-    return tuple(links)
+        if _printable_ascii(url):
+            priority = _article_priority(parts.path[len(prefix) :], " ".join(labels))
+            # A duplicate card may provide a useful heading after an empty image
+            # link. Keep its earliest position but consider its most useful label.
+            links[url] = min(priority, links.get(url, priority))
+    return tuple(sorted(links, key=links.__getitem__))
 
 
 def _follow_articles(
@@ -984,7 +1035,8 @@ def fetch_registered_documents(
     collapsing both into silence.
 
     Ordered as the registry declares them, each registered page followed by the articles it
-    links to in the page's own order, so two runs over the same registry and the same pages
+    links to by declared priority and then page order, so two runs over the same registry
+    and the same pages
     produce the same request order and the same capture. Nothing is followed from a page that
     was refused: an index that was not read names no articles.
     """

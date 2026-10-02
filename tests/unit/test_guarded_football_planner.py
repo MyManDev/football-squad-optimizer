@@ -140,6 +140,7 @@ def test_guarded_live_routing_leaves_other_methods_unchanged(tmp_path, monkeypat
     if route != "current":
         horizon = replace(horizon, model_name="fixture_football_candidate")
     seen = []
+    policies = []
 
     class Routed(Exception):
         pass
@@ -147,6 +148,7 @@ def test_guarded_live_routing_leaves_other_methods_unchanged(tmp_path, monkeypat
     def mark(name):
         def called(*args, **kwargs):
             seen.append(name)
+            policies.append(args[3])
             raise Routed
 
         return called
@@ -171,3 +173,5 @@ def test_guarded_live_routing_leaves_other_methods_unchanged(tmp_path, monkeypat
     assert seen == [
         "guarded" if route == "football" else "automatic" if route == "automatic" else "standard"
     ]
+    assert policies[0].allow_two_free_transfers is (route in {"football", "automatic"})
+    assert policies[0].max_transfers_per_gameweek == (None if route == "one_week" else 1)

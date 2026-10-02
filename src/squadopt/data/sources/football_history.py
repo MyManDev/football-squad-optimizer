@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -142,9 +143,23 @@ def normalize_history(frame: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def archive_history(root: Path) -> pd.DataFrame:
+def archive_history(root: Path, *, seasons: Sequence[str] | None = None) -> pd.DataFrame:
+    """Read only the selected archive seasons, validating the whole selection first.
+
+    Excluded seasons are never opened, including for validation. The default retains
+    the measured archive population; choosing fewer seasons is an explicit new fit.
+    """
+    selected = ARCHIVE_SEASONS if seasons is None else seasons
+    if (
+        isinstance(selected, (str, bytes))
+        or not isinstance(selected, Sequence)
+        or not selected
+        or any(not isinstance(season, str) or season not in ARCHIVE_SEASONS for season in selected)
+        or len(set(selected)) != len(selected)
+    ):
+        raise InvalidValueError("Archive seasons must be a nonempty unique supported selection.")
     parts = []
-    for season in ARCHIVE_SEASONS:
+    for season in sorted(selected):
         base = root / "data" / season
         frame = pd.read_csv(base / "gws/merged_gw.csv", low_memory=False)
         frame = frame.loc[frame.position.isin(POSITIONS)].copy()

@@ -224,6 +224,7 @@ def _capture_reply(
                     "player_name": "Player 3",
                     "team_name": CLUB,
                     "disposition": disposition,
+                    "fixture_scope": "upcoming_premier_league",
                     "speaker": "manager",
                     "source_url": URL,
                     "quote": source_quote if reply_quote is None else reply_quote,

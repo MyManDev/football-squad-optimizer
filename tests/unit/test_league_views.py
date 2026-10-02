@@ -1,6 +1,7 @@
 """The league views builder: member advice from the seam, independence pinned as fact."""
 
 import dataclasses
+import hashlib
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -1970,6 +1971,39 @@ def test_files_the_rule_does_not_understand_are_left_alone(
     assert (out / "entries" / "README.json").is_file()
 
 
+def _verified_manager_word(player_id: int, disposition: str) -> ManagerWord:
+    """A synthetic statement at the already-validated advice consumer boundary."""
+
+    predicate = {
+        "stated_expected_absent": "will miss the next Premier League match",
+        "stated_rotation_risk": "may be rested in the next Premier League match",
+        "stated_expected_to_start": "will start the next Premier League match",
+    }[disposition]
+    quote = f"Player {player_id} {predicate}."
+    header = "Published: 2026-08-21T10:00:00Z\n"
+    source = (header + quote).encode("utf-8")
+    digest = hashlib.sha256(source).hexdigest()
+    return ManagerWord(
+        player_id=player_id,
+        disposition=disposition,
+        speaker="the manager",
+        published_at_utc="2026-08-21T10:00:00Z",
+        published_precision="instant",
+        club="Club 1",
+        source_url="https://club.example/club-1/news",
+        fetched_at_utc="2026-08-22T11:00:00Z",
+        words=quote,
+        source_sha256=digest,
+        span_start=len(header.encode("utf-8")),
+        span_end=len(source),
+        fixture_scope="upcoming_premier_league",
+        scope_verified=True,
+        publication_verified=True,
+        publication_source="text_published",
+        publication_source_sha256=digest,
+    )
+
+
 def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
@@ -1986,21 +2020,9 @@ def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
         gameweek=2,
         source_kind="synthetic_fixture",
         source_label="club_news_v1.fixture.json",
-        evidence_table="rotation_evidence_v2_2026-27_gw02.csv",
+        evidence_table="rotation_evidence_v4_2026-27_gw02.csv",
         clubs_covered=("Club 1",),
-        words=(
-            ManagerWord(
-                player_id=squad[0],
-                disposition="stated_expected_absent",
-                speaker="the manager",
-                published_at_utc="2026-08-21T10:00:00Z",
-                published_precision="instant",
-                club="Club 1",
-                source_url="https://club.example/club-1/news",
-                fetched_at_utc="2026-08-22T11:00:00Z",
-                words="He will not travel.",
-            ),
-        ),
+        words=(_verified_manager_word(squad[0], "stated_expected_absent"),),
     )
 
     build_league_views(

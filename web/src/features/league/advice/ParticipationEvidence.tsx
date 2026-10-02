@@ -1,3 +1,4 @@
+import { StatementOutcomes } from "./StatementOutcomes";
 import { useLanguage } from "../../../i18n/context";
 import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
@@ -115,6 +116,7 @@ export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
         </li>
       </ul>
       {evidence.applied_player_count === 0 && <p>{copy.noneApplied}</p>}
+      <StatementOutcomes view={view} />
       <ul className={styles.assumptionList}>
         {assumptions.map((assumption) => (
           <li key={assumption}>{assumption}</li>

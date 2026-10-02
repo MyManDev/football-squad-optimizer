@@ -20,6 +20,13 @@ def main() -> None:
     parser.add_argument("--snapshot-id", required=True)
     parser.add_argument("--archive-root", type=Path, required=True)
     parser.add_argument("--artifact-root", type=Path, required=True)
+    parser.add_argument(
+        "--training-season",
+        action="append",
+        dest="training_seasons",
+        help="Allowed training season; repeat for every archive/current season to include. "
+        "Excluded seasons are not read. Omit to retain the existing training population.",
+    )
     parser.add_argument("--contextual", action="store_true", help="Build football_contextual_v3.")
     parser.add_argument(
         "--with-components",
@@ -46,10 +53,16 @@ def main() -> None:
         else None
     )
     if args.with_components:
-        document, companion = produce_football_components(snapshot, args.archive_root)
+        document, companion = produce_football_components(
+            snapshot, args.archive_root, training_seasons=args.training_seasons
+        )
     else:
         document = produce_football_forecast(
-            snapshot, args.archive_root, contextual=args.contextual, manager_words=words
+            snapshot,
+            args.archive_root,
+            contextual=args.contextual,
+            manager_words=words,
+            training_seasons=args.training_seasons,
         )
         companion = None
     publish_football_artifacts(
