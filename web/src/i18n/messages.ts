@@ -872,8 +872,6 @@ const en = {
       "Each change is what the eleven with the captain doubled moves by once that swap is added to the changes before it, so the changes add up to the whole plan's gain.",
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
-    windowValueReason: "Part of the multiweek plan using published projections.",
-    modeTradeoffReason: "This move is part of the selected strategy’s expected-point trade-off.",
     planCost: (points: string) =>
       `This strategy gives up ~${points} expected points against the pure-points pick, hits included.`,
     // The same price where a proof is missing. A bound is not a range around a guess:
@@ -1977,8 +1975,6 @@ const tr: MessageSchema<typeof en> = {
       "Her değişiklik, kendinden önceki değişikliklere eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden değişiklikler planın toplam kazancını verir.",
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
-    windowValueReason: "Yayımlanan puan tahminlerini kullanan çok haftalı planın bir parçası.",
-    modeTradeoffReason: "Bu hamle, seçilen stratejinin beklenen puan ödünleşiminin bir parçasıdır.",
     planCost: (pointsValue) =>
       `Bu strateji, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor (transfer cezaları dahil).`,
     planCostAtMost: (pointsValue) =>

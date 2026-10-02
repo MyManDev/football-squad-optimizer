@@ -665,6 +665,17 @@
     grid-column: 2;
   }
 
+  /* Under 390 px the stamp leaves the facts a column too narrow for one line each, so
+     they take the row under it, side by side. */
+  @media (max-width: 389.98px) {
+    :global([data-mark="decision"]):has([data-stamp]) .facts {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      flex-wrap: wrap;
+      column-gap: var(--space-3);
+    }
+  }
+
   /* The reason shared by every board follows the stamp, with the plan's other sentences;
      a board with a reason of its own keeps it under that board. */
   .reason {

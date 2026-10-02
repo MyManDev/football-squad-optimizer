@@ -257,7 +257,7 @@ export function AdviceDecision({
   const chipCopy = CHIP_COPY[language];
   const { rowsAreShares, chipBasis } = adviceBasis(view, chipCopy);
   const codes = clubCodesFromFixtures(fixtures);
-  const reasons = view.moves.map((move) => reasonFor(copy, language, move.reason_code));
+  const reasons = view.moves.map((move) => reasonFor(language, move.reason_code));
   // Boards that share a caption say it once, under them; a caption that differs stays with
   // its own board.
   const sharedReason = reasons.every((reason) => reason === reasons[0]);
@@ -501,22 +501,15 @@ export function AdviceMethodNotes({ view }: { view: EntryAdvice }) {
   );
 }
 
-type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
-
 /**
- * The caption under a move, keyed on the reason the producer stated for it. A move chosen
- * for expected points alone carries none: the board's own figure already says so.
+ * The caption under a move, for the two reasons that name something the member switched
+ * on (the manager's word, the Top 100 influence). Any other move carries none: the board's
+ * own figure and the settings named beside the heading already say why it is there.
  */
-function reasonFor(
-  copy: MemberCopy,
-  language: "tr" | "en",
-  code: AdviceMove["reason_code"],
-): string | null {
+function reasonFor(language: "tr" | "en", code: AdviceMove["reason_code"]): string | null {
   if (code === "manager_word") return EVIDENCE_COPY[language].moveReason;
   if (code === "top100_preference") return TOP100_COPY[language].moveReason;
-  if (code === "window_value") return copy.windowValueReason;
-  if (code === "points_gain") return null;
-  return copy.modeTradeoffReason;
+  return null;
 }
 
 /**

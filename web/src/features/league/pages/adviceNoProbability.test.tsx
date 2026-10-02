@@ -297,11 +297,9 @@ describe("a move card claims only what the payload carries", () => {
     expect(turkish).not.toMatch(/Bir haftalık saf puan planının parçası/);
   });
 
-  it("keeps the longer-window caption for a window that solved one", () => {
+  it("captions no move with the window it was solved in", () => {
     const window = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
     expect(window.payload.moves[0]?.reason_code).toBe("window_value");
-    expect(renderState("en", window)).toMatch(
-      /Part of the multiweek plan using published projections/,
-    );
+    expect(renderState("en", window)).not.toMatch(/Part of the multiweek plan/);
   });
 });
