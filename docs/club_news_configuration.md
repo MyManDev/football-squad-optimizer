@@ -159,6 +159,67 @@ Moving the observation changes which documents are eligible in the narrow case a
 not new editorial content, it does not make any statement more reliable, and it is no
 evidence about how well stated news predicts who plays.
 
+## One run, read line by line
+
+Four things are easy to mistake for one another: the settings being ready, a source being
+covered, an answer being empty, and a statement being applied. One synthetic run shows where
+each is said. The registry in this example names two clubs, Arsenal with one page and Man Utd
+with two, out of four clubs in the roster.
+
+**1. The settings are ready.** `--check-config` reads the private file and prints the provider
+and model it resolved. Nothing was fetched and no model was contacted, so this says the
+request could be built. It does not say the key is accepted, and it says nothing about news.
+
+**2. One club is selected, with a budget of one call.**
+
+```text
+python -m scripts.capture_club_news --settings-file <private-file> --roster-snapshot <capture> --club Arsenal --max-model-calls 1 --dry-run
+```
+
+The lines below are from that run.
+
+<!-- worked-example: begin -->
+```text
+Read          2 documents
+Selected      1 documents for coding
+Call budget   1; 1 attempted; no automatic provider retry
+Snapshot clubs: 4 [Arsenal, Everton, Man Utd, Fulham]
+Registered clubs: 2 [Arsenal, Man Utd]
+Selected clubs: 1 [Arsenal]
+Read and coded: 1 [Arsenal]
+Not registered: 2 [Everton, Fulham]
+Registered, not selected: 1 [Man Utd]
+Selected for coding: 1 documents, of which 1 dated articles.
+Coded with a dated article: 1 [Arsenal]
+Answered in this run: 1 [Arsenal]
+Answer with no claims: 1 [Arsenal]
+Call attempted and failed: 0 []
+Model calls attempted: 1.
+Raw claims: 0, as the model stated them. How many apply is not known here; each is checked against its source at export.
+Dry run: nothing written.
+```
+<!-- worked-example: end -->
+
+**3. What was covered.** Two documents were read from Arsenal's host: its registered page
+and one article that page links. The registered page is listed as unselected, because the
+article it links was selected in its place. One club out of four was read and coded. Two
+are not registered at all and one is registered and was not selected, so for three clubs
+this run has no news and says so; it does not say they published none.
+
+**4. The answer was empty.** The model was asked once and answered with an empty list of
+claims. `Answer with no claims` names Arsenal. That is a successful answer and not a failed
+call, and it is not a player update either: the article was read, and nothing in it was
+coded as a statement about a player's availability.
+
+**5. Nothing was applied, and this command could not have applied anything.** Raw claims
+are counted as the model stated them. A statement is applied only later and elsewhere: the
+weekly run exports the capture, and there each claim is located in the held page and checked
+(the quote names the player, it is about the club's next league match, and the page's own
+publication time is verifiable). A claim that passes
+reaches a decision as an applied statement, with its source; one that does not is kept as
+readable words with the reason it carries no authority. With zero raw claims there is
+nothing to check, and the decisions for that week are made without club news.
+
 ## Fixture components for minute evidence
 
 The v1 builder can publish the forecast and its fixture components from the same fit.
