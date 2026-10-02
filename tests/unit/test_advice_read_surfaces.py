@@ -80,23 +80,17 @@ def test_the_required_core_is_the_envelope_plus_the_moves() -> None:
     assert required <= ENVELOPE_FIELDS | {"moves"}
 
 
-def test_no_rank_probability_can_hide_in_the_scoped_role_exception() -> None:
-    """Owner-requested player roles are scoped separately from forbidden rank odds."""
+def test_member_roles_do_not_add_modeled_probabilities() -> None:
+    """Player-role explanations obey the same member probability boundary."""
     schema = _payload_schema()
-    role = schema["properties"].pop("role_forecast")
+    role = schema["properties"]["role_forecast"]
     assert role == role_forecast_schema()
     assert role["additionalProperties"] is False
     assert role["properties"]["version"] == {"const": "football_role_forecast_v1"}
     assert role["properties"]["calibration"] == {"const": "not_independently_verified"}
     row = role["properties"]["rows"]["items"]
     assert row["additionalProperties"] is False
-    assert {name for name in _declared_names(role) if re.search(FORBIDDEN_FIELD_PATTERN, name)} == {
-        "start_probability",
-        "cameo_probability",
-        "zero_probability",
-        "unknown_role_probability",
-        "sixty_minute_probability",
-    }
+    assert not any(re.search(FORBIDDEN_FIELD_PATTERN, name) for name in _declared_names(role))
     comparison = schema["properties"]["information_review"]["properties"]["comparison"]
     assert comparison == policy_comparison_schema()
     assert comparison["properties"].pop("news_arrival_probability") == {"type": "null"}

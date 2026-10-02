@@ -30,7 +30,7 @@ from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.club_news_coding import ROTATION_CLAIM_CODING_CONTRACT_VERSION
 from squadopt.data.sources.fpl_live import FIXTURES_PAYLOAD
-from squadopt.live import read_inputs
+from squadopt.live import project, read_inputs, read_projection_handoff
 from squadopt.live import transfers as live_transfers
 from squadopt.live.football_artifact import (
     football_artifact_path,
@@ -299,7 +299,7 @@ def test_news_outcome_reaches_one_real_bounded_planner(
         club_news_source=None,
         snapshot_root=case["snapshot_root"],
         inputs=inputs,
-        projection=native.projection,
+        projection=project(inputs, in_season=read_projection_handoff(case["handoff_path"])),
     )
     assert switches.football is not None, switches.notes
     assert (
