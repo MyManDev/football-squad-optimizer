@@ -1,0 +1,563 @@
+"""Count how stated playing chances resolved by the next decision capture; nothing is fitted.
+
+    python -m scripts.measure_availability_transitions --snapshot-root <captures> \\
+        --protocol-merged-at <instant> --protocol-commit <sha> \\
+        [--through-gameweek <n>] --output <fresh directory>
+
+The experimental football planner treats a held player's stated 25, 50 or 75 per cent
+chance of playing as resolving before the next decision, eligible with that probability
+(``live/football_observations.py``). The stored captures already hold the answer: the
+decision capture of gameweek g says what the source stated, and the decision capture of
+g+1 says how the same player stood when the next decision was made. This counts, per
+stated chance, how many were by then available, still doubtful, out, no longer listed, or
+carried a status the rule does not know.
+Counts and player codes are recorded; no note text leaves the capture. Nothing is
+fetched, fitted or scored against a match outcome. Protocol:
+``docs/availability_transitions_prereg.md``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import sys
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Final
+
+import pandas as pd
+
+from squadopt.data.errors import DataError, DataSourceError
+from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
+from squadopt.data.sources.fpl_live import (
+    availability_snapshot,
+    gameweek_deadlines,
+    next_open_deadline,
+)
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
+from squadopt.prediction.availability import (
+    AVAILABILITY_RULE_CONTRACT_VERSION,
+    KNOWN_STATUSES,
+    STATUS_AVAILABLE,
+    STATUS_DOUBTFUL,
+    UNAVAILABLE_STATUSES,
+)
+
+CONTRACT_VERSION: Final = "availability_transitions_v1"
+#: This runner's five classes. The precedence and the status vocabulary are the
+#: availability rule's; the classes, and ``unknown`` where that rule would stop, are ours.
+CLASSIFICATION_VERSION: Final = "availability_transitions_classes_v1"
+#: The stated chances the window consumer turns into an information branch.
+STATED_CHANCES: Final = (25, 50, 75)
+#: What the next decision capture can say. ``absent`` is a player the later capture no
+#: longer lists; ``unknown`` is a status the rule does not know or a chance outside 0 to
+#: 100. Both are reported as their own count, never folded into another class or zero.
+OUTCOME_CLASSES: Final = ("available", "doubtful", "out", "absent", "unknown")
+#: Below this many observations an interval is printed and marked thin.
+SMALL_SAMPLE: Final = 10
+#: The repository root, so the destination refusals do not depend on the working directory.
+REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[1]
+#: Two-sided 90 percent, the interval width the repository's other records use.
+Z_90: Final = 1.6448536269514722
+
+
+class TransitionsRefusal(ValueError):
+    """The stored captures or the arguments cannot support the count that was asked for."""
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionCapture:
+    """The latest stored live capture whose own open deadline is ``gameweek``."""
+
+    gameweek: int
+    snapshot_id: str
+    captured_at_utc: str
+    deadline_utc: str
+    bootstrap: bytes
+
+    def identity(self) -> dict[str, Any]:
+        return {
+            "gameweek": self.gameweek,
+            "snapshot_id": self.snapshot_id,
+            "captured_at_utc": self.captured_at_utc,
+            "deadline_utc": self.deadline_utc,
+        }
+
+
+def wilson_interval(successes: int, trials: int, z: float = Z_90) -> tuple[float, float] | None:
+    """Wilson score interval for a share; ``None`` when nothing was observed."""
+    if trials <= 0:
+        return None
+    if not 0 <= successes <= trials:
+        raise ValueError("Successes must lie between zero and the number of trials.")
+    share = successes / trials
+    denominator = 1 + z * z / trials
+    centre = (share + z * z / (2 * trials)) / denominator
+    half = z * math.sqrt(share * (1 - share) / trials + z * z / (4 * trials * trials)) / denominator
+    return (max(0.0, centre - half), min(1.0, centre + half))
+
+
+def resolve(status: str, chance: float | None) -> str:
+    """Read one later-capture row by the availability rule's precedence, into our classes.
+
+    The rule reads the status first and stops on one it does not know, whatever the
+    chance says; here that row is ``unknown``, not a guess. Then a stated chance wins over
+    the status, as ``apply_availability`` applies it: 100 is available, 0 is out, and any
+    chance between them is a partial multiplier, so the player is still doubtful. A chance
+    outside 0 to 100, which the rule would clip, or one that is not finite, is ``unknown``.
+    Without a chance the status decides.
+    """
+    if status not in KNOWN_STATUSES:
+        return "unknown"
+    if chance is not None:
+        if not math.isfinite(chance):
+            return "unknown"
+        if chance == 100:
+            return "available"
+        if chance == 0:
+            return "out"
+        if 0 < chance < 100:
+            return "doubtful"
+        return "unknown"
+    if status == STATUS_AVAILABLE:
+        return "available"
+    if status == STATUS_DOUBTFUL:
+        return "doubtful"
+    if status in UNAVAILABLE_STATUSES:
+        return "out"
+    return "unknown"
+
+
+def _skipped(identifier: str, captured_at_utc: str, reason: str) -> dict[str, str]:
+    return {"snapshot_id": identifier, "captured_at_utc": captured_at_utc, "reason": reason}
+
+
+def decision_captures(
+    snapshot_root: Path,
+) -> tuple[dict[int, DecisionCapture], list[dict[str, str]], list[dict[str, str]]]:
+    """One decision capture per gameweek, the captures that were no decision, the inventory.
+
+    The decision capture is the latest capture by instant whose open deadline is that
+    week, the rule the prospective football protocol scores from; on an identical instant
+    the later listed capture is taken. A capture with no bootstrap payload, one whose
+    deadlines cannot be read, or one taken after every published deadline describes no
+    decision; it is listed as skipped with its reason, not treated as a week. The inventory
+    names every capture read with its instant, so a bounded reading can say which it saw.
+    """
+    if not snapshot_root.is_dir():
+        raise TransitionsRefusal(f"No snapshot directory at {snapshot_root}.")
+    identifiers = list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE)
+    if not identifiers:
+        raise TransitionsRefusal(f"No {FPL_LIVE_SOURCE} captures under {snapshot_root}.")
+    chosen: dict[int, DecisionCapture] = {}
+    skipped: list[dict[str, str]] = []
+    inventory: list[dict[str, str]] = []
+    for identifier in identifiers:
+        snapshot = read_snapshot(snapshot_root, identifier)
+        captured_at_utc = snapshot.metadata.captured_at_utc
+        inventory.append({"snapshot_id": identifier, "captured_at_utc": captured_at_utc})
+        bootstrap = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
+        if bootstrap is None:
+            skipped.append(_skipped(identifier, captured_at_utc, "no_bootstrap_payload"))
+            continue
+        try:
+            deadlines = gameweek_deadlines(bootstrap)
+        except DataError:
+            skipped.append(_skipped(identifier, captured_at_utc, "deadlines_unreadable"))
+            continue
+        try:
+            deadline = next_open_deadline(deadlines, as_of_utc=captured_at_utc)
+        except DataSourceError:
+            skipped.append(_skipped(identifier, captured_at_utc, "after_every_deadline"))
+            continue
+        candidate = DecisionCapture(
+            deadline.gameweek, identifier, captured_at_utc, deadline.deadline_utc, bootstrap
+        )
+        held = chosen.get(candidate.gameweek)
+        # An identical instant goes to the later listed id.
+        if held is None or as_instant(candidate.captured_at_utc) >= as_instant(
+            held.captured_at_utc
+        ):
+            chosen[candidate.gameweek] = candidate
+    return chosen, skipped, inventory
+
+
+def _merge_instant(value: str) -> str:
+    """The protocol's merge instant, accepted with any offset and recorded in UTC."""
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as error:
+        raise TransitionsRefusal(f"protocol merge instant must be ISO-8601: {value!r}") from error
+    if parsed.tzinfo is None:
+        raise TransitionsRefusal("protocol merge instant must carry its offset or Z.")
+    return normalize_utc_timestamp(
+        parsed.astimezone(UTC).isoformat().replace("+00:00", "Z"), label="protocol merge instant"
+    )
+
+
+def _share(successes: int, trials: int) -> dict[str, Any] | None:
+    interval = wilson_interval(successes, trials)
+    if interval is None:
+        return None
+    return {"value": successes / trials, "wilson_90": list(interval)}
+
+
+def cell_from_outcomes(stated: int | None, outcomes: Mapping[str, Sequence[int]]) -> dict[str, Any]:
+    """One cell: counts, codes, shares with their interval, and the share among the resolved.
+
+    ``available_among_resolved`` reads available against available plus out, the two
+    states the planner's binary branch can represent; a player still doubtful is
+    unresolved, not evidence either way.
+    """
+    counts = {name: len(outcomes[name]) for name in OUTCOME_CLASSES}
+    trials = sum(counts.values())
+    resolved = counts["available"] + counts["out"]
+    return {
+        "stated_chance": stated,
+        "players_stated": trials,
+        "distinct_players": len({code for name in OUTCOME_CLASSES for code in outcomes[name]}),
+        "small_sample": trials < SMALL_SAMPLE,
+        "small_resolved": resolved < SMALL_SAMPLE,
+        "counts": counts,
+        "players": {name: sorted(outcomes[name]) for name in OUTCOME_CLASSES},
+        "shares": (
+            None
+            if trials == 0
+            else {name: _share(counts[name], trials) for name in OUTCOME_CLASSES}
+        ),
+        "available_among_resolved": _share(counts["available"], resolved),
+    }
+
+
+def _outcomes(
+    codes: Sequence[int], later: pd.DataFrame, chances: pd.Series
+) -> dict[str, list[int]]:
+    outcomes: dict[str, list[int]] = {name: [] for name in OUTCOME_CLASSES}
+    for code in codes:
+        if code not in later.index:
+            outcomes["absent"].append(code)
+            continue
+        chance = chances.loc[code]
+        outcomes[
+            resolve(str(later.loc[code, "status"]), None if pd.isna(chance) else float(chance))
+        ].append(code)
+    return outcomes
+
+
+def pair_transitions(earlier: DecisionCapture, later: DecisionCapture) -> dict[str, Any]:
+    """How every player stated at 25, 50 or 75 in the earlier capture stood in the later one."""
+    if later.gameweek != earlier.gameweek + 1:
+        raise TransitionsRefusal("A pair is two consecutive decision captures.")
+    if as_instant(later.captured_at_utc) < as_instant(earlier.deadline_utc):
+        raise TransitionsRefusal(
+            f"The later decision capture {later.snapshot_id} was taken before the earlier "
+            f"deadline {earlier.deadline_utc}."
+        )
+    republished = {d.gameweek: d.deadline_utc for d in gameweek_deadlines(later.bootstrap)}
+    if republished.get(earlier.gameweek) != earlier.deadline_utc:
+        raise TransitionsRefusal(
+            f"The later capture {later.snapshot_id} publishes a different deadline for "
+            f"gameweek {earlier.gameweek} than {earlier.deadline_utc}; a moved deadline is a "
+            "different week."
+        )
+    before = availability_snapshot(earlier.bootstrap)
+    if before.player_id.duplicated().any():
+        raise TransitionsRefusal(f"The earlier capture {earlier.snapshot_id} repeats a player.")
+    after = availability_snapshot(later.bootstrap).set_index("player_id")
+    if after.index.duplicated().any():
+        raise TransitionsRefusal(f"The later capture {later.snapshot_id} repeats a player.")
+    chances = pd.to_numeric(after.chance_of_playing, errors="coerce")
+    stated = pd.to_numeric(before.chance_of_playing, errors="coerce")
+    cells = []
+    for chance in STATED_CHANCES:
+        codes = [int(code) for code in before.loc[stated.eq(chance), "player_id"]]
+        cells.append(cell_from_outcomes(chance, _outcomes(codes, after, chances)))
+    pooled = [int(code) for code in before.loc[stated.isin(STATED_CHANCES), "player_id"]]
+    cells.append(cell_from_outcomes(None, _outcomes(pooled, after, chances)))
+    return {"earlier": earlier.identity(), "later": later.identity(), "cells": cells}
+
+
+def pooled_prospective(pairs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """The reading's figure: prospective pairs only, per stated chance and over the three.
+
+    The unit is a player-pair: a player doubtful at two consecutive decisions is two
+    observations, and the interval treats them as such; ``distinct_players`` says how many
+    players they are. Retrospective pairs never enter here.
+    """
+    kept = [pair for pair in pairs if pair["prospective"]]
+    cells = []
+    for stated in (*STATED_CHANCES, None):
+        outcomes: dict[str, list[int]] = {name: [] for name in OUTCOME_CLASSES}
+        for pair in kept:
+            cell = next(c for c in pair["cells"] if c["stated_chance"] == stated)
+            for name in OUTCOME_CLASSES:
+                outcomes[name].extend(cell["players"][name])
+        cells.append(cell_from_outcomes(stated, outcomes))
+    return {"pairs": len(kept), "cells": cells}
+
+
+def measure(
+    snapshot_root: Path,
+    protocol_merged_at: str,
+    *,
+    protocol_commit: str | None = None,
+    through_gameweek: int | None = None,
+) -> dict[str, Any]:
+    """Every consecutive pair of decision captures under ``snapshot_root``, read once."""
+    merged = _merge_instant(protocol_merged_at)
+    if through_gameweek is not None and (
+        isinstance(through_gameweek, bool) or not 1 <= through_gameweek <= 38
+    ):
+        raise TransitionsRefusal("through_gameweek must be a gameweek in 1..38.")
+    captures, skipped, inventory = decision_captures(snapshot_root)
+    if through_gameweek is not None:
+        # A reading's inventory ends at its bound: the last kept decision capture's deadline.
+        captures = {g: c for g, c in captures.items() if g <= through_gameweek}
+        if not captures:
+            raise TransitionsRefusal(
+                f"No decision capture at or before gameweek {through_gameweek}."
+            )
+        horizon = as_instant(captures[max(captures)].deadline_utc)
+        inventory = [c for c in inventory if as_instant(c["captured_at_utc"]) <= horizon]
+        skipped = [c for c in skipped if as_instant(c["captured_at_utc"]) <= horizon]
+    pairs: list[dict[str, Any]] = []
+    refused: list[dict[str, Any]] = []
+    without_partner: list[int] = []
+    for gameweek in sorted(captures):
+        later = captures.get(gameweek + 1)
+        if later is None:
+            without_partner.append(gameweek)
+            continue
+        try:
+            pair = pair_transitions(captures[gameweek], later)
+        except TransitionsRefusal as error:
+            # A refused pair is listed with its reason, like a skipped capture; the other
+            # pairs of the reading stand.
+            refused.append(
+                {
+                    "earlier": captures[gameweek].identity(),
+                    "later": later.identity(),
+                    "reason": str(error),
+                }
+            )
+            continue
+        # Prospective means the earlier week's decision was still open when the protocol
+        # merged; a pair whose later state could already have been seen is retrospective.
+        pair["prospective"] = as_instant(captures[gameweek].deadline_utc) > as_instant(merged)
+        pairs.append(pair)
+    return {
+        "artifact_type": "availability_transitions",
+        "contract_version": CONTRACT_VERSION,
+        "classification": CLASSIFICATION_VERSION,
+        "precedence_from": AVAILABILITY_RULE_CONTRACT_VERSION,
+        "stated_chances": list(STATED_CHANCES),
+        "outcome_classes": list(OUTCOME_CLASSES),
+        "interval": "wilson_90",
+        "small_sample_below": SMALL_SAMPLE,
+        "protocol_merged_at_utc": merged,
+        "protocol_commit": protocol_commit,
+        "through_gameweek": through_gameweek,
+        "captures_read": len(inventory),
+        "captures_skipped": skipped,
+        "decision_captures": [captures[week].identity() for week in sorted(captures)],
+        "pairs": pairs,
+        "pairs_refused": refused,
+        "prospective_pairs": sum(bool(pair["prospective"]) for pair in pairs),
+        "pooled_prospective": pooled_prospective(pairs),
+        "gameweeks_without_partner": without_partner,
+        "news_text_included": False,
+        "outcomes_read": False,
+        "measurement_only": True,
+        "gate_evidence": False,
+        "locked_holdout_accessed": False,
+    }
+
+
+def _interval(share: Mapping[str, Any] | None) -> str:
+    if share is None:
+        return "not observed"
+    low, high = share["wilson_90"]
+    return f"{share['value']:.2f} [{low:.2f}, {high:.2f}]"
+
+
+def _row(label: str, prospective: str, cell: Mapping[str, Any]) -> str:
+    counts = cell["counts"]
+    stated = "all" if cell["stated_chance"] is None else str(cell["stated_chance"])
+    available = _interval(None if cell["shares"] is None else cell["shares"]["available"])
+    if cell["small_sample"] and cell["shares"] is not None:
+        available += " thin"
+    resolved = _interval(cell["available_among_resolved"])
+    if cell["small_resolved"] and cell["available_among_resolved"] is not None:
+        resolved += " thin"
+    return (
+        f"| {label} | {prospective} | {stated} | {cell['players_stated']} | "
+        f"{counts['available']} | {counts['doubtful']} | {counts['out']} | {counts['absent']} | "
+        f"{counts['unknown']} | {available} | {resolved} |"
+    )
+
+
+_HEADER: Final = (
+    "| Pair | Prospective | Stated | Players | Available | Doubtful | Out | Absent | Unknown "
+    "| Available share [90% Wilson] | Available among resolved |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+)
+
+
+def summary(record: Mapping[str, Any]) -> str:
+    """The record as prose and two tables; counts are counts, shares carry their interval."""
+    pooled = record["pooled_prospective"]
+    lines = [
+        "# How stated playing chances resolved by the next decision",
+        "",
+        f"Contract `{record['contract_version']}`, classes `{record['classification']}` with the "
+        f"precedence of `{record['precedence_from']}`, protocol merged "
+        f"{record['protocol_merged_at_utc']}"
+        + (f" at `{record['protocol_commit']}`" if record.get("protocol_commit") else "")
+        + ".",
+        "",
+        "A player stated at 25, 50 or 75 in one gameweek's decision capture, read again in the",
+        "next gameweek's decision capture. A retrospective pair is one whose earlier deadline",
+        "had already passed when the protocol merged, so its later state could have been seen;",
+        "it is shown and never pooled with the prospective pairs. A gameweek with no following",
+        "decision capture has no pair, which is absent rather than zero. An interval on fewer",
+        f"than {record['small_sample_below']} observations is marked thin. Available among",
+        "resolved reads available against available plus out, the two states the planner's",
+        "binary branch can represent. The pooled unit is a player-pair: a player doubtful at",
+        "two consecutive decisions is two observations.",
+        "",
+        f"## Pooled over {pooled['pairs']} prospective pair(s)",
+        "",
+        *_HEADER,
+        *(_row("prospective pooled", "yes", cell) for cell in pooled["cells"]),
+        "",
+        "## Per pair",
+        "",
+        *_HEADER,
+    ]
+    for pair in record["pairs"]:
+        label = f"GW{pair['earlier']['gameweek']} to GW{pair['later']['gameweek']}"
+        lines.extend(
+            _row(label, "yes" if pair["prospective"] else "no", cell) for cell in pair["cells"]
+        )
+    missing = record["gameweeks_without_partner"]
+    if missing:
+        lines += ["", "No pair for gameweek(s) " + ", ".join(str(w) for w in missing) + "."]
+    for pair in record["pairs_refused"]:
+        lines += [
+            "",
+            f"Pair GW{pair['earlier']['gameweek']} to GW{pair['later']['gameweek']} refused: "
+            f"{pair['reason']}",
+        ]
+    if record["captures_skipped"]:
+        lines += [
+            "",
+            "Captures that were no decision: "
+            + ", ".join(f"{s['snapshot_id']} ({s['reason']})" for s in record["captures_skipped"])
+            + ".",
+        ]
+    lines += [
+        "",
+        "Counts describe this season's captures. No share is a calibrated probability, and",
+        "nothing here changes a forecast, a planner or a member page.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _refuse_destination(output: Path, snapshot_root: Path) -> None:
+    """The record goes into a fresh directory of the operator's, never into the inputs or data/."""
+    target = output.resolve()
+    for forbidden, why in (
+        (snapshot_root.resolve(), "inside the snapshot root"),
+        ((REPOSITORY_ROOT / "data").resolve(), "under the repository's data/"),
+        ((REPOSITORY_ROOT / "docs").resolve(), "under the repository's docs/"),
+    ):
+        if target == forbidden or forbidden in target.parents:
+            raise TransitionsRefusal(f"Refusing to write {why}: {output}.")
+    ancestor = next((path for path in output.parents if path.exists()), None)
+    if ancestor is not None and not ancestor.is_dir():
+        raise TransitionsRefusal(f"Refusing to write under a file: {output}.")
+
+
+def run(
+    snapshot_root: Path,
+    protocol_merged_at: str,
+    output: Path,
+    *,
+    protocol_commit: str | None = None,
+    through_gameweek: int | None = None,
+) -> dict[str, Any]:
+    """Measure first, then create the directory, so a refusal leaves nothing behind."""
+    _refuse_destination(output, snapshot_root)
+    if output.exists():
+        raise FileExistsError(f"Output directory already exists: {output}")
+    record = measure(
+        snapshot_root,
+        protocol_merged_at,
+        protocol_commit=protocol_commit,
+        through_gameweek=through_gameweek,
+    )
+    output.mkdir(parents=True, exist_ok=False)
+    (output / "record.json").write_text(
+        json.dumps(record, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+    )
+    (output / "summary.md").write_text(summary(record), encoding="utf-8")
+    return record
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--snapshot-root",
+        type=Path,
+        required=True,
+        help="the store of fpl-live captures, read only",
+    )
+    parser.add_argument(
+        "--protocol-merged-at",
+        required=True,
+        help="committer instant of the protocol's merge commit on develop; any offset, kept in UTC",
+    )
+    parser.add_argument(
+        "--protocol-commit", required=True, help="that merge commit's hash, named in the record"
+    )
+    parser.add_argument(
+        "--through-gameweek",
+        type=int,
+        default=None,
+        help="a reading's bound: decision captures after this gameweek are not part of it",
+    )
+    parser.add_argument(
+        "--output", type=Path, required=True, help="a directory that must not exist yet"
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        result = run(
+            arguments.snapshot_root,
+            arguments.protocol_merged_at,
+            arguments.output,
+            protocol_commit=arguments.protocol_commit,
+            through_gameweek=arguments.through_gameweek,
+        )
+    except (TransitionsRefusal, DataError, ValueError, OSError) as error:
+        print(f"Refused: {error}", file=sys.stderr)
+        return 1
+    print(
+        json.dumps(
+            {
+                "pairs": len(result["pairs"]),
+                "pairs_refused": len(result["pairs_refused"]),
+                "prospective_pairs": result["prospective_pairs"],
+                "gameweeks_without_partner": result["gameweeks_without_partner"],
+                "captures_skipped": len(result["captures_skipped"]),
+            }
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
