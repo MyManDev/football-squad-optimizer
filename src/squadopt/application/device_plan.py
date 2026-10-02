@@ -22,6 +22,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Final
 
+from squadopt.contracts.players import sort_players_by_id
 from squadopt.data.errors import DataSourceError
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import SeasonRules
@@ -49,15 +50,21 @@ def device_plan_table(
 ) -> dict[str, object]:
     """The capture's table and rules, as the member path's solver receives them.
 
-    The players keep the projection table's order: the server breaks ties between equal
-    plans by rank in that order, and a device that reorders the table would resolve the
-    same tie differently.
+    The players are sorted by id, the order the planner sorts its own table into before
+    it solves: the server breaks ties between equal plans by rank in that order, and a
+    device that reorders the table would resolve the same tie differently.
+
+    A sale price is published for the held fifteen only; the planner fills a non-held
+    player's with the buy price, which the one-week answer never uses since a player not
+    held cannot be sold. No per-week transfer cap applies under the member policy.
     """
 
     settings = OptimizationConfig() if optimization is None else optimization
-    table = projection.table.loc[
-        :, ["player_id", "name", "team_id", "position", "price_tenths", "expected_points"]
-    ]
+    table = sort_players_by_id(
+        projection.table.loc[
+            :, ["player_id", "name", "team_id", "position", "price_tenths", "expected_points"]
+        ]
+    )
     coefficients = objective_coefficients(table["expected_points"].tolist(), settings)
     policy = member_planning_policy(rules)
     return {

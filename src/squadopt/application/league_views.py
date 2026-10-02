@@ -110,7 +110,7 @@ from squadopt.application.top100_weight import (
     top100_file,
 )
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION as LEAGUE_VIEW_CONTRACT_VERSION
-from squadopt.data.errors import DataError, DataSourceError
+from squadopt.data.errors import DataError
 from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
     Projection,
@@ -1169,11 +1169,16 @@ def _device_plan_block(
     rules: SeasonRules,
     prices: Mapping[int, int],
 ) -> dict[str, object] | None:
-    """One member's device-plan inputs, or ``None`` where the live path would not plan."""
+    """One member's device-plan inputs, or ``None`` where the live path would not plan.
+
+    A rendered member has already passed these same calls for the baseline plan, so for
+    a tree this build writes the block is present on every entry document; the ``None``
+    is the guard for a provider whose picks the baseline path did not see.
+    """
 
     try:
         held = held_squad_from_picks(picks, current_prices=prices)
-    except DataSourceError:
+    except (EntryError, DataError):
         return None
     return device_plan_entry(inputs, projection, held, rules)
 

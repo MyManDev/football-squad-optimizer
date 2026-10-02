@@ -8,8 +8,9 @@ Two documents, both inside the `provisional_league_ui_v1` envelope the league tr
   the season's rules and the member planning policy as numbers.
 - `device_plan` on `data/league/entries/<id>.json`, one per member: the fifteen, the bank
   after the spending-power rule, the free transfers under the cap, and the sale price of
-  each held player. `null` where the live path would refuse to plan for that member;
-  absent on documents from before the field.
+  each held player. Present on every entry document a build writes, since a rendered
+  member has passed the same preparation for the baseline plan; `null` is the guard for a
+  provider the baseline path did not see; absent on documents from before the field.
 
 The producer is `squadopt.application.device_plan`; the page's solver is
 `web/src/features/league/device/planModel.ts`, which restates the server's one-week model
@@ -33,9 +34,14 @@ over these numbers and solves it with HiGHS compiled to WebAssembly in a Web Wor
 | `rules.expected_points_scale` | The integer scale; the objective divided by it is in points. |
 | `players[]` | The table in solver order: `id`, `name`, `short_name`, `team`, `position`, `buy_tenths`, `expected_points`, and `coefficients` as `[squad, starter, captain]`, the server's exact integers. |
 
-The order of `players` is part of the contract: the server breaks ties between equal
-plans by rank in that order, and a device that reorders the table resolves the same tie
+`players` is sorted by id, the order the planner sorts its own table into before it
+solves. The order is part of the contract: the server breaks ties between equal plans by
+rank in that order, and a device that reorders the table resolves the same tie
 differently.
+
+Two things the device model takes as given: a player not held has no sale price (the
+planner fills the buy price, which a one-week answer never uses, since a player not held
+cannot be sold), and no per-week transfer cap applies under the member policy.
 
 ## The member block
 

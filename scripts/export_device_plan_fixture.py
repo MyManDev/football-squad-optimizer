@@ -36,7 +36,14 @@ from squadopt.planning import (
     optimize_transfer_plan,
 )
 
-FIXTURE: Final = Path("web/src/fixtures/device-plan/instances.json")
+FIXTURE: Final = (
+    Path(__file__).resolve().parents[1]
+    / "web"
+    / "src"
+    / "fixtures"
+    / "device-plan"
+    / "instances.json"
+)
 SEED: Final = 20261003
 MAX_FREE_TRANSFERS: Final = 5
 CLUBS: Final = tuple(f"Club {k}" for k in range(1, 9))
