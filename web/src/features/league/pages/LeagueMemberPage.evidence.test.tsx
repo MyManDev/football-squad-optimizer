@@ -296,7 +296,8 @@ describe("the manager's word on the advice card", () => {
     const { container } = renderPage("en", advice);
     const text = container.textContent ?? "";
     expect(text).toContain(EVIDENCE_COPY.en.moveReason);
-    expect(text).toContain(MESSAGES.en.leagueMembers.pointsGainReason);
+    // The move chosen for points alone carries no caption; the word's move keeps its own.
+    expect(container.querySelectorAll('[class*="reason"]')).toHaveLength(1);
     expect(text.split(EVIDENCE_COPY.en.moveReason).length - 1).toBe(1);
     expect(text).not.toMatch(AS_A_CHANCE);
   });

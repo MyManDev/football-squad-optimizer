@@ -20,7 +20,6 @@ import type { AdviceJob } from "../advice/useAdviceJob";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
-import { ChipForecastCard } from "../components/ChipForecastCard";
 import { MemberFixtureRail, type RailPlacement } from "../components/MemberFixtureRail";
 import { DisclosureIcon, InfoIcon } from "../components/memberIcons";
 import { isMemberStrategy } from "../types";
@@ -134,7 +133,6 @@ function LeagueMemberContent({
     job,
     request,
     shown,
-    computedForecast,
     rejectedContext,
     rejectedUnreadable,
   } = useMemberAdviceView(
@@ -212,14 +210,9 @@ function LeagueMemberContent({
       codes={codes}
     />
   );
-  // What to make of the decision: the two honesty lines, how it was worked out and the
-  // member's history. Placed after the decision on a phone and after the squad elsewhere.
+  // What to make of the decision: how it was worked out and the member's history. Placed after the decision on a phone and after the squad elsewhere.
   const honesty = (
     <div key="honesty" className={styles.honestyBlock} data-mark="honesty">
-      <div className={styles.honestyLines}>
-        <p>{copy.honestyModel}</p>
-        <p>{copy.honestyDecision}</p>
-      </div>
       <details className={styles.how}>
         <summary className={styles.howSummary}>
           <InfoIcon />
@@ -519,11 +512,6 @@ function LeagueMemberContent({
           </Tool>
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
-            <ChipForecastCard
-              published={indexReadable ? index?.chip_forecast : undefined}
-              computed={computedForecast}
-              squad={view}
-            />
           </Tool>
         </div>
       </div>

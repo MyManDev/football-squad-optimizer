@@ -296,11 +296,6 @@ export function MemberFixtureRail({
                 )}
               </section>
             ) : null}
-            <p className={styles.legend}>
-              {copy.railLegendVenue}
-              <br />
-              {copy.railLegendDifficulty}
-            </p>
           </>
         )}
       </div>

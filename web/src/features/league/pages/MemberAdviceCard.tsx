@@ -150,13 +150,10 @@ export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
         <ExampleDataBadge sourceKind={shown.envelope.source_kind} />
       </p>
       {view.solver_status === "OPTIMAL" ? (
-        <>
-          <p className={board.stampBox} data-stamp="">
-            <CheckIcon />
-            {copy.stampOptimal}
-          </p>
-          <p className={board.stampCaption}>{copy.stampOptimalCaption}</p>
-        </>
+        <p className={board.stampBox} data-stamp="">
+          <CheckIcon />
+          {copy.stampOptimal}
+        </p>
       ) : view.solver_status === "FEASIBLE" ? (
         <p className={`${board.stampTags} ${board.stampUnproven}`} data-stamp="">
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>
@@ -288,11 +285,15 @@ export function AdviceDecision({
                   season={view.season}
                   gameweek={view.gameweek}
                 />
-                {sharedReason ? null : <p className={board.reason}>{reasons[index]}</p>}
+                {sharedReason || reasons[index] === null ? null : (
+                  <p className={board.reason}>{reasons[index]}</p>
+                )}
               </div>
             ))}
           </div>
-          {sharedReason ? <p className={board.reason}>{reasons[0]}</p> : null}
+          {sharedReason && reasons[0] !== null ? (
+            <p className={board.reason}>{reasons[0]}</p>
+          ) : null}
         </div>
       )}
       <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
@@ -501,16 +502,19 @@ export function AdviceMethodNotes({ view }: { view: EntryAdvice }) {
 
 type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 
-/** The caption under a move, keyed on the reason the producer stated for it. */
+/**
+ * The caption under a move, keyed on the reason the producer stated for it. A move chosen
+ * for expected points alone carries none: the board's own figure already says so.
+ */
 function reasonFor(
   copy: MemberCopy,
   language: "tr" | "en",
   code: AdviceMove["reason_code"],
-): string {
+): string | null {
   if (code === "manager_word") return EVIDENCE_COPY[language].moveReason;
   if (code === "top100_preference") return TOP100_COPY[language].moveReason;
   if (code === "window_value") return copy.windowValueReason;
-  if (code === "points_gain") return copy.pointsGainReason;
+  if (code === "points_gain") return null;
   return copy.modeTradeoffReason;
 }
 
@@ -761,7 +765,7 @@ function GainStrip({
         : copy.gainCaptionBeforeCost(cost)
       : chipBasis !== null
         ? chipCopy.gainCaption(chipBasis)
-        : copy.gainCaption;
+        : null;
   const shortName = (move: AdviceMove) => move.player_in?.short_name || move.player_in?.name || "";
   return (
     <div className={board.gain}>
@@ -773,8 +777,13 @@ function GainStrip({
               data-sign={gain >= 0.005 ? "up" : gain <= -0.005 ? "down" : undefined}
             >
               {signedFigure(gain, locale)}
-            </strong>{" "}
-            <span className={board.gainCaption}>{caption}</span>
+            </strong>
+            {caption !== null ? (
+              <>
+                {" "}
+                <span className={board.gainCaption}>{caption}</span>
+              </>
+            ) : null}
           </p>
         ) : null}
         {facts.length > 0 ? (
@@ -903,6 +912,10 @@ function RivalPlayers({
   );
 }
 
+/** The producer's sentence that no chip was offered to the solver. Not shown to the member. */
+const NO_CHIP_LIMIT =
+  "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.";
+
 /**
  * What the producer says this plan assumes, in its own sentences. It used to hang inside
  * the window section, which meant a one-week document could publish a limit and show it
@@ -913,7 +926,7 @@ function RivalPlayers({
 function StatedLimits({ view }: { view: EntryAdvice }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const limits = view.stated_limits ?? [];
+  const limits = (view.stated_limits ?? []).filter((sentence) => sentence !== NO_CHIP_LIMIT);
   if (limits.length === 0) return null;
   const weeks = view.plan_weeks?.length ?? 1;
   const label = weeks > 1 ? copy.windowLimitsLabel : copy.planLimitsLabel;

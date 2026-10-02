@@ -340,14 +340,15 @@ describe("the substitution boards", () => {
 });
 
 describe("the gain strip and the captain line", () => {
-  it("states the gain with its basis, the bar, and the transfer facts", () => {
+  it("states the gain as a bare figure, with the bar and the transfer facts", () => {
     const squad: LeagueViewEnvelope<EntrySquad> = structuredClone(SQUAD);
     squad.payload.free_transfers_known = true;
     squad.payload.free_transfers = 2;
     show("tr", { squad });
     const copy = MESSAGES.tr.leagueMembers;
-    const caption = screen.getByText(copy.gainCaption);
-    expect(caption.closest("p")).toHaveTextContent(`+3,01 ${copy.gainCaption}`);
+    // The figure stands alone: a plan that pays no hit carries no sentence beside it.
+    const figure = within(decision()).getByText("+3,01", { selector: "strong" });
+    expect(figure.closest("p")!.textContent).toBe("+3,01");
     expect(screen.getByText(copy.freeTransfersUsed(2, 2))).toBeInTheDocument();
     expect(screen.getByText(copy.hitPointsFact("0"))).toBeInTheDocument();
     // Every share is published and none is below zero: one stacked bar at a fixed scale.
@@ -452,7 +453,10 @@ describe("the proof stamp", () => {
     // Turkish capitals: the dotted İ, never the English I.
     expect(MESSAGES.tr.leagueMembers.stampOptimal).toBe("EN İYİ PLAN · KANITLANDI");
     expect(screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal)).toBeInTheDocument();
-    expect(screen.getByText(MESSAGES.tr.leagueMembers.stampOptimalCaption)).toBeInTheDocument();
+    // The stamp is the whole statement; no sentence under it.
+    const stamp = screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal).closest("div")!;
+    expect(stamp.querySelectorAll("p[data-stamp]")).toHaveLength(1);
+    expect(stamp).not.toHaveTextContent("kanıtlandı.");
   });
 
   it("keeps the unproven badge and the gap sentence for a plan found without a proof", () => {
@@ -501,11 +505,12 @@ describe("the decision heading", () => {
 });
 
 describe("honesty and the tools", () => {
-  it("shows two honesty lines and keeps the rest one click away", () => {
-    show("tr");
+  it("keeps how it was worked out one click away, with no sentences in front of it", () => {
+    const { container } = show("tr");
     const copy = MESSAGES.tr.leagueMembers;
-    expect(screen.getByText(copy.honestyModel)).toBeVisible();
-    expect(screen.getByText(copy.honestyDecision)).toBeVisible();
+    expect(container.querySelector('[data-mark="honesty"]')!.firstElementChild!.tagName).toBe(
+      "DETAILS",
+    );
     const how = screen.getByText(copy.howComputed).closest("details")!;
     expect(how).not.toHaveAttribute("open");
     for (const sentence of [

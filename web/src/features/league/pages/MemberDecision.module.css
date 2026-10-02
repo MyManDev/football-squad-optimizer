@@ -535,15 +535,13 @@
   max-width: 320px;
 }
 
-/* Where the heading row has the room, the stamp's caption is one line, and a tag (example
-   data, a computed plan) stands beside the stamp rather than on a line of its own. */
+/* Where the heading row has the room, a tag (example data, a computed plan) stands beside
+   the stamp rather than on a line of its own. */
 @media (min-width: 600px) {
   .stamp {
     display: grid;
     grid-template-columns: auto auto;
-    grid-template-areas:
-      "tags box"
-      "caption caption";
+    grid-template-areas: "tags box";
     align-items: center;
     justify-content: end;
     justify-items: end;
@@ -558,10 +556,6 @@
   .stampBox,
   .stampUnproven {
     grid-area: box;
-  }
-
-  .stampCaption {
-    grid-area: caption;
   }
 }
 
@@ -593,29 +587,9 @@
   white-space: nowrap;
 }
 
-.stampCaption {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-  text-align: right;
-  text-wrap: pretty;
-}
-
-/* Where the decision column is narrower (a tablet, a desktop with the sidebar open under
-   1440 px), the stamp's sentence takes two balanced lines so the stamp keeps its place at
-   the right of the heading instead of dropping under it. */
-@container decision (max-width: 759.98px) {
-  .stampCaption {
-    max-width: 34ch;
-    text-wrap: balance;
-  }
-}
-
 /* On a phone the decision reads as D-Phone-Bu-Hafta draws it: the boards, the captain
-   line, the gain figure and its bar, the proof stamp beside the week's transfer facts with
-   its sentence under both, then the boards' shared reason and the sentences that qualify
-   the plan. LeagueMemberPage.module.css makes the decision a two-column grid there; the
+   line, the gain figure and its bar, the proof stamp beside the week's transfer facts,
+   then the boards' shared reason and the sentences that qualify the plan. LeagueMemberPage.module.css makes the decision a two-column grid there; the
    boards' wrapper, the gain strip and the stamp step aside (display: contents) so each of
    their parts takes its own place in that grid, in the order below. */
 @media (max-width: 599.98px) {
@@ -636,7 +610,6 @@
   .gainList,
   .facts,
   .stampTags,
-  .stampCaption,
   .states {
     grid-column: 1 / -1;
   }
@@ -687,13 +660,6 @@
 
   :global([data-mark="decision"]):has([data-stamp]) .facts {
     grid-column: 2;
-  }
-
-  .stampCaption {
-    order: 7;
-    max-width: none;
-    text-align: left;
-    text-wrap: wrap;
   }
 
   /* The reason shared by every board follows the stamp, with the plan's other sentences;
