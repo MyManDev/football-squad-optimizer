@@ -11,7 +11,7 @@ from squadopt.optimization import SolverExecutionError, SolverStatus
 from squadopt.planning import ChipAvailability, PlanningHorizon, TransferPlanningConfig
 from squadopt.planning.observed import optimize_observed_window, validate_observations
 from squadopt.planning.recourse import ObservationNode
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
 
 
 def comparison_problem(players, config, window=3):
@@ -179,8 +179,12 @@ def test_partial_comparison_keeps_complete_baseline(
 
 
 @pytest.mark.parametrize("chance", [25, 50, 75])
-def test_health_information_preserves_mean_and_minutes(known_optimum_players, small_config, chance):
-    horizon, initial, _ = problem(known_optimum_players, small_config)
+@pytest.mark.parametrize("version", [FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION])
+@pytest.mark.parametrize("window", [3, 5])
+def test_health_information_preserves_mean_and_minutes(
+    known_optimum_players, small_config, chance, version, window
+):
+    horizon, initial, _ = problem(known_optimum_players, small_config, window)
     ids = {p: i + 1 for i, p in enumerate(horizon.table.player_id.unique())}
     table = horizon.table.copy()
     table["player_id"] = table.player_id.map(ids)
@@ -195,7 +199,7 @@ def test_health_information_preserves_mean_and_minutes(known_optimum_players, sm
         horizon,
         initial,
         pd.DataFrame({"player_id": [player], "chance_of_playing": [chance]}),
-        model_version=FOOTBALL_MODEL_VERSION,
+        model_version=version,
         source_snapshot_id="test-capture",
         captured_at_utc="2026-09-01T00:00:00Z",
         deadline_utc="2026-09-02T00:00:00Z",
@@ -215,6 +219,53 @@ def test_health_information_preserves_mean_and_minutes(known_optimum_players, sm
     assert yes.horizon.table.loc[lambda x: x.gameweek.eq(3), "expected_points"].tolist() == (
         horizon.table.loc[lambda x: x.gameweek.eq(3), "expected_points"].tolist()
     )
+
+
+def test_joint_role_news_keeps_existing_first_week_minute_and_teammate_updates(
+    known_optimum_players, small_config
+):
+    horizon, initial, _ = problem(known_optimum_players, small_config, 5)
+    ids = {p: i + 1 for i, p in enumerate(horizon.table.player_id.unique())}
+    table = horizon.table.copy()
+    table["player_id"] = table.player_id.map(ids)
+    table["appearance_probability"] = 0.8
+    table["fixture_count"] = 1
+    player = ids["FWD_A"]
+    mask = table.player_id.eq(player)
+    table.loc[mask, ["expected_points", "appearance_probability"]] *= 0.5
+    # A prior exact first-week minutes statement has changed player exposure and
+    # reallocated some teammate points. The later eligibility experiment must not
+    # restore the original first-week values or carry this one-fixture change on.
+    table.loc[table.gameweek.eq(1) & mask, "expected_points"] *= 0.6
+    table.loc[table.gameweek.eq(1) & table.player_id.eq(ids["MID_A"]), "expected_points"] += 0.4
+    horizon = PlanningHorizon(table)
+    before = horizon.table.copy(deep=True)
+    initial = replace(initial, squad_player_ids=tuple(ids[p] for p in initial.squad_player_ids))
+    information = availability_observations(
+        horizon,
+        initial,
+        pd.DataFrame({"player_id": [player], "chance_of_playing": [50]}),
+        model_version=JOINT_ROLE_MODEL_VERSION,
+        source_snapshot_id="synthetic",
+        captured_at_utc="2026-09-01T00:00:00Z",
+        deadline_utc="2026-09-02T00:00:00Z",
+    )
+    validate_observations(horizon, information.nodes)
+    pd.testing.assert_frame_equal(horizon.table, before)
+    for node in information.nodes:
+        assert not node.horizon.table.gameweek.eq(1).any()
+        later = node.horizon.table.gameweek.ge(3)
+        pd.testing.assert_frame_equal(
+            node.horizon.table.loc[later], before.loc[before.gameweek.ge(3)]
+        )
+        assert node.horizon.table.fixture_count.eq(1).all()
+        rows = node.horizon.table.loc[node.horizon.table.player_id.eq(player)]
+        if node.observation_id == "eligible":
+            row = rows.loc[rows.gameweek.eq(2)].iloc[0]
+            original = before.loc[before.player_id.eq(player) & before.gameweek.eq(2)].iloc[0]
+            assert row.expected_points / row.appearance_probability == pytest.approx(
+                original.expected_points / original.appearance_probability
+            )
 
 
 def test_clock_truncation_is_not_silently_replaced(

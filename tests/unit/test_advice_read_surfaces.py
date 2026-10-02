@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from typing import Any, Final
 
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN, PUBLISHABLE_FIELDS
+from squadopt.contracts.football_explanations import policy_comparison_schema, role_forecast_schema
 from squadopt.platform.advice_documents import ADVICE_READ_SCHEMA_PATH
 
 #: Names the served document carries that no strategy publishes: the address of the
@@ -27,6 +28,8 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "window",  # address: how many weeks the plan spans (1, 3, 5)
         "source_snapshot_id",  # provenance: the capture the advice was computed from
         "information_review",  # conditional actions and source playing chance; no rank odds
+        "role_forecast",  # explicitly requested experimental start/cameo/minute estimates
+        "official_injuries",  # editorial source facts; no inference that unlisted means healthy
         "prediction_model",  # provenance: selected experimental forecast version and digest
         "participation_evidence",  # provenance: source record counts and update assumptions
         "official_information",  # provenance: source-stated facts, not calibrated predictions
@@ -77,10 +80,21 @@ def test_the_required_core_is_the_envelope_plus_the_moves() -> None:
     assert required <= ENVELOPE_FIELDS | {"moves"}
 
 
-def test_no_declared_name_reads_as_a_probability() -> None:
-    """The envelope's stop-rule, applied to the served contract at every depth."""
-
-    names = sorted(set(_declared_names(_payload_schema())))
+def test_member_roles_do_not_add_modeled_probabilities() -> None:
+    """Player-role explanations obey the same member probability boundary."""
+    schema = _payload_schema()
+    role = schema["properties"]["role_forecast"]
+    assert role == role_forecast_schema()
+    assert role["additionalProperties"] is False
+    assert role["properties"]["version"] == {"const": "football_role_forecast_v1"}
+    assert role["properties"]["calibration"] == {"const": "not_independently_verified"}
+    row = role["properties"]["rows"]["items"]
+    assert row["additionalProperties"] is False
+    assert not any(re.search(FORBIDDEN_FIELD_PATTERN, name) for name in _declared_names(role))
+    comparison = schema["properties"]["information_review"]["properties"]["comparison"]
+    assert comparison == policy_comparison_schema()
+    assert comparison["properties"].pop("news_arrival_probability") == {"type": "null"}
+    names = sorted(set(_declared_names(schema)))
 
     assert names, "the schema declares no properties at all"
     assert [name for name in names if re.search(FORBIDDEN_FIELD_PATTERN, name)] == []

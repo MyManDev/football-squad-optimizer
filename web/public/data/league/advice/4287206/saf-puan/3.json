@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-22T22:04:06Z",
+  "generated_at_utc": "2026-10-02T16:56:19Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,36 +9,36 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
+    "source_snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
     "moves": [
       {
         "move_id": "gw06-1",
         "player_out": {
-          "player_id": 244851,
-          "name": "Cole Palmer",
-          "short_name": "Palmer",
-          "position": "MID",
-          "team": "Chelsea"
+          "player_id": 500040,
+          "name": "Cristhian Mosquera",
+          "short_name": "Mosquera",
+          "position": "DEF",
+          "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 437730,
-          "name": "Antoine Semenyo",
-          "short_name": "Semenyo",
-          "position": "MID",
+          "player_id": 477424,
+          "name": "Jo\u0161ko Gvardiol",
+          "short_name": "Gvardiol",
+          "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 0.7997440492119665,
+        "expected_points_delta": 1.5510194723643025,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.7997440492119665,
+    "expected_gain_vs_hold": 1.5510194723643025,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 51.351005927582634,
+    "expected_own_points": 51.386182575097884,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -48,12 +48,12 @@
       "expected_points": 7.9988702038468515
     },
     "vice_captain": {
-      "player_id": 437730,
-      "name": "Antoine Semenyo",
-      "short_name": "Semenyo",
+      "player_id": 244850,
+      "name": "Morgan Rogers",
+      "short_name": "Rogers",
       "position": "MID",
-      "team": "Man City",
-      "expected_points": 4.792013121272329
+      "team": "Chelsea",
+      "expected_points": 4.553504725956036
     },
     "starting_xi": [
       {
@@ -62,7 +62,15 @@
         "short_name": "Kinsk\u00fd",
         "position": "GK",
         "team": "Spurs",
-        "expected_points": 2.6246306705210545
+        "expected_points": 2.6246306705210487
+      },
+      {
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
+        "position": "DEF",
+        "team": "Man City",
+        "expected_points": 3.6993157992754457
       },
       {
         "player_id": 466075,
@@ -70,7 +78,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5501706966178403
+        "expected_points": 3.5501706966178355
       },
       {
         "player_id": 455084,
@@ -78,23 +86,7 @@
         "short_name": "Davis",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.8975259077726996
-      },
-      {
-        "player_id": 223827,
-        "name": "Daniel Ballard",
-        "short_name": "Ballard",
-        "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.8643951025481926
-      },
-      {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.792013121272329
+        "expected_points": 2.8975259077726943
       },
       {
         "player_id": 244850,
@@ -102,7 +94,7 @@
         "short_name": "Rogers",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.553504725956041
+        "expected_points": 4.553504725956036
       },
       {
         "player_id": 466052,
@@ -110,7 +102,15 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.016641096584412
+        "expected_points": 4.01664109658441
+      },
+      {
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 3.9922690720603606
       },
       {
         "player_id": 184029,
@@ -118,7 +118,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9797310309386305
+        "expected_points": 3.9797310309386273
       },
       {
         "player_id": 223094,
@@ -134,7 +134,7 @@
         "short_name": "Calvert-Lewin",
         "position": "FWD",
         "team": "Leeds",
-        "expected_points": 3.2079631514265685
+        "expected_points": 3.2079631514265645
       },
       {
         "player_id": 475168,
@@ -142,7 +142,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 2.866690016251166
+        "expected_points": 2.8666900162511615
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Petrovi\u0107",
         "position": "GK",
         "team": "Bournemouth",
-        "expected_points": 2.271991682224694
+        "expected_points": 2.271991682224687
       },
       {
         "player_id": 513545,
@@ -160,7 +160,15 @@
         "short_name": "Sangar\u00e9",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 2.5464318519096416
+        "expected_points": 2.5464318519096447
+      },
+      {
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
+        "position": "DEF",
+        "team": "Sunderland",
+        "expected_points": 2.1482963269111397
       },
       {
         "player_id": 451284,
@@ -168,15 +176,7 @@
         "short_name": "Ewijk",
         "position": "DEF",
         "team": "Coventry City",
-        "expected_points": 1.1257902631080505
-      },
-      {
-        "player_id": 500040,
-        "name": "Cristhian Mosquera",
-        "short_name": "Mosquera",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 0.3100338283485778
+        "expected_points": 1.1257902631080452
       }
     ],
     "chip": null,
@@ -185,11 +185,37 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
             "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 500040,
+            "name": "Cristhian Mosquera",
+            "short_name": "Mosquera",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 51.386182575097884
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
+            "position": "MID",
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
@@ -205,33 +231,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 51.351005927582634
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
-            "position": "FWD",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 53.6935511386801
+        "expected_points": 52.7195436960511
       },
       {
         "gameweek": 8,
@@ -257,7 +257,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.603865282110945
+        "expected_points": 53.97113097465735
       }
     ],
     "stated_limits": [
@@ -265,7 +265,8 @@
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
       "Prices are held at the captured values; no price change is modelled.",
-      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points."
     ],
     "data_quality": "partial",
     "missing_fields": [

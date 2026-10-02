@@ -1,8 +1,8 @@
 """The manager's word, as a constraint the member switches on.
 
-Model-sourced club news enters advice the one way this repository allows it to: as a
-declared constraint with a price, never as a projection input (the 8 September decision,
-``docs/rotation_evidence_contract.md``). The evidence table states, per roster player, what
+This module applies model-coded club news as a declared constraint with a price,
+not as a projection input. The separately authorized football participation and minute
+consumers have their own gates. The evidence table states, per roster player, what
 the club's own page said and how the model coded it, categorically. This module turns the
 dispositions that name an absence or a doubt into a ``FirstWeekExclusion``, and carries the
 manager's own words beside it, resolved from the captured bytes by digest and span, so the
@@ -36,6 +36,7 @@ from typing import Final
 import pandas as pd
 
 from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
+from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import CLUB_NEWS_SOURCE, FixtureClubNewsProvider, RawDocument
@@ -529,7 +530,7 @@ def load_manager_words(
 
     table = Path(table_path)
     manifest = table.with_suffix(".manifest.json")
-    if not manifest.is_file():
+    if not Path(addressable(manifest)).is_file():
         raise ManagerWordsError(f"No manifest beside {table.name}: expected {manifest.name}.")
     documents, kind, label = documents_from_source(club_news_source, snapshot_root=snapshot_root)
     return manager_words_from_artifact(

@@ -105,3 +105,59 @@ it("writes the selected plan's figure the way the rest of the Turkish page does"
   expect(screen.getByText("56,11")).toBeInTheDocument();
   expect(screen.queryByText("56.11")).not.toBeInTheDocument();
 });
+
+it("keeps preferences when reading and requesting the other model, including preference-only changes", async () => {
+  const request: AdviceRequest = {
+    leagueId: 352490,
+    entryId: 101,
+    strategy: "saf-puan",
+    window: 3,
+    top100Weight: 20,
+    model: "football",
+    preferences: {
+      keep_players: [10],
+      avoid_players: [20],
+      no_hits: true,
+      save_chips: true,
+    },
+  };
+  const readAdvice = vi.fn<AdviceClient["readAdvice"]>(async () => ({
+    kind: "not-computed" as const,
+  }));
+  const requestAdvice = vi.fn<AdviceClient["requestAdvice"]>(async () => ({
+    kind: "unavailable" as const,
+  }));
+  const client: AdviceClient = { readAdvice, requestAdvice, readJob: vi.fn() };
+  const renderCard = (chosen: AdviceRequest) => (
+    <LanguageProvider initialLanguage="en">
+      <ModelComparison request={chosen} selected={null} client={client} />
+    </LanguageProvider>
+  );
+  const view = render(renderCard(request));
+  await waitFor(() =>
+    expect(readAdvice.mock.calls.at(-1)?.[0]).toEqual({ ...request, model: "current" }),
+  );
+  expect(requestAdvice).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Compute the other model" }));
+  await waitFor(() => expect(requestAdvice).toHaveBeenCalledTimes(1));
+  expect(requestAdvice.mock.calls[0]![0]).toEqual({ ...request, model: "current" });
+
+  const changed: AdviceRequest = {
+    ...request,
+    preferences: {
+      keep_players: [30],
+      avoid_players: [40],
+      no_hits: false,
+      save_chips: false,
+    },
+  };
+  view.rerender(renderCard(changed));
+  await waitFor(() =>
+    expect(readAdvice.mock.calls.at(-1)?.[0]).toEqual({ ...changed, model: "current" }),
+  );
+  expect(requestAdvice).toHaveBeenCalledTimes(1);
+  expect(adviceRequestKey(changed)).not.toBe(adviceRequestKey(request));
+  fireEvent.click(screen.getByRole("button", { name: "Compute the other model" }));
+  await waitFor(() => expect(requestAdvice).toHaveBeenCalledTimes(2));
+  expect(requestAdvice.mock.calls[1]![0]).toEqual({ ...changed, model: "current" });
+});

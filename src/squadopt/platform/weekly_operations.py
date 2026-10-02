@@ -505,7 +505,11 @@ class WeeklyOperations:
         # check silently stops finding anything.
         distinguishing = rotation_source_capture(identifier, news)
         table, manifest = rotation_artifact(
-            self.paths.rotation, self.request.season, self.request.gameweek, distinguishing
+            self.paths.rotation,
+            self.request.season,
+            self.request.gameweek,
+            distinguishing,
+            decision_snapshot_id=identifier,
         )
         # Readability, not existence. A pair this reader cannot open is a pair this stage does
         # not have, and exporting over it is the recovery. The alternative is the branch that
