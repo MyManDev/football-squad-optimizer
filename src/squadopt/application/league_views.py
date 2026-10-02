@@ -81,6 +81,11 @@ from squadopt.application.chip_forecast_publication import (
     member_chip_forecast,
     published_chip_gains,
 )
+from squadopt.application.device_plan import (
+    DEVICE_PLAN_DOCUMENT,
+    device_plan_entry,
+    device_plan_table,
+)
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
@@ -105,7 +110,7 @@ from squadopt.application.top100_weight import (
     top100_file,
 )
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION as LEAGUE_VIEW_CONTRACT_VERSION
-from squadopt.data.errors import DataError
+from squadopt.data.errors import DataError, DataSourceError
 from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
     Projection,
@@ -1157,6 +1162,22 @@ def _entry_squad_payload(
     }
 
 
+def _device_plan_block(
+    picks: EntryPicks,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    prices: Mapping[int, int],
+) -> dict[str, object] | None:
+    """One member's device-plan inputs, or ``None`` where the live path would not plan."""
+
+    try:
+        held = held_squad_from_picks(picks, current_prices=prices)
+    except DataSourceError:
+        return None
+    return device_plan_entry(inputs, projection, held, rules)
+
+
 def _suggested_strategy(
     task: MemberRenderTask,
     *,
@@ -1537,6 +1558,11 @@ def build_league_views(
             missing=missing,
             scored_gameweek=scored_gameweek,
         )
+        # The member's side of the one-week problem, for a solve on the member's own
+        # device: the fifteen, the spending power, the free transfers and the sale prices
+        # exactly as the published plan was held to them. Absent where the live path
+        # would refuse to plan, so the device never solves a problem the server did not.
+        squad_payload["device_plan"] = _device_plan_block(picks, inputs, projection, rules, prices)
         squad_path.write_text(
             json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
             encoding="utf-8",
@@ -2042,6 +2068,9 @@ def build_league_views(
         newline="\n",
     )
     written.append(members_path.name)
+    # The shared side of every member's one-week problem: the capture's table in solver
+    # order with the server's integer coefficients, and the rules as numbers.
+    _write(DEVICE_PLAN_DOCUMENT, device_plan_table(inputs, projection, rules, league_id=league_id))
 
     # Whatever this run did not produce is not this week's advice, and the tree it wrote
     # into is last week's. Removed after members.json rather than before the renders, so a
