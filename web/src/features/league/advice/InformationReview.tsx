@@ -9,7 +9,7 @@ const COPY = {
     title: "Haber gelince plan nasıl değişir?",
     assumption:
       "Yakalanan oynama bilgisi bir sonraki karar gününden önce netleşirse bu seçenekler izlenebilir. Bu bir iyileşme tarihi veya kesin gelecek transfer tahmini değildir.",
-    probability: "Kaynakta belirtilen oynama ihtimali",
+    playingValue: "FPL oynama değeri",
     source: "Bilginin kaydedildiği an",
     selected: "Seçilen ilk hamle",
     alternative: "Diğer ilk hamle",
@@ -29,6 +29,7 @@ const COPY = {
     expectedScale:
       "Puanlar temel futbol tahmininden gelir; otomatik değişiklikler ve kaptan oynamazsa yardımcı kaptanın ek puanı dahildir. Top100 ağırlığı puan kazancı değildir. Seçim, transfer temkin payını korur; yedeklere sabit bir değer eklenmez.",
     starters: "İlk 11",
+    firstWeek: "İlk haftanın on biri",
     captain: "Kaptan",
     vice: "Yardımcı kaptan",
     bench: "Yedek sırası",
@@ -50,7 +51,7 @@ const COPY = {
     title: "How could news change the plan?",
     assumption:
       "These options assume captured availability information resolves before the next decision deadline. This is not a recovery date or a certain future transfer forecast.",
-    probability: "Source-stated playing chance",
+    playingValue: "FPL playing value",
     source: "Information captured at",
     selected: "Selected first action",
     alternative: "Other first action",
@@ -70,6 +71,7 @@ const COPY = {
     expectedScale:
       "Points use the base football forecast, including automatic substitutions and the vice-captain bonus when the captain does not play. Top100 influence is not a points gain. Selection retains the hit caution; no fixed bench value is added.",
     starters: "Starting eleven",
+    firstWeek: "First week's eleven",
     captain: "Captain",
     vice: "Vice-captain",
     bench: "Bench order",
@@ -107,8 +109,13 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
         <>
           <p className={styles.honesty}>{copy.assumption}</p>
           <p>
-            <strong>{review.player_name}</strong> · {copy.probability}:{" "}
-            {review.source_playing_chance_percent}%
+            <strong>{review.player_name}</strong>
+            {typeof review.source_playing_chance_percent === "number" ? (
+              <>
+                {" "}
+                · {copy.playingValue}: {review.source_playing_chance_percent}/100
+              </>
+            ) : null}
           </p>
           <p className={styles.muted}>
             {copy.next}: {review.information_gameweek}
@@ -132,6 +139,11 @@ export function InformationReview({ view }: { view: EntryAdvice }) {
               )}
               {candidate.first_lineup && (
                 <div className={styles.muted}>
+                  {/* The eleven of the decision week, named as that week so a later branch's
+                      squad is not read as the first decision. */}
+                  <p>
+                    {copy.firstWeek}: {messages.common.gameweekShort(view.gameweek)}
+                  </p>
                   <p>
                     {copy.captain}: {candidate.first_lineup.captain} · {copy.vice}:{" "}
                     {candidate.first_lineup.vice_captain}

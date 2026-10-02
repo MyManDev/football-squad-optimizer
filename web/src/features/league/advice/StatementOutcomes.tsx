@@ -1,6 +1,7 @@
 import { useLanguage } from "../../../i18n/context";
 import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
+import { isInjurySourceInstant } from "./officialInjuryFacts";
 import styles from "../pages/LeagueMemberPage.module.css";
 
 const REASONS: Record<string, [string, string]> = {
@@ -99,21 +100,34 @@ export function StatementOutcomes({ view }: { view: EntryAdvice }) {
               : tr
                 ? "Bu açıklama gerekli koşulları sağlamadığı için tahmini değiştirmedi."
                 : "This statement did not meet the requirements for changing the forecast.");
+          // A player the answer does not name is said so; an id is not a name.
+          const name =
+            names.get(row.player_id) ?? (tr ? "Adı yayımlanmayan oyuncu" : "Unnamed player");
           return (
             <li key={row.player_id + ":" + i}>
-              <strong>{names.get(row.player_id) ?? "#" + row.player_id}</strong> ·{" "}
+              <strong>{name}</strong> ·{" "}
               {row.applied ? (tr ? "Uygulandı" : "Applied") : tr ? "Uygulanmadı" : "Not applied"}
               <p>{explanation}</p>
-              {row.source_published_at && Number.isFinite(Date.parse(row.source_published_at)) && (
-                <time dateTime={row.source_published_at}>
-                  {utcShort(row.source_published_at, locale)}
-                </time>
+              {/* The source's own publication instant, read strictly: a day alone is not an
+                  instant and is not shown as one. */}
+              {isInjurySourceInstant(row.source_published_at) && (
+                <>
+                  {tr ? "Kaynak yayın zamanı" : "Source published"}:{" "}
+                  <time dateTime={row.source_published_at}>
+                    {utcShort(row.source_published_at, locale)}
+                  </time>
+                </>
               )}
               {source && (
                 <>
                   {" "}
                   ·{" "}
-                  <a href={source} target="_blank" rel="noreferrer">
+                  <a
+                    href={source}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={tr ? `Kaynak: ${name}` : `Source: ${name}`}
+                  >
                     {tr ? "Kaynak" : "Source"}
                   </a>
                 </>

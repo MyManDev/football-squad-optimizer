@@ -154,7 +154,9 @@ for (const [window, top100, width] of [
     expect(submitted).toBe(0);
     const evidence = page.getByTestId("participation-evidence");
     await evidence.locator(":scope > summary").click();
-    await expect(evidence).toContainText("Bu tahmine uygulanmış hoca açıklaması yok");
+    // Zero statements read is said as that, not as "none applied".
+    await expect(evidence).toContainText("Bu hafta değerlendirilecek hoca açıklaması okunmadı.");
+    await expect(evidence).not.toContainText("Bu tahmine uygulanmış hoca açıklaması yok");
     await page.getByRole("button", { name: "Hesapla", exact: true }).click();
     await expect(page.getByTestId("new-information-notice")).toHaveCount(0);
     await expect(page.getByTestId("statement-outcomes")).toContainText(
