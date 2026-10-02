@@ -23,6 +23,7 @@ from typing import Any, Final
 
 import pandas as pd
 
+from squadopt.application.advice import _attributed_gains, _paired_by_position
 from squadopt.application.lineup_publication import best_eleven_points
 from squadopt.contracts.players import order_outfield_bench
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
@@ -199,6 +200,21 @@ def _reference(
     hold_points = best_eleven_points(lookup[p] for p in held)
     assert plan_points is not None and hold_points is not None
     assert plan.objective_value is not None
+    # The move rows as the advice publishes them: paired by position in id order, each
+    # row's gain the published basis's move when the swap is applied in row order.
+    rows = {
+        int(str(row.player_id)): row
+        for row in table.rename(columns={"team_id": "team"}).itertuples(index=False)
+    }
+    series = {player: pd.Series({"position": row.position}) for player, row in rows.items()}
+    outs = sorted(int(v) for v in week.transfers_out["player_id"])
+    ins = sorted(int(v) for v in week.transfers_in["player_id"])
+    paired = _paired_by_position(outs, ins, by_id=series, pool_by_id=series)
+    gains = _attributed_gains(paired, held=held, lookup=lookup, expected_total=plan_points)
+    moves = [
+        {"out": out, "in": arriving, "gain": None if gains is None else gains[index]}
+        for index, (out, arriving) in enumerate(paired)
+    ]
     return {
         "solver_status": plan.solver_status.value,
         "objective_value": float(plan.objective_value),
@@ -212,6 +228,8 @@ def _reference(
         "transfer_hit_points": float(week.transfer_hit_points),
         "expected_own_points": plan_points,
         "hold_points": hold_points,
+        "moves": moves,
+        "expected_gain_vs_hold": None if gains is None else sum(gains),
     }
 
 

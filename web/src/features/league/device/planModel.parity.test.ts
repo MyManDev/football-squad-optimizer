@@ -63,6 +63,17 @@ describe.each(members.map((member) => [member.entry_id, member] as const))(
       expect(answer.transfer_hit_points).toBe(reference.transfer_hit_points);
       expect(answer.expected_own_points).toBeCloseTo(reference.expected_own_points, 9);
       expect(answer.hold_points).toBeCloseTo(reference.hold_points, 9);
+      // The move rows: the same pairs, and each row's gain as the advice attributes it.
+      expect(answer.moves.map((m) => [m.out, m.in])).toEqual(
+        reference.moves.map((m) => [m.out, m.in]),
+      );
+      for (const [index, move] of answer.moves.entries()) {
+        const expected = reference.moves[index]!.gain;
+        if (expected === null) expect(move.gain).toBeNull();
+        else expect(move.gain).toBeCloseTo(expected, 9);
+      }
+      if (reference.expected_gain_vs_hold === null) expect(answer.expected_gain_vs_hold).toBeNull();
+      else expect(answer.expected_gain_vs_hold).toBeCloseTo(reference.expected_gain_vs_hold, 9);
       // The planner reports its objective unscaled; the device's integer divided by the
       // scale is that number.
       expect(answer.objective).toBeCloseTo(reference.objective_value, 6);

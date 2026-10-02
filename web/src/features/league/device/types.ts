@@ -71,7 +71,21 @@ export interface DevicePlanAnswer {
   /** The eleven with the captain doubled, for the plan and for holding the fifteen. */
   expected_own_points: number;
   hold_points: number;
+  /**
+   * The swaps as the advice prints them, paired by position in id order. Each row's gain
+   * is what the basis moved by when that swap was applied after the rows above it, so
+   * the rows add up to `expected_gain_vs_hold` exactly; null on every row when the chain
+   * does not end at the eleven the plan fields.
+   */
+  moves: DevicePlanMove[];
+  expected_gain_vs_hold: number | null;
   seconds: number;
+}
+
+export interface DevicePlanMove {
+  out: number | null;
+  in: number | null;
+  gain: number | null;
 }
 
 function finite(value: unknown): value is number {

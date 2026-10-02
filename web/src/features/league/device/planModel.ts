@@ -10,7 +10,12 @@
  * model to the server's answers on fixed instances; the LP text here is the whole model.
  */
 
-import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanEntry } from "./types";
+import type {
+  DevicePlanAnswer,
+  DevicePlanDocument,
+  DevicePlanEntry,
+  DevicePlanMove,
+} from "./types";
 
 /** The one-shot solver this model needs: HiGHS's legacy `solve` over LP text. */
 export interface LpSolver {
@@ -38,8 +43,6 @@ interface TieBreak {
 
 interface BuildOptions {
   tieBreak?: TieBreak | null;
-  /** Fix the squad to the held fifteen: the value of doing nothing. */
-  hold?: boolean;
 }
 
 /** Sum of rank times variable; rank is the player's place in the document's order. */
@@ -53,7 +56,7 @@ function rankSum(count: number, prefix: string): string {
 export function buildLp(
   document: DevicePlanDocument,
   entry: DevicePlanEntry,
-  { tieBreak = null, hold = false }: BuildOptions = {},
+  { tieBreak = null }: BuildOptions = {},
 ): string {
   const { players, rules } = document;
   const heldSet = new Set(entry.held);
@@ -104,7 +107,6 @@ export function buildLp(
     ...arrivals.map((i) => `${players[i]!.buy_tenths} ${s(i)}`),
   ];
   rows.push(`bank: ${spend.join(PLUS)} <= ${entry.bank_tenths + proceeds}`);
-  if (hold) holders.forEach((i, k) => rows.push(`keep${k}: ${s(i)} = 1`));
 
   let sense = "Maximize";
   let goal = primary;
@@ -129,6 +131,45 @@ export function buildLp(
     " paid",
     "Binary",
     ...binaries.map((name) => ` ${name}`),
+    "End",
+  ].join("\n");
+}
+
+/**
+ * The lineup problem alone, for a fifteen taken as given: the eleven and the captain on
+ * the server's objective, under the eleven's position bounds. The squad's own rules (the
+ * club limit, the bank, the transfer line) do not bind a fifteen that is not being
+ * chosen, exactly as the server's `best_eleven_points` reads a fifteen's worth.
+ */
+export function buildLineupLp(document: DevicePlanDocument, squad: number[]): string {
+  const { players, rules } = document;
+  const inSquad = new Set(squad);
+  const x = (i: number) => `x${i}`;
+  const c = (i: number) => `c${i}`;
+  const chosen = players.map((p, i) => (inSquad.has(p.id) ? i : -1)).filter((i) => i >= 0);
+  const sum = (terms: string[]) => (terms.length ? terms.join(PLUS) : "0 x0");
+  const objective: string[] = [];
+  for (const i of chosen) {
+    const [, starter, captain] = players[i]!.coefficients;
+    if (starter) objective.push(`${starter} ${x(i)}`);
+    if (captain) objective.push(`${captain} ${c(i)}`);
+  }
+  const rows: string[] = [];
+  rows.push(`xi: ${sum(chosen.map(x))} = ${rules.starting_size}`);
+  rows.push(`cap: ${sum(chosen.map(c))} = 1`);
+  for (const i of chosen) rows.push(`ca${i}: ${c(i)} - ${x(i)} <= 0`);
+  for (const position of Object.keys(rules.squad_position_limits)) {
+    const members = chosen.filter((i) => players[i]!.position === position);
+    rows.push(`lo_${position}: ${sum(members.map(x))} >= ${rules.starting_position_min[position]}`);
+    rows.push(`hi_${position}: ${sum(members.map(x))} <= ${rules.starting_position_max[position]}`);
+  }
+  return [
+    "Maximize",
+    ` obj: ${objective.join(PLUS)}`,
+    "Subject To",
+    ...rows.map((row) => ` ${row}`),
+    "Binary",
+    ...chosen.flatMap((i) => [` ${x(i)}`, ` ${c(i)}`]),
     "End",
   ].join("\n");
 }
@@ -193,18 +234,36 @@ export function solvePlan(
     last = tier;
   }
 
-  // Doing nothing: the held fifteen's best eleven and captain, the basis the gain is on.
-  const held = solver.solve(buildLp(document, entry, { hold: true }), EXACT);
-  if (held.Status !== "Optimal") throw new DevicePlanRefused(held.Status, "hold");
+  // The value of fielding exactly a fifteen: its best eleven and captain on the same
+  // objective, the basis every gain is on.
+  const valueOf = (squad: number[]): number => {
+    const fixed = solver.solve(buildLineupLp(document, squad), EXACT);
+    if (fixed.Status !== "Optimal") throw new DevicePlanRefused(fixed.Status, "hold");
+    return elevenPoints(
+      document,
+      selected(fixed, document, "x"),
+      selected(fixed, document, "c")[0]!,
+    );
+  };
 
   const heldSet = new Set(entry.held);
   const squad = selected(last, document, "s");
   const startingXi = selected(last, document, "x");
   const captain = selected(last, document, "c")[0]!;
   const transfersIn = squad.filter((id) => !heldSet.has(id));
+  const transfersOut = entry.held.filter((id) => !squad.includes(id)).sort((a, b) => a - b);
   const paid = Math.max(0, transfersIn.length - entry.free_transfers);
-  const holdXi = selected(held, document, "x");
-  const holdCaptain = selected(held, document, "c")[0]!;
+  const expectedOwnPoints = elevenPoints(document, startingXi, captain);
+  const holdPoints = valueOf(entry.held);
+  const { moves, gain } = attributedMoves(
+    document,
+    entry.held,
+    transfersOut,
+    transfersIn,
+    holdPoints,
+    expectedOwnPoints,
+    valueOf,
+  );
   return {
     objective_scaled: primaryValue,
     objective: primaryValue / document.rules.expected_points_scale,
@@ -214,11 +273,97 @@ export function solvePlan(
     vice_captain: viceCaptain(document, startingXi, captain),
     bench: orderedBench(document, squad, startingXi),
     transfers_in: transfersIn,
-    transfers_out: entry.held.filter((id) => !squad.includes(id)).sort((a, b) => a - b),
+    transfers_out: transfersOut,
     transfer_hit_points: paid * document.rules.hit_points_charged,
-    expected_own_points: elevenPoints(document, startingXi, captain),
-    hold_points: elevenPoints(document, holdXi, holdCaptain),
+    expected_own_points: expectedOwnPoints,
+    hold_points: holdPoints,
+    moves,
+    expected_gain_vs_hold: gain,
     seconds: (now() - started) / 1000,
+  };
+}
+
+/**
+ * The server's pairing: each outgoing player with an incoming player of the same
+ * position, both lists in id order; whatever is left over is paired in id order at the
+ * end rather than dropped.
+ */
+export function pairedByPosition(
+  document: DevicePlanDocument,
+  outs: number[],
+  ins: number[],
+): Array<[number | null, number | null]> {
+  const position = new Map(document.players.map((p) => [p.id, p.position]));
+  const waiting = new Map<string, number[]>();
+  const spareIns: number[] = [];
+  for (const arriving of ins) {
+    const where = position.get(arriving);
+    if (where === undefined) spareIns.push(arriving);
+    else waiting.set(where, [...(waiting.get(where) ?? []), arriving]);
+  }
+  const pairs: Array<[number | null, number | null]> = [];
+  const spareOuts: number[] = [];
+  for (const leaving of outs) {
+    const where = position.get(leaving);
+    const queue = where === undefined ? undefined : waiting.get(where);
+    if (queue && queue.length) pairs.push([leaving, queue.shift()!]);
+    else spareOuts.push(leaving);
+  }
+  const leftoverIns = [...[...waiting.values()].flat(), ...spareIns].sort((a, b) => a - b);
+  for (let index = 0; index < Math.max(spareOuts.length, leftoverIns.length); index += 1) {
+    pairs.push([spareOuts[index] ?? null, leftoverIns[index] ?? null]);
+  }
+  return pairs;
+}
+
+/**
+ * Each swap's share of the gain: the rows are applied to the held fifteen in order and
+ * the basis re-read after each. Null on every row, and no total, when the chain does
+ * not end at the eleven the plan fields.
+ */
+function attributedMoves(
+  document: DevicePlanDocument,
+  held: number[],
+  outs: number[],
+  ins: number[],
+  holdPoints: number,
+  expectedOwnPoints: number,
+  valueOf: (squad: number[]) => number,
+): { moves: DevicePlanMove[]; gain: number | null } {
+  const pairs = pairedByPosition(document, outs, ins);
+  const squad = [...held];
+  const gains: number[] = [];
+  let previous = holdPoints;
+  let walkable = true;
+  for (const [leaving, arriving] of pairs) {
+    if (!walkable) break;
+    if (
+      leaving === null ||
+      arriving === null ||
+      !squad.includes(leaving) ||
+      squad.includes(arriving)
+    ) {
+      walkable = false;
+      break;
+    }
+    squad[squad.indexOf(leaving)] = arriving;
+    const value = valueOf(squad);
+    gains.push(value - previous);
+    previous = value;
+  }
+  if (!walkable || Math.abs(previous - expectedOwnPoints) > 1e-6) {
+    return {
+      moves: pairs.map(([out, arriving]) => ({ out, in: arriving, gain: null })),
+      gain: null,
+    };
+  }
+  return {
+    moves: pairs.map(([out, arriving], index) => ({
+      out,
+      in: arriving,
+      gain: gains[index] ?? null,
+    })),
+    gain: gains.reduce((total, value) => total + value, 0),
   };
 }
 

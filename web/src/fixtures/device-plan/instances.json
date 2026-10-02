@@ -968,7 +968,15 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_own_points": 74.39,
-    "hold_points": 66.38
+    "hold_points": 66.38,
+    "moves": [
+     {
+      "out": 152,
+      "in": 160,
+      "gain": 8.010000000000005
+     }
+    ],
+    "expected_gain_vs_hold": 8.010000000000005
    }
   },
   {
@@ -1064,7 +1072,25 @@
     ],
     "transfer_hit_points": 4.0,
     "expected_own_points": 76.22,
-    "hold_points": 50.05
+    "hold_points": 50.05,
+    "moves": [
+     {
+      "out": 113,
+      "in": 123,
+      "gain": 4.190000000000005
+     },
+     {
+      "out": 152,
+      "in": 159,
+      "gain": 12.720000000000006
+     },
+     {
+      "out": 153,
+      "in": 160,
+      "gain": 9.259999999999991
+     }
+    ],
+    "expected_gain_vs_hold": 26.17
    }
   },
   {
@@ -1164,7 +1190,35 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_own_points": 95.08,
-    "hold_points": 59.03
+    "hold_points": 59.03,
+    "moves": [
+     {
+      "out": 136,
+      "in": 135,
+      "gain": 1.8399999999999963
+     },
+     {
+      "out": 148,
+      "in": 146,
+      "gain": 5.300000000000004
+     },
+     {
+      "out": 154,
+      "in": 158,
+      "gain": 11.739999999999995
+     },
+     {
+      "out": 155,
+      "in": 159,
+      "gain": 7.909999999999997
+     },
+     {
+      "out": 156,
+      "in": 160,
+      "gain": 9.260000000000005
+     }
+    ],
+    "expected_gain_vs_hold": 36.05
    }
   },
   {
@@ -1256,7 +1310,15 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_own_points": 64.9,
-    "hold_points": 59.85
+    "hold_points": 59.85,
+    "moves": [
+     {
+      "out": 121,
+      "in": 116,
+      "gain": 5.050000000000004
+     }
+    ],
+    "expected_gain_vs_hold": 5.050000000000004
    }
   },
   {
@@ -1352,7 +1414,25 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_own_points": 81.63,
-    "hold_points": 54.44
+    "hold_points": 54.44,
+    "moves": [
+     {
+      "out": 115,
+      "in": 116,
+      "gain": 4.789999999999999
+     },
+     {
+      "out": 153,
+      "in": 159,
+      "gain": 14.990000000000002
+     },
+     {
+      "out": 155,
+      "in": 160,
+      "gain": 7.409999999999997
+     }
+    ],
+    "expected_gain_vs_hold": 27.189999999999998
    }
   },
   {
@@ -1444,7 +1524,15 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_own_points": 79.31,
-    "hold_points": 73.35
+    "hold_points": 73.35,
+    "moves": [
+     {
+      "out": 121,
+      "in": 123,
+      "gain": 5.960000000000008
+     }
+    ],
+    "expected_gain_vs_hold": 5.960000000000008
    }
   },
   {
@@ -1538,7 +1626,20 @@
     ],
     "transfer_hit_points": 4.0,
     "expected_own_points": 51.72,
-    "hold_points": 22.35
+    "hold_points": 22.35,
+    "moves": [
+     {
+      "out": 156,
+      "in": 158,
+      "gain": 18.919999999999995
+     },
+     {
+      "out": 157,
+      "in": 159,
+      "gain": 10.450000000000003
+     }
+    ],
+    "expected_gain_vs_hold": 29.369999999999997
    }
   },
   {
@@ -1632,7 +1733,20 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_own_points": 56.04,
-    "hold_points": 25.300000000000004
+    "hold_points": 25.300000000000004,
+    "moves": [
+     {
+      "out": 150,
+      "in": 158,
+      "gain": 20.29
+     },
+     {
+      "out": 157,
+      "in": 159,
+      "gain": 10.449999999999996
+     }
+    ],
+    "expected_gain_vs_hold": 30.739999999999995
    }
   }
  ]
