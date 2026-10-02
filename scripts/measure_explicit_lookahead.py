@@ -49,6 +49,16 @@ from squadopt.prediction.availability import apply_availability
 #: (`application/advice.py`, WINDOW_DETERMINISTIC_UNITS_PER_WEEK). Every solve here gets
 #: this rate, so a control's two solves and the lookahead's one solve sum to equal units.
 UNITS_PER_WEEK = 20.0
+#: A protected solve's hold probe has its own one-unit cap outside the main search
+#: (`planning/optimizer.py`). Each solve reserves it inside its share, so a declared total
+#: is what an arm may spend, probes included. The measured run did not: its control's two
+#: probes and the lookahead's one ran outside the shares (#904 review).
+HOLD_PROBE_UNITS = 1.0
+#: The solver's objective rounds each player-week's points half up to
+#: 1/expected_points_scale, once (`optimization/coefficients.py`). With no bench weight a
+#: week's lineup carries eleven starter terms and the captain's term again, so a path's
+#: scaled objective and its unrounded rescore differ by at most this much per forecast week.
+ROUNDING_PER_WEEK = 12 * 0.5 / OptimizationConfig().expected_points_scale
 #: A safety stop, not a budget. Where a clock stops a search is a function of the machine,
 #: so a solve it stops is FAILED and never read.
 WALL_CEILING_SECONDS = 7200.0
@@ -82,21 +92,37 @@ def cases(first: int, expiry: int, profiles: Sequence[int]) -> list[Case]:
 
 
 def solver_config(weeks: int) -> OptimizationConfig:
+    """One protected solve's main search, with its hold probe's unit reserved from its share."""
     return OptimizationConfig(
         bench_weight=0,
         solver_time_limit_seconds=WALL_CEILING_SECONDS,
-        solver_deterministic_time_limit=UNITS_PER_WEEK * weeks,
+        solver_deterministic_time_limit=UNITS_PER_WEEK * weeks - HOLD_PROBE_UNITS,
     )
 
 
 def budget_arithmetic(case: Case, first: int) -> dict[str, float]:
-    """Control units (window plus continuation) equal lookahead units by construction."""
+    """Each arm's total, main-search caps and probe caps; the totals are equal by construction.
+
+    The control is two protected solves, so two probes; the lookahead is one. Each probe is
+    reserved inside its solve's share, so the totals are what each arm may spend.
+    """
     total = case.last_week - first + 1
-    control = UNITS_PER_WEEK * case.window + UNITS_PER_WEEK * (total - case.window)
-    lookahead = UNITS_PER_WEEK * total
+    shares = (UNITS_PER_WEEK * case.window, UNITS_PER_WEEK * (total - case.window))
+    control_main = sum(share - HOLD_PROBE_UNITS for share in shares)
+    lookahead_main = UNITS_PER_WEEK * total - HOLD_PROBE_UNITS
+    control = control_main + HOLD_PROBE_UNITS * len(shares)
+    lookahead = lookahead_main + HOLD_PROBE_UNITS
     if not math.isclose(control, lookahead):
         raise ValueError("Control and lookahead deterministic budgets must be equal.")
-    return {"control_units": control, "lookahead_units": lookahead, "forecast_weeks": total}
+    return {
+        "control_units": control,
+        "lookahead_units": lookahead,
+        "control_main_search_units": control_main,
+        "lookahead_main_search_units": lookahead_main,
+        "control_probe_units": HOLD_PROBE_UNITS * len(shares),
+        "lookahead_probe_units": HOLD_PROBE_UNITS,
+        "forecast_weeks": total,
+    }
 
 
 def self_parity(served: pd.DataFrame, extended: pd.DataFrame) -> None:
@@ -189,6 +215,8 @@ def solve_record(plan: TransferPlanResult, horizon: PlanningHorizon, wall: float
     if wall_clock_stopped_the_search(plan.solver_status, diagnostics):
         return {"valid": False, "status": "FAILED", "error": "wall clock stopped the search"}
     audited = audit_plan(plan, horizon, horizon, DecisionPreferences(), ChipAvailability())
+    hold = diagnostics.get("hold_protection")
+    probe: Mapping[str, Any] = hold if isinstance(hold, Mapping) else {}
     net = sum(net_week_points(w) for w in plan.weeks)
     if not math.isclose(net, audited["base_net_points"], abs_tol=1e-7):
         raise ValueError("Net points disagree with the independent rescore.")
@@ -202,6 +230,9 @@ def solve_record(plan: TransferPlanResult, horizon: PlanningHorizon, wall: float
         "relative_optimality_gap": diagnostics.get("relative_optimality_gap"),
         "deterministic_time_used": diagnostics.get("deterministic_time_used"),
         "deterministic_time_limit": diagnostics.get("solver_deterministic_time_limit"),
+        # The probe's work is its own, outside the main search's usage above.
+        "hold_probe_deterministic_time_used": probe.get("deterministic_time"),
+        "hold_probe_deterministic_time_limit": probe.get("deterministic_time_limit"),
         "deterministic_time_budget_exhausted": diagnostics.get(
             "deterministic_time_budget_exhausted"
         ),
@@ -230,19 +261,33 @@ def label_pair(
     lookahead: Mapping[str, Any],
     flagged: frozenset[int],
 ) -> dict[str, Any]:
-    """Read one pair by the declared rule; the gain is defined only under proved controls."""
+    """Read one pair by the declared rule; the gain is defined only under proved controls.
+
+    A proof certifies the solver's rounded objective, not the unrounded rescore the deltas
+    are taken on. Two paths can tie on the first and differ on the second, by at most the
+    rounding envelope: ``ROUNDING_PER_WEEK`` for each path in every forecast week. So a
+    proved lookahead below a proved control within that envelope is a tie, and only a
+    shortfall beyond it is a code defect. The solver's bound is likewise on its rounded
+    objective, so the gain's upper bound on the rescore adds the lookahead's own envelope.
+    """
     arms = (window, continuation, lookahead)
     if not all(arm.get("valid") for arm in arms):
         return {"valid": False, "labels": ["failed"]}
     control_total = window["net_points"] + continuation["net_points"]
     total = lookahead["net_points"]
     delta = total - control_total
+    weeks = len(lookahead["weeks"])
+    envelope = 2 * ROUNDING_PER_WEEK * weeks
     labels = []
     controls_proved = window["status"] == "OPTIMAL" and continuation["status"] == "OPTIMAL"
-    if delta < -1e-6 and controls_proved and lookahead["status"] == "OPTIMAL":
-        raise ValueError("A proved lookahead below a proved feasible path is a code defect.")
+    proved = controls_proved and lookahead["status"] == "OPTIMAL"
+    if delta < -envelope and proved:
+        raise ValueError(
+            "A proved lookahead below a proved feasible path beyond the rounding envelope "
+            "is a code defect."
+        )
     if delta < -1e-6:
-        labels.append("unproved_shortfall")
+        labels.append("tie_within_rounding" if proved else "unproved_shortfall")
     changed = window["first_action"]["squad"] != lookahead["first_action"]["squad"]
     if changed:
         labels.append("first_week_changed")
@@ -260,7 +305,11 @@ def label_pair(
         "lookahead_total": total,
         "delta": delta if "gain_defined" in labels else None,
         "delta_unread": None if "gain_defined" in labels else delta,
-        "gain_upper_bound": None if bound is None else float(bound) - control_total,
+        "rounding_envelope": envelope,
+        "rounded_bound_minus_control": None if bound is None else float(bound) - control_total,
+        "gain_upper_bound": (
+            None if bound is None else float(bound) + ROUNDING_PER_WEEK * weeks - control_total
+        ),
         "labels": labels,
         "free_next_window_end": window["weeks"][-1]["free_next"],
         "free_next_lookahead_window_end": lookahead["weeks"][len(window["weeks"]) - 1]["free_next"],
@@ -325,7 +374,7 @@ def render_markdown(compacted: Mapping[str, Any]) -> str:
     """The record's table, derived from the JSON so the two cannot disagree."""
     lines = [
         "| Profile | Window | Tail | Control (window + continuation) | Lookahead | Statuses "
-        "(window/continuation/lookahead) | Delta | Gain upper bound, scaled objective | Labels |",
+        "(window/continuation/lookahead) | Delta | Gain upper bound, on the rescore | Labels |",
         "| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |",
     ]
     for case in compacted["cases"]:
@@ -469,6 +518,10 @@ def run(
                     for c in declared
                 },
                 "rolling_one_week": UNITS_PER_WEEK * (expiry - first + 1),
+                "hold_probe": (
+                    f"{HOLD_PROBE_UNITS} unit per protected solve, reserved inside its share; "
+                    "each solve's probe usage is recorded beside its main-search usage"
+                ),
                 "wall_stopped": "FAILED, never read; no budget is raised after a result",
             },
             "arms": {
@@ -488,7 +541,10 @@ def run(
                 "delta is defined only when window and continuation are OPTIMAL; a negative "
                 "delta is unproved_shortfall, never a loss; the lookahead bound gives an upper "
                 "bound on the in-forecast gain; the primary finding is how often the first-week "
-                "action changed"
+                "action changed; a proof certifies the objective rounded to 0.001 points per "
+                f"player-week, so a proved lookahead within {ROUNDING_PER_WEEK} points per path "
+                "per forecast week of a proved control is tie_within_rounding, a shortfall beyond "
+                "twice that is a code defect, and the bound adds the lookahead's envelope"
             ),
             "dropped": {
                 "tail_plus_three": "no declared reason; the served tail replaces it",

@@ -11,6 +11,8 @@ import pandas as pd
 import pytest
 from scripts.measure_explicit_lookahead import (
     AVAILABILITY_LABEL,
+    HOLD_PROBE_UNITS,
+    ROUNDING_PER_WEEK,
     UNITS_PER_WEEK,
     WALL_CEILING_SECONDS,
     Case,
@@ -30,7 +32,8 @@ from scripts.measure_explicit_lookahead import (
 )
 from tests.unit.test_shortlist_matrix import CONFIG, world
 
-from squadopt.optimization import SolverStatus
+from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.optimization.coefficients import objective_coefficients
 from squadopt.planning import optimize_transfer_plan, to_planning_horizon
 from squadopt.planning.recourse_chips import net_week_points
 
@@ -53,9 +56,23 @@ def test_control_and_lookahead_budgets_are_equal_by_construction():
         assert arithmetic["control_units"] == arithmetic["lookahead_units"] == units
         assert arithmetic["forecast_weeks"] * UNITS_PER_WEEK == units
     config = solver_config(14)
-    assert config.solver_deterministic_time_limit == 280.0
+    assert config.solver_deterministic_time_limit == 279.0
     assert config.solver_time_limit_seconds == WALL_CEILING_SECONDS
     assert config.bench_weight == 0
+
+
+def test_every_hold_probe_is_reserved_inside_the_arm_it_belongs_to():
+    """The #904 review: the measured run's probes ran outside the shares, 102 against 101."""
+    served, expiry = cases(6, 19, [1000])[:2]
+    arithmetic = budget_arithmetic(served, 6)
+    assert (arithmetic["control_probe_units"], arithmetic["lookahead_probe_units"]) == (2.0, 1.0)
+    assert arithmetic["control_main_search_units"] == 59.0 + 39.0
+    assert arithmetic["lookahead_main_search_units"] == 99.0
+    long = budget_arithmetic(expiry, 6)
+    assert long["control_main_search_units"] + long["control_probe_units"] == 280.0
+    assert long["lookahead_main_search_units"] + long["lookahead_probe_units"] == 280.0
+    # Fourteen one-week solves, each its own probe inside its twenty units.
+    assert 14 * (solver_config(1).solver_deterministic_time_limit + HOLD_PROBE_UNITS) == 280.0
 
 
 def _frame(weeks, points=None):
@@ -143,7 +160,9 @@ def test_a_pair_is_read_by_the_declared_rule():
     ahead = _arm("OPTIMAL", 301.5, range(2, 17), bound=305.0)
     pair = label_pair(control, continuation, ahead, frozenset())
     assert pair["delta"] == pytest.approx(1.5)
-    assert pair["gain_upper_bound"] == pytest.approx(5.0)
+    assert pair["rounded_bound_minus_control"] == pytest.approx(5.0)
+    assert pair["gain_upper_bound"] == pytest.approx(5.0 + 2 * ROUNDING_PER_WEEK)
+    assert pair["rounding_envelope"] == pytest.approx(4 * ROUNDING_PER_WEEK)
     assert pair["labels"] == ["first_week_changed", "gain_defined"]
     flagged = label_pair(control, continuation, ahead, frozenset({16}))
     assert flagged["labels"] == ["first_week_changed", AVAILABILITY_LABEL, "gain_defined"]
@@ -173,12 +192,45 @@ def test_an_unproved_shortfall_is_not_a_loss_and_a_proved_one_is_a_defect():
     assert failed == {"valid": False, "labels": ["failed"]}
 
 
+def test_the_rounding_envelope_is_twelve_half_steps_of_the_points_scale_a_week():
+    """Eleven starters and the captain each carry one half-up rounding of their points."""
+    scale = OptimizationConfig().expected_points_scale
+    assert ROUNDING_PER_WEEK == pytest.approx(12 * 0.5 / scale) == pytest.approx(0.006)
+    worst = [round(2 + 0.5 / scale - 1e-9, 12)] * 11
+    coefficients = objective_coefficients(worst, OptimizationConfig(bench_weight=0))
+    starters = sum(starter for _, starter, _ in coefficients) / scale
+    captain = coefficients[0][2] / scale
+    assert sum(worst) + worst[0] - (starters + captain) == pytest.approx(
+        ROUNDING_PER_WEEK, abs=1e-6
+    )
+
+
+def test_two_proved_paths_tied_on_the_rounded_objective_are_a_tie_not_a_defect():
+    """Tied scaled objectives, different unrounded scores: the regression the review asked for."""
+    control = _arm("OPTIMAL", 100.0, range(1, 16))
+    continuation = _arm("OPTIMAL", 200.0, range(1, 16))
+    # Each of the lookahead's two weeks may round up by 0.006 where the control's rounds down.
+    tied = _arm("OPTIMAL", 300.0 - 2 * ROUNDING_PER_WEEK * 2 + 1e-9, range(1, 16), incoming=())
+    pair = label_pair(control, continuation, tied, frozenset())
+    assert pair["labels"] == ["tie_within_rounding", "hold_equal"]
+    assert pair["delta"] is None
+    assert pair["delta_unread"] == pytest.approx(-4 * ROUNDING_PER_WEEK)
+    beyond = _arm("OPTIMAL", 300.0 - 4 * ROUNDING_PER_WEEK - 1e-4, range(1, 16), incoming=())
+    with pytest.raises(ValueError, match="beyond the rounding envelope"):
+        label_pair(control, continuation, beyond, frozenset())
+    unproved = label_pair(control, _arm("FEASIBLE", 200.0, range(1, 16)), tied, frozenset())
+    assert unproved["labels"] == ["unproved_shortfall", "hold_equal"]
+
+
 def test_a_real_two_week_solve_is_recorded_and_handed_on_with_its_end_state():
     projection, state = world()
     horizon = to_planning_horizon(projection)
     plan = optimize_transfer_plan(horizon, state, CONFIG, protect_hold=True, linearization_level=2)
     record = solve_record(plan, horizon, 1.0)
     assert record["valid"] and record["status"] == "OPTIMAL"
+    probe = plan.diagnostics["hold_protection"]
+    assert record["hold_probe_deterministic_time_used"] == probe["deterministic_time"]
+    assert record["hold_probe_deterministic_time_limit"] == probe["deterministic_time_limit"]
     assert record["net_points"] == pytest.approx(sum(net_week_points(w) for w in plan.weeks))
     assert record["first_action"] == first_action(plan.weeks[0])
     assert len(record["first_action"]["squad"]) == 15

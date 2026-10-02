@@ -30,13 +30,16 @@ It scores nothing on 2025-26. The owner's later planner studies (#906) restrict 
 archive to 2022-23 to 2024-25, so their forecasts differ from this one.
 
 Three policies are scored on that one forecast, every solve at the production rate of
-twenty deterministic units per forecast week, `protect_hold=True`, linearization 2,
+twenty deterministic main-search units per forecast week, `protect_hold=True`,
+linearization 2,
 `TransferPlanningConfig()` defaults (a hit costs the four points it is charged), no
 chips, no preferences, no Top100 weight:
 
 - `window_then_continue`: the 3- or 5-week window solved blind to the tail, then the
   tail solved from the window's end state (squad, bank, carried free transfers). Its
-  units equal the lookahead's by construction.
+  main-search caps equal the lookahead's by construction; each solve's one-unit hold
+  probe ran outside them, so it was allowed one unit more in total (see the corrections
+  below).
 - `lookahead`: one solve over window and tail.
 - `rolling_one_week`: fourteen sequential one-week solves with the same handoff, the
   control the earlier horizon records were measured against; its transfer counts,
@@ -66,16 +69,16 @@ wall clock stops is failed and not read; no budget was raised after a result.
 
 ## Results
 
-Six pairs, all valid. Units are equal per pair: 100 for the served tail, 280 for the expiry tail. Every FEASIBLE solve exhausted its deterministic budget; none was stopped by the clock.
+Six pairs, all valid. Main-search caps are equal per pair: 100 for the served tail, 280 for the expiry tail. With the hold probes outside them the configured totals were 102 against 101 and 282 against 281, and 294 for the rolling control. Every FEASIBLE solve exhausted its deterministic budget; none was stopped by the clock.
 
-| Profile | Window | Tail | Control (window + continuation) | Lookahead | Statuses (window/continuation/lookahead) | Delta | Gain upper bound, scaled objective | Labels |
+| Profile | Window | Tail | Control (window + continuation) | Lookahead | Statuses (window/continuation/lookahead) | Delta | Gain upper bound, on the rescore | Labels |
 | --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |
-| 1000 | 3 | served to GW10 | 270.256740 | 270.608100 | OPTIMAL/OPTIMAL/FEASIBLE | +0.351360 | +2.130 | hold_equal, gain_defined |
-| 1000 | 3 | expiry to GW19 | 740.122418 | 732.006587 | OPTIMAL/FEASIBLE/FEASIBLE | (-8.115832, not read) | +24.569 | unproved_shortfall, hold_equal |
-| 1000 | 5 | expiry to GW19 | 740.620956 | 732.006587 | FEASIBLE/FEASIBLE/FEASIBLE | (-8.614369, not read) | +24.070 | unproved_shortfall, hold_equal |
-| 900 | 3 | served to GW10 | 264.504834 | 264.753529 | OPTIMAL/OPTIMAL/FEASIBLE | +0.248695 | +0.590 | hold_equal, gain_defined |
-| 900 | 3 | expiry to GW19 | 717.288527 | 713.267554 | OPTIMAL/FEASIBLE/FEASIBLE | (-4.020973, not read) | +27.623 | unproved_shortfall, hold_equal |
-| 900 | 5 | expiry to GW19 | 726.497467 | 713.267554 | FEASIBLE/FEASIBLE/FEASIBLE | (-13.229913, not read) | +18.415 | unproved_shortfall, hold_equal |
+| 1000 | 3 | served to GW10 | 270.256740 | 270.608100 | OPTIMAL/OPTIMAL/FEASIBLE | +0.351360 | +2.160 | hold_equal, gain_defined |
+| 1000 | 3 | expiry to GW19 | 740.122418 | 732.006587 | OPTIMAL/FEASIBLE/FEASIBLE | (-8.115832, not read) | +24.653 | unproved_shortfall, hold_equal |
+| 1000 | 5 | expiry to GW19 | 740.620956 | 732.006587 | FEASIBLE/FEASIBLE/FEASIBLE | (-8.614369, not read) | +24.154 | unproved_shortfall, hold_equal |
+| 900 | 3 | served to GW10 | 264.504834 | 264.753529 | OPTIMAL/OPTIMAL/FEASIBLE | +0.248695 | +0.620 | hold_equal, gain_defined |
+| 900 | 3 | expiry to GW19 | 717.288527 | 713.267554 | OPTIMAL/FEASIBLE/FEASIBLE | (-4.020973, not read) | +27.707 | unproved_shortfall, hold_equal |
+| 900 | 5 | expiry to GW19 | 726.497467 | 713.267554 | FEASIBLE/FEASIBLE/FEASIBLE | (-13.229913, not read) | +18.499 | unproved_shortfall, hold_equal |
 
 Rolling one-week control on GW6-19, the same forecast and handoff, beside each squad's best expiry-tail control and its fourteen-week lookahead:
 
@@ -91,7 +94,9 @@ the three-week window and the two weeks the five-week artifact already carries, 
 control solves proved optimal and the lookahead returned FEASIBLE at its full hundred
 units (relative gaps 0.66 percent and 0.13 percent). Its plan is worth **+0.351** (squad
 1000) and **+0.249** (squad 900) more on the same forecast than window-then-continue,
-with the in-forecast gain bounded above by +2.130 and +0.590. The first-week action is
+with the in-forecast gain bounded above by +2.160 and +0.620 on the rescore (the
+solver's bound on its rounded objective plus its 0.030 rounding envelope over five
+weeks). The first-week action is
 the same in every arm (a hold in GW6, the first transfers in GW7) and so are the weekly
 transfer counts, as the record's per-week moves show; the lookahead gives up 0.469 and 0.438 inside the window and takes
 0.820 and 0.687 in the tail. That is the trade `optimize_with_lookahead` was built to
@@ -138,8 +143,8 @@ first-week action moved him, so the availability label was never applied. Buy eq
 acquisition accounting (#894) stays off in every arm. The calendar is the captured one,
 one fixture per club per week, no blank or double. GW19 is the first-half chip expiry,
 not the season's end; banked free transfers are worth nothing at that edge in every arm.
-Wall seconds are this machine's. Units are equal per comparison; equal units are not
-equal difficulty, and every fourteen-week solve returned FEASIBLE. Every
+Wall seconds are this machine's. Main-search caps are equal per comparison; equal caps
+are not equal difficulty, and every fourteen-week solve returned FEASIBLE. Every
 number is in-forecast points on one supplied forecast; the realized negatives for longer
 horizons (`planner_horizon_rolling_note.md`: rolling H3 -2.30, H4 -8.32) stand beside it.
 Nothing here promotes a horizon, changes the served artifact, its reader, a default or
@@ -173,6 +178,33 @@ arm was dropped because an unpriced right is spent inside any window solve; its 
 control is a reservation-priced right, which the lookahead refuses to stack, so chip
 timing with transfers stays unmeasured, and a longer dated horizon is not evidence that
 the automatic chip strategy is ready.
+
+## Corrections after review
+
+The owner's review of 2 October found two claims stated more strongly than the run
+supports. Both are corrected here; no solve, input, delta, status or label changed,
+and the JSON carries them as `review_corrections`.
+
+**Equal work was equal main-search caps.** Every protected solve also ran a hold probe
+with its own one-unit cap outside its main search (`planning/optimizer.py` at
+d9e92745). The control is two solves and the lookahead one, so the control was allowed
+102 units against 101 on the served tail and 282 against 281 on the expiry tail; the
+fourteen rolling solves were allowed 294. These are caps, not usage. The probes' usage
+is not in this record and not inferred from its cap: the run wrote each solve only
+through `solve_record`, which at the measured source keeps no probe field, so the
+retained local results do not hold it either. The runner now reserves each probe
+inside its solve's share and records its usage, so a future run spends equal totals.
+
+**A proof is on the rounded objective, the deltas on the rescore.** The solver rounds
+each player-week's points to 0.001 once; with no bench weight a week's lineup carries
+eleven starter terms and the captain's again, so a path's scaled objective and its
+unrounded rescore differ by at most 0.006 points a week. Two paths tied on the first
+can differ on the second. A proved lookahead within twice that, per forecast week, of
+a proved control is now `tie_within_rounding`, and only a shortfall beyond it is a code
+defect. No lookahead here proved optimal, so no label moves. The gain's upper bound in
+the table is now the solver's bound plus the lookahead's own envelope (0.030 over five
+weeks, 0.084 over fourteen) less the control's rescore; the earlier figure, bound less
+rescore, is kept as `rounded_bound_minus_control`.
 
 ## Post-measurement changes to the record
 

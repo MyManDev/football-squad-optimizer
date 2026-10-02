@@ -534,15 +534,17 @@
           "lookahead_total": 270.60809971615004,
           "delta": 0.35136000453496763,
           "delta_unread": null,
-          "gain_upper_bound": 2.1302602883849318,
-          "labels": [
-            "hold_equal",
-            "gain_defined"
-          ],
           "free_next_window_end": 1,
           "free_next_lookahead_window_end": 1,
           "hits_control": 0.0,
-          "hits_lookahead": 0.0
+          "hits_lookahead": 0.0,
+          "rounding_envelope": 0.06,
+          "rounded_bound_minus_control": 2.1302602883849318,
+          "gain_upper_bound": 2.1602602883849316,
+          "labels": [
+            "hold_equal",
+            "gain_defined"
+          ]
         }
       },
       {
@@ -992,15 +994,17 @@
           "lookahead_total": 732.0065867307441,
           "delta": null,
           "delta_unread": -8.115831729094793,
-          "gain_upper_bound": 24.568581540161176,
-          "labels": [
-            "unproved_shortfall",
-            "hold_equal"
-          ],
           "free_next_window_end": 1,
           "free_next_lookahead_window_end": 4,
           "hits_control": 0.0,
-          "hits_lookahead": 0.0
+          "hits_lookahead": 0.0,
+          "rounding_envelope": 0.168,
+          "rounded_bound_minus_control": 24.568581540161176,
+          "gain_upper_bound": 24.652581540161176,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ]
         }
       },
       {
@@ -1458,15 +1462,17 @@
           "lookahead_total": 732.0065867307441,
           "delta": null,
           "delta_unread": -8.614369102712203,
-          "gain_upper_bound": 24.070044166543767,
-          "labels": [
-            "unproved_shortfall",
-            "hold_equal"
-          ],
           "free_next_window_end": 1,
           "free_next_lookahead_window_end": 5,
           "hits_control": 0.0,
-          "hits_lookahead": 0.0
+          "hits_lookahead": 0.0,
+          "rounding_envelope": 0.168,
+          "rounded_bound_minus_control": 24.070044166543767,
+          "gain_upper_bound": 24.154044166543766,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ]
         }
       },
       {
@@ -1754,15 +1760,17 @@
           "lookahead_total": 264.75352890091625,
           "delta": 0.24869470696637563,
           "delta_unread": null,
-          "gain_upper_bound": 0.5901658060501518,
-          "labels": [
-            "hold_equal",
-            "gain_defined"
-          ],
           "free_next_window_end": 1,
           "free_next_lookahead_window_end": 1,
           "hits_control": 0.0,
-          "hits_lookahead": 0.0
+          "hits_lookahead": 0.0,
+          "rounding_envelope": 0.06,
+          "rounded_bound_minus_control": 0.5901658060501518,
+          "gain_upper_bound": 0.6201658060501518,
+          "labels": [
+            "hold_equal",
+            "gain_defined"
+          ]
         }
       },
       {
@@ -2222,15 +2230,17 @@
           "lookahead_total": 713.2675535244477,
           "delta": null,
           "delta_unread": -4.020973092959139,
-          "gain_upper_bound": 27.623473382593147,
-          "labels": [
-            "unproved_shortfall",
-            "hold_equal"
-          ],
           "free_next_window_end": 1,
           "free_next_lookahead_window_end": 3,
           "hits_control": 0.0,
-          "hits_lookahead": 0.0
+          "hits_lookahead": 0.0,
+          "rounding_envelope": 0.168,
+          "rounded_bound_minus_control": 27.623473382593147,
+          "gain_upper_bound": 27.707473382593147,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ]
         }
       },
       {
@@ -2698,15 +2708,17 @@
           "lookahead_total": 713.2675535244477,
           "delta": null,
           "delta_unread": -13.229913158575073,
-          "gain_upper_bound": 18.414533316977213,
-          "labels": [
-            "unproved_shortfall",
-            "hold_equal"
-          ],
           "free_next_window_end": 1,
           "free_next_lookahead_window_end": 5,
           "hits_control": 0.0,
-          "hits_lookahead": 0.0
+          "hits_lookahead": 0.0,
+          "rounding_envelope": 0.168,
+          "rounded_bound_minus_control": 18.414533316977213,
+          "gain_upper_bound": 18.498533316977213,
+          "labels": [
+            "unproved_shortfall",
+            "hold_equal"
+          ]
         }
       }
     ],
@@ -3239,5 +3251,31 @@
   "measured_source": {
     "commit": "d9e92745",
     "note": "The protocol's source hashes are of that commit. After the run the compaction was widened to keep each path's per-week moves in this record and the table prints the bound column to three decimals; the forecast_documents block and this measured_source block were added by hand from the run's own served and extended documents, fingerprints cross-checked against the protocol, and the runner's compact.json does not carry them. No solve, input or number changed and the local results' sha256 above is unchanged."
+  },
+  "review_corrections": {
+    "review": "#904 review of 2026-10-02 on head 5a34fdd5",
+    "hold_probe_accounting": {
+      "measured_run": "Every protected solve also ran a hold probe with its own one-unit cap outside its main-search cap. The control's two solves and the lookahead's one therefore had equal main-search caps, not equal total caps.",
+      "configured_total_caps": {
+        "served_tail": {
+          "control": 102.0,
+          "lookahead": 101.0
+        },
+        "expiry_tail": {
+          "control": 282.0,
+          "lookahead": 281.0
+        },
+        "rolling_one_week": 294.0
+      },
+      "probe_usage": "Not recovered and not inferred from the cap. The run wrote each solve only through solve_record, which at the measured source keeps no probe field, so neither this record nor the retained local results hold it.",
+      "runner_after_review": "Each protected solve reserves its probe inside its share, so the declared totals are what each arm may spend, and its record keeps the probe's usage and cap beside the main search's."
+    },
+    "rounding": {
+      "per_path_per_forecast_week": 0.006,
+      "basis": "The solver's objective rounds each player-week's points half up to 0.001, once; with no bench weight a week's lineup carries eleven starter terms and the captain's term again, so a path's scaled objective and its unrounded rescore differ by at most 12 x 0.0005 points a week.",
+      "proof_rule_after_review": "A proved lookahead below a proved control by at most twice that, per forecast week, is tie_within_rounding; only a shortfall beyond it is a code defect.",
+      "gain_upper_bound": "The solver's bound on its rounded objective, plus the lookahead's own envelope, less the control's rescore. rounded_bound_minus_control keeps the earlier figure.",
+      "labels_changed": "None. No lookahead solve proved optimal, so the proof rule never applied, and every delta, status and label is as measured."
+    }
   }
 }
