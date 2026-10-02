@@ -8,6 +8,7 @@ import pytest
 
 from squadopt.evaluation.models import FrozenSquadDecision
 from squadopt.evaluation.scoring import score_frozen_squad_decision
+from squadopt.scenarios import expected_lineup as lineup_module
 from squadopt.scenarios.expected_lineup import expected_lineup_score, improve_expected_lineup
 
 XI = (1, 3, 4, 5, 8, 9, 10, 11, 13, 14, 15)
@@ -218,7 +219,7 @@ def test_bounded_search_retains_incumbent_and_same_fifteen(squad, limit):
     assert 1 <= result.evaluations <= limit
     assert result.states_evaluated <= 640 * result.evaluations
     assert result.autosub_cache_hits <= result.evaluations
-    assert result.captain_pairs_considered <= 20 * 45
+    assert result.captain_pairs_considered <= 110 * 45
     assert result.best.expected_net_points >= result.incumbent.expected_net_points
     assert set(result.best.starting_xi) | set(result.best.ordered_bench) == set(range(1, 16))
     assert result.proof_scope == "bounded_fixed_squad_neighborhood_only"
@@ -278,6 +279,171 @@ def test_ties_cache_and_identifier_types_are_deterministic(squad):
         strings, tuple(map(str, XI)), tuple(map(str, BENCH)), "13", "8", max_evaluations=2
     )
     assert all(isinstance(player, str) for player in result.best.scoring_multipliers)
+
+
+@pytest.fixture
+def rank_four_captain_squad(squad):
+    table = squad.assign(expected_points=1.0)
+    for player, points in {1: 6.0, 3: 5.5, 4: 5.0, 5: 4.0}.items():
+        table.loc[table.player_id.eq(player), "expected_points"] = points
+    table.loc[table.player_id.eq(5), "appearance_probability"] = 0.4
+    return table
+
+
+def official_pair_scores(table, *, chip=None, not_captain=(), hits=0):
+    """Enumerate complete official outcomes for every permitted fixed-XI pair."""
+    return {
+        (captain, vice): official_expectation(
+            table, captain=captain, vice=vice, chip=chip, hits=hits
+        )[0]
+        for captain in XI
+        for vice in XI
+        if captain != vice and captain not in not_captain and vice not in not_captain
+    }
+
+
+@pytest.mark.parametrize(
+    "chip,incumbent_points,gain",
+    [(None, 34.1, 1.6), ("3xc", 40.1, 3.2), ("bboost", 37.5, 1.6)],
+)
+def test_rank_four_captain_beats_shortlist_and_matches_every_official_pair(
+    rank_four_captain_squad, chip, incumbent_points, gain
+):
+    table = rank_four_captain_squad
+    before = table.copy(deep=True)
+    result = improve_expected_lineup(
+        table, XI, BENCH, 1, 3, chip=chip, not_starting=BENCH, max_evaluations=2
+    )
+    official = official_pair_scores(table, chip=chip)
+    assert result.incumbent.expected_net_points == pytest.approx(incumbent_points)
+    assert result.best.expected_net_points == pytest.approx(incumbent_points + gain)
+    assert result.best.expected_net_points == pytest.approx(max(official.values()))
+    assert (result.best.captain_id, result.best.vice_captain_id) == (5, 1)
+    assert result.best.starting_xi == XI and result.best.ordered_bench == BENCH
+    assert result.evaluations == 2 and result.captain_pairs_considered == 110
+    assert result.proof_scope == "bounded_fixed_squad_neighborhood_only"
+    pd.testing.assert_frame_equal(table, before)
+
+
+def test_all_captain_pairs_spend_only_two_scores_and_reuse_autosubs(
+    rank_four_captain_squad, monkeypatch
+):
+    original_score = lineup_module._score
+    scored_decisions = []
+
+    def counted_score(data, decision):
+        scored_decisions.append(decision)
+        return original_score(data, decision)
+
+    monkeypatch.setattr(lineup_module, "_score", counted_score)
+    result = improve_expected_lineup(
+        rank_four_captain_squad, XI, BENCH, 1, 3, not_starting=BENCH, max_evaluations=2
+    )
+    assert len(scored_decisions) == result.evaluations == 2
+    assert result.captain_pairs_considered == 110
+    assert result.autosub_cache_hits == 1
+    assert result.states_evaluated == result.incumbent.states_evaluated == 2
+    assert result.best.autosub_points == result.incumbent.autosub_points
+
+
+@pytest.mark.parametrize(
+    "blocked,incumbent,expected_pair",
+    [((1,), (3, 4), (5, 3)), ((5,), (1, 3), (1, 3))],
+)
+def test_captain_pair_oracle_excludes_both_roles(
+    rank_four_captain_squad, blocked, incumbent, expected_pair
+):
+    result = improve_expected_lineup(
+        rank_four_captain_squad,
+        XI,
+        BENCH,
+        *incumbent,
+        not_starting=BENCH,
+        not_captain=blocked,
+        max_evaluations=2,
+    )
+    official = official_pair_scores(rank_four_captain_squad, not_captain=blocked)
+    assert result.best.expected_net_points == pytest.approx(max(official.values()))
+    assert (result.best.captain_id, result.best.vice_captain_id) == expected_pair
+    assert not set(expected_pair) & set(blocked)
+    assert result.captain_pairs_considered == 10 * 9
+
+
+def test_captain_pair_oracle_accepts_signed_points_zero_q_and_charges_hits_once(squad):
+    table = squad.assign(expected_points=-1.0)
+    table.loc[table.player_id.isin((1, 3)), ["expected_points", "appearance_probability"]] = 0.0
+    table.loc[table.player_id.eq(5), ["expected_points", "appearance_probability"]] = [-0.4, 0.4]
+    result = improve_expected_lineup(
+        table, XI, BENCH, 8, 9, not_starting=BENCH, hit_points=4, max_evaluations=2
+    )
+    official = official_pair_scores(table, hits=4)
+    assert (result.best.captain_id, result.best.vice_captain_id) == (1, 3)
+    assert result.best.expected_net_points == pytest.approx(max(official.values()))
+    assert result.best.expected_net_points > result.incumbent.expected_net_points
+    assert result.best.captain_bonus_points == result.best.vice_bonus_points == 0
+    assert result.best.hit_points == 4
+    assert result.evaluations == 2
+
+
+@pytest.mark.parametrize("string_ids", [False, True])
+def test_improved_pair_ties_ignore_table_and_xi_order(squad, string_ids):
+    table = squad.assign(expected_points=1.0)
+    table.loc[table.player_id.isin((3, 4)), "expected_points"] = 6.0
+    convert = str if string_ids else int
+    table["player_id"] = table.player_id.map(convert)
+    xi, bench = tuple(map(convert, XI)), tuple(map(convert, BENCH))
+    first = improve_expected_lineup(
+        table, xi, bench, convert(13), convert(8), not_starting=bench, max_evaluations=2
+    )
+    reordered = improve_expected_lineup(
+        table.iloc[::-1],
+        xi,
+        bench,
+        convert(13),
+        convert(8),
+        not_starting=bench,
+        max_evaluations=2,
+    )
+    reversed_xi = improve_expected_lineup(
+        table,
+        xi[::-1],
+        bench,
+        convert(13),
+        convert(8),
+        not_starting=bench,
+        max_evaluations=2,
+    )
+    assert first == reordered
+    for result in (first, reversed_xi):
+        assert (result.best.captain_id, result.best.vice_captain_id) == (convert(3), convert(1))
+        assert result.best.expected_net_points == first.best.expected_net_points
+        assert result.best.expected_net_points > result.incumbent.expected_net_points
+        assert result.best.ordered_bench == bench
+        assert result.evaluations == 2 and result.captain_pairs_considered == 110
+    assert reversed_xi.best.starting_xi == xi[::-1]
+
+
+@pytest.mark.parametrize("locked_first,limit", [(False, 1), (True, 2)])
+def test_stronger_pair_cannot_bypass_score_budget_or_first_action_lock(
+    rank_four_captain_squad, locked_first, limit
+):
+    result = improve_expected_lineup(
+        rank_four_captain_squad,
+        XI,
+        BENCH,
+        1,
+        3,
+        not_starting=BENCH,
+        max_evaluations=limit,
+        locked_first=locked_first,
+    )
+    assert result.best == result.incumbent
+    assert result.best.starting_xi == XI and result.best.ordered_bench == BENCH
+    assert (result.best.captain_id, result.best.vice_captain_id) == (1, 3)
+    assert result.evaluations == 1 and result.autosub_cache_hits == 0
+    assert result.states_evaluated == result.incumbent.states_evaluated
+    assert result.captain_pairs_considered == (0 if locked_first else 110)
+    assert result.budget_exhausted is (not locked_first)
 
 
 @pytest.mark.parametrize("limit", [0, -1, True, 1.5, 10001])
