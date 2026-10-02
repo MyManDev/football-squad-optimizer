@@ -6,19 +6,31 @@ no outcome of the gameweek it decides or of a later one before its first reading
 
 ## The question
 
-On 2026-10-01, under the experimental football model, a member's three- and five-week window
-is planned by `plan_transfer_horizon` in `src/squadopt/live/transfers.py`. When the capture
-states a 25, 50 or 75 per cent chance of playing for a held player who meets the conditions of
-`availability_observations` in `src/squadopt/live/football_observations.py`, the window is
-solved by `bounded_observed_window_v1` (`src/squadopt/planning/observed.py`, released in
-`site-2026-27-gw06-fix7`); otherwise by `sequential_certified_window_v1`
-(`src/squadopt/planning/guarded.py`, released in `site-2026-27-gw06-fix6`). #911, released the
-same day in `site-2026-27-gw06-fix8`, replaces the observed route with
-`complete_observed_window_v2`. Windows under the current model keep the full-window solver,
-`optimize_transfer_plan(..., protect_hold=True)` in `src/squadopt/planning/optimizer.py`, which is
-also the path a football window took before #907.
-These routes change between releases, so the arm this protocol calls `served` is whatever
-`plan_transfer_horizon` routes to at the frozen commit (rule 3), and its records name the version.
+On 2026-10-02, under the experimental football model, a member's three- and five-week window
+is planned by `plan_transfer_horizon` in `src/squadopt/live/transfers.py`. Its planner source
+is the one `site-2026-27-gw06-fix11` released. It routes such a window three ways:
+
+- **Observed.** When the capture states a 25, 50 or 75 per cent chance of playing for a held
+  player who meets the conditions of `availability_observations` in
+  `src/squadopt/live/football_observations.py`, the window is solved by
+  `expected_lineup_observed_window_v4` (`src/squadopt/planning/observed.py`).
+- **Expected.** Otherwise, when the forecast carries appearance probabilities and the window
+  has at least five deterministic units, it is solved by `expected_lineup_window_v1`
+  (`src/squadopt/planning/expected_window.py`). That route ranks two guarded proposals on one
+  expected lineup utility.
+- **Guarded.** Otherwise, it is solved by `sequential_certified_window_v1`
+  (`src/squadopt/planning/guarded.py`).
+
+Each routed window may also make a second move in a week from two banked free transfers
+(`allow_two_free_transfers` in `src/squadopt/planning/models.py`).
+
+Windows under the current model keep the full-window solver,
+`optimize_transfer_plan(..., protect_hold=True)` in `src/squadopt/planning/optimizer.py`. That
+is also the path a football window took before #907.
+
+These routes changed with each of #907, #909, #911, #915 and #919. So the arm this protocol
+calls `served` is whatever `plan_transfer_horizon` routes to at the frozen commit (rule 3), and
+its records name the version.
 
 The evidence for the two routes is in-forecast. #907 shipped functional checks and no
 measurement. #909's record, `docs/research/football_information_windows.md`, is a four-case
@@ -65,9 +77,9 @@ under `DetectionPolicy(confidence_level=0.90, power=0.80)` is 7.45 points a game
 scored weeks and 5.18 at 31. It treats weeks as independent, which is optimistic at a positive
 autocorrelation. The analogue's mean is below both.
 
-I expect contrast A to sit near zero: both arms solve the same window under the same policy and
-the same configured work, and differ only where a budget-limited search stops in a different
-place. I expect contrast B to be above zero and below its detectable effect, and both final
+I expect contrast A to sit near zero. Both arms solve the same window under the same policy and
+the same configured work. They differ in the search, and where the observed or expected route
+applies, in a final choice made on expected lineup utility, not on points alone. I expect contrast B to be above zero and below its detectable effect, and both final
 intervals to include zero. These are stated priors, and no clause reads them.
 
 ## 1. Identity and binding
@@ -77,10 +89,13 @@ intervals to include zero. These are stated priors, and no clause reads them.
 2. It binds from the commit that merges it. The first chain week is the first gameweek whose
    deadline falls after the later of two merges: this document's, and that of the runner
    `scripts/measure_planner_policy_chain.py`. The target is GW6, whose deadline the bootstrap of
-   capture `fpl-live-20260922T214539Z-364991a4f832` puts at 2026-10-10T10:00:00Z. If either
-   merges later, the first chain week moves to the next deadline; the reading dates do not move,
-   so a later start leaves fewer weeks to read. A first chain week fixed before any of its inputs
-   exist cannot be chosen after its outcome is seen.
+   capture `fpl-live-20260922T214539Z-364991a4f832` puts at 2026-10-10T10:00:00Z. The owner's
+   answer on #632 (5948324329) holds GW6 to two dates: this document merged by 6 October and the
+   runner by 8 October. If either misses its date, the first chain week is GW7, or the first
+   deadline after the later merge when that is later still. The reading dates do not move, so a
+   later start leaves fewer weeks to read. A first chain week fixed before any of its inputs
+   exist cannot be chosen after its outcome is seen, and an earlier week is never relabelled as
+   the start.
 3. Every decision is computed from the runner's merge commit, the frozen source, and `served`
    is the routed planner at that commit, whatever version strings it carries. The first run
    refuses unless HEAD is that commit. It records the commit, the sha256 of this document's
@@ -161,16 +176,25 @@ intervals to include zero. These are stated priors, and no clause reads them.
 
 12. The window arms use the member transfer policy `plan_transfer_horizon` applies to a window:
     a planning hit cost of 8 with 4 charged, at most one transfer a week and the captured sale
-    fee on later purchases. The one-week arm uses the same policy uncapped, as the product serves
+    fee on later purchases. For a three- or five-week football window it routes, that policy also
+    allows a second move in a week from two banked free transfers (`allow_two_free_transfers`),
+    and `hold` plans under the same policy. A truncated window (rule 14) is not routed and keeps
+    one move. The one-week arm uses the same policy uncapped, as the product serves
     one week, so contrast B compares a capped window with an uncapped week and does not separate
     the horizon from the cap. Whenever `served` and `hold` plan from the same state, as they do
     in the first chain week, the runner checks that their plans carry the same configuration and
     horizon fingerprints, and refuses a mismatch.
-13. `served` records the route its call took (observed, guarded, or neither), that route's
-    version string, the observed window's outcome (`observed_window.status`: `compared`, or the
-    reason it is incomplete, in which case the plan is the guarded baseline solved at 40 per
-    cent of the units) and whether the guarded construction completed
-    (`sequential_incumbent.seed_completed`). Contrast A is also split by these, descriptively.
+13. `served` records:
+    - the route its call took (observed, expected, guarded, or neither) and that route's
+      version string;
+    - the observed window's outcome (`observed_window.status`): `compared`, or the reason it is
+      incomplete, in which case the plan is the guarded baseline solved at 40 per cent of the
+      units;
+    - the expected window's outcome and chosen proposal (`expected_lineup_window.status` and
+      `chosen`);
+    - whether the guarded construction completed (`sequential_incumbent.seed_completed`).
+
+    Contrast A is also split by these, descriptively.
 14. A window that would reach past GW38 is truncated to min(w, 39 - g) weeks: GW35 to GW38 for
     five weeks and GW37 and GW38 for three. The product refuses such a window, and the routed
     planner needs three or five weeks, so a truncated week is not the served planner. There
@@ -360,13 +384,15 @@ intervals to include zero. These are stated priors, and no clause reads them.
     never writes under `data/` or elsewhere under `artifacts/`, never starts, stops or calls
     the backend or port 8000, and never opens a live store or `data/runtime`. The operator
     announces each run on the tracking issue.
-40. Who runs the decision step and the scorer, and on which machine, is the owner's decision,
-    asked on #632 as Question PC1. Nothing runs before an Answer names the operator and the
-    machine, and silence is not an answer. The machine is best the one that writes the football
-    artifacts; any other copies its inputs as rule 6 says. If the Answer comes after the first chain week's
-    deadline, the chain still starts at its first chain week and decides weeks in order, each
-    from its own capture and artifact if both are still on disk with a write time before that
-    week's deadline; a week whose inputs are gone is missing. Each decision is a function of the
+40. Who runs the decision step and the scorer, and on which machine, was asked on #632 as
+    Question PC1. The owner answered on 2026-10-02 (5948324329): the owner runs both on the
+    owner's machine, which writes the football artifacts and keeps the captures. The first
+    computation comes after the 9 to 11 October freeze, from GW6's decision capture and served
+    forecast, and reads no match outcome. Another operator or machine needs a new Answer, and
+    silence is not one; any other machine copies its inputs as rule 6 says. However late a
+    decision is computed, the chain starts at its first chain week and decides weeks in order,
+    each from its own capture and artifact if both are still on disk with a write time before
+    that week's deadline; a week whose inputs are gone is missing. Each decision is a function of the
     frozen source and of inputs written before its week's deadline, so when it is computed does
     not change it. If no chain has started by gameweek 21's deadline, the runner refuses to start
     one, nothing is read and the protocol lapses unrun.
@@ -381,4 +407,6 @@ windows, or about whether the forecast's chances of playing are calibrated. It d
 timing, the Top 100 weight, the manager's word or the preferences. In contrast B the one-week
 planning table carries no appearance probability while the windows' tables do, and
 `lineup_fields` orders the bench by it when it is present, so the two arms' bench orders follow
-different rules.
+different rules. Where the observed or expected route applies, `served` also makes its final
+choice on expected lineup utility, while `hold` and the one-week path choose on points. So
+neither contrast separates the search from that choice.

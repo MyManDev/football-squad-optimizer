@@ -101,7 +101,10 @@ def _protocol() -> str:
         "no verdict at fewer than 15 weeks, no verdict at the interim, and one interim reading"
         " only",
         "The interim records no verdict.",
-        "the reading dates do not move, so a later start leaves fewer weeks to read",
+        "The reading dates do not move, so a later start leaves fewer weeks to read.",
+        "this document merged by 6 October and the runner by 8 October. If either misses its"
+        " date, the first chain week is GW7",
+        "an earlier week is never relabelled as the start",
         "A capture taken after every published deadline has closed targets no gameweek and is left"
         " out.",
         "Each week's receipt lists every capture whose own target is that week, with its instant",
@@ -116,8 +119,11 @@ def _protocol() -> str:
         "`locked_holdout_accessed: false`",
         "`forecast_archive_seasons`",
         "never on a Tuesday or Friday",
-        "Nothing runs before an Answer names the operator and the machine, and silence is not"
-        " an answer.",
+        "The owner answered on 2026-10-02 (5948324329): the owner runs both on the owner's machine",
+        "Another operator or machine needs a new Answer, and silence is not one",
+        "allows a second move in a week from two banked free transfers",
+        "and `hold` plans under the same policy",
+        "(observed, expected, guarded, or neither)",
         "If no chain has started by gameweek 21's deadline, the runner refuses to start one,"
         " nothing is read and the protocol lapses unrun.",
         "is whatever `plan_transfer_horizon` routes to at the frozen commit",
