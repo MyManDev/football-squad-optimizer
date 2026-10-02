@@ -61,6 +61,7 @@ from squadopt.platform.club_news_provider import (
     REFUSAL_BUDGET,
     REFUSAL_CALL_FAILED,
     REFUSAL_NOTHING_SELECTED,
+    WeekCoding,
     code_week,
     code_week_by_club,
     register_provider,
@@ -159,6 +160,7 @@ def _report(week: Any) -> Any:
     assert week.document_selection is not None
     return build_coding_stage_report(
         roster_clubs=LEAGUE,
+        read_clubs=tuple(dict.fromkeys(d.club for d in week.documents)),
         selection=week.document_selection,
         raw_claims={entry.club: club_news_acquire._raw_claim_count(entry) for entry in week.coded},
         reused_clubs=week.reused_clubs,
@@ -341,7 +343,14 @@ def test_when_the_article_is_turned_away_the_club_is_coded_without_one() -> None
     [
         ({"raw_claims": {"Arsenal": 2, "Man Utd": -1}}, "nonnegative integers"),
         ({"raw_claims": {"Arsenal": 2, "Man Utd": True}}, "nonnegative integers"),
-        ({"raw_claims": {"Arsenal": 2, "Man Utd": 0, "Spurs": 1}}, "document selected"),
+        # Chelsea was read and nothing of it was selected: an answer for it is not this run's.
+        (
+            {
+                "raw_claims": {"Arsenal": 2, "Man Utd": 0, "Chelsea": 1},
+                "refusal_kinds": (("Liverpool", REFUSAL_CALL_FAILED),),
+            },
+            "document selected",
+        ),
         ({"reused_clubs": ("Liverpool",)}, "must belong to a coded club"),
         ({"refusal_kinds": (("Liverpool", "something_else"),)}, "Unknown coding refusal kind"),
         ({"refusal_kinds": (("Arsenal", REFUSAL_CALL_FAILED),)}, "exactly one coding outcome"),
@@ -356,6 +365,42 @@ def test_when_the_article_is_turned_away_the_club_is_coded_without_one() -> None
         ),
         ({"model_calls_attempted": -1}, "nonnegative integer"),
         ({"model_calls_attempted": True}, "nonnegative integer"),
+        # A club that was read vanishes from no list: it has an outcome or the report is refused.
+        ({"raw_claims": {"Arsenal": 2}}, "Every read club has exactly one coding outcome"),
+        # An outcome for a club nobody read is not this run's.
+        (
+            {
+                "refusal_kinds": (
+                    ("Chelsea", REFUSAL_NOTHING_SELECTED),
+                    ("Liverpool", REFUSAL_BUDGET),
+                    ("Spurs", REFUSAL_BUDGET),
+                )
+            },
+            "Every read club has exactly one coding outcome",
+        ),
+        # A name outside the league is not a club this report can place.
+        (
+            {"raw_claims": {"Arsenal": 2, "Man Utd": 0, "Example FC": 1}},
+            "exact selected club names",
+        ),
+        (
+            {"read_clubs": ("Arsenal", "Man Utd", "Chelsea", "Liverpool", "Nowhere")},
+            "exact selected club names",
+        ),
+        # The kind of a refusal fits the selection: nothing selected is for a club with none.
+        (
+            {"refusal_kinds": (("Chelsea", REFUSAL_BUDGET), ("Liverpool", REFUSAL_BUDGET))},
+            "nothing selected is the refusal of a club with no selected document",
+        ),
+        (
+            {
+                "refusal_kinds": (
+                    ("Chelsea", REFUSAL_NOTHING_SELECTED),
+                    ("Liverpool", REFUSAL_NOTHING_SELECTED),
+                )
+            },
+            "nothing selected is the refusal of a club with no selected document",
+        ),
     ],
 )
 def test_coding_inputs_that_do_not_describe_one_run_are_refused(
@@ -364,6 +409,7 @@ def test_coding_inputs_that_do_not_describe_one_run_are_refused(
     week = _week()
     arguments: dict[str, Any] = {
         "roster_clubs": LEAGUE,
+        "read_clubs": tuple(dict.fromkeys(d.club for d in week.documents)),
         "selection": week.document_selection,
         "raw_claims": {"Arsenal": 2, "Man Utd": 0},
         "reused_clubs": (),
@@ -373,6 +419,15 @@ def test_coding_inputs_that_do_not_describe_one_run_are_refused(
     arguments.update(overrides)
     with pytest.raises(ValueError, match=message):
         build_coding_stage_report(**arguments)
+
+
+def test_a_week_coding_whose_kinds_do_not_follow_its_refusals_is_refused() -> None:
+    week = _week(max_calls=1)
+    coding = code_week(_Outcomes(), TARGETED, week.documents, ROSTER, max_calls=1)
+    with pytest.raises(ValueError, match="Each refusal has its kind"):
+        WeekCoding(coding.coded, coding.refused, coding.calls_attempted, coding.refusal_kinds[1:])
+    with pytest.raises(ValueError, match="Each refusal has its kind"):
+        WeekCoding(coding.coded, coding.refused, coding.calls_attempted, ())
 
 
 def test_the_four_refusal_kinds_are_the_ones_the_coding_stage_names() -> None:

@@ -202,8 +202,12 @@ def format_club_news_coverage(report: ClubNewsCoverageReport) -> str:
 class CodingStageReport:
     """What the coding stage did with the documents that were read, one outcome per place.
 
-    Every list is in roster order and names league clubs only. A club appears in exactly
-    one of the answer lists or one of the refusal lists, never in two.
+    Every list is in roster order and names league clubs only. Every club that was read
+    has exactly one outcome: it is in ``answered_clubs`` or ``reused_clubs``, or in exactly
+    one of the four refusal lists. The dated-article lists and the claims lists describe
+    the coded clubs further and do not add outcomes: a coded club is in one of the two
+    dated-article lists, and in ``empty_answer_clubs`` or ``unreadable_answer_clubs`` when
+    its answer states no claim or no list of claims.
 
     A *dated article* is a selected document whose own held fields state a publication time
     verifiably. It is the only evidence this report has that a page is an article: a page
@@ -240,6 +244,7 @@ _REFUSAL_KINDS = (
 def build_coding_stage_report(
     *,
     roster_clubs: Sequence[str],
+    read_clubs: Sequence[str],
     selection: DocumentSelection,
     raw_claims: Mapping[str, int | None],
     reused_clubs: Sequence[str],
@@ -248,12 +253,15 @@ def build_coding_stage_report(
 ) -> CodingStageReport:
     """Describe the coding stage from the one selection it used and its own outcomes.
 
-    ``raw_claims`` names every coded club with the number of claims its answer states, or
-    ``None`` for an answer that carries no list of claims. ``reused_clubs`` are the coded
-    clubs whose answer came from an earlier capture. ``refusal_kinds`` is the coding stage's
-    own list of which kind each refusal was. A club may not be both coded and refused, a
-    reused club must be coded, and a coded club must have a selected document: an answer
-    with nothing selected behind it is not an answer this run can describe.
+    ``read_clubs`` are the clubs a document was read for; each has exactly one outcome
+    here, and no outcome names a club that was not read. ``raw_claims`` names every coded
+    club with the number of claims its answer states, or ``None`` for an answer that
+    carries no list of claims. ``reused_clubs`` are the coded clubs whose answer came from
+    an earlier capture. ``refusal_kinds`` is the coding stage's own list of which kind each
+    refusal was. A club may not be both coded and refused, a reused club must be coded, a
+    coded club must have a selected document, and a refusal for nothing selected is the
+    refusal of a club with no selected document and of no other: an outcome that does
+    not fit the selection is not an outcome this run can describe.
     """
 
     roster = _names(roster_clubs, "Snapshot teams")
@@ -263,6 +271,7 @@ def build_coding_stage_report(
     def ordered(names: set[str]) -> tuple[str, ...]:
         return tuple(club for club in league if club in names)
 
+    read = set(_names(read_clubs, "Read clubs"))
     coded = set(raw_claims)
     if any(
         count is not None and (type(count) is not int or count < 0) for count in raw_claims.values()
@@ -280,11 +289,25 @@ def build_coding_stage_report(
         kind_of[club] = kind
     if type(model_calls_attempted) is not int or model_calls_attempted < 0:
         raise ValueError("Model calls attempted must be a nonnegative integer.")
+    outcomes = coded | set(kind_of)
+    if outcomes - league_set:
+        raise ValueError("Coding outcomes must belong to exact selected club names.")
+    if read - league_set:
+        raise ValueError("Read clubs must belong to exact selected club names.")
+    if outcomes != read:
+        raise ValueError(
+            "Every read club has exactly one coding outcome, and no other club has one."
+        )
 
     chosen = [document for document in selection.documents if document.club in league_set]
     with_selection = {document.club for document in selection.documents}
     if coded - with_selection:
         raise ValueError("A coded club must have a document selected for coding.")
+    for club, kind in kind_of.items():
+        if (kind == REFUSAL_NOTHING_SELECTED) != (club not in with_selection):
+            raise ValueError(
+                "A refusal for nothing selected is the refusal of a club with no selected document."
+            )
     dated = [
         document
         for document in chosen

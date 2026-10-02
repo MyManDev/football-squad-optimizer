@@ -551,6 +551,7 @@ def main(
             format_coding_stage(
                 build_coding_stage_report(
                     roster_clubs=league_clubs,
+                    read_clubs=tuple(dict.fromkeys(d.club for d in week.documents)),
                     selection=week.document_selection,
                     raw_claims=raw_claims,
                     reused_clubs=week.reused_clubs,

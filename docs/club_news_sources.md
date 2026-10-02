@@ -276,7 +276,7 @@ A second block describes the coding stage, one outcome to a line:
 | `Answer without a claims list` | coded clubs whose answer carries no list of claims at all |
 | `Call attempted and failed` | read clubs whose call was begun and gave no usable answer |
 | `Stopped by the call budget, no call attempted` | read clubs the budget did not reach |
-| `Refused before a call was attempted` | read clubs whose input was refused while the question was built |
+| `Refused before a call was attempted` | read clubs refused with no call attempted: the input was refused while the question was built, or a held answer no longer met the contract |
 | `No document selected for coding` | read clubs with nothing selected |
 | `Model calls attempted` | calls begun in this run, answered or failed |
 | `Raw claims` | claims as the model stated them, before any is checked against its source |

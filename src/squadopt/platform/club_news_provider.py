@@ -434,7 +434,11 @@ class WeekCoding:
     coded: tuple[CodedClub, ...]
     refused: tuple[tuple[str, str], ...]
     calls_attempted: int
-    refusal_kinds: tuple[tuple[str, str], ...] = ()
+    refusal_kinds: tuple[tuple[str, str], ...]
+
+    def __post_init__(self) -> None:
+        if [club for club, _ in self.refusal_kinds] != [club for club, _ in self.refused]:
+            raise ValueError("Each refusal has its kind, in the order the refusals are listed.")
 
 
 #: No document of the club was selected for coding, so there was nothing to ask about.
@@ -553,6 +557,8 @@ def code_week(
                 and held.prompt_sha256 == prompt_sha256
                 and held.response.model_identifier == config.model_identifier
             ):
+                # A held answer that no longer meets the contract is refused with no call
+                # attempted, like an input refused before its question is built.
                 require_requested_coding_contract(held.response)
                 coded.append(held)
                 continue
