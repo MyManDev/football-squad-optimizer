@@ -1,5 +1,12 @@
 # Copy to a private location outside Git and web/public.
 # The acquisition process reads this file; the browser and advice API do not.
+#
+# Precedence, for each setting: the environment variable, then this file, then the
+# provider's own default where it has one. There is no command-line option for the
+# provider, the model, the endpoint or the key; the command takes only --settings-file.
+# An environment override of the provider or the endpoint names a different destination,
+# and nothing bound to this file's destination follows it there: not the model, the key,
+# the response format, the token limit or the local-HTTP permission.
 [llm]
 provider = "openai"
 model = "YOUR_MODEL_ID"
@@ -9,6 +16,10 @@ max_completion_tokens = 16000
 
 # Alternatively remove api_key_env and put api_key in the PRIVATE copy only.
 # Never pass the key as a command-line argument or put it in this tracked example.
+
+# response_format, max_completion_tokens, base_url and allow_local_http apply to the
+# openai and openai-compatible providers only. With provider = "anthropic" or "gemini",
+# remove those lines: the command refuses them instead of ignoring them.
 
 # For a compatible service, change provider, model, key reference and endpoint together:
 # provider = "openai-compatible"

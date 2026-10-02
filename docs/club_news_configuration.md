@@ -37,9 +37,26 @@ The environment-only configuration remains supported. `SQUADOPT_LLM_PROVIDER`,
 `SQUADOPT_LLM_MODEL` and `SQUADOPT_LLM_API_KEY` override matching file defaults.
 OpenAI settings also accept `SQUADOPT_LLM_BASE_URL`, `SQUADOPT_LLM_RESPONSE_FORMAT`,
 `SQUADOPT_LLM_MAX_COMPLETION_TOKENS` and `SQUADOPT_LLM_ALLOW_LOCAL_HTTP`.
-A provider or endpoint override discards the file-bound model and credential; supply the new
-destination's model and key explicitly. A missing named `api_key_env` refuses rather than
-trying another credential.
+There is no command-line option for the provider, the model, the endpoint or the key.
+
+Where each setting comes from, first match wins:
+
+| Setting | 1 | 2 | 3 |
+| --- | --- | --- | --- |
+| Provider | `SQUADOPT_LLM_PROVIDER` | the file's `provider` (required in a file) | `anthropic` when there is no file |
+| Model | `SQUADOPT_LLM_MODEL` | the file's `model`, if the destination is the file's | the default of `anthropic` or `gemini`; any other provider refuses |
+| Endpoint | `SQUADOPT_LLM_BASE_URL` | the file's `base_url`, if the provider is the file's | the official address for `openai`; `openai-compatible` refuses without one |
+| Key | `SQUADOPT_LLM_API_KEY` | the file's `api_key_env` or `api_key`, if the destination is the file's | the provider's own variable (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`) |
+
+The destination is the provider together with its endpoint. An environment override that
+names a different destination leaves everything the file bound to its own destination
+behind: the model, the key, the response format, the token limit and the local-HTTP
+permission. The new destination then needs its own model and key, from the environment or
+from the provider's default and own key variable where it has them. A missing named
+`api_key_env` refuses rather than trying another credential.
+
+`--check-config` prints the provider and model it resolved and, for the OpenAI adapters,
+the response format and token limit that will be requested.
 
 `openai` uses the official endpoint and requires an explicit model; its vendor-key
 fallback is `OPENAI_API_KEY`. `openai-compatible` requires an explicit model and
