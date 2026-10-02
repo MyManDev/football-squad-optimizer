@@ -42,6 +42,15 @@ def document(title, path="news/update", published=None):
         ("Match report: Liverpool win", "news/update"),
         ("Latest news", "news"),
         ("Tickets available", "news/tickets/update"),
+        # The same rule by its other names: a section in the path, or a labelled title.
+        ("Scholar signs first deal", "news/academy/scholar-signs"),
+        ("Cup run continues", "news/youth/cup-run"),
+        ("Under-18s: late winner", "news/update"),
+        ("Liverpool Ladies name squad", "news/update"),
+        ("New home kit on sale", "news/shop/home-kit"),
+        ("Matchday lounge packages", "news/hospitality/lounge"),
+        ("International report: three called up", "news/update"),
+        ("Highlights: Liverpool 2-0", "news/update"),
     ],
 )
 def test_explicit_irrelevant_pages_are_not_sent_to_a_provider(title, path):
@@ -71,6 +80,23 @@ def test_verified_source_date_is_used_without_substituting_fetch_time(date, reas
     doc = document("Team news", published=date)
     selection = select_coding_documents((doc,), as_of="2026-10-02T10:00:00Z")
     assert selection.documents == () and selection.decisions[0].reason == reason
+
+
+@pytest.mark.parametrize(
+    "title,path",
+    [
+        ("Injury update ahead of the weekend", "news/injury-update"),
+        ("Press conference: every word on fitness", "news/presser"),
+        ("Match preview: all you need to know", "news/preview"),
+        ("Squad update", "news/squad"),
+        ("A message from the club", "news/first-team/message"),
+    ],
+)
+def test_first_team_availability_and_upcoming_match_pages_are_named_as_such(title, path):
+    doc = document(title, path)
+    selection = select_coding_documents((doc,))
+    assert selection.documents == (doc,)
+    assert selection.decisions[0].reason == "availability_or_upcoming_match"
 
 
 def test_unknown_date_or_scope_is_not_declared_upcoming_or_absent():

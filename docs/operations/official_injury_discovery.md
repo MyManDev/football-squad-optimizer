@@ -17,6 +17,12 @@ Do not run the central capture command or pass central artifacts into publicatio
 without the required permission and a separate activation decision. The existing
 FPL feed and the independently registered club sources remain separate paths.
 
+The club-news acquisition does not depend on it. In a rehearsed run of
+`python -m scripts.capture_club_news` without `--official-injury-capture`, every request
+goes to a registered club host (`test_club_news_acquisition_report.py`, which also asserts
+the capability constant is off). The same command given that option refuses before it reads
+any input (`test_club_news_acquire.py`).
+
 ## Prepared optional capability
 
 The official [league injury page](https://www.premierleague.com/en/latest-player-injuries)
