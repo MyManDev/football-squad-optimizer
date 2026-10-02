@@ -594,7 +594,14 @@ def test_the_served_route_reads_the_observed_block_before_its_guarded_baselines(
     guarded = _plan(
         diagnostics={"sequential_incumbent": {"version": "sequential_certified_window_v1"}}
     )
+    expected = _plan(
+        diagnostics={
+            "expected_lineup_window": {"version": "expected_lineup_window_v1"},
+            "sequential_incumbent": {"version": "sequential_certified_window_v1"},
+        }
+    )
     assert chain._route(both) == ("observed", "bounded_observed_window_v1")  # type: ignore[arg-type]
+    assert chain._route(expected) == ("expected", "expected_lineup_window_v1")  # type: ignore[arg-type]
     assert chain._route(guarded) == ("guarded", "sequential_certified_window_v1")  # type: ignore[arg-type]
     assert chain._route(_plan(diagnostics={})) == ("standard", None)  # type: ignore[arg-type]
 
@@ -616,6 +623,8 @@ def test_an_observed_comparison_is_published_feasible_and_not_counted_as_proved(
         "proved": False,
         "selection_status": "FEASIBLE_RESTRICTED_MENU",
         "observed_window_status": "compared",
+        "expected_window_status": None,
+        "expected_window_chosen": None,
         "seed_completed": True,
         "seed_note": None,
     }
