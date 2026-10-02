@@ -101,6 +101,9 @@ UNITS_PER_WEEK = 20.0
 #: The standard path's hold probe runs outside the primary limit, so the hold arm's primary
 #: limit is one unit short of the others' total (rule 11).
 HOLD_PROBE_UNITS = 1.0
+#: The model name ``build_football_horizon`` gives a football horizon; ``plan_transfer_horizon``
+#: routes and finances a three- or five-week window by it (rule 12).
+FOOTBALL_HORIZON_MODEL = "fixture_football_candidate"
 #: The configuration measure_shortlist_matrix.py builds its squads under (rule 9).
 SQUAD_CONFIG = OptimizationConfig(
     bench_weight=0, solver_time_limit_seconds=120, solver_deterministic_time_limit=60
@@ -516,11 +519,15 @@ def prepare_window(
     horizon: ProjectionHorizon,
     held: HeldSquad,
     rules: SeasonRules,
+    *,
+    deterministic_units: float,
 ) -> PreparedWindow:
     """The preparation ``plan_transfer_horizon`` performs before it routes a window.
 
     The hold arm runs this preparation and then the standard path, so it is checked against
-    ``plan_transfer_horizon`` on a horizon that takes the standard path, plan for plan.
+    ``plan_transfer_horizon`` on a horizon that takes the standard path, plan for plan, and
+    against its policy on a football window that it routes. ``deterministic_units`` is the
+    window's whole budget, the one the routed planner's condition reads.
     """
 
     horizon.assert_fingerprint()
@@ -564,6 +571,15 @@ def prepare_window(
     policy = _transfer_config(rules, transfer_cap=None if weeks == 1 else 1)
     if weeks > 1:
         policy = replace(policy, acquisition_sell_on_fee=fee)
+    # A three- or five-week football window that plan_transfer_horizon routes also lets a
+    # second move come from two banked free transfers (fix11), so the hold arm plans under
+    # that policy too and rule 12's fingerprint check still compares like with like.
+    if (
+        horizon.model_name == FOOTBALL_HORIZON_MODEL
+        and weeks in (3, 5)
+        and deterministic_units >= 2
+    ):
+        policy = replace(policy, allow_two_free_transfers=True)
     state = InitialSquadState(
         held.squad_player_ids,
         bank_tenths=budget.bank_tenths,
@@ -603,9 +619,14 @@ class ArmOutcome:
 
 def _route(plan: TransferPlanResult) -> tuple[str, str | None]:
     """Rule 13: the route the served call took. An observed plan also carries its guarded
-    baseline's block, so the observed block is read first."""
+    baseline's block, and an expected-lineup plan its chosen guarded proposal's, so those
+    two blocks are read before the guarded one."""
 
-    for route, key in (("observed", "observed_window"), ("guarded", "sequential_incumbent")):
+    for route, key in (
+        ("observed", "observed_window"),
+        ("expected", "expected_lineup_window"),
+        ("guarded", "sequential_incumbent"),
+    ):
         block = plan.diagnostics.get(key)
         if isinstance(block, dict):
             version = block.get("version")
@@ -622,6 +643,7 @@ def _status(plan: TransferPlanResult, route: str) -> dict[str, object]:
     """Rules 13 and 20: the solver status, what the product publishes, and whether it proves."""
 
     observed = _block(plan, "observed_window")
+    expected = _block(plan, "expected_lineup_window")
     compared = observed.get("status") == "compared"
     solver = plan.solver_status.name
     published = SolverStatus.FEASIBLE.name if compared else solver
@@ -632,6 +654,8 @@ def _status(plan: TransferPlanResult, route: str) -> dict[str, object]:
         "proved": published == SolverStatus.OPTIMAL.name,
         "selection_status": plan.diagnostics.get("selection_status"),
         "observed_window_status": observed.get("status") if route == "observed" else None,
+        "expected_window_status": expected.get("status") if route == "expected" else None,
+        "expected_window_chosen": expected.get("chosen") if route == "expected" else None,
         "seed_completed": seed,
         "seed_note": None
         if seed is not None
@@ -647,11 +671,15 @@ def _work(plan: TransferPlanResult) -> dict[str, object]:
     diagnostics = plan.diagnostics
     used = diagnostics.get("deterministic_time_used")
     observed = _block(plan, "observed_window")
+    expected = _block(plan, "expected_lineup_window")
     guarded = _block(plan, "sequential_incumbent")
     hold = _block(plan, "hold_protection")
     total: object = used
     if observed:
         total = observed.get("actual_total")
+    elif expected:
+        # Both proposals' guarded totals, each with its own hold probe inside its share.
+        total = expected.get("actual_total")
     elif guarded:
         total = guarded.get("actual_total")
     elif hold and isinstance(used, int | float):
@@ -709,7 +737,11 @@ def run_arm(arm: str, week: WeekInputs, held: HeldSquad) -> ArmOutcome:
             )
         else:
             prepared = prepare_window(
-                week.inputs, week.forecast.build_horizon(weeks), held, week.rules
+                week.inputs,
+                week.forecast.build_horizon(weeks),
+                held,
+                week.rules,
+                deterministic_units=units,
             )
             policy = prepared.policy
             plan = optimize_transfer_plan(

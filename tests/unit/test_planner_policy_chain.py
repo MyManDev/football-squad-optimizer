@@ -9,6 +9,7 @@ outcome, and the arms themselves are tested on the shared synthetic window.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 from dataclasses import replace
@@ -36,6 +37,8 @@ from squadopt.live.football_artifact import football_artifact_path, forecast_dig
 from squadopt.live.recommendation import read_inputs
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import PlanningHorizon
+from squadopt.planning.guarded import GUARDED_PLANNER_VERSION
+from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
@@ -457,7 +460,7 @@ def test_the_hold_arm_is_one_unit_short_so_its_probe_brings_it_level(
         "state",  # type: ignore[arg-type]
         SimpleNamespace(configuration_fingerprint="c"),  # type: ignore[arg-type]
     )
-    monkeypatch.setattr(chain, "prepare_window", lambda *args: prepared)
+    monkeypatch.setattr(chain, "prepare_window", lambda *args, **kwargs: prepared)
     monkeypatch.setattr(chain, "PlanningHorizon", lambda table: ("horizon", table))
 
     def optimize(
@@ -646,7 +649,7 @@ def test_the_hold_arm_is_the_standard_path_plan_for_plan(tmp_path: Path, length:
     served, served_policy = plan_transfer_horizon(
         inputs, horizon, held, rules, optimization=BUDGET, linearization_level=2
     )
-    prepared = chain.prepare_window(inputs, horizon, held, rules)
+    prepared = chain.prepare_window(inputs, horizon, held, rules, deterministic_units=20)
     ours = optimize_transfer_plan(
         PlanningHorizon(prepared.planning_table),
         prepared.state,
@@ -666,6 +669,89 @@ def test_the_hold_arm_is_the_standard_path_plan_for_plan(tmp_path: Path, length:
         assert int(mine.captain["player_id"]) == int(theirs.captain["player_id"])
 
 
+def _football(horizon: Any, *, appearance: bool) -> Any:
+    """The synthetic window relabelled as the football forecast the routed planner takes."""
+
+    table = horizon.table.copy()
+    if appearance:
+        table["appearance_probability"] = 0.9
+    return replace(
+        horizon,
+        table=table,
+        model_name=chain.FOOTBALL_HORIZON_MODEL,
+        model_version=FOOTBALL_MODEL_VERSION,
+        contract_version=(
+            APPEARANCE_HORIZON_CONTRACT_VERSION if appearance else horizon.contract_version
+        ),
+    )
+
+
+@pytest.mark.parametrize("length", [3, 5])
+def test_a_routed_football_window_and_the_hold_arm_share_one_policy(
+    tmp_path: Path, length: int
+) -> None:
+    """Rule 12 on the path the chain takes: a football window the planner routes and finances.
+
+    The synthetic tests above use a control-model horizon, which takes the standard path, so
+    they could not see that a routed football window now plans under a second policy flag.
+    """
+
+    inputs, horizon, held, rules = _inputs(tmp_path, tuple(range(2, 2 + length)))
+    football = _football(horizon, appearance=False)
+    served, served_policy = plan_transfer_horizon(
+        inputs, football, held, rules, optimization=BUDGET, linearization_level=2
+    )
+    prepared = chain.prepare_window(inputs, football, held, rules, deterministic_units=20)
+    assert served_policy.allow_two_free_transfers is True
+    assert prepared.policy == served_policy
+    assert prepared.policy.configuration_fingerprint == served_policy.configuration_fingerprint
+    assert chain._route(served) == ("guarded", GUARDED_PLANNER_VERSION)
+
+
+def test_an_expected_lineup_window_is_named_as_its_own_route(tmp_path: Path) -> None:
+    """Rule 13: its guarded proposals carry the guarded block, so the route is read first."""
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    served, _policy = plan_transfer_horizon(
+        inputs,
+        _football(horizon, appearance=True),
+        held,
+        rules,
+        optimization=BUDGET,
+        linearization_level=2,
+    )
+    review = served.diagnostics["expected_lineup_window"]
+    assert "sequential_incumbent" in served.diagnostics
+    assert chain._route(served) == ("expected", "expected_lineup_window_v1")
+    status = chain._status(served, "expected")
+    assert status["expected_window_status"] == review["status"]
+    assert status["expected_window_chosen"] == review["chosen"]
+    assert chain._work(served)["deterministic_time_used"] == review["actual_total"]
+
+
+def test_a_control_or_truncated_window_keeps_the_one_move_policy(tmp_path: Path) -> None:
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    control = chain.prepare_window(inputs, horizon, held, rules, deterministic_units=60)
+    assert control.policy.allow_two_free_transfers is False
+    # Two weeks is neither three nor five: the planner takes the standard path, and so does
+    # the hold arm's policy.
+    inputs, horizon, held, rules = _inputs(tmp_path / "short", (2, 3))
+    short = _football(horizon, appearance=False)
+    _, served_policy = plan_transfer_horizon(
+        inputs, short, held, rules, optimization=BUDGET, linearization_level=2
+    )
+    prepared = chain.prepare_window(inputs, short, held, rules, deterministic_units=40)
+    assert served_policy.allow_two_free_transfers is False
+    assert prepared.policy.configuration_fingerprint == served_policy.configuration_fingerprint
+
+
+def test_the_routing_names_the_runner_copies_are_the_planners() -> None:
+    source = inspect.getsource(live_transfers.plan_transfer_horizon)
+    assert f'model_name == "{chain.FOOTBALL_HORIZON_MODEL}"' in source
+    assert "allow_two_free_transfers=True" in source
+    assert "len(projection_horizon.target_gameweeks) in (3, 5)" in source
+
+
 def _lowered(tmp_path: Path) -> tuple[Any, Any, Any, Any]:
     """The synthetic window with every purchase four tenths below its current price."""
 
@@ -676,7 +762,7 @@ def _lowered(tmp_path: Path) -> tuple[Any, Any, Any, Any]:
 
 def test_the_hold_arm_sells_at_the_games_price_not_the_current_one(tmp_path: Path) -> None:
     inputs, horizon, held, rules = _lowered(tmp_path)
-    prepared = chain.prepare_window(inputs, horizon, held, rules)
+    prepared = chain.prepare_window(inputs, horizon, held, rules, deterministic_units=20)
     table = prepared.planning_table.loc[prepared.planning_table.gameweek.eq(2)]
     fee = float(rules.transfers.sell_on_fee)
     current = dict(zip(table.player_id, table.buy_price_tenths, strict=True))
@@ -691,7 +777,13 @@ def test_the_hold_arm_sells_at_the_games_price_not_the_current_one(tmp_path: Pat
 def test_the_hold_arm_refuses_a_horizon_from_another_capture(tmp_path: Path) -> None:
     inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
     with pytest.raises(chain.ChainError):
-        chain.prepare_window(replace(inputs, snapshot_id="another-capture"), horizon, held, rules)
+        chain.prepare_window(
+            replace(inputs, snapshot_id="another-capture"),
+            horizon,
+            held,
+            rules,
+            deterministic_units=20,
+        )
 
 
 def test_the_state_after_a_week_is_the_ledgers_state_after_it(tmp_path: Path) -> None:
