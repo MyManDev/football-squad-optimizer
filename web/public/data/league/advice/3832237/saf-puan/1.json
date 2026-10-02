@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-22T22:04:06Z",
+  "generated_at_utc": "2026-10-02T16:56:19Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
+    "source_snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
     "moves": [
       {
         "move_id": "gw06-1",
@@ -27,17 +27,17 @@
           "position": "FWD",
           "team": "Man City"
         },
-        "expected_points_delta": 8.136503697537712,
+        "expected_points_delta": 8.370528625256398,
         "reason_code": "points_gain"
       },
       {
         "move_id": "gw06-2",
         "player_out": {
-          "player_id": 430871,
-          "name": "Matheus Santos Carneiro da Cunha",
-          "short_name": "Cunha",
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
           "position": "MID",
-          "team": "Man Utd"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 60307,
@@ -46,7 +46,7 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": -0.3452673614023709,
+        "expected_points_delta": 0.524267453903164,
         "reason_code": "points_gain"
       },
       {
@@ -59,13 +59,13 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
+          "player_id": 17761,
+          "name": "James Tarkowski",
+          "short_name": "Tarkowski",
           "position": "DEF",
-          "team": "Leeds"
+          "team": "Everton"
         },
-        "expected_points_delta": 1.7910710657191231,
+        "expected_points_delta": 2.9572814503456613,
         "reason_code": "points_gain"
       },
       {
@@ -84,7 +84,7 @@
           "position": "DEF",
           "team": "Ipswich Town"
         },
-        "expected_points_delta": 0.6196677303358413,
+        "expected_points_delta": 0.6196677303358342,
         "reason_code": "points_gain"
       },
       {
@@ -97,24 +97,24 @@
           "team": "Brentford"
         },
         "player_in": {
-          "player_id": 441264,
-          "name": "Brian Brobbey",
-          "short_name": "Brobbey",
+          "player_id": 601767,
+          "name": "Vakhtang Salia",
+          "short_name": "Salia",
           "position": "FWD",
-          "team": "Sunderland"
+          "team": "Newcastle"
         },
-        "expected_points_delta": -0.14969158312587894,
+        "expected_points_delta": -0.6614510358844186,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 10.052283549064427,
+    "expected_gain_vs_hold": 11.810294223956639,
     "expected_points_cost": 0.0,
     "rival_label": null,
-    "solver_status": "FEASIBLE",
-    "optimality_gap": 6.915999999999997,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 54.805560915363024,
+    "expected_own_points": 54.86204346747849,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -124,12 +124,12 @@
       "expected_points": 7.9988702038468515
     },
     "vice_captain": {
-      "player_id": 437730,
-      "name": "Antoine Semenyo",
-      "short_name": "Semenyo",
-      "position": "MID",
-      "team": "Man City",
-      "expected_points": 4.792013121272329
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Magalh\u00e3es",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.557988193553639
     },
     "starting_xi": [
       {
@@ -138,7 +138,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.937285604836282
+        "expected_points": 3.937285604836277
       },
       {
         "player_id": 226597,
@@ -146,15 +146,15 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.557988193553642
+        "expected_points": 4.557988193553639
       },
       {
-        "player_id": 226182,
-        "name": "Jayden Bogle",
-        "short_name": "Bogle",
+        "player_id": 17761,
+        "name": "James Tarkowski",
+        "short_name": "Tarkowski",
         "position": "DEF",
-        "team": "Leeds",
-        "expected_points": 3.213241931064083
+        "team": "Everton",
+        "expected_points": 4.109952400950679
       },
       {
         "player_id": 455084,
@@ -162,15 +162,7 @@
         "short_name": "Davis",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.8975259077726996
-      },
-      {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.792013121272329
+        "expected_points": 2.8975259077726943
       },
       {
         "player_id": 446008,
@@ -178,7 +170,15 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.5145936666230195
+        "expected_points": 4.514593666623016
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.4635446562597805
       },
       {
         "player_id": 60307,
@@ -186,7 +186,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.118277294857414
+        "expected_points": 4.1182772948574105
       },
       {
         "player_id": 424876,
@@ -194,7 +194,7 @@
         "short_name": "Szoboszlai",
         "position": "MID",
         "team": "Liverpool",
-        "expected_points": 3.901377512814318
+        "expected_points": 3.9013775128143147
       },
       {
         "player_id": 84450,
@@ -202,7 +202,7 @@
         "short_name": "Xhaka",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.2945342332333274
+        "expected_points": 3.2945342332333203
       },
       {
         "player_id": 223094,
@@ -213,12 +213,12 @@
         "expected_points": 7.9988702038468515
       },
       {
-        "player_id": 441264,
-        "name": "Brian Brobbey",
-        "short_name": "Brobbey",
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
         "position": "FWD",
-        "team": "Sunderland",
-        "expected_points": 3.5809830416422095
+        "team": "Hull City",
+        "expected_points": 3.069223588883662
       }
     ],
     "bench": [
@@ -228,15 +228,7 @@
         "short_name": "Donnarumma",
         "position": "GK",
         "team": "Man City",
-        "expected_points": 3.0824953426510118
-      },
-      {
-        "player_id": 169432,
-        "name": "Oli McBurnie",
-        "short_name": "McBurnie",
-        "position": "FWD",
-        "team": "Hull City",
-        "expected_points": 3.0692235888836668
+        "expected_points": 3.082495342651006
       },
       {
         "player_id": 231416,
@@ -244,7 +236,15 @@
         "short_name": "Kad\u0131o\u011flu",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 2.277858177436863
+        "expected_points": 2.2778581774368583
+      },
+      {
+        "player_id": 601767,
+        "name": "Vakhtang Salia",
+        "short_name": "Salia",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 1.3473254086181279
       },
       {
         "player_id": 106611,
@@ -252,12 +252,13 @@
         "short_name": "Keane",
         "position": "DEF",
         "team": "Everton",
-        "expected_points": 0.1192900721542131
+        "expected_points": 0.11929007215421392
       }
     ],
     "chip": null,
     "stated_limits": [
-      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points."
     ],
     "data_quality": "partial",
     "missing_fields": [
