@@ -19,6 +19,7 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { shownLimits } from "../advice/hiddenLimits";
 import { MESSAGES } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
@@ -82,10 +83,11 @@ describe("the plan states that football v1 splits attacking shares before availa
 
     const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
     expect(listed(limits)).toEqual(
-      published
-        .filter((sentence) => sentence !== NO_CHIP_STATED_LIMIT)
-        .map((sentence) => copy.statedLimits[sentence]),
+      shownLimits(published).map((sentence) => copy.statedLimits[sentence]),
     );
+    // The limit that follows from the model is among them; the window's standing ones are not.
+    expect(shownLimits(published)).toContain(FOOTBALL_SHARE_STATED_LIMIT);
+    expect(shownLimits(published).length).toBeLessThan(published.length);
     if (language === "tr") expect(limits).not.toHaveTextContent(FOOTBALL_SHARE_STATED_LIMIT);
   });
 });

@@ -682,7 +682,7 @@ const en = {
       `The ${asked}-week window was not published for this strategy, so this selection is the ${shown}-week plan.`,
     windowTitle: (weeks: number) => `The ${weeks}-week window`,
     windowRule:
-      "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan, in expected points under the limits stated here.",
+      "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan.",
     windowLimitsLabel: "What this window assumes",
     // The same list on a one-week document, where "window" would name nothing the
     // reader can see. A one-week plan is handed no chip either, and until it said so a
@@ -1793,7 +1793,7 @@ const tr: MessageSchema<typeof en> = {
       `${asked} haftalık pencere bu strateji için yayınlanmadı; bu seçim ${shown} haftalık plandır.`,
     windowTitle: (weeks) => `${weeks} haftalık pencere`,
     windowRule:
-      "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası; beklenen puan, burada yazılı sınırlar altında.",
+      "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası.",
     windowLimitsLabel: "Bu pencerenin varsaydıkları",
     planLimitsLabel: "Bu planın varsaydıkları",
     windowWeek: "Hafta",

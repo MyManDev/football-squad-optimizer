@@ -16,6 +16,7 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { shownLimits } from "../advice/hiddenLimits";
 import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
@@ -76,11 +77,12 @@ describe("the advice card shows a window week by week", () => {
     const section = screen.getByRole("region", { name: copy.windowTitle(5) });
     const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
     const items = within(limits).getAllByRole("listitem");
-    // Every published limit but the one about chips, which the page does not show.
+    // The window's standing assumptions are published but not listed; what is left here
+    // is the one sentence that follows from a setting, the Top 100 uplift.
+    const shown = shownLimits(WINDOW_STATED_LIMITS);
+    expect(shown).toHaveLength(1);
     expect(items.map((item) => item.textContent)).toEqual(
-      WINDOW_STATED_LIMITS.filter((sentence) => sentence !== NO_CHIP_STATED_LIMIT).map(
-        (sentence) => copy.statedLimits[sentence],
-      ),
+      shown.map((sentence) => copy.statedLimits[sentence]),
     );
     expect(
       within(section).getByRole("columnheader", { name: copy.windowHits }),
@@ -130,7 +132,8 @@ describe("the advice card shows a window week by week", () => {
         "toString",
         "probability 97% chance",
       ];
-      const published = [WINDOW_STATED_LIMITS[0]!, ...raw];
+      const known = shownLimits(WINDOW_STATED_LIMITS)[0]!;
+      const published = [known, ...raw];
       const advice = {
         ...base,
         payload: { ...base.payload, stated_limits: [...published] },
@@ -141,7 +144,7 @@ describe("the advice card shows a window week by week", () => {
       const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
       const items = within(limits).getAllByRole("listitem");
       expect(items.map((item) => item.textContent)).toEqual([
-        copy.statedLimits[WINDOW_STATED_LIMITS[0]!],
+        copy.statedLimits[known],
         ...raw.map(() => copy.statedLimitUnknown),
       ]);
       for (const sentence of raw) expect(limits).not.toHaveTextContent(sentence);
