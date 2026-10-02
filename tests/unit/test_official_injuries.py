@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from squadopt.contracts import injuries as injury_contract
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
 from squadopt.data.sources.premier_league_injuries import (
@@ -186,7 +187,9 @@ def test_details_only_route_within_existing_exact_club_origin_and_path():
     assert links == {source.url: (fact.details_urls[0],)}
 
 
-def test_capture_is_four_requests_no_provider_and_exact_offline_replay(tmp_path: Path):
+def test_capture_is_four_requests_no_provider_and_exact_offline_replay(tmp_path: Path, monkeypatch):
+    # Exercise dormant transport only with synthetic bytes, never an operational override.
+    monkeypatch.setattr(injury_contract, "OFFICIAL_INJURY_SOURCE_ENABLED", True)
     boot, source = documents()
     roster = write_snapshot(
         tmp_path / "roster",
@@ -221,7 +224,8 @@ def test_capture_is_four_requests_no_provider_and_exact_offline_replay(tmp_path:
     )
 
 
-def test_stale_terms_refuse_before_any_fetch(tmp_path: Path):
+def test_stale_terms_refuse_before_any_fetch(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(injury_contract, "OFFICIAL_INJURY_SOURCE_ENABLED", True)
     boot, _ = documents()
     meta = write_snapshot(
         tmp_path,
@@ -296,3 +300,102 @@ def test_public_record_filters_unsafe_links_without_rewriting_captured_facts():
     public = found.public_record([10])
     assert public["facts"][0]["details_urls"] == [links[0]]
     assert found.facts[0].details_urls == links
+
+
+def test_disabled_source_refuses_capture_before_clock_fetch_or_write(tmp_path):
+    assert injury_contract.OFFICIAL_INJURY_SOURCE_ENABLED is False
+    boot, _ = documents()
+    meta = write_snapshot(
+        tmp_path / "roster",
+        source=FPL_LIVE_SOURCE,
+        captured_at_utc=NOW,
+        payloads={BOOTSTRAP_PAYLOAD: json.dumps(boot).encode()},
+    )
+    with pytest.raises(ValueError, match="central official injury source is disabled"):
+        capture_official_injuries(
+            roster_snapshot=read_snapshot(tmp_path / "roster", meta.snapshot_id),
+            capture_root=tmp_path / "not-created",
+            terms_read_on=date(2026, 10, 2),
+            fetch=lambda _: pytest.fail("Disabled source must not fetch"),
+            now=lambda: pytest.fail("Disabled source must refuse before acquisition starts"),
+        )
+    assert not (tmp_path / "not-created").exists()
+
+
+def test_disabled_capture_cli_refuses_before_reading_roster(tmp_path, monkeypatch, capsys):
+    from squadopt.platform import official_injury_capture as capture_module
+
+    monkeypatch.setattr(capture_module, "read_snapshot", lambda *_: pytest.fail("No source reads"))
+    assert (
+        capture_module.main(
+            [
+                "--snapshot-root",
+                str(tmp_path),
+                "--roster-snapshot",
+                "not-read",
+                "--capture-root",
+                str(tmp_path / "not-created"),
+                "--terms-read-on",
+                "2026-10-02",
+            ]
+        )
+        == 1
+    )
+    assert "central official injury source is disabled" in capsys.readouterr().out
+    assert not (tmp_path / "not-created").exists()
+
+
+def test_disabled_held_capture_reader_refuses_before_payload_use(tmp_path):
+    meta = write_snapshot(
+        tmp_path,
+        source="official-pl-injuries",
+        captured_at_utc=NOW,
+        payloads={"not-an-injury-report.json": b"{}"},
+    )
+    with pytest.raises(ValueError, match="central official injury source is disabled"):
+        read_official_injury_capture(read_snapshot(tmp_path, meta.snapshot_id))
+
+
+def test_duplicate_unknown_club_labels_are_one_public_coverage_name():
+    from jsonschema import Draft202012Validator
+
+    boot, source = documents()
+    source["items"][0]["response"]["title"] = "Injury News - Unknown FC"
+    source["items"].append(source["items"][0])
+    found = report(boot, source)
+    assert found.unknown_source_clubs == ("Unknown FC",)
+    Draft202012Validator(injury_contract.official_injuries_schema()).validate(found.public_record())
+
+
+@pytest.mark.parametrize("value", ["2026-10-03T00:00:00Z", "2026-10-02T10:00:01Z", "2026-10-03"])
+def test_future_row_clock_is_withheld_without_losing_the_fact(value):
+    boot, source = documents()
+    source["items"][0]["response"]["items"][0]["response"]["date"] = value
+    found = report(boot, source)
+    assert len(found.facts) == 1 and found.facts[0].injury == "Ankle"
+    assert found.facts[0].source_date is None
+    assert found.public_record([10])["facts"][0]["source_date"] is None
+    assert found.incomplete_clubs == ("Liverpool",)
+    assert "date is after observation" in found.refusals[0]
+
+
+def test_missing_link_target_does_not_discard_the_row_or_its_valid_link():
+    boot, source = documents()
+    links = source["items"][0]["response"]["items"][0]["response"]["links"]
+    links.extend([{"label": "Details"}, None])
+    found = report(boot, source)
+    assert len(found.facts) == 1 and found.facts[0].injury == "Ankle"
+    assert found.facts[0].details_urls == (links[0]["promoUrl"],)
+    assert found.incomplete_clubs == ("Liverpool",)
+    assert len(found.refusals) == 2
+    assert all("promoUrl; link withheld" in reason for reason in found.refusals)
+
+
+def test_afc_bournemouth_alias_requires_bournemouth_in_the_captured_roster():
+    boot, source = documents()
+    source["items"][0]["response"]["title"] = "Injury News - AFC Bournemouth"
+    assert report(boot, source).unknown_source_clubs == ("AFC Bournemouth",)
+    boot["teams"][0]["name"] = "Bournemouth"
+    found = report(boot, source)
+    assert found.received_clubs == ("Bournemouth",)
+    assert found.facts[0].player_id == 10

@@ -5,6 +5,7 @@ real parser, joined against a synthetic capture whose roster is that fixture's r
 join under test is the join that will run in production; only the bytes are ours.
 """
 
+import hashlib
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -25,6 +26,7 @@ from tests.fixtures.synthetic_rotation_capture import (
 from squadopt.data.errors import DataSourceError, InvalidValueError
 from squadopt.data.sources.club_news import FixtureClubNewsProvider
 from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_response
+from squadopt.data.sources.club_news_coding import UnlocatableClaim
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
     FORBIDDEN_COLUMNS,
@@ -720,3 +722,96 @@ def test_asking_for_an_uncoded_clubs_response_refuses_rather_than_guessing() -> 
 
     with pytest.raises(DataSourceError, match="Everton"):
         model.response_sha256_for("Everton")
+
+
+@pytest.mark.parametrize("opponent_first", [False, True])
+def test_opponent_citation_cannot_quarantine_own_club_claim(provider, claims, opponent_first):
+    own = claims[0]
+    opponent = next(
+        provider.fetch(url) for url in provider.urls if provider.fetch(url).club != own.team_name
+    )
+    foreign = replace(
+        own,
+        disposition="stated_rotation_risk",
+        source_url=opponent.requested_url,
+        source_sha256=hashlib.sha256(opponent.readable).hexdigest(),
+    )
+    ordered = (foreign, *claims) if opponent_first else (*claims, foreign)
+    result = _build(provider, ordered)
+    pd.testing.assert_frame_equal(_build(provider, claims), result)
+    assert result.attrs["players_with_conflicting_claims"] == ()
+    assert dict(result.attrs["claims_unresolved"])["other_club_source"] == 1
+
+
+def test_opponent_only_claim_needs_no_response_from_players_club(provider, claims):
+    own = claims[0]
+    opponent = next(
+        provider.fetch(url) for url in provider.urls if provider.fetch(url).club != own.team_name
+    )
+    foreign = replace(
+        own,
+        source_url=opponent.requested_url,
+        source_sha256=hashlib.sha256(opponent.readable).hexdigest(),
+    )
+    model = ClubModelProvenance(by_club={opponent.club: _provenance(UNITED_RESPONSE_SHA256)})
+    result = _build(provider, (foreign,), model=model)
+    assert not result.rotation_claim_observed.any()
+    assert result.model_response_sha256.isna().all()
+    assert dict(result.attrs["claims_unresolved"])["other_club_source"] == 1
+
+
+@pytest.mark.parametrize("own_source", [False, True])
+def test_unlocatable_opponent_claim_does_not_mark_own_club_player(provider, claims, own_source):
+    own = claims[0]
+    source = next(
+        provider.fetch(url)
+        for url in provider.urls
+        if (provider.fetch(url).club == own.team_name) == own_source
+    )
+    dropped = UnlocatableClaim(
+        own.player_name, own.team_name, source.requested_url, "Missing quote"
+    )
+    result = _build(provider, (), unverifiable_claims=(dropped,))
+    assert int(result.rotation_claim_unresolved.sum()) == int(own_source)
+
+
+def test_unknown_citation_digest_is_not_accepted_as_own_club_claim(provider, claims):
+    result = _build(provider, (replace(claims[0], source_sha256="f" * 64),))
+    assert not result.rotation_claim_observed.any()
+    assert dict(result.attrs["claims_unresolved"])["unverified_club_source"] == 1
+
+
+@pytest.mark.parametrize("citation", ["own", "foreign", "unknown"])
+@pytest.mark.parametrize("response", ["own", "foreign", "unbound", "missing"])
+def test_unverifiable_response_binding_controls_player_diagnostics(
+    provider, claims, citation, response
+):
+    own = claims[0]
+    foreign = next(
+        provider.fetch(url) for url in provider.urls if provider.fetch(url).club != own.team_name
+    )
+    source_url = {
+        "own": own.source_url,
+        "foreign": foreign.requested_url,
+        "unknown": "https://example.invalid/not-fetched",
+    }[citation]
+    dropped = UnlocatableClaim(own.player_name, own.team_name, source_url, "Missing citation")
+    binding = (
+        None
+        if response == "unbound"
+        else {}
+        if response == "missing"
+        else {dropped: frozenset({own.team_name if response == "own" else foreign.club})}
+    )
+    result = _build(
+        provider,
+        (),
+        unverifiable_claims=(dropped,),
+        unverifiable_response_clubs=binding,
+    )
+
+    expected_unresolved = response == "own" or (response == "unbound" and citation == "own")
+    assert int(result.rotation_claim_unresolved.sum()) == int(expected_unresolved)
+    assert not result.rotation_claim_observed.any()
+    assert result.rotation_disposition.isna().all()
+    assert result.attrs["claims_unverifiable_citation"] == 1

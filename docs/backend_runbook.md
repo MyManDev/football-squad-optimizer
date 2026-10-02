@@ -94,7 +94,8 @@ SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT=4  # queued + running, per address per
 # The repository's artifacts/ directory. The Top 100 settings read the week's export from
 # phase_b/player_evidence_v1_<season>_gw<NN>_top100_<hash12>.csv (newest generated one that
 # passes the handoff's own gate for the current capture); the manager's word reads
-# rotation/rotation_evidence_v2_<season>_gw<NN>_<capture hash12>.csv, each with its manifest.
+# rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash12>_decision_<decision hash12>.csv,
+# with its manifest. Fixture-backed evidence uses only <decision hash12> after gw<NN>.
 SQUADOPT_BACKEND_ARTIFACT_ROOT=<path to artifacts/>
 # What the rotation table was coded from: the committed fixture file, or a club-news capture
 # directory under the snapshot root. Needed for the manager's word only.
@@ -108,6 +109,12 @@ switch, because the Top 100 gate needs the projected table. An export or rotatio
 lands later is picked up by both without a restart. The Top 100 menu needs a handoff built
 without the uplift (`--projection component-only`), as the weekly runbook says; otherwise the
 gate refuses every export and the setting stays off.
+
+Current V4 rotation manifests declare whether the source is a captured reading or a fixture,
+and list players whose conflicting claims were withheld. A captured reading must retain its
+news snapshot and completion time even when it yielded no claims. Each conflicting player
+must belong to the roster, remain unresolved, and carry no observed claim. Historical V2/V3
+pairs retain their earlier manifest semantics; they do not acquire V4 provenance on read.
 
 The backend follows the capture named consistently by the published human entry documents
 under `league/entries/`, when that capture and its matching handoff are readable. It uses the

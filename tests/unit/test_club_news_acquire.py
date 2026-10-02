@@ -246,6 +246,35 @@ def test_articles_are_coded_with_their_club_and_a_missing_one_narrows_nothing() 
 # --- the command ------------------------------------------------------------
 
 
+def test_central_referrals_are_disabled_before_any_inputs_provider_or_fetch(
+    tmp_path, monkeypatch, capsys
+):
+    from squadopt.platform import club_news_acquire as acquire
+
+    def refuse(*_args, **_kwargs):
+        pytest.fail(
+            "Disabled central referrals must not read inputs, configure a provider or fetch"
+        )
+
+    monkeypatch.setattr(acquire, "load_club_sources", refuse)
+    monkeypatch.setattr(acquire, "read_snapshot", refuse)
+    monkeypatch.setattr(acquire, "build_coding_provider", refuse)
+    assert (
+        main(
+            [
+                "--roster-snapshot",
+                "not-read",
+                "--official-injury-capture",
+                str(tmp_path / "not-read"),
+            ],
+            environ={},
+            opener=refuse,
+        )
+        == 1
+    )
+    assert "central official injury source is disabled" in capsys.readouterr().out
+
+
 def _registry(path: Path, sources: Sequence[ClubSource]) -> Path:
     path.write_text(
         json.dumps(

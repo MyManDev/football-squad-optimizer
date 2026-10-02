@@ -102,3 +102,48 @@ def test_empty_model_response_stays_successful_zero_claims():
     coded, refused = code_week_by_club(_Recorder(), CONFIG, (doc,), ROSTER)
     assert refused == () and len(coded) == 1
     assert json.loads(coded[0].response.text)["claims"] == []
+
+
+@pytest.mark.parametrize(
+    "path,published",
+    [
+        ("news/fitness-update", None),
+        ("news", "2026-10-02T09:59:00Z"),
+    ],
+)
+def test_section_heading_does_not_hide_an_article(path, published):
+    doc = document("News", path, published)
+    selection = select_coding_documents((doc,), as_of="2026-10-02T10:00:00Z")
+    assert selection.documents == (doc,)
+
+
+def test_referrals_share_priority_and_request_cap_with_index_articles(monkeypatch):
+    from dataclasses import replace
+    from datetime import date
+
+    from squadopt.platform import club_news_fetch as fetch
+
+    source = fetch.ClubSource("Liverpool", "https://club.example/news", date(2026, 10, 1))
+    index = document("Latest news", "news")
+    markup = b'<a href="/news/a">First team news</a><a href="/news/b">Club update</a>'
+    index = replace(index, content=markup, byte_length=len(markup))
+    requested = []
+
+    def read(article, **kwargs):
+        requested.append(article.url)
+        return document("Team news", article.url.partition("club.example/")[2])
+
+    monkeypatch.setattr(fetch, "fetch_club_document", read)
+    docs, refused = fetch._follow_articles(
+        source,
+        index,
+        claimed={source.url},
+        opener=lambda *a, **k: None,
+        now=lambda: None,
+        sleeper=lambda delay: None,
+        check_robots=False,
+        manners=fetch.HostManners(articles_per_host=1),
+        additional_urls=("https://club.example/news/ordinary-referral",),
+    )
+    assert requested == ["https://club.example/news/a"]
+    assert len(docs) == 1 and refused == []

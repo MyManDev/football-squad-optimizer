@@ -13,6 +13,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.data.snapshots import (
     CapturedSnapshot,
     SnapshotMetadata,
@@ -80,6 +81,7 @@ def capture_official_injuries(
     The supplied terms reading covers both official hosts. Unknown robots, redirects,
     repeated widgets and unbounded/paginated responses refuse rather than crawl.
     """
+    require_official_injury_source()
     today = now().date()
     if not 0 <= (today - terms_read_on).days <= TERMS_READING_VALID_DAYS:
         raise ValueError("A current dated reading for both official hosts is required.")
@@ -143,6 +145,7 @@ def capture_official_injuries(
 
 
 def read_official_injury_capture(snapshot: CapturedSnapshot) -> OfficialInjuryReport:
+    require_official_injury_source()
     if snapshot.metadata.source != SOURCE:
         raise ValueError("The supplied snapshot is not an official injury capture.")
     bootstrap = snapshot.payloads[BOOTSTRAP_PAYLOAD]
@@ -184,6 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--terms-read-on", required=True, type=date.fromisoformat)
     args = parser.parse_args(argv)
     try:
+        require_official_injury_source()
         snapshot, report = capture_official_injuries(
             roster_snapshot=read_snapshot(args.snapshot_root, args.roster_snapshot),
             capture_root=args.capture_root,

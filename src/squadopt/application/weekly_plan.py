@@ -214,6 +214,7 @@ def prepare_week(
             season=request.season,
             gameweek=request.gameweek,
             snapshot_id=rotation_source_capture(request.snapshot_id, request.rotation_capture),
+            decision_snapshot_id=request.snapshot_id,
         )
     skip = None
     if request.decide:
@@ -384,12 +385,17 @@ def rotation_pair_is_readable(table: Path, manifest: Path) -> bool:
 
 
 def check_rotation_for_reused_capture(
-    rotation_root: Path, *, season: str, gameweek: int, snapshot_id: str
+    rotation_root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    snapshot_id: str,
+    decision_snapshot_id: str | None = None,
 ) -> None:
     """Refuse a reused live capture whose rotation export is not already on disk.
 
     The same shape as :func:`check_evidence_for_reused_capture` and the same argument, from
-    this artifact's own contract rather than from Phase B's. ``rotation_evidence_v2`` records
+    this artifact's own contract rather than from Phase B's. The rotation manifest records
     ``generated_at_utc``, and the lane's ordering constraint is that the claim chain is frozen
     before the decision capture: re-exporting now for a capture already taken stamps the
     artifact after it, always, and no amount of promptness escapes that. Said here, before
@@ -400,7 +406,13 @@ def check_rotation_for_reused_capture(
     and then fail at the read.
     """
 
-    table, manifest = rotation_artifact(rotation_root, season, gameweek, snapshot_id)
+    table, manifest = rotation_artifact(
+        rotation_root,
+        season,
+        gameweek,
+        snapshot_id,
+        decision_snapshot_id=decision_snapshot_id,
+    )
     if rotation_pair_is_readable(table, manifest):
         return
     if table.is_file() and manifest.is_file():

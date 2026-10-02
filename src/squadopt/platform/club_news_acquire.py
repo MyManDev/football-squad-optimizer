@@ -34,6 +34,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
+from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.data.claim_identity import roster_from_short_names
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
@@ -290,6 +291,8 @@ def main(
 
     arguments = _parse_arguments(argv)
     try:
+        if arguments.official_injury_capture is not None:
+            require_official_injury_source()
         if arguments.check_config:
             config = check_coding_provider(environ, settings_file=arguments.settings_file)
             print(

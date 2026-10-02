@@ -107,11 +107,11 @@ class RoleMinuteDistribution:
 
     @property
     def expected_minutes(self) -> Array:
-        return (self.probabilities * self.minutes).sum(axis=1)
+        return np.asarray((self.probabilities * self.minutes).sum(axis=1), dtype=np.float64)
 
     @property
     def p60(self) -> Array:
-        return self.probabilities[:, self.bins >= 2].sum(axis=1)
+        return np.asarray(self.probabilities[:, self.bins >= 2].sum(axis=1), dtype=np.float64)
 
     def collapsed(self) -> tuple[Array, Array]:
         """Four-bin marginals for existing readers; nonlinear heads use joint support."""

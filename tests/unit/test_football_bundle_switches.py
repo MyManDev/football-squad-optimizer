@@ -13,7 +13,7 @@ from tests.unit.test_football_publication import publication_case as publication
 from tests.unit.test_joint_role_minute_evidence import joint_documents
 
 from squadopt.data.snapshots import METADATA_FILENAME, PAYLOAD_DIRECTORY, read_snapshot
-from squadopt.live import Projection, read_inputs
+from squadopt.live import Projection, read_inputs, read_projection_handoff
 from squadopt.live.football_artifact import football_artifact_path, forecast_digest
 from squadopt.platform import advice_switches as switches
 from squadopt.platform.advice_cache import advice_cache_key
@@ -28,7 +28,16 @@ def baseline(case):
     capture = read_snapshot(case["snapshot_root"], case["snapshot_id"])
     inputs = read_inputs(capture, season="2026-27")
     frame = inputs.players.copy().assign(expected_points=2.0, appearance_probability=0.5)
-    return inputs, Projection(frame, (), {"model_version": "synthetic-current"})
+    return inputs, Projection(
+        frame,
+        (),
+        {
+            "model_version": "synthetic-current",
+            "projection_handoff_fingerprint": read_projection_handoff(
+                case["handoff_path"]
+            ).fingerprint,
+        },
+    )
 
 
 def load(case, *, configured=None, inputs=None, projection=None):
@@ -128,6 +137,34 @@ def test_new_joint_pair_cannot_be_served_until_real_ready_marker_is_complete(cas
     assert active.football.horizon.model_version == JOINT_ROLE_MODEL_VERSION
     assert active.football_bundle_sha256 == ready.fingerprint
     assert active.football.projection.diagnostics["fixture_role_estimates"]
+
+
+@pytest.mark.parametrize("changed_handoff", [False, True])
+def test_ready_bundle_must_bind_the_handoff_actually_served(case, tmp_path, changed_handoff):
+    add_quiet_news(case, tmp_path)
+    ready = seal_football_bundle(**case)
+    inputs, projection = baseline(case)
+    diagnostics = dict(projection.diagnostics)
+    assert diagnostics.pop("projection_handoff_fingerprint") == ready.handoff_fingerprint
+    if changed_handoff:
+        # A legal newly issued handoff for the same capture is not the sealed one.
+        held = read_projection_handoff(case["handoff_path"])
+        points = dict(held.expected_points)
+        first = next(iter(points))
+        points[first] += 0.5
+        other = replace(held, expected_points=points)
+        assert other.source_snapshot_id == case["snapshot_id"]
+        diagnostics["projection_handoff_fingerprint"] = other.fingerprint
+    changed = replace(projection, diagnostics=diagnostics)
+    saved = changed.table.copy(deep=True)
+    selected = load(case, inputs=inputs, projection=changed)
+    assert selected.football is None and not selected.football_components_bound
+    assert selected.football_bundle_sha256 is None and selected.manager_words is None
+    assert any("differs from the served baseline handoff" in note for note in selected.notes)
+    assert switches.switch_identity(selected, model="current") == {}
+    with pytest.raises(switches.SwitchInputUnavailable):
+        switches.switch_identity(selected, model="football")
+    assert_frame_equal(changed.table, saved, check_exact=True)
 
 
 def test_sealed_news_and_copied_rotation_override_stale_config_and_later_unsealed_edits(

@@ -126,10 +126,10 @@ def test_parent_and_worker_only_open_selected_synthetic_archive_files(
     }
 
 
-@pytest.mark.parametrize("archives", [ARCHIVES, BASELINE_ARCHIVES])
 def test_component_fit_inputs_use_the_same_selection_before_any_fit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, archives: tuple[str, ...]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    archives = BASELINE_ARCHIVES
     for season in archives:
         archive = player_fixture._archive(tmp_path, [player_fixture._gameweek_row()], season=season)
         fixture_fixture._archive(
@@ -173,6 +173,33 @@ def test_component_fit_inputs_use_the_same_selection_before_any_fit(
     }
 
 
+@pytest.mark.parametrize("archives", [ARCHIVES, ("2021-22",), ("2024-25",)])
+def test_phase_c_refuses_a_subset_before_reading_or_fitting_any_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, archives: tuple[str, ...]
+) -> None:
+    def forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        pytest.fail("A different training population must not use the Phase C version.")
+
+    monkeypatch.setattr(projection_handoff, "build_panel", forbidden)
+    monkeypatch.setattr(projection_handoff, "build_fixture_panel", forbidden)
+    monkeypatch.setattr(projection_handoff, "load_team_codes", forbidden)
+    monkeypatch.setattr(projection_handoff, "fit_component_models", forbidden)
+    with pytest.raises(DataSourceError, match="requires the full Phase C training population"):
+        projection_handoff._component_table(
+            tmp_path / "unused-archive",
+            bootstrap=b"{}",
+            fixtures=b"[]",
+            event_payloads={},
+            season="2026-27",
+            target=2,
+            source_snapshot_id="synthetic",
+            captured_at_utc="2026-08-28T15:30:00Z",
+            deadline_utc="2026-08-29T10:00:00Z",
+            fallback=pd.DataFrame(),
+            training_seasons=(*archives, "2026-27"),
+        )
+
+
 def test_handoff_forwards_selection_to_fallback_and_component_and_records_actual_roles(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -193,24 +220,24 @@ def test_handoff_forwards_selection_to_fallback_and_component_and_records_actual
     def component(
         *_args: Any, fallback: pd.DataFrame, training_seasons: Any, **_kwargs: Any
     ) -> Any:
-        assert tuple(training_seasons) == SELECTED
-        return fallback.copy(), {"component_training_seasons": list(ARCHIVES)}
+        assert tuple(training_seasons) == BASELINE_SELECTED
+        return fallback.copy(), {"component_training_seasons": list(BASELINE_ARCHIVES)}
 
     monkeypatch.setattr(projection_handoff, "build_panel", panel)
     monkeypatch.setattr(projection_handoff, "_component_table", component)
     _projection, written, report = handoff_fixture._build(
         world,
         snapshot_id=capture.snapshot_id,
-        training_seasons=SELECTED,
+        training_seasons=BASELINE_SELECTED,
         dry_run=True,
     )
-    assert written is None and calls == [ARCHIVES]
-    assert report["fallback_training_seasons"] == list(ARCHIVES)
-    assert report["component_training_seasons"] == list(ARCHIVES)
+    assert written is None and calls == [BASELINE_ARCHIVES]
+    assert report["fallback_training_seasons"] == list(BASELINE_ARCHIVES)
+    assert report["component_training_seasons"] == list(BASELINE_ARCHIVES)
     assert report["training_selection"] == {
         "contract_version": "prospective_training_selection_v1",
-        "allowed_seasons": list(SELECTED),
-        "archive_seasons_read": list(ARCHIVES),
+        "allowed_seasons": list(BASELINE_SELECTED),
+        "archive_seasons_read": list(BASELINE_ARCHIVES),
         "captured_history_season": "2026-27",
         "captured_history_role": "scoring_and_fallback_only",
     }

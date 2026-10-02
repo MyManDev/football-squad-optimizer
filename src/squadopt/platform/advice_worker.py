@@ -57,6 +57,7 @@ from squadopt.application.advice_menu import (
 )
 from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, participation_summary
 from squadopt.application.football_roles import role_forecast_summary
+from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
@@ -314,6 +315,8 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
+        if capture.switches.official_injuries is not None:
+            require_official_injury_source()
         request = _menu_request(spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
@@ -402,6 +405,7 @@ def build_advice_compute(
                 _advice_player_ids(advice)
             )
         if capture.switches.official_injuries is not None:
+            require_official_injury_source()
             advice["official_injuries"] = capture.switches.official_injuries.public_record(
                 sorted(_advice_player_ids(advice))[:50]
             )

@@ -474,10 +474,16 @@ def load_switch_inputs(
                 snapshot_root=snapshot_root,
                 snapshot_id=inputs.snapshot_id,
             )
+            if (
+                projection.diagnostics.get("projection_handoff_fingerprint")
+                != bundle.handoff_fingerprint
+            ):
+                raise ValueError("Ready bundle handoff differs from the served baseline handoff.")
             club_news_source = (
                 snapshot_root / bundle.news_capture_id if bundle.news_capture_id else None
             )
         except (DataError, OSError, ValueError, KeyError, TypeError) as error:
+            bundle = None
             invalid_bundle = True
             club_news_source = None
             notes.append(f"football bundle refused: {error}")

@@ -12,9 +12,13 @@ The control is `football_team_share_v1`; the candidate is
 `football_joint_role_minutes_v1`. This does **not** compare against the separate
 Phase C baseline. Each origin fits the candidate once and evaluates the old
 football prediction path using the shared fitted heads, with no additional
-control fit. Appearance probability therefore remains identical.
+control fit. Appearance probability therefore remains identical. The control
+uses the same restricted development population as the candidate. It is not the
+served v1 model trained on its full historical population, so this comparison
+cannot establish superiority over the currently served football model.
 
-All 13 preregistered origins completed; there were no failed folds. Eight
+All 13 origins declared in the runner completed; there were no failed folds.
+The declaration was not committed before execution and is not a prospective preregistration. Eight
 historical origins cover GW11, GW19, GW27 and GW35 in each of 2023-24 and 2024-25.
 Five further origins cover the captured, settled 2026-27 GW1-5. The historical
 targets contain 6,228 player-fixture rows and the current targets 3,191, for
@@ -73,7 +77,17 @@ All 9,419 target rows have a scored role label. Candidate role NLL/Brier are
 control has no start/cameo distribution, so its role metrics and paired role
 deltas are null. These numbers do not establish improved role calibration.
 Current GW1 is particularly weak, with role NLL 1.584764; the receipt alone
-does not establish its cause.
+does not establish its cause. For context, a uniform three-class forecast has
+NLL `ln(3) = 1.098612` and summed multiclass Brier `2/3`. GW1 is worse than
+that uniform NLL comparator. A training-only empirical base-rate comparator was
+not recorded, so no calibrated-role advantage against that comparator is claimed.
+Member output withholds modeled role percentages pending that evidence.
+
+The excluded 2025-26 season creates a historical gap. For returning players at
+the first 2026-27 origin, the most recent retained appearance is in 2024-25 and
+`days_since_appear` reaches its 365-day cap. Subsequent origins may use earlier
+settled 2026-27 appearances. This is a feature limitation, not evidence that the
+player actually spent a year without playing. No excluded-season data was opened.
 
 ## Evidence limits and execution
 
@@ -94,3 +108,16 @@ The evidence set is `protocol.json`, `folds.json`, `scores.json`,
 `comparison.json`, `budgets.json`, `failures.json`, `result.json`,
 `current-evidence.json` and the source/input/operator receipts from
 `current100-measure01`.
+
+## Reproducible receipt identity
+
+The [committed receipt](evidence/football_joint_role_minutes_2026_10_02.json)
+contains the original protocol, fold list, losses, budgets, input and source
+hashes, and execution result. It is a copy of the original measurement receipts;
+later review corrections did not rerun or relabel that experiment as a new head.
+The exact measurement source remains `272f12682c2996eb0324b44186ff4adecedb8550`.
+The current history came from `fpl-live-20261001T233218Z-7945d6b3c732`, captured
+at `2026-10-01T23:32:18.344567Z`, fingerprint
+`7945d6b3c732bd3e38bd11009d32070f733e93d9dbc3570d69f53d1b21452e8d`.
+The receipt names and hashes the twelve allowed archive files and seven current
+FPL payloads without publishing private machine paths or credentials.

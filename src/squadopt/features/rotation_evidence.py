@@ -31,6 +31,7 @@ column of nulls, because a missing field is the source having renamed something,
 observation of nothing.
 """
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -553,7 +554,9 @@ def claim_targets_next_fixture(
 
 
 def _resolved_claims(
-    claims: Sequence[ParsedClaim], roster: pd.DataFrame
+    claims: Sequence[ParsedClaim],
+    roster: pd.DataFrame,
+    source_clubs: Mapping[tuple[str, str], set[str]],
 ) -> tuple[dict[int, _ClaimRow], dict[str, int], frozenset[int]]:
     """Place each claim on a player, counting the ones that could not be placed.
 
@@ -565,6 +568,7 @@ def _resolved_claims(
 
     seam_roster = roster_from_short_names(roster)
     names = {player.player_id: player.web_name for player in seam_roster}
+    clubs = dict(zip(roster.player_id, roster.team_name, strict=True))
     placed: dict[int, _ClaimRow] = {}
     unresolved: dict[str, int] = {}
     conflicting: set[int] = set()
@@ -572,6 +576,11 @@ def _resolved_claims(
         identity = resolve_claim_player(claim.player_name, claim.team_name, seam_roster)
         if not isinstance(identity, ResolvedClaim):
             unresolved[identity.reason] = unresolved.get(identity.reason, 0) + 1
+            continue
+        cited_clubs = source_clubs.get((claim.source_url, claim.source_sha256), set())
+        if cited_clubs != {clubs[identity.player_id]}:
+            reason = "other_club_source" if cited_clubs else "unverified_club_source"
+            unresolved[reason] = unresolved.get(reason, 0) + 1
             continue
         candidate = _ClaimRow(
             disposition=claim.disposition,
@@ -607,7 +616,10 @@ def _resolved_claims(
 
 
 def _unverifiable_players(
-    dropped: Sequence[UnlocatableClaim], roster: pd.DataFrame
+    dropped: Sequence[UnlocatableClaim],
+    roster: pd.DataFrame,
+    source_clubs: Mapping[str, set[str]],
+    response_clubs: Mapping[UnlocatableClaim, frozenset[str]] | None,
 ) -> frozenset[int]:
     """Which roster players had a claim whose citation could not be verified.
 
@@ -615,13 +627,26 @@ def _unverifiable_players(
     decided the same way whichever side of the locator the claim came out on. A dropped claim
     naming somebody the roster does not carry is itself dropped: it would be a source error
     about a player this week never had, and the table has no row to put it on.
+
+    An explicit stored response-club binding identifies whose failed statement this was;
+    the failed URL cannot do that. Without this context, retain the conservative legacy
+    rule that only a known same-club URL can identify an unresolved player.
     """
 
     seam_roster = roster_from_short_names(roster)
     players: set[int] = set()
+    clubs = dict(zip(roster.player_id, roster.team_name, strict=True))
     for claim in dropped:
         identity = resolve_claim_player(claim.player_name, claim.team_name, seam_roster)
-        if isinstance(identity, ResolvedClaim):
+        if not isinstance(identity, ResolvedClaim):
+            continue
+        club = clubs[identity.player_id]
+        own_response = (
+            source_clubs.get(claim.source_url) == {club}
+            if response_clubs is None
+            else club in response_clubs.get(claim, frozenset())
+        )
+        if own_response:
             players.add(identity.player_id)
     return frozenset(players)
 
@@ -728,6 +753,7 @@ def build_rotation_evidence_table(
     model: ClubModelProvenance | None,
     clubs_partially_covered: Sequence[str] = (),
     unverifiable_claims: Sequence[UnlocatableClaim] = (),
+    unverifiable_response_clubs: Mapping[UnlocatableClaim, frozenset[str]] | None = None,
     club_news_snapshot_id: str | None = None,
 ) -> pd.DataFrame:
     """Build one week's rotation evidence: one row per roster player, always.
@@ -804,8 +830,17 @@ def build_rotation_evidence_table(
         deadline_timestamp_utc=deadline_timestamp_utc,
     )
     code_by_name = _team_code_by_name(bootstrap)
-    placed, unresolved, conflicting = _resolved_claims(claims, roster)
-    unverifiable = _unverifiable_players(unverifiable_claims, roster)
+    source_clubs: dict[tuple[str, str], set[str]] = {}
+    url_clubs: dict[str, set[str]] = {}
+    for document in documents:
+        digest = hashlib.sha256(document.readable).hexdigest()
+        for url in {document.requested_url, document.final_url}:
+            source_clubs.setdefault((url, digest), set()).add(document.club)
+            url_clubs.setdefault(url, set()).add(document.club)
+    placed, unresolved, conflicting = _resolved_claims(claims, roster, source_clubs)
+    unverifiable = _unverifiable_players(
+        unverifiable_claims, roster, url_clubs, unverifiable_response_clubs
+    )
     if model is not None:
         _require_provenance_covers_claimed_clubs(model, roster, placed)
 

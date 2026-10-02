@@ -2,6 +2,17 @@
 
 from typing import Any
 
+# Acquisition and redistribution are not enabled. This is deliberately a code
+# capability, with no configuration, environment or command-line override.
+OFFICIAL_INJURY_SOURCE_ENABLED = False
+
+
+def require_official_injury_source() -> None:
+    """Refuse operational use while retaining offline parser/schema support."""
+    if not OFFICIAL_INJURY_SOURCE_ENABLED:
+        raise ValueError("The central official injury source is disabled.")
+
+
 OFFICIAL_INJURIES_VERSION = "official_pl_injuries_v1"
 OFFICIAL_INJURIES_URL = "https://www.premierleague.com/en/latest-player-injuries"
 OFFICIAL_INJURIES_LIMIT = (

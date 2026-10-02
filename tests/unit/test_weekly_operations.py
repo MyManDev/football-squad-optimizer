@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from tests.unit.test_publication_services import publication_world
 
+from squadopt.application import weekly_plan
 from squadopt.application.build import _recent_events
 from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_artifact
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
@@ -455,10 +456,76 @@ def test_the_preflight_looks_for_the_artifact_the_stage_will_open(tmp_path: Path
         handoff=base.supplied_handoff,
     )
     operation.run.directory.mkdir(parents=True, exist_ok=True)
-    named, _ = rotation_artifact(operation.paths.rotation, "2026-27", 2, capture)
+    named, _ = rotation_artifact(
+        operation.paths.rotation,
+        "2026-27",
+        2,
+        capture,
+        decision_snapshot_id=operation.request.snapshot_id,
+    )
 
     with pytest.raises(WeekError, match=re.escape(named.name)):
         operation._preflight()
+
+
+@pytest.mark.parametrize("decision_bound", [False, True])
+def test_reused_rotation_preflight_and_stage_require_the_same_two_capture_pair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, decision_bound: bool
+) -> None:
+    capture = "club-news-20260912T143000Z-abcdef123456"
+    base = world(tmp_path, rotation=True)
+    operation = weekly.WeeklyOperations(
+        replace(base.request, rotation_capture=capture),
+        base.paths,
+        run_id="synthetic",
+        repository_commit="b" * 40,
+        handoff=base.supplied_handoff,
+    )
+    operation.run.directory.mkdir(parents=True, exist_ok=True)
+    expected = rotation_artifact(
+        operation.paths.rotation,
+        "2026-27",
+        2,
+        capture,
+        decision_snapshot_id=operation.request.snapshot_id,
+    )
+    existing = (
+        expected
+        if decision_bound
+        else rotation_artifact(operation.paths.rotation, "2026-27", 2, capture)
+    )
+    for path in existing:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("synthetic readable pair", encoding="utf-8")
+    checked = []
+
+    def read(table, manifest):
+        # Readability is independently covered; this service regression pins the exact
+        # pair both stages ask that reader to validate, including the decision capture.
+        assert (table, manifest) == existing
+        checked.append((table, manifest))
+
+    def export(*_args, **_kwargs):
+        pytest.fail("A reused capture must not export after preflight.")
+
+    monkeypatch.setattr(weekly_plan, "read_rotation_evidence_artifact", read)
+    monkeypatch.setattr(weekly, "read_rotation_evidence_artifact", read)
+    monkeypatch.setattr(weekly, "export_rotation_evidence", export)
+    if not decision_bound:
+        with pytest.raises(WeekError, match=re.escape(expected[0].name)):
+            operation._preflight()
+        assert checked == []
+        return
+
+    operation._preflight()
+    assert checked == [expected]
+    operation.values["capture"] = {
+        "snapshot_id": operation.request.snapshot_id,
+        "deadline_utc": "2026-08-28T17:30:00Z",
+    }
+    result = operation._rotation()
+    assert checked == [expected, expected, expected]
+    assert result.value["table"] == str(expected[0])
 
 
 def test_missing_reused_rotation_refuses_before_capture_or_export(tmp_path: Path) -> None:

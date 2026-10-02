@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { AdviceRolePointComponents, EntryAdvice } from "../types";
 import { ParticipationEvidence } from "./ParticipationEvidence";
 import { isAdvicePayload } from "./adviceShape";
@@ -23,12 +24,7 @@ function example(): EntryAdvice {
           gameweek: 6,
           kickoff: "2026-10-11T12:30:00Z",
           status: "fitted_known_start_labels",
-          start_probability: 0.4,
-          cameo_probability: 0.1,
-          zero_probability: 0.5,
-          unknown_role_probability: 0,
           expected_minutes: 34,
-          sixty_minute_probability: 0.3,
           captured_eligibility_multiplier: 0.5,
           news_applied: true,
         },
@@ -38,7 +34,7 @@ function example(): EntryAdvice {
 }
 
 it.each(["tr", "en"] as const)(
-  "shows model roles with limits even without a coach claim in %s",
+  "shows expected minutes and role limits without modeled probabilities in %s",
   (language) => {
     const view = example();
     expect(isAdvicePayload(view)).toBe(true);
@@ -48,9 +44,13 @@ it.each(["tr", "en"] as const)(
       </LanguageProvider>,
     );
     const section = screen.getByTestId("role-forecast");
-    expect(section).toHaveTextContent("40%");
-    expect(section).toHaveTextContent("10%");
-    expect(section).toHaveTextContent("50%");
+    expect(section).toHaveTextContent(
+      language === "tr" ? "Beklenen dakika: 34,0" : "Expected minutes: 34.0",
+    );
+    expect(section.textContent).not.toMatch(AS_A_CHANCE);
+    expect(section).toHaveTextContent(
+      language === "tr" ? "kesinleşmiş bir ilk 11 değildir" : "not a confirmed lineup",
+    );
     expect(section).toHaveTextContent(
       language === "tr" ? "Bağımsız doğruluk ölçümü" : "Independent accuracy validation",
     );
@@ -65,9 +65,6 @@ it.each(["tr", "en"] as const)(
 it("keeps unknown starting roles distinct from zero and refuses out-of-range or extra fields", () => {
   const view = example();
   const row = view.role_forecast!.rows[0]!;
-  row.start_probability = null;
-  row.cameo_probability = null;
-  row.unknown_role_probability = 0.5;
   row.status = "unavailable_no_known_start_labels";
   expect(isAdvicePayload(view)).toBe(true);
   render(
@@ -75,18 +72,36 @@ it("keeps unknown starting roles distinct from zero and refuses out-of-range or 
       <ParticipationEvidence view={view} />
     </LanguageProvider>,
   );
-  expect(screen.getByTestId("role-forecast")).toHaveTextContent("Starts: —");
+  expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");
+  expect(screen.getByTestId("role-forecast").textContent).not.toMatch(AS_A_CHANCE);
   expect(screen.getByTestId("role-forecast")).toHaveTextContent(
     "Insufficient recorded starting-role evidence",
   );
-  row.zero_probability = 1.1;
+  row.captured_eligibility_multiplier = 1.1;
   expect(isAdvicePayload(view)).toBe(false);
-  row.zero_probability = 0.5;
+  row.captured_eligibility_multiplier = 0.5;
   expect(
     isAdvicePayload({ ...view, role_forecast: { ...view.role_forecast, win_probability: 0.8 } }),
   ).toBe(false);
   expect(
     isAdvicePayload({ ...view, role_forecast: { ...view.role_forecast, calibration: "verified" } }),
+  ).toBe(false);
+});
+
+it.each([
+  "start_probability",
+  "cameo_probability",
+  "zero_probability",
+  "unknown_role_probability",
+  "sixty_minute_probability",
+])("rejects the internal model field %s at the member payload boundary", (field) => {
+  const view = example();
+  const row = view.role_forecast!.rows[0]!;
+  expect(
+    isAdvicePayload({
+      ...view,
+      role_forecast: { ...view.role_forecast, rows: [{ ...row, [field]: 0.5 }] },
+    }),
   ).toBe(false);
 });
 

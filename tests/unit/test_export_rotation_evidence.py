@@ -190,6 +190,7 @@ def test_the_provider_survives_the_artifact_and_an_older_one_stays_readable(
         "club_news_source_kind",
         "club_news_snapshot_id",
         "club_news_captured_at_utc",
+        "players_with_conflicting_claims",
     ):
         del document[field]
     manifest_path.write_text(
@@ -216,6 +217,9 @@ def test_the_export_writes_a_readable_pair(tmp_path: Path, clean_tree: None) -> 
     assert tuple(table.columns) == ROTATION_EVIDENCE_COLUMNS
     assert len(table) == len(roster_entries())
     assert table.attrs["repository_commit"] == COMMIT
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["club_news_source_kind"] == "fixture"
+    assert manifest["players_with_conflicting_claims"] == []
 
 
 def test_the_artifact_name_carries_the_contract_the_week_and_the_capture(
@@ -343,6 +347,95 @@ def test_a_manifest_missing_a_required_field_is_refused(
         read_rotation_evidence_artifact(table_path, manifest_path)
 
 
+@pytest.mark.parametrize("field", ["club_news_source_kind", "players_with_conflicting_claims"])
+def test_current_rotation_manifest_requires_its_source_and_conflict_declarations(
+    published: tuple[Path, Path], field: str
+) -> None:
+    table_path, manifest_path = published
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del document[field]
+    manifest_path.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(DataValidationError, match="missing required manifest field"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+@pytest.mark.parametrize("kind", [None, "", "unrecorded", 1])
+def test_current_source_kind_is_a_closed_required_fact(
+    published: tuple[Path, Path], kind: object
+) -> None:
+    table_path, manifest_path = published
+    _rewrite_manifest(manifest_path, club_news_source_kind=kind)
+    with pytest.raises(DataValidationError, match="must be capture or fixture"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+def test_a_capture_source_cannot_drop_its_capture_binding(published: tuple[Path, Path]) -> None:
+    table_path, manifest_path = published
+    _rewrite_manifest(manifest_path, club_news_source_kind="capture")
+    with pytest.raises(DataValidationError, match="requires a club-news capture binding"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+@pytest.mark.parametrize("field", ["club_news_snapshot_id", "club_news_captured_at_utc"])
+def test_fixture_evidence_cannot_claim_even_a_partial_capture_binding(
+    published: tuple[Path, Path], field: str
+) -> None:
+    table_path, manifest_path = published
+    _rewrite_manifest(manifest_path, **{field: None})
+    with pytest.raises(DataValidationError, match="fixture evidence cannot declare"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+@pytest.mark.parametrize("players", [None, "1", [True], [0], [-1], [1.0], [1, 1]])
+def test_conflict_declaration_requires_unique_positive_player_ids(
+    published: tuple[Path, Path], players: object
+) -> None:
+    table_path, manifest_path = published
+    _rewrite_manifest(manifest_path, players_with_conflicting_claims=players)
+    with pytest.raises(DataValidationError, match="Conflicting player IDs"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+def test_conflicting_player_must_belong_to_the_roster(published: tuple[Path, Path]) -> None:
+    table_path, manifest_path = published
+    missing = int(pd.read_csv(table_path).player_id.max()) + 1
+    _rewrite_manifest(manifest_path, players_with_conflicting_claims=[missing])
+    with pytest.raises(DataValidationError, match="must belong to the table's roster"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+@pytest.mark.parametrize("observed", [False, True])
+def test_declared_conflict_cannot_retain_a_claim_or_look_like_a_quiet_reading(
+    published: tuple[Path, Path], observed: bool
+) -> None:
+    table_path, manifest_path = published
+    table = pd.read_csv(table_path)
+    row = table.index[table.rotation_claim_observed.eq(observed)][0]
+    table.loc[row, "rotation_claim_unresolved"] = observed
+    _republish(table, table_path, manifest_path)
+    _rewrite_manifest(
+        manifest_path, players_with_conflicting_claims=[int(table.loc[row, "player_id"])]
+    )
+    with pytest.raises(DataValidationError, match="unresolved claims and no observed claim"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
+def test_a_quarantined_conflict_survives_reading_as_unresolved(
+    published: tuple[Path, Path],
+) -> None:
+    table_path, manifest_path = published
+    table = pd.read_csv(table_path)
+    row = table.index[~table.rotation_claim_observed][0]
+    player_id = int(table.loc[row, "player_id"])
+    table.loc[row, "rotation_claim_unresolved"] = True
+    _republish(table, table_path, manifest_path)
+    _rewrite_manifest(manifest_path, players_with_conflicting_claims=[player_id])
+    loaded = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert loaded.attrs["players_with_conflicting_claims"] == (player_id,)
+    assert loaded.loc[row, "rotation_claim_unresolved"]
+    assert not loaded.loc[row, "rotation_claim_observed"]
+
+
 def test_a_row_count_that_is_not_the_roster_size_is_refused(
     published: tuple[Path, Path],
 ) -> None:
@@ -459,14 +552,15 @@ def test_a_disposition_on_a_row_that_observed_nothing_is_refused(
         read_rotation_evidence_artifact(table_path, manifest_path)
 
 
-def test_a_missing_observation_flag_is_refused(published: tuple[Path, Path]) -> None:
+@pytest.mark.parametrize("flag", ["rotation_claim_observed", "rotation_claim_unresolved"])
+def test_a_missing_observation_flag_is_refused(published: tuple[Path, Path], flag: str) -> None:
     table_path, manifest_path = published
     table = pd.read_csv(table_path)
     # Read back, the flag arrives as a plain bool column that cannot hold a missing value --
     # which is itself the property under test. Widened here so the damaged table can exist at
     # all, and the reader is what has to notice it.
-    table["rotation_claim_observed"] = table["rotation_claim_observed"].astype("object")
-    table.loc[0, "rotation_claim_observed"] = None
+    table[flag] = table[flag].astype("object")
+    table.loc[0, flag] = None
     _republish(table, table_path, manifest_path)
 
     with pytest.raises(DataValidationError, match="collapse the very distinction"):

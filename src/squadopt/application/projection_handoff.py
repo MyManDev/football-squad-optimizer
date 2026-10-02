@@ -38,6 +38,7 @@ import pandas as pd
 
 from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.contracts import OPTIONAL_COLUMNS
+from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
@@ -191,6 +192,11 @@ def _component_table(
         if training_seasons is None
         else explicit_archive_seasons(training_seasons, current_season=season)
     )
+    if archives != COMPONENT_TRAINING_SEASONS:
+        raise DataSourceError(
+            f"{COMPONENT_MODEL_VERSION} requires the full Phase C training population "
+            f"{COMPONENT_TRAINING_SEASONS!r}; a subset needs a separately versioned model."
+        )
     training_panel = build_panel(archive_root, seasons=archives)
     training_fixtures = build_fixture_panel(archive_root, seasons=archives)
     training_team_codes = pd.concat(

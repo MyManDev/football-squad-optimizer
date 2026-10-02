@@ -844,7 +844,7 @@ def _has_dot_segment(path: str) -> bool:
     return "." in segments or ".." in segments
 
 
-def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
+def _ranked_article_links(source: ClubSource, index: RawDocument) -> dict[str, int]:
     """The article URLs a registered page links to, under the one rule this lane follows.
 
     A link counts when
@@ -878,18 +878,18 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
 
     media_type = index.content_type.split(";", 1)[0].strip().lower()
     if media_type not in _INDEX_MEDIA_TYPES:
-        return ()
+        return {}
     try:
         markup = index.content.decode("utf-8")
     except UnicodeDecodeError:
-        return ()
+        return {}
     reader = _LinkReader()
     reader.feed(markup)
     reader.close()
 
     registered = urllib.parse.urlsplit(source.url)
     if not registered.path.strip("/"):
-        return ()
+        return {}
     prefix = f"{registered.path.rstrip('/')}/"
     links: dict[str, int] = {}
     for href, labels in reader.links:
@@ -915,6 +915,12 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
             # A duplicate card may provide a useful heading after an empty image
             # link. Keep its earliest position but consider its most useful label.
             links[url] = min(priority, links.get(url, priority))
+    return links
+
+
+def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
+    """Return same-origin registered articles in content-priority and page order."""
+    links = _ranked_article_links(source, index)
     return tuple(sorted(links, key=links.__getitem__))
 
 
@@ -977,7 +983,10 @@ def _follow_articles(
         for url in additional_urls
         if (valid := registered_article_url(source, url)) is not None
     )
-    for url in dict.fromkeys((*referred, *article_links(source, index))):
+    ranked = _ranked_article_links(source, index)
+    for url in referred:
+        ranked.setdefault(url, _article_priority(urllib.parse.urlsplit(url).path, ""))
+    for url in sorted(ranked, key=ranked.__getitem__):
         address = _address_of(url)
         if address in claimed:
             continue

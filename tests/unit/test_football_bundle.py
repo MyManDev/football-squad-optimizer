@@ -352,3 +352,23 @@ def test_cli_seals_without_activation(case, capsys):
         args.extend([flag, str(case[key])])
     assert main(args) == 0
     assert json.loads(capsys.readouterr().out)["activation"] == "not_performed"
+
+
+def test_disabled_central_source_cannot_be_sealed_or_read(case, monkeypatch):
+    from squadopt.contracts.injuries import OFFICIAL_INJURY_SOURCE_ENABLED
+
+    assert OFFICIAL_INJURY_SOURCE_ENABLED is False
+    with pytest.raises(ValueError, match="central official injury source is disabled"):
+        bundle.seal_football_bundle(**case, official_injury_capture_id="official-pl-not-read")
+    assert not marker(case).exists()
+    assert not (marker(case).parent / (case["snapshot_id"] + ".bundle")).exists()
+
+    bundle.seal_football_bundle(**case)
+    record = json.loads(marker(case).read_bytes())
+    record["official_injuries"] = {"snapshot_id": "official-pl-not-read"}
+    dump(marker(case), record)
+    monkeypatch.setattr(
+        bundle, "_source", lambda *_: pytest.fail("Disabled input must not be read")
+    )
+    with pytest.raises(ValueError, match="central official injury source is disabled"):
+        read(case)

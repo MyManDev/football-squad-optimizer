@@ -152,6 +152,10 @@ def _forecast_and_components(
     cutoff = pd.Timestamp(inputs.captured_at_utc)
     first = int(inputs.deadline.gameweek)
     archives, include_current = _training_sources(training_seasons, season)
+    if role_minutes and (archives != ("2022-23", "2023-24", "2024-25") or not include_current):
+        raise ValueError(
+            "Joint role minutes require exactly 2022-23, 2023-24, 2024-25 and the captured season."
+        )
     history = (
         archive_history(archive_root)
         if training_seasons is None

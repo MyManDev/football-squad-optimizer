@@ -461,12 +461,7 @@ export interface EntryAdvice {
       gameweek: number;
       kickoff: string;
       status: "fitted_known_start_labels" | "unavailable_no_known_start_labels";
-      start_probability: number | null;
-      cameo_probability: number | null;
-      zero_probability: number;
-      unknown_role_probability: number;
       expected_minutes: number;
-      sixty_minute_probability: number;
       captured_eligibility_multiplier: number;
       news_applied: boolean;
       point_components?: AdviceRolePointComponents;

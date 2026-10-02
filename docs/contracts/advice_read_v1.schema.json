@@ -1881,18 +1881,6 @@
               "items": {
                 "additionalProperties": false,
                 "properties": {
-                  "cameo_probability": {
-                    "anyOf": [
-                      {
-                        "maximum": 1,
-                        "minimum": 0,
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "captured_eligibility_multiplier": {
                     "maximum": 1,
                     "minimum": 0,
@@ -1971,38 +1959,11 @@
                     ],
                     "type": "object"
                   },
-                  "sixty_minute_probability": {
-                    "maximum": 1,
-                    "minimum": 0,
-                    "type": "number"
-                  },
-                  "start_probability": {
-                    "anyOf": [
-                      {
-                        "maximum": 1,
-                        "minimum": 0,
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "status": {
                     "enum": [
                       "fitted_known_start_labels",
                       "unavailable_no_known_start_labels"
                     ]
-                  },
-                  "unknown_role_probability": {
-                    "maximum": 1,
-                    "minimum": 0,
-                    "type": "number"
-                  },
-                  "zero_probability": {
-                    "maximum": 1,
-                    "minimum": 0,
-                    "type": "number"
                   }
                 },
                 "required": [
@@ -2012,11 +1973,6 @@
                   "gameweek",
                   "kickoff",
                   "status",
-                  "start_probability",
-                  "cameo_probability",
-                  "zero_probability",
-                  "unknown_role_probability",
-                  "sixty_minute_probability",
                   "captured_eligibility_multiplier",
                   "expected_minutes",
                   "news_applied"

@@ -16,6 +16,7 @@ from types import MappingProxyType
 from typing import Any
 
 from squadopt.application.manager_words import load_manager_words
+from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
@@ -79,6 +80,7 @@ class FootballBundle:
     news_capture_id: str | None
     official_injury_capture_id: str | None
     official_injuries: OfficialInjuryReport | None
+    handoff_fingerprint: str
 
 
 def _validate(
@@ -89,6 +91,8 @@ def _validate(
     news_capture_id: str | None,
     official_injury_capture_id: str | None,
 ) -> tuple[dict[str, Any], OfficialInjuryReport | None]:
+    if official_injury_capture_id is not None:
+        require_official_injury_source()
     extras = files.keys() - (_REQUIRED | _OPTIONAL)
     if not files.keys() >= _REQUIRED or any(
         not re.fullmatch(r"site_entry_[1-9][0-9]*", role) for role in extras
@@ -326,6 +330,8 @@ def read_football_bundle(
         or record.get("snapshot_id") != snapshot_id
     ):
         raise ValueError("Unsupported or mismatched football ready marker.")
+    if record.get("official_injuries") is not None:
+        require_official_injury_source()
     files = _relative_files(marker, snapshot_id, record.get("files"))
     news = record.get("news")
     official = record.get("official_injuries")
@@ -361,6 +367,7 @@ def read_football_bundle(
         news_id,
         official_id,
         report,
+        identity["handoff_fingerprint"],
     )
 
 
@@ -380,6 +387,8 @@ def seal_football_bundle(
     Copies may survive an interruption; only the final marker makes them ready.
     Repeating the identical inputs completes that interruption or returns a replay.
     """
+    if official_injury_capture_id is not None:
+        require_official_injury_source()
     marker = football_bundle_path(artifact_root, snapshot_id)
     _safe(Path(addressable(marker)))
     existing = (

@@ -30,7 +30,8 @@ from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION
 from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSION
 from squadopt.prediction.football_components import IDENTITY_COLUMNS
 
-SELECTION = ("2022-23", "2023-24", "2024-25")
+ARCHIVES = ("2022-23", "2023-24", "2024-25")
+SELECTION = (*ARCHIVES, "2026-27")
 
 
 def producer(monkeypatch, tmp_path):
@@ -42,7 +43,7 @@ def producer(monkeypatch, tmp_path):
     captured_calendar = []
     history = pd.DataFrame(
         {
-            "season": SELECTION,
+            "season": ARCHIVES,
             "kickoff": pd.to_datetime(
                 ["2023-05-01T15:00Z", "2024-05-01T15:00Z", "2025-05-01T15:00Z"]
             ),
@@ -51,12 +52,12 @@ def producer(monkeypatch, tmp_path):
 
     def archive(root, *, seasons):
         calls["archives"].append(tuple(seasons))
-        assert tuple(seasons) == SELECTION
+        assert tuple(seasons) == ARCHIVES
         return history.copy()
 
     def training(frame, *, prior_only_season):
         calls["priors"].append(prior_only_season)
-        assert set(frame.season) == set(SELECTION)
+        assert set(frame.season) == set(ARCHIVES)
         return pd.DataFrame({"season": ["2023-24"] * 48 + ["2024-25"] * 48})
 
     class Joint:
@@ -113,13 +114,13 @@ def producer(monkeypatch, tmp_path):
             table=table, contract_version=APPEARANCE_HORIZON_CONTRACT_VERSION
         ), frame
 
-    monkeypatch.setattr(module, "ARCHIVE_SEASONS", (*SELECTION, "2025-26"))
+    monkeypatch.setattr(module, "ARCHIVE_SEASONS", (*ARCHIVES, "2025-26"))
     monkeypatch.setattr(module, "archive_history", archive)
     monkeypatch.setattr(module, "causal_training", training)
     monkeypatch.setattr(module, "JointRoleFootballModel", Joint)
     monkeypatch.setattr(module, "build_football_horizon", build)
-    monkeypatch.setattr(module, "captured_history", lambda *a, **k: pytest.fail("Not selected."))
-    for season in SELECTION:
+    monkeypatch.setattr(module, "captured_history", lambda *a, **k: pd.DataFrame())
+    for season in ARCHIVES:
         for name in ("gws/merged_gw.csv", "players_raw.csv", "teams.csv", "fixtures.csv"):
             path = tmp_path / "archive" / "data" / season / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,13 +133,13 @@ def test_one_joint_fit_produces_bound_pair_that_both_readers_agree_on(monkeypatc
     served, companion = module.produce_football_components(
         snapshot, tmp_path / "archive", role_minutes=True, training_seasons=SELECTION
     )
-    assert calls == {"fits": 1, "archives": [SELECTION], "priors": [SELECTION[0]]}
+    assert calls == {"fits": 1, "archives": [ARCHIVES], "priors": [SELECTION[0]]}
     assert served["model_version"] == companion["model_version"] == JOINT_ROLE_MODEL_VERSION
     assert served["role_metadata"] == companion["role_metadata"]
     assert served["role_metadata"] is not companion["role_metadata"]
     assert served["training_selection"] == companion["training_selection"]
-    assert served["training_selection"]["archive_seasons_read"] == list(SELECTION)
-    assert not served["training_selection"]["captured_history_included"]
+    assert served["training_selection"]["archive_seasons_read"] == list(ARCHIVES)
+    assert served["training_selection"]["captured_history_included"]
     assert companion["captured_availability"]["application"] == "not_applied"
     assert served["fingerprint"] == forecast_digest(served)
     assert companion["forecast_fingerprint"] == served["fingerprint"]
@@ -409,7 +410,10 @@ def test_component_explanation_retains_season_specific_scoring(
 
 def test_optional_component_schema_keeps_legacy_rows_but_refuses_incomplete_or_extra_terms():
     _, inputs, _, basis = world(joint_documents())
-    row = fixture_role_estimates(basis, inputs)[0]
+    estimates = fixture_role_estimates(basis, inputs)
+    row = role_forecast_summary({"fixture_role_estimates": estimates}, {estimates[0]["player_id"]})[
+        "rows"
+    ][0]
     validator = Draft202012Validator(role_forecast_schema()["properties"]["rows"]["items"])
     assert validator.is_valid(row)
     legacy = {key: value for key, value in row.items() if key != "point_components"}
@@ -421,3 +425,31 @@ def test_optional_component_schema_keeps_legacy_rows_but_refuses_incomplete_or_e
     incomplete = deepcopy(row)
     incomplete["point_components"].pop("clipping")
     assert not validator.is_valid(incomplete)
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        ARCHIVES,
+        (*SELECTION, "2025-26"),
+        ("2024-25", "2026-27"),
+        ("2026-27",),
+    ],
+)
+def test_joint_training_population_is_fixed_before_any_history_read(
+    monkeypatch, tmp_path, selection
+):
+    module, snapshot, _ = _producer_world(monkeypatch)
+    monkeypatch.setattr(module, "ARCHIVE_SEASONS", (*ARCHIVES, "2025-26"))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail(
+            "An invalid joint population must fail before archive or captured history reads."
+        )
+
+    monkeypatch.setattr(module, "archive_history", forbidden)
+    monkeypatch.setattr(module, "captured_history", forbidden)
+    with pytest.raises(ValueError, match="Joint role minutes require exactly"):
+        module.produce_football_components(
+            snapshot, tmp_path, role_minutes=True, training_seasons=selection
+        )

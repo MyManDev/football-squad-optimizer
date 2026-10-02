@@ -13,6 +13,7 @@ import pandas as pd
 
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import write_document_once
+from squadopt.data.claim_identity import normalise_claim_name
 from squadopt.data.errors import DataError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import (
@@ -84,6 +85,7 @@ class _ClubNewsInputs:
     clubs_declared: tuple[str, ...]
     clubs_covered: tuple[str, ...]
     unverifiable: tuple[UnlocatableClaim, ...] = ()
+    unverifiable_response_clubs: Mapping[UnlocatableClaim, frozenset[str]] | None = None
     #: Covered clubs at least one of whose registered pages was not read. A narrowing of
     #: coverage, never a substitute for it -- every name here is also in ``clubs_covered``.
     clubs_partially_covered: tuple[str, ...] = ()
@@ -125,9 +127,10 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
     **Responses are de-duplicated by their text before parsing.** One response can cover
     several clubs -- the fixture answers once for all of them -- and parsing the same
     response once per club would produce the same claim twice and refuse the week for a
-    duplication this function created. The provenance mapping still has an entry per club,
-    because that is a statement about which response coded which club and not about how
-    many distinct answers there were.
+    duplication this function created. Each distinct response is located only against the
+    documents of its associated clubs; a per-club answer cannot borrow another call's sources.
+    A legacy combined response retains every club explicitly associated with its stored text.
+    The provenance mapping still has an entry per club.
     """
 
     documents, coded, clubs_declared, clubs_covered, partially_covered = read_club_news_capture(
@@ -141,14 +144,40 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         )
 
     claims: list[ParsedClaim] = []
+    coverage_claims: list[ParsedClaim] = []
     unverifiable: list[UnlocatableClaim] = []
+    unverifiable_response_clubs: dict[UnlocatableClaim, frozenset[str]] = {}
     for text in dict.fromkeys(entry.response.text for entry in coded):
-        response = next(entry.response for entry in coded if entry.response.text == text)
-        located, dropped = locate_claims_reporting(response, documents)
-        claims.extend(parse_claim_response(located, documents))
-        unverifiable.extend(dropped)
+        associated = [entry for entry in coded if entry.response.text == text]
+        response_clubs = {entry.club for entry in associated}
+        response_documents = tuple(doc for doc in documents if doc.club in response_clubs)
+        source_clubs: dict[str, set[str]] = {}
+        for document in response_documents:
+            for url in {document.requested_url, document.final_url}:
+                source_clubs.setdefault(url, set()).add(normalise_claim_name(document.club))
+        located, dropped = locate_claims_reporting(associated[0].response, response_documents)
+        parsed = parse_claim_response(located, response_documents)
+        claims.extend(parsed)
+        # The table still counts resolved opponent mentions as refused claims. Coverage
+        # and unresolved-player flags, however, describe only a club's own statements.
+        coverage_claims.extend(
+            claim
+            for claim in parsed
+            if source_clubs.get(claim.source_url) == {normalise_claim_name(claim.team_name)}
+        )
+        # A failed citation cannot establish source ownership. The stored response can:
+        # its own-player error stays unresolved even if the cited URL was never fetched
+        # or belongs to another club. An opponent response cannot flag that player.
+        response_club_names = {normalise_claim_name(club) for club in response_clubs}
+        for claim in dropped:
+            if normalise_claim_name(claim.team_name) not in response_club_names:
+                continue
+            unverifiable.append(claim)
+            unverifiable_response_clubs[claim] = unverifiable_response_clubs.get(
+                claim, frozenset()
+            ) | frozenset(response_clubs)
 
-    covered = _clubs_still_covered(clubs_covered, claims=claims, unverifiable=unverifiable)
+    covered = _clubs_still_covered(clubs_covered, claims=coverage_claims, unverifiable=unverifiable)
     # A club dropped from coverage above is no longer partly read either: it is unread, and
     # carrying its name in both lists would say two things about it at once.
     partial = tuple(club for club in partially_covered if club in set(covered))
@@ -159,6 +188,7 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         clubs_declared=clubs_declared,
         clubs_covered=covered,
         unverifiable=tuple(unverifiable),
+        unverifiable_response_clubs=unverifiable_response_clubs,
         clubs_partially_covered=partial,
         capture_id=snapshot.metadata.snapshot_id,
         captured_at_utc=snapshot.metadata.captured_at_utc,
@@ -180,11 +210,15 @@ def _clubs_still_covered(
     list exists to carry -- so only clubs that lost claims are reconsidered here.
     """
 
-    lost = {claim.team_name for claim in unverifiable}
+    lost = {normalise_claim_name(claim.team_name) for claim in unverifiable}
     if not lost:
         return tuple(clubs_covered)
-    kept = {claim.team_name for claim in claims}
-    return tuple(club for club in clubs_covered if club not in lost or club in kept)
+    kept = {normalise_claim_name(claim.team_name) for claim in claims}
+    return tuple(
+        club
+        for club in clubs_covered
+        if normalise_claim_name(club) not in lost or normalise_claim_name(club) in kept
+    )
 
 
 def _provenance_from_capture(coded: Sequence[CodedClub]) -> ClubModelProvenance:
@@ -409,6 +443,7 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         clubs_partially_covered=club_news.clubs_partially_covered,
         model=club_news.model,
         unverifiable_claims=club_news.unverifiable,
+        unverifiable_response_clubs=club_news.unverifiable_response_clubs,
         club_news_snapshot_id=arguments.club_news_snapshot,
     )
     name = arguments.table_name or _artifact_name(

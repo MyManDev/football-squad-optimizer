@@ -13,7 +13,6 @@ def _object(fields: dict[str, Any]) -> dict[str, Any]:
 
 
 def role_forecast_schema() -> dict[str, Any]:
-    probability = {"type": "number", "minimum": 0, "maximum": 1}
     identity = {"type": "integer", "minimum": 1}
     row = _object(
         {
@@ -23,19 +22,8 @@ def role_forecast_schema() -> dict[str, Any]:
             "gameweek": identity,
             "kickoff": {"type": "string"},
             "status": {"enum": ["fitted_known_start_labels", "unavailable_no_known_start_labels"]},
-            **{
-                key: {"anyOf": [probability, {"type": "null"}]}
-                for key in ("start_probability", "cameo_probability")
-            },
-            **{
-                key: probability
-                for key in (
-                    "zero_probability",
-                    "unknown_role_probability",
-                    "sixty_minute_probability",
-                    "captured_eligibility_multiplier",
-                )
-            },
+            # This multiplier quotes captured FPL eligibility, not a model role estimate.
+            "captured_eligibility_multiplier": {"type": "number", "minimum": 0, "maximum": 1},
             "expected_minutes": {"type": "number", "minimum": 0, "maximum": 120},
             "news_applied": {"type": "boolean"},
         }

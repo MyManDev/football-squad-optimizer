@@ -14,7 +14,7 @@ from squadopt.data.sources.club_news import RawDocument
 from squadopt.data.sources.club_news_metadata import publication_metadata
 from squadopt.data.timestamps import as_instant
 
-SELECTION_POLICY_VERSION = "first_team_document_selection_v1"
+SELECTION_POLICY_VERSION = "first_team_document_selection_v2"
 MAX_DOCUMENT_AGE_DAYS = 7
 
 
@@ -89,6 +89,9 @@ def select_coding_documents(
             reader.feed(document.content.decode("utf-8"))
         title = reader.headings[0] if len(reader.headings) == 1 else ""
         path = document.final_url.split("://", 1)[-1].partition("/")[2]
+        metadata = publication_metadata(
+            document.content, document.content_type, source_url=document.final_url
+        )
         reason = "eligible_unclassified"
         priority = article_priority(path, title)
         own_team_title = re.sub(
@@ -108,27 +111,34 @@ def select_coding_documents(
             re.IGNORECASE,
         ):
             reason = "explicit_other_competition_or_past_match"
-        elif title.casefold() in {
-            "news",
-            "latest news",
-            "all news",
-            "first team news",
-            "first-team news",
-        }:
+        elif (
+            not metadata.verified
+            and path.strip("/").rsplit("/", 1)[-1].casefold()
+            in {"news", "latest-news", "all-news", "first-team-news"}
+            and title.casefold()
+            in {
+                "news",
+                "latest news",
+                "all news",
+                "first team news",
+                "first-team news",
+            }
+        ):
             reason = "explicit_discovery_index"
         elif priority == 0:
             reason = "availability_or_upcoming_match"
         eligible = not reason.startswith("explicit_")
-        if eligible and cutoff is not None:
-            metadata = publication_metadata(
-                document.content, document.content_type, source_url=document.final_url
-            )
-            if metadata.verified and metadata.published_precision == "instant":
-                published = as_instant(str(metadata.published_at_utc))
-                if published > cutoff:
-                    reason, eligible = "publication_after_observation", False
-                elif published < cutoff - timedelta(days=MAX_DOCUMENT_AGE_DAYS):
-                    reason, eligible = "publication_outside_current_window", False
+        if (
+            eligible
+            and cutoff is not None
+            and metadata.verified
+            and metadata.published_precision == "instant"
+        ):
+            published = as_instant(str(metadata.published_at_utc))
+            if published > cutoff:
+                reason, eligible = "publication_after_observation", False
+            elif published < cutoff - timedelta(days=MAX_DOCUMENT_AGE_DAYS):
+                reason, eligible = "publication_outside_current_window", False
         if eligible:
             selected.append(document)
         decisions.append(

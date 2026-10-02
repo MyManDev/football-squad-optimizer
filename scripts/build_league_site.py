@@ -156,7 +156,7 @@ def main() -> int:
     parser.add_argument(
         "--rotation-evidence",
         type=Path,
-        help="this week's rotation evidence table (rotation_evidence_v2 csv, its manifest "
+        help="this week's rotation evidence table (rotation_evidence_v4 csv, its manifest "
         "beside it); with --club-news-source, the manager's word is solved for every "
         "member as a switchable, priced constraint",
     )

@@ -158,12 +158,7 @@ function expectedAnswer(window: 3 | 5) {
           gameweek: answer.payload.gameweek,
           kickoff: "2026-09-05T14:00:00Z",
           status: "fitted_known_start_labels",
-          start_probability: 0.4,
-          cameo_probability: 0.1,
-          zero_probability: 0.5,
-          unknown_role_probability: 0,
           expected_minutes: 34,
-          sixty_minute_probability: 0.4,
           captured_eligibility_multiplier: 0.5,
           news_applied: false,
           point_components: {
@@ -184,12 +179,7 @@ function expectedAnswer(window: 3 | 5) {
           gameweek: answer.payload.gameweek,
           kickoff: "2026-09-05T16:30:00Z",
           status: "unavailable_no_known_start_labels",
-          start_probability: null,
-          cameo_probability: null,
-          zero_probability: 0,
-          unknown_role_probability: 1,
           expected_minutes: 60,
-          sixty_minute_probability: 0.7,
           captured_eligibility_multiplier: 1,
           news_applied: false,
         },
@@ -314,13 +304,13 @@ for (const [window, width] of [
     await expect(participation).toContainText("Uygulanamayan açıklama: 1");
     const role = participation.getByTestId("role-forecast");
     await role.locator(":scope > summary").click();
-    await expect(role).toContainText("İlk 11: 40% · Sonradan girer: 10% · Oynamaz: 50%");
-    await expect(role).toContainText("Beklenen dakika: 34,0 · 60 dakikaya ulaşır: 40%");
-    await expect(role).toContainText("FPL yüzdesi ilk 11 garantisi değildir");
+    await expect(role).toContainText("Beklenen dakika: 34,0");
+    await expect(role).toContainText("kesinleşmiş bir ilk 11 değildir");
+    await expect(role).not.toContainText("%");
     await expect(role).toContainText("FPL oynayabilirliği bir kez uygulanır");
     await expect(role).toContainText("Bağımsız doğruluk ölçümü henüz tamamlanmış değildir");
     await expect(role).toContainText("İlk 11 bilgisi için yeterli kayıt yok");
-    await expect(role).toContainText("İlk 11: — · Sonradan girer: — · Oynamaz: 0%");
+    await expect(role).toContainText("Beklenen dakika: 60,0");
     const rolePoints = role.getByTestId("role-point-components");
     await expect(rolePoints).not.toHaveAttribute("open");
     await rolePoints.locator(":scope > summary").focus();

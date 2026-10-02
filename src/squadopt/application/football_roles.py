@@ -1,4 +1,4 @@
-"""Public fixture-role estimates from the same component law used by the planner."""
+"""Internal fixture-role estimates and their restricted public explanation."""
 
 from __future__ import annotations
 
@@ -133,13 +133,33 @@ def bind_role_absences(
     return result
 
 
+# Keep modeled role probabilities internal until a publication gate admits them.
+# An allowlist also prevents future diagnostic fields from reaching member payloads.
+_PUBLIC_ROLE_FIELDS = (
+    "player_id",
+    "name",
+    "fixture_id",
+    "gameweek",
+    "kickoff",
+    "status",
+    "expected_minutes",
+    "captured_eligibility_multiplier",
+    "news_applied",
+    "point_components",
+)
+
+
 def role_forecast_summary(
     diagnostics: Mapping[str, object], player_ids: Set[int]
 ) -> dict[str, Any] | None:
     rows = diagnostics.get("fixture_role_estimates")
     if not isinstance(rows, list):
         return None
-    selected = [row for row in rows if row["player_id"] in player_ids]
+    selected = [
+        {key: row[key] for key in _PUBLIC_ROLE_FIELDS if key in row}
+        for row in rows
+        if row["player_id"] in player_ids
+    ]
     if not selected:
         return None
     return {

@@ -219,35 +219,32 @@ const isSourceAvailability = ({ at, text }: { at: string; text: string }) =>
   at.startsWith("features/league/advice/InformationReview.tsx:") &&
   SOURCE_AVAILABILITY_COPY.some((label) => label === text);
 
-// The owner requested experimental starting-role estimates. This narrow surface
-// identifies them as unvalidated model estimates, never rank or winning odds.
 // Conditional scenario bounds are explicitly denied the meaning of an outcome CI.
-const SCOPED_MODEL_COPY: Record<string, readonly string[]> = {
-  "features/league/advice/RoleForecast.tsx": [
-    "%",
-    "Bunlar geçmiş maçlardan öğrenilmiş model tahminleridir; FPL yüzdesi ilk 11 garantisi değildir. FPL oynayabilirliği bir kez uygulanır. Bağımsız doğruluk ölçümü henüz tamamlanmış değildir.",
-    "These are model estimates learned from past matches. The FPL percentage is not a guaranteed start. Captured eligibility is applied once. Independent accuracy validation is not complete.",
-  ],
+// Role explanations have no exception: modeled role probabilities remain internal.
+const SCENARIO_DENIALS: Record<string, readonly string[]> = {
   "features/league/advice/InformationReview.tsx": [
     "Bu aralık maç sonucu için bir güven aralığı değildir. Haberin ne zaman geleceğine olasılık atanmadı; banka ve kalan transfere ek puan yazılmadı.",
     "This is not a confidence interval for match outcomes. No news-arrival probability or extra point value for bank/free transfers was assigned.",
   ],
 };
-const isScopedModelCopy = ({ at, text }: { at: string; text: string }) =>
-  Object.entries(SCOPED_MODEL_COPY).some(
+const isScenarioDenial = ({ at, text }: { at: string; text: string }) =>
+  Object.entries(SCENARIO_DENIALS).some(
     ([path, labels]) => at.startsWith(`${path}:`) && labels.includes(text),
   );
 
 describe("every string a production component writes inline", () => {
-  it("limits role estimates and scenario disclaimers to their exact approved surface", () => {
+  it("limits scenario denials to their exact surface without a role-estimate exception", () => {
     expect(
-      INLINE.filter(isScopedModelCopy)
+      INLINE.filter(isScenarioDenial)
         .map(({ text }) => text)
         .sort(),
-    ).toEqual(Object.values(SCOPED_MODEL_COPY).flat().sort());
-    expect(isScopedModelCopy({ at: "elsewhere.tsx:1", text: "%" })).toBe(false);
-    for (const path of Object.keys(SCOPED_MODEL_COPY)) {
-      expect(isScopedModelCopy({ at: `${path}:1`, text: "Win probability 80%" })).toBe(false);
+    ).toEqual(Object.values(SCENARIO_DENIALS).flat().sort());
+    expect(isScenarioDenial({ at: "elsewhere.tsx:1", text: "%" })).toBe(false);
+    expect(isScenarioDenial({ at: "features/league/advice/RoleForecast.tsx:1", text: "%" })).toBe(
+      false,
+    );
+    for (const path of Object.keys(SCENARIO_DENIALS)) {
+      expect(isScenarioDenial({ at: `${path}:1`, text: "Win probability 80%" })).toBe(false);
     }
   });
   it("only exempts the captured availability labels and marker", () => {
@@ -275,7 +272,7 @@ describe("every string a production component writes inline", () => {
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
     const offenders = INLINE.filter(
-      (entry) => !isSourceAvailability(entry) && !isScopedModelCopy(entry),
+      (entry) => !isSourceAvailability(entry) && !isScenarioDenial(entry),
     )
       .filter(({ text }) => AS_A_CHANCE.test(text))
       .map(({ at, text }) => `${at}: ${text}`);

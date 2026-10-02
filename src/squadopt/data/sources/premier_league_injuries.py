@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Collection, Mapping
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
 
@@ -27,6 +27,7 @@ MAX_CLUBS = 20
 MAX_ROWS = 200
 # Explicit publisher labels, not fuzzy name matching or an assumed season roster.
 CLUB_LABELS = {
+    "AFC Bournemouth": "Bournemouth",
     "Brighton & Hove Albion": "Brighton",
     "Coventry City": "Coventry",
     "Hull City": "Hull",
@@ -175,6 +176,27 @@ def _updated(page: bytes, observed_at: str) -> str | None:
         return result if as_instant(result) <= as_instant(observed_at) else None
     except ValueError:
         return None
+
+
+def _row_date(value: object, observed_at: str) -> str | None:
+    """Preserve source wording, but refuse a known instant/day after observation."""
+    if not isinstance(value, str):
+        return None
+    observed = as_instant(observed_at)
+    try:
+        parsed = as_instant(value)
+    except ValueError:
+        return value  # Undated source wording is not promoted to an instant.
+    if parsed.tzinfo is None:
+        try:
+            future = date.fromisoformat(value) > observed.date()
+        except ValueError as error:
+            raise ValueError("Injury source date has no timezone; date withheld.") from error
+    else:
+        future = parsed > observed
+    if future:
+        raise ValueError("Injury source date is after observation; date withheld.")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -349,12 +371,26 @@ def read_official_injuries(
                     links = fact.get("links") or []
                     if not isinstance(links, list) or len(links) > 5:
                         raise ValueError("Injury details links are malformed.")
-                    urls = tuple(
-                        dict.fromkeys(_name(_mapping(link).get("promoUrl")) for link in links)
-                    )
+                    urls = []
+                    for link_index, link in enumerate(links):
+                        link_url = link.get("promoUrl") if isinstance(link, dict) else None
+                        if not isinstance(link_url, str) or not link_url.strip():
+                            incomplete.append(club)
+                            refusals.append(
+                                f"{club} row {row_index} link {link_index}: "
+                                "Injury details link has no nonempty promoUrl; link withheld."
+                            )
+                            continue
+                        urls.append(_name(link_url))
                     description = fact.get("description")
                     if description is not None and not isinstance(description, str):
                         raise ValueError("Injury description is not text.")
+                    try:
+                        source_date = _row_date(fact.get("date"), observed_at)
+                    except ValueError as error:
+                        source_date = None
+                        incomplete.append(club)
+                        refusals.append(f"{club} row {row_index}: {error}")
                     facts.append(
                         OfficialInjuryFact(
                             club,
@@ -367,14 +403,14 @@ def read_official_injuries(
                             if matches
                             else "unmapped_name",
                             description,
-                            fact.get("date") if isinstance(fact.get("date"), str) else None,
+                            source_date,
                             fact.get("publishFrom")
                             if type(fact.get("publishFrom")) is int
                             else None,
                             fact.get("lastModified")
                             if type(fact.get("lastModified")) is int
                             else None,
-                            urls,
+                            tuple(dict.fromkeys(urls)),
                             _span(
                                 playlist,
                                 (
@@ -407,7 +443,7 @@ def read_official_injuries(
         tuple(received),
         tuple(c for c in clubs.values() if c not in received),
         tuple(dict.fromkeys(incomplete)),
-        tuple(unknown),
+        tuple(dict.fromkeys(unknown)),
         tuple(facts),
         tuple(refusals),
     )
