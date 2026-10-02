@@ -3,15 +3,16 @@
 Status: pre-registered, written before any of its forecasts is made. It declares a
 measurement, not a candidate. It changes no forecast, planner, default, member page or
 capture, and it promotes nothing. Its question is the prediction side's
-(`docs/architecture/ownership.md`): how much the served football forecast loses per week of
-lead. Nothing is run by this document. Its runner is a separate pull request, and the run
+(`docs/architecture/ownership.md`): how much the football forecast `football_team_share_v1`
+loses per week of lead. Nothing is run by this document. Its runner is a separate pull request, and the run
 waits until this protocol has merged.
 
 ## Why this is written
 
 A planner's horizon should rest on how its forecast degrades with lead
-(`docs/prediction_research_agenda.md`, "Multi-horizon forecasting"), and for the served
-model, `football_team_share_v1`, no such record exists:
+(`docs/prediction_research_agenda.md`, "Multi-horizon forecasting"). For
+`football_team_share_v1`, the football model the experimental option has served so far, no
+such record exists:
 
 - `horizon_decay` (`src/squadopt/backtest/horizon_decay.py`) measures the drift of the
   earlier horizon builder, not the football model, at offsets 0 to 3 by default.
@@ -20,7 +21,9 @@ model, `football_team_share_v1`, no such record exists:
   that record says.
 
 This protocol measures the error at each lead separately, for `football_team_share_v1`
-only, from one to fourteen weeks ahead.
+only, from one to fourteen weeks ahead. The joint role model the owner is preparing for the
+experimental option (`football_joint_role_minutes_v1`) is a different model; a record of it
+needs its own protocol, and this one says nothing about it.
 
 ## What has been read
 
@@ -154,7 +157,8 @@ lead.
 ## What a result licenses
 
 Nothing by itself. The record does not choose a planner horizon, does not lengthen the
-served artifact and says nothing about the contextual model or the current model. A
+served artifact and says nothing about the contextual model, the joint role model or the
+current model. A
 lead-dependent dispersion or shrinkage needs its own protocol, declared after this record.
 
 ## Deliberate exclusions
