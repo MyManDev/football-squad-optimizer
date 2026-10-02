@@ -3,15 +3,19 @@
 import dataclasses
 import json
 
+import jsonschema
 import pytest
+from tests.unit import test_live_recommendation as live
 from tests.unit.test_source_fpl_live import EVENTS, TEAMS, _element
 
+from squadopt.contracts.information import official_information_schema
 from squadopt.data.errors import DataError
 from squadopt.data.sources.fpl_information import (
     FplInformation,
     captured_fpl_information,
     information_changes,
 )
+from squadopt.live.recommendation import read_inputs
 
 
 def _feed(*, observed="2026-08-20T12:00:00Z", changes=None, reverse=False):
@@ -104,9 +108,52 @@ def test_invalid_source_percentage_refused(chance):
         _feed(changes={"chance_of_playing_next_round": chance})
 
 
-def test_news_from_after_observation_refused():
-    with pytest.raises(DataError, match="after"):
-        _feed(changes={"news_added": "2026-08-21T00:00:00Z"})
+def _saka(feed):
+    return next(p for p in feed.players if p.player_id == 118748)
+
+
+def test_a_stamp_after_the_observation_is_not_carried_and_the_capture_still_reads():
+    on_time = _feed(changes={"news": "ankle", "news_added": "2026-08-20T11:59:59Z"})
+    late = _feed(changes={"news": "ankle", "news_added": "2026-08-20T12:00:01Z"})
+    assert _saka(on_time).source_added_at == "2026-08-20T11:59:59Z"
+    assert _saka(late).source_added_at is None
+    assert _saka(late).news_state == "present"
+    assert dataclasses.replace(_saka(late), source_added_at="2026-08-20T11:59:59Z") == _saka(
+        on_time
+    )
+    other = [p for p in late.players if p.player_id != 118748]
+    assert other == [p for p in on_time.players if p.player_id != 118748]
+    public = late.public_record([118748])
+    jsonschema.validate(public, official_information_schema())
+    assert public["players"][0]["source_added_at"] is None
+
+
+def test_a_stamp_at_the_observation_is_carried():
+    feed = _feed(changes={"news": "ankle", "news_added": "2026-08-20T12:00:00Z"})
+    assert _saka(feed).source_added_at == "2026-08-20T12:00:00Z"
+
+
+def test_a_cleared_note_with_a_late_stamp_is_still_cleared_and_not_unreported():
+    feed = _feed(changes={"news": "", "news_added": "2026-08-21T00:00:00Z"})
+    assert _saka(feed).source_added_at is None
+    assert _saka(feed).news_state == "cleared"
+
+
+def test_one_late_stamp_no_longer_stops_reading_the_capture(tmp_path):
+    elements = live._elements()
+    late = elements[0]
+    late.update(news="Knock", news_added="2026-08-13T20:11:44Z")
+    snapshot = live._capture(tmp_path, live._bootstrap(elements=elements))
+    inputs = read_inputs(snapshot, season=live.SEASON)
+    assert inputs.official_information is not None
+    (row,) = (p for p in inputs.official_information.players if p.player_id == late["code"])
+    assert row.source_added_at is None
+    assert row.news_state == "present"
+
+
+def test_a_malformed_stamp_is_still_refused():
+    with pytest.raises(DataError):
+        _feed(changes={"news": "ankle", "news_added": "yesterday"})
 
 
 def test_legacy_capture_has_no_invented_news():
