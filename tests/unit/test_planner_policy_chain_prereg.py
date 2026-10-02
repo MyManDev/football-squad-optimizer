@@ -66,7 +66,12 @@ def _protocol() -> str:
         "The runner reads the file's bytes once, records their sha256",
         "The artifact is never rebuilt, never borrowed from another capture and never written to.",
         "The decision step uses no archive, no handoff, no member or entry payload and nothing"
-        " captured after the week's deadline.",
+        " captured after the week's deadline enters a decision.",
+        "Later captures are read only for the deadlines they state (rule 5)",
+        "never the feature commit that wrote it",
+        "before 2026-10-07T00:00:00Z and 2026-10-09T00:00:00Z",
+        "No decision is computed before 2026-10-11T10:00:00Z, the end of the 9 to 11 October"
+        " freeze",
         "A squad not proved OPTIMAL at 60 units is built once more at 240.",
         "A squad still not proved drops only its own chains",
         "so every purchase lot is known",
@@ -108,8 +113,9 @@ def _protocol() -> str:
         " only",
         "The interim records no verdict.",
         "The reading dates do not move, so a later start leaves fewer weeks to read.",
-        "this document merged by 6 October and the runner by 8 October. If either misses its"
-        " date, the first chain week is GW7",
+        "this document merged by 6 October and the runner by 8 October, each by the end of that"
+        " day in UTC",
+        "If either misses its date, the first chain week is GW7",
         "an earlier week is never relabelled as the start",
         "A capture taken after every published deadline has closed targets no gameweek and is left"
         " out.",
