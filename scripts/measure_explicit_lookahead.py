@@ -54,11 +54,6 @@ UNITS_PER_WEEK = 20.0
 #: is what an arm may spend, probes included. The measured run did not: its control's two
 #: probes and the lookahead's one ran outside the shares (#904 review).
 HOLD_PROBE_UNITS = 1.0
-#: The solver's objective rounds each player-week's points half up to
-#: 1/expected_points_scale, once (`optimization/coefficients.py`). With no bench weight a
-#: week's lineup carries eleven starter terms and the captain's term again, so a path's
-#: scaled objective and its unrounded rescore differ by at most this much per forecast week.
-ROUNDING_PER_WEEK = 12 * 0.5 / OptimizationConfig().expected_points_scale
 #: A safety stop, not a budget. Where a clock stops a search is a function of the machine,
 #: so a solve it stops is FAILED and never read.
 WALL_CEILING_SECONDS = 7200.0
@@ -98,6 +93,13 @@ def solver_config(weeks: int) -> OptimizationConfig:
         solver_time_limit_seconds=WALL_CEILING_SECONDS,
         solver_deterministic_time_limit=UNITS_PER_WEEK * weeks - HOLD_PROBE_UNITS,
     )
+
+
+#: The solver's objective rounds each player-week's points half up to
+#: 1/expected_points_scale, once (`optimization/coefficients.py`). With no bench weight a
+#: week's lineup carries eleven starter terms and the captain's term again, so a path's
+#: scaled objective and its unrounded rescore differ by at most this much per forecast week.
+ROUNDING_PER_WEEK = 12 * 0.5 / solver_config(1).expected_points_scale
 
 
 def budget_arithmetic(case: Case, first: int) -> dict[str, float]:
