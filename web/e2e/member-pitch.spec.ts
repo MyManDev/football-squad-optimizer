@@ -373,7 +373,6 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
   });
   expect(await bottom(captain)).toBeLessThanOrEqual(548);
   const stamp = decision.getByText(copy.leagueMembers.stampOptimal, { exact: true });
-  const caption = decision.getByText(copy.leagueMembers.stampOptimalCaption, { exact: true });
   // When a runner draws the page taller than this machine does, say where: the bottom of
   // every block above the stamp, so a failure names the block that grew.
   const layout = await page.evaluate(() => {
@@ -390,7 +389,7 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
       : [];
     return { phoneBar: at("body header"), topBar: at("main header"), blocks };
   });
-  expect(await bottom(caption), JSON.stringify(layout)).toBeLessThanOrEqual(664);
+  expect(await bottom(stamp), JSON.stringify(layout)).toBeLessThanOrEqual(664);
   expect(await bottom(page.locator('[data-mark="honesty"]'))).toBeLessThanOrEqual(844);
   // The stamp stands beside the week's transfer facts, as the artboard draws it, after the
   // captain line and the gain figure.

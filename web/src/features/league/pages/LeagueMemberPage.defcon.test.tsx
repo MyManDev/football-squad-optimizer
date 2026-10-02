@@ -62,10 +62,8 @@ describe("the plan states that the current model does not forecast DEFCON", () =
     renderAdvice(withLimits(1, [NO_CHIP_STATED_LIMIT, NO_DEFCON_STATED_LIMIT]), language);
 
     const limits = screen.getByRole("region", { name: copy.planLimitsLabel });
-    expect(listed(limits)).toEqual([
-      copy.statedLimits[NO_CHIP_STATED_LIMIT],
-      copy.statedLimits[NO_DEFCON_STATED_LIMIT],
-    ]);
+    // The sentence about chips is published but not shown to the member.
+    expect(listed(limits)).toEqual([copy.statedLimits[NO_DEFCON_STATED_LIMIT]]);
     if (language === "tr") {
       expect(limits).toHaveTextContent("DEFCON");
       expect(limits).not.toHaveTextContent(NO_DEFCON_STATED_LIMIT);
@@ -79,7 +77,11 @@ describe("the plan states that the current model does not forecast DEFCON", () =
     renderAdvice(withLimits(3, published), language);
 
     const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
-    expect(listed(limits)).toEqual(published.map((sentence) => copy.statedLimits[sentence]));
+    expect(listed(limits)).toEqual(
+      published
+        .filter((sentence) => sentence !== NO_CHIP_STATED_LIMIT)
+        .map((sentence) => copy.statedLimits[sentence]),
+    );
     if (language === "tr") expect(limits).not.toHaveTextContent(NO_DEFCON_STATED_LIMIT);
   });
 });

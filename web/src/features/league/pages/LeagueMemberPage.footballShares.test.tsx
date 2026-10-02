@@ -69,10 +69,8 @@ describe("the plan states that football v1 splits attacking shares before availa
     renderAdvice(withLimits(1, [NO_CHIP_STATED_LIMIT, FOOTBALL_SHARE_STATED_LIMIT]), language);
 
     const limits = screen.getByRole("region", { name: copy.planLimitsLabel });
-    expect(listed(limits)).toEqual([
-      copy.statedLimits[NO_CHIP_STATED_LIMIT],
-      copy.statedLimits[FOOTBALL_SHARE_STATED_LIMIT],
-    ]);
+    // The sentence about chips is published but not shown to the member.
+    expect(listed(limits)).toEqual([copy.statedLimits[FOOTBALL_SHARE_STATED_LIMIT]]);
     expect(limits).not.toHaveTextContent(copy.statedLimitUnknown);
     if (language === "tr") expect(limits).not.toHaveTextContent(FOOTBALL_SHARE_STATED_LIMIT);
   });
@@ -83,7 +81,11 @@ describe("the plan states that football v1 splits attacking shares before availa
     renderAdvice(withLimits(3, published), language);
 
     const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
-    expect(listed(limits)).toEqual(published.map((sentence) => copy.statedLimits[sentence]));
+    expect(listed(limits)).toEqual(
+      published
+        .filter((sentence) => sentence !== NO_CHIP_STATED_LIMIT)
+        .map((sentence) => copy.statedLimits[sentence]),
+    );
     if (language === "tr") expect(limits).not.toHaveTextContent(FOOTBALL_SHARE_STATED_LIMIT);
   });
 });

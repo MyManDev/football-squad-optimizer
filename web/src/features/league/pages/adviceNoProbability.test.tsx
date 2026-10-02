@@ -291,10 +291,10 @@ describe("a move card claims only what the payload carries", () => {
     expect(advice.payload.window).toBe(1);
     const english = renderState("en", advice);
     expect(english).not.toMatch(/longer window/);
-    expect(english).toMatch(/Part of the one-week pure-points plan/);
+    expect(english).not.toMatch(/Part of the one-week pure-points plan/);
     const turkish = renderState("tr", advice);
     expect(turkish).not.toMatch(/Uzun pencere/);
-    expect(turkish).toMatch(/Bir haftalık saf puan planının parçası/);
+    expect(turkish).not.toMatch(/Bir haftalık saf puan planının parçası/);
   });
 
   it("keeps the longer-window caption for a window that solved one", () => {

@@ -552,8 +552,6 @@ const en = {
   leagueMembers: {
     loading: "Loading league members…",
     computeBodySelf: "Compute this plan from your own squad.",
-    computeBodyOther:
-      "You are viewing another member. The computation starts from this member's public squad.",
     computeRivalNearest: "Nearest above in the standings",
     computeButton: "Compute",
     computeRequesting: "Sending the request…",
@@ -845,7 +843,6 @@ const en = {
       "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
     memberSquad: "Your current squad",
-    heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
     bench: "Bench",
     emptySquad: "No squad is available for this member.",
     emptySquadBody: "The published member record does not contain squad data.",
@@ -876,7 +873,6 @@ const en = {
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     windowValueReason: "Part of the multiweek plan using published projections.",
-    pointsGainReason: "Part of the one-week pure-points plan, chosen for expected points alone.",
     modeTradeoffReason: "This move is part of the selected strategy’s expected-point trade-off.",
     planCost: (points: string) =>
       `This strategy gives up ~${points} expected points against the pure-points pick, hits included.`,
@@ -951,7 +947,6 @@ const en = {
     fixtureAway: "A",
     fixtureNone: "no match",
     fixtureStrip: (first: number, last: number) => `Fixtures, gameweeks ${first} to ${last}`,
-    gainCaption: "expected points gained over making no transfer (the eleven, captain doubled)",
     gainCaptionBeforeCost: (cost: string) =>
       `expected points gained over making no transfer (the eleven, captain doubled), before this week's transfer cost of ${cost}`,
     freeTransfersUsed: (used: number, free: number) => `${used}/${free} free transfers`,
@@ -959,12 +954,8 @@ const en = {
       `${chip}: none of the ${free} free transfers held is used`,
     hitPointsFact: (points: string) => `${points} hit points`,
     stampOptimal: "BEST PLAN · PROVEN",
-    stampOptimalCaption:
-      "On these forecasts and settings no better plan exists, and that is proved.",
     captainMark: "C",
     viceMark: "V",
-    honestyModel: "Expected points are a model's estimate, not a promise.",
-    honestyDecision: "You make the decision; SquadOpt does not make transfers for you.",
     howComputed: "How was this worked out?",
     freshnessTitle: "Decision and outcome data",
     freshnessDecision: (gameweek: number, published: string) =>
@@ -1006,8 +997,6 @@ const en = {
     railWeekHead: "GW",
     railWeekColumn: (gameweek: number) => `Gameweek ${gameweek}`,
     railPlayer: "Player",
-    railLegendVenue: "H: home · A: away.",
-    railLegendDifficulty: "Fixture difficulty is not shown.",
     railNoCalendar: "The fixture calendar is not available, so no match is shown here.",
     railLoading: "Reading the fixture calendar.",
     railNoWeeks: "The calendar lists none of these gameweeks.",
@@ -1690,8 +1679,6 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueMembers: {
     computeBodySelf: "Bu planı kendi kadrondan hesaplat.",
-    computeBodyOther:
-      "Başka bir üyeye bakıyorsun. Hesap bu üyenin herkese açık kadrosundan başlar.",
     computeRivalNearest: "Sıralamada hemen üstündeki",
     computeButton: "Hesapla",
     computeRequesting: "İstek gönderiliyor…",
@@ -1964,7 +1951,6 @@ const tr: MessageSchema<typeof en> = {
       "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
     memberSquad: "Şu anki kadron",
-    heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     bench: "Yedekler",
     emptySquad: "Bu üye için kadro bulunmuyor.",
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
@@ -1992,8 +1978,6 @@ const tr: MessageSchema<typeof en> = {
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     windowValueReason: "Yayımlanan puan tahminlerini kullanan çok haftalı planın bir parçası.",
-    pointsGainReason:
-      "Bir haftalık saf puan planının parçası; yalnızca beklenen puana göre seçildi.",
     modeTradeoffReason: "Bu hamle, seçilen stratejinin beklenen puan ödünleşiminin bir parçasıdır.",
     planCost: (pointsValue) =>
       `Bu strateji, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor (transfer cezaları dahil).`,
@@ -2060,7 +2044,6 @@ const tr: MessageSchema<typeof en> = {
     fixtureAway: "D",
     fixtureNone: "maç yok",
     fixtureStrip: (first, last) => `${first}-${last}. hafta fikstürü`,
-    gainCaption: "beklenen puan kazancı, hiç transfer yapmamana göre (ilk on bir, kaptan iki kat)",
     gainCaptionBeforeCost: (cost) =>
       `beklenen puan kazancı, hiç transfer yapmamana göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
     freeTransfersUsed: (used, free) => `${used}/${free} ücretsiz transfer`,
@@ -2068,11 +2051,8 @@ const tr: MessageSchema<typeof en> = {
       `${chip}: eldeki ${free} ücretsiz transfer kullanılmaz`,
     hitPointsFact: (points) => `${points} ceza puanı`,
     stampOptimal: "EN İYİ PLAN · KANITLANDI",
-    stampOptimalCaption: "Bu tahminlere ve ayarlara göre daha iyi bir plan yok; bu kanıtlandı.",
     captainMark: "C",
     viceMark: "V",
-    honestyModel: "Beklenen puan bir model tahminidir, söz değildir.",
-    honestyDecision: "Kararı sen verirsin; SquadOpt senin yerine transfer yapmaz.",
     howComputed: "Nasıl hesaplandı?",
     freshnessTitle: "Karar ve sonuç verisi",
     freshnessDecision: (gameweek, published) =>
@@ -2107,8 +2087,6 @@ const tr: MessageSchema<typeof en> = {
     railWeekHead: "hafta",
     railWeekColumn: (gameweek) => `${gameweek}. hafta`,
     railPlayer: "Oyuncu",
-    railLegendVenue: "E: ev · D: deplasman.",
-    railLegendDifficulty: "Fikstür zorluk derecesi gösterilmez.",
     railNoCalendar: "Fikstür takvimi okunamadı; bu yüzden burada maç gösterilmiyor.",
     railLoading: "Fikstür takvimi okunuyor.",
     railNoWeeks: "Takvim bu haftaların hiçbirini listelemiyor.",

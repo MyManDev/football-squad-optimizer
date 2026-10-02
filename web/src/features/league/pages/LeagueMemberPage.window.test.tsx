@@ -76,8 +76,11 @@ describe("the advice card shows a window week by week", () => {
     const section = screen.getByRole("region", { name: copy.windowTitle(5) });
     const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
     const items = within(limits).getAllByRole("listitem");
+    // Every published limit but the one about chips, which the page does not show.
     expect(items.map((item) => item.textContent)).toEqual(
-      WINDOW_STATED_LIMITS.map((sentence) => copy.statedLimits[sentence]),
+      WINDOW_STATED_LIMITS.filter((sentence) => sentence !== NO_CHIP_STATED_LIMIT).map(
+        (sentence) => copy.statedLimits[sentence],
+      ),
     );
     expect(
       within(section).getByRole("columnheader", { name: copy.windowHits }),
@@ -154,21 +157,17 @@ describe("the advice card shows a window week by week", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "still says the one-week plan was never offered a chip in %s",
+    "shows no assumptions under a one-week plan whose only limit is the chip one in %s",
     (language) => {
       const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
       const copy = MESSAGES[language].leagueMembers;
       expect(advice.payload.stated_limits).toEqual([NO_CHIP_STATED_LIMIT]);
       renderAdvice(advice, language);
 
-      // A one-week document names the plan, not a window nobody can see.
-      const limits = screen.getByRole("region", { name: copy.planLimitsLabel });
-      expect(
-        within(limits)
-          .getAllByRole("listitem")
-          .map((item) => item.textContent),
-      ).toEqual([copy.statedLimits[NO_CHIP_STATED_LIMIT]]);
+      // The sentence is still in the document; the page leaves it, and the empty heading, out.
+      expect(screen.queryByRole("region", { name: copy.planLimitsLabel })).toBeNull();
       expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+      expect(document.body).not.toHaveTextContent(copy.statedLimits[NO_CHIP_STATED_LIMIT]!);
     },
   );
 });

@@ -100,10 +100,9 @@ describe("the card states one basis for the rows, the total and the gain", () =>
       expect(within(board).getByText(COPY.boardGainLabel)).toBeInTheDocument();
     }
     // The boards are read in order, which is what makes them add up, and the total they
-    // add up to is on the page beside them, with the basis it is measured on.
+    // add up to is on the page beside them as a bare figure.
     expect(text).toContain(COPY.moveRowsBasis);
-    expect(gainLine(COPY.gainCaption)).toBe(`+1.7 ${COPY.gainCaption}`);
-    expect(COPY.gainCaption).toContain("the eleven, captain doubled");
+    expect(screen.getByText("+1.7", { selector: "strong" }).closest("p")?.textContent).toBe("+1.7");
   });
 
   it("names the week's transfer cost in the gain sentence when the plan pays one", () => {
@@ -119,8 +118,6 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     expect(gainLine(COPY.gainCaptionBeforeCost("4.0"))).toBe(
       `+3.5 ${COPY.gainCaptionBeforeCost("4.0")}`,
     );
-    // The plain sentence, which leaves the week's charge unsaid, is not the one printed.
-    expect(screen.queryByText(COPY.gainCaption)).toBeNull();
   });
 
   it("prints no gain sentence where the producer measured none", () => {
@@ -133,7 +130,7 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     delete (absent.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
 
     expect(renderAdvice(absent)).not.toContain("over making no transfer");
-    expect(COPY.gainCaption).toContain("over making no transfer");
+    expect(COPY.gainCaptionBeforeCost("4.0")).toContain("over making no transfer");
   });
 
   it("says a row's share was not published rather than printing it as zero", () => {
