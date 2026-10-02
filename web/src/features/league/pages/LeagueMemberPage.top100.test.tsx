@@ -111,13 +111,11 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(text).toContain(TOP100_COPY.tr.weightLine(20));
     expect(text).toContain(TOP100_COPY.tr.changed);
     // The setting, what it did and its price; no caveat under them and no limit listed.
-    expect(text).not.toContain(TOP100_COPY.tr.honesty);
-    expect(text).not.toContain(TOP100_COPY.tr.notStart);
+    expect(text).not.toMatch(/tercihin bedelidir|ölçümü değildir/);
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.cost("0,4"));
     expect(page).not.toContain(TOP100_COPY.tr.costAtMost("0,4"));
     expect(page).not.toContain(TOP100_COPY.tr.limit(20));
-    expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
   });
 
   it("says an unchanged plan is unchanged, in English", () => {
@@ -304,7 +302,6 @@ describe("a Top 100 weighted plan on the advice card", () => {
     for (const sentence of Object.values(TOP100_COPY.tr.variantLimits)) {
       expect(page).not.toContain(sentence);
     }
-    expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
     expect(section(container)).toContain(TOP100_COPY.tr.weightLine(20));
     expect(page).not.toMatch(AS_A_CHANCE);
   });

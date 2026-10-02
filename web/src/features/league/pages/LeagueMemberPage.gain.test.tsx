@@ -102,7 +102,9 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     // The boards are read in order, which is what makes them add up, and the total they
     // add up to is on the page beside them as a bare figure.
     expect(text).toContain(COPY.moveRowsBasis);
-    expect(screen.getByText("+1.7", { selector: "strong" }).closest("p")?.textContent).toBe("+1.7");
+    const figure = screen.getByText("+1.7", { selector: "strong" });
+    expect(figure.nextElementSibling).toHaveClass("visually-hidden");
+    expect(figure.closest("p")?.textContent).toBe(`+1.7 ${COPY.boardGainLabel}`);
   });
 
   it("names the week's transfer cost in the gain sentence when the plan pays one", () => {
@@ -121,16 +123,28 @@ describe("the card states one basis for the rows, the total and the gain", () =>
   });
 
   it("prints no gain sentence where the producer measured none", () => {
-    const unmeasured = withPayload({ moves: [move("m1", null)], expected_gain_vs_hold: null });
+    // Both pay a hit, so a measured gain would carry its sentence; these print none.
+    const unmeasured = withPayload({
+      moves: [move("m1", null)],
+      expected_gain_vs_hold: null,
+      transfer_hit_points: 4,
+    });
 
     expect(renderAdvice(unmeasured)).not.toContain("over making no transfer");
 
     cleanup();
-    const absent = withPayload({ moves: [move("m1", 1.2)] });
+    const absent = withPayload({ moves: [move("m1", 1.2)], transfer_hit_points: 4 });
     delete (absent.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
 
     expect(renderAdvice(absent)).not.toContain("over making no transfer");
-    expect(COPY.gainCaptionBeforeCost("4.0")).toContain("over making no transfer");
+
+    cleanup();
+    const measured = withPayload({
+      moves: [move("m1", 1.2)],
+      expected_gain_vs_hold: 1.2,
+      transfer_hit_points: 4,
+    });
+    expect(renderAdvice(measured)).toContain("over making no transfer");
   });
 
   it("says a row's share was not published rather than printing it as zero", () => {

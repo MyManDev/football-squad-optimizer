@@ -5,7 +5,7 @@
  * member page does not list a plan's limits.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -49,8 +49,9 @@ function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | 
 function expectNoAssumptions(container: HTMLElement, published: readonly string[]) {
   for (const language of ["tr", "en"] as const) {
     const copy = MESSAGES[language].leagueMembers;
-    expect(screen.queryByRole("region", { name: copy.planLimitsLabel })).toBeNull();
-    expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+    expect(container).not.toHaveTextContent(
+      /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+    );
     for (const sentence of published) {
       expect(container).not.toHaveTextContent(sentence);
       if (Object.hasOwn(copy.statedLimits, sentence)) {
@@ -65,7 +66,7 @@ describe("the plan states that football v1 splits attacking shares before availa
     const copy = MESSAGES[language].leagueMembers;
     expect(Object.hasOwn(copy.statedLimits, FOOTBALL_SHARE_STATED_LIMIT)).toBe(true);
     const sentence = copy.statedLimits[FOOTBALL_SHARE_STATED_LIMIT]!;
-    expect(sentence).not.toBe(copy.statedLimitUnknown);
+    expect(sentence.length).toBeGreaterThan(40);
     // A stated mechanism, not a size: no number and no chance wording in either language.
     expect(sentence).not.toMatch(AS_A_CHANCE);
     expect(sentence).not.toMatch(/\d/);

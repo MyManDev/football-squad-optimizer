@@ -57,7 +57,7 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 
 /**
  * The state of a request for this page's plan as one quiet line, for the decision heading:
- * it stays beside the result when the member scrolls past the settings. Nothing while
+ * it stays beside the result, while the settings sit further down the page. Nothing while
  * no request was made.
  */
 function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null {
@@ -267,6 +267,8 @@ function LeagueMemberContent({
       id="plan-settings"
       aria-labelledby="plan-settings-title"
       className={styles.planSettings}
+      // The decision's "change settings" link lands here; focus follows it.
+      tabIndex={-1}
     >
       <MemberDecisionControls
         entryId={entryId}

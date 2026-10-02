@@ -447,7 +447,7 @@ describe("the fixture rail", () => {
         "LIV - MCISzoboszlai / Guéhi, Haaland",
       ]);
       // No legend under the tables.
-      expect(aside.querySelector('[class*="legend"]')).toBeNull();
+      expect(aside).not.toHaveTextContent(/E: ev|H: home|zorluk derecesi|Fixture difficulty/);
     },
   );
 

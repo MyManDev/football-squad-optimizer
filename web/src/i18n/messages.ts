@@ -655,8 +655,6 @@ const en = {
       },
     },
     rivalPlayersTitle: "Shared and different players",
-    rivalPlayersBasis:
-      "Names compare the recommended 15 (XI plus bench) with the rival's published XI, using player IDs from the same capture. They are not rankings or new projections. The published expected gap compares the two XIs with captains and subtracts this plan's transfer hits.",
     rivalPlayerGroups: {
       shared: "Shared: recommended 15 and rival XI",
       recommendedOnly: "Recommended 15 only",
@@ -683,18 +681,11 @@ const en = {
     windowTitle: (weeks: number) => `The ${weeks}-week window`,
     windowRule:
       "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan.",
-    windowLimitsLabel: "What this window assumes",
-    // The same list on a one-week document, where "window" would name nothing the
-    // reader can see. A one-week plan is handed no chip either, and until it said so a
-    // blank chip line read as a chip that had been weighed and turned down.
-    planLimitsLabel: "What this plan assumes",
     windowWeek: "Week",
     windowWeekOf: (gameweek: number) => `GW${gameweek}`,
     windowHits: "Hit points",
     windowPoints: "Expected points",
     // Only exact published limit keys receive these reviewed explanations.
-    statedLimitUnknown:
-      "No translated explanation is available for this published window assumption.",
     statedLimits: {
       "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
         "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.",
@@ -1032,10 +1023,6 @@ const en = {
       autoThisWeek: "Automatic plan · this week",
       ownThisWeek: "Your choice · this week",
       hold: "Hold",
-      autoHonesty:
-        "Holding values approximate future opportunities from the selected model in this capture. They do not prove season-long superiority or a full stochastic MDP. Later dates are replanned with new data.",
-      autoFuture:
-        "Future opportunities assume a stationary distribution; injuries and competition between chips may change their value. Wildcard effects beyond the forecast window are unmeasured.",
       expiry: "expiry",
       holdingValue: "holding value",
       opportunities: "opportunities beyond the window",
@@ -1768,8 +1755,6 @@ const tr: MessageSchema<typeof en> = {
       },
     },
     rivalPlayersTitle: "Ortak ve farklı oyuncular",
-    rivalPlayersBasis:
-      "Adlar, aynı veri kesitindeki oyuncu kimlikleriyle önerilen 15'i (ilk 11 ve yedekler) rakibin yayımlanan ilk 11'iyle karşılaştırır. Sıralama veya yeni puan tahmini değildir. Yayımlanan beklenen fark, iki ilk 11'i kaptanlarla karşılaştırır ve bu planın transfer cezasını çıkarır.",
     rivalPlayerGroups: {
       shared: "Ortak: önerilen 15 ve rakibin ilk 11'i",
       recommendedOnly: "Yalnız önerilen 15'te",
@@ -1796,14 +1781,11 @@ const tr: MessageSchema<typeof en> = {
     windowTitle: (weeks) => `${weeks} haftalık pencere`,
     windowRule:
       "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası.",
-    windowLimitsLabel: "Bu pencerenin varsaydıkları",
-    planLimitsLabel: "Bu planın varsaydıkları",
     windowWeek: "Hafta",
     windowWeekOf: (gameweek) => `OH${gameweek}`,
     windowHits: "Transfer cezası",
     windowPoints: "Beklenen puan",
     // Only exact published limit keys receive these reviewed explanations.
-    statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
       "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
         "Gelecek her maçın tahmini, kayıtlı geçmiş verilerinden ayrı hesaplanır; maçsız haftalarda yalnız o haftanın puanı sıfırdır. Gelecekteki maç sonuçları veya sakatlık güncellemeleri varsayılmaz.",
@@ -2118,10 +2100,6 @@ const tr: MessageSchema<typeof en> = {
       autoThisWeek: "Otomatik plan · bu hafta",
       ownThisWeek: "Senin seçimin · bu hafta",
       hold: "Sakla",
-      autoHonesty:
-        "Saklama değerleri, seçilen modelin bu veri çekimindeki gelecek fırsatlarından yaklaşık olarak hesaplanır. Sezon boyunca daha iyi sonuç verdiklerini kanıtlamaz; sezonun geri kalanını baştan sona çözen bir plan da değildir. Sonraki haftalar yeni veriyle yeniden planlanır.",
-      autoFuture:
-        "Gelecek fırsatlar sabit bir dağılım varsayar; sakatlıklar ve çipler arası rekabet bu değeri değiştirebilir. Wildcard'ın tahmin penceresi dışındaki uzun vadeli etkisi ölçülmüş değildir.",
       expiry: "son hafta",
       holdingValue: "saklama değeri",
       opportunities: "pencere sonrası fırsat",

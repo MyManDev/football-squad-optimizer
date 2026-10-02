@@ -76,7 +76,9 @@ describe("the advice card shows a window week by week", () => {
       }
       const { container } = renderAdvice(advice, language);
       const section = screen.getByRole("region", { name: copy.windowTitle(5) });
-      expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+      expect(container).not.toHaveTextContent(
+        /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+      );
       for (const sentence of WINDOW_STATED_LIMITS) {
         expect(container).not.toHaveTextContent(copy.statedLimits[sentence]!);
       }
@@ -137,11 +139,13 @@ describe("the advice card shows a window week by week", () => {
       const { container } = renderAdvice(advice, language);
       const copy = MESSAGES[language].leagueMembers;
       const section = screen.getByRole("region", { name: copy.windowTitle(3) });
-      expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+      expect(container).not.toHaveTextContent(
+        /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+      );
       for (const sentence of [raw[0]!, raw[3]!]) {
         expect(container).not.toHaveTextContent(sentence);
       }
-      expect(container).not.toHaveTextContent(copy.statedLimitUnknown);
+      expect(container).not.toHaveTextContent(/No translated explanation|çevrilmiş bir açıklama/);
       expect(advice.payload.stated_limits).toEqual(published);
       expect(within(section).getByText(copy.windowWeekOf(2))).toBeInTheDocument();
     },
@@ -161,8 +165,9 @@ describe("the advice card shows a window week by week", () => {
       renderAdvice(advice, language);
 
       // The sentence is still in the document; the page leaves it, and the empty heading, out.
-      expect(screen.queryByRole("region", { name: copy.planLimitsLabel })).toBeNull();
-      expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+      expect(document.body).not.toHaveTextContent(
+        /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+      );
       expect(document.body).not.toHaveTextContent(copy.statedLimits[NO_CHIP_STATED_LIMIT]!);
     },
   );

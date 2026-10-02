@@ -136,7 +136,7 @@ function adviceBasis(view: EntryAdvice, chipCopy: ChipCopy) {
 }
 
 /**
- * The proof stamp beside the decision heading. KANITLANDI · OPTİMAL only for a plan the
+ * The proof stamp beside the decision heading. EN İYİ PLAN · KANITLANDI only for a plan the
  * solver proved (OPTIMAL); a plan it found without finishing the proof (FEASIBLE) keeps the
  * "proof incomplete" badge, and its gap sentence stands under the boards. Any other status
  * claims nothing.
@@ -397,8 +397,7 @@ export function AdviceDecision({
 
 /**
  * What a switch adds to the plan (rival players, the club's word, the Top 100 weight, the
- * chip), what the plan assumes, and the window. Each renders only where the document
- * carries it. The week's lineup is the squad section's list view (`PlanLineup`).
+ * chip), and the window. Each renders only where the document carries it. The week's lineup is the squad section's list view (`PlanLineup`).
  */
 export function AdviceDetails({
   shown,
@@ -699,8 +698,8 @@ function SubstitutionBoard({
 
 /**
  * What the plan is worth against doing nothing, on the same basis as the boards and the
- * lineup total: the figure, and beside it the sentence that says what it is measured
- * against. Where every board's share is published and none is below zero they are drawn
+ * lineup total: the figure, and beside it a sentence only where the figure needs one (a
+ * transfer cost not yet deducted, a chip's own basis). Where every board's share is published and none is below zero they are drawn
  * as one stacked bar at a fixed scale; otherwise the shares are listed with their signs.
  * A document without the gain gets no figure, not a zero. Under it, the transfers this
  * week uses of the free ones held and the week's hit charge, each only where published.
@@ -777,7 +776,10 @@ function GainStrip({
                 {" "}
                 <span className={board.gainCaption}>{caption}</span>
               </>
-            ) : null}
+            ) : (
+              // Nothing to read beside the figure, so it is named for a screen reader only.
+              <span className="visually-hidden"> {copy.boardGainLabel}</span>
+            )}
           </p>
         ) : null}
         {facts.length > 0 ? (
@@ -908,8 +910,7 @@ function RivalPlayers({
 /**
  * A three- or five-week window: one row per gameweek (transfers, hit points, chip,
  * expected points). The moves and the lineup above are the first week's; the rest of the
- * window lives here. What the window assumes is stated above, beside every other plan's
- * assumptions. Rendered only when the producer published it, so a one-week document shows
+ * window lives here. Rendered only when the producer published it, so a one-week document shows
  * nothing extra. The table never scrolls sideways: on a phone each week is a block of its
  * own, the week and its expected points on the first line, then who comes in, who goes
  * out, the hit points and the chip, each under its column's name.
@@ -1126,8 +1127,8 @@ function Top100Section({ view, priced }: { view: EntryAdvice; priced: boolean })
 
 /**
  * A chip strategy the service planned: the chip this week (or hold), the plan week by
- * week, and for the automatic strategy what its holding values are and are not. The Top
- * 100 setting is named as the weight it is, never as a share.
+ * week, and for the automatic strategy its holding values. The Top 100 setting is named
+ * as the weight it is, never as a share.
  */
 function ChipStrategySection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
@@ -1149,19 +1150,17 @@ function ChipStrategySection({ view }: { view: EntryAdvice }) {
           .join(" · ")}
       </p>
       {strategy.mode === "auto" && (
-        <>
-          <ul>
-            {strategy.reservations.map((reservation) => (
-              <li key={`${reservation.chip}-${reservation.first_gameweek}`}>
-                {name(reservation.chip)} · {copy.expiry}{" "}
-                {messages.common.gameweekShort(reservation.last_gameweek)} · {copy.holdingValue}{" "}
-                {points(reservation.holding_value, 1, locale)}
-                {" · "}
-                {reservation.remaining_opportunities} {copy.opportunities}
-              </li>
-            ))}
-          </ul>
-        </>
+        <ul>
+          {strategy.reservations.map((reservation) => (
+            <li key={`${reservation.chip}-${reservation.first_gameweek}`}>
+              {name(reservation.chip)} · {copy.expiry}{" "}
+              {messages.common.gameweekShort(reservation.last_gameweek)} · {copy.holdingValue}{" "}
+              {points(reservation.holding_value, 1, locale)}
+              {" · "}
+              {reservation.remaining_opportunities} {copy.opportunities}
+            </li>
+          ))}
+        </ul>
       )}
       <p className={styles.muted}>
         {copy.utilityNote(strategy.top100_weight)}
@@ -1174,9 +1173,8 @@ function ChipStrategySection({ view }: { view: EntryAdvice }) {
 
 /**
  * A chip the member chose: which chip, what the chip week is expected to score above the
- * member's own plan without it, and that the number is one gameweek's and nothing more.
- * A gain, so it is never worded as something given up, and never as a reason to play the
- * chip now. Rendered only on a chip document.
+ * member's own plan without it. A gain, so it is never worded as something given up.
+ * Rendered only on a chip document.
  */
 function ChipChoiceSection({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();

@@ -364,10 +364,10 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
   };
   await page.getByRole("link", { name: copy.leagueMembers.viewPlan, exact: true }).click();
   await expect(page).toHaveURL(/#entry-advice-title$/);
-  // After the explicit jump, transfer facts and caveats still fit one phone viewport.
+  // After the explicit jump, the boards and the transfer facts still fit one phone viewport.
   expect(await bottom(boards.nth(1))).toBeLessThanOrEqual(548);
-  // The captain line is the paragraph that names the vice-captain too (the gain's caption
-  // also says 'kaptan').
+  // The captain line is the paragraph that names the vice-captain too (a gain sentence
+  // can also say 'kaptan').
   const captain = decision.locator("p").filter({
     has: page.getByText(copy.leagueMembers.viceCaptainLabel, { exact: true }),
   });
@@ -405,6 +405,31 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("member-390.png") });
 });
+
+for (const width of [320, 360, 375]) {
+  test(`under 390 px the transfer facts take the row under the stamp at ${width}`, async ({
+    page,
+  }) => {
+    await open(page, width, 800, twoMoves(), true);
+    const decision = page.locator('[data-mark="decision"]');
+    const stamp = decision.locator("p[data-stamp]");
+    const facts = decision.locator("ul").filter({ hasText: copy.leagueMembers.hitPointsFact("0") });
+    const stampBox = (await stamp.boundingBox())!;
+    const factsBox = (await facts.boundingBox())!;
+    // Beside the stamp there is no room for a fact on one line, so the facts sit under it.
+    expect(factsBox.y).toBeGreaterThanOrEqual(stampBox.y + stampBox.height);
+    const items = facts.locator("li");
+    await expect(items).not.toHaveCount(0);
+    for (const item of await items.all()) {
+      // One 16 px line each: nothing wraps inside a fact.
+      expect((await item.boundingBox())!.height).toBeLessThanOrEqual(17);
+    }
+    expect(stampBox.x + stampBox.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+}
 
 for (const [width, height] of [
   [1440, 900],

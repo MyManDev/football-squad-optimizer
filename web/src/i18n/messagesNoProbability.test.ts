@@ -151,9 +151,6 @@ describe("every string in both message catalogues", () => {
       )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
-    // The one sentence about advice is the denial, in both languages.
-    expect(catalogue.get("en.chipCopy.honesty")).toMatch(/not advice to play it now/);
-    expect(catalogue.get("tr.chipCopy.honesty")).toMatch(/tavsiyesi değildir/);
   });
 
   it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {

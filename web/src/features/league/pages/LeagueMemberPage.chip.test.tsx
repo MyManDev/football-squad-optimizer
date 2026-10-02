@@ -112,12 +112,11 @@ describe("a chosen chip on the advice card", () => {
     expect(text).toContain(CHIP_COPY.tr.title);
     expect(text).toContain(CHIP_COPY.tr.chosen("Bench Boost"));
     expect(text).toContain(CHIP_COPY.tr.gain("+8,3"));
-    expect(text).not.toContain(CHIP_COPY.tr.honesty);
+    expect(text).not.toMatch(/tavsiyesi değildir|ölçülmedi/);
     expect(text).not.toContain(CHIP_COPY.tr.freeHit);
     // The plan's published limits are not listed on the page.
     const page = container.textContent ?? "";
     expect(page).not.toContain(CHIP_COPY.tr.limits[chosen("bboost", 0).payload.stated_limits![0]!]);
-    expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
   });
 
   it("states the same in English, and the Free Hit's one-week squad", () => {
@@ -129,13 +128,12 @@ describe("a chosen chip on the advice card", () => {
     const text = section(container);
     expect(text).toContain(CHIP_COPY.en.chosen("Free Hit"));
     expect(text).toContain(CHIP_COPY.en.gain("+3.5"));
-    expect(text).not.toContain(CHIP_COPY.en.honesty);
+    expect(text).not.toMatch(/not advice to play it now|is not measured/);
     expect(text).toContain(CHIP_COPY.en.freeHit);
     const page = container.textContent ?? "";
     for (const sentence of chosen("freehit", 0).payload.stated_limits!) {
       expect(page).not.toContain(CHIP_COPY.en.limits[sentence]);
     }
-    expect(page).not.toContain(MESSAGES.en.leagueMembers.statedLimitUnknown);
   });
 
   it("prints a chip week that came out below the plan without it as measured", () => {

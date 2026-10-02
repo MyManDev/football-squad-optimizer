@@ -48,7 +48,7 @@ for (const language of ["tr", "en"] as const) {
     await page.goto(`/league/members/${ENTRY}?mode=${row.strategy}&rival=${row.rival_entry_id}`);
     const region = page.getByRole("region", { name: copy.rivalPlayersTitle });
     await expect(region.getByText(copy.rivalPlayerGroups.shared)).toBeVisible();
-    await expect(region.getByText(copy.rivalPlayersBasis)).toHaveCount(0);
+    await expect(region.locator("p")).toHaveCount(0);
     const plan = mockEntryAdviceEnvelope(ENTRY, "ortak-koru", 1, row.rival_entry_id).payload;
     const rival = mockEntrySquadEnvelopes[row.rival_entry_id]!.payload;
     const held = new Set(rival.starting_xi.map((player) => player.player_id));
