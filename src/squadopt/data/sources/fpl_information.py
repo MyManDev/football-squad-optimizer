@@ -108,6 +108,12 @@ def captured_fpl_information(
 
     Older minimal captures have no editorial columns and return None. Once all editorial
     columns are declared, malformed identities, timestamps and percentages fail closed.
+
+    A well-formed stamp later than the observation is not carried, and nothing else about
+    the row changes. The note was in the bytes we held, so it was known at the observation;
+    only the source's own instant for it cannot be, which means the source's clock ran ahead
+    of ours. This is read inside every member's advice, so one such row must not stop all
+    of them.
     """
     raw = json.loads(bootstrap)
     elements = raw.get("elements", [])
@@ -134,10 +140,10 @@ def captured_fpl_information(
             raise DataError("Official playing percentage must be between zero and 100.")
         added = news.at[code, "news_added_utc"]
         source_at = None if added is None or str(added) == "<NA>" else str(added)
-        if source_at is not None and as_instant(source_at) > as_instant(observed):
-            raise DataError("Official news timestamp is after the observation.")
         text = str(news.at[code, "news"])
         state = "present" if text else ("cleared" if source_at else "not_reported")
+        if source_at is not None and as_instant(source_at) > as_instant(observed):
+            source_at = None
         result.append(
             FplPlayerInformation(
                 player_id=code,

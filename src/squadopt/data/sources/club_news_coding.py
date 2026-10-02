@@ -52,6 +52,7 @@ from squadopt.data.sources.club_news import (
     RawDocument,
     RosterPlayer,
 )
+from squadopt.data.sources.club_news_claims import parse_claim_response
 from squadopt.data.sources.club_news_metadata import publication_metadata
 from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
@@ -576,6 +577,9 @@ class UnlocatableClaim:
     bytes it cites -- which is a different fact from "his club said nothing about him" and a
     very different fact from "his club was never read". Collapsing the three is what this
     whole lane exists to prevent, and until this type existed the first one had nowhere to go.
+
+    A quote that located but whose claim the parser refuses on its own is carried here too;
+    ``why`` says which of the two happened.
     """
 
     player_name: str
@@ -722,11 +726,53 @@ def locate_claims_reporting(
     So this returns both halves. The caller records the dropped claims as source errors, which
     is the one thing they must not silently become: a player whose citation could not be
     verified is not a player nobody wrote about.
+
+    A located claim the parser would refuse on its own is dropped the same way, with the
+    parser's reason: a full-match label its quote does not carry, say, or a value outside a
+    closed vocabulary. Its player and team are known, so it can be named, and refusing the
+    response for it would cost every other claim exactly as an unlocatable quote did.
     """
 
     document, available = _coding_document(response, documents)
     located, dropped = _located_entries(document, available, report_unverifiable=True)
-    return _response_of(document, located, response), tuple(dropped)
+    refused = _refused_alone(document, located, response, documents)
+    dropped.extend(
+        UnlocatableClaim(
+            player_name=str(located[index]["player_name"]),
+            team_name=str(located[index]["team_name"]),
+            source_url=str(located[index]["source_url"]),
+            why=why,
+        )
+        for index, why in refused.items()
+    )
+    kept = [entry for index, entry in enumerate(located) if index not in refused]
+    return _response_of(document, kept, response), tuple(dropped)
+
+
+def _refused_alone(
+    document: Mapping[str, object],
+    located: Sequence[Mapping[str, object]],
+    response: ClaimResponse,
+    documents: Sequence[RawDocument],
+) -> dict[int, str]:
+    """Ask the parser about each located claim alone, and keep its reason for each refusal.
+
+    The rules stay the parser's; this only asks. The response is parsed once with no claims
+    first, so a fault of the whole response still refuses it rather than each claim in turn.
+    Each claim is then parsed against the document it cites, which is all a claim's own
+    checks read.
+    """
+
+    parse_claim_response(_response_of(document, [], response), documents)
+    refused: dict[int, str] = {}
+    for index, entry in enumerate(located):
+        url = entry["source_url"]
+        cited = [item for item in documents if url in (item.requested_url, item.final_url)]
+        try:
+            parse_claim_response(_response_of(document, [entry], response), cited)
+        except ClubNewsError as error:
+            refused[index] = str(error)
+    return refused
 
 
 def locate_claim_response(
