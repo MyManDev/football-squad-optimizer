@@ -176,12 +176,17 @@ request could be built. It does not say the key is accepted, and it says nothing
 python -m scripts.capture_club_news --settings-file <private-file> --roster-snapshot <capture> --club Arsenal --max-model-calls 1 --dry-run
 ```
 
-The lines below are from that run.
+The lines below are a selection from that run, in the order printed. The full output also
+lists the pages read with their observation instant, the per-club refusal lines, and the
+coverage lines whose count is zero. Under `--club` the `Registry` line counts the filtered
+part of the registry and says so; the coverage lines count the whole registry.
 
 <!-- worked-example: begin -->
 ```text
+Registry      1 pages, 1 clubs declared (filtered by --club from 3 registered pages)
 Read          2 documents
 Selected      1 documents for coding
+  unselected  Arsenal: discovery_index_with_selected_articles; https://club.example/arsenal/team-news
 Call budget   1; 1 attempted; no automatic provider retry
 Snapshot clubs: 4 [Arsenal, Everton, Man Utd, Fulham]
 Registered clubs: 2 [Arsenal, Man Utd]
@@ -201,8 +206,9 @@ Dry run: nothing written.
 <!-- worked-example: end -->
 
 **3. What was covered.** Two documents were read from Arsenal's host: its registered page
-and one article that page links. The registered page is listed as unselected, because the
-article it links was selected in its place. One club out of four was read and coded. Two
+and one article that page links. The registered page is the `unselected` line, with the
+reason `discovery_index_with_selected_articles`: the article it links was selected in its
+place. One club out of four was read and coded. Two
 are not registered at all and one is registered and was not selected, so for three clubs
 this run has no news and says so; it does not say they published none.
 

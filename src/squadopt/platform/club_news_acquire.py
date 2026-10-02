@@ -521,7 +521,16 @@ def main(
         return 1
 
     config = resolved
-    print(f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared")
+    # The registry line counts what this run asked for. Under --club that is the filtered
+    # part of the registry, and the coverage lines below count the whole registry.
+    print(
+        f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared"
+        + (
+            f" (filtered by --club from {len(registry_sources)} registered pages)"
+            if arguments.club
+            else ""
+        )
+    )
     print(f"Read          {len(week.documents)} documents")
     if week.coding_observed_at is not None:
         print(
