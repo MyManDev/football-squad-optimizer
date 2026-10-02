@@ -92,6 +92,7 @@ identified below rather than being silently pooled with v1 evidence.
 | Artifact | Finding | PR |
 | --- | --- | --- |
 | [Direct DEFCON development](research/football_defcon_development.json) / [readout](research/football_defcon_development.md) | Fixed direct-tail candidate, 33 paired reused-data weeks with comparator parity; event and point losses retained separately, no promotion. | This change |
+| [Joint role and minutes](research/football_joint_role_minutes_2026_10_02.md) | 13 fixed development origins against the existing football model; minutes MAE 15.0313 to 14.6690, small point-error gains, mixed component and position results. No realized squad gain or independent superiority measured. | This change |
 | [Football component ablation](research/football_component_ablation.md) | 61 reused development weeks; component losses expose point-error cancellation. No candidate promoted. | #775 |
 | [`football_candidate_development_record`](research/football_candidate_development_record.json) / [readout](research/football_candidate_results.md) | 56 paired development weeks with all 112 primary/tie proofs: team-share +4.9821 points/week, descriptive 97.5% block interval [1.6158, 8.2857]. Production port/scorer parity passed. Future-role and full-match-CS ablations rejected; recourse/rival checks synthetic only. No independent evidence or promotion. | This change |
 | `baseline_bayesopt` | First real BO run: best observed `fw10-bw0` at 56.50 mean realized points (147 folds) | #57 |

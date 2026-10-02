@@ -80,6 +80,21 @@ def test_observed_worker_preserves_member_choices(tmp_path, monkeypatch, window,
     assert result["solver_status"] == "FEASIBLE"
     assert len(result["plan_weeks"]) == window
     assert any(c["selected"] for c in review["candidates"])
+    comparison = review["comparison"]
+    assert comparison["basis"] == "expected_own_points"
+    assert comparison["news_arrival_probability"] is None
+    assert comparison["terminal_resource_value_added"] is False
+    baseline = {b["state"]: b["expected_net_points"] for b in review["candidates"][0]["branches"]}
+    for index, compared in enumerate(comparison["candidates"]):
+        branches = review["candidates"][index]["branches"]
+        points = [b["expected_net_points"] for b in branches]
+        assert compared["scenario_min"] == pytest.approx(min(points))
+        assert compared["scenario_max"] == pytest.approx(max(points))
+        assert compared["branch_gaps_vs_baseline"] == pytest.approx(
+            {b["state"]: b["expected_net_points"] - baseline[b["state"]] for b in branches}
+        )
+        assert compared["first_state"]["bank_tenths"] >= 0
+        assert 0 <= compared["first_state"]["free_transfers"] <= 5
     for candidate in review["candidates"]:
         assert candidate["chip"] is None
         assert candidate["expected_net_points"] is not None

@@ -1,4 +1,4 @@
-"""Read a ``rotation_evidence_v2`` pair, or refuse it.
+"""Read a ``rotation_evidence_v4`` pair or a supported legacy pair, or refuse it.
 
 The owner's lane reads this instead of raw captures, so everything the table asserts about
 itself is checked here before a single row is returned: the digest, the manifest's required
@@ -20,11 +20,13 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
+from io import BytesIO
 from pathlib import Path
 from typing import Final
 
 import pandas as pd
 
+from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataSourceError, DataValidationError
 from squadopt.data.sources.club_news import (
     CLAIM_SPEAKERS,
@@ -100,6 +102,7 @@ _NEVER_MISSING_FLAGS: Final[tuple[str, ...]] = (
     "timing_verified",
     "club_source_covered",
     "rotation_claim_observed",
+    "rotation_claim_unresolved",
     "model_evidence_observed",
     "fixture_context_midweek",
 )
@@ -114,7 +117,7 @@ _CLAIM_ONLY_COLUMNS: Final[tuple[str, ...]] = (
 
 def _read_manifest(path: Path) -> Mapping[str, object]:
     try:
-        raw = path.read_text(encoding="utf-8")
+        raw = Path(addressable(path)).read_text(encoding="utf-8")
     except (OSError, UnicodeError) as error:
         raise DataSourceError(f"Cannot read the manifest at {path}: {error}") from error
     try:
@@ -124,6 +127,11 @@ def _read_manifest(path: Path) -> Mapping[str, object]:
     if not isinstance(document, dict):
         raise DataValidationError(f"{path} must hold a JSON object.")
     missing = sorted(REQUIRED_MANIFEST_FIELDS - document.keys())
+    if document.get("contract_version") == CONTRACT_VERSION:
+        missing = sorted(
+            set(missing)
+            | ({"club_news_source_kind", "players_with_conflicting_claims"} - document.keys())
+        )
     if missing:
         raise DataValidationError(f"{path} is missing required manifest field(s) {missing!r}.")
     return document
@@ -168,6 +176,15 @@ def _optional_name(manifest: Mapping[str, object], key: str) -> str | None:
     return value
 
 
+def _conflicting_player_ids(manifest: Mapping[str, object]) -> tuple[int, ...]:
+    value = manifest.get("players_with_conflicting_claims", [])
+    if not isinstance(value, list) or any(type(item) is not int or item <= 0 for item in value):
+        raise DataValidationError("Conflicting player IDs must be a list of positive integers.")
+    if len(value) != len(set(value)):
+        raise DataValidationError("Conflicting player IDs must be unique.")
+    return tuple(value)
+
+
 def _whole_number(manifest: Mapping[str, object], key: str) -> int:
     value = manifest.get(key)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -192,7 +209,25 @@ def _validate_news_binding(manifest: Mapping[str, object], table: pd.DataFrame) 
     their original validation; a partial or malformed new binding is refused.
     """
     fields = ("club_news_snapshot_id", "club_news_captured_at_utc")
+    if manifest.get("contract_version") == CONTRACT_VERSION:
+        kind = manifest["club_news_source_kind"]
+        if kind not in ("capture", "fixture"):
+            raise DataValidationError("V4 club_news_source_kind must be capture or fixture.")
+        if kind == "fixture" and (
+            any(key in manifest for key in fields)
+            or manifest.get("provider") is not None
+            or any(source.startswith("club-news-") for source in _row_sources(table))
+        ):
+            raise DataValidationError(
+                "V4 fixture evidence cannot declare a provider or a club-news capture binding."
+            )
     if not any(key in manifest for key in fields):
+        if manifest.get("contract_version") == CONTRACT_VERSION and (
+            manifest.get("club_news_source_kind") == "capture"
+            or manifest.get("provider") is not None
+            or any(source.startswith("club-news-") for source in _row_sources(table))
+        ):
+            raise DataValidationError("V4 capture evidence requires a club-news capture binding.")
         return
     news_id = _optional_name(manifest, fields[0])
     news_at = _optional_name(manifest, fields[1])
@@ -304,6 +339,16 @@ def _validate_manifest_and_table(
 
     observed_claims = table["rotation_claim_observed"].astype("boolean")
     if version == CONTRACT_VERSION:
+        conflicting = _conflicting_player_ids(manifest)
+        if not set(conflicting) <= set(table["player_id"]):
+            raise DataValidationError("Conflicting player IDs must belong to the table's roster.")
+        conflict_rows = table["player_id"].isin(conflicting)
+        if not bool(table.loc[conflict_rows, "rotation_claim_unresolved"].all()) or bool(
+            observed_claims.loc[conflict_rows].any()
+        ):
+            raise DataValidationError(
+                "Conflicting players must have unresolved claims and no observed claim."
+            )
         _validate_attestation(table, observed_claims)
     for column in _CLAIM_ONLY_COLUMNS:
         present = table[column].notna()
@@ -412,7 +457,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
 
     manifest = _read_manifest(manifest_path)
     try:
-        table_bytes = table_path.read_bytes()
+        table_bytes = Path(addressable(table_path)).read_bytes()
     except OSError as error:
         raise DataSourceError(f"Cannot read the table at {table_path}: {error}") from error
     digest = hashlib.sha256(table_bytes).hexdigest()
@@ -423,7 +468,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "published, so they are refused before they are parsed."
         )
     try:
-        table = pd.read_csv(table_path, dtype=dict(_ROTATION_EVIDENCE_DTYPES))
+        table = pd.read_csv(BytesIO(table_bytes), dtype=dict(_ROTATION_EVIDENCE_DTYPES))
     except (ValueError, pd.errors.ParserError) as error:
         raise DataValidationError(f"{table_path.name} could not be read: {error}") from error
 
@@ -465,6 +510,7 @@ def read_rotation_evidence_artifact(table_path: Path, manifest_path: Path) -> pd
             "response_sha256s": _string_list(manifest, "response_sha256s"),
             "claims_coded": manifest["claims_coded"],
             "claims_ambiguous": manifest["claims_ambiguous"],
+            "players_with_conflicting_claims": _conflicting_player_ids(manifest),
             "players_not_addressed": manifest["players_not_addressed"],
         }
     )

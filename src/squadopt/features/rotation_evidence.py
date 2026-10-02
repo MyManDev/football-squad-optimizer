@@ -6,14 +6,13 @@ came from; and **absent distinguished from zero** in every column where the two 
 confused. What it adds is a claim, and the claim is the reason this file is careful.
 
 **One claim field, and it is categorical.** ``rotation_disposition`` is a value from a closed
-vocabulary or it is missing. There is no probability, likelihood, chance, score or confidence
-anywhere in the table, and there never will be: a generated number of that kind is forbidden
-on a member-facing surface *and* is an unmeasured claim besides. A ``confidence`` column is a
-probability wearing a different hat, so it is in the forbidden set beside the obvious ones,
+vocabulary or it is missing. Generated probability or confidence is not a claim field.
+The table separately preserves official source percentages as stated facts, never as
+calibrated starts. A generated ``confidence`` column belongs to the forbidden set,
 and the forbidden set is checked against this schema at import time rather than only against
 a table at export time.
 
-**The citation is a pointer, not a quote.** Columns 18-20 carry the source document's digest
+**The citation is a pointer, not a quote.** Columns 19-21 carry the source document's digest
 and a byte span into it. The card resolves those against the locally held snapshot bytes when
 it renders, so a member reads the manager's own words while this table carries none of them --
 and the words shown are provably the words captured, because the digest is checked first.
@@ -32,6 +31,7 @@ column of nulls, because a missing field is the source having renamed something,
 observation of nothing.
 """
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -92,7 +92,8 @@ MIDWEEK_WINDOW_DAYS: Final = 4
 #: The gameweek before which there is no previous round to have been played midweek.
 MIN_TARGET_GAMEWEEK: Final = 2
 
-#: The 28 columns, in the one order they are ever written or read. The "absent means" contract
+#: The 29 legacy columns, in their serialized order. V4 adds five attestation columns below.
+#: The "absent means" contract
 #: for each lives in ``docs/rotation_evidence_contract.md`` and in the builder's guards.
 LEGACY_ROTATION_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
     "contract_version",
@@ -553,8 +554,10 @@ def claim_targets_next_fixture(
 
 
 def _resolved_claims(
-    claims: Sequence[ParsedClaim], roster: pd.DataFrame
-) -> tuple[dict[int, _ClaimRow], dict[str, int]]:
+    claims: Sequence[ParsedClaim],
+    roster: pd.DataFrame,
+    source_clubs: Mapping[tuple[str, str], set[str]],
+) -> tuple[dict[int, _ClaimRow], dict[str, int], frozenset[int]]:
     """Place each claim on a player, counting the ones that could not be placed.
 
     An unplaced claim does not refuse the week. The three reasons are counted separately
@@ -565,19 +568,21 @@ def _resolved_claims(
 
     seam_roster = roster_from_short_names(roster)
     names = {player.player_id: player.web_name for player in seam_roster}
+    clubs = dict(zip(roster.player_id, roster.team_name, strict=True))
     placed: dict[int, _ClaimRow] = {}
     unresolved: dict[str, int] = {}
+    conflicting: set[int] = set()
     for claim in claims:
         identity = resolve_claim_player(claim.player_name, claim.team_name, seam_roster)
         if not isinstance(identity, ResolvedClaim):
             unresolved[identity.reason] = unresolved.get(identity.reason, 0) + 1
             continue
-        if identity.player_id in placed:
-            raise InvalidValueError(
-                f"Two claims resolve to player {identity.player_id}; the table carries one "
-                "disposition per player and the parser is supposed to have refused this."
-            )
-        placed[identity.player_id] = _ClaimRow(
+        cited_clubs = source_clubs.get((claim.source_url, claim.source_sha256), set())
+        if cited_clubs != {clubs[identity.player_id]}:
+            reason = "other_club_source" if cited_clubs else "unverified_club_source"
+            unresolved[reason] = unresolved.get(reason, 0) + 1
+            continue
+        candidate = _ClaimRow(
             disposition=claim.disposition,
             source_sha256=claim.source_sha256,
             span_start=claim.span_start,
@@ -593,11 +598,28 @@ def _resolved_claims(
             publication_source=claim.publication_source,
             publication_source_sha256=claim.publication_source_sha256,
         )
-    return placed, unresolved
+        if identity.player_id in conflicting:
+            unresolved["conflicting_player_claims"] += 1
+            continue
+        previous = placed.get(identity.player_id)
+        if previous is not None:
+            if previous == candidate:
+                continue  # The exact same source citation may be returned by two responses.
+            placed.pop(identity.player_id)
+            conflicting.add(identity.player_id)
+            unresolved["conflicting_player_claims"] = (
+                unresolved.get("conflicting_player_claims", 0) + 2
+            )
+            continue
+        placed[identity.player_id] = candidate
+    return placed, unresolved, frozenset(conflicting)
 
 
 def _unverifiable_players(
-    dropped: Sequence[UnlocatableClaim], roster: pd.DataFrame
+    dropped: Sequence[UnlocatableClaim],
+    roster: pd.DataFrame,
+    source_clubs: Mapping[str, set[str]],
+    response_clubs: Mapping[UnlocatableClaim, frozenset[str]] | None,
 ) -> frozenset[int]:
     """Which roster players had a claim whose citation could not be verified.
 
@@ -605,13 +627,26 @@ def _unverifiable_players(
     decided the same way whichever side of the locator the claim came out on. A dropped claim
     naming somebody the roster does not carry is itself dropped: it would be a source error
     about a player this week never had, and the table has no row to put it on.
+
+    An explicit stored response-club binding identifies whose failed statement this was;
+    the failed URL cannot do that. Without this context, retain the conservative legacy
+    rule that only a known same-club URL can identify an unresolved player.
     """
 
     seam_roster = roster_from_short_names(roster)
     players: set[int] = set()
+    clubs = dict(zip(roster.player_id, roster.team_name, strict=True))
     for claim in dropped:
         identity = resolve_claim_player(claim.player_name, claim.team_name, seam_roster)
-        if isinstance(identity, ResolvedClaim):
+        if not isinstance(identity, ResolvedClaim):
+            continue
+        club = clubs[identity.player_id]
+        own_response = (
+            source_clubs.get(claim.source_url) == {club}
+            if response_clubs is None
+            else club in response_clubs.get(claim, frozenset())
+        )
+        if own_response:
             players.add(identity.player_id)
     return frozenset(players)
 
@@ -658,9 +693,8 @@ def _require_documents_precede_the_capture(
 
     **What this does not close.** The model's own call instant is not checked here, because a
     response carries no timestamp and the club-news capture arrives as an identifier rather
-    than as a snapshot. That half closes in A6, where the response is written into a capture
-    with its own stamped instant. Said here rather than left for a reader to assume the check
-    is stronger than it is.
+    than as a snapshot. The export and consumer additionally verify the completed news
+    capture's stamped instant and bind it in the V4 manifest, including zero-claim responses.
     """
 
     captured = as_instant(captured_at_utc)
@@ -719,6 +753,7 @@ def build_rotation_evidence_table(
     model: ClubModelProvenance | None,
     clubs_partially_covered: Sequence[str] = (),
     unverifiable_claims: Sequence[UnlocatableClaim] = (),
+    unverifiable_response_clubs: Mapping[UnlocatableClaim, frozenset[str]] | None = None,
     club_news_snapshot_id: str | None = None,
 ) -> pd.DataFrame:
     """Build one week's rotation evidence: one row per roster player, always.
@@ -795,8 +830,17 @@ def build_rotation_evidence_table(
         deadline_timestamp_utc=deadline_timestamp_utc,
     )
     code_by_name = _team_code_by_name(bootstrap)
-    placed, unresolved = _resolved_claims(claims, roster)
-    unverifiable = _unverifiable_players(unverifiable_claims, roster)
+    source_clubs: dict[tuple[str, str], set[str]] = {}
+    url_clubs: dict[str, set[str]] = {}
+    for document in documents:
+        digest = hashlib.sha256(document.readable).hexdigest()
+        for url in {document.requested_url, document.final_url}:
+            source_clubs.setdefault((url, digest), set()).add(document.club)
+            url_clubs.setdefault(url, set()).add(document.club)
+    placed, unresolved, conflicting = _resolved_claims(claims, roster, source_clubs)
+    unverifiable = _unverifiable_players(
+        unverifiable_claims, roster, url_clubs, unverifiable_response_clubs
+    )
     if model is not None:
         _require_provenance_covers_claimed_clubs(model, roster, placed)
 
@@ -863,7 +907,8 @@ def build_rotation_evidence_table(
                 # made about him and its citation could not be verified. Without it that
                 # player reads as "his club was read and said nothing about him", which is
                 # false -- something was said, and we could not stand behind the quote.
-                "rotation_claim_unresolved": identifier in unverifiable,
+                "rotation_claim_unresolved": identifier in unverifiable
+                or identifier in conflicting,
                 "rotation_disposition": pd.NA if claim is None else claim.disposition,
                 "rotation_claim_source_sha256": pd.NA if claim is None else claim.source_sha256,
                 "rotation_claim_span_start": pd.NA if claim is None else claim.span_start,
@@ -944,6 +989,7 @@ def build_rotation_evidence_table(
             "claims_unresolved": tuple(sorted(unresolved.items())),
             "claims_unverifiable_citation": len(unverifiable_claims),
             "players_with_unverifiable_citation": tuple(sorted(unverifiable)),
+            "players_with_conflicting_claims": tuple(sorted(conflicting)),
             "claims_ambiguous": unresolved.get("ambiguous", 0),
             "players_not_addressed": len(roster) - len(placed),
             "provider": None if model is None else model.provider,

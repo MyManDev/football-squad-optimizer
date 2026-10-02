@@ -1,4 +1,5 @@
 import { StatementOutcomes } from "./StatementOutcomes";
+import { RoleForecast } from "./RoleForecast";
 import { useLanguage } from "../../../i18n/context";
 import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
@@ -28,7 +29,7 @@ const COPY = {
       appearance_unchanged_by_minute_evidence:
         "Süre kısıtı, oyuncunun sahaya çıkmasıyla ilgili mevcut tahmini değiştirmez; ayrı bir yokluk haberi ayrıca değerlendirilir.",
       club_attack_shares_reallocated:
-        "Takımın gol ve asist toplamı korunur; oyuncular arasındaki paylar değişen sürelere göre yeniden dağıtılır.",
+        "Takımın gol ve asist toplamı, oynayabilirlik uygulanmadan önce korunur; oyuncular arasındaki paylar değişen sürelere göre yeniden dağıtılır.",
       declared_minute_intervention_not_calibration:
         "Bu süre değişikliği açık bir model varsayımıdır; haber etiketlerinden öğrenilmiş bir sayısal dönüşüm değildir.",
       minute_evidence_not_applied:
@@ -64,7 +65,7 @@ const COPY = {
       appearance_unchanged_by_minute_evidence:
         "A minute restriction preserves the current appearance forecast; a separate absence statement is evaluated separately.",
       club_attack_shares_reallocated:
-        "The club's goal and assist totals stay fixed; players' shares are redistributed using the changed minutes.",
+        "The club's goal and assist totals stay fixed before eligibility is applied; players' shares are redistributed using the changed minutes.",
       declared_minute_intervention_not_calibration:
         "This minute change is an explicit model assumption, not a numerical mapping learned from news labels.",
       minute_evidence_not_applied:
@@ -82,7 +83,7 @@ const COPY = {
 export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();
   const evidence = view.participation_evidence;
-  if (!evidence) return null;
+  if (!evidence) return <RoleForecast view={view} />;
   const copy = COPY[language];
   const asOf =
     evidence.as_of && !Number.isNaN(new Date(evidence.as_of).getTime()) ? evidence.as_of : null;
@@ -117,6 +118,7 @@ export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
       </ul>
       {evidence.applied_player_count === 0 && <p>{copy.noneApplied}</p>}
       <StatementOutcomes view={view} />
+      <RoleForecast view={view} />
       <ul className={styles.assumptionList}>
         {assumptions.map((assumption) => (
           <li key={assumption}>{assumption}</li>

@@ -8,6 +8,59 @@ import { InformationReview } from "./InformationReview";
 import type { EntryAdvice } from "../types";
 
 afterEach(cleanup);
+it.each(["tr", "en"] as const)(
+  "explains scenario bounds without inventing arrival odds in %s",
+  (language) => {
+    const data = view();
+    data.information_review!.comparison = {
+      version: "completed_policy_comparison_v1",
+      basis: "expected_own_points",
+      baseline_index: 0,
+      scenario_ids: ["eligible", "unavailable"],
+      news_arrival_probability: null,
+      scope: "supplied_conditional_scenarios_only",
+      terminal_resource_value_added: false,
+      candidates: [
+        {
+          index: 0,
+          action_kind: "hold",
+          first_state: { bank_tenths: 25, free_transfers: 2 },
+          scenario_min: 110,
+          scenario_max: 130,
+          branch_gaps_vs_baseline: { eligible: 0, unavailable: 0 },
+          minimum_gap_vs_baseline: 0,
+          maximum_gap_vs_baseline: 0,
+          dominates_baseline: false,
+          dominated_by: [],
+        },
+      ],
+    };
+    expect(isAdvicePayload(data)).toBe(true);
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <InformationReview view={data} />
+      </LanguageProvider>,
+    );
+    const comparison = screen.getByTestId("policy-comparison");
+    expect(comparison).toHaveTextContent("110");
+    expect(comparison).toHaveTextContent("130");
+    expect(comparison).toHaveTextContent(
+      language === "tr" ? "güven aralığı değildir" : "not a confidence interval",
+    );
+    expect(comparison).toHaveTextContent(
+      language === "tr" ? "olasılık atanmadı" : "No news-arrival probability",
+    );
+    expect(
+      isAdvicePayload({
+        ...data,
+        information_review: {
+          ...data.information_review,
+          comparison: { ...data.information_review!.comparison, news_arrival_probability: 0.5 },
+        },
+      }),
+    ).toBe(false);
+  },
+);
 function view(): EntryAdvice {
   const base = mockEntryAdviceEnvelope(35249001, "saf-puan", 3).payload;
   return { ...base, information_review: mockInformationReview() };
