@@ -56,7 +56,8 @@ from squadopt.features.rotation_evidence import claim_fixture_calendar, claim_ta
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.planning import FirstWeekExclusion
 
-MANAGERS_WORD_RULE_VERSION: Final = "managers_word_rule_v2"
+# v3: a statement binds only when its quote is a whole sentence of the held source.
+MANAGERS_WORD_RULE_VERSION: Final = "managers_word_rule_v3"
 MANAGERS_WORD_FILE: Final = "hoca-sozu.json"
 """The file name of the switched-on plan beside a member's one-week baseline."""
 NOT_STARTING_DISPOSITIONS: Final[frozenset[str]] = frozenset({"stated_expected_absent"})
