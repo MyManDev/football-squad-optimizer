@@ -92,6 +92,47 @@ change. Validate a saved response against its captured source spans before claim
 it supplied any usable statements. The source reader and downstream timing checks apply
 regardless of provider.
 
+## Which instant the coding observes from
+
+One acquisition run keeps four times apart, because each answers a different question:
+
+| Time | What it is | Where it comes from |
+| --- | --- | --- |
+| Publication | when the club says an article was published | the held page's own verifiable fields; never rewritten |
+| Fetch | when one page was read | recorded on each document |
+| Coding observation | the one instant the week's coding looks from | taken once, after the last page was read |
+| Capture completion | when the capture was written | after coding |
+
+The run's own start settles the target gameweek and deadline before any page is read. It
+also bounds the inputs that must already exist: an earlier news capture given for reuse has
+to precede it.
+
+The coding observation is what the document selection, the model's decision context
+(`as_of`) and the target-deadline check all use. It used to be fixed before the fetch. An
+article published while the pages were being read was then turned away as
+`publication_after_observation`, although its page was already in hand. Taken after the
+fetch, that article is judged against a moment at which it had been read. An article whose
+stated publication is later than the observation is still turned away, and so is one more
+than seven days older than it.
+
+The command prints the instant on its `Observed` line. If the target deadline passed while
+the pages were being read, the run stops with `Refused`: nothing is coded against the closed
+week, no capture is written, and the next gameweek is not taken instead. Start a new run for
+it. The provider settings are still checked before any page is fetched, so a missing key or
+an unlisted model refuses with nothing read; the adapter itself is built after the fetch.
+
+The documents are selected once, and that one selection is both what is sent for coding and
+what the run reports as selected.
+
+Reuse is unchanged. The observation is not part of what makes a question the same question:
+unchanged pages for the same season, gameweek and deadline reuse the earlier answer as it was
+given, with its own model revision and the source's own publication times. What a later run
+adds is when it read the pages.
+
+Moving the observation changes which documents are eligible in the narrow case above. It is
+not new editorial content, it does not make any statement more reliable, and it is no
+evidence about how well stated news predicts who plays.
+
 ## Fixture components for minute evidence
 
 The v1 builder can publish the forecast and its fixture components from the same fit.

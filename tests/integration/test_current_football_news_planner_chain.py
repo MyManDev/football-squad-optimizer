@@ -162,7 +162,8 @@ def _acquire(case, tmp_path, monkeypatch, capsys, mode):
         }
     )
 
-    def build(environ, *, settings_file, target_context):
+    def bind(resolved, target_context):
+        assert resolved is config
         assert target_context["season"] == "2026-27" and target_context["gameweek"] == 6
         assert pd.Timestamp(target_context["deadline"]) == pd.Timestamp(DEADLINE)
         return (
@@ -175,7 +176,8 @@ def _acquire(case, tmp_path, monkeypatch, capsys, mode):
             replace(config, target_context=target_context),
         )
 
-    monkeypatch.setattr(club_news_acquire, "build_coding_provider", build)
+    monkeypatch.setattr(club_news_acquire, "resolve_provider_config", lambda *a, **k: config)
+    monkeypatch.setattr(club_news_acquire, "bind_coding_provider", bind)
     monkeypatch.setattr(club_news_acquire, "_utc_now", lambda: FETCHED)
     before = set(case["snapshot_root"].iterdir())
     status = club_news_acquire.main(
