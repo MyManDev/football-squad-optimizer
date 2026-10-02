@@ -568,7 +568,19 @@ def code_week(
                 continue
             attempted += 1
             called = True
-            response = provider.code(club_documents, roster)
+            try:
+                response = provider.code(club_documents, roster)
+            except ClubNewsError:
+                raise
+            except Exception as error:
+                # An adapter turns the failures it knows into its own refusal, with the
+                # text it has made safe. Anything else is an error nobody prepared: its
+                # message can quote the request, headers included, so only its type is
+                # kept, and it costs this club's call like any other failed call.
+                raise ClubNewsError(
+                    f"The provider call failed with {type(error).__name__}. Its message is "
+                    "withheld, because an unprepared error can quote the request."
+                ) from None
             require_requested_coding_contract(response)
         except ClubNewsError as error:
             refused.append((club, str(error)))
