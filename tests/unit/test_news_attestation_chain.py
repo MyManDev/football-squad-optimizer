@@ -203,7 +203,7 @@ def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, bo
         ("Saka is out", "Saka is out", True),
         ("First. Saka is out. Last.", "Saka is out.", True),
         ("First.  \t Saka is out", "Saka is out", True),
-        ("He said: Saka is out.", "Saka is out.", False),
+        ("He said: Saka is out.", "Saka is out.", True),
         ("Not that Saka is out.", "Saka is out.", False),
         ("Saka is out, they say.", "Saka is out", False),
         ("Saka is out for now", "Saka is out", False),
@@ -215,6 +215,14 @@ def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, bo
         ("Saka is out\u2026 for now.", "Saka is out", False),
         ("Saka is out!", "Saka is out!", True),
         ("Is he fit? Saka is out.", "Saka is out.", True),
+        # The colon that introduces reported words opens a statement; a clause run into
+        # the words does not.
+        ("Coach: Saka is out.", "Saka is out.", True),
+        ('Arteta said: "Saka is out."', "Saka is out.", True),
+        ("Arteta on Saka: he is out.", "he is out.", True),
+        ("Arteta said Saka is out.", "Saka is out.", False),
+        ("It is not true that Saka is out.", "Saka is out.", False),
+        ("Not true: Saka is out, he said.", "Saka is out", False),
         ("“Saka is out.”", "Saka is out.", True),
         ("(Saka is out)", "Saka is out", True),
     ],
