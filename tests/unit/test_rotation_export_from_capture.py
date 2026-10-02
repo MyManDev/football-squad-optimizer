@@ -563,6 +563,47 @@ def test_a_format_breach_still_refuses_the_whole_response(tmp_path: Path) -> Non
         _export(tmp_path, from_capture=True, coded=coded)
 
 
+def test_one_claim_the_parser_refuses_costs_that_claim_and_not_the_week(tmp_path: Path) -> None:
+    """The same rule one step later: the quote locates, and the parser refuses the claim.
+
+    A label the response's contract does not have is refused for that claim. Before, it
+    refused the whole response, and every club it coded lost its week of evidence.
+    """
+
+    name, player_id = _claimed_player()
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    (claim,) = (entry for entry in fixture["claims"] if entry["player_name"] == name)
+    claim["disposition"] = "stated_full_match_unavailable"
+    response = ClaimResponse(
+        text=json.dumps(fixture, ensure_ascii=False),
+        model_identifier="synthetic-stub",
+        model_version="fixture-1",
+    )
+    coded = tuple(
+        CodedClub(
+            club=club,
+            response=response,
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
+        )
+        for club in FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    )
+
+    whole = _export(tmp_path / "whole", from_capture=True).set_index("player_id")
+    damaged = _export(tmp_path / "damaged", from_capture=True, coded=coded).set_index("player_id")
+
+    row = damaged.loc[player_id]
+    assert bool(row["rotation_claim_unresolved"]) is True
+    assert bool(row["rotation_claim_observed"]) is False
+    assert pd.isna(row["rotation_disposition"])
+    columns = [*CLAIM_COLUMNS[1:-1], "rotation_claim_unresolved"]
+    pd.testing.assert_frame_equal(
+        damaged.drop(index=player_id)[columns], whole.drop(index=player_id)[columns]
+    )
+
+
 def test_a_club_whose_every_claim_lost_its_citation_is_no_longer_covered(
     tmp_path: Path,
 ) -> None:
