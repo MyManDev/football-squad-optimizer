@@ -171,6 +171,11 @@ def fake_world(monkeypatch):
             assert (path / "protocol.json").exists()
             assert (path / "input-hashes.json").exists()
             assert (path / "folds.json").exists()
+            protocol = json.loads((path / "protocol.json").read_text())
+            assert protocol["role_diagnostics"]["probability_bin_edges"] == [
+                i / 10 for i in range(11)
+            ]
+            assert protocol["role_diagnostics"]["additional_fits"] == 0
             original(self, *args, **kwargs)
 
         monkeypatch.setattr(Model, "__init__", init)
@@ -219,6 +224,20 @@ def test_fixed_eight_origins_one_fit_each_and_no_extra_control_fit(monkeypatch, 
     assert all(r["paired_origins"] == 0 for r in old_comparison if r["metric"] == "role_nll")
     role_comparison = json.loads((output / "role-comparison.json").read_text())
     assert all(r["paired_origins"] == 8 for r in role_comparison)
+    diagnostics = json.loads((output / "role-diagnostics.json").read_text())
+    assert len(diagnostics) == 8 * 2 * 5
+    for record in diagnostics:
+        same = next(
+            r
+            for r in diagnostics
+            if (r["fold"], r["position"]) == (record["fold"], record["position"])
+            and r["arm"] != record["arm"]
+        )
+        assert same["appearance"] == record["appearance"]
+        for name in ("appearance", "conditional_start"):
+            assert len(record[name]["bins"]) == 10
+            assert sum(cell["count"] for cell in record[name]["bins"]) == record[name]["rows"]
+        assert not {"player_id", "player_code", "probabilities", "labels"} & record.keys()
     with pytest.raises(FileExistsError):
         study.run(tmp_path / "archive", output, training_seasons=study.SEASONS)
 
@@ -426,6 +445,7 @@ def test_q_mismatch_marks_folds_failed_without_partial_arm_results(monkeypatch, 
     assert result["completed_origins"] == 0 and result["candidate_fit_attempts"] == 8
     assert json.loads((output / "scores.json").read_text()) == []
     assert json.loads((output / "role-scores.json").read_text()) == []
+    assert json.loads((output / "role-diagnostics.json").read_text()) == []
     assert len(json.loads((output / "failures.json").read_text())) == 8
 
 
@@ -444,3 +464,128 @@ def test_missing_training_support_is_null_not_a_failed_fold(monkeypatch, tmp_pat
     assert all(r["role_scored_rows"] == 0 and r["role_nll"] is None for r in roles)
     summary = json.loads((output / "role-comparison.json").read_text())
     assert all(r["paired_origins"] == 0 and r["joint_minus_pooled"] is None for r in summary)
+
+
+def test_role_diagnostics_unfloored_decomposition_and_population_are_explicit():
+    actual = pd.DataFrame({"minutes": [0, 40, 75, 90, 30], "starts": [0, 1, 0, 1, np.nan]})
+    q = pd.Series([0.2, 0.8, 0.6, 0.5, 0.7])
+    r = pd.Series([0.5, 0.7, 0.4, 0.6, 0.2])
+    prediction = pd.DataFrame(
+        {"zero_probability": 1 - q, "start_probability": q * r, "cameo_probability": q * (1 - r)}
+    )
+    before = prediction.copy(deep=True)
+    diagnostic = study.role_diagnostics(actual, prediction, q)
+    appearance, conditional = diagnostic["appearance"], diagnostic["conditional_start"]
+    assert (diagnostic["role_known_rows"], diagnostic["role_unknown_rows"]) == (4, 1)
+    assert appearance["rows"] == 4 and conditional["rows"] == 3
+    assert diagnostic["conditional_q_zero_rows"] == 0
+    assert diagnostic["conditional_unsupported_rows"] == 0
+    assert appearance["floor_active_rows"] == conditional["floor_active_rows"] == 0
+    assert diagnostic["joint_floor_active_rows"] == 0
+    assert appearance["brier"] == pytest.approx((0.2**2 + 0.2**2 + 0.4**2 + 0.5**2) / 4)
+    assert conditional["brier"] == pytest.approx((0.3**2 + 0.4**2 + 0.4**2) / 3)
+    joint = study.role_losses(actual, prediction)
+    # Conditional loss has three rows, while joint and appearance have four.
+    assert joint["role_nll"] == pytest.approx(appearance["nll"] + 3 / 4 * conditional["nll"])
+    pd.testing.assert_frame_equal(prediction, before)
+
+
+def test_q_zero_is_undefined_for_conditional_role_but_counted_in_appearance_loss():
+    actual = pd.DataFrame({"minutes": [75, 0, 40, 75, 90], "starts": [1, 0, 1, 0, np.nan]})
+    q = pd.Series([0.0, 0.9, 1e-8, 0.4, 0.7])
+    r = pd.Series([0.6, 0.5, 1e-8, 1.0, 0.2])
+    prediction = pd.DataFrame(
+        {"zero_probability": 1 - q, "start_probability": q * r, "cameo_probability": q * (1 - r)}
+    )
+    diagnostic = study.role_diagnostics(actual, prediction, q)
+    assert diagnostic["positive_known_rows"] == 3
+    assert diagnostic["conditional_q_zero_rows"] == 1
+    assert diagnostic["appearance"]["rows"] == 4
+    assert diagnostic["appearance"]["floor_active_rows"] == 1
+    assert diagnostic["conditional_start"]["rows"] == 2
+    assert diagnostic["conditional_start"]["floor_active_rows"] == 1
+    assert diagnostic["joint_floor_active_rows"] == 3
+
+
+def test_separately_floored_losses_are_not_claimed_to_decompose_joint_nll():
+    actual = pd.DataFrame({"minutes": [40], "starts": [1]})
+    q = pd.Series([1e-8])
+    prediction = pd.DataFrame(
+        {
+            "zero_probability": 1 - q,
+            "start_probability": q * 1e-8,
+            "cameo_probability": q * (1 - 1e-8),
+        }
+    )
+    diagnostic = study.role_diagnostics(actual, prediction, q)
+    appearance, conditional = diagnostic["appearance"], diagnostic["conditional_start"]
+    joint = study.role_losses(actual, prediction)
+    assert appearance["floor_active_rows"] == conditional["floor_active_rows"] == 0
+    assert diagnostic["joint_floor_active_rows"] == 1
+    assert joint["role_nll"] == pytest.approx(-np.log(study.LOG_FLOOR))
+    assert appearance["nll"] + conditional["nll"] == pytest.approx(-2 * np.log(1e-8))
+    assert appearance["nll"] + conditional["nll"] > joint["role_nll"]
+
+
+def test_probability_bins_keep_empty_cells_and_place_boundaries_once():
+    probabilities = np.array([i / 10 for i in range(11)])
+    diagnostic = study._binary_calibration(probabilities, np.zeros(11))
+    assert [cell["count"] for cell in diagnostic["bins"]] == [1] * 9 + [2]
+    assert diagnostic["bins"][1]["mean_pred"] == 0.1
+    assert diagnostic["bins"][-1]["mean_pred"] == pytest.approx(0.95)
+    assert [cell["upper_inclusive"] for cell in diagnostic["bins"]] == [False] * 9 + [True]
+    sparse = study._binary_calibration(np.array([0.05, 0.1, 1.0]), np.array([0, 1, 1]))
+    assert len(sparse["bins"]) == 10
+    empty = sparse["bins"][2]
+    assert empty["count"] == 0 and empty["mean_pred"] is None and empty["event_rate"] is None
+    no_rows = study._binary_calibration(np.array([]), np.array([]))
+    assert no_rows["nll"] is None and no_rows["brier"] is None
+    assert all(cell["count"] == 0 and cell["mean_pred"] is None for cell in no_rows["bins"])
+
+
+def test_log_floor_counts_only_strictly_lower_observed_probabilities():
+    diagnostic = study._binary_calibration(
+        np.array([0, study.LOG_FLOOR / 2, study.LOG_FLOOR, study.LOG_FLOOR * 2, 1]),
+        np.ones(5),
+    )
+    assert diagnostic["floor_active_rows"] == 2
+    assert diagnostic["zero_observed_probability_rows"] == 1
+    assert diagnostic["nll"] == pytest.approx(
+        -(3 * np.log(study.LOG_FLOOR) + np.log(2 * study.LOG_FLOOR)) / 5
+    )
+
+
+@pytest.mark.parametrize("missing", ["all", "one"])
+def test_unavailable_roles_keep_appearance_diagnostics_without_invented_conditional_values(missing):
+    actual = observed()
+    q = pd.Series([0.0, 0.5, 0.0, 1.0])
+    prediction = pd.DataFrame(
+        {"zero_probability": 1 - q, "start_probability": np.nan, "cameo_probability": np.nan}
+    )
+    if missing == "one":
+        prediction["start_probability"] = q * 0.5
+        prediction["cameo_probability"] = q * 0.5
+        prediction.loc[0, "start_probability"] = np.nan
+    diagnostic = study.role_diagnostics(actual, prediction, q)
+    assert not diagnostic["role_forecast_available"]
+    assert diagnostic["appearance"]["rows"] == 4
+    assert diagnostic["conditional_start"]["rows"] == 0
+    assert diagnostic["conditional_start"]["nll"] is None
+    assert diagnostic["conditional_q_zero_rows"] == 1
+    assert diagnostic["conditional_unsupported_rows"] == 2
+    assert diagnostic["joint_scored_rows"] == 0
+    assert diagnostic["joint_floor_active_rows"] is None
+
+
+def test_tiny_positive_q_is_not_reconstructed_from_rounded_zero_probability():
+    actual = pd.DataFrame({"minutes": [40], "starts": [1]})
+    q = pd.Series([1e-20])
+    prediction = pd.DataFrame(
+        {"zero_probability": 1 - q, "start_probability": q * 0.25, "cameo_probability": q * 0.75}
+    )
+    assert prediction.zero_probability.iloc[0] == 1.0
+    diagnostic = study.role_diagnostics(actual, prediction, q)
+    assert diagnostic["conditional_q_zero_rows"] == 0
+    assert diagnostic["conditional_start"]["rows"] == 1
+    assert diagnostic["conditional_start"]["nll"] == pytest.approx(-np.log(0.25))
+    assert diagnostic["appearance"]["floor_active_rows"] == 1
