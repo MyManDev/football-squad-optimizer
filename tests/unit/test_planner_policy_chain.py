@@ -12,6 +12,7 @@ import hashlib
 import inspect
 import json
 import os
+import subprocess
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -228,8 +229,111 @@ def test_the_first_bound_week_is_the_first_deadline_after_the_later_merge(
     bound = chain.binding_instant(commits)
     assert bound == T0 - timedelta(days=2)
     assert chain.frozen_commit(commits) == "b"
-    assert chain.first_bound_week(index, Path("."), bound) == 6
-    assert chain.first_bound_week(index, Path("."), T0) == 7
+    assert chain.first_bound_week(index, Path("."), commits) == 6
+    at_deadline = {**commits, "runner": {"commit": "b", "committed_utc": T0.isoformat()}}
+    assert chain.first_bound_week(index, Path("."), at_deadline) == 7
+
+
+@pytest.mark.parametrize(
+    "protocol,runner,week",
+    [
+        ("2026-10-06T23:59:59+00:00", "2026-10-08T23:59:59+00:00", 6),
+        ("2026-10-07T00:00:00+00:00", "2026-10-08T09:00:00+00:00", 7),
+        ("2026-10-06T12:00:00+00:00", "2026-10-09T00:00:00+00:00", 7),
+        ("2026-10-07T00:00:00+00:00", "2026-10-09T00:00:00+00:00", 7),
+    ],
+)
+def test_gw6_needs_both_merges_by_their_dates_and_either_miss_falls_back_to_gw7(
+    monkeypatch: pytest.MonkeyPatch, protocol: str, runner: str, week: int
+) -> None:
+    """Rule 2 and Answer 5948324329: each date on its own, not only the GW6 deadline."""
+
+    _bootstrap_deadlines(monkeypatch, {6: T0, 7: T0 + timedelta(days=7)})
+    commits = {
+        "protocol": {"commit": "a", "committed_utc": protocol},
+        "runner": {"commit": "b", "committed_utc": runner},
+    }
+    assert chain.first_bound_week((_entry("newest", -1, 6),), Path("."), commits) == week
+
+
+def test_no_decision_is_computed_before_the_freeze_ends_and_nothing_is_touched_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 40: a Saturday run after GW6's deadline, or a Sunday one before 10:00Z, refuses
+    before the output check, the source identity, the lock or the inventory."""
+
+    touched: list[str] = []
+
+    def forbidden(name: str) -> object:
+        def call(*args: object, **kwargs: object) -> object:
+            touched.append(name)
+            raise AssertionError(f"{name} ran before the boundary")
+
+        return call
+
+    for name in ("refuse_output", "source_identity", "single_run", "capture_inventory"):
+        monkeypatch.setattr(chain, name, forbidden(name))
+    for moment in (T0 + timedelta(hours=1), chain.FIRST_COMPUTATION - timedelta(seconds=1)):
+        with pytest.raises(chain.ChainError, match="end of the freeze"):
+            chain.decide(*ROOTS(tmp_path), tmp_path / "out", 6, "issuecomment-1", now=moment)
+    assert touched == [] and not (tmp_path / "out").exists()
+    with pytest.raises(AssertionError, match="refuse_output ran"):
+        chain.decide(
+            *ROOTS(tmp_path), tmp_path / "out", 6, "issuecomment-1", now=chain.FIRST_COMPUTATION
+        )
+    assert touched == ["refuse_output"]
+
+
+def test_the_merge_identities_are_the_commits_on_the_line_they_were_merged_into(
+    tmp_path: Path,
+) -> None:
+    """Rule 2 on a real history: a feature commit that added the file, a fix, a normal merge;
+    then a squash merge. The identities are the merge and the squash commit."""
+
+    def git(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *arguments],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def write(path: str, text: str) -> None:
+        target = tmp_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+
+    git("init", "-q", "-b", "develop")
+    write("README", "base")
+    git("add", "-A")
+    git("commit", "-q", "-m", "base")
+    git("switch", "-q", "-c", "protocol")
+    write(chain.PROTOCOL_FILE, "protocol")
+    git("add", "-A")
+    git("commit", "-q", "-m", "add the protocol")
+    written = git("rev-parse", "HEAD")
+    write(chain.PROTOCOL_FILE, "protocol, fixed")
+    git("commit", "-q", "-am", "fix the protocol")
+    git("switch", "-q", "develop")
+    git("merge", "-q", "--no-ff", "protocol", "-m", "merge the protocol")
+    merged = git("rev-parse", "HEAD")
+    git("switch", "-q", "-c", "runner")
+    write(chain.RUNNER_FILE, "runner")
+    git("add", "-A")
+    git("commit", "-q", "-m", "add the runner")
+    git("switch", "-q", "develop")
+    git("merge", "-q", "--squash", "runner")
+    git("commit", "-q", "-m", "the runner, squashed")
+    squashed = git("rev-parse", "HEAD")
+
+    commits = chain.binding_commits(root=tmp_path)
+    assert commits["protocol"]["commit"] == merged != written
+    assert commits["runner"]["commit"] == squashed
+    assert chain.frozen_commit(commits) == squashed == git("rev-parse", "HEAD")
+    # Made within one second here, as two merges of one merge group can be: the line decides.
+    assert commits["protocol"]["committed_utc"] <= commits["runner"]["committed_utc"]
+    assert int(commits["runner"]["line_position"]) > int(commits["protocol"]["line_position"])
 
 
 # Rules 6 to 8: the served forecast, read once and never rebuilt
@@ -1108,12 +1212,15 @@ def test_the_recorded_lineup_is_the_published_one_and_the_scorer_accepts_it(tmp_
 
 
 def _fake_git(monkeypatch: pytest.MonkeyPatch, *, head: str = "b", dirty: str = "") -> None:
-    def git(*arguments: str) -> str:
+    def git(*arguments: str, cwd: Path | None = None) -> str:
         if arguments[:1] == ("status",):
             return dirty
         if arguments[:2] == ("rev-parse", "HEAD"):
             return head
+        if arguments[:2] == ("rev-list", "--first-parent"):
+            return "1" if arguments[-1] == "a" else "2"
         if arguments[0] == "log":
+            assert "--first-parent" in arguments and "--diff-merges=first-parent" in arguments
             path = arguments[-1]
             return (
                 "a 2026-10-06T12:00:00+00:00"
@@ -1235,6 +1342,8 @@ def _chain_world(
 ) -> tuple[Path, list[tuple[str, int]]]:
     root = tmp_path / "artifacts" / "planner_policy_chain"
     monkeypatch.setattr(chain, "OUTPUT_ROOT", root)
+    # These tests decide on the GW6 deadline's own day; rule 40's boundary has its own test.
+    monkeypatch.setattr(chain, "FIRST_COMPUTATION", T0 - timedelta(days=30))
     commits = {
         "protocol": {"commit": "a", "committed_utc": "2026-10-06T12:00:00+00:00"},
         "runner": {"commit": "b", "committed_utc": "2026-10-08T09:00:00+00:00"},

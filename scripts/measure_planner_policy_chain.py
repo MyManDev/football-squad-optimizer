@@ -123,6 +123,13 @@ SEASON_OPENS = datetime(2026, 6, 1, tzinfo=UTC)
 CAPTURE_INSTANT = re.compile(r"-(\d{8}T\d{6}Z)-")
 #: Rule 40: no chain starts once this gameweek's deadline has passed.
 LAPSE_GAMEWEEK = 21
+#: Rule 2 and Answer 5948324329: GW6 is the first chain week only if this protocol merged by
+#: the end of 6 October and the runner by the end of 8 October, in UTC committer instants.
+TARGET_FIRST_WEEK = 6
+PROTOCOL_MERGED_BEFORE = datetime(2026, 10, 7, tzinfo=UTC)
+RUNNER_MERGED_BEFORE = datetime(2026, 10, 9, tzinfo=UTC)
+#: Rule 40: no decision is computed before the 9 to 11 October freeze ends.
+FIRST_COMPUTATION = datetime(2026, 10, 11, 10, 0, tzinfo=UTC)
 #: Packages whose versions decide what the solver returns; a later run must match them.
 PINNED_PACKAGES: tuple[str, ...] = ("ortools", "numpy", "pandas")
 #: Rule 39: the decision step never runs on a Tuesday or a Friday, operator's time (UTC+3,
@@ -908,10 +915,10 @@ def _record(**fields: object) -> dict[str, object]:
 # Preflight and the frozen source (rules 2, 3 and 39)
 
 
-def _git(*arguments: str) -> str:
+def _git(*arguments: str, cwd: Path | None = None) -> str:
     return subprocess.run(
         ["git", *arguments],
-        cwd=REPOSITORY,
+        cwd=REPOSITORY if cwd is None else cwd,
         check=True,
         capture_output=True,
         text=True,
@@ -925,16 +932,38 @@ def _git_bytes(*arguments: str) -> bytes:
     ).stdout
 
 
-def binding_commits() -> dict[str, dict[str, str]]:
-    """Rule 2: the commit that added this protocol and the one that added this runner."""
+def binding_commits(root: Path | None = None) -> dict[str, dict[str, str]]:
+    """Rule 2: the merges that added this protocol and this runner to HEAD's line.
+
+    A file is looked for on HEAD's first-parent line, each commit compared with its first
+    parent: a squash merge is found as the squash commit and a normal merge as the merge
+    commit, never as the feature commit that wrote the file on its branch.
+    """
 
     commits = {}
     for name, path in (("protocol", PROTOCOL_FILE), ("runner", RUNNER_FILE)):
-        added = _git("log", "--diff-filter=A", "--format=%H %cI", "-1", "--", path)
+        added = _git(
+            "log",
+            "--first-parent",
+            "--diff-merges=first-parent",
+            "--diff-filter=A",
+            "--no-patch",
+            "--format=%H %cI",
+            "-1",
+            "--",
+            path,
+            cwd=root,
+        )
         if not added:
             raise ChainError(f"{path} has no commit; the protocol has not merged.")
         sha, instant = added.split(" ", 1)
-        commits[name] = {"commit": sha, "committed_utc": _instant(instant).isoformat()}
+        # Its place on the line: two merges of one merge group can share a second.
+        position = int(_git("rev-list", "--first-parent", "--count", sha, cwd=root))
+        commits[name] = {
+            "commit": sha,
+            "committed_utc": _instant(instant).isoformat(),
+            "line_position": str(position),
+        }
     return commits
 
 
@@ -945,9 +974,16 @@ def binding_instant(commits: Mapping[str, Mapping[str, str]]) -> datetime:
 
 
 def frozen_commit(commits: Mapping[str, Mapping[str, str]]) -> str:
-    """Rule 3: the later of the two merge commits is the frozen source."""
+    """Rule 3: the later of the two merge commits on the line is the frozen source.
 
-    return max(commits.values(), key=lambda entry: _instant(entry["committed_utc"]))["commit"]
+    Later means further along HEAD's first-parent line; the committer instant only breaks a
+    tie between commits whose place was not recorded.
+    """
+
+    return max(
+        commits.values(),
+        key=lambda entry: (int(entry.get("line_position", 0)), _instant(entry["committed_utc"])),
+    )["commit"]
 
 
 def stated_constants_hold() -> None:
@@ -986,18 +1022,29 @@ def source_identity() -> dict[str, object]:
 
 
 def first_bound_week(
-    index: Sequence[CaptureIndexEntry], snapshot_root: Path, bound: datetime
+    index: Sequence[CaptureIndexEntry],
+    snapshot_root: Path,
+    commits: Mapping[str, Mapping[str, str]],
 ) -> int:
-    """Rule 2: the first gameweek whose deadline, as the newest capture states it, is later."""
+    """Rule 2: the first gameweek whose deadline, as the newest capture states it, follows the
+    later merge; and GW7 at the earliest if either merge missed its date."""
 
     if not index:
         raise ChainError("No live capture to read the deadlines from.")
+    bound = binding_instant(commits)
     newest = max(index, key=lambda entry: entry.captured_at_utc)
     snapshot = read_snapshot(snapshot_root, newest.snapshot_id)
     for deadline in gameweek_deadlines(snapshot.payloads[BOOTSTRAP_PAYLOAD]):
         if _instant(deadline.deadline_utc) > bound:
-            return int(deadline.gameweek)
-    raise ChainError("No gameweek deadline falls after the protocol bound.")
+            week = int(deadline.gameweek)
+            break
+    else:
+        raise ChainError("No gameweek deadline falls after the protocol bound.")
+    late = (
+        _instant(commits["protocol"]["committed_utc"]) >= PROTOCOL_MERGED_BEFORE
+        or _instant(commits["runner"]["committed_utc"]) >= RUNNER_MERGED_BEFORE
+    )
+    return max(week, TARGET_FIRST_WEEK + 1) if late else week
 
 
 def refuse_output(output: Path, snapshot_root: Path, artifact_root: Path) -> None:
@@ -1010,6 +1057,16 @@ def refuse_output(output: Path, snapshot_root: Path, artifact_root: Path) -> Non
     for forbidden in (snapshot_root.resolve(), football, REPOSITORY / "data"):
         if resolved == forbidden or resolved.is_relative_to(forbidden):
             raise ChainError(f"The chain never writes under {forbidden}.")
+
+
+def refuse_before_first_computation(now: datetime) -> None:
+    """Rule 40: nothing is computed before the freeze ends, not even an inventory."""
+
+    if now < FIRST_COMPUTATION:
+        raise ChainError(
+            f"No decision is computed before {FIRST_COMPUTATION.isoformat()}, the end of the "
+            "freeze (rule 40)."
+        )
 
 
 def refuse_day(now: datetime) -> None:
@@ -1067,7 +1124,7 @@ def check(
 
     moment = datetime.now(UTC) if now is None else now
     index = capture_index(snapshot_root)
-    first = first_bound_week(index, snapshot_root, binding_instant(binding_commits()))
+    first = first_bound_week(index, snapshot_root, binding_commits())
     for gameweek in range(first, LAST_GAMEWEEK + 1):
         pending = moment <= deadline_of(index, snapshot_root, gameweek)
         selection = decision_capture(index, gameweek)
@@ -1335,7 +1392,7 @@ def start_chain(
             "(rule 40)."
         )
     commits = cast(Mapping[str, Mapping[str, str]], identity["binding_commits"])
-    bound_week = first_bound_week(index, snapshot_root, binding_instant(commits))
+    bound_week = first_bound_week(index, snapshot_root, commits)
     skipped: list[dict[str, object]] = []
     for gameweek in range(bound_week, LAST_GAMEWEEK + 1):
         if moment <= deadline_of(index, snapshot_root, gameweek):
@@ -1385,6 +1442,7 @@ def decide(
     if not answer.strip():
         raise ChainError("Name the Answer on #632 that names the operator (rule 40).")
     refuse_day(moment)
+    refuse_before_first_computation(moment)
     refuse_output(output, snapshot_root, artifact_root)
     identity = source_identity()
     with single_run(output):
