@@ -15,7 +15,6 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urlsplit
 
 from squadopt.data.sources.club_news_readable import extract_readable_text
 from squadopt.data.timestamps import as_instant
@@ -194,19 +193,15 @@ class OfficialInjuryFact:
 
 
 def _public_url(value: str) -> bool:
-    """Preserve source links only when they can be a safe public HTTPS anchor."""
-    if not value.startswith("https://") or re.search(r"[\s\\]", value):
+    """Surface only HTTPS DNS-host anchors; transport parsing stays in platform."""
+    if re.search(r"[\s\\\x00-\x20\x7f]", value):
         return False
-    try:
-        parsed = urlsplit(value)
-        return (
-            bool(parsed.hostname)
-            and not parsed.username
-            and not parsed.password
-            and (parsed.port is None or 1 <= parsed.port <= 65535)
-        )
-    except ValueError:
-        return False
+    matched = re.fullmatch(
+        r"https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?"
+        r"(?::(?P<port>[0-9]{1,5}))?(?:/[^\s\\]*)?",
+        value,
+    )
+    return matched is not None and (matched["port"] is None or 1 <= int(matched["port"]) <= 65535)
 
 
 @dataclass(frozen=True, slots=True)

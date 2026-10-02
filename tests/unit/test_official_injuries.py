@@ -288,6 +288,9 @@ def test_public_record_filters_unsafe_links_without_rewriting_captured_facts():
         "https://name:secret@example.com/held",
         "https://example.com\\other",
         "https://example.com:invalid/held",
+        "https://example.com:0/held",
+        "https://example.com:65536/held",
+        "https://example.com/held\x00",
     )
     found = replace(found, facts=(replace(found.facts[0], details_urls=links),))
     public = found.public_record([10])
