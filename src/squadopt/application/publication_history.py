@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from squadopt.data.errors import DataSourceError
 
 PROSPECTIVE_SEASON = "2026-27"
-PROSPECTIVE_ARCHIVE_SEASONS = ("2022-23", "2023-24", "2024-25")
+PROSPECTIVE_ARCHIVE_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
 
 
 def explicit_archive_seasons(
@@ -15,6 +15,8 @@ def explicit_archive_seasons(
 
     Current-season evidence comes from the named capture, never an archive directory.
     It must be explicitly permitted because these publication paths use that capture.
+    The baseline may retain its existing 2021-22 through 2024-25 training population;
+    a narrower experimental football selection does not change this publication policy.
     Legacy callers omit the selection and retain their existing policy.
     """
     allowed = {*PROSPECTIVE_ARCHIVE_SEASONS, PROSPECTIVE_SEASON}
@@ -28,8 +30,8 @@ def explicit_archive_seasons(
         or PROSPECTIVE_SEASON not in selected
     ):
         raise DataSourceError(
-            "Explicit training seasons must be unique allowed seasons (2022-23, 2023-24, "
-            "2024-25, 2026-27), including the current captured season 2026-27."
+            "Explicit training seasons must be unique allowed seasons (2021-22, 2022-23, "
+            "2023-24, 2024-25, 2026-27), including the current captured season 2026-27."
         )
     archives = tuple(sorted(set(selected) & set(PROSPECTIVE_ARCHIVE_SEASONS)))
     if not archives:

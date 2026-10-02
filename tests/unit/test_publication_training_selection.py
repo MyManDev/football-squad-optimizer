@@ -25,20 +25,24 @@ from squadopt.platform import publication_workers
 
 ARCHIVES = ("2022-23", "2023-24", "2024-25")
 SELECTED = (*ARCHIVES, "2026-27")
+BASELINE_ARCHIVES = ("2021-22", *ARCHIVES)
+BASELINE_SELECTED = (*BASELINE_ARCHIVES, "2026-27")
 
 
 class ReachedBoundary(Exception):
     """The real readers completed; stop before a fit, solve or publication."""
 
 
-def _guard_archive_reads(monkeypatch: pytest.MonkeyPatch) -> set[str]:
+def _guard_archive_reads(
+    monkeypatch: pytest.MonkeyPatch, archives: tuple[str, ...] = ARCHIVES
+) -> set[str]:
     opened: set[str] = set()
     original = vaastav._read_required
 
     def read(path: Path, required: Any, label: str) -> pd.DataFrame:
         # This hook is immediately before the real CSV open, not a fake panel loader.
-        assert any(season in path.parts for season in ARCHIVES), path
-        assert "2025-26" not in path.parts and "2021-22" not in path.parts, path
+        assert any(season in path.parts for season in archives), path
+        assert "2025-26" not in path.parts and "2020-21" not in path.parts, path
         opened.add(Path(*path.parts[path.parts.index("data") + 1 :]).as_posix())
         return original(path, required, label)
 
@@ -53,7 +57,8 @@ def _guard_archive_reads(monkeypatch: pytest.MonkeyPatch) -> set[str]:
         ("2026-27",),
         ("2022-23",),
         ("2025-26", "2026-27"),
-        ("2021-22", "2026-27"),
+        ("2020-21", "2026-27"),
+        (*BASELINE_SELECTED, "2025-26"),
         (*SELECTED, "2024-25"),
         ("../2024-25", "2026-27"),
         "2024-25",
@@ -80,12 +85,20 @@ def test_current_season_is_capture_permission_not_an_archive_directory() -> None
         explicit_archive_seasons(SELECTED, current_season="2025-26")
 
 
+def test_baseline_can_preserve_its_existing_component_training_population() -> None:
+    assert explicit_archive_seasons(BASELINE_SELECTED) == (
+        projection_handoff.COMPONENT_TRAINING_SEASONS
+    )
+    assert explicit_archive_seasons(("2021-22", "2026-27")) == ("2021-22",)
+
+
 @pytest.mark.parametrize("worker", [False, True])
+@pytest.mark.parametrize("archives", [ARCHIVES, BASELINE_ARCHIVES])
 def test_parent_and_worker_only_open_selected_synthetic_archive_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker: bool, archives: tuple[str, ...]
 ) -> None:
-    request = replace(publication_world(tmp_path), training_seasons=SELECTED)
-    opened = _guard_archive_reads(monkeypatch)
+    request = replace(publication_world(tmp_path), training_seasons=(*archives, "2026-27"))
+    opened = _guard_archive_reads(monkeypatch, archives)
     if worker:
         monkeypatch.setattr(publication_workers, "_WORKER_CONTEXT", {})
         publication_workers._worker_init(
@@ -108,22 +121,23 @@ def test_parent_and_worker_only_open_selected_synthetic_archive_files(
             league_publication.publish_league(request)
     assert opened == {
         f"{season}/{name}"
-        for season in ARCHIVES
+        for season in archives
         for name in ("gws/merged_gw.csv", "players_raw.csv")
     }
 
 
+@pytest.mark.parametrize("archives", [ARCHIVES, BASELINE_ARCHIVES])
 def test_component_fit_inputs_use_the_same_selection_before_any_fit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, archives: tuple[str, ...]
 ) -> None:
-    for season in ARCHIVES:
+    for season in archives:
         archive = player_fixture._archive(tmp_path, [player_fixture._gameweek_row()], season=season)
         fixture_fixture._archive(
             tmp_path,
             [fixture_fixture._fixture_row(kickoff=f"{season[:4]}-08-15T19:00:00Z")],
             season=season,
         )
-    opened = _guard_archive_reads(monkeypatch)
+    opened = _guard_archive_reads(monkeypatch, archives)
 
     def stop(
         panel: pd.DataFrame,
@@ -133,8 +147,8 @@ def test_component_fit_inputs_use_the_same_selection_before_any_fit(
         seasons: Any,
         **_kwargs: Any,
     ) -> Any:
-        assert tuple(seasons) == ARCHIVES
-        assert set(panel.season) == set(fixtures.season) == set(clubs.season) == set(ARCHIVES)
+        assert tuple(seasons) == archives
+        assert set(panel.season) == set(fixtures.season) == set(clubs.season) == set(archives)
         raise ReachedBoundary
 
     monkeypatch.setattr(projection_handoff, "build_component_modelling_frame", stop)
@@ -150,11 +164,11 @@ def test_component_fit_inputs_use_the_same_selection_before_any_fit(
             captured_at_utc="2026-08-28T15:30:00Z",
             deadline_utc="2026-08-29T10:00:00Z",
             fallback=pd.DataFrame(),
-            training_seasons=SELECTED,
+            training_seasons=(*archives, "2026-27"),
         )
     assert opened == {
         f"{season}/{name}"
-        for season in ARCHIVES
+        for season in archives
         for name in ("gws/merged_gw.csv", "players_raw.csv", "teams.csv", "fixtures.csv")
     }
 
