@@ -270,17 +270,21 @@ def _text(value: object) -> str | None:
 
 def _resolve(
     documents: Sequence[RawDocument], digest: str | None, start: object, end: object
-) -> tuple[RawDocument | None, str | None]:
-    """The document whose bytes hash to the citation, and the cited span decoded.
+) -> tuple[RawDocument | None, str | None, bool]:
+    """The document whose bytes hash to the citation, the cited span, and whether it stands alone.
 
     The claim parser hashed the bytes it indexed; whether those were the readable text
     or the raw content is settled by which one hashes to the digest, so both are tried
     and the span is cut from the one that matched. A digest no held document produces
     resolves to nothing rather than to different words presented as the source's own.
+
+    The third value says whether the span is a whole sentence of the text it was cut from
+    (:func:`_is_whole_sentence`). The scope rule reads the quote alone, so it cannot see
+    what the source wrapped around it.
     """
 
     if digest is None:
-        return None, None
+        return None, None, False
     for document in documents:
         for candidate in (document.readable, document.content):
             if hashlib.sha256(candidate).hexdigest() != digest:
@@ -288,15 +292,55 @@ def _resolve(
             try:
                 first, last = int(str(start)), int(str(end))
             except (TypeError, ValueError):
-                return document, None
+                return document, None, False
             if not 0 <= first < last <= len(candidate):
-                return document, None
+                return document, None, False
             try:
                 words = candidate[first:last].decode("utf-8").strip()
             except UnicodeDecodeError:
-                return document, None
-            return document, words or None
-    return None, None
+                return document, None, False
+            return document, words or None, _is_whole_sentence(candidate, first, last)
+    return None, None, False
+
+
+#: What may stand between a sentence boundary and the quote: space, and a quotation mark
+#: or bracket that opens (before) or closes (after) the sentence the quote is.
+_SPACE: Final = " \t"
+_MARKS: Final = "\"'\u201c\u201d\u2018\u2019()[]"
+_SENTENCE_END: Final = ".!?"
+_BOUNDARY: Final = _SENTENCE_END + "\n\r"
+
+
+def _is_whole_sentence(text: bytes, first: int, last: int) -> bool:
+    """Whether ``text[first:last]`` is a complete sentence of ``text``, not part of one.
+
+    A quote is located as any unique substring of the source, and the scope rule then
+    reads the quote on its own. "Saka will miss the next Premier League match." is also a
+    substring of "It is not true that Saka will miss the next Premier League match." and
+    of "Arteta denied that Saka will miss the next Premier League match if he trains."
+    Neither says what the quote says, and a quote that begins or ends inside a sentence
+    cannot show that it does.
+
+    So a statement can bind only where the source's own text bounds it: what comes before
+    it is the start of the text, a line break, or the end of a sentence, and what comes
+    after it is the end of the text, a line break, or sentence punctuation. Anything else,
+    including an attribution such as "Arteta said", leaves the words readable and without
+    authority. That refuses some true statements. It never turns a sentence into its part.
+    """
+
+    try:
+        before = text[:first].decode("utf-8")
+        quoted = text[first:last].decode("utf-8")
+        after = text[last:].decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    lead = before.rstrip(_SPACE).rstrip(_MARKS).rstrip(_SPACE)
+    if lead and lead[-1] not in _BOUNDARY:
+        return False
+    if quoted.strip().rstrip(_MARKS).endswith(tuple(_SENTENCE_END)):
+        return True
+    rest = after.lstrip(_SPACE).lstrip(_MARKS).lstrip(_SPACE)
+    return not rest or rest[0] in _BOUNDARY
 
 
 def _covered(table: pd.DataFrame, table_path: Path) -> tuple[str, ...]:
@@ -398,7 +442,7 @@ def manager_words_from_artifact(
         disposition = _text(row.get("rotation_disposition"))
         if disposition is None:
             continue
-        document, cited = _resolve(
+        document, cited, whole_sentence = _resolve(
             documents,
             _text(row.get("rotation_claim_source_sha256")),
             row.get("rotation_claim_span_start"),
@@ -416,9 +460,12 @@ def manager_words_from_artifact(
             if cited
             else ("unspecified", False)
         )
-        scope_verified = row.get("rotation_claim_scope_verified") is True and checked_scope == (
-            scope,
-            True,
+        scope_verified = (
+            row.get("rotation_claim_scope_verified") is True
+            and checked_scope == (scope, True)
+            # The table's flag and the quote's own wording are not enough: the quote must
+            # be a whole sentence of the source, or the source may say something else.
+            and whole_sentence
         )
         if scope_verified:
             scope_verified = target_basis is not None and _targets_decision(

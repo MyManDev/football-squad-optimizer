@@ -21,6 +21,7 @@ from tests.unit.test_rotation_export_from_capture import _decision
 
 from squadopt.application.manager_words import (
     ManagerWordsError,
+    _is_whole_sentence,
     documents_from_source,
     load_manager_words,
     manager_words_from_artifact,
@@ -44,6 +45,7 @@ def _pair(
     version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     extra_fixture=None,
     disposition="stated_expected_absent",
+    body=None,
 ):
     root = tmp_path / "snapshots"
     if extra_fixture is None:
@@ -62,7 +64,8 @@ def _pair(
         ).snapshot_id
     news = write_club_news_capture(
         root,
-        documents=(_document(quote),),
+        # ``body`` is what the club published, when that is more than the quote itself.
+        documents=(_document(quote if body is None else body),),
         coded=(
             CodedClub(
                 "Arsenal",
@@ -133,6 +136,87 @@ def test_replayed_legacy_evidence_never_silently_acquires_attestation(tmp_path, 
     assert word.words is not None
     assert not word.scope_verified and not word.publication_verified
     assert word.role is None
+
+
+ABSENCE = "Saka will miss the next Premier League match."
+
+
+@pytest.mark.parametrize(
+    ("body", "quote"),
+    [
+        (f"It is not true that {ABSENCE}", ABSENCE),
+        ("Neither Timber nor Saka will miss the next Premier League match.", ABSENCE),
+        (f"Arteta denied that {ABSENCE}", ABSENCE),
+        (f"Reports that {ABSENCE[:-1]} are wrong.", ABSENCE[:-1]),
+        (f"{ABSENCE[:-1]} if he fails a late test.", ABSENCE[:-1]),
+        (f"{ABSENCE[:-1]}, according to one report the club rejects.", ABSENCE[:-1]),
+        (f"Arteta said {ABSENCE}", ABSENCE),
+    ],
+)
+def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body, quote):
+    """The quote's own wording passes the scope rule; the sentence it was cut from says more.
+
+    The words stay readable and their publication stays verified. What is withheld is the
+    statement's authority over a player: no role is taken from part of a sentence.
+    """
+
+    table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
+    row = read_rotation_evidence_artifact(table_path, manifest_path)
+    observed = row.loc[row.rotation_claim_observed].iloc[0]
+    # The table accepts it: its rule reads the quote alone.
+    assert bool(observed.rotation_claim_scope_verified)
+
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+
+    assert word.words == quote and word.publication_verified
+    assert not word.scope_verified and word.role is None
+
+
+@pytest.mark.parametrize(
+    ("body", "quote"),
+    [
+        (f"Team news follows. {ABSENCE} Timber is fit.", ABSENCE),
+        (f"Team news\n{ABSENCE}\nTimber is fit.", ABSENCE),
+        (f'Arteta spoke on Friday. "{ABSENCE}" More to follow.', ABSENCE),
+        (f"Fitness update! {ABSENCE[:-1]}!", ABSENCE[:-1]),
+        (f"Is he fit? {ABSENCE}", ABSENCE),
+    ],
+)
+def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, body, quote):
+    table_path, _, source = _pair(tmp_path, quote=quote, body=body)
+
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+
+    assert word.words == quote
+    assert word.scope_verified and word.publication_verified
+    assert word.role == "not_starting"
+
+
+@pytest.mark.parametrize(
+    ("text", "quote", "expected"),
+    [
+        ("Saka is out.", "Saka is out.", True),
+        ("Saka is out", "Saka is out", True),
+        ("First. Saka is out. Last.", "Saka is out.", True),
+        ("First.  \t Saka is out", "Saka is out", True),
+        ("He said: Saka is out.", "Saka is out.", False),
+        ("Not that Saka is out.", "Saka is out.", False),
+        ("Saka is out, they say.", "Saka is out", False),
+        ("Saka is out for now", "Saka is out", False),
+        ("Saka is outstanding.", "Saka is out", False),
+        ("“Saka is out.”", "Saka is out.", True),
+        ("(Saka is out)", "Saka is out", True),
+    ],
+)
+def test_whole_sentence_boundaries(text, quote, expected):
+    encoded = text.encode("utf-8")
+    first = encoded.index(quote.encode("utf-8"))
+    assert _is_whole_sentence(encoded, first, first + len(quote.encode("utf-8"))) is expected
+
+
+def test_a_span_that_cuts_a_character_in_half_is_not_a_sentence():
+    encoded = "Şaka is out.".encode()
+    assert _is_whole_sentence(encoded, 1, len(encoded)) is False
 
 
 def _rewrite(table_path, manifest_path, change):
