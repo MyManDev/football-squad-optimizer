@@ -336,16 +336,6 @@
   }
 }
 
-.status:hover {
-  color: var(--color-text);
-  text-decoration: underline;
-}
-
-.status[aria-current="page"] {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
 /* Rail: 72 px of icons. The labels stay in the accessible names. */
 
 .sidebar[data-mode="rail"] .brandRow {

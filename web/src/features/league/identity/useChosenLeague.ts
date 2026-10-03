@@ -35,8 +35,18 @@ export function writeChosenLeague(leagueId: number | null): void {
 }
 
 function subscribe(callback: () => void): () => void {
+  // Another tab giving or forgetting the number reaches this one through the storage event.
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    chosenLeagueId = readStored();
+    callback();
+  };
   window.addEventListener(CHANGE_EVENT, callback);
-  return () => window.removeEventListener(CHANGE_EVENT, callback);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, callback);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 function snapshot(): number | null {
