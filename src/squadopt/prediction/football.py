@@ -23,11 +23,13 @@ from sklearn.pipeline import make_pipeline  # type: ignore[import-untyped]
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 from squadopt.prediction.football_features import FEATURES, TEAM_FEATURES
-from squadopt.prediction.football_minutes_role import JointRoleMinutes
+from squadopt.prediction.football_minutes_role import JointRoleMinutes, RetainedHistoryRoleMinutes
 
 FOOTBALL_MODEL_VERSION = "football_team_share_v1"
 ROLE_MODEL_VERSION = "football_team_share_role_transition_v2"
 JOINT_ROLE_MODEL_VERSION = "football_joint_role_minutes_v1"
+JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION = "football_joint_role_retained_history_v1"
+JOINT_ROLE_MODEL_VERSIONS = (JOINT_ROLE_MODEL_VERSION, JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION)
 Array = npt.NDArray[np.float64]
 
 
@@ -238,10 +240,11 @@ class JointRoleFootballModel(FixtureFootballModel):
     """
 
     model_version = JOINT_ROLE_MODEL_VERSION
+    role_minutes_type = JointRoleMinutes
 
     def __init__(self, train: pd.DataFrame, history: pd.DataFrame, *, cutoff: pd.Timestamp):
         super().__init__(train, history, cutoff=cutoff)
-        self.role_minutes = JointRoleMinutes(train, cutoff=cutoff)
+        self.role_minutes = self.role_minutes_type(train, cutoff=cutoff)
 
     @property
     def role_metadata(self) -> dict[str, object]:
@@ -314,6 +317,18 @@ class JointRoleFootballModel(FixtureFootballModel):
         # This is native, unscaled appearance. One shared eligibility state per
         # player-week is still applied by the reader, including double gameweeks.
         result["availability_multiplier"] = 1.0
-        result["model_version"] = JOINT_ROLE_MODEL_VERSION
+        result["model_version"] = self.model_version
         fields = self.role_minutes.fields(state, index=target.index)
         return pd.concat([result, fields], axis=1)
+
+
+class RetainedHistoryRoleFootballModel(JointRoleFootballModel):
+    """Opt-in retained-history role variant; the original joint default is unchanged.
+
+    The inherited constructor fits the existing appearance and component heads
+    once, and directly fits this variant's binary role head once. This class does
+    not itself enable a CLI, artifact reader, public family or live publication.
+    """
+
+    model_version = JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION
+    role_minutes_type = RetainedHistoryRoleMinutes

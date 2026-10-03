@@ -13,8 +13,13 @@ import pandas as pd
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION, ProjectionHorizon
 from squadopt.prediction.availability import apply_availability
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+)
 from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
+from squadopt.prediction.football_minutes_role import RETAINED_HISTORY_ROLE_FEATURE_VERSION
 
 FOOTBALL_CHOICE = "football"
 MODEL_CHOICES = ("current", FOOTBALL_CHOICE)
@@ -76,10 +81,20 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         raise ValueError("Football forecast fingerprint mismatch.")
     contextual = document.get("model_version") == CONTEXTUAL_MODEL_VERSION
     version = document.get("model_version")
-    if version not in (FOOTBALL_MODEL_VERSION, CONTEXTUAL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION):
+    if version not in (
+        FOOTBALL_MODEL_VERSION,
+        CONTEXTUAL_MODEL_VERSION,
+        *JOINT_ROLE_MODEL_VERSIONS,
+    ):
         raise ValueError("Football forecast has an unsupported model_version.")
-    if version == JOINT_ROLE_MODEL_VERSION and not isinstance(document.get("role_metadata"), dict):
+    if version in JOINT_ROLE_MODEL_VERSIONS and not isinstance(document.get("role_metadata"), dict):
         raise ValueError("Joint role forecast requires its training metadata.")
+    if (
+        version == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION
+        and document["role_metadata"].get("role_feature_version")
+        != RETAINED_HISTORY_ROLE_FEATURE_VERSION
+    ):
+        raise ValueError("Retained-history forecast requires its explicit role feature identity.")
     if contextual and (
         document.get("availability_application") != "before_team_shares_v1"
         or document.get("projection_contract") != APPEARANCE_HORIZON_CONTRACT_VERSION

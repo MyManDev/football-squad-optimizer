@@ -11,7 +11,11 @@ from squadopt.optimization import SolverExecutionError, SolverStatus
 from squadopt.planning import ChipAvailability, PlanningHorizon, TransferPlanningConfig
 from squadopt.planning.observed import optimize_observed_window, validate_observations
 from squadopt.planning.recourse import ObservationNode
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+)
 
 
 def comparison_problem(players, config, window=3):
@@ -179,7 +183,7 @@ def test_partial_comparison_keeps_complete_baseline(
 
 
 @pytest.mark.parametrize("chance", [25, 50, 75])
-@pytest.mark.parametrize("version", [FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION])
+@pytest.mark.parametrize("version", [FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS])
 @pytest.mark.parametrize("window", [3, 5])
 def test_health_information_preserves_mean_and_minutes(
     known_optimum_players, small_config, chance, version, window
@@ -1094,3 +1098,131 @@ def test_clock_truncated_hold_probe_is_rejected(
             TransferPlanningConfig(),
         )
     assert len(injected) == 1
+
+
+def test_reversed_named_updates_preserve_a_tied_nonbaseline_action_and_cell_caps(
+    known_optimum_players, small_config, monkeypatch
+):
+    import squadopt.planning.observed as module
+
+    horizon, initial, config = problem(known_optimum_players, small_config)
+    table = horizon.table.assign(expected_points=0.0)
+    nominal = table.gameweek.eq(2) & table.player_id.isin(("DEF_A", "MID_A"))
+    table.loc[nominal, "expected_points"] = 4.0
+    horizon = PlanningHorizon(table)
+    settings = TransferPlanningConfig()
+    future = table.loc[table.gameweek.ne(1)].copy()
+    alpha, omega = future.copy(), future.copy()
+    for frame, defender, midfielder in ((alpha, 6.0, 2.0), (omega, 2.0, 6.0)):
+        frame.loc[frame.gameweek.eq(2) & frame.player_id.eq("DEF_A"), "expected_points"] = defender
+        frame.loc[frame.gameweek.eq(2) & frame.player_id.eq("MID_A"), "expected_points"] = (
+            midfielder
+        )
+    nodes = (
+        ObservationNode("omega", 0.5, PlanningHorizon(omega)),
+        ObservationNode("alpha", 0.5, PlanningHorizon(alpha)),
+    )
+    # One real tiny resource skeleton. Subsequent searches are controlled complete
+    # feasible returns, so this tests admission/tie/budget orchestration, not CP quality.
+    skeleton = module.optimize_transfer_plan(
+        horizon,
+        initial,
+        config,
+        settings,
+        fixed_week_squads={w: initial.squad_player_ids for w in horizon.gameweeks},
+    )
+    assert skeleton.has_solution
+
+    def charged(plan, limit):
+        return replace(
+            plan,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={
+                **plan.diagnostics,
+                "deterministic_time_used": limit,
+                "deterministic_time_budget_exhausted": True,
+                "primary_search_status": "FEASIBLE",
+            },
+        )
+
+    def complete_policy(target, action, limit):
+        plan = module.forecast_policy_seed(skeleton, horizon, target, config, settings)
+        weeks = []
+        for week in plan.weeks:
+            role = "MID_A" if action == "B" and week.gameweek > 1 else "DEF_A"
+            selected = week.selected_squad.set_index("player_id", drop=False)
+            starters = selected.loc[["GK_A", "FWD_A", role]].reset_index(drop=True)
+            bench = selected.loc[~selected.index.isin(starters.player_id)].reset_index(drop=True)
+            captain_id = (
+                {"baseline": "GK_A", "A": "DEF_A", "B": "FWD_A"}[action]
+                if week.gameweek == 1
+                else ("FWD_A" if action == "baseline" else role)
+            )
+            captain = selected.loc[captain_id]
+            score = float(starters.expected_points.sum() + captain.expected_points)
+            weeks.append(
+                replace(
+                    week,
+                    starting_xi=starters,
+                    bench=bench,
+                    captain=captain,
+                    projected_score=score,
+                    projected_bench_points=float(bench.expected_points.sum()),
+                    discounted_objective_contribution=score,
+                )
+            )
+        total = sum(w.projected_score for w in weeks)
+        return charged(
+            replace(
+                plan,
+                weeks=tuple(weeks),
+                total_projected_score=total,
+                total_projected_bench_points=sum(w.projected_bench_points for w in weeks),
+                objective_value=total,
+            ),
+            limit,
+        )
+
+    def baseline(target, _initial, options, _transfer, **_kwargs):
+        return complete_policy(target, "baseline", options.solver_deterministic_time_limit)
+
+    def controlled_search(target, _initial, options, _transfer, **kwargs):
+        limit = options.solver_deterministic_time_limit
+        if kwargs.get("first_week_exclusion") is not None:
+            # Keep exactly the freshly rescored, complete branch/nominal seed.
+            return charged(kwargs["incumbent_plan"], limit)
+        if kwargs.get("incumbent_plan") is None:
+            return complete_policy(target, "baseline", limit)  # Duplicate held action.
+        points = target.table.loc[
+            target.table.gameweek.eq(2) & target.table.player_id.eq("DEF_A"), "expected_points"
+        ].iloc[0]
+        return complete_policy(target, "A" if points == 6 else "B", limit)
+
+    monkeypatch.setattr(module, "optimize_guarded_window", baseline)
+    monkeypatch.setattr(module, "optimize_transfer_plan", controlled_search)
+    snapshots = []
+    for supplied in (nodes, tuple(reversed(nodes))):
+        result = module.optimize_observed_window(horizon, initial, supplied, config, settings)
+        review = result.diagnostics["observed_window"]
+        assert review["status"] == "compared" and review["candidate_count"] == 3
+        policies = {c["branches"][0]["first_action"]["captain"]: c for c in review["candidates"]}
+        # Both alternatives have zero first-week points and legal later lineups.
+        # A's branch utilities are(12,4), B's(4,12); the baseline mean is4.
+        assert {p: c["selection_utility"] for p, c in policies.items()} == {
+            "GK_A": 4.0,
+            "DEF_A": 8.0,
+            "FWD_A": 8.0,
+        }
+        assert result.weeks[0].captain.player_id == "DEF_A"
+        cells = {}
+        for row in review["ledger"]:
+            if row["phase"].startswith("candidate_"):
+                phase, node_id = row["phase"].split("/")
+                candidate = review["candidates"][int(phase.removeprefix("candidate_"))]
+                captain = candidate["branches"][0]["first_action"]["captain"]
+                cells[captain, node_id] = (row["cap"], row["actual"], row["status"])
+        assert set(cells) == {(p, n) for p in policies for n in ("alpha", "omega")}
+        assert all(cap == pytest.approx(0.25) for cap, _actual, _status in cells.values())
+        assert review["actual_total"] == pytest.approx(5.0)
+        snapshots.append((result.weeks[0].captain.player_id, policies, cells))
+    assert snapshots[0] == snapshots[1]

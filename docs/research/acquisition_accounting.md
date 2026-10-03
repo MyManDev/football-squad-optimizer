@@ -23,10 +23,20 @@ starts a new lot. Wildcard retains new lots; Free Hit restores the incoming lots
 squad and bank. The fee must be explicitly supplied for the applicable rules.
 
 The default remains `None`, preserving the existing supplied-path contract and
-recorded fingerprints. Enabling accounting changes the configuration fingerprint
-and records the policy in result diagnostics. No live caller or forecast model
-is activated by this change. The supplied old-holding path and future market
-prices remain inputs, not price forecasts proved by this correction.
+recorded fingerprints. It is not an instruction to charge a zero fee. Enabling
+accounting changes the configuration fingerprint and records the policy in result
+diagnostics. The live multiweek adapter explicitly binds the captured season's
+fee and rejects a conflicting supplied fee. The supplied old-holding path and
+future market prices remain inputs, not price forecasts proved by this correction.
+
+The older research-only `optimize_observed_recourse` retains a separate
+compatibility convention: with `None`, it rebases the first action's new permanent
+purchases at a 0.5 fee before solving the continuation with supplied sale paths.
+Free Hit purchases are not carried forward. This does not provide full acquisition
+tracking for later continuation purchases and is not the full-horizon `None`
+contract. The member advice observation branch uses the full-horizon observed
+planner; the live multiweek adapter supplies the captured fee. Historical research
+results must retain their original convention.
 
 Hand-accounted tests cover rising and falling prices, three and five weeks,
 zero/full/half fees, original holdings, repurchases, Wildcard, Free Hit and a

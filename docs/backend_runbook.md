@@ -102,6 +102,42 @@ SQUADOPT_BACKEND_ARTIFACT_ROOT=<path to artifacts/>
 SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json>
 ```
 
+### Persistent native Windows artifact selection
+
+The native launcher can retain a separately prepared immutable artifact root across
+standard restarts and logon launches. The operator may create
+`<RepoRoot>/artifacts/backend-artifact-root.json` with exactly one string field:
+
+```json
+{"artifact_root": "artifacts/football-retained-gw06-fix14"}
+```
+
+The directory must already exist. Relative paths resolve from `RepoRoot`, not the caller's
+working directory. An explicit `-ArtifactRoot` wins without reading the file. With no
+selection file, the existing `<RepoRoot>/artifacts` default remains. An empty, malformed,
+unknown-field or missing-directory selection refuses before any processes start; it never
+silently chooses the old root. `-Stop` and `-Status` do not read this file, so an invalid
+selection cannot prevent process control. The allowed PID registry records the artifact
+root actually passed to the API and every worker; status labels old registries as unrecorded.
+The launcher does not create or rewrite the selection file.
+
+Prepare and validate the bundle before selecting it, then use the normal idle-queue,
+release-code and capture checks before restart. Validate the selection before using the
+restart helper; its `-DryRun` previews stop only. The existing logon watcher and standard
+restart helper already invoke this launcher; no shortcut, scheduled task or tunnel change
+is needed. For a reviewed rollback, change the selection to the previous retained root
+(or pass it explicitly for a single start), then perform the same safe restart. Preserve
+all immutable artifacts and the prior selection in the release record.
+
+This file does not redirect the weekly producer. Its Top 100 and rotation stages still
+write under the weekly workspace's `artifacts/`. For a new deadline, retain the exact
+validated Top 100 CSV/manifest pair from that run in the selected root, preserving its
+bytes and provenance; build the football forecast with `--artifact-root <selected-root>`
+and seal the new capture's bundle there with `scripts.prepare_football_bundle`. Keep the
+existing news/rotation, capture, handoff and publication ordering. Use the existing producer
+and bundle validation path; do not overwrite an older capture's immutable files or assume
+that changing this selection generates a new forecast.
+
 Both processes need the same two values: the api uses them to refuse early and to address the
 cache, the worker to compute. With an artifact root set, the api projects the capture once per
 context, the first time a request or `GET /api/v1/leagues/{id}/capabilities` asks about a

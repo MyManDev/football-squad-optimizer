@@ -10,7 +10,7 @@ import pandas as pd
 
 from squadopt.live import RecommendationInputs
 from squadopt.live.minute_evidence import FixtureComponentBasis
-from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
 
 
 def _point_components(row: Mapping[str, Any], season: str, eligibility: float) -> dict[str, float]:
@@ -38,7 +38,7 @@ def fixture_role_estimates(
     applied_fixtures: Set[tuple[int, int]] = frozenset(),
 ) -> list[dict[str, Any]]:
     """Keep source eligibility separate from model roles; never infer a role from minutes."""
-    if basis is None or basis.companion["model_version"] != JOINT_ROLE_MODEL_VERSION:
+    if basis is None or basis.companion["model_version"] not in JOINT_ROLE_MODEL_VERSIONS:
         return []
     rows = basis.fixture_rows if revised_rows is None else revised_rows
     multipliers = {
@@ -150,8 +150,13 @@ _PUBLIC_ROLE_FIELDS = (
 
 
 def role_forecast_summary(
-    diagnostics: Mapping[str, object], player_ids: Set[int]
+    diagnostics: Mapping[str, object],
+    player_ids: Set[int],
+    *,
+    model_version: str = JOINT_ROLE_MODEL_VERSION,
 ) -> dict[str, Any] | None:
+    if model_version not in JOINT_ROLE_MODEL_VERSIONS:
+        return None
     rows = diagnostics.get("fixture_role_estimates")
     if not isinstance(rows, list):
         return None
@@ -164,7 +169,7 @@ def role_forecast_summary(
         return None
     return {
         "version": "football_role_forecast_v1",
-        "model_version": JOINT_ROLE_MODEL_VERSION,
+        "model_version": model_version,
         "calibration": "not_independently_verified",
         "scope": "current_gameweek_fixtures",
         "rows": selected,

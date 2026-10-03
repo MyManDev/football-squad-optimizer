@@ -15,20 +15,23 @@ import squadopt.application.advice_menu as menu
 from squadopt.application.advice import TOP100_LIMIT
 from squadopt.application.advice_variants import TOP100_WINDOW_LIMIT
 from squadopt.platform.advice_documents import validate_advice_document
+from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSIONS
 
 window_world = _window_world
 world = _world
 
 
 @pytest.mark.parametrize("window,weight", [(3, 20), (5, 50)])
+@pytest.mark.parametrize("version", JOINT_ROLE_MODEL_VERSIONS)
 def test_weighted_football_request_solves_only_its_selected_horizon(
-    world, monkeypatch, window, weight
+    world, monkeypatch, window, weight, version
 ):
     projection = replace(
         world["projection"],
         diagnostics={
             **world["projection"].diagnostics,
             "model_name": "fixture_football_candidate",
+            "model_version": version,
         },
     )
     built = []
@@ -36,7 +39,9 @@ def test_weighted_football_request_solves_only_its_selected_horizon(
     original_plan = chip_module.plan_transfer_horizon
 
     def builder(dates):
-        horizon = replace(world["builder"](dates), model_name="fixture_football_candidate")
+        horizon = replace(
+            world["builder"](dates), model_name="fixture_football_candidate", model_version=version
+        )
         built.append(horizon)
         return horizon
 
@@ -70,6 +75,7 @@ def test_weighted_football_request_solves_only_its_selected_horizon(
     before = base.table.set_index(["gameweek", "player_id"])
     after = chosen.table.set_index(["gameweek", "player_id"])
     assert chosen.source_snapshot_id == base.source_snapshot_id
+    assert chosen.model_version == base.model_version == version
     for (gameweek, player), row in before.iterrows():
         factor = 1 + weight / 100 * world["counts"].counts.get(player, 0) / 100
         assert after.loc[(gameweek, player), "expected_points"] == pytest.approx(

@@ -99,7 +99,7 @@ from squadopt.platform.worker_heartbeat import (
     prune_stale_heartbeats,
 )
 from squadopt.platform.worker_metrics import serve_worker_metrics
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
 
 __all__ = [
     "DEFAULT_ARCHIVE_EVERY_SECONDS",
@@ -395,7 +395,11 @@ def build_advice_compute(
             participation = participation_summary(projection.diagnostics)
             if participation is not None:
                 advice["participation_evidence"] = participation
-            roles = role_forecast_summary(projection.diagnostics, _advice_player_ids(advice))
+            roles = role_forecast_summary(
+                projection.diagnostics,
+                _advice_player_ids(advice),
+                model_version=football.horizon.model_version,
+            )
             if roles is not None:
                 advice["role_forecast"] = roles
             participation_assumptions = (
@@ -415,7 +419,7 @@ def build_advice_compute(
                 *(
                     [SHARES_BEFORE_AVAILABILITY_LIMIT]
                     if football.horizon.model_version
-                    in (FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION)
+                    in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS)
                     else []
                 ),
             ]
