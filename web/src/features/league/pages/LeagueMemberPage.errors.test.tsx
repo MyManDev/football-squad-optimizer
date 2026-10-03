@@ -186,6 +186,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
       advice.payload.control_solver_status =
         kind === "control" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
       const { container } = showAdvice(language, advice);
+      expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
       for (const sentence of PROOF_CAVEATS[language]) {
         expect(container.textContent).not.toMatch(sentence);
       }

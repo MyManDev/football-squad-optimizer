@@ -166,6 +166,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
       "mode=saf-puan&window=1&top100=30",
     );
     const page = container.textContent ?? "";
+    expect(page).toContain("Your gameweek");
     expect(page).not.toContain(TOP100_COPY.en.costAtMost("2.7"));
     expect(page).not.toContain(TOP100_COPY.en.cost("0.2"));
     expect(page).not.toMatch(/finish(ing)? its proof|proof is incomplete|Proof incomplete/i);

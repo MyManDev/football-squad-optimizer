@@ -245,9 +245,10 @@ export function AdviceRequestPanel({
             {computeCopy.otherCapture}
           </p>
         ) : null}
-        {service === "ready" && supported ? (
+        {service === "ready" && supported && (published === false || !chipChosen) ? (
           <p role="note" className={styles.note}>
-            {published === false ? <>{computeCopy.notPrecomputed} </> : null}
+            {published === false ? computeCopy.notPrecomputed : null}
+            {published === false && !chipChosen ? " " : null}
             {chipChosen ? null : (
               <>
                 {computeCopy.duration[request.window]} {computeCopy.durationNote}

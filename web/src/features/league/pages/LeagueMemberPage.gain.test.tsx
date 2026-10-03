@@ -191,6 +191,7 @@ describe("the solver's bound is not printed", () => {
   it("says nothing about a one-week bound", () => {
     const text = renderAdvice(withPayload({ solver_status: "FEASIBLE", optimality_gap: 1.1 }));
 
+    expect(text).toContain("Your gameweek");
     expect(text).not.toMatch(/could not finish the proof/);
     expect(text).not.toMatch(/gap ≤ 1\.1 pts/);
     expect(text).not.toMatch(/within 1\.1 of the best value/);
@@ -203,6 +204,7 @@ describe("the solver's bound is not printed", () => {
 
     expect(weeks).toBe(5);
     expect(base.payload.solver_status).toBe("FEASIBLE");
+    expect(text).toContain("Your gameweek");
     expect(text).not.toMatch(/could not finish the proof/);
     expect(text).not.toMatch(/gameweeks of the plan at once/);
   });

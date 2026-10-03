@@ -34,37 +34,39 @@ const data: OfficialInjuryFacts = {
   limit: OFFICIAL_INJURY_LIMIT,
 };
 
-it.each(["tr", "en"] as const)("shows coverage, source clocks and limits in %s", (language) => {
-  expect(isOfficialInjuryFacts(data)).toBe(true);
-  render(
-    <LanguageProvider initialLanguage={language}>
-      <OfficialInjuryCard data={data} playerNames={{ 10: "Player Alpha" }} />
-    </LanguageProvider>,
-  );
-  const card = screen.getByTestId("official-injuries");
-  expect(card).not.toHaveAttribute("open");
-  expect(card).toHaveTextContent("1/2");
-  expect(card).toHaveTextContent("Player Alpha");
-  expect(card).toHaveTextContent("Man Utd");
-  expect(card).toHaveTextContent(
-    language === "tr" ? "Eksik okunmuş bölümler" : "Incomplete sections",
-  );
-  expect(card).toHaveTextContent(
-    language === "tr" ? "sağlıklı veya kesin oynayacak" : "healthy or certain to play",
-  );
-  expect(card).toHaveTextContent(
-    language === "tr" ? "yokluk, ilk 11 veya dakika" : "absence, a start, or expected minutes",
-  );
-  expect([...card.querySelectorAll("time")].map((node) => node.getAttribute("datetime"))).toEqual([
-    data.source_updated_at,
-    data.observed_at,
-    data.facts[0].source_date,
-  ]);
-  expect(card.querySelector("a")).toHaveAttribute("href", data.source_url);
-  expect(card.querySelectorAll("a")).toHaveLength(2);
-});
+it.each(["tr", "en"] as const)(
+  "shows coverage and source clocks without caveats in %s",
+  (language) => {
+    expect(isOfficialInjuryFacts(data)).toBe(true);
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <OfficialInjuryCard data={data} playerNames={{ 10: "Player Alpha" }} />
+      </LanguageProvider>,
+    );
+    const card = screen.getByTestId("official-injuries");
+    expect(card).not.toHaveAttribute("open");
+    expect(card).toHaveTextContent("1/2");
+    expect(card).toHaveTextContent("Player Alpha");
+    expect(card).toHaveTextContent("Man Utd");
+    expect(card).toHaveTextContent(
+      language === "tr" ? "Eksik okunmuş bölümler" : "Incomplete sections",
+    );
+    expect(card).not.toHaveTextContent(
+      language === "tr" ? "sağlıklı veya kesin oynayacak" : "healthy or certain to play",
+    );
+    expect(card).not.toHaveTextContent(
+      language === "tr" ? "yayın zamanı değildir" : "not the source news publication time",
+    );
+    expect(card).not.toHaveTextContent(language === "tr" ? "olmayabilir" : "may not be the record");
+    expect([...card.querySelectorAll("time")].map((node) => node.getAttribute("datetime"))).toEqual(
+      [data.source_updated_at, data.observed_at, data.facts[0].source_date],
+    );
+    expect(card.querySelector("a")).toHaveAttribute("href", data.source_url);
+    expect(card.querySelectorAll("a")).toHaveLength(2);
+  },
+);
 
-it("omits unnamed facts and never treats an empty selection as a healthy squad", () => {
+it("omits unnamed facts and says nothing about an empty selection", () => {
   render(
     <LanguageProvider initialLanguage="en">
       <OfficialInjuryCard data={data} />
@@ -72,7 +74,7 @@ it("omits unnamed facts and never treats an empty selection as a healthy squad",
   );
   const card = screen.getByTestId("official-injuries");
   expect(card).toHaveTextContent("No source records to display");
-  expect(card).toHaveTextContent("does not mean a player is healthy");
+  expect(card).not.toHaveTextContent("does not mean a player is healthy");
   expect(card).not.toHaveTextContent("Ankle");
   expect(card).not.toHaveTextContent("#10");
 });

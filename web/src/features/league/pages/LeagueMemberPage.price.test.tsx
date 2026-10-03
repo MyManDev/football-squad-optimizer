@@ -106,8 +106,12 @@ describe("a price whose own plan is unproven reads as a ceiling", () => {
   });
 
   it("says nothing about the proof behind the plan", () => {
-    expect(renderText("en", found)).not.toMatch(/This is the best plan the search found/);
-    expect(renderText("tr", found)).not.toMatch(/aramanın bulduğu en iyi plan/);
+    const en = renderText("en", found);
+    expect(en).toContain("Your gameweek");
+    expect(en).not.toMatch(/This is the best plan the search found/);
+    const tr = renderText("tr", found);
+    expect(tr).toContain("Bu haftaki kadron");
+    expect(tr).not.toMatch(/aramanın bulduğu en iyi plan/);
   });
 });
 
@@ -131,6 +135,7 @@ describe("a price against an unproven pure-points plan is not printed", () => {
 
   it("prints no figure for the plan or the alternative, and no explanation, in English", () => {
     const text = renderText("en", older);
+    expect(text).toContain("Your gameweek");
     expect(text).not.toMatch(/gives up/);
     expect(text).not.toMatch(/expected points against pure points/);
     expect(text).not.toMatch(/2\.3|7\.9|6\.4/);
@@ -140,6 +145,7 @@ describe("a price against an unproven pure-points plan is not printed", () => {
 
   it("prints no figure for the plan or the alternative, and no explanation, in Turkish", () => {
     const text = renderText("tr", older);
+    expect(text).toContain("Bu haftaki kadron");
     expect(text).not.toMatch(/vazgeçiyor/);
     expect(text).not.toMatch(/maliyet en fazla|2,3|7,9|6,4/);
     expect(text).not.toMatch(/bu yüzden fiyat belirtilmiyor/);
@@ -182,6 +188,7 @@ describe("no price is ever rendered as a giveaway", () => {
     delete (legacy.payload.alternative_plan as { expected_points_cost_ceiling?: number })
       ?.expected_points_cost_ceiling;
     const text = renderText("en", legacy);
+    expect(text).toContain("Your gameweek");
     expect(text).not.toMatch(/gives up/);
     expect(text).not.toMatch(/no price is stated/);
   });

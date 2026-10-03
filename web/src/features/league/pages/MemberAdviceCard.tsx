@@ -196,8 +196,7 @@ function shownPrice(view: EntryAdvice): number | undefined {
 
 /**
  * The decision itself: one substitution board per move, the gain strip, the captain line,
- * and the sentences that change how the plan may be read (the proof, the price, the rival
- * bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
+ * and the sentences that change how the plan may be read (the price, the rival bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
  */
 export function AdviceDecision({
   shown,
