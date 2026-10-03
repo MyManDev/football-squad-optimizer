@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { createAdviceClient } from "../advice/adviceClient";
+import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { adviceRequestKey } from "../advice/adviceJobStore";
 import { canComputeAdvice, resolvePublishedAdvice } from "../advice/adviceSelection";
 import { AdviceContextError, checkedAdvice } from "../advice/adviceResponse";
@@ -11,6 +11,7 @@ import {
   type AdviceJob,
   type ComputePhase,
 } from "../advice/useAdviceJob";
+import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
 
 /** The same attempt, without the earlier answer it carried. */
 function withoutEarlier(state: ComputePhase): ComputePhase {
@@ -32,6 +33,7 @@ export function useMemberAdviceView(
     client,
     capabilities = null,
     computeService = "static",
+    deviceDependencies,
   }: LeagueMemberViewProps,
   searchParams: URLSearchParams,
 ) {
@@ -75,6 +77,7 @@ export function useMemberAdviceView(
     request.model !== "football" &&
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
+  const deviceJob = useDevicePlan(view, request, deviceDependencies);
   const requestKey = [
     adviceRequestKey(request),
     selection.status,
@@ -92,10 +95,12 @@ export function useMemberAdviceView(
   useEffect(() => {
     resumable.current = request;
   });
+  const { reset: resetDevice, run: runOnDevice } = deviceJob;
   useEffect(() => {
     reset();
+    resetDevice();
     if (computeAvailable) resume?.(resumable.current);
-  }, [requestKey, computeAvailable, reset, resume]);
+  }, [requestKey, computeAvailable, reset, resetDevice, resume]);
   useEffect(() => {
     if (readOnOpen) readCached?.(resumable.current);
   }, [requestKey, readOnOpen, readCached]);
@@ -196,6 +201,22 @@ export function useMemberAdviceView(
       : earlier !== null && earlierKept === null
         ? { ...job, state: withoutEarlier(job.state) }
         : job;
+  // One answer at a time: asking the service drops the device's answer, and asking the
+  // device drops the service's, so what the card shows is what was asked for last.
+  const { reset: resetJob, compute: computeOnService } = job;
+  const runOnDeviceAndDropJob = useCallback(() => {
+    resetJob();
+    runOnDevice();
+  }, [resetJob, runOnDevice]);
+  const device: DevicePlan = { ...deviceJob, run: runOnDeviceAndDropJob };
+  const computeAndDropDevice = useCallback(
+    (asked: AdviceRequest) => {
+      resetDevice();
+      computeOnService(asked);
+    },
+    [resetDevice, computeOnService],
+  );
+  const jobForPanel: AdviceJob = { ...panelJob, compute: computeAndDropDevice };
   let shown: ShownAdvice | null = null;
   if (computed) {
     shown = {
@@ -203,6 +224,8 @@ export function useMemberAdviceView(
       origin: computed.source === "api-cache" ? "computed" : "published",
       source: computed.source,
     };
+  } else if (plainOnly && deviceJob.state.phase === "done") {
+    shown = { envelope: deviceJob.state.envelope, origin: "computed", source: "device" };
   } else if (published) {
     shown = { envelope: published, origin: waiting ? "published-while-computing" : "published" };
   } else if (waiting?.fallback) {
@@ -216,7 +239,8 @@ export function useMemberAdviceView(
     indexReadable,
     selectionAvailable,
     computeAvailable,
-    job: panelJob,
+    job: jobForPanel,
+    device,
     request,
     shown,
     rejectedContext,

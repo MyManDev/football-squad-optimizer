@@ -109,6 +109,7 @@ function LeagueMemberContent({
   capabilities = null,
   computeService = "static",
   computePending = false,
+  deviceDependencies,
   rivalSquad = null,
   windowControl = null,
   deadlinePassed = null,
@@ -132,6 +133,7 @@ function LeagueMemberContent({
     selectionAvailable,
     computeAvailable,
     job,
+    device,
     request,
     shown,
     rejectedContext,
@@ -147,6 +149,7 @@ function LeagueMemberContent({
       client,
       capabilities,
       computeService,
+      deviceDependencies,
     },
     searchParams,
   );
@@ -180,7 +183,10 @@ function LeagueMemberContent({
   ]
     .filter(Boolean)
     .join(" · ");
-  const echo = computeEcho(copy, job.state);
+  const echo =
+    shown?.source === "device"
+      ? copy.computeEcho(copy.computeEchoStates.device)
+      : computeEcho(copy, job.state);
   const dateTime = (iso: string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
       new Date(iso),
@@ -308,6 +314,7 @@ function LeagueMemberContent({
         dockClassName={styles.computeDock}
         request={request}
         job={job}
+        device={device}
         selectionAvailable={
           selectionAvailable &&
           !selection.evidence.on &&

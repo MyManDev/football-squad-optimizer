@@ -477,6 +477,51 @@ def _prepare_planning(
     )
 
 
+@dataclass(frozen=True)
+class MemberPlanningInputs:
+    """What one member's one-week solve is given, as the live path builds it.
+
+    The bank is the spending power after the stated sale value, the free transfers are
+    under the season's cap, and the sale prices are the ones the horizon carries for the
+    held fifteen. Published for a solve on the member's own device, which must receive
+    the numbers the server's solver receives and not a description of them.
+    """
+
+    bank_tenths: int
+    free_transfers: int
+    sell_prices_tenths: Mapping[int, int]
+    transfer_config: TransferPlanningConfig
+    settings: OptimizationConfig
+
+
+def member_planning_policy(rules: SeasonRules) -> TransferPlanningConfig:
+    """The member planning policy under this season's rules, as every published plan uses it."""
+
+    return _transfer_config(rules)
+
+
+def member_planning_inputs(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+) -> MemberPlanningInputs:
+    """One member's one-week inputs, through the same preparation as ``plan_transfers``.
+
+    Raises ``DataSourceError`` exactly where the live path would refuse to plan: a held
+    squad from another season or week, or a held player the capture no longer lists.
+    """
+
+    prepared = _prepare_planning(inputs, projection, held, rules, optimization=None, chip=None)
+    return MemberPlanningInputs(
+        bank_tenths=int(prepared.state.bank_tenths),
+        free_transfers=int(prepared.state.free_transfers),
+        sell_prices_tenths=dict(prepared.sell_prices),
+        transfer_config=prepared.transfer_config,
+        settings=prepared.settings,
+    )
+
+
 def _package_decision(
     plan: TransferPlanResult,
     held: HeldSquad,

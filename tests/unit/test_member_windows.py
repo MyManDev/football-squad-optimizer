@@ -324,9 +324,15 @@ def test_the_batch_publishes_the_windows_without_moving_the_baseline_bytes(
     assert (tmp_path / "plain" / baseline).read_bytes() == (
         tmp_path / "windows" / baseline
     ).read_bytes()
-    assert set(reports["plain"].files) == {"members.json", f"entries/{ENTRY}.json", baseline}
+    assert set(reports["plain"].files) == {
+        "members.json",
+        "device-plan.json",
+        f"entries/{ENTRY}.json",
+        baseline,
+    }
     assert set(reports["windows"].files) == {
         "members.json",
+        "device-plan.json",
         f"entries/{ENTRY}.json",
         baseline,
         f"advice/{ENTRY}/saf-puan/3.json",
