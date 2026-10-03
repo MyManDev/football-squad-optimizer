@@ -283,6 +283,99 @@ def _one_week_swap(
     return PlanningHorizon(table)
 
 
+@pytest.mark.parametrize(
+    ("chip", "free", "moves", "expected_paid"),
+    [
+        (None, 0, 0, 0),
+        (None, 0, 2, 2),
+        (None, 1, 2, 1),
+        (None, 5, 2, 0),
+        ("wildcard", 0, 4, 0),
+        ("freehit", 0, 4, 0),
+    ],
+)
+def test_paid_transfer_count_is_a_constraint_not_an_objective_preference(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    chip: str | None,
+    free: int,
+    moves: int,
+    expected_paid: int,
+) -> None:
+    """A wrong auxiliary count must be impossible even without a scoring objective."""
+    horizon = PlanningHorizon(
+        _horizon_table(known_optimum_players, (1,)).assign(
+            buy_price_tenths=50, sell_price_tenths=50
+        )
+    )
+    initial = replace(OPTIMAL_INITIAL, free_transfers=free)
+    settings = TransferPlanningConfig(transfer_hit_cost_points=0)
+    # Keep both rebuild variables present, including when neither chip is used.
+    rights = ChipAvailability({"wildcard": {1}, "freehit": {1}})
+    tables = planning_optimizer._validated_week_tables(horizon, small_config)
+    artifacts = planning_optimizer._build_model(
+        tables, set(initial.squad_player_ids), initial, small_config, settings, rights
+    )
+    model = artifacts.model
+    model.clear_objective()
+    model.add(artifacts.transfer_count_vars[0] == moves)
+    for name, variable in artifacts.chip_vars[0].items():
+        model.add(variable == int(name == chip))
+    solver = cp_model.CpSolver()
+    solver.parameters.num_search_workers = 1
+    solver.parameters.max_deterministic_time = 1
+    solver.parameters.max_time_in_seconds = 5
+    assert solver.solve(model) == cp_model.OPTIMAL, "The requested resource state is legal."
+
+    # Old lower-bound accounting admitted an inflated count. Clearing the objective
+    # makes this a constraint regression, independent of the solver's tie choice.
+    model.add(artifacts.paid_transfer_vars[0] != expected_paid)
+    assert solver.solve(model) == cp_model.INFEASIBLE
+
+
+@pytest.mark.parametrize("chip", [None, "wildcard", "freehit"])
+@pytest.mark.parametrize("price", ["zero", "rounded_zero", "ordinary"])
+def test_zero_or_positive_selection_hit_price_preserves_actual_payment(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    chip: str | None,
+    price: str,
+) -> None:
+    selection_price = {
+        "zero": 0.0,
+        "rounded_zero": 0.25 / small_config.expected_points_scale,
+        "ordinary": 4.0,
+    }[price]
+    horizon = PlanningHorizon(
+        _horizon_table(known_optimum_players, (1,)).assign(
+            buy_price_tenths=50, sell_price_tenths=50
+        )
+    )
+    settings = TransferPlanningConfig(transfer_hit_cost_points=selection_price)
+    rights = ChipAvailability() if chip is None else ChipAvailability({chip: {1}}, {1: chip})
+    result = optimize_transfer_plan(
+        horizon,
+        OPTIMAL_INITIAL,
+        small_config,
+        settings,
+        chips=rights,
+        fixed_week_squads={1: ("GK_B", "DEF_A", "MID_B", "FWD_A")},
+    )
+    assert result.solver_status is SolverStatus.OPTIMAL
+    week = result.weeks[0]
+    assert week.transfer_count == 2
+    assert week.paid_transfer_count == (1 if chip is None else 0)
+    assert week.transfer_hit_points == (4.0 if chip is None else 0.0)
+    assert result.total_transfer_hit_points == week.transfer_hit_points
+    assert result.objective_value == pytest.approx(
+        week.projected_score
+        + small_config.bench_weight * week.projected_bench_points
+        - week.paid_transfer_count * selection_price
+    )
+    if price != "ordinary":
+        assert result.diagnostics["hit_cost_scaled"] == 0
+
+
 def test_a_planning_margin_filters_transfers_without_changing_the_hit_reported(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,

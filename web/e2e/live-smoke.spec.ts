@@ -1,7 +1,7 @@
 import { expect, test, type Response } from "@playwright/test";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
-import { points } from "../src/lib/format";
+import { figure } from "../src/lib/format";
 
 // publish_series_horizon in application/weekly_suggestion_eval.py omits this
 // document until the settled series supports a horizon. Only its 404 is absence.
@@ -131,7 +131,7 @@ test("published league and member journey works without submitting a solve", asy
   expect(Number.isFinite(advice.payload.expected_own_points)).toBe(true);
   await expect(plan).toContainText(
     MESSAGES.en.leagueMembers.expectedOwnPoints(
-      points(advice.payload.expected_own_points!, 1, "en-GB"),
+      figure(advice.payload.expected_own_points!, "en-GB"),
     ),
   );
   for (const selector of [

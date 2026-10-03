@@ -285,14 +285,34 @@ def test_expected_window_selects_on_common_lineup_utility(window):
     assert review["selection_policy"]["hit_points_charged"] == 4
     assert review["selection_policy"]["transfer_hit_cost_points"] == 4
     assert review["baseline_completed"]
-    assert len(review["candidates"]) == 2
+    assert [p["proposal"] for p in review["candidates"]][:2] == [
+        "legacy_proposal",
+        "zero_bonus_proposal",
+    ]
+    assert len(review["candidates"]) in (2, 3)
     assert review["actual_total"] <= config.solver_deterministic_time_limit + 0.01
-    assert sum(entry["cap"] for entry in review["ledger"]) == config.solver_deterministic_time_limit
+    assert (
+        sum(entry["cap"] for entry in review["ledger"][:2])
+        == config.solver_deterministic_time_limit
+    )
+    assert review["reused_cap"] <= review["released_after_original_phases"]
+    assert review["gross_sequential_issued_cap"] == pytest.approx(
+        config.solver_deterministic_time_limit + review["reused_cap"]
+    )
+    assert review["lineup_evaluation_cap"] == 384 * window + 1
+    assert review["previous_lineup_evaluation_cap"] == 256 * window
+    assert review["lineup_evaluations"] <= review["lineup_evaluation_cap"]
+    assert review["equal_total_lineup_work_claim"] is False
     utility = sum(assert_fresh_score(w).expected_net_points for w in result.weeks)
     assert utility == pytest.approx(max(p["utility"] for p in review["candidates"]))
     assert review["gain_vs_retained_baseline"] >= -1e-9
     assert result.diagnostics["best_objective_bound"] is None
     for entry in review["ledger"]:
+        if entry.get("lineup_search") is None:
+            # An optional failed solve still belongs in the CP ledger, without a
+            # fictitious exact lineup evaluation.
+            assert entry["phase"] == "initial_single_swap" and entry["reason"] != "retained"
+            continue
         assert entry["lineup_search"]["evaluations"] <= 128 * window
         for work in entry["lineup_search"]["weeks"]:
             assert work["states_evaluated"] <= 640 * work["evaluations"]
@@ -448,8 +468,8 @@ def test_observed_expected_branches_freeze_today_and_recompute_every_legal_week(
         assert len(candidate["branches"]) == 2
         assert candidate["branches"][0]["first_action"] == candidate["branches"][1]["first_action"]
         candidate_utility = 0.0
-        for branch, node in zip(candidate["branches"], nodes, strict=True):
-            assert branch["id"] == node.observation_id
+        for branch in candidate["branches"]:
+            node = next(n for n in nodes if n.observation_id == branch["id"])
             assert len(branch["weeks"]) == window - 1
             target = pd.concat(
                 [

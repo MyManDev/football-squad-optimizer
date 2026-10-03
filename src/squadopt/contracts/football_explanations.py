@@ -49,7 +49,12 @@ def role_forecast_schema() -> dict[str, Any]:
     return _object(
         {
             "version": {"const": "football_role_forecast_v1"},
-            "model_version": {"const": "football_joint_role_minutes_v1"},
+            "model_version": {
+                "enum": [
+                    "football_joint_role_minutes_v1",
+                    "football_joint_role_retained_history_v1",
+                ]
+            },
             "calibration": {"const": "not_independently_verified"},
             "scope": {"const": "current_gameweek_fixtures"},
             "rows": {"type": "array", "items": row},

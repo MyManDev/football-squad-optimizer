@@ -137,6 +137,21 @@ def test_expanded_chip_rights_and_terminal_values_are_recomputed(
     assert result.diagnostics["chip_availability_fingerprint"] == rights.availability_fingerprint
     assert result.objective_value == pytest.approx(plan.objective_value)
     assert result.diagnostics["terminal_chip_holding_value"] == pytest.approx(81)
+    # Relaxing proposal rights yields only a seed; the current full model must
+    # independently certify its complete decisions under the expanded rights.
+    checked = optimize_transfer_plan(
+        source,
+        initial,
+        config,
+        settings,
+        chips=rights,
+        incumbent_plan=result,
+        protect_incumbent=True,
+    )
+    assert checked.has_solution
+    assert checked.diagnostics["chip_availability_fingerprint"] == rights.availability_fingerprint
+    assert checked.diagnostics["incumbent_hint"]["version"] == "certified_decisions_v1"
+    assert checked.diagnostics["incumbent_hint"]["claimed_objective_used"] is False
     forbidden = ChipAvailability({"3xc": frozenset({1, 2, 3})}, {1: "3xc"})
     with pytest.raises(TransferPlanningValidationError, match="chip schedule"):
         forecast_policy_seed(

@@ -1813,7 +1813,8 @@
               "enum": [
                 "football_team_share_v1",
                 "football_contextual_v3",
-                "football_joint_role_minutes_v1"
+                "football_joint_role_minutes_v1",
+                "football_joint_role_retained_history_v1"
               ]
             }
           },
@@ -1875,7 +1876,10 @@
               "const": "not_independently_verified"
             },
             "model_version": {
-              "const": "football_joint_role_minutes_v1"
+              "enum": [
+                "football_joint_role_minutes_v1",
+                "football_joint_role_retained_history_v1"
+              ]
             },
             "rows": {
               "items": {

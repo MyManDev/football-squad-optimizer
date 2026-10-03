@@ -32,6 +32,7 @@ const predictionModel: Predicate = (value) =>
       "football_team_share_v1",
       "football_contextual_v3",
       "football_joint_role_minutes_v1",
+      "football_joint_role_retained_history_v1",
     ),
     experimental: oneOf(true),
     fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
@@ -263,7 +264,10 @@ const rolePointComponents: Predicate = (value) =>
 const roleForecast: Predicate = (value) =>
   closedFields(value, {
     version: oneOf("football_role_forecast_v1"),
-    model_version: oneOf("football_joint_role_minutes_v1"),
+    model_version: oneOf(
+      "football_joint_role_minutes_v1",
+      "football_joint_role_retained_history_v1",
+    ),
     calibration: oneOf("not_independently_verified"),
     scope: oneOf("current_gameweek_fixtures"),
     rows: array((row) =>
