@@ -1,0 +1,28 @@
+# Role reference and diagnostic evidence
+
+The joint start/cameo model has lower role loss than a simple training-only reference in 12 of 13 development origins. The remaining origin, 2026-27 GW1, exposes a conditional-start weakness. This supports further controlled research, not a claim of calibrated probabilities, independent predictive superiority, or improved live FPL results.
+
+This report snapshots completed `math100-role-measure02`; later research drafts and results are outside its scope. It concerns the reference and diagnostics added at frozen commit `49b451ae011eba21e59a0932e3deea9333a1ca7d`. They add no runtime model change or activation. The independent artifact review records byte-for-byte equality of the existing `scores.json` and `comparison.json` with their preserved earlier outputs. The new role reference and ten-bin diagnostics are separate outputs; neither adds a fit.
+
+The completed run contains 13 candidate fits: eight historical origins at GW11, 19, 27 and 35 of 2023-24 and 2024-25, plus settled GW1-5 of 2026-27. The three permitted historical seasons are 2022-23, 2023-24 and 2024-25; 2022-23 supplies priors only. The receipt records 12 historical archive files and no access to 2025-26. An earlier interrupted attempt contributes an upper bound of one additional fit attempt, making the combined upper bound 14, not 14 completed fits. The completed run records 112.85 seconds total elapsed time, including 55.25 seconds of preparation. These durations are not additive and exclude the unreported elapsed duration of the earlier interrupted attempt.
+
+Current evidence comes from capture `fpl-live-20261001T233218Z-7945d6b3c732`, captured at `2026-10-01T23:32:18.344567Z`. Each origin uses only earlier gameweeks and a cutoff 90 minutes before the first target kickoff, with kickoff plus three hours as the settlement proxy. Current origin cutoffs range from `2026-08-21T17:30:00Z` to `2026-09-18T17:30:00Z`. These are retrospective causal filters, not proof of historically available deadline rosters or publication timestamps.
+
+The reference estimates one pooled training rate, `r = starts / known positive-minute appearances`, and emits the zero/start/cameo law `[1-q, q*r, q*(1-r)]`. Both arms preserve exactly the same appearance value `q` and score the same known-role rows. Reported losses average origins equally. The frozen four-bin control has no start/cameo law and is not assigned invented role scores.
+
+| Role metric, all positions | Pooled reference | Joint model | Joint minus reference | Better origins |
+| --- | ---: | ---: | ---: | ---: |
+| Negative log loss | 0.641484 | 0.564326 | -0.077157 | 12/13 |
+| Three-class Brier loss | 0.335657 | 0.300226 | -0.035431 | 12/13 |
+
+There are 9,419 paired target rows, including 3,965 positive appearances with known start labels. Both metrics improve in all eight historical origins and four of five current origins. No unknown target role labels or missing positive-appearance start labels were recorded in the retained supervised training populations. The latter range from 3,011 to 24,180 known positive-role rows per origin and overlap heavily; they must not be added as distinct observations. This establishes neither completeness outside the retained population nor missing-at-random labels.
+
+For current GW1, joint role log loss is 1.584764 versus the reference's 1.509995. On its 306 known positive appearances, conditional-start log loss is 0.745517 versus 0.600621, and binary Brier loss is 0.269293 versus 0.205138. The shared appearance term contributes to absolute loss but cancels from the paired role log-loss difference. The paired weakness is therefore in the conditional role prediction.
+
+Diagnostics use ten fixed probability bins for appearance and conditional start, separately by origin and position. In current GW1's lowest appearance bin, 375 rows average 0.0341 predicted appearance against an observed rate of 0.4213. Its conditional-start bin from 0.9 through 1.0 contains 66 rows averaging 0.9522 against 0.8788 observed. Other origins and bins differ in direction, so a universal overconfidence claim is unsupported. These are descriptive diagnostics, not significance tests. No scored observed-event probabilities activated the `1e-12` log floor, and no conditional rows had undefined `q=0` in this run; those cases remain explicit in the diagnostic contract.
+
+The evidence is limited by reconstructed historical player populations, possible omission of former players from the current roster, proxy timing, and overlapping development data. Component results are mixed across positions and outcomes; the role-reference result is not a general points forecast improvement. The points residual remains fixed per appearance rather than decomposed into minute-specific events. No independent holdout, provider call, live change or realized FPL gain is part of this measurement.
+
+Two follow-ups remain hypotheses: one prespecified bounded scalar-temperature procedure with causal inner validation, and synthetic checks of retained-history support semantics. No temperature has been selected or evaluated in this report, and neither follow-up is an accepted improvement. The first keeps appearance and conditional-minute laws fixed; it cannot repair the shared low-appearance prediction. The second must not be treated as the established cause of GW1's error.
+
+The accompanying [compact evidence record](football_role_reference_2026_10_03.json) contains exact source and receipt hashes, capture identity, per-origin support counts, paired metrics and explicit limits. It was assembled from completed generated artifacts and their independent review; no new fit, solver call or input-data read was performed to prepare this report.
