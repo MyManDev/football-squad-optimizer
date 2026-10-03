@@ -132,6 +132,8 @@ def optimize_observed_window(
     """
     horizon = horizon.validated_copy()
     validate_observations(horizon, nodes)
+    # Stable proposal/seed admission and tie priority for the same named updates.
+    nodes = tuple(sorted(nodes, key=lambda node: node.observation_id))
     budget = optimization.solver_deterministic_time_limit
     if budget is None or budget < 5:
         raise ValueError("Observed windows need an explicit total budget of at least five.")

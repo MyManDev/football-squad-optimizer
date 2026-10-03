@@ -1,6 +1,7 @@
 """Joint-role components reach the existing cited, fixture-bound minute intervention."""
 
 from copy import deepcopy
+from math import exp
 
 import numpy as np
 import pandas as pd
@@ -183,3 +184,121 @@ def test_redigested_inconsistent_joint_companion_is_refused(damage):
     companion["fingerprint"] = forecast_digest(companion)
     with pytest.raises(ValueError):
         basis_from((served, companion, calendar, clubs))
+
+
+@pytest.mark.parametrize("residual", [0.3, -3.0])
+def test_shorter_match_has_independent_seven_point_score_and_asymmetric_dgw_oracle(residual):
+    # The original seven-point law is (0.1, .028, .006, .765, .012, .004, .085).
+    # Excluding a full match preserves each role's mass: start .799, cameo .101.
+    # The resulting shorter supports are literal fractions of those role totals.
+    shortened = (0.1, 0.658, 0.141, 0.0, 0.07575, 0.02525, 0.0)
+    second = (0.55, 0.014, 0.003, 0.3825, 0.006, 0.002, 0.0425)
+    support = (0.0, 40.0, 80.0, 90.0, 10.0, 65.0, 90.0)
+    role_columns = [
+        "zero_probability",
+        *(f"{role}_minute_probability_{b}" for role in ("start", "cameo") for b in (1, 2, 3)),
+    ]
+    # Scalar NB event tails at the six role-specific supports, never at collapsed means.
+    dc_tail = tuple(
+        float(nbinom.sf(9, 4.0, 4.0 / (4.0 + 8.0 * minutes / 90.0))) for minutes in support
+    )
+    short_dc = sum(p * tail for p, tail in zip(shortened, dc_tail, strict=True))
+    second_dc = sum(p * tail for p, tail in zip(second, dc_tail, strict=True))
+    short_cs = 0.141 * exp(-1.5 * 80 / 90) + 0.02525 * exp(-1.5 * 65 / 90)
+    second_cs = (
+        0.003 * exp(-1.5 * 80 / 90)
+        + 0.3825 * exp(-1.5)
+        + 0.002 * exp(-1.5 * 65 / 90)
+        + 0.0425 * exp(-1.5)
+    )
+    # Eleven equal original teammates each have 78.48 expected minutes.
+    # Only player 3 changes in fixture 62; the complete side's attack mass is fixed.
+    share = 39.99875 / (10 * 78.48 + 39.99875)
+    short_goals, short_assists = 1.2 * share, 0.9 * share
+    short_raw = (
+        0.9
+        + 0.16625
+        + 6 * short_goals
+        + 3 * short_assists
+        + 4 * short_cs
+        + 2 * short_dc
+        + 0.9 * residual
+    )
+    second_raw = (
+        0.45
+        + 0.43
+        + 6 * (1.2 / 11)
+        + 3 * (0.9 / 11)
+        + 4 * second_cs
+        + 2 * second_dc
+        + 0.45 * residual
+    )
+
+    served, companion, calendar, clubs = joint_documents(dgw=True)
+    # A separately supplied valid second-fixture law has half the appearance mass.
+    # No producer scoring/aggregation helper is used to calculate either oracle.
+    for row in companion["rows"]:
+        if row["player_code"] != 3:
+            continue
+        row["raw_expected_points"] += row["appearance_probability"] * (residual - 0.3)
+        row["expected_points"] = max(row["raw_expected_points"], 0.0)
+        row["residual_if_appearance"] = residual
+        if row["fixture"] == 69:
+            row.update(dict(zip(role_columns, second, strict=True)))
+            row.update(
+                minute_probability_0=0.55,
+                minute_probability_1=0.02,
+                minute_probability_2=0.005,
+                minute_probability_3=0.425,
+                start_probability=0.3995,
+                cameo_probability=0.0505,
+                appearance_probability=0.45,
+                p60=0.43,
+                expected_minutes=39.24,
+                expected_minutes_if_appearance=87.2,
+                clean_sheet_probability=second_cs,
+                defcon_probability=second_dc,
+                raw_expected_points=second_raw,
+                expected_points=max(second_raw, 0.0),
+            )
+    for row in served["rows"]:
+        if row["player_id"] == 3:
+            row["expected_points"] = sum(
+                r["expected_points"]
+                for r in companion["rows"]
+                if r["player_code"] == 3 and r["GW"] == row["gameweek"]
+            )
+            row["appearance_probability"] = 0.945 if row["gameweek"] == 6 else 0.9
+    served["fingerprint"] = forecast_digest(served)
+    companion["forecast_fingerprint"] = served["fingerprint"]
+    companion["fingerprint"] = forecast_digest(companion)
+    basis = basis_from((served, companion, calendar, clubs))
+    result = apply_explicit_minute_evidence(basis, [claim()])
+    actual = result.fixture_rows.query("fixture == 62 and player_code == 3").iloc[0]
+
+    np.testing.assert_allclose(actual[role_columns].to_numpy(float), shortened, atol=1e-12)
+    assert actual.start_probability == pytest.approx(0.799)
+    assert actual.cameo_probability == pytest.approx(0.101)
+    assert actual.appearance_probability == pytest.approx(0.9)
+    assert actual.p60 == pytest.approx(0.16625)
+    assert actual.expected_minutes == pytest.approx(39.99875)
+    assert actual.expected_minutes_if_appearance == pytest.approx(39.99875 / 0.9)
+    assert actual.clean_sheet_probability == pytest.approx(short_cs, abs=1e-12)
+    assert actual.defcon_probability == pytest.approx(short_dc, abs=1e-12)
+    assert actual.goals == pytest.approx(short_goals, abs=1e-12)
+    assert actual.assists == pytest.approx(short_assists, abs=1e-12)
+    assert actual.residual_if_appearance == residual
+    assert actual.raw_expected_points == pytest.approx(short_raw, abs=1e-12)
+    assert actual.expected_points == pytest.approx(max(short_raw, 0.0), abs=1e-12)
+    if residual < 0:
+        assert short_raw < 0  # Exercise the fixture floor before weekly aggregation.
+
+    later = result.fixture_rows.query("fixture == 69 and player_code == 3").iloc[0]
+    np.testing.assert_allclose(later[role_columns].to_numpy(float), second, atol=1e-12)
+    assert later.expected_points == pytest.approx(max(second_raw, 0.0), abs=1e-12)
+    week = result.weekly_rows.query("gameweek == 6 and player_id == 3").iloc[0]
+    # a=0.5 is one shared eligibility state: .5 * (1 - .1*.55), not independent per match.
+    assert week.appearance_probability == pytest.approx(0.4725)
+    assert week.expected_points == pytest.approx(
+        0.5 * (max(short_raw, 0.0) + max(second_raw, 0.0)), abs=1e-12
+    )

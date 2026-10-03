@@ -69,7 +69,7 @@ from squadopt.platform.football_minute_basis import (
     football_components_path,
     load_football_minute_basis,
 )
-from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSIONS
 
 __all__ = [
     "CHIP_SWITCH",
@@ -579,7 +579,7 @@ def load_switch_inputs(
         football = read_football_forecast(
             football_artifact_path(artifact_root, inputs.snapshot_id), inputs
         )
-        if football.horizon.model_version == JOINT_ROLE_MODEL_VERSION and bundle is None:
+        if football.horizon.model_version in JOINT_ROLE_MODEL_VERSIONS and bundle is None:
             raise ValueError("The joint-role model requires a complete ready bundle.")
         minute_input = load_football_minute_basis(
             artifact_root=artifact_root,

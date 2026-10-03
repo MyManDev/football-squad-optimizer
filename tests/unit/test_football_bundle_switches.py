@@ -19,7 +19,11 @@ from squadopt.platform import advice_switches as switches
 from squadopt.platform.advice_cache import advice_cache_key
 from squadopt.platform.football_bundle import seal_football_bundle
 from squadopt.platform.football_minute_basis import football_components_path
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+)
 from squadopt.prediction.football_components import COMPONENT_COLUMNS
 from squadopt.prediction.football_minutes_role import ROLE_COMPONENT_COLUMNS, ROLE_METADATA_COLUMNS
 
@@ -80,7 +84,7 @@ def cache_key(case, identity):
     )
 
 
-def make_joint_pair(case):
+def make_joint_pair(case, *, version=JOINT_ROLE_MODEL_VERSION):
     """Replace only this synthetic fixture pair with a valid joint-law pair before sealing."""
     forecast_path = football_artifact_path(case["artifact_root"], case["snapshot_id"])
     components_path = football_components_path(case["artifact_root"], case["snapshot_id"])
@@ -100,8 +104,12 @@ def make_joint_pair(case):
     for row in served["rows"]:
         row["expected_points"] = float(totals.loc[row["gameweek"], row["player_id"]])
     for document in (served, companion):
-        document["model_version"] = JOINT_ROLE_MODEL_VERSION
+        document["model_version"] = version
         document["role_metadata"] = dict(template["role_metadata"])
+        if version != JOINT_ROLE_MODEL_VERSION:
+            document["role_metadata"]["role_feature_version"] = (
+                "retained_player_history_indicator_v1"
+            )
     served["fingerprint"] = forecast_digest(served)
     companion["forecast_fingerprint"] = served["fingerprint"]
     companion["fingerprint"] = forecast_digest(companion)
@@ -121,8 +129,9 @@ def test_old_v1_without_marker_remains_available_and_leaves_current_baseline_exa
     assert_frame_equal(projection.table, saved, check_exact=True)
 
 
-def test_new_joint_pair_cannot_be_served_until_real_ready_marker_is_complete(case):
-    make_joint_pair(case)
+@pytest.mark.parametrize("version", JOINT_ROLE_MODEL_VERSIONS)
+def test_new_joint_pair_cannot_be_served_until_real_ready_marker_is_complete(case, version):
+    make_joint_pair(case, version=version)
     before = signature(case)
     waiting = load(case)
     assert waiting.football is None and not waiting.football_components_bound
@@ -134,7 +143,7 @@ def test_new_joint_pair_cannot_be_served_until_real_ready_marker_is_complete(cas
     assert signature(case) != before
     active = load(case)
     assert active.football is not None and active.football_components_bound
-    assert active.football.horizon.model_version == JOINT_ROLE_MODEL_VERSION
+    assert active.football.horizon.model_version == version
     assert active.football_bundle_sha256 == ready.fingerprint
     assert active.football.projection.diagnostics["fixture_role_estimates"]
 

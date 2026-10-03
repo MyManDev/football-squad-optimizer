@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import time
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -35,8 +36,12 @@ CURRENT_SEASON = "2026-27"
 ORIGINS = tuple((season, week) for season in SEASONS[1:] for week in (11, 19, 27, 35))
 ARCHIVE_FILES = ("gws/merged_gw.csv", "players_raw.csv", "teams.csv", "fixtures.csv")
 ARMS = ("frozen_v1", "joint_role")
+ROLE_ARMS = ("pooled_empirical_role", "joint_role")
+MEASUREMENT_CONTRACT = "football_joint_role_measurement_v2"
 POSITIONS = ("ALL", "GK", "DEF", "MID", "FWD")
 LOG_FLOOR = 1e-12
+PROBABILITY_BIN_EDGES = tuple(i / 10 for i in range(11))
+ROLE_RATIO_ROUNDOFF_ATOL = 1e-12
 SOURCE_FILES = (
     "scripts/measure_football_role_minutes.py",
     "src/squadopt/application/football_live.py",
@@ -137,6 +142,15 @@ def losses(actual: pd.DataFrame, prediction: pd.DataFrame) -> dict[str, object]:
     if not np.isin(bins, range(4)).all():
         raise ValueError("Observed minute classes must be in 0..3.")
     result.update({"minute_bin_" + k: v for k, v in _categorical_loss(minute, bins).items()})
+    result.update(role_losses(actual, prediction))
+    return result
+
+
+def role_losses(actual: pd.DataFrame, prediction: pd.DataFrame) -> dict[str, object]:
+    """Score the same known zero/start/cameo outcomes for either role forecast."""
+    if len(actual) != len(prediction) or not actual.index.equals(prediction.index) or actual.empty:
+        raise ValueError("Role measurement rows must be nonempty and exactly aligned.")
+    result: dict[str, object] = {}
     starts = actual.get("starts", pd.Series(np.nan, index=actual.index))
     known = actual.minutes.eq(0) | (actual.minutes.gt(0) & starts.isin([0, 1]))
     result.update(
@@ -203,6 +217,207 @@ def summarize(records: list[dict[str, object]]) -> list[dict[str, object]]:
     return result
 
 
+def pooled_role_baseline(
+    train: pd.DataFrame, control: pd.DataFrame, joint: pd.DataFrame
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Use the exact causal supervised train, not priors or target labels.
+
+    Both predictions call the unchanged four-bin appearance head on the same
+    target. Require exact elementwise q equality; no statistical tolerance or
+    availability adjustment belongs in this restricted role comparison.
+    """
+    if control.empty or not control.index.equals(joint.index):
+        raise ValueError("Restricted role predictions must share their target rows.")
+    q = control.appearance_probability.to_numpy(float)
+    candidate_q = joint.appearance_probability.to_numpy(float)
+    if (
+        not np.isfinite(q).all()
+        or not np.isfinite(candidate_q).all()
+        or ((q < 0) | (q > 1)).any()
+        or ((candidate_q < 0) | (candidate_q > 1)).any()
+        or not np.array_equal(q, candidate_q)
+    ):
+        raise ValueError("Restricted role comparison requires identical finite appearance q.")
+    labels = train.get("starts", pd.Series(np.nan, index=train.index))
+    appeared = train.minutes.gt(0)
+    if (labels.notna() & ~labels.isin([0, 1])).any() or (labels.eq(1) & ~appeared).any():
+        raise ValueError("Recorded starts must be binary and have positive minutes.")
+    known = appeared & labels.isin([0, 1])
+    count = int(known.sum())
+    starting = int(labels.loc[known].sum())
+    rate = starting / count if count else None
+    prediction = pd.DataFrame(
+        {
+            "zero_probability": 1 - q,
+            "start_probability": q * rate if rate is not None else np.nan,
+            "cameo_probability": q * (1 - rate) if rate is not None else np.nan,
+        },
+        index=control.index,
+    )
+    return prediction, {
+        "status": "available" if count else "unavailable_no_known_start_labels",
+        "training_appearance_rows": int(appeared.sum()),
+        "known_start_label_rows": count,
+        "unknown_start_label_rows": int((appeared & labels.isna()).sum()),
+        "starting_label_rows": starting,
+        "pooled_start_given_appearance": rate,
+    }
+
+
+def _binary_calibration(probabilities: np.ndarray, labels: np.ndarray) -> dict[str, object]:
+    """Fixed bins and binary losses; an empty population has no measured loss."""
+    if (
+        probabilities.ndim != 1
+        or probabilities.shape != labels.shape
+        or not np.isfinite(probabilities).all()
+        or ((probabilities < 0) | (probabilities > 1)).any()
+        or not np.isin(labels, [0, 1]).all()
+    ):
+        raise ValueError("Calibration requires aligned binary labels and finite probabilities.")
+    observed_probability = np.where(labels == 1, probabilities, 1 - probabilities)
+    bins = np.minimum(np.searchsorted(PROBABILITY_BIN_EDGES, probabilities, side="right") - 1, 9)
+    cells = []
+    for index, (lower, upper) in enumerate(pairwise(PROBABILITY_BIN_EDGES)):
+        selected = bins == index
+        count = int(selected.sum())
+        cells.append(
+            {
+                "lower": lower,
+                "upper": upper,
+                "upper_inclusive": index == 9,
+                "count": count,
+                "mean_pred": float(probabilities[selected].mean()) if count else None,
+                "event_rate": float(labels[selected].mean()) if count else None,
+            }
+        )
+    return {
+        "rows": len(labels),
+        "nll": float(-np.log(np.maximum(observed_probability, LOG_FLOOR)).mean())
+        if len(labels)
+        else None,
+        "brier": float(((probabilities - labels) ** 2).mean()) if len(labels) else None,
+        "floor_active_rows": int((observed_probability < LOG_FLOOR).sum()),
+        "zero_observed_probability_rows": int((observed_probability == 0).sum()),
+        "bins": cells,
+    }
+
+
+def role_diagnostics(
+    actual: pd.DataFrame, prediction: pd.DataFrame, appearance: pd.Series
+) -> dict[str, object]:
+    """Separate appearance and conditional-start evidence without inventing q=0 roles.
+
+    Like role_losses, a partially missing role forecast is unavailable as a whole.
+    Appearance can still be diagnosed on known role rows. No row payload is retained.
+    """
+    if (
+        actual.empty
+        or not actual.index.equals(prediction.index)
+        or not actual.index.equals(appearance.index)
+    ):
+        raise ValueError("Role diagnostics require nonempty aligned rows.")
+    q = appearance.to_numpy(float)
+    if not np.isfinite(q).all() or ((q < 0) | (q > 1)).any():
+        raise ValueError("Role diagnostics require finite appearance probabilities.")
+    starts = actual.get("starts", pd.Series(np.nan, index=actual.index))
+    positive = actual.minutes.gt(0) & starts.isin([0, 1])
+    known = actual.minutes.eq(0) | positive
+    positive_q = positive.to_numpy() & (q > 0)
+    fields = ["zero_probability", "start_probability", "cameo_probability"]
+    supported = set(fields) <= set(prediction) and prediction[fields].notna().all().all()
+    conditional = np.array([], dtype=float)
+    conditional_labels = np.array([], dtype=float)
+    joint_floor_rows = None
+    if supported:
+        roles = prediction[fields].to_numpy(float)
+        if (
+            not np.isfinite(roles).all()
+            or ((roles < 0) | (roles > 1)).any()
+            or not np.allclose(roles[:, 0], 1 - q, atol=ROLE_RATIO_ROUNDOFF_ATOL, rtol=0)
+            or not np.allclose(roles.sum(axis=1), 1, atol=ROLE_RATIO_ROUNDOFF_ATOL, rtol=0)
+        ):
+            raise ValueError("Role diagnostic probabilities do not share the appearance law.")
+        conditional = roles[positive_q, 1] / q[positive_q]
+        if (conditional > 1 + ROLE_RATIO_ROUNDOFF_ATOL).any():
+            raise ValueError("Conditional start probability exceeds the appearance mass.")
+        # Only floating summation/division roundoff is clipped. q=0 is never divided,
+        # floored or replaced; these undefined conditional observations are counted.
+        conditional = np.clip(conditional, 0, 1)
+        conditional_labels = starts.loc[positive_q].to_numpy(float)
+        observed_roles = np.where(
+            actual.loc[known, "minutes"].eq(0), 0, np.where(starts.loc[known].eq(1), 1, 2)
+        )
+        observed_probability = roles[known.to_numpy()][np.arange(int(known.sum())), observed_roles]
+        joint_floor_rows = int((observed_probability < LOG_FLOOR).sum())
+    return {
+        "rows": len(actual),
+        "role_known_rows": int(known.sum()),
+        "role_unknown_rows": int((~known).sum()),
+        "positive_known_rows": int(positive.sum()),
+        "role_forecast_available": bool(supported),
+        "appearance": _binary_calibration(
+            q[known.to_numpy()], actual.loc[known, "minutes"].gt(0).to_numpy(float)
+        ),
+        "conditional_start": _binary_calibration(conditional, conditional_labels),
+        "conditional_q_zero_rows": int((positive.to_numpy() & (q == 0)).sum()),
+        "conditional_unsupported_rows": int(positive_q.sum()) if not supported else 0,
+        "joint_scored_rows": int(known.sum()) if supported else 0,
+        "joint_floor_active_rows": joint_floor_rows,
+    }
+
+
+def summarize_roles(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Equal-origin role pairs only; unsupported or missing arms never become zero."""
+    result = []
+    for position in POSITIONS:
+        pairs: dict[str, dict[str, dict[str, object]]] = {}
+        for record in records:
+            if record["position"] != position:
+                continue
+            fold, arm = str(record["fold"]), str(record["arm"])
+            pair = pairs.setdefault(fold, {})
+            if arm not in ROLE_ARMS or arm in pair:
+                raise ValueError("Each role fold/position must have unique declared arms.")
+            pair[arm] = record
+        for metric in ("role_nll", "role_brier"):
+            paired = []
+            for pair in pairs.values():
+                if not all(arm in pair and pair[arm].get(metric) is not None for arm in ROLE_ARMS):
+                    continue
+                before, after = (pair[arm] for arm in ROLE_ARMS)
+                counts = ("rows", "role_known_rows", "role_unknown_rows", "role_scored_rows")
+                if (
+                    any(before[k] != after[k] for k in counts)
+                    or int(before["role_scored_rows"]) < 1
+                ):
+                    raise ValueError("Paired role losses must score the same nonempty population.")
+                a, b = float(before[metric]), float(after[metric])
+                if not np.isfinite([a, b]).all():
+                    raise ValueError("Paired role losses must be finite.")
+                paired.append((a, b, int(before["role_scored_rows"])))
+            delta = np.array([b - a for a, b, _ in paired])
+            result.append(
+                {
+                    "position": position,
+                    "metric": metric,
+                    "reported_origins": len(pairs),
+                    "paired_origins": len(paired),
+                    "unpaired_origins": len(pairs) - len(paired),
+                    "paired_scored_rows": sum(rows for _, _, rows in paired),
+                    "pooled_empirical_role": float(np.mean([a for a, _, _ in paired]))
+                    if paired
+                    else None,
+                    "joint_role": float(np.mean([b for _, b, _ in paired])) if paired else None,
+                    "joint_minus_pooled": float(delta.mean()) if paired else None,
+                    "negative_deltas": int((delta < -1e-12).sum()),
+                    "positive_deltas": int((delta > 1e-12).sum()),
+                    "ties": int((np.abs(delta) <= 1e-12).sum()),
+                    "interpretation": "lower_loss_is_better_shared_appearance",
+                }
+            )
+    return result
+
+
 def run(
     archive: Path,
     output: Path,
@@ -222,7 +437,7 @@ def run(
     source_hashes = _hashes(project, SOURCE_FILES)
     hashes = _hashes(archive, tuple(f"data/{s}/{name}" for s in SEASONS for name in ARCHIVE_FILES))
     protocol = {
-        "contract": "football_joint_role_measurement_v1",
+        "contract": MEASUREMENT_CONTRACT,
         "archive_seasons": list(SEASONS),
         "prior_only_season": SEASONS[0],
         "historical_origins": [[s, w] for s, w in ORIGINS],
@@ -232,6 +447,8 @@ def run(
         "fit_budget": {
             "candidate_fits_per_fold": 1,
             "control_additional_fits": 0,
+            "role_baseline_additional_fits": 0,
+            "role_diagnostic_additional_fits": 0,
             "maximum_origins": 46,
         },
         "cutoff": (
@@ -245,9 +462,35 @@ def run(
         "role_population": (
             "positive_minutes_with_recorded_binary_starts; no_minutes_based_role_labels"
         ),
+        "role_baseline": {
+            "name": ROLE_ARMS[0],
+            "training": "exact_causal_supervised_train; pooled_across_positions",
+            "support": "positive_minutes_with_recorded_binary_starts",
+            "rate": "count_starts_1 / count_known_positive_minute_starts",
+            "probabilities": ["1-q", "q*r", "q*(1-r)"],
+            "appearance": "frozen_control; exact_elementwise_equal_to_joint",
+            "unsupported": "null_rate_and_role_losses; no_default_or_smoothing",
+            "evaluation": "same_known_zero_start_cameo_rows; equal_origin_pairs",
+            "outputs": ["role-scores.json", "role-comparison.json"],
+        },
         "metric_aggregation": (
             "equal_origin_pairs; all_positions; lower_losses_better; signed_bias_not_ranked"
         ),
+        "role_diagnostics": {
+            "version": "role_calibration_diagnostics_v1",
+            "output": "role-diagnostics.json",
+            "probability_bin_edges": list(PROBABILITY_BIN_EDGES),
+            "bin_closure": "left_closed_right_open; last_bin_includes_one",
+            "appearance_population": "known_zero_or_positive_binary_start_rows",
+            "conditional_population": "observed_positive_binary_start_rows_with_q_gt_zero",
+            "q_zero_conditional": "undefined_counted_and_excluded; no_probability_floor",
+            "missing_role_forecast": "unavailable_whole_origin_position; no_zero_loss",
+            "conditional_ratio_roundoff_atol": ROLE_RATIO_ROUNDOFF_ATOL,
+            "brier": "binary_squared_error; role_scores_remain_three_class_sum_squared_error",
+            "nll_floor_active": "observed_outcome_probability_strictly_less_than_log_score_floor",
+            "decomposition": "unfloored_only; separately_floored_terms_need_not_sum_to_role_nll",
+            "additional_fits": 0,
+        },
         "defcon_policy": "known_current_outcomes_only; no_historical_zero_fill",
         "availability_or_news_backfill": False,
         "hyperparameter_search": False,
@@ -260,7 +503,9 @@ def run(
             "former/transferred player coverage can be incomplete.",
             "Three-hour settlement proxy and 90-minute deadline proxy "
             "are not verified historical publication times.",
-            "Control has no start/cameo law; its role scores remain null.",
+            "Frozen v1 control has no start/cameo law; its role scores remain null.",
+            "The separate pooled role reference reuses control appearance; "
+            "it is not a standalone model or independent calibration evidence.",
             "Points residual stays fixed per appearance; "
             "it is not decomposed into minute-specific events.",
         ],
@@ -298,7 +543,7 @@ def run(
     write(output / "folds.json", [[s, w] for s, w in origins])
     training = causal_training(history, prior_only_season=SEASONS[0])
     preparation_seconds = time.perf_counter() - started
-    records, budgets, failures = [], [], []
+    records, role_records, diagnostic_records, budgets, failures = [], [], [], [], []
     for season, week in origins:
         fold = f"{season}-gw{week:02d}"
         fold_started = time.perf_counter()
@@ -306,6 +551,7 @@ def run(
             "fold": fold,
             "candidate_fit_attempts": 0,
             "control_additional_fits": 0,
+            "role_baseline_additional_fits": 0,
         }
         try:
             actual = history.loc[history.season.eq(season) & history.GW.eq(week)].copy()
@@ -331,7 +577,12 @@ def run(
             budget["role_metadata"] = dict(candidate.role_metadata)
             control = FixtureFootballModel.predict(candidate, target)
             full = candidate.predict(target)
+            pooled, baseline_metadata = pooled_role_baseline(train, control, full)
+            budget["role_baseline"] = baseline_metadata
+            budget["appearance_q_identical"] = True
             fold_records = []
+            fold_role_records = []
+            fold_diagnostics = []
             for arm, prediction in zip(ARMS, (control, full), strict=True):
                 for position in POSITIONS:
                     mask = (
@@ -349,7 +600,39 @@ def run(
                             **losses(actual.loc[mask], prediction.loc[mask]),
                         }
                     )
+            for arm, prediction in zip(ROLE_ARMS, (pooled, full), strict=True):
+                for position in POSITIONS:
+                    mask = (
+                        pd.Series(True, index=actual.index)
+                        if position == "ALL"
+                        else actual.position.eq(position)
+                    )
+                    if not mask.any():
+                        continue
+                    fold_role_records.append(
+                        {
+                            "fold": fold,
+                            "position": position,
+                            "arm": arm,
+                            "rows": int(mask.sum()),
+                            **role_losses(actual.loc[mask], prediction.loc[mask]),
+                        }
+                    )
+                    fold_diagnostics.append(
+                        {
+                            "fold": fold,
+                            "position": position,
+                            "arm": arm,
+                            **role_diagnostics(
+                                actual.loc[mask],
+                                prediction.loc[mask],
+                                control.loc[mask, "appearance_probability"],
+                            ),
+                        }
+                    )
             records.extend(fold_records)
+            role_records.extend(fold_role_records)
+            diagnostic_records.extend(fold_diagnostics)
             budget["status"] = "complete"
         except Exception as error:
             # Do not leak paths or data in a public-ready result; retain the fold and class.
@@ -358,17 +641,22 @@ def run(
         budget["wall_seconds"] = time.perf_counter() - fold_started
         budgets.append(budget)
         write(output / "scores.json", records)
+        write(output / "role-scores.json", role_records)
+        write(output / "role-diagnostics.json", diagnostic_records)
         write(output / "budgets.json", budgets)
         write(output / "failures.json", failures)
         print(f"{fold}: {budget['status']}", flush=True)
     unchanged = _hashes(project, SOURCE_FILES) == source_hashes
     complete = not failures and unchanged
     write(output / "comparison.json", summarize(records))
+    write(output / "role-comparison.json", summarize_roles(role_records))
     write(
         output / "result.json",
         {
+            "contract": MEASUREMENT_CONTRACT,
             "status": "complete" if complete else "incomplete",
             "required_origins": len(origins),
+            "role_baseline_additional_fits": 0,
             "completed_origins": sum(b["status"] == "complete" for b in budgets),
             "candidate_fit_attempts": sum(int(b["candidate_fit_attempts"]) for b in budgets),
             "preparation_seconds": preparation_seconds,

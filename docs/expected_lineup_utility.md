@@ -8,7 +8,13 @@ Weekly XI rotation already existed. This change evaluates complete three- and fi
 
 The live expected-lineup route is enabled only for the fixture-football model over three or five weeks, with appearance probabilities present and an explicit deterministic solver budget of at least five. Automatic chip strategy must be off, and first-week overlap, transfer-cap and role-exclusion arguments must all be absent. Existing alternative routes retain their prior behavior; the new autosub objective does not apply to every product combination.
 
+The public `model=football` selector uses the currently accepted football artifact; it is not a joint-role-only route. The reader accepts team-share v1, contextual v3, joint-role-minutes v1 and its explicitly selected retained-history variant under the same fixture-football family. Joint-role inputs additionally require their complete ready bundle. A usable observed-information node takes precedence and goes directly to the observed planner. The optional nominal proposal below therefore does not extend the observed action menu. Current-model and overlap-constrained solves retain their existing routes.
+
+Top100 remains a user choice. Nonzero-weight pure-points football requests keep one selected-weight planning call and rescore its decisions on the raw forecast for publication. This proposal neither adds a zero-weight solve nor interprets preference utility as raw FPL points.
+
 Keep, avoid, no-hits and save-chips preferences remain supported through the certified resource path. The role helper itself also supports starter and captain/vice exclusions, but this does not change the live routing limits above. Forced-chip scoring and state preservation are tested separately; those tests do not establish activation for every chip product route.
+
+The retained-history role variant is an explicit operator choice: add `--retained-role-history` to `build_football_forecast --role-minutes --with-components`, with the same complete explicit training-season selection. Omitting the new flag keeps the previous model. Its separately identified artifact and matching companion still require a complete ready bundle; existing immutable artifacts are never replaced by that command. This adds no member-facing model selector, automatic promotion or new probability display. The retained-history feature changes only the conditional role head, and remains development evidence rather than independently verified predictive superiority.
 
 ## Scoring mathematics
 
@@ -32,9 +38,21 @@ With roles and q fixed, the total is linear in mu. Recorded player multipliers a
 
 ## Bounded search and decisions
 
-Each weekly role-search invocation retains its incumbent and evaluates at most 128 distinct lineups by default. Candidates use legal one-for-one XI swaps within the same fifteen, six outfield bench orders, and a bounded captain/vice shortlist. Scores and autosub calculations are cached. Evaluation counts, actual convolution states, captain pairs and cache use are recorded. This is a bounded search, not a global optimality proof. Branches can invoke it repeatedly, so 128 is not the request-wide budget.
+Each weekly role-search invocation retains its incumbent and evaluates at most 128 distinct lineups by default. Candidates use legal one-for-one XI swaps within the same fifteen and six outfield bench orders. Every eligible ordered captain and vice pair in each explored XI is ranked analytically, at most 110 pairs. Pair ranking requires no additional full lineup scores or autosub calculations; those results remain cached. Evaluation counts, actual convolution states, captain pairs and cache use are recorded. This is a bounded search, not a global optimality proof. Branches can invoke it repeatedly, so 128 is not the request-wide budget.
+
+The frozen 42-record comparison below predates this complete captain-pair search and was not rerun for that change. Its new validation uses controlled fixed-XI cases and an independent official-outcome scorer; it does not establish realized score gains.
 
 CP remains responsible for feasible transfer, price, bank, free-transfer and chip paths. Its bench-weighted objective is a proposal surrogate. Ordinary expected-window planning allocates 40% of its solver budget to a guarded legacy proposal and 60% to a guarded zero-bench-bonus proposal, then ranks complete candidates on the common expectation. Observed planning retains a guarded baseline and budgets hold/information proposals, continuations and reconciliation together. Solver work and lineup evaluation work are reported separately.
+
+### Optional initial-squad swap
+
+The nominal expected-window route retains both original complete proposals and their 128 role evaluations per week. Only after both native solves are optimal for their surrogate, their seeds are complete and no wall-clock truncation occurred can one additional proposal use the deterministic CP budget that was actually unspent. The optional primary solve and tie-break split the remaining wall allowance. Issued allocation, released/reused allocation and actual work are reported separately.
+
+A deterministic same-position scan considers at most `15 * (N - 15)` initial-roster replacements, where N is the first-week player-pool size. Expected-lineup multipliers provide a cheap ranking heuristic, not a certified gain. At most one template score and one cold full-horizon CP call are added. That call keeps the original purchase lots, bank, free transfers, prices, dated chip rights, preferences and transfer policy. It fixes only the proposed first squad; subsequent weeks remain free to transfer, including reversing that choice. An all-weeks-fixed witness is consequently not an oracle for this completion.
+
+Unsupported horizons, first-week Wildcard/Free Hit, role exclusions, insufficient solver slack, duplicate first squads and absence of a positive legal pair leave the original menu unchanged. An incomplete, infeasible or wall-truncated optional solve also leaves it unchanged, while its spent work remains counted. Equal final utility retains the earlier proposal. Native resource certification does not prove optimality for the expected-lineup objective.
+
+The exact lineup-evaluation allowance deliberately increases from `256 * weeks` to `384 * weeks + 1`: 1,153 for three weeks and 1,921 for five. The original two searches are unchanged; the additional allowance is one template evaluation plus at most 128 per new-candidate week. CP work, exact evaluations, convolution states and elapsed time must be compared separately. This is not an equal-total-work or predictive-improvement claim. The earlier 42-record comparison below predates this optional proposal and is not evidence for its effect.
 
 Role improvement preserves every resource decision and purchase history. Explicit starter exclusions are respected; captain exclusions also constrain the vice. Other human constraints remain in the certified resource path.
 

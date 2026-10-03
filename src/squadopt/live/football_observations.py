@@ -14,7 +14,7 @@ import pandas as pd
 
 from squadopt.planning.models import InitialSquadState, PlanningHorizon
 from squadopt.planning.recourse import ObservationNode
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
 
 AVAILABILITY_OBSERVATION_VERSION = "captured_next_deadline_resolution_v1"
 
@@ -71,7 +71,7 @@ def availability_observations(
     # contextual model reallocates team shares after availability and is not invertible
     # from weekly totals. A current-week minute intervention is also preserved:
     # the two nodes start next week and never replace the decided week's forecast.
-    if model_version not in (FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION):
+    if model_version not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS):
         return result("conditional_team_components_unavailable")
     if len(horizon.gameweeks) not in (3, 5):
         return result("unsupported_window")

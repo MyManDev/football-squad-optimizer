@@ -202,3 +202,34 @@ it.each([
     }),
   ).toBe(false);
 });
+
+it.each(["football_joint_role_minutes_v1", "football_joint_role_retained_history_v1"] as const)(
+  "reads the same restricted role explanation for %s",
+  (version) => {
+    const view = example();
+    view.role_forecast!.model_version = version;
+    expect(isAdvicePayload(view)).toBe(true);
+    render(
+      <LanguageProvider initialLanguage="en">
+        <ParticipationEvidence view={view} />
+      </LanguageProvider>,
+    );
+    expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");
+    expect(screen.getByTestId("role-forecast").textContent).not.toMatch(AS_A_CHANCE);
+    expect(
+      isAdvicePayload({
+        ...view,
+        role_forecast: { ...view.role_forecast, model_version: "unknown" },
+      }),
+    ).toBe(false);
+    expect(
+      isAdvicePayload({
+        ...view,
+        role_forecast: {
+          ...view.role_forecast,
+          rows: [{ ...view.role_forecast!.rows[0], start_probability: 0.8 }],
+        },
+      }),
+    ).toBe(false);
+  },
+);

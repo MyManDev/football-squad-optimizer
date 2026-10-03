@@ -459,7 +459,7 @@ export interface AdviceRolePointComponents {
 export interface EntryAdvice {
   role_forecast?: {
     version: "football_role_forecast_v1";
-    model_version: "football_joint_role_minutes_v1";
+    model_version: "football_joint_role_minutes_v1" | "football_joint_role_retained_history_v1";
     calibration: "not_independently_verified";
     scope: "current_gameweek_fixtures";
     rows: {

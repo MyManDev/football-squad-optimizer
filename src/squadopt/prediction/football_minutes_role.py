@@ -26,6 +26,8 @@ from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 from squadopt.prediction.football_features import FEATURES, POS
 
 ROLE_MINUTE_VERSION: Final = "joint_start_cameo_minutes_v1"
+RETAINED_HISTORY_ROLE_FEATURE_VERSION: Final = "retained_player_history_indicator_v1"
+RETAINED_HISTORY_FEATURE: Final = "has_retained_player_history"
 MINUTE_PRIOR_ROWS: Final = 10.0
 Array = npt.NDArray[np.float64]
 
@@ -51,16 +53,34 @@ ROLE_METADATA_COLUMNS: Final = (
 )
 
 
-def _matrix(frame: pd.DataFrame) -> Array:
+def _matrix(frame: pd.DataFrame, *, retained_history: bool = False) -> Array:
     values = frame.loc[:, list(FEATURES)].to_numpy(float)
     if not np.isfinite(values).all():
         raise ValueError("Role-minute features must be finite.")
+    if retained_history:
+        past = frame.past_rows.to_numpy(float)
+        if (past < 0).any() or not np.equal(past, np.floor(past)).all():
+            raise ValueError("Retained history counts must be nonnegative integers.")
+        # This includes retained older seasons and observed nonappearances. It is
+        # not a claim about current fitness or why the retained history is absent.
+        return np.column_stack((values, (past > 0).astype(float)))
     return values
 
 
 class _CategoricalHead:
-    def __init__(self, frame: pd.DataFrame, labels: npt.NDArray[np.int64], classes: int):
+    def __init__(
+        self,
+        frame: pd.DataFrame,
+        labels: npt.NDArray[np.int64],
+        classes: int,
+        *,
+        retained_history: bool = False,
+    ):
         self.classes = classes
+        self.retained_history = retained_history
+        # The new design is validated even for a constant fitted class, as in the
+        # accepted research head. The existing head keeps its original fit path.
+        design = _matrix(frame, retained_history=True) if retained_history else None
         self.constant: Array | None = None
         self.model: Any = None
         if not len(frame):
@@ -75,12 +95,12 @@ class _CategoricalHead:
             with warnings.catch_warnings():
                 warnings.simplefilter("error", ConvergenceWarning)
                 try:
-                    self.model.fit(_matrix(frame), labels)
+                    self.model.fit(_matrix(frame) if design is None else design, labels)
                 except ConvergenceWarning as error:
                     raise ValueError("Role-minute fit did not converge.") from error
 
     def predict(self, frame: pd.DataFrame) -> Array:
-        design = _matrix(frame)
+        design = _matrix(frame, retained_history=self.retained_history)
         if self.constant is not None:
             return np.tile(self.constant, (len(frame), 1))
         output = np.zeros((len(frame), self.classes))
@@ -150,6 +170,8 @@ class JointRoleMinutes:
     Every fitted and pooled statistic comes from the known-label appearance subset.
     """
 
+    retained_history = False
+
     def __init__(self, train: pd.DataFrame, *, cutoff: pd.Timestamp):
         if cutoff.tzinfo is None or train.empty:
             raise ValueError("Role minutes need a timezone-aware cutoff and training rows.")
@@ -186,7 +208,12 @@ class JointRoleMinutes:
         self.means: dict[tuple[str, str], Array] = {}
         if not self.supported:
             return
-        self.role = _CategoricalHead(fitted, fitted.starts.to_numpy(dtype=np.int64), 2)
+        self.role = _CategoricalHead(
+            fitted,
+            fitted.starts.to_numpy(dtype=np.int64),
+            2,
+            retained_history=self.retained_history,
+        )
         for role, label in (("start", 1), ("cameo", 0)):
             role_rows = fitted.loc[fitted.starts.eq(label)]
             self.conditional[role] = _CategoricalHead(
@@ -207,7 +234,7 @@ class JointRoleMinutes:
 
     @property
     def metadata(self) -> dict[str, object]:
-        return {
+        metadata: dict[str, object] = {
             "version": ROLE_MINUTE_VERSION,
             "status": "fitted_known_start_labels"
             if self.supported
@@ -222,6 +249,14 @@ class JointRoleMinutes:
             "residual_policy": "per_appearance_residual_held_fixed",
             "probability_calibration": "not_independently_verified",
         }
+        if self.retained_history:
+            metadata.update(
+                role_feature_version=RETAINED_HISTORY_ROLE_FEATURE_VERSION,
+                role_features=[*FEATURES, RETAINED_HISTORY_FEATURE],
+                retained_history_definition="past_rows > 0",
+                retained_history_scope="retained_past_player_rows_including_nonappearances",
+            )
+        return metadata
 
     def predict(
         self, target: pd.DataFrame, *, baseline_probabilities: Array, baseline_minutes: Array
@@ -297,3 +332,14 @@ class JointRoleMinutes:
         result["unknown_start_label_rows"] = self.unknown_start_label_rows
         result["minute_prior_rows"] = MINUTE_PRIOR_ROWS
         return result
+
+
+class RetainedHistoryRoleMinutes(JointRoleMinutes):
+    """Explicit role-head variant with one retained-history discontinuity feature.
+
+    All appearance inputs, positive minute heads, shrinkage and unknown-role
+    fallback remain those of the original joint law. No current-season-only or
+    minimum-observation threshold is introduced.
+    """
+
+    retained_history = True
