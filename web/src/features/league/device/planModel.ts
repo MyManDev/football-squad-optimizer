@@ -53,20 +53,17 @@ interface BuildOptions {
  * A chip's objective, from the planner's own model: a Bench Boost scores every squad
  * member in full (the starter coefficient moves from the eleven to the fifteen), a Triple
  * Captain counts the captain's coefficient once more, and a Wildcard or a Free Hit lifts
- * the hits and the cap and scores as any week does. The planner's remainder for the bench
- * is a non-negative coefficient; a document that carries a negative one is refused rather
- * than scored on a model the planner does not use.
+ * the hits and the cap and scores as any week does. The planner adds each chip's term
+ * through a variable bounded above and maximised, so a negative coefficient earns no
+ * term: a negative remainder stays on the eleven, a negative captain is not tripled.
  */
 function chipCoefficients(
   player: DevicePlanPlayer,
   chip: DeviceChip | null,
 ): [number, number, number] {
   const [squad, starter, captain] = player.coefficients;
-  if (chip === "bboost") {
-    if (starter < 0) throw new DevicePlanRefused("negative starter coefficient", "plan");
-    return [squad + starter, 0, captain];
-  }
-  if (chip === "3xc") return [squad, starter, 2 * captain];
+  if (chip === "bboost") return [squad + Math.max(starter, 0), Math.min(starter, 0), captain];
+  if (chip === "3xc") return [squad, starter, captain + Math.max(captain, 0)];
   return [squad, starter, captain];
 }
 

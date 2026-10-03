@@ -44,6 +44,7 @@ def test_the_recorded_answers_are_the_planner_s() -> None:
         assert _same(fresh["entry"], held["entry"], "entry") == [], fresh["entry_id"]
         differences = _same(fresh["reference"], held["reference"], "reference")
         assert differences == [], (fresh["entry_id"], differences)
+    assert _same(rebuilt["chips"], recorded["chips"], "chips") == []
 
 
 def test_the_fixture_covers_a_paid_transfer_and_every_free_transfer_count() -> None:
@@ -52,3 +53,30 @@ def test_the_fixture_covers_a_paid_transfer_and_every_free_transfer_count() -> N
     assert any(m["reference"]["transfer_hit_points"] > 0 for m in members)
     assert {m["entry"]["free_transfers"] for m in members} >= {1, 2, 3, 5}
     assert all(m["reference"]["solver_status"] == "OPTIMAL" for m in members)
+
+
+def test_the_fixture_plays_every_chip_on_its_own_basis() -> None:
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    chips = recorded["chips"]
+    assert {c["chip"] for c in chips} == {"wildcard", "freehit", "bboost", "3xc"}
+    assert all(c["reference"]["solver_status"] == "OPTIMAL" for c in chips)
+    # A rebuild pays no hits; a Bench Boost counts the fifteen, so it is worth at least
+    # the eleven (exactly that with a bench of zeros); a Triple Captain counts the
+    # captain once more.
+    plain = {m["entry_id"]: m["reference"] for m in recorded["members"]}
+    for case in chips:
+        reference = case["reference"]
+        if case["chip"] in {"wildcard", "freehit"}:
+            assert reference["transfer_hit_points"] == 0.0
+        if case["chip"] == "bboost":
+            assert (
+                reference["expected_own_points"] >= plain[case["entry_id"]]["expected_own_points"]
+            )
+        if case["chip"] == "3xc":
+            assert reference["expected_own_points"] > plain[case["entry_id"]]["expected_own_points"]
+        assert reference["gain_vs_no_chip"] == (
+            reference["expected_own_points"] - reference["transfer_hit_points"]
+        ) - (
+            plain[case["entry_id"]]["expected_own_points"]
+            - plain[case["entry_id"]]["transfer_hit_points"]
+        )

@@ -76,9 +76,18 @@ export function deviceChip(
   if (chip === null) return null;
   if (!isDeviceChip(chip) || !squad.chips?.known) return undefined;
   const halves = squad.chips.states[chip];
+  const gameweek = squad.chips.gameweek;
+  // As the server reads the member's chip menu: a half still available whose window
+  // holds the decided gameweek.
   const playable =
     halves !== undefined &&
-    Object.values(halves).some((half) => half !== null && half.state === "available");
+    Object.values(halves).some(
+      (half) =>
+        half !== null &&
+        half.state === "available" &&
+        half.start_event <= gameweek &&
+        gameweek <= half.stop_event,
+    );
   return playable ? chip : undefined;
 }
 

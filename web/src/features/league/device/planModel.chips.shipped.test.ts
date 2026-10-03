@@ -13,10 +13,16 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
+import type { EntryAdvice, EntryAdviceIndex, EntrySquad, LeagueViewEnvelope } from "../types";
 import { solveRequest } from "./devicePlan.worker";
-import type { LpSolver } from "./planModel";
-import { DEVICE_CHIPS, isDevicePlanDocument, isDevicePlanEntry, type DeviceChip } from "./types";
+import { rebuilds, type LpSolver } from "./planModel";
+import {
+  isDeviceChip,
+  isDevicePlanDocument,
+  isDevicePlanEntry,
+  type DeviceChip,
+  type DevicePlanDocument,
+} from "./types";
 
 const require = createRequire(import.meta.url);
 const ROOT = join(__dirname, "../../../../public/data/league");
@@ -30,34 +36,73 @@ interface Case {
   published: EntryAdvice;
 }
 
-function cases(): Case[] {
-  if (!existsSync(join(ROOT, "device-plan.json")) || !existsSync(join(ROOT, "entries"))) return [];
+/** The tree's members with device inputs, and every chip document each one's index names. */
+function cases(): { cases: Case[]; withInputs: number } {
+  if (!existsSync(join(ROOT, "device-plan.json")) || !existsSync(join(ROOT, "entries"))) {
+    return { cases: [], withInputs: 0 };
+  }
   const found: Case[] = [];
+  let withInputs = 0;
   for (const name of readdirSync(join(ROOT, "entries"))) {
     const match = /^(\d+)\.json$/.exec(name);
     if (!match) continue;
     const entryId = Number(match[1]);
     const squad = read<LeagueViewEnvelope<EntrySquad>>(`entries/${name}`).payload;
     if (!isDevicePlanEntry(squad.device_plan)) continue;
-    for (const chip of DEVICE_CHIPS) {
-      const path = `advice/${entryId}/saf-puan/1/chip-${chip}.json`;
-      if (!existsSync(join(ROOT, path))) continue;
+    withInputs += 1;
+    // The index is the authority on which chip documents the publish wrote; a document
+    // it names must be there, so a publish that drops one fails here, not silently.
+    const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(
+      `advice/${entryId}/index.json`,
+    ).payload;
+    const paths = index.chips?.available ? (index.chips.paths ?? {}) : {};
+    for (const [chip, path] of Object.entries(paths)) {
+      if (!isDeviceChip(chip)) continue;
       found.push({
         entryId,
         chip,
         squad,
-        published: read<LeagueViewEnvelope<EntryAdvice>>(path).payload,
+        published: read<LeagueViewEnvelope<EntryAdvice>>(String(path)).payload,
       });
     }
   }
-  return found;
+  return { cases: found, withInputs };
 }
 
-const shipped = cases();
+const tree = cases();
+const shipped = tree.cases;
 const ids = (players: Array<{ player_id: number }>) =>
   players.map((p) => p.player_id).sort((a, b) => a - b);
 
-describe("the shipped chip plans", () => {
+/**
+ * The planner's objective of a published plan, on the document's integer scale: the
+ * squad coefficients over the fifteen, the starter coefficients over the eleven, the
+ * captain's, each as the chip reads them, less the caution margin per paid transfer.
+ * What the device maximises, so a proven device plan may not fall below it.
+ */
+function publishedObjective(
+  document: DevicePlanDocument,
+  published: EntryAdvice,
+  chip: DeviceChip,
+  freeTransfers: number,
+): number {
+  const byId = new Map(document.players.map((p) => [p.id, p.coefficients]));
+  const eleven = new Set(published.starting_xi!.map((p) => p.player_id));
+  const fifteen = [...published.starting_xi!, ...published.bench!].map((p) => p.player_id);
+  let total = 0;
+  for (const id of fifteen) {
+    const [squad, starter, captain] = byId.get(id)!;
+    total += chip === "bboost" ? squad + Math.max(starter, 0) : squad;
+    if (eleven.has(id)) total += chip === "bboost" ? Math.min(starter, 0) : starter;
+    if (id === published.captain!.player_id) {
+      total += chip === "3xc" ? captain + Math.max(captain, 0) : captain;
+    }
+  }
+  const paid = rebuilds(chip) ? 0 : Math.max(0, published.moves.length - freeTransfers);
+  return total - document.rules.hit_cost_scaled * paid;
+}
+
+describe.skipIf(shipped.length === 0)("the shipped chip plans", () => {
   let solver: LpSolver;
   beforeAll(async () => {
     const wasm = readFileSync(require.resolve("highs/runtime"));
@@ -65,13 +110,24 @@ describe("the shipped chip plans", () => {
     solver = (await load({ wasmBinary: wasm })) as unknown as LpSolver;
   }, 60_000);
 
-  it("are solved from the tree's device inputs", () => {
-    if (shipped.length === 0) return;
+  it("are solved from the tree's device inputs, for every member the tree wrote them for", () => {
     const document = read<LeagueViewEnvelope<unknown>>("device-plan.json").payload;
     expect(isDevicePlanDocument(document)).toBe(true);
-    // Every chip the game has is represented somewhere in the tree, or the tree says why.
-    const chips = new Set(shipped.map((c) => c.chip));
-    expect(chips.size).toBeGreaterThan(0);
+    // Every member with device inputs has at least one chip document, or says why.
+    const members = new Set(shipped.map((c) => c.entryId));
+    for (const name of readdirSync(join(ROOT, "entries"))) {
+      const match = /^(\d+)\.json$/.exec(name);
+      if (!match) continue;
+      const entryId = Number(match[1]);
+      if (!members.has(entryId)) {
+        const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(
+          `advice/${entryId}/index.json`,
+        ).payload;
+        expect(index.chips?.available ? Object.keys(index.chips.paths ?? {}) : []).toEqual([]);
+      }
+    }
+    expect(members.size).toBeGreaterThan(0);
+    expect(tree.withInputs).toBeGreaterThanOrEqual(members.size);
   });
 
   it.each(shipped.map((c) => [c.entryId, c.chip, c] as const))(
@@ -86,10 +142,11 @@ describe("the shipped chip plans", () => {
       expect(answer.chip).toBe(chip);
       expect(published.chip).toBe(chip);
       // A plan the server found without finishing its proof is not held to: the device
-      // proves its own, which may be the better plan. Its points may not fall short.
+      // proves its own, which may be the better plan. On the planner's own objective the
+      // proven plan may not fall below the published one.
       if (published.solver_status !== "OPTIMAL") {
-        expect(answer.expected_own_points - answer.transfer_hit_points).toBeGreaterThanOrEqual(
-          published.expected_own_points! - (published.transfer_hit_points ?? 0) - 1e-6,
+        expect(answer.objective_scaled).toBeGreaterThanOrEqual(
+          publishedObjective(document, published, chip, squad.device_plan.free_transfers) - 1e-6,
         );
         return;
       }

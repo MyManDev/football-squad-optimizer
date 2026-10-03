@@ -11,7 +11,10 @@ still be the planner's, so a planner change that moves an answer fails there fir
 is carried here by rerunning this script.
 
 The table is synthetic and small, built from a fixed seed, so the fixture is a model
-parity check and not a claim about any player.
+parity check and not a claim about any player. The ``chips`` instances play each chip the
+game has on two of the fifteens, forced for the decided week as the member's chosen chip
+is, with every total on the chip week's own basis and the gain against the member's
+no-chip plan the way ``advice_chips`` measures it.
 """
 
 from __future__ import annotations
@@ -25,12 +28,17 @@ import pandas as pd
 from scripts._experiment_cli import measurement_optimization_config
 
 from squadopt.application.advice import _attributed_gains, _paired_by_position
-from squadopt.application.lineup_publication import best_eleven_points
+from squadopt.application.advice_chips import chip_week_points
+from squadopt.application.lineup_publication import (
+    best_eleven_points,
+    best_lineup_points_with_chip,
+)
 from squadopt.contracts.players import order_outfield_bench
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
 from squadopt.planning import (
+    ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
     TransferPlanningConfig,
@@ -47,6 +55,11 @@ FIXTURE: Final = (
 )
 SEED: Final = 20261003
 MAX_FREE_TRANSFERS: Final = 5
+GAMEWEEK: Final = 7
+CHIPS: Final = ("wildcard", "freehit", "bboost", "3xc")
+#: Which fifteens play each chip: the one that holds two free transfers and a little money,
+#: and the weak one with money, whose rebuild under a Wildcard is a real rebuild.
+CHIP_MEMBERS: Final = (2, 7)
 CLUBS: Final = tuple(f"Club {k}" for k in range(1, 9))
 SHAPE: Final = {"GK": 8, "DEF": 20, "MID": 20, "FWD": 12}
 PRICE: Final = {"GK": (40, 55), "DEF": (40, 75), "MID": (45, 130), "FWD": (45, 125)}
@@ -72,7 +85,7 @@ def _table(rng: random.Random) -> pd.DataFrame:
             points = 0.0 if rng.random() < 0.08 else round(max(0.0, base), 2)
             rows.append(
                 {
-                    "gameweek": 7,
+                    "gameweek": GAMEWEEK,
                     "player_id": player_id,
                     "name": f"Player {player_id}",
                     "team_id": CLUBS[rng.randrange(len(CLUBS))],
@@ -125,7 +138,7 @@ def _document(table: pd.DataFrame, settings: OptimizationConfig) -> dict[str, An
         "contract_version": "league_device_plan_v1",
         "league_id": 1,
         "season": "2026-27",
-        "gameweek": 7,
+        "gameweek": GAMEWEEK,
         "source_snapshot_id": "synthetic-device-plan-fixture",
         "policy_id": "member_planning_policy_v2",
         "rules": {
@@ -166,6 +179,7 @@ def _reference(
     bank: int,
     free: int,
     settings: OptimizationConfig,
+    chip: str | None = None,
 ) -> dict[str, Any]:
     horizon_table = table.copy()
     horizon_table["sell_price_tenths"] = [
@@ -180,15 +194,24 @@ def _reference(
         horizon_discount_factor=1.0,
         chip_holding_value_points={},
     )
+    # A chosen chip is forced for the decided week, as the member's chip advice forces it.
+    chips = (
+        None
+        if chip is None
+        else ChipAvailability(available={chip: frozenset({GAMEWEEK})}, forced={GAMEWEEK: chip})
+    )
     plan = optimize_transfer_plan(
         PlanningHorizon(horizon_table),
         InitialSquadState(tuple(held), bank_tenths=bank, free_transfers=free),
         settings,
         transfer,
+        chips=chips,
     )
     if plan.solver_status.value != "OPTIMAL":
         raise RuntimeError(f"The reference solve was not proved: {plan.solver_status.value}.")
     week = plan.weeks[0]
+    if week.chip != chip:
+        raise RuntimeError(f"The forced {chip!r} plan came back playing {week.chip!r}.")
     captain = int(week.captain["player_id"])
     eligible = week.starting_xi.loc[week.starting_xi.player_id.ne(captain)]
     vice = int(
@@ -204,10 +227,23 @@ def _reference(
         for row in table.itertuples(index=False)
     }
     squad = sorted(int(v) for v in week.selected_squad["player_id"])
-    plan_points = best_eleven_points(lookup[p] for p in squad)
-    hold_points = best_eleven_points(lookup[p] for p in held)
+
+    # What a fifteen is worth on the basis the week scores on: the eleven with the captain
+    # doubled, or the chip week's own reading of it.
+    def value_of(players: list[int]) -> float | None:
+        if chip is None:
+            return best_eleven_points(lookup[p] for p in players)
+        return best_lineup_points_with_chip((lookup[p] for p in players), chip)
+
+    plan_points = value_of(squad)
+    hold_points = value_of(held)
     assert plan_points is not None and hold_points is not None
     assert plan.objective_value is not None
+    if chip is not None and abs(chip_week_points(week) - plan_points) > 1e-6:
+        raise RuntimeError(
+            f"The {chip!r} week counts {chip_week_points(week)!r}; its fifteen is worth "
+            f"{plan_points!r} on the chip basis."
+        )
     # The move rows as the advice publishes them: paired by position in id order, each
     # row's gain the published basis's move when the swap is applied in row order.
     rows = {
@@ -218,7 +254,11 @@ def _reference(
     outs = sorted(int(v) for v in week.transfers_out["player_id"])
     ins = sorted(int(v) for v in week.transfers_in["player_id"])
     paired = _paired_by_position(outs, ins, by_id=series, pool_by_id=series)
-    gains = _attributed_gains(paired, held=held, lookup=lookup, expected_total=plan_points)
+    gains = (
+        _attributed_gains(paired, held=held, lookup=lookup, expected_total=plan_points)
+        if chip is None
+        else _gains_on_chip_basis(paired, held, value_of, plan_points)
+    )
     moves = [
         {"out": out, "in": arriving, "gain": None if gains is None else gains[index]}
         for index, (out, arriving) in enumerate(paired)
@@ -241,6 +281,36 @@ def _reference(
     }
 
 
+def _gains_on_chip_basis(
+    paired: list[tuple[int | None, int | None]],
+    held: list[int],
+    value_of: Any,
+    expected_total: float,
+) -> list[float] | None:
+    """The move rows on the chip week's basis, as ``advice_chips._rows_on_chip_basis``
+    walks them: the rows in order, each the change once that swap is added to the ones
+    above it, from the held fifteen valued with the same chip played. ``None`` when the
+    chain does not end at the eleven the plan fields."""
+
+    squad = list(held)
+    previous = value_of(squad)
+    if previous is None:
+        return None
+    gains: list[float] = []
+    for out, arriving in paired:
+        if out is None or arriving is None or out not in squad or arriving in squad:
+            return None
+        squad[squad.index(out)] = arriving
+        value = value_of(squad)
+        if value is None:
+            return None
+        gains.append(value - previous)
+        previous = value
+    if abs(previous - expected_total) > 1e-6:
+        return None
+    return gains
+
+
 def build_fixture() -> dict[str, Any]:
     rng = random.Random(SEED)
     # The limits of a run that writes a committed record: deterministic time binds, not the
@@ -248,7 +318,7 @@ def build_fixture() -> dict[str, Any]:
     settings = measurement_optimization_config()
     table = _table(rng)
     document = _document(table, settings)
-    members = []
+    members: list[dict[str, Any]] = []
     # Free transfers across the cap, banks from empty to generous, and one fifteen whose
     # sale prices sit below the buy prices (a risen squad, sold at half the rise).
     for entry_id, (free, bank, risen, weak) in enumerate(
@@ -289,11 +359,34 @@ def build_fixture() -> dict[str, Any]:
                 "reference": _reference(table, held, sell, bank, free, settings),
             }
         )
+    chips: list[dict[str, Any]] = []
+    for member in members:
+        if member["entry_id"] not in CHIP_MEMBERS:
+            continue
+        entry = member["entry"]
+        plain = member["reference"]
+        for chip in CHIPS:
+            reference = _reference(
+                table,
+                list(entry["held"]),
+                {int(k): int(v) for k, v in entry["sell_tenths"].items()},
+                int(entry["bank_tenths"]),
+                int(entry["free_transfers"]),
+                settings,
+                chip=chip,
+            )
+            # The chip week net of its hits above the member's own no-chip plan net of
+            # its hits: ``advice_chips``'s gain_vs_no_chip.
+            reference["gain_vs_no_chip"] = (
+                reference["expected_own_points"] - reference["transfer_hit_points"]
+            ) - (plain["expected_own_points"] - plain["transfer_hit_points"])
+            chips.append({"entry_id": member["entry_id"], "chip": chip, "reference": reference})
     return {
         "note": "Synthetic device-plan parity instances; scripts/export_device_plan_fixture.py.",
         "seed": SEED,
         "document": document,
         "members": members,
+        "chips": chips,
     }
 
 
@@ -301,7 +394,10 @@ def main() -> int:
     fixture = build_fixture()
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
     FIXTURE.write_text(json.dumps(fixture, indent=1), encoding="utf-8", newline="\n")
-    print(f"Wrote {FIXTURE} with {len(fixture['members'])} instances.")
+    print(
+        f"Wrote {FIXTURE} with {len(fixture['members'])} instances and "
+        f"{len(fixture['chips'])} chip instances."
+    )
     return 0
 
 
