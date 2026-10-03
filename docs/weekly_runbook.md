@@ -177,6 +177,37 @@ net columns beside it.
 
 ## Timing
 
+### The order the week's instants must keep
+
+Every step below records an instant, and the readers refuse a step whose instant is
+out of order. The list is the whole order for one deadline, with the check that holds
+each line; the commands are in the table above and in the documents named.
+
+1. **Club news is fetched, then coded from one observation instant taken after the last
+   page was read** (`scripts.capture_club_news`; `docs/club_news_configuration.md`). The
+   coding refuses a document fetched after its observation instant.
+2. **The decision capture is taken** (`fpl_capture.capture`). The rotation export refuses a
+   news document fetched at or after the decision capture, and the bundle refuses a news
+   capture that completed after it.
+3. **The football forecast is built with its components from that capture**
+   (`scripts.build_football_forecast --with-components`), and **the projection handoff from
+   the capture and the evidence** (`scripts.build_projection_handoff`). The bundle binds
+   the forecast's and the handoff's fingerprints to the capture and refuses any other.
+4. **The weekly run**: rotation export, league tree, advice record, site, scoreboard,
+   publish pull request (`platform.weekly_operations`). The journal refuses a stage whose
+   predecessor did not complete; the league tree carries one `generated_at_utc`, which the
+   bundle requires to be after the capture.
+5. **The bundle is sealed against the published tree** (`scripts.prepare_football_bundle`;
+   `docs/operations/official_injury_discovery.md`). Its marker is written last, after every
+   copy has been read back through the production validators; a name or an input the reader
+   would refuse is refused before anything is copied.
+6. **The site pull request merges through develop's merge queue, the release is cut and
+   tagged, the backend is restarted** (`docs/deployment_runbook.md`). The restart reads the
+   one capture every published human entry names, on the public site and locally, and
+   refuses when the two differ.
+
+A step run out of this order is not late; its artifact is refused by the next reader.
+
 - **Take the capture two to three hours before the deadline, not the night before.**
   The capture must be open for the requested gameweek — the command reads the deadline
   back from it and refuses a mismatch — but "open" is a floor, not the policy. The week
