@@ -100,10 +100,11 @@ describe("the card states one basis for the rows, the total and the gain", () =>
       expect(within(board).getByText(COPY.boardGainLabel)).toBeInTheDocument();
     }
     // The boards are read in order, which is what makes them add up, and the total they
-    // add up to is on the page beside them, with the basis it is measured on.
+    // add up to is on the page beside them as a bare figure.
     expect(text).toContain(COPY.moveRowsBasis);
-    expect(gainLine(COPY.gainCaption)).toBe(`+1.7 ${COPY.gainCaption}`);
-    expect(COPY.gainCaption).toContain("for the eleven with the captain doubled");
+    const figure = screen.getByText("+1.7", { selector: "strong" });
+    expect(figure.nextElementSibling).toHaveClass("visually-hidden");
+    expect(figure.closest("p")?.textContent).toBe(`+1.7 ${COPY.boardGainLabel}`);
   });
 
   it("names the week's transfer cost in the gain sentence when the plan pays one", () => {
@@ -119,21 +120,31 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     expect(gainLine(COPY.gainCaptionBeforeCost("4.0"))).toBe(
       `+3.5 ${COPY.gainCaptionBeforeCost("4.0")}`,
     );
-    // The plain sentence, which leaves the week's charge unsaid, is not the one printed.
-    expect(screen.queryByText(COPY.gainCaption)).toBeNull();
   });
 
   it("prints no gain sentence where the producer measured none", () => {
-    const unmeasured = withPayload({ moves: [move("m1", null)], expected_gain_vs_hold: null });
+    // Both pay a hit, so a measured gain would carry its sentence; these print none.
+    const unmeasured = withPayload({
+      moves: [move("m1", null)],
+      expected_gain_vs_hold: null,
+      transfer_hit_points: 4,
+    });
 
-    expect(renderAdvice(unmeasured)).not.toContain("against keeping the squad you hold");
+    expect(renderAdvice(unmeasured)).not.toContain("over making no transfer");
 
     cleanup();
-    const absent = withPayload({ moves: [move("m1", 1.2)] });
+    const absent = withPayload({ moves: [move("m1", 1.2)], transfer_hit_points: 4 });
     delete (absent.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
 
-    expect(renderAdvice(absent)).not.toContain("against keeping the squad you hold");
-    expect(COPY.gainCaption).toContain("against keeping the squad you hold");
+    expect(renderAdvice(absent)).not.toContain("over making no transfer");
+
+    cleanup();
+    const measured = withPayload({
+      moves: [move("m1", 1.2)],
+      expected_gain_vs_hold: 1.2,
+      transfer_hit_points: 4,
+    });
+    expect(renderAdvice(measured)).toContain("over making no transfer");
   });
 
   it("says a row's share was not published rather than printing it as zero", () => {

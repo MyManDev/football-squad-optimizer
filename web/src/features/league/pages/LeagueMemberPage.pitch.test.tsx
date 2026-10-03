@@ -446,8 +446,8 @@ describe("the fixture rail", () => {
         "SUN - BHABrobbey / Cuyper, Groß",
         "LIV - MCISzoboszlai / Guéhi, Haaland",
       ]);
-      expect(aside).toHaveTextContent(copy.railLegendVenue);
-      expect(aside).toHaveTextContent(copy.railLegendDifficulty);
+      // No legend under the tables.
+      expect(aside).not.toHaveTextContent(/E: ev|H: home|zorluk derecesi|Fixture difficulty/);
     },
   );
 

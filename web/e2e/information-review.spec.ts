@@ -285,7 +285,7 @@ for (const [window, width, modelVersion] of [
     const comparison = selected.getByTestId("policy-comparison");
     const format = (value: number) => value.toFixed(1).replace(".", ",");
     const expectedComparison = answer.payload.information_review!.comparison!.candidates[0]!;
-    await expect(region).toContainText("Kaynakta belirtilen oynama ihtimali: 50%");
+    await expect(region).toContainText("FPL oynama değeri: 50/100");
     await expect(comparison).toContainText(
       `Hesaplanan haber senaryolarındaki puan aralığı: ${format(expectedComparison.scenario_min)} – ${format(expectedComparison.scenario_max)}`,
     );

@@ -49,6 +49,16 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(readViewerEntry()?.entryId).toBe(viewer);
   });
 
+  it("says what the site does before the field, and keeps the ID help folded", () => {
+    open(language);
+    const intro = screen.getByText(copy.intro);
+    const field = screen.getByLabelText(copy.label);
+    expect(intro.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const help = screen.getByText(copy.helpTitle).closest("details")!;
+    expect(help.open).toBe(false);
+    expect(help).toHaveTextContent(copy.help);
+  });
+
   it("validates decimal IDs before requesting any publication", async () => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);

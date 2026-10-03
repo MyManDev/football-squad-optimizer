@@ -1,6 +1,7 @@
 import type { DecisionInformation, OfficialInformation } from "../advice/informationFacts";
 import type { OfficialInjuryFacts } from "../advice/officialInjuryFacts";
 import type { PlayerView } from "../../../data/schema";
+import type { DevicePlanEntry } from "../device/types";
 import type { PlayMode, WindowSize } from "../../../lib/decisionVocabulary";
 import type { Top100Weight } from "../advice/top100";
 
@@ -161,6 +162,13 @@ export interface EntrySquad {
   squad_basis?: string;
   /** The chip active in the captured week as the source reported it, or null. */
   active_chip?: string | null;
+  /**
+   * The member's side of the one-week problem for a solve on the member's own device:
+   * the fifteen, the bank after the spending-power rule, the free transfers under the
+   * cap, and each held player's sale price. Absent on documents from before the block;
+   * null where the publisher would not plan for this member.
+   */
+  device_plan?: DevicePlanEntry | null;
 }
 
 export interface EntryScoreComparison {

@@ -2,6 +2,7 @@ import { withRequestDeadline, type RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import { chipPath, isMemberChip } from "./advice/chipChoice";
+import { isDevicePlanDocument, type DevicePlanDocument } from "./device/types";
 import { isTop100Weight, top100TargetPath, type Top100Target } from "./advice/top100";
 import type { WindowSize } from "../../lib/decisionVocabulary";
 import type {
@@ -82,6 +83,22 @@ async function readOrExample<T>(
     if (error instanceof LeagueDataMissing) return example();
     throw error;
   }
+}
+
+/**
+ * The capture's table and rules for a solve on the member's own device. Published beside
+ * members.json by the same build; absent on a tree from before it, which reads as
+ * `LeagueDataMissing`. There is no example document: the page offers the device solve
+ * only where the publisher wrote its inputs.
+ */
+export async function loadDevicePlan(
+  options?: RequestOptions,
+): Promise<LeagueViewEnvelope<DevicePlanDocument>> {
+  const envelope = await read<unknown>("device-plan.json", options);
+  if (!isDevicePlanDocument(envelope.payload)) {
+    throw new LeagueDataError("The published device-plan document is not the expected shape.");
+  }
+  return envelope as LeagueViewEnvelope<DevicePlanDocument>;
 }
 
 export async function loadLeagueMembers(): Promise<LeagueViewEnvelope<LeagueMembers>> {

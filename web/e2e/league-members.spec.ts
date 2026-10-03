@@ -19,12 +19,12 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(page).toHaveURL(/\/league\/members\/35249001$/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
 
-  // Pure points is published at three and five weeks; the window's limits are stated.
+  // Pure points is published at three and five weeks; the page lists no assumptions.
   await expect(page.getByRole("radio", { name: /3 hafta/ })).toBeEnabled();
   await page.getByRole("radio", { name: /3 hafta/ }).click();
   await expect(page).toHaveURL(/window=3/);
   await expect(page.getByRole("region", { name: "3 haftalık pencere" })).toBeVisible();
-  await expect(page.getByText(/Bu pencerenin varsaydıkları/)).toBeVisible();
+  await expect(page.getByText(/Bu pencerenin varsaydıkları/)).toHaveCount(0);
   await page.getByRole("radio", { name: /1 hafta/ }).click();
   // A rival strategy stays at one week: the longer windows are shown disabled.
   await page.getByRole("radio", { name: /^Ortak çekirdeği koru/ }).click();

@@ -14,6 +14,8 @@ const COPY = {
     dateUnknown: "Tarih bildirilmedi",
     gameweekUnknown: "Hafta bildirilmedi",
     noneApplied: "Bu tahmine uygulanmış hoca açıklaması yok.",
+    noStatements: "Bu hafta değerlendirilecek hoca açıklaması okunmadı.",
+    allRejected: "Okunan açıklamaların hiçbiri gerekli koşulları sağlamadı; tahmin değişmedi.",
     applied: "Doğrulanmış haberin uygulandığı oyuncu",
     unapplied: "Uygulanamayan açıklama",
     explanation:
@@ -50,6 +52,8 @@ const COPY = {
     dateUnknown: "Date not reported",
     gameweekUnknown: "Gameweek not reported",
     noneApplied: "No coach statement was applied to this forecast.",
+    noStatements: "No coach statement was read for this week.",
+    allRejected: "None of the statements read met the requirements; the forecast is unchanged.",
     applied: "Players with verified statements applied",
     unapplied: "Statements that could not be applied",
     explanation:
@@ -116,7 +120,17 @@ export function ParticipationEvidence({ view }: { view: EntryAdvice }) {
           {copy.unapplied}: <span className="num">{evidence.unapplied_statement_count}</span>.
         </li>
       </ul>
-      {evidence.applied_player_count === 0 && <p>{copy.noneApplied}</p>}
+      {/* Nothing applied has three shapes: nothing was read, everything read was turned
+          away, or statements were read and none reached a player. Each says which. */}
+      {evidence.applied_player_count === 0 && (
+        <p>
+          {evidence.manager_statement_count === 0
+            ? copy.noStatements
+            : evidence.unapplied_statement_count >= evidence.manager_statement_count
+              ? copy.allRejected
+              : copy.noneApplied}
+        </p>
+      )}
       <StatementOutcomes view={view} />
       <RoleForecast view={view} />
       <ul className={styles.assumptionList}>

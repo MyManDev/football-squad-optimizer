@@ -73,7 +73,8 @@ it("shows conditional news, base points and hold without presenting future moves
     </LanguageProvider>,
   );
   const region = screen.getByRole("region", { name: "Haber gelince plan nasıl değişir?" });
-  expect(region).toHaveTextContent("75%");
+  expect(region).toHaveTextContent("FPL oynama değeri: 75/100");
+  expect(region).not.toHaveTextContent("%");
   expect(region).toHaveTextContent("Bu hafta transfer yapma");
   expect(region).toHaveTextContent("kesin gelecek transfer tahmini değildir");
   expect(region).toHaveTextContent("Top100 ağırlığı puan kazancı değildir");

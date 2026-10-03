@@ -2109,3 +2109,23 @@ def test_accepted_chip_with_artifacts_does_not_prepare_a_projection(
     )
     assert response.status_code == 202, response.text
     assert backend.contexts._context is None
+
+
+def test_the_injury_facts_asked_for_are_the_members_own_players_first() -> None:
+    """The source answers fifty identities at most; the squad is never the part left out."""
+
+    own_ids = list(range(9001, 9016))
+    advice = {
+        "starting_xi": [{"player_id": i} for i in own_ids[:11]],
+        "bench": [{"player_id": i} for i in own_ids[11:]],
+        "captain": {"player_id": own_ids[0]},
+        "vice_captain": {"player_id": own_ids[1]},
+        "moves": [{"player_out": {"player_id": own_ids[2]}, "player_in": {"player_id": 9050}}],
+        # A rival eleven and plan weeks naming sixty players with lower ids than the squad.
+        "rival_lineup": [{"player_id": i} for i in range(1, 61)],
+    }
+    asked = worker_module._injury_fact_ids(advice)
+    assert len(asked) == 50
+    assert set(own_ids) <= set(asked) and 9050 in asked
+    assert asked[: len(own_ids) + 1] == [*own_ids, 9050]
+    assert asked[len(own_ids) + 1 :] == list(range(1, 50 - len(own_ids)))

@@ -3,7 +3,6 @@ import { MemoryRouter } from "react-router";
 import { afterEach, expect, it } from "vitest";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { AdviceCard } from "./MemberAdviceCard";
@@ -46,7 +45,7 @@ function show(
   );
 }
 it.each(["en", "tr"] as const)(
-  "shows two base totals and limits without a difference in %s",
+  "shows two base totals and no difference, with no sentence under them, in %s",
   (language) => {
     const selected = plan("fark-yarat", 70);
     show(selected, plan("saf-puan", 60), language);
@@ -54,8 +53,7 @@ it.each(["en", "tr"] as const)(
     const region = screen.getByRole("region", { name: copy.windowComparisonTitle });
     expect(within(region).getByText(language === "en" ? "198.0" : "198,0")).toBeInTheDocument();
     expect(within(region).getByText(language === "en" ? "168.0" : "168,0")).toBeInTheDocument();
-    expect(region).toHaveTextContent(MESSAGES[language].leagueMembers.windowLimits);
-    expect(region).toHaveTextContent(copy.windowComparisonBasis);
+    expect(region.querySelectorAll("p")).toHaveLength(0);
     expect(region).not.toHaveTextContent("30");
   },
 );

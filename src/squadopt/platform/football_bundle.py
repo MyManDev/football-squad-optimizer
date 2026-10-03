@@ -35,6 +35,11 @@ from squadopt.platform.projection_retention import _safe
 CONTRACT_VERSION = "football_ready_bundle_v1"
 _REQUIRED = frozenset({"forecast", "components", "handoff", "site_members"})
 _OPTIONAL = frozenset({"rotation_table", "rotation_manifest"})
+#: The one rule for a sealed rotation filename, applied when a bundle is read and, so that
+#: no marker is ever written for a bundle its reader refuses, before anything is copied.
+_ROTATION_FILENAME = re.compile(r"[A-Za-z0-9_-]+(?:\.manifest)?\.(?:csv|json)")
+#: Names a rotation artifact may not take inside the bundle folder.
+_RESERVED_FILENAMES = frozenset({"handoff.json", "site.json"})
 
 
 def football_bundle_path(artifact_root: Path, snapshot_id: str) -> Path:
@@ -305,7 +310,7 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
             ):
                 raise ValueError("Unexpected bundle role or relative path.")
             name = relative.removeprefix(prefix)
-            if not re.fullmatch(r"[A-Za-z0-9_-]+(?:\.manifest)?\.(?:csv|json)", name):
+            if name in _RESERVED_FILENAMES or not _ROTATION_FILENAME.fullmatch(name):
                 raise ValueError("Invalid sealed rotation filename.")
         elif relative != expected:
             raise ValueError("Bundle role has an unexpected filename.")
@@ -409,6 +414,13 @@ def seal_football_bundle(
             rotation_table=rotation_table_path,
             rotation_manifest=rotation_table_path.with_suffix(".manifest.json"),
         )
+    # The reader's rule, before validation, a copy or a marker: a name the reader would
+    # refuse must not become a marker that refuses every later read and reseal.
+    for role in _OPTIONAL & files.keys():
+        if files[role].name in _RESERVED_FILENAMES:
+            raise ValueError("Reserved rotation artifact filename.")
+        if not _ROTATION_FILENAME.fullmatch(files[role].name):
+            raise ValueError("Invalid sealed rotation filename.")
     identity, _ = _validate(
         snapshot_root=snapshot_root,
         snapshot_id=snapshot_id,
@@ -423,8 +435,6 @@ def seal_football_bundle(
         if role.startswith("site_"):
             destinations[role] = folder / "site" / path.relative_to(site_data_root)
     for role in _OPTIONAL & files.keys():
-        if files[role].name in {"handoff.json", "site.json"}:
-            raise ValueError("Reserved rotation artifact filename.")
         destinations[role] = folder / files[role].name
     payloads = {role: Path(addressable(path)).read_bytes() for role, path in files.items()}
     record = {

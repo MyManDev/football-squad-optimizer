@@ -28,7 +28,6 @@ export interface ChipCopy {
   title: string;
   chosen: (name: string) => string;
   gain: (points: string) => string;
-  honesty: string;
   unproven: string;
   freeHit: string;
   basis: Record<MemberChip, string>;
@@ -76,8 +75,6 @@ const en: ChipCopy = {
   chosen: (name) => `${name} is played this gameweek because you chose it.`,
   gain: (points) =>
     `~${points} expected points this gameweek against your own plan without the chip, hits included.`,
-  honesty:
-    "This is one gameweek's difference. What the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.",
   unproven:
     "The solver found at least one of the two plans without finishing its proof, so the difference is between the plans it found.",
   freeHit:
@@ -132,8 +129,6 @@ const tr: ChipCopy = {
   title: "Çip seçimi",
   chosen: (name) => `${name} bu hafta oynanıyor, çünkü sen seçtin.`,
   gain: (points) => `Çipsiz kendi planına göre bu hafta ~${points} beklenen puan, cezalar dahil.`,
-  honesty:
-    "Bu yalnız bu haftanın farkıdır. Çipin sonraki bir haftada kaç puan getireceği ölçülmedi; bu yüzden bu, çipi şimdi oyna tavsiyesi değildir.",
   unproven:
     "Çözücü iki plandan en az birini ispatını bitirmeden buldu; fark, bulduğu planlar arasındaki farktır.",
   freeHit:

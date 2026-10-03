@@ -20,6 +20,7 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -604,6 +605,97 @@ def test_one_claim_the_parser_refuses_costs_that_claim_and_not_the_week(tmp_path
     pd.testing.assert_frame_equal(
         damaged.drop(index=player_id)[columns], whole.drop(index=player_id)[columns]
     )
+
+
+def _one_call_per_club(damage: dict[str, object] | None = None) -> tuple[CodedClub, ...]:
+    """Arsenal and Man Utd each answered by their own call, Arsenal's optionally damaged."""
+
+    responses = {club: json.loads(_response_for(club).text) for club in ("Arsenal", "Man Utd")}
+    if damage is not None:
+        responses["Arsenal"].update(damage)
+    return tuple(
+        CodedClub(
+            club=club,
+            response=ClaimResponse(
+                text=json.dumps(responses[club], ensure_ascii=False),
+                model_identifier="synthetic-stub",
+                model_version="fixture-1",
+            ),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
+        )
+        for club in ("Arsenal", "Man Utd")
+    )
+
+
+def _summary(tmp_path: Path, coded: tuple[CodedClub, ...]) -> tuple[Any, pd.DataFrame, Any]:
+    root = tmp_path / "snapshots"
+    decision = _decision(root)
+    news = _news_capture(root, coded=coded)
+    summary = export_rotation_evidence(
+        RotationExportRequest(
+            SEASON,
+            TARGET_GAMEWEEK,
+            DEADLINE,
+            decision,
+            root,
+            None,
+            tmp_path / "out",
+            club_news_snapshot=news,
+            table_name="table",
+        ),
+        repository_commit=COMMIT,
+    )
+    table = pd.read_csv(tmp_path / "out" / "table.csv").set_index("player_id")
+    manifest = json.loads((tmp_path / "out" / "table.manifest.json").read_text(encoding="utf-8"))
+    return summary, table, manifest
+
+
+def test_one_club_answer_the_reader_refuses_costs_that_club_and_not_the_week(
+    tmp_path: Path,
+) -> None:
+    """Two claims about one player refuse the response; with a call per club that is one club.
+
+    The parser has no rule for choosing between two answers about a player, so it refuses
+    the response they came in. That used to end the export, and United's readable answer
+    was lost with Arsenal's. Now Arsenal leaves the covered list, United's rows are exactly
+    what they are in a clean week, and the refusal is returned with its reason.
+    """
+
+    clean_summary, clean, _ = _summary(tmp_path / "clean", _one_call_per_club())
+    arsenal = json.loads(_response_for("Arsenal").text)
+    twice = [*arsenal["claims"], dict(arsenal["claims"][0])]
+
+    summary, table, manifest = _summary(tmp_path / "damaged", _one_call_per_club({"claims": twice}))
+
+    assert clean_summary["responses_refused"] == []
+    (refusal,) = summary["responses_refused"]
+    assert refusal["clubs"] == ["Arsenal"]
+    assert "twice" in refusal["reason"]
+    assert manifest["clubs_covered"] == ["Man Utd"]
+    assert "Arsenal" in manifest["clubs_declared"]
+    arsenal_rows = table.loc[list(_players_of("Arsenal"))]
+    assert not arsenal_rows.club_source_covered.any()
+    assert not arsenal_rows.rotation_claim_observed.any()
+    united = list(_players_of("Man Utd"))
+    # Everything a claim puts in a row, and the coverage flags. The capture's own id is in
+    # other columns and differs between the two weeks by construction.
+    columns = [*CLAIM_COLUMNS[1:-1], "rotation_claim_unresolved", "club_source_covered"]
+    pd.testing.assert_frame_equal(table.loc[united, columns], clean.loc[united, columns])
+    assert table.loc[united, "rotation_claim_observed"].any()
+
+
+def test_a_week_whose_every_answer_is_refused_is_still_refused(tmp_path: Path) -> None:
+    """With nothing left to narrow, the reader's own refusal is raised as it was."""
+
+    arsenal = json.loads(_response_for("Arsenal").text)
+    twice = [*arsenal["claims"], dict(arsenal["claims"][0])]
+    (only_arsenal, _united) = _one_call_per_club({"claims": twice})
+
+    with pytest.raises(ClubNewsError, match="twice"):
+        _summary(tmp_path, (only_arsenal,))
 
 
 def test_a_club_whose_every_claim_lost_its_citation_is_no_longer_covered(

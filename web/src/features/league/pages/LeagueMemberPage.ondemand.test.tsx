@@ -303,6 +303,55 @@ describe("a selection nobody published, with the service answering", () => {
     expect(container.querySelector('[data-testid="top100-influence"]')).toBeNull();
   });
 
+  it("keeps the answer this selection already received when a later attempt is refused", async () => {
+    const client = new RecordingClient((request) => ({
+      kind: "advice",
+      envelope: computed(request),
+      source: "api-cache",
+    }));
+    const { container } = renderView(link, client, { adviceIssue: "not-listed" });
+    await pressCompute();
+    await waitFor(() => expect(container).toHaveTextContent(copy.computeDone));
+    expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
+
+    client.answer = () => {
+      throw new AdviceApiError(503, "ADVICE_BACKEND_DISABLED");
+    };
+    await pressCompute();
+    await waitFor(() =>
+      expect(container).toHaveTextContent(computeCopy.failures.ADVICE_BACKEND_DISABLED!),
+    );
+    expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
+    expect(container).toHaveTextContent(computeCopy.earlierRemains);
+    expect(container).not.toHaveTextContent(computeCopy.publishedRemains);
+    expect(container).not.toHaveTextContent(copy.computeDone);
+  });
+
+  it("drops an earlier answer from another capture instead of letting it mask the attempt", async () => {
+    const client = new RecordingClient((request) => ({
+      kind: "advice",
+      envelope: computed(request, { source_snapshot_id: "another-capture" }),
+      source: "api-cache",
+    }));
+    const { container } = renderView(link, client, { adviceIssue: "not-listed" });
+    await pressCompute();
+    await waitFor(() =>
+      expect(container).toHaveTextContent(computeCopy.failures.ANSWER_OTHER_CAPTURE!),
+    );
+
+    client.answer = () => {
+      throw new AdviceApiError(503, "ADVICE_BACKEND_DISABLED");
+    };
+    await pressCompute();
+    await waitFor(() =>
+      expect(container).toHaveTextContent(computeCopy.failures.ADVICE_BACKEND_DISABLED!),
+    );
+    expect(container).toHaveTextContent(computeCopy.publishedRemains);
+    expect(container).not.toHaveTextContent(computeCopy.earlierRemains);
+    expect(container).not.toHaveTextContent(computeCopy.failures.ANSWER_OTHER_CAPTURE!);
+    expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
+  });
+
   it.each([false, true])(
     "resumes a remembered job before reading the cache (missing: %s)",
     async (missing) => {

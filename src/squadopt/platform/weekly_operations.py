@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import re
 import secrets
 import shutil
@@ -190,6 +191,9 @@ class WeeklyOperations:
             paths = replace(paths, out=paths.journal / run_id / "preview")
         self.request, self.paths, self.run_id = request, paths, run_id
         self.repository_commit, self.resume = repository_commit, resume
+        # The run log proper is configured by `execute`; until then a stage called on its
+        # own records through the module's logger, so nothing it has to say is lost.
+        self.log = RunLog(logging.getLogger(__name__), run_id, None)
         self.supplied_handoff = handoff
         self.record_advice = record_advice
         self.no_advice_record = no_advice_record
@@ -515,8 +519,9 @@ class WeeklyOperations:
         # not have, and exporting over it is the recovery. The alternative is the branch that
         # skips the export and then raises at the read below, on a run that cannot be retried
         # inside its own window.
+        refused: list[dict[str, object]] = []
         if not rotation_pair_is_readable(table, manifest):
-            export_rotation_evidence(
+            summary = export_rotation_evidence(
                 # Keyword arguments, deliberately. Positionally the eighth field is never
                 # reached, which is why this stage could not name a capture at all: the field
                 # and its refusal have existed since the capture path landed.
@@ -533,9 +538,24 @@ class WeeklyOperations:
                 ),
                 repository_commit=self.repository_commit,
             )
+            # A club whose answer the reader refused is absent from the covered list, and
+            # the manifest cannot say why: its keys are the artifact contract's. The reason
+            # is kept here, in the stage's receipt, where an operator reading the run sees
+            # it beside the table it describes.
+            reported = summary.get("responses_refused")
+            if isinstance(reported, list):
+                refused = [entry for entry in reported if isinstance(entry, dict)]
+            for refusal in refused:
+                self.log.event(
+                    "tick.week.rotation.answer_refused",
+                    clubs=refusal.get("clubs"),
+                    reason=refusal.get("reason"),
+                )
         read_rotation_evidence_artifact(table, manifest)
         return self._receipt(
-            "rotation", {"table": str(table), "manifest": str(manifest)}, (table, manifest)
+            "rotation",
+            {"table": str(table), "manifest": str(manifest), "responses_refused": refused},
+            (table, manifest),
         )
 
     def _handoff(self) -> WeeklyStageResult:
