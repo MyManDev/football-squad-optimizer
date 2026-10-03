@@ -378,8 +378,9 @@ describe("league member advice flow", () => {
     ).toHaveValue("");
     expect(screen.getByRole("button", { name: "Compute" })).toBeDisabled();
     expect(
-      screen.getByText(/A rival strategy is not computed over a longer window/),
+      screen.getByText(/Compute supports pure points at one, three or five weeks/),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/not computed over a longer window/)).toBeNull();
     expect(screen.queryByText("You can ask for it with Compute above.")).toBeNull();
   });
 

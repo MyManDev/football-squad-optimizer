@@ -248,9 +248,7 @@ export function AdviceRequestPanel({
         {service === "ready" && supported ? (
           <p role="note" className={styles.note}>
             {published === false ? <>{computeCopy.notPrecomputed} </> : null}
-            {chipChosen ? (
-              computeCopy.chipDurationUnknown
-            ) : (
+            {chipChosen ? null : (
               <>
                 {computeCopy.duration[request.window]} {computeCopy.durationNote}
               </>

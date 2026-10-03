@@ -553,8 +553,7 @@
     grid-area: tags;
   }
 
-  .stampBox,
-  .stampUnproven {
+  .stampBox {
     grid-area: box;
   }
 }
@@ -646,10 +645,9 @@
     justify-content: flex-start;
   }
 
-  /* The stamp (or the unproven badge) stands in the first column, the transfer facts
-     beside it; with no stamp the facts take the whole row. */
-  .stampBox,
-  .stampUnproven {
+  /* The stamp stands in the first column, the transfer facts beside it; with no stamp
+     the facts take the whole row. */
+  .stampBox {
     order: 5;
     grid-column: 1;
     justify-self: start;

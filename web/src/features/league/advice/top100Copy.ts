@@ -33,7 +33,6 @@ export interface Top100Copy {
   variantLimits: Record<string, string>;
   title: string;
   weightLine: (weight: number) => string;
-  saturation: string;
   unchanged: string;
   changed: string;
   /** The same, where no price is printed above to point at. */
@@ -42,7 +41,6 @@ export interface Top100Copy {
   costAtMost: (points: string) => string;
   combinedCost: (points: string) => string;
   combinedCostAtMost: (points: string) => string;
-  unproven: string;
   moveReason: string;
   limit: (weight: number) => string;
 }
@@ -86,7 +84,6 @@ const en: Top100Copy = {
   },
   title: "Top 100 influence",
   weightLine: (weight) => `Setting: ${weight} (your choice).`,
-  saturation: "A higher setting can return the same plan.",
   unchanged: "This setting did not change your plan this week.",
   changed: "This setting changed your plan; the price is stated above.",
   changedNoPrice: "This setting changed your plan.",
@@ -98,8 +95,6 @@ const en: Top100Copy = {
     `The manager's word and this setting together give up ~${points} expected points in the base model against the pure-points plan with both off, hits included.`,
   combinedCostAtMost: (points) =>
     `The manager's word and this setting together give up at most ${points} expected points in the base model against the pure-points plan with both off, hits included.`,
-  unproven:
-    "The solver found this plan without finishing its proof, so the price below is stated as at most.",
   moveReason: "In the plan because of the Top 100 influence.",
   limit: (weight) =>
     `The plan was chosen with the Top 100 influence at ${weight}; every expected-points number here is the base model's, without it.`,
@@ -140,7 +135,6 @@ const tr: Top100Copy = {
   },
   title: "Top 100 etkisi",
   weightLine: (weight) => `Ayar: ${weight} (senin seçimin).`,
-  saturation: "Daha yüksek bir ayar aynı planı verebilir.",
   unchanged: "Bu ayar bu hafta planını değiştirmedi.",
   changed: "Bu ayar planını değiştirdi; bedeli yukarıda yazılı.",
   changedNoPrice: "Bu ayar planını değiştirdi.",
@@ -152,8 +146,6 @@ const tr: Top100Copy = {
     `Hocanın sözü ve bu ayar birlikte, ikisinin de kapalı olduğu saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
   combinedCostAtMost: (points) =>
     `Hocanın sözü ve bu ayar birlikte, ikisinin de kapalı olduğu saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
-  unproven:
-    "Çözücü bu planın ispatını bitirmeden buldu; bu nedenle aşağıdaki bedel en fazla olarak yazılı.",
   moveReason: "Top 100 etkisi nedeniyle planda.",
   limit: (weight) =>
     `Plan Top 100 etkisi ${weight} iken seçildi; buradaki her beklenen puan, etki olmadan temel modelindir.`,

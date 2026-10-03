@@ -226,7 +226,6 @@ function LeagueMemberContent({
           <span>{copy.howComputed}</span>
         </summary>
         <div className={styles.howBody}>
-          <p>{copy.honestyRule}</p>
           <p>{copy.independentAdviceRule}</p>
           {!adviceLoading && shown ? <AdviceMethodNotes view={shown.envelope.payload} /> : null}
           <p>{copy.diagnosticOnly}</p>
@@ -242,7 +241,6 @@ function LeagueMemberContent({
               )}
             </p>
           ) : null}
-          <p>{copy.freshnessNote}</p>
         </div>
       </details>
       {view.league_id === 352490 ? (

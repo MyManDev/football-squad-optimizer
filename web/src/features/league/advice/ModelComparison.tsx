@@ -128,11 +128,6 @@ export function ModelComparison({
           </tr>
         </tbody>
       </table>
-      <p>
-        {tr
-          ? "Puanlar her modelin kendi tahminidir; yüksek sayı daha başarılı model demek değildir. Başarı, ileride gerçekleşen sonuçlarla ölçülecek."
-          : "Each score is its model's estimate; a larger number does not prove greater accuracy. Success needs future observed outcomes."}
-      </p>
       {!counterpart && (
         <button
           type="button"

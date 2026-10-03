@@ -399,18 +399,11 @@ export function MemberDecisionControls({
         ) : null}
         {needsRival ? (
           <>
-            <p>{copy.rivalNote}</p>
             {windows.length > 1 ? <p>{top100Copy.rivalWindows}</p> : null}
             {(computable?.rivals.length ?? 0) > 0 ? <p>{computeCopy.rivalComputable}</p> : null}
           </>
         ) : null}
-        <p>
-          {selection.request.model === "football"
-            ? copy.modelWindowNote
-            : windows.length > 1
-              ? copy.windowLimits
-              : copy.windowNotComputed}
-        </p>
+        {selection.request.model === "football" ? <p>{copy.modelWindowNote}</p> : null}
         {showModel ? <p>{copy.modelNote}</p> : null}
         {computable && computable.strategies.length > 0 ? <p>{computeCopy.controlsNote}</p> : null}
       </div>

@@ -116,11 +116,14 @@ describe.each(["tr", "en"] as const)("failure sentences in %s", (language) => {
     }
   });
 
-  it("words every duration as about, and none as a promise", () => {
+  it("words every duration as about, without a promise or a measurement caveat", () => {
     expect(copy.duration[3]).toMatch(language === "tr" ? /yaklaşık/ : /about/);
     expect(copy.duration[5]).toMatch(language === "tr" ? /yaklaşık/ : /about/);
     expect(copy.duration[1]).not.toMatch(/\d/);
-    expect(copy.durationNote).toMatch(language === "tr" ? /söz değildir/ : /not a promise/);
+    expect(copy.durationNote).not.toMatch(/söz|promise/i);
+    for (const text of Object.values(copy.duration)) {
+      expect(text).not.toMatch(/ölçülmedi|not measured/i);
+    }
     for (const text of [...Object.values(copy.duration), copy.durationNote, copy.leaveOpen]) {
       expect(text).not.toMatch(/guarantee|always|never more|garanti|kesin|mutlaka/i);
     }

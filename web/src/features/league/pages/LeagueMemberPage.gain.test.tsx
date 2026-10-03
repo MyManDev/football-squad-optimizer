@@ -187,23 +187,23 @@ describe("the card states one basis for the rows, the total and the gain", () =>
   });
 });
 
-describe("the solver's bound is labelled for what it bounds", () => {
-  it("calls a one-week bound a bound on the planner's objective, not on points", () => {
+describe("the solver's bound is not printed", () => {
+  it("says nothing about a one-week bound", () => {
     const text = renderAdvice(withPayload({ solver_status: "FEASIBLE", optimality_gap: 1.1 }));
 
-    expect(text).toContain(COPY.unprovenPlanBody("1.1"));
+    expect(text).not.toMatch(/could not finish the proof/);
     expect(text).not.toMatch(/gap ≤ 1\.1 pts/);
+    expect(text).not.toMatch(/within 1\.1 of the best value/);
   });
 
-  it("says a window bound covers every gameweek of the plan at once", () => {
+  it("says nothing about a window bound either", () => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 5);
     const weeks = base.payload.plan_weeks!.length;
     const text = renderAdvice(base);
 
     expect(weeks).toBe(5);
     expect(base.payload.solver_status).toBe("FEASIBLE");
-    expect(text).toContain(
-      COPY.unprovenPlanBodyWindow(base.payload.optimality_gap!.toFixed(1), weeks),
-    );
+    expect(text).not.toMatch(/could not finish the proof/);
+    expect(text).not.toMatch(/gameweeks of the plan at once/);
   });
 });

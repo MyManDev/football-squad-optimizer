@@ -268,7 +268,8 @@ describe.each(["tr", "en"] as const)("the system's record beside the table in %s
     );
     const karne = screen.getByRole("region", { name: copy.karneTitle });
     expect(karne).toHaveTextContent(copy.karneLede);
-    expect(karne).toHaveTextContent(copy.karneCaption);
+    // The "not yours" caption is gone.
+    expect(karne.textContent).not.toMatch(/not yours|senin kadron değil/);
     const weeks = within(karne).getAllByRole("img");
     expect(weeks).toHaveLength(3);
     expect(weeks[1]).toHaveTextContent(copy.karneNone);

@@ -28,7 +28,6 @@ export interface ChipCopy {
   title: string;
   chosen: (name: string) => string;
   gain: (points: string) => string;
-  unproven: string;
   freeHit: string;
   basis: Record<MemberChip, string>;
   expectedOwnPoints: (points: string, basis: string) => string;
@@ -47,7 +46,7 @@ const FREE_HIT_LIMIT =
 const en: ChipCopy = {
   legend: "Chip",
   none: "None",
-  help: "Choosing a chip shows your one-week plan with that chip played this gameweek, and what that week is expected to score above your own plan without it. The planner never chooses a chip itself: what a chip would be worth in a later gameweek is not measured, so nothing here says this is the gameweek to play it.",
+  help: "Choosing a chip shows your one-week plan with that chip played this gameweek, and what that week is expected to score above your own plan without it.",
   plain: "No chip is selected; the published plan plays none.",
   onlyBaseline: "One-week pure-points plan only.",
   blockedBySwitches:
@@ -75,8 +74,6 @@ const en: ChipCopy = {
   chosen: (name) => `${name} is played this gameweek because you chose it.`,
   gain: (points) =>
     `~${points} expected points this gameweek against your own plan without the chip, hits included.`,
-  unproven:
-    "The solver found at least one of the two plans without finishing its proof, so the difference is between the plans it found.",
   freeHit:
     "A Free Hit squad is for this gameweek only; the squad you hold now returns at the next deadline.",
   basis: {
@@ -103,7 +100,7 @@ const en: ChipCopy = {
 const tr: ChipCopy = {
   legend: "Çip",
   none: "Yok",
-  help: "Bir çip seçersen bir haftalık planın, o çip bu hafta oynanmış haliyle gösterilir; yanında da o haftanın çipsiz kendi planına göre beklenen puan farkı yazar. Planlayıcı çipi hiçbir zaman kendisi seçmez: bir çipin sonraki bir haftada kaç puan getireceği ölçülmedi, bu yüzden buradaki hiçbir şey çipi oynama haftasının bu hafta olduğunu söylemez.",
+  help: "Bir çip seçersen bir haftalık planın, o çip bu hafta oynanmış haliyle gösterilir; yanında da o haftanın çipsiz kendi planına göre beklenen puan farkı yazar.",
   plain: "Çip seçili değil; yayınlanan plan çip oynamaz.",
   onlyBaseline: "Yalnız bir haftalık saf puan planında.",
   blockedBySwitches:
@@ -129,8 +126,6 @@ const tr: ChipCopy = {
   title: "Çip seçimi",
   chosen: (name) => `${name} bu hafta oynanıyor, çünkü sen seçtin.`,
   gain: (points) => `Çipsiz kendi planına göre bu hafta ~${points} beklenen puan, cezalar dahil.`,
-  unproven:
-    "Çözücü iki plandan en az birini ispatını bitirmeden buldu; fark, bulduğu planlar arasındaki farktır.",
   freeHit:
     "Free Hit kadrosu yalnız bu hafta içindir; bir sonraki haftada şimdiki kadron geri gelir.",
   basis: {
