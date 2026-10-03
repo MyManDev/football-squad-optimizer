@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import pandas as pd
+from scripts._experiment_cli import measurement_optimization_config
 
 from squadopt.application.advice import _attributed_gains, _paired_by_position
 from squadopt.application.lineup_publication import best_eleven_points
@@ -242,7 +243,9 @@ def _reference(
 
 def build_fixture() -> dict[str, Any]:
     rng = random.Random(SEED)
-    settings = OptimizationConfig()
+    # The limits of a run that writes a committed record: deterministic time binds, not the
+    # machine's clock. The coefficients and the rules do not depend on the limits.
+    settings = measurement_optimization_config()
     table = _table(rng)
     document = _document(table, settings)
     members = []
