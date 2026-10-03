@@ -289,7 +289,9 @@ def test_reader_refuses_postseal_tampering(case, damage):
         read(case)
 
 
-def add_quiet_news(case, tmp_path, table_name="rotation-bundle"):
+def add_quiet_news(
+    case, tmp_path, table_name="rotation-bundle", captured_at_utc="2026-09-22T11:00:00Z"
+):
     response = _response()
     raw = json.loads(response.text)
     raw["claims"] = []
@@ -303,7 +305,7 @@ def add_quiet_news(case, tmp_path, table_name="rotation-bundle"):
         ),
         clubs_declared=("Club 1",),
         clubs_covered=("Club 1",),
-        captured_at_utc="2026-09-22T11:00:00Z",
+        captured_at_utc=captured_at_utc,
     )
     outputs = export_rotation_evidence(
         RotationExportRequest(
@@ -384,6 +386,35 @@ def test_a_reserved_rotation_name_is_refused_by_the_seal_and_by_the_reader(case,
     sealed.marker_path.write_bytes(json.dumps(record).encode("utf-8"))
     with pytest.raises(ValueError, match="Invalid sealed rotation filename"):
         read(case)
+
+
+def test_a_news_capture_completed_after_the_decision_capture_is_refused_at_export(case, tmp_path):
+    """The order of the two instants holds before a bundle is even possible: the export
+    refuses the pair, so there is no table for a seal to read, and the seal's own check
+    (``News capture must complete before the decision capture``) is its second line."""
+
+    decision_captured_at = read_snapshot(
+        case["snapshot_root"], case["snapshot_id"]
+    ).metadata.captured_at_utc
+    assert decision_captured_at < "2026-09-22T23:59:00Z"
+    with pytest.raises(DataError, match="must complete before the decision capture"):
+        add_quiet_news(case, tmp_path, captured_at_utc="2026-09-22T23:59:00Z")
+    assert "rotation_table_path" not in case
+    assert not marker(case).exists()
+
+
+def test_a_rotation_pair_naming_another_decision_capture_is_not_sealed(case, tmp_path):
+    """A pair exported for a different decision of the same week does not seal this one."""
+
+    outputs = add_quiet_news(case, tmp_path)
+    manifest_path = Path(outputs["table_path"]).with_suffix(".manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["roster_snapshot_id"] = "fpl-live-20260922T120001Z-another-decision"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises((ValueError, DataError)):
+        bundle.seal_football_bundle(**case)
+    assert not marker(case).exists()
+    assert not (marker(case).parent / (case["snapshot_id"] + ".bundle")).exists()
 
 
 def test_news_without_rotation_is_not_a_ready_bundle(case):
