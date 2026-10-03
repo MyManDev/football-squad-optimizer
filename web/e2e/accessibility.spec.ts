@@ -215,8 +215,8 @@ test("skip link and the sidebar's controls take keyboard focus in order", async 
   await expect(skip).toBeInViewport();
   await expect(skip).toHaveCSS("outline-style", "solid");
 
-  // Then the sidebar, in the order it stands: its collapse button, the navigation, the
-  // language switch and the operations link.
+  // Then the sidebar, in the order it stands: its collapse button, the navigation and
+  // the language switch.
   const sidebar = page.locator("#sidebar");
   const navigation = page.getByRole("navigation");
   const order = [
@@ -227,7 +227,6 @@ test("skip link and the sidebar's controls take keyboard focus in order", async 
     navigation.getByRole("link", { name: "Katkıda bulun", exact: true }),
     sidebar.getByRole("button", { name: /^TR/ }),
     sidebar.getByRole("button", { name: /^EN/ }),
-    sidebar.getByRole("link", { name: "Operasyon Durumu" }),
   ];
   for (const control of order) {
     await page.keyboard.press("Tab");
@@ -296,8 +295,8 @@ test("the tablet rail names every icon and opens the sidebar over the page", asy
   expect(rail.width).toBe(72);
 
   const expand = page.getByRole("button", { name: "Kenar çubuğunu aç" });
-  // The rail's other controls are touch targets too.
-  for (const control of [expand, page.getByRole("link", { name: "Operasyon Durumu" })]) {
+  // The rail's other control is a touch target too.
+  for (const control of [expand]) {
     const box = (await control.boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.height).toBeGreaterThanOrEqual(44);

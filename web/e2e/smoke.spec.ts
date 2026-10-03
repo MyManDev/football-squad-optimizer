@@ -60,9 +60,12 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
   await expect(page.getByRole("table", { name: /sezon ledger/i })).toBeVisible();
 });
 
-test("status is reachable from the sidebar", async ({ page }) => {
+test("status is reachable by its address and not from the sidebar", async ({ page }) => {
   await page.goto("/");
-  await page.locator("#sidebar").getByRole("link", { name: "Operasyon Durumu" }).click();
+  await expect(
+    page.locator("#sidebar").getByRole("link", { name: "Operasyon Durumu" }),
+  ).toHaveCount(0);
+  await page.goto("/status");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Durum");
 });
 
