@@ -340,14 +340,10 @@ def _choices(
     )
     if len(eligible) < 2:
         return
-    shortlist = eligible[:3]
-    for player in (original.captain, original.vice):
-        if player in eligible and player not in shortlist:
-            shortlist.append(player)
-    pairs = [(c, v) for c in shortlist for v in shortlist if c != v]
+    pairs = [(c, v) for c in eligible for v in eligible if c != v]
     data.captain_pairs_considered += len(pairs)
-    # Captain/vice expectation is analytic and independent of bench admission.
-    # Only the best of this bounded set can improve a given XI/bench arrangement.
+    # All at most 110 eligible pairs can be ranked analytically, independently of
+    # bench admission. This spends no extra lineup scores or autosub convolutions.
     captain, vice = min(
         pairs,
         key=lambda pair: (
@@ -381,10 +377,12 @@ def improve_expected_lineup(
 ) -> ExpectedLineupSearchResult:
     """Keep the incumbent and explore legal one-player XI swaps on the same 15.
 
-    Six outfield bench orders and a bounded captain/vice shortlist are considered.
+    Six outfield bench orders are considered, with the best eligible captain/vice
+    pair found analytically for each visited XI (at most 110 ordered pairs).
     Round-robin exploration gives XI alternatives a turn before exhausting their
     bench orders. The positive count cap includes the incumbent; duplicate scores
-    and repeated autosub convolutions are cached. No global optimality is claimed.
+    and repeated autosub convolutions are cached. The XI/bench neighborhood remains
+    bounded; no global lineup or transfer optimality is claimed.
     locked_first freezes the entire action, including bench order and vice.
     """
     if (

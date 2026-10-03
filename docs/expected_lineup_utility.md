@@ -38,7 +38,9 @@ With roles and q fixed, the total is linear in mu. Recorded player multipliers a
 
 ## Bounded search and decisions
 
-Each weekly role-search invocation retains its incumbent and evaluates at most 128 distinct lineups by default. Candidates use legal one-for-one XI swaps within the same fifteen, six outfield bench orders, and a bounded captain/vice shortlist. Scores and autosub calculations are cached. Evaluation counts, actual convolution states, captain pairs and cache use are recorded. This is a bounded search, not a global optimality proof. Branches can invoke it repeatedly, so 128 is not the request-wide budget.
+Each weekly role-search invocation retains its incumbent and evaluates at most 128 distinct lineups by default. Candidates use legal one-for-one XI swaps within the same fifteen and six outfield bench orders. Every eligible ordered captain and vice pair in each explored XI is ranked analytically, at most 110 pairs. Pair ranking requires no additional full lineup scores or autosub calculations; those results remain cached. Evaluation counts, actual convolution states, captain pairs and cache use are recorded. This is a bounded search, not a global optimality proof. Branches can invoke it repeatedly, so 128 is not the request-wide budget.
+
+The frozen 42-record comparison below predates this complete captain-pair search and was not rerun for that change. Its new validation uses controlled fixed-XI cases and an independent official-outcome scorer; it does not establish realized score gains.
 
 CP remains responsible for feasible transfer, price, bank, free-transfer and chip paths. Its bench-weighted objective is a proposal surrogate. Ordinary expected-window planning allocates 40% of its solver budget to a guarded legacy proposal and 60% to a guarded zero-bench-bonus proposal, then ranks complete candidates on the common expectation. Observed planning retains a guarded baseline and budgets hold/information proposals, continuations and reconciliation together. Solver work and lineup evaluation work are reported separately.
 
