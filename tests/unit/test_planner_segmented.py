@@ -113,6 +113,119 @@ def test_acquisition_lots_survive_sale_repurchase_and_freehit(
     assert checked.has_solution
 
 
+@pytest.mark.parametrize("window", [3, 5])
+@pytest.mark.parametrize("free_transfers", [0, 5])
+def test_literal_two_transfer_lots_and_freehit_resource_table(
+    known_optimum_players, small_config, monkeypatch, window, free_transfers
+):
+    horizon, initial, config = problem(known_optimum_players, small_config, window)
+    table = horizon.table.loc[
+        horizon.table.player_id.isin(("GK_A", "DEF_A", "MID_A", "MID_B", "FWD_A", "FWD_B"))
+    ].copy()
+    market = {
+        "MID_A": (50, 45, 47, 52, 50),
+        "FWD_A": (50, 48, 50, 47, 50),
+        "MID_B": (46, 49, 51, 50, 55),
+        "FWD_B": (51, 49, 54, 48, 47),
+    }
+    supplied_sales = {
+        "MID_A": (48, 44, 46, 45, 48),
+        "FWD_A": (49, 47, 49, 46, 49),
+        "MID_B": market["MID_B"],
+        "FWD_B": market["FWD_B"],
+    }
+    for player, prices in market.items():
+        mask = table.player_id.eq(player)
+        table.loc[mask, "buy_price_tenths"] = prices[:window]
+        table.loc[mask, "sell_price_tenths"] = supplied_sales[player][:window]
+    horizon = PlanningHorizon(table)
+    initial = replace(initial, bank_tenths=0, free_transfers=free_transfers)
+    settings = TransferPlanningConfig(acquisition_sell_on_fee=0.5)
+    rights = ChipAvailability({"freehit": frozenset({2})}, {2: "freehit"})
+    incoming = ("B", "A", "A", "B", "A")
+    outgoing = ("A", "B", "B", "A", "B")
+    squads = {
+        week: ("GK_A", "DEF_A", f"MID_{suffix}", f"FWD_{suffix}")
+        for week, suffix in enumerate(incoming[:window], 1)
+    }
+    original = module.optimize_transfer_plan
+
+    def prescribed(part_horizon, *args, **kwargs):
+        fixed = {week: squads[week] for week in part_horizon.gameweeks}
+        return original(part_horizon, *args, fixed_week_squads=fixed, **kwargs)
+
+    monkeypatch.setattr(module, "optimize_transfer_plan", prescribed)
+    seed = plan_in_segments(
+        horizon, initial, config, segment_lengths=(1,) * window, transfer=settings, chips=rights
+    )
+    # Pin the same squads during certification: a later improving search is not the
+    # literal path under audit. The unsliced model still checks all resource states.
+    certified = optimize_transfer_plan(
+        horizon,
+        initial,
+        config,
+        settings,
+        chips=rights,
+        fixed_week_squads=squads,
+        incumbent_plan=seed,
+        protect_incumbent=True,
+    )
+    assert certified.diagnostics["incumbent_hint"]["claimed_objective_used"] is False
+
+    # Independent MID/FWD literals, never read from a solver or production sale helper.
+    # GW1 uses original supplied sale prices. FH2 restores B's 46/51 purchase lots
+    # and bank 0, despite its temporary A squad costing 45/48 and leaving bank 3.
+    # A is then acquired at 47/50; B's later repurchase resets its basis to 50/48.
+    sales = ((48, 49), (47, 49), (48, 52), (49, 47), (52, 47))
+    buys = ((46, 51), (45, 48), (47, 50), (50, 48), (50, 50))
+    bank_before = (0, 0, 0, 3, 1)
+    bank_after = (0, 3, 3, 1, 0)
+    ft_before, ft_unused, ft_next, paid, hits = {
+        0: (
+            (0, 1, 1, 1, 1),
+            (0, 1, 0, 0, 0),
+            (1, 1, 1, 1, 1),
+            (2, 0, 1, 1, 1),
+            (8, 0, 4, 4, 4),
+        ),
+        5: (
+            (5, 4, 4, 3, 2),
+            (3, 4, 2, 1, 0),
+            (4, 4, 3, 2, 1),
+            (0, 0, 0, 0, 0),
+            (0, 0, 0, 0, 0),
+        ),
+    }[free_transfers]
+    for plan in (seed, certified):
+        assert plan.has_solution
+        assert tuple(week.gameweek for week in plan.weeks) == tuple(range(1, window + 1))
+        assert dict(plan.chips_played) == {2: "freehit"}
+        assert plan.diagnostics["deterministic_time_used"] <= 5.005  # Each has its own 5-unit cap.
+        assert plan.total_transfer_hit_points == sum(hits[:window])
+        for index, week in enumerate(plan.weeks):
+            assert set(week.selected_squad.player_id) == set(squads[week.gameweek])
+            assert week.transfers_out.set_index("player_id").sell_price_tenths.to_dict() == {
+                f"MID_{outgoing[index]}": sales[index][0],
+                f"FWD_{outgoing[index]}": sales[index][1],
+            }
+            assert week.transfers_in.set_index("player_id").buy_price_tenths.to_dict() == {
+                f"MID_{incoming[index]}": buys[index][0],
+                f"FWD_{incoming[index]}": buys[index][1],
+            }
+            assert (week.bank_before_tenths, week.bank_after_tenths) == (
+                bank_before[index],
+                bank_after[index],
+            )
+            assert (week.free_transfers_before, week.free_transfers_unused) == (
+                ft_before[index],
+                ft_unused[index],
+            )
+            assert week.free_transfers_for_next_gameweek == ft_next[index]
+            assert week.transfer_count == 2
+            assert week.paid_transfer_count == paid[index]
+            assert week.transfer_hit_points == hits[index]
+
+
 def test_chip_periods_renew_without_recreating_used_right(known_optimum_players, small_config):
     args = problem(known_optimum_players, small_config, 5)
     rights = ChipAvailability(
