@@ -1,0 +1,539 @@
+{
+  "version": "role_followups_public_evidence_v1",
+  "report_date": "2026-10-03",
+  "scope": "two_prespecified_development_candidates; no_runtime_activation",
+  "source_commit": "64362f2c06a1957ebaa12128ce74cd9157e0227f",
+  "measured_code_commit": "49b451ae011eba21e59a0932e3deea9333a1ca7d",
+  "aggregation": "unweighted_mean_of_paired_origin_metrics; never_pool_position_rows_with_ALL",
+  "baseline": "unchanged_joint_role",
+  "reference_measurement": "math100-role-measure02",
+  "candidates": {
+    "temperature": {
+      "run_label": "math100-role-temperature01",
+      "contract": "conditional_role_temperature_research_v1",
+      "completed": true,
+      "development_gate_accepted": false,
+      "predictive_superiority_verified": false,
+      "promotion": false,
+      "independent_audit": {
+        "score_cells": 65,
+        "paired_role_population_mismatches": [],
+        "appearance_score_mismatches": [],
+        "recorded_gate_count": 50,
+        "independently_failed_gates": [
+          {
+            "cohort": "historical",
+            "position": "ALL",
+            "metric": "minutes_mae",
+            "paired_origins": 8,
+            "base": 13.255676426632398,
+            "candidate": 13.328692499306836,
+            "candidate_minus_base": 0.07301607267443799,
+            "gate": "nonworse_points_or_minutes",
+            "pass": false
+          },
+          {
+            "cohort": "current",
+            "position": "ALL",
+            "metric": "minutes_mae",
+            "paired_origins": 5,
+            "base": 16.930400239427037,
+            "candidate": 17.22586373138596,
+            "candidate_minus_base": 0.2954634919589232,
+            "gate": "nonworse_points_or_minutes",
+            "pass": false
+          },
+          {
+            "cohort": "current",
+            "position": "ALL",
+            "metric": "role_brier",
+            "paired_origins": 5,
+            "base": 0.38687835706495355,
+            "candidate": 0.3871529335872014,
+            "candidate_minus_base": 0.0002745765222478269,
+            "gate": "nonworse_all_or_position_1percent",
+            "pass": false
+          },
+          {
+            "cohort": "overall",
+            "position": "ALL",
+            "metric": "role_brier",
+            "paired_origins": 13,
+            "base": 0.3002256287826802,
+            "candidate": 0.3002516591471888,
+            "candidate_minus_base": 2.603036450860019e-05,
+            "gate": "nonworse_all_or_position_1percent",
+            "pass": false
+          }
+        ],
+        "gate_decision_mismatches": [],
+        "maximum_absolute_gate_mean_reconstruction_error": 3.552713678800501e-15,
+        "acceptance_recomputed": false,
+        "baseline_output_hash_equal": {
+          "scores.json": true,
+          "comparison.json": true,
+          "role-scores.json": true,
+          "role-comparison.json": true,
+          "role-diagnostics.json": true
+        }
+      },
+      "worst_position_relative_role_loss_increase": {
+        "cohort": "current",
+        "position": "GK",
+        "metric": "role_nll",
+        "relative_increase": 0.009615182270302114
+      },
+      "cost": {
+        "fit_attempts_as_recorded": {
+          "outer": 13,
+          "inner_role": 13
+        },
+        "fit_event_counts": {
+          "outer/started": 13,
+          "outer/finished": 13,
+          "inner_role/started": 13,
+          "inner_role/finished": 13
+        },
+        "fit_seconds": {
+          "outer": 42.4885057999054,
+          "inner_role": 1.273820300004445
+        },
+        "total_wall_seconds": 109.05682339996565,
+        "preparation_seconds_included_in_total": 49.84062110004015,
+        "duration_fields_not_additive": true
+      },
+      "end_of_run_guards": {
+        "clean_expected_commit": true,
+        "tracked_source_hashes_unchanged": true,
+        "operator_and_test_hashes_unchanged": true
+      },
+      "excluded_season_access": false,
+      "provider_calls": 0,
+      "live_changes": false,
+      "receipt_sha256": {
+        "temperature-protocol.json": "777c04f03c034f97f053047a01bd1d2f20d89f2ee9a8f4efb6c445d02cd48454",
+        "temperature-result.json": "aab240cc63a74f3e62499f80dfe79a968429996d5937af0000498738a31b1a94",
+        "temperature-comparison.json": "bc46d5342911d3a1d95edd37317a786625b225e5d2e99b8f8c9ea66cafd8d0fa",
+        "temperature-scores.json": "2879ea746baacf347ee1273c2acbfcf12422f7773563721949ae3597542e1e23",
+        "temperature-diagnostics.json": "8ddf77ff4a872812182e948f881adc3d033b286869558289f36de1a54c8dcd60",
+        "temperature-fit-attempts.jsonl": "a954c6af49b0f04b6dd1a7e3c39fbb02f092309b2d8798a7d3046cd8ac04a329",
+        "result.json": "6e4ce522e7110c7710458c9ca9db2bf9eddeb455b3dcebd34c8f28df6905c6ab",
+        "current-evidence.json": "8713b88d79dff046ccafa89e38793cd9e91d8b05b3f856d07357acc023b4b544",
+        "source-hashes.json": "dbae26ab67f11ca01c99dbba94915e8975fc978b71c75d252f7a32d3f41efc22",
+        "input-hashes.json": "5f9891b99b1236972614a4612e4a8854ddc27d9c8d06ff0cb453c6b9da561cc8",
+        "temperature-calibration.json": "33a96ca1e8da4b46f9dad874b98a4b5439a85c433d9563586cc359251f0f37d1"
+      },
+      "candidate_definition": {
+        "type": "single_conditional_binary_temperature",
+        "beta_bounds": [
+          0.5,
+          1.0
+        ],
+        "temperature_bounds": [
+          1.0,
+          2.0
+        ],
+        "bisections": 48,
+        "inner_validation": "last_four_settled_distinct_season_GW_groups_of_causal_train",
+        "inner_prefix": "before_first_validation_kickoff_minus_90m_and_plus3h_settled",
+        "support": {
+          "prefix_known_min": 100,
+          "validation_known_min": 100,
+          "validation_each_label_min": 10,
+          "prefix_classes_required": 2
+        },
+        "development_assumption": "temperature learned on prefix role head transfers to refitted full outer role head",
+        "unchanged": [
+          "q",
+          "zero mass",
+          "role conditional minutes",
+          "other fitted heads"
+        ]
+      },
+      "temperature_summary": {
+        "available_origins": 13,
+        "T_equals_1": 4,
+        "T_equals_2": 0,
+        "minimum": 1.0,
+        "maximum": 1.3232842895583377
+      },
+      "cohort_ALL_delta": {
+        "historical": {
+          "role_nll": -0.00019788647338109255,
+          "role_brier": -0.00012931098407847896,
+          "minutes_mae": 0.07301607267443799,
+          "points_mae": -0.0005554148902057188
+        },
+        "current": {
+          "role_nll": -0.0010289627668754742,
+          "role_brier": 0.0002745765222478824,
+          "minutes_mae": 0.29546349195891963,
+          "points_mae": -0.0010688343801719125
+        },
+        "overall": {
+          "role_nll": -0.0005175312016481026,
+          "role_brier": 2.603036450860019e-05,
+          "minutes_mae": 0.15857277239923917,
+          "points_mae": -0.000752883924808101
+        }
+      },
+      "current_GW1_delta": {
+        "fold": "2026-27-gw01",
+        "paired_role_rows": 593,
+        "role_nll_delta": -0.006708020686949201,
+        "role_brier_delta": -0.0003629548964280138,
+        "minutes_mae_delta": 0.010215528872095092,
+        "points_mae_delta": -0.0011252650723405644
+      },
+      "reported_archive_file_count": 12,
+      "temperature_by_origin": {
+        "2023-24-gw11": 1.0,
+        "2023-24-gw19": 1.0902312110745733,
+        "2023-24-gw27": 1.0,
+        "2023-24-gw35": 1.1356998230810809,
+        "2024-25-gw11": 1.0,
+        "2024-25-gw19": 1.0654186725733303,
+        "2024-25-gw27": 1.0,
+        "2024-25-gw35": 1.157370987124686,
+        "2026-27-gw01": 1.0544946218878843,
+        "2026-27-gw02": 1.3232842895583377,
+        "2026-27-gw03": 1.2978680476345381,
+        "2026-27-gw04": 1.2293201091543196,
+        "2026-27-gw05": 1.099098553476331
+      },
+      "inner_support_ranges": {
+        "prefix_known_rows": [
+          1776,
+          22950
+        ],
+        "validation_known_rows": [
+          1128,
+          1297
+        ]
+      }
+    },
+    "retained-support": {
+      "run_label": "math100-role-retained-support01",
+      "contract": "conditional_role_retained_history_support_research_v1",
+      "completed": true,
+      "development_gate_accepted": true,
+      "predictive_superiority_verified": false,
+      "promotion": false,
+      "independent_audit": {
+        "score_cells": 65,
+        "paired_role_population_mismatches": [],
+        "appearance_score_mismatches": [],
+        "recorded_gate_count": 35,
+        "independently_failed_gates": [],
+        "gate_decision_mismatches": [],
+        "maximum_absolute_gate_mean_reconstruction_error": 1.1102230246251565e-16,
+        "acceptance_recomputed": true,
+        "baseline_output_hash_equal": {
+          "scores.json": true,
+          "comparison.json": true,
+          "role-scores.json": true,
+          "role-comparison.json": true,
+          "role-diagnostics.json": true
+        }
+      },
+      "worst_position_relative_role_loss_increase": {
+        "cohort": "historical",
+        "position": "GK",
+        "metric": "role_nll",
+        "relative_increase": 0.003990438877103042
+      },
+      "cost": {
+        "fit_attempts_as_recorded": {
+          "outer": 13,
+          "role_head": 13,
+          "role_estimator": 13
+        },
+        "fit_event_counts": {
+          "outer/started": 13,
+          "outer/finished": 13,
+          "role_head/started": 13,
+          "role_head/finished": 13
+        },
+        "fit_seconds": {
+          "outer": 37.86455850000493,
+          "role_head": 1.422890100046061
+        },
+        "total_wall_seconds": 107.20355310000014,
+        "preparation_seconds_included_in_total": 52.43047819996718,
+        "duration_fields_not_additive": true
+      },
+      "end_of_run_guards": {
+        "clean_expected_commit": true,
+        "source_hashes_unchanged": true,
+        "operator_inputs_unchanged": true
+      },
+      "excluded_season_access": false,
+      "provider_calls": 0,
+      "live_changes": false,
+      "receipt_sha256": {
+        "retained-support-protocol.json": "b45a16131a0badd5f1ac702111652152c869b3a4ae918e0bcabf2b10c683c233",
+        "retained-support-result.json": "356a8b20959fbf0cf685bd011389a90db49b6cb848670b9458c827144d8f2ebc",
+        "retained-support-comparison.json": "21f72a978ceb158ec1db3d97c02c7033a6cca9b9c2c7edb00cff64abe7589b2d",
+        "retained-support-scores.json": "b50267e4c46b845ec3c89219d45b6ab2ee27dbc2e8e92080306b1f3d9e0e9be7",
+        "retained-support-diagnostics.json": "a36caf5551ed055882980dbc1b515a476b9606c9b86ef21b05d8585d9fe01e73",
+        "retained-support-fit-attempts.jsonl": "be41e4a072cee482c546e0113aee8f20a014610a6b23def26deff6683b2ce084",
+        "result.json": "35abc5d9abe48615bc11a1aaeedeeac9091bd4739313a1271332396b9ad9333f",
+        "current-evidence.json": "8713b88d79dff046ccafa89e38793cd9e91d8b05b3f856d07357acc023b4b544",
+        "source-hashes.json": "dbae26ab67f11ca01c99dbba94915e8975fc978b71c75d252f7a32d3f41efc22",
+        "input-hashes.json": "5f9891b99b1236972614a4612e4a8854ddc27d9c8d06ff0cb453c6b9da561cc8",
+        "retained-support-support.json": "57b6bee8e0e84b4225eb45187ee199f0f8bf3cf91503ccb2986b888b584fc891"
+      },
+      "candidate_definition": {
+        "type": "single_retained_history_indicator",
+        "feature": "has_retained_player_history=(past_rows>0)",
+        "scope": "conditional_start_cameo_head_only",
+        "estimator": {
+          "scaler": "StandardScaler",
+          "model": "LogisticRegression",
+          "C": 1,
+          "max_iter": 1000,
+          "random_state": 0
+        },
+        "unchanged": [
+          "global FEATURES",
+          "appearance head and q",
+          "within-role minute heads",
+          "role/bin minute means",
+          "other fitted heads",
+          "frozen v1"
+        ],
+        "raw_old_prediction_matrices_available": false,
+        "protocol_predeclared_status": "prepared_not_executed",
+        "role_estimator_count_duplicates_role_head_count": true
+      },
+      "cohort_ALL_delta": {
+        "historical": {
+          "role_nll": -0.00046603712876025494,
+          "role_brier": -8.10259008801606e-05,
+          "minutes_mae": -0.06140331529480392,
+          "points_mae": -0.00164775604860945
+        },
+        "current": {
+          "role_nll": -0.001905827349068523,
+          "role_brier": -0.00043151474490049635,
+          "minutes_mae": -0.0716854048036275,
+          "points_mae": -0.004868256253603542
+        },
+        "overall": {
+          "role_nll": -0.0010198025981096315,
+          "role_brier": -0.00021582930242641796,
+          "minutes_mae": -0.0653579651058891,
+          "points_mae": -0.002886409973607229
+        }
+      },
+      "current_GW1_delta": {
+        "fold": "2026-27-gw01",
+        "paired_role_rows": 593,
+        "role_nll_delta": 0.0035941398369558897,
+        "role_brier_delta": 0.001597970987528008,
+        "minutes_mae_delta": 0.045092874962687546,
+        "points_mae_delta": -0.008479140286276499
+      },
+      "reported_archive_file_count": 12,
+      "training_support_by_origin": {
+        "2023-24-gw11": {
+          "known": 3011,
+          "without_retained_history": 82,
+          "unknown": 0
+        },
+        "2023-24-gw19": {
+          "known": 5319,
+          "without_retained_history": 85,
+          "unknown": 0
+        },
+        "2023-24-gw27": {
+          "known": 7705,
+          "without_retained_history": 100,
+          "unknown": 0
+        },
+        "2023-24-gw35": {
+          "known": 10054,
+          "without_retained_history": 100,
+          "unknown": 0
+        },
+        "2024-25-gw11": {
+          "known": 14436,
+          "without_retained_history": 149,
+          "unknown": 0
+        },
+        "2024-25-gw19": {
+          "known": 16835,
+          "without_retained_history": 149,
+          "unknown": 0
+        },
+        "2024-25-gw27": {
+          "known": 19297,
+          "without_retained_history": 164,
+          "unknown": 0
+        },
+        "2024-25-gw35": {
+          "known": 21721,
+          "without_retained_history": 167,
+          "unknown": 0
+        },
+        "2026-27-gw01": {
+          "known": 22950,
+          "without_retained_history": 167,
+          "unknown": 0
+        },
+        "2026-27-gw02": {
+          "known": 23256,
+          "without_retained_history": 268,
+          "unknown": 0
+        },
+        "2026-27-gw03": {
+          "known": 23566,
+          "without_retained_history": 273,
+          "unknown": 0
+        },
+        "2026-27-gw04": {
+          "known": 23873,
+          "without_retained_history": 282,
+          "unknown": 0
+        },
+        "2026-27-gw05": {
+          "known": 24180,
+          "without_retained_history": 282,
+          "unknown": 0
+        }
+      }
+    }
+  },
+  "source_sha256": {
+    "scripts/measure_football_role_minutes.py": "5a3f3964c37aa29ce57a445fd6f7498b9a7b94b4cf2ff1299bbb82b3f896fd20",
+    "src/squadopt/application/football_live.py": "c934958666cb936aebf8e2ce82ec41ca5d6c99ec74723c73d6cc8eb77d1c7774",
+    "src/squadopt/data/sources/football_history.py": "dfad934c7cb6c1ca5ee6a7ca3e7574f25845e0257600fc95a109f5beb57ed84a",
+    "src/squadopt/prediction/football.py": "3e71ad27a941c004bc196ff8f12ac48d73187c541f52907d002718edc42a4f6c",
+    "src/squadopt/prediction/football_features.py": "af24356b989fc13c7f23940a01ea2371265c9bc5c7dddbd9b6c759e9ef2317b9",
+    "src/squadopt/prediction/football_minutes_role.py": "a4fd0f0e799b64a81429875593e549572d657218511a58f7b63d8b6e4e77530b"
+  },
+  "origins": [
+    [
+      "2023-24",
+      11
+    ],
+    [
+      "2023-24",
+      19
+    ],
+    [
+      "2023-24",
+      27
+    ],
+    [
+      "2023-24",
+      35
+    ],
+    [
+      "2024-25",
+      11
+    ],
+    [
+      "2024-25",
+      19
+    ],
+    [
+      "2024-25",
+      27
+    ],
+    [
+      "2024-25",
+      35
+    ],
+    [
+      "2026-27",
+      1
+    ],
+    [
+      "2026-27",
+      2
+    ],
+    [
+      "2026-27",
+      3
+    ],
+    [
+      "2026-27",
+      4
+    ],
+    [
+      "2026-27",
+      5
+    ]
+  ],
+  "current_evidence": {
+    "status": "available",
+    "snapshot_id": "fpl-live-20261001T233218Z-7945d6b3c732",
+    "fingerprint": "7945d6b3c732bd3e38bd11009d32070f733e93d9dbc3570d69f53d1b21452e8d",
+    "captured_at_utc": "2026-10-01T23:32:18.344567Z",
+    "payload_sha256": {
+      "bootstrap-static.json": "4a4ff5144ba70f76742a6609654e808362b638d9127b9e93baef03985cbc134a",
+      "event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+      "event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+      "event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+      "event-gw04-live.json": "a4ebf3dac44cb598e6f62a1dd5333e3d5ce7206303dbda62f513830ae7cfd095",
+      "event-gw05-live.json": "aeee6dd5b56567b04ef9b4e5b9828ee4d81e094803dc0e6553cd3b394178c6dd",
+      "fixtures.json": "113c3c674e681542b8a7926a02036cab9d438f7f1c0bd5d4410afa367a31ad04"
+    },
+    "gameweeks": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "rows": 3191
+  },
+  "baseline_output_sha256": {
+    "scores.json": "d3fa576840c5e6da386349c212d890356f24d229016201adff049e349dbc15a7",
+    "comparison.json": "0e204f3ecac8e8c6ca58ae56bfdfa6db15af2846efe96a71a2f0299789f1ae77",
+    "role-scores.json": "fb2d184ebe3d33fea1e90dbc3f95cb2e75b142bd55403466edec946a87949352",
+    "role-comparison.json": "06285f572541c6591fb0c3b936295c9338e3f7d2655167542b49edaf916e60f2",
+    "role-diagnostics.json": "66c706bc5c11fdbe390e6aa1213a7358fef63cd8105fc81d88e0d104eaa2ab98"
+  },
+  "limits": [
+    "Development gates are not an independent holdout or a live deployment decision.",
+    "No access to 2025-26 is reported; only generated receipts were read to prepare this record.",
+    "Source capture and causal filtering do not establish historically available deadline rosters.",
+    "Historical reconstructed populations and current-roster retention can omit players.",
+    "Origins and growing training sets overlap; support counts must not be summed as unique players.",
+    "Retained history means retained causal fixture rows, not a complete playing career or proof of the cause of GW1 error.",
+    "Current GW1 role NLL, Brier and minutes MAE worsen for the retained-support candidate.",
+    "Shared q and unchanged within-role laws limit the changes each candidate can make.",
+    "Temperature prefix-to-full-head transfer is a modeling assumption.",
+    "There is no calibrated-probability, statistical-significance, global component superiority or realized FPL gain claim.",
+    "Saved baseline aggregates and diagnostic bytes match; raw old prediction matrices were not retained.",
+    "No new fit, solver, test, provider request or input-data read was performed during report preparation."
+  ],
+  "baseline_cohort_ALL_metrics": {
+    "historical": {
+      "role_nll": 0.4479942247742749,
+      "role_brier": 0.24606767360625945,
+      "minutes_mae": 13.255676426632398,
+      "points_mae": 0.9473984372599368
+    },
+    "current": {
+      "role_nll": 0.7504576865505289,
+      "role_brier": 0.3868783570649535,
+      "minutes_mae": 16.930400239427037,
+      "points_mae": 1.2664199229821456
+    },
+    "overall": {
+      "role_nll": 0.5643263254574495,
+      "role_brier": 0.3002256287826802,
+      "minutes_mae": 14.669031739245721,
+      "points_mae": 1.0700990086915556
+    }
+  },
+  "allowed_historical_seasons": [
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "prior_only_season": "2022-23"
+}
