@@ -41,7 +41,7 @@ import signal
 import threading
 import time
 import traceback
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 from datetime import UTC, datetime
 from types import FrameType
@@ -139,6 +139,27 @@ def _advice_player_ids(value: object) -> set[int]:
         for item in value:
             found.update(_advice_player_ids(item))
     return found
+
+
+#: What the central injury source will publish facts for at most.
+_INJURY_FACT_LIMIT = 50
+
+#: The parts of an advice document that name the member's own decision players.
+_OWN_DECISION_FIELDS = ("starting_xi", "bench", "captain", "vice_captain", "moves")
+
+
+def _injury_fact_ids(advice: Mapping[str, object]) -> list[int]:
+    """The players to ask the central injury source about, the member's own first.
+
+    The source answers at most fifty identities. A document can name more than that
+    once rival elevens and plan weeks are counted, and taking the fifty lowest ids
+    could leave out the member's own squad, which is what the card is for. So the
+    member's decision players come first, then the rest in id order, up to the limit.
+    """
+
+    own = _advice_player_ids({field: advice.get(field) for field in _OWN_DECISION_FIELDS})
+    rest = _advice_player_ids(advice) - own
+    return [*sorted(own), *sorted(rest)][:_INJURY_FACT_LIMIT]
 
 
 def _utc_now() -> datetime:
@@ -407,7 +428,7 @@ def build_advice_compute(
         if capture.switches.official_injuries is not None:
             require_official_injury_source()
             advice["official_injuries"] = capture.switches.official_injuries.public_record(
-                sorted(_advice_player_ids(advice))[:50]
+                _injury_fact_ids(advice)
             )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
