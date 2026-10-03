@@ -400,6 +400,13 @@ def main(
                 f"Configuration valid: provider {config.provider!r}, "
                 f"model {config.model_identifier!r}."
             )
+            if config.provider in ("openai", "openai-compatible"):
+                # The two settings that shape the request and have a default, said so an
+                # operator sees the format that will be asked for and not only the model.
+                print(
+                    f"Response format {config.response_format!r}, completion token limit "
+                    f"{config.max_completion_tokens}."
+                )
             print(
                 "API key configured. Offline check only; "
                 "authentication and service availability were not tested."
@@ -455,8 +462,14 @@ def main(
             prior = read_snapshot(prior_path.parent, prior_path.name)
             if as_instant(prior.metadata.captured_at_utc) >= as_instant(as_of):
                 raise ClubNewsError("Previous news capture must precede this run.")
+            # The capture an answer was coded in, kept through a chain of reuses. An answer
+            # the earlier capture had itself reused already names where it came from; naming
+            # the earlier capture instead would move its origin one step with every run.
             previous = tuple(
-                replace(entry, reused_from_snapshot=prior.metadata.snapshot_id)
+                replace(
+                    entry,
+                    reused_from_snapshot=entry.reused_from_snapshot or prior.metadata.snapshot_id,
+                )
                 for entry in read_captured_responses(prior)
             )
         # Resolved and checked before any page is fetched, so a missing key, an unlisted
@@ -508,7 +521,16 @@ def main(
         return 1
 
     config = resolved
-    print(f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared")
+    # The registry line counts what this run asked for. Under --club that is the filtered
+    # part of the registry, and the coverage lines below count the whole registry.
+    print(
+        f"Registry      {len(sources)} pages, {len(week.clubs_declared)} clubs declared"
+        + (
+            f" (filtered by --club from {len(registry_sources)} registered pages)"
+            if arguments.club
+            else ""
+        )
+    )
     print(f"Read          {len(week.documents)} documents")
     if week.coding_observed_at is not None:
         print(
