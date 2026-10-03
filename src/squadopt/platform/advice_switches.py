@@ -134,6 +134,11 @@ class AdviceSwitchInputs:
             "participation": FOOTBALL_PARTICIPATION_VERSION,
             "ready_bundle": self.football_bundle_sha256,
         }
+        if self.rotation_table_sha256 is not None:
+            # The same news read under a different rule is different information: a plan
+            # shown under the old rule must be told it is stale. Only where news is bound,
+            # so a revision with no news does not move.
+            identity["news_rule"] = MANAGERS_WORD_RULE_VERSION
         revision = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         return {
             "version": "football_decision_information_v1",
@@ -185,6 +190,11 @@ def switch_identity(
             "rotation_table_sha256": inputs.rotation_table_sha256,
             "ready_bundle_sha256": inputs.football_bundle_sha256,
         }
+        if inputs.rotation_table_sha256 is not None:
+            # Which statements bind is the reader's rule, and the same table read under a
+            # different rule is a different input. Named only where news is bound, so a
+            # football answer with no news keeps the key it was written under.
+            identity[MODEL_SWITCH]["news_rule_version"] = MANAGERS_WORD_RULE_VERSION
     if chip is not None:
         identity[CHIP_SWITCH] = {
             "chip": chip,

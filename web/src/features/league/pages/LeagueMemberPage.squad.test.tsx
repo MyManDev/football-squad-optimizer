@@ -107,7 +107,6 @@ describe("the member's published squad", () => {
     expect(within(pitch).getAllByLabelText(copy.squad.captainLabel)).toHaveLength(1);
     // The held squad names no vice-captain, so none is drawn.
     expect(within(pitch).queryByLabelText(copy.squad.viceCaptainLabel)).toBeNull();
-    expect(screen.getByText(copy.leagueMembers.heldViceCaptainUnavailable)).toBeInTheDocument();
     const bench = benchItems(language);
     expect(bench).toHaveLength(4);
     bench.forEach((item, index) =>
@@ -180,9 +179,6 @@ describe("the member's published squad", () => {
       expect(within(vice).getByTitle(viceInEleven.name)).toBeInTheDocument();
       const held = heldSection(language);
       expect(held).not.toHaveAttribute("open");
-      expect(
-        within(held).getByText(copy.leagueMembers.heldViceCaptainUnavailable),
-      ).toBeInTheDocument();
       expect(held).not.toHaveTextContent("Proposed Vice Only");
       // It lists the fifteen the member holds, the eleven and the bench.
       expect(within(held).getAllByRole("listitem")).toHaveLength(

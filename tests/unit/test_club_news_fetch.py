@@ -1523,6 +1523,27 @@ def test_an_article_answered_by_a_page_already_read_is_not_stored_twice() -> Non
     assert any("not stored a second time" in reason for _club, reason in refused)
 
 
+def test_two_links_answered_by_one_article_store_it_once_under_the_first_address() -> None:
+    """A second address for the same article is not a second document.
+
+    The index links the article and an older address that redirects to it. The article is
+    kept once, under the address that was asked for first and with the address that
+    answered, so a claim cites one page and its bytes are held once.
+    """
+
+    alias = _Reply(ARTICLE_ONE_BODY, final_url=ARTICLE_ONE)
+
+    documents, refused = _read_news_host(_news_host(**{ARTICLE_TWO: alias}))
+
+    assert [document.requested_url for document in documents] == [PAGE, ARTICLE_ONE]
+    kept = documents[1]
+    assert (kept.requested_url, kept.final_url) == (ARTICLE_ONE, ARTICLE_ONE)
+    assert kept.content == ARTICLE_ONE_BODY
+    second = [reason for _club, reason in refused if ARTICLE_TWO in reason]
+    assert len(second) == 1
+    assert ARTICLE_ONE in second[0] and "not stored a second time" in second[0]
+
+
 def test_a_registered_page_linked_from_another_is_read_once_as_itself() -> None:
     """A link to a registered page is left for that page's own entry, so it is read once."""
 

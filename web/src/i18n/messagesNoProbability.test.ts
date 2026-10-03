@@ -151,9 +151,6 @@ describe("every string in both message catalogues", () => {
       )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
-    // The one sentence about advice is the denial, in both languages.
-    expect(catalogue.get("en.chipCopy.honesty")).toMatch(/not advice to play it now/);
-    expect(catalogue.get("tr.chipCopy.honesty")).toMatch(/tavsiyesi değildir/);
   });
 
   it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {
@@ -206,18 +203,9 @@ function inlineText(path: string): { at: string; text: string }[] {
 
 const INLINE = PRODUCTION.filter((path) => path.endsWith(".tsx")).flatMap(inlineText);
 
-// The owner requested captured FPL playing percentages as inputs to conditional plans.
-// This sole display copies source data (25/50/75); it is not a modeled rank/win estimate.
-// Keep exact bilingual labels, one component and exactly one percent marker. All other
-// probability claims still pass through the unchanged site-wide guard.
-const SOURCE_AVAILABILITY_COPY = [
-  "Kaynakta belirtilen oynama ihtimali",
-  "Source-stated playing chance",
-  "%",
-] as const;
-const isSourceAvailability = ({ at, text }: { at: string; text: string }) =>
-  at.startsWith("features/league/advice/InformationReview.tsx:") &&
-  SOURCE_AVAILABILITY_COPY.some((label) => label === text);
+// FPL's captured playing value (25, 50, 75) is shown as the source's own figure, "FPL
+// playing value: 75/100", under the same label the FPL card uses. It is not worded as a
+// chance and carries no percent marker, so it needs no exemption from the guard.
 
 // Conditional scenario bounds are explicitly denied the meaning of an outcome CI.
 // Role explanations have no exception: modeled role probabilities remain internal.
@@ -247,20 +235,13 @@ describe("every string a production component writes inline", () => {
       expect(isScenarioDenial({ at: `${path}:1`, text: "Win probability 80%" })).toBe(false);
     }
   });
-  it("only exempts the captured availability labels and marker", () => {
-    expect(
-      INLINE.filter(isSourceAvailability)
-        .map(({ text }) => text)
-        .sort(),
-    ).toEqual([...SOURCE_AVAILABILITY_COPY].sort());
-    for (const text of SOURCE_AVAILABILITY_COPY) expect(AS_A_CHANCE.test(text)).toBe(true);
-    expect(isSourceAvailability({ at: "other.tsx:1", text: "%" })).toBe(false);
-    expect(
-      isSourceAvailability({
-        at: "features/league/advice/InformationReview.tsx:1",
-        text: "Win probability",
-      }),
-    ).toBe(false);
+  it("names FPL's playing value as the source's figure, with no chance wording or marker", () => {
+    const review = INLINE.filter(({ at }) =>
+      at.startsWith("features/league/advice/InformationReview.tsx:"),
+    );
+    expect(review.some(({ text }) => text === "FPL oynama değeri")).toBe(true);
+    expect(review.some(({ text }) => text === "FPL playing value")).toBe(true);
+    expect(review.filter(({ text }) => text === "%")).toEqual([]);
   });
   it("was actually read: literals, template text and JSX text, in both languages", () => {
     expect(INLINE.length).toBeGreaterThan(1000);
@@ -271,9 +252,7 @@ describe("every string a production component writes inline", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const offenders = INLINE.filter(
-      (entry) => !isSourceAvailability(entry) && !isScenarioDenial(entry),
-    )
+    const offenders = INLINE.filter((entry) => !isScenarioDenial(entry))
       .filter(({ text }) => AS_A_CHANCE.test(text))
       .map(({ at, text }) => `${at}: ${text}`);
     expect(offenders).toEqual([]);

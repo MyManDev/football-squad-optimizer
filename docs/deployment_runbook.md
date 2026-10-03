@@ -230,7 +230,10 @@ the publication claimed by that document; it is not a whole-tree byte comparison
 A settled release also requires its gameweek as the sixth argument (for GW5, append `5`).
 The dry run prints every step and performs
 no network requests or writes. Remove `--dry-run` only when operating the release.
-The script waits for the site PR to merge, creates a two-parent release whose tree
+The site pull request merges into develop through the branch's merge queue
+(`enqueuePullRequest` in the GitHub API; `gh pr merge` on develop lands in the same queue),
+which runs the merge-group checks before the merge; the recipe waits for that merge and
+does not perform it. It then creates a two-parent release whose tree
 equals develop, waits for the release PR to be clean and merges it with a merge
 commit. It then waits for successful main push CI at the exact SHA with one
 unexpired site artifact, creates the annotated tag, dispatches the trusted workflow
@@ -485,6 +488,34 @@ Then remove the worktree, which nothing runs from any more:
 ```powershell
 git worktree remove <release-worktree>
 ```
+
+## The release record
+
+One record per release, written by the operator after the live checks pass and kept with
+the run's receipts. Four blocks, each a fact the scripts printed, and three timings that
+are never added together because they measure different things:
+
+```text
+Release
+  tag:                site-<season>-gw<NN>-<kind>      (the annotated tag; `git show <tag>`)
+  main commit:        <sha>                            (`git rev-parse <tag>^{commit}`)
+  site PR:            #<n>, merged <instant>           (the queue's merge)
+  accepted stamp:     <generated_at_utc>               (from members.json, verified equal)
+Backend
+  launcher commit:    <sha>                            (printed by restart_backend.ps1)
+  restarted at:       <instant>
+Capture
+  active capture:     <fpl-live id>                    (the one every human entry names)
+  bundle marker:      <sha256 of <id>.bundle.json>     (the fingerprint the service reports)
+  news capture:       <club-news id or none>
+Evidence
+  live checks:        verify_live.py passed at <instant>
+  queue wait:         advice_job_wait_seconds          (time in the queue, from /metrics)
+  solve:              advice_solve_seconds             (time in the solver, from /metrics)
+  warm-up:            advice_worker_warmed elapsed     (from the worker's log line)
+```
+
+A field the scripts did not print is left as "not recorded", never estimated.
 
 ## Daily circuit breaker
 
