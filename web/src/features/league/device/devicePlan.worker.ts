@@ -8,13 +8,15 @@
 import loadHighs from "highs";
 import wasmUrl from "highs/runtime?url";
 
-import { DevicePlanRefused, solvePlan, type LpSolver } from "./planModel";
-import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanEntry } from "./types";
+import { DevicePlanRefused, gainVsNoChip, solvePlan, type LpSolver } from "./planModel";
+import type { DeviceChip, DevicePlanAnswer, DevicePlanDocument, DevicePlanEntry } from "./types";
 
 export interface DevicePlanRequest {
   id: number;
   document: DevicePlanDocument;
   entry: DevicePlanEntry;
+  /** A chip to play this week, or null for the plain plan. */
+  chip?: DeviceChip | null;
 }
 
 export type DevicePlanReply =
@@ -36,14 +38,33 @@ function highs(): Promise<LpSolver> {
   return solver;
 }
 
+/**
+ * The plan asked for: with a chip, the chip week and, beside it, the member's own no-chip
+ * plan the chip is measured against, exactly as the server measures `gain_vs_no_chip`.
+ */
+export function solveRequest(
+  solver: LpSolver,
+  { document, entry, chip = null }: Omit<DevicePlanRequest, "id">,
+): DevicePlanAnswer {
+  if (chip === null) return solvePlan(solver, document, entry);
+  const started = performance.now();
+  const without = solvePlan(solver, document, entry);
+  const answer = solvePlan(solver, document, entry, () => performance.now(), chip);
+  return {
+    ...answer,
+    gain_vs_no_chip: gainVsNoChip(answer, without),
+    seconds: (performance.now() - started) / 1000,
+  };
+}
+
 self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
-  const { id, document, entry } = event.data;
+  const { id } = event.data;
   let reply: DevicePlanReply;
   try {
     const loaded = await highs();
     // The page shows the solver as loading until here, and as computing from here.
     self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
-    reply = { id, kind: "answer", answer: solvePlan(loaded, document, entry) };
+    reply = { id, kind: "answer", answer: solveRequest(loaded, event.data) };
   } catch (error) {
     reply =
       error instanceof DevicePlanRefused

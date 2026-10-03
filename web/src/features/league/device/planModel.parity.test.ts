@@ -11,10 +11,12 @@ import { createRequire } from "node:module";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import fixture from "../../../fixtures/device-plan/instances.json";
+import { solveRequest } from "./devicePlan.worker";
 import { DevicePlanRefused, buildLp, solvePlan, type LpSolver } from "./planModel";
 import {
   isDevicePlanDocument,
   isDevicePlanEntry,
+  type DeviceChip,
   type DevicePlanDocument,
   type DevicePlanEntry,
 } from "./types";
@@ -106,3 +108,52 @@ describe("the model text", () => {
     expect(() => solvePlan(solver, document, starved, () => 0)).toThrow(DevicePlanRefused);
   });
 });
+
+// The chip instances: each chip the game has, forced for the week on two of the fifteens,
+// solved by the planner with every total on the chip week's basis.
+const chipCases = fixture.chips.map((c) => ({
+  ...c,
+  entry: members.find((m) => m.entry_id === c.entry_id)!.entry,
+  chip: c.chip as DeviceChip,
+}));
+
+describe("the chip instances", () => {
+  it("play every chip on the two fifteens", () => {
+    expect(new Set(chipCases.map((c) => c.chip))).toEqual(
+      new Set(["wildcard", "freehit", "bboost", "3xc"]),
+    );
+    expect(chipCases.length).toBe(8);
+  });
+});
+
+describe.each(chipCases.map((c) => [`${c.entry_id} ${c.chip}`, c] as const))(
+  "chip instance %s",
+  (_, c) => {
+    it("solves to the server's chip week and its gain against the plain plan", () => {
+      const answer = solveRequest(solver, { document, entry: c.entry, chip: c.chip });
+      const reference = c.reference;
+      expect(answer.chip).toBe(c.chip);
+      expect(answer.squad).toEqual(reference.squad);
+      expect(answer.starting_xi).toEqual(reference.starting_xi);
+      expect(answer.captain).toBe(reference.captain);
+      expect(answer.vice_captain).toBe(reference.vice_captain);
+      expect(answer.bench).toEqual(reference.bench);
+      expect(answer.transfers_in).toEqual(reference.transfers_in);
+      expect(answer.transfers_out).toEqual(reference.transfers_out);
+      expect(answer.transfer_hit_points).toBe(reference.transfer_hit_points);
+      expect(answer.expected_own_points).toBeCloseTo(reference.expected_own_points, 9);
+      expect(answer.hold_points).toBeCloseTo(reference.hold_points, 9);
+      expect(answer.moves.map((m) => [m.out, m.in])).toEqual(
+        reference.moves.map((m) => [m.out, m.in]),
+      );
+      for (const [index, move] of answer.moves.entries()) {
+        const expected = reference.moves[index]!.gain;
+        if (expected === null) expect(move.gain).toBeNull();
+        else expect(move.gain).toBeCloseTo(expected, 9);
+      }
+      if (reference.expected_gain_vs_hold === null) expect(answer.expected_gain_vs_hold).toBeNull();
+      else expect(answer.expected_gain_vs_hold).toBeCloseTo(reference.expected_gain_vs_hold, 9);
+      expect(answer.gain_vs_no_chip).toBeCloseTo(reference.gain_vs_no_chip, 9);
+    });
+  },
+);

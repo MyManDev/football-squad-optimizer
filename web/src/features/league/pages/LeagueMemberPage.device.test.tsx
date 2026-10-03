@@ -63,6 +63,7 @@ class CannedSolver implements DeviceSolver {
       kind: "answer",
       answer: {
         objective_scaled: 0,
+        chip: null,
         objective: member.reference.objective_value,
         squad: member.reference.squad,
         starting_xi: member.reference.starting_xi,

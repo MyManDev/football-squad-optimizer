@@ -77,7 +77,10 @@ export function useMemberAdviceView(
     request.model !== "football" &&
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
-  const deviceJob = useDevicePlan(view, request, deviceDependencies);
+  // The chip the page shows is the selection's; without the service's capabilities the
+  // request carries none, so the device is asked for the selection, chip included.
+  const deviceRequest = { ...request, chip: request.chip ?? selection.chip.chip };
+  const deviceJob = useDevicePlan(view, deviceRequest, deviceDependencies);
   const requestKey = [
     adviceRequestKey(request),
     selection.status,
@@ -224,7 +227,8 @@ export function useMemberAdviceView(
       origin: computed.source === "api-cache" ? "computed" : "published",
       source: computed.source,
     };
-  } else if (plainOnly && deviceJob.state.phase === "done") {
+  } else if (deviceJob.state.phase === "done") {
+    // The device's state is keyed by the selection it answered, chip included.
     shown = { envelope: deviceJob.state.envelope, origin: "computed", source: "device" };
   } else if (published) {
     shown = { envelope: published, origin: waiting ? "published-while-computing" : "published" };
