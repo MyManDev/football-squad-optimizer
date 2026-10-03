@@ -4,15 +4,21 @@ import { useNavigate } from "react-router";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { LeagueDataMissing, lookupPublishedLeague, SUPPORTED_LEAGUE_ID } from "../data";
+import { useChosenLeague } from "../identity/useChosenLeague";
 import styles from "./LeagueEntryPage.module.css";
 
 type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "failed";
 
-export function LeagueEntryPage() {
+/**
+ * `inPlace`: the gate rendered this form at a league address; a connected league shows
+ * that page where it stands instead of sending the visitor to the members list.
+ */
+export function LeagueEntryPage({ inPlace = false }: { inPlace?: boolean }) {
   const { messages } = useLanguage();
   const copy = messages.leagueEntry;
   const navigate = useNavigate();
-  const [value, setValue] = useState("");
+  const { leagueId: remembered, choose } = useChosenLeague();
+  const [value, setValue] = useState(remembered === null ? "" : String(remembered));
   const [state, setState] = useState<State>("idle");
   const active = useRef(true);
   useEffect(() => {
@@ -39,8 +45,10 @@ export function LeagueEntryPage() {
     try {
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
-      if (result === "connected") navigate("/league/members");
-      else setState("unsupported");
+      if (result === "connected") {
+        choose(leagueId);
+        if (!inPlace) navigate("/league/members");
+      } else setState("unsupported");
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");
     }

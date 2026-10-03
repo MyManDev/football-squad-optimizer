@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { writeChosenLeague } from "../identity/useChosenLeague";
 import { readViewerEntry, writeViewerEntry } from "../identity/useViewerEntry";
 import { LeagueEntryPage } from "./LeagueEntryPage";
 
@@ -17,6 +18,8 @@ afterEach(() => {
 beforeEach(() => {
   localStorage.clear();
   writeViewerEntry(null);
+  // Each case is a first visit: no league remembered from the one before.
+  writeChosenLeague(null);
 });
 
 function open(language: Language) {

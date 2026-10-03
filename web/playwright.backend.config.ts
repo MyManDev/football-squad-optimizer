@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { rememberedLeague } from "./e2e/leagueState";
+
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 if (!context) throw new Error("Run this smoke through tests/integration/test_advice_browser.py.");
 const output = `node_modules/.cache/${context.buildName}`;
@@ -12,7 +14,11 @@ export default defineConfig({
   timeout: 60_000,
   reporter: "list",
   outputDir: "test-results/backend",
-  use: { baseURL: context.webOrigin, trace: "retain-on-failure" },
+  use: {
+    baseURL: context.webOrigin,
+    storageState: rememberedLeague(context.webOrigin),
+    trace: "retain-on-failure",
+  },
   webServer: {
     // Vite substitutes the API origin during the build. Keep this test bundle
     // separate from dist, which may subsequently be published as the static site.
