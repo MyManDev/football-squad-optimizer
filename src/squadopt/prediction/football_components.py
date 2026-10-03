@@ -28,6 +28,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
+from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSIONS
 from squadopt.prediction.football_minutes_role import (
     ROLE_COMPONENT_COLUMNS,
     ROLE_METADATA_COLUMNS,
@@ -266,7 +267,7 @@ def component_rows(
         raise ValueError(f"Fixture components hold rows of another model than {model_version}.")
     if not components.position.isin(POSITIONS).all():
         raise ValueError("A fixture component names an unknown position.")
-    joint_role = model_version == "football_joint_role_minutes_v1"
+    joint_role = model_version in JOINT_ROLE_MODEL_VERSIONS
     extras = [*ROLE_COMPONENT_COLUMNS, *ROLE_METADATA_COLUMNS] if joint_role else []
     if joint_role and not set(extras) <= set(components):
         raise ValueError("Joint-role components lack their declared minute fields.")

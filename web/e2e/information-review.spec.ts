@@ -2,7 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { mockInformationReview } from "../src/fixtures/information";
-import type { AdviceLineup, AdviceLineupExpectation } from "../src/features/league/types";
+import type {
+  AdviceLineup,
+  AdviceLineupExpectation,
+  EntryAdvice,
+} from "../src/features/league/types";
 import { isAdvicePayload } from "../src/features/league/advice/adviceShape";
 import { installLeagueMocks } from "./leagueMocks";
 
@@ -12,7 +16,10 @@ import { installLeagueMocks } from "./leagueMocks";
  * 43 starting +1 autosub +3 captain +2 vice =49. Later news gives 52 or 46,
  * whose equal-weight mean remains 49. Same-position swaps preserve a legal XI.
  */
-function expectedAnswer(window: 3 | 5) {
+function expectedAnswer(
+  window: 3 | 5,
+  modelVersion: NonNullable<EntryAdvice["role_forecast"]>["model_version"],
+) {
   const answer = mockEntryAdviceEnvelope(35249001, "saf-puan", window);
   const roles = (index: number): AdviceLineup => {
     const starting_xi = answer.payload.starting_xi!.map((player) => ({
@@ -141,13 +148,13 @@ function expectedAnswer(window: 3 | 5) {
     })),
     prediction_model: {
       id: "football",
-      version: "football_joint_role_minutes_v1",
+      version: modelVersion,
       experimental: true,
       fingerprint: "a".repeat(64),
     },
     role_forecast: {
       version: "football_role_forecast_v1",
-      model_version: "football_joint_role_minutes_v1",
+      model_version: modelVersion,
       calibration: "not_independently_verified",
       scope: "current_gameweek_fixtures",
       rows: [
@@ -211,11 +218,13 @@ function expectedAnswer(window: 3 | 5) {
   return answer;
 }
 
-for (const [window, width] of [
-  [3, 390],
-  [3, 320],
-  [5, 390],
-  [5, 320],
+// Keep the existing four phone cases: both admitted joint versions traverse the
+// API parser, role/component rendering and accessibility checks at both horizons.
+for (const [window, width, modelVersion] of [
+  [3, 390, "football_joint_role_minutes_v1"],
+  [3, 320, "football_joint_role_retained_history_v1"],
+  [5, 390, "football_joint_role_minutes_v1"],
+  [5, 320, "football_joint_role_retained_history_v1"],
 ] as const) {
   test(`conditional football plan preserves ${window} weeks and Top100 at ${width}px`, async ({
     page,
@@ -226,7 +235,9 @@ for (const [window, width] of [
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await installLeagueMocks(page);
     const squad = mockEntrySquadEnvelopes[35249001]!.payload;
-    const answer = expectedAnswer(window);
+    const answer = expectedAnswer(window, modelVersion);
+    expect(answer.payload.prediction_model?.version).toBe(modelVersion);
+    expect(answer.payload.role_forecast?.model_version).toBe(modelVersion);
     expect(isAdvicePayload(answer.payload)).toBe(true);
     const reads: string[] = [];
     const writes: string[] = [];

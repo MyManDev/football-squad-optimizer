@@ -11,7 +11,11 @@ from squadopt.optimization import SolverExecutionError, SolverStatus
 from squadopt.planning import ChipAvailability, PlanningHorizon, TransferPlanningConfig
 from squadopt.planning.observed import optimize_observed_window, validate_observations
 from squadopt.planning.recourse import ObservationNode
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+)
 
 
 def comparison_problem(players, config, window=3):
@@ -179,7 +183,7 @@ def test_partial_comparison_keeps_complete_baseline(
 
 
 @pytest.mark.parametrize("chance", [25, 50, 75])
-@pytest.mark.parametrize("version", [FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION])
+@pytest.mark.parametrize("version", [FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS])
 @pytest.mark.parametrize("window", [3, 5])
 def test_health_information_preserves_mean_and_minutes(
     known_optimum_players, small_config, chance, version, window

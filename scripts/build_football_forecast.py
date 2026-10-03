@@ -34,6 +34,12 @@ def main() -> None:
         help="Fit joint starting/substitute minutes using the explicit training-season allowlist.",
     )
     parser.add_argument(
+        "--retained-role-history",
+        action="store_true",
+        help="Select the retained-history joint role candidate; requires --role-minutes "
+        "and --with-components. The existing model remains the default.",
+    )
+    parser.add_argument(
         "--with-components",
         action="store_true",
         help="Publish the forecast and its verified fixture companion from one model fit.",
@@ -43,6 +49,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.role_minutes and (args.contextual or not args.training_seasons):
         parser.error("--role-minutes requires --training-season and excludes --contextual")
+    if args.retained_role_history and not (args.role_minutes and args.with_components):
+        parser.error("--retained-role-history requires --role-minutes and --with-components")
     if args.with_components and args.contextual:
         parser.error("--with-components does not support --contextual")
     if bool(args.rotation_evidence) != bool(args.club_news_source):
@@ -65,6 +73,7 @@ def main() -> None:
             args.archive_root,
             training_seasons=args.training_seasons,
             **({"role_minutes": True} if args.role_minutes else {}),
+            **({"retained_role_history": True} if args.retained_role_history else {}),
         )
     else:
         document = produce_football_forecast(
@@ -74,6 +83,7 @@ def main() -> None:
             manager_words=words,
             training_seasons=args.training_seasons,
             **({"role_minutes": True} if args.role_minutes else {}),
+            **({"retained_role_history": True} if args.retained_role_history else {}),
         )
         companion = None
     publish_football_artifacts(

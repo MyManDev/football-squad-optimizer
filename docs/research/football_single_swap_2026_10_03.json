@@ -1,0 +1,985 @@
+{
+  "version": "synthetic_single_swap_public_evidence_v1",
+  "report_date": "2026-10-03",
+  "source_commit": "a069e5df9561ac0c820814a7b557f953227e59a6",
+  "run_label": "math100-single-swap-comparison01",
+  "protocol": "single_swap_paired_comparison_v2",
+  "status": "complete",
+  "eight_case_acceptance": true,
+  "source_sha256": {
+    "src/squadopt/planning/expected_window.py": "c4cfd8bfa170ce30a3a4d35b09b8e8180187afdbba51d324f5855ef5fdb2757f",
+    "src/squadopt/planning/expected_swap.py": "05ca9905a9acf2b515deaa09b20236143ed99875b74cf28942bc2f03a6deb245",
+    "src/squadopt/planning/guarded.py": "9fc4a4ce086483501f4ef7a4ccaf1e416e79b13d6e3737ebb90d2d3e47089083",
+    "src/squadopt/planning/segmented.py": "401fc91c062412e319018df96b4f3cc445191c8b24950e2e1c1e0495cdad55a2",
+    "src/squadopt/planning/optimizer.py": "1a01f68258d69e0deca139da11e8024584431d0d3b6948d2582f9196ca28bf40",
+    "src/squadopt/planning/models.py": "4834f8f1eb744a305d328fbd5fec2cfbd15c64a1e26ebb4d8b3d2ffbf1f89204",
+    "src/squadopt/planning/lineup_utility.py": "e5fd573511c46ca3f00d665a3d28683cd23e3a845e346677514d386fee9a637c",
+    "src/squadopt/scenarios/expected_lineup.py": "860af1eb91f3ef6f7d9c89555e7959cc97addf06dc1ac604def78d8f7c0f9c29",
+    "src/squadopt/optimization/config.py": "0e23e2d9d384445120031d8f6bd8704ce11fb6fe673083fb8b7240e66d7f58c3",
+    "src/squadopt/application/top100_weight.py": "2ad5ecc92cd8c77599981fb6026546e883d657d41f34d54a35fb1e373ffc4ab4",
+    "src/squadopt/application/advice_variants.py": "db56e73c11189020ab6bbcbe54654d9935115ea5a5c06082f23e00efcf036ddb"
+  },
+  "operator_protocol_sha256": {
+    "operator": "a689d19002d3b7ce2e1ee2fd1d91924248d661b333494726f0ecd73974daa131",
+    "protocol": "896a1a61a0a6b145be56d4fe091e617d33e0e188e98bcbbe43eafdf8472aa54a"
+  },
+  "scope": "nominal first-week-only single-swap extension; synthetic inputs only",
+  "budgets": {
+    "shared_CP_cap_across_eight_cases": 55,
+    "three_week_CP_cap": 5,
+    "five_week_CP_cap": 10,
+    "original_allocation_fractions": [
+      0.4,
+      0.6
+    ],
+    "CP_original_actual": 0.21320531342869214,
+    "CP_optional_actual": 0.04798896748143006,
+    "CP_total_actual": 0.26119428091012226,
+    "original_lineup_cap_formula": "256*W",
+    "new_lineup_cap_formula": "384*W+1",
+    "original_matrix_score_cap": 7680,
+    "new_matrix_score_cap": 11528,
+    "actual_original_scores": 7680,
+    "actual_extra_scores": 1668,
+    "actual_total_scores": 9348,
+    "actual_appearance_states": 17787,
+    "actual_hold_score_calls": 4,
+    "actual_hold_score_states": 7,
+    "original_guarded_proposal_calls": 16,
+    "optional_full_window_calls": 3,
+    "call_count_excludes_internal_seed_and_solver_phases": true,
+    "configured_solver_wall_seconds": 180,
+    "aggregate_elapsed_guarantee": false,
+    "measured_total_wall_seconds": 8.815373299992643,
+    "equal_total_work_claimed": false,
+    "CP_accounting_tolerance_not_reusable_slack": 0.01
+  },
+  "independent_receipt_audit": {
+    "plan_weeks_checked": 90,
+    "source_hashes_checked": 11,
+    "source_hash_mismatches": 0,
+    "helper_hashes_checked": 2,
+    "helper_hash_mismatches": 0,
+    "original_value_digests_checked": 16,
+    "original_value_digest_mismatches": 0,
+    "digest_reconstruction": "Restore integer player/gameweek dictionary keys lost in JSON round-trip before the original sorted-key serialization. File byte hashes are recorded separately.",
+    "closed_form_points": "Starting unconditional means plus certain captain13 bonus plus 0.5 times the first legal reserve mean when DEF3 is absent; q=1 control has no autosub term.",
+    "maximum_absolute_points_reconstruction_error": 1.1368683772161603e-13,
+    "resource_checks": "Independently replay each original and selected path from initial bank/FT/held15; distinguish temporary FH state and WC persistence; verify roles, transfer sets, legal formation, keep/avoid/no-hits, charged hits and FT accrual.",
+    "ledger_checks": "Reconstruct original seed plus final work, sum each phase once, verify optional cap uses B minus completed original actual, and independently sum scorer calls/states.",
+    "issues": []
+  },
+  "synthetic_inputs": {
+    "initial_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "universe_size": 17,
+    "positions": [
+      "GK",
+      "GK",
+      "DEF",
+      "DEF",
+      "DEF",
+      "DEF",
+      "DEF",
+      "MID",
+      "MID",
+      "MID",
+      "MID",
+      "MID",
+      "FWD",
+      "FWD",
+      "FWD",
+      "DEF",
+      "MID"
+    ],
+    "unconditional_base_points": [
+      4,
+      2,
+      8,
+      7,
+      6,
+      0.4,
+      0.2,
+      15,
+      14,
+      13,
+      12,
+      11,
+      20,
+      19,
+      0.1,
+      4,
+      12
+    ],
+    "appearance": "Only DEF3 has q=.5; all others q1; certain case sets DEF3 q1 without changing its unconditional mean.",
+    "initial_prices": 50,
+    "outside_prices": 60,
+    "initial_bank": 10,
+    "prices_constant": true,
+    "distinct_club_per_player": true,
+    "captain": 13,
+    "vice": 14,
+    "no_terminal_bonuses": true,
+    "top100": "Synthetic count100 for DEF16 and zero for all others, weight20: selection mean4.8 versus base mean4.0; apply once."
+  },
+  "cases": [
+    {
+      "case": "opportunity3",
+      "window": 3,
+      "original_utility": 450.59999999999997,
+      "candidate_utility": 452.2,
+      "delta": 1.6000000000000227,
+      "base_points": 452.2,
+      "actual_cp": 0.022330199326186087,
+      "score_evaluations": 1153,
+      "seconds": 0.9407984999706969,
+      "initial_FT": 1,
+      "optional": {
+        "status": "OPTIMAL",
+        "reason": "retained",
+        "cap": 4.982606429774485,
+        "actual": 0.004936629100671242,
+        "solver_calls": 1,
+        "cheap_pair_checks": 30,
+        "cheap_pair_cap": 30,
+        "hold_score_calls": 1,
+        "hold_score_states": 2
+      },
+      "lineup_states": 2288,
+      "original_value_digests": [
+        "b791436859b8b15f28c0b14b820ac9c35bb1aa99685deb866c912741ccb8e63d",
+        "63855af2d5333072a53db21325ff6d9b8926ac8765ba3ba76c164e749aad8886"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [
+            16
+          ],
+          "out": [
+            6
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 151.0
+        },
+        {
+          "week": 2,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 151.0
+        },
+        {
+          "week": 3,
+          "in": [
+            6,
+            17
+          ],
+          "out": [
+            12,
+            16
+          ],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 2,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        }
+      ],
+      "receipt_sha256": {
+        "opportunity3-comparison.json": "82f67a52c526d6673bd14dff31122619b2d9ec650b38e6075fe77d2eda9a8399",
+        "opportunity3-result.json": "89609562eade15388d92a101352af8a7ab888b07371951901a47814850c9254c",
+        "opportunity3-original-1.json": "62589449991532ab0cacda13fafd502f7d0372fd3a3cef691ef9ccfb3bd24201",
+        "opportunity3-original-2.json": "e256a674a9ccd2cbb4c513e699e12e38a338b1f0dbca870e3f7eac4a699a3738",
+        "opportunity3-raw-1.json": "62be26a625c8285c426959cd1da99dae0255c53666f4d4382bd307536eb1ac0d",
+        "opportunity3-raw-2.json": "0f0705bd3397c44936624a388e58e03277d3f82bc19eb295fd959af9ada853c7"
+      }
+    },
+    {
+      "case": "opportunity5",
+      "window": 5,
+      "original_utility": 751.0,
+      "candidate_utility": 752.5999999999999,
+      "delta": 1.599999999999909,
+      "base_points": 752.5999999999999,
+      "actual_cp": 0.0730985557808628,
+      "score_evaluations": 1921,
+      "seconds": 1.7431566999293864,
+      "initial_FT": 1,
+      "optional": {
+        "status": "OPTIMAL",
+        "reason": "retained",
+        "cap": 9.949031509494867,
+        "actual": 0.022130065275730117,
+        "solver_calls": 1,
+        "cheap_pair_checks": 30,
+        "cheap_pair_cap": 30,
+        "hold_score_calls": 1,
+        "hold_score_states": 2
+      },
+      "lineup_states": 3812,
+      "original_value_digests": [
+        "b8346925a74856233a2807ca63da5a7d7c167d3503fba6c81af3cebbaba8c99d",
+        "6dcd077a1de88cb31db6f001d9f2f293ebf589aca0b3899931f5aad892ca8acd"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [
+            16
+          ],
+          "out": [
+            6
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 151.0
+        },
+        {
+          "week": 2,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 151.0
+        },
+        {
+          "week": 3,
+          "in": [
+            6,
+            17
+          ],
+          "out": [
+            12,
+            16
+          ],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 2,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 4,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 5,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 2,
+          "free_unused": 2,
+          "ft_next": 3,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        }
+      ],
+      "receipt_sha256": {
+        "opportunity5-comparison.json": "1f39d06b31f3c98eab6b7c38a3ff75f8a1f2f9bba6311f64c3b21d4308152afe",
+        "opportunity5-result.json": "c1d86010f7364961d89372479be0cfe30140508027d4c7f6300b046ce168d313",
+        "opportunity5-original-1.json": "2c67d0b071dea5c6de410c996d0a3eac0f101115fa6d9f936b55301c3186dc31",
+        "opportunity5-original-2.json": "9f49f52e2152102f076bb6c0e4d9dee55f74056e0ed6e1cfd5e05a3141b38857",
+        "opportunity5-raw-1.json": "e9ca723f20a0d7cf701f143a30dc2a9ab4a81a9c077fb4d5819716dea0b3400c",
+        "opportunity5-raw-2.json": "6382b658a8fb7dd1c19a806f56c0ab12408eb31c78196bed66a6085d5558ca53"
+      }
+    },
+    {
+      "case": "certain",
+      "window": 3,
+      "original_utility": 450.0,
+      "candidate_utility": 450.0,
+      "delta": 0.0,
+      "base_points": 450.0,
+      "actual_cp": 0.017393570225514843,
+      "score_evaluations": 769,
+      "seconds": 0.7452991999452934,
+      "initial_FT": 1,
+      "optional": {
+        "status": "skipped",
+        "reason": "no_distinct_legal_positive_pair",
+        "cap": 0.0,
+        "actual": 0.0,
+        "solver_calls": 0,
+        "cheap_pair_checks": 30,
+        "cheap_pair_cap": 30,
+        "hold_score_calls": 1,
+        "hold_score_states": 1
+      },
+      "lineup_states": 763,
+      "original_value_digests": [
+        "11317335c7ba16ec2efe82c853238e6e73a131c326dae5650cfe135aaea36846",
+        "56dcba6b6f04423082decad7d97cc7b92c5e814ba3fd01ce2bc591d0e68a3ba1"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [
+            17
+          ],
+          "out": [
+            12
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.0
+        },
+        {
+          "week": 2,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.0
+        },
+        {
+          "week": 3,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 2,
+          "free_unused": 2,
+          "ft_next": 3,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.0
+        }
+      ],
+      "receipt_sha256": {
+        "certain-comparison.json": "9c157ceff7e198be00a820af3a050eb79e0dcdab86cc28ac55e9bd9a7eb46fd4",
+        "certain-result.json": "77e4674e1091ef5b5b4f72a2abb4dd2261907205ba5a59b1c4fc715e406e4521",
+        "certain-original-1.json": "aa2db1a3efb7e95243af3d6697b05400adb2d8de33eb2449bf1d1efb49474de7",
+        "certain-original-2.json": "0eb37c4950e04f25cff71bc096541dfa77c88ebc73299facc2d547525c382ac4",
+        "certain-raw-1.json": "2fb6a2b7e60ca06ea182ce021a2940a4f077a9a627fe440fb89d132a73778873",
+        "certain-raw-2.json": "c9cf39ea2aa3b060c872652d86014da629500bb7c76cd010452065574e075fe4"
+      }
+    },
+    {
+      "case": "first_freehit",
+      "window": 3,
+      "original_utility": 450.59999999999997,
+      "candidate_utility": 450.59999999999997,
+      "delta": 0.0,
+      "base_points": 450.59999999999997,
+      "actual_cp": 0.012853536098511949,
+      "score_evaluations": 768,
+      "seconds": 0.6996374999871477,
+      "initial_FT": 1,
+      "optional": {
+        "status": "skipped",
+        "reason": "first_week_rebuild",
+        "cap": 0.0,
+        "actual": 0.0,
+        "solver_calls": 0,
+        "cheap_pair_checks": 0,
+        "cheap_pair_cap": 0,
+        "hold_score_calls": 0,
+        "hold_score_states": 0
+      },
+      "lineup_states": 1524,
+      "original_value_digests": [
+        "6291408db603fdffdaec38f240968a796031c2a1afa0734eb594fa96942c386d",
+        "7068114c34f09cc464b04cf3c3be25d9111fbb6553355fe1293a83270b4d2eff"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [
+            17
+          ],
+          "out": [
+            12
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": "freehit",
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 2,
+          "in": [
+            17
+          ],
+          "out": [
+            12
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 3,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        }
+      ],
+      "receipt_sha256": {
+        "first_freehit-comparison.json": "f1959ca1638784f553aacb0fa72589b59d62024f1397d8e6f7d0b3717c5d88c8",
+        "first_freehit-result.json": "917a8a54ddb48e35001e7b47d25bfe66443b2730be606a63a67185e11c295bb9",
+        "first_freehit-original-1.json": "22d3d8080a392585e8b36543f77a69407f3761303a25075011b66d2a1935705b",
+        "first_freehit-original-2.json": "2479039b966aaaebe552f39a467a2ac61f78c49b267559e31ac68c452dc487f6",
+        "first_freehit-raw-1.json": "6a4e74f6bb38c13295a0e59ecd03af57cf8768267ba1a0733246f5bfa8f9d8e4",
+        "first_freehit-raw-2.json": "415cf01f209575f31ced5dff2b1fd5479a3613fc20f9961a53a5ce25359d40c3"
+      }
+    },
+    {
+      "case": "first_wildcard",
+      "window": 5,
+      "original_utility": 751.0,
+      "candidate_utility": 751.0,
+      "delta": 0.0,
+      "base_points": 751.0,
+      "actual_cp": 0.050872056970281916,
+      "score_evaluations": 1280,
+      "seconds": 1.3209321999456733,
+      "initial_FT": 1,
+      "optional": {
+        "status": "skipped",
+        "reason": "first_week_rebuild",
+        "cap": 0.0,
+        "actual": 0.0,
+        "solver_calls": 0,
+        "cheap_pair_checks": 0,
+        "cheap_pair_cap": 0,
+        "hold_score_calls": 0,
+        "hold_score_states": 0
+      },
+      "lineup_states": 2540,
+      "original_value_digests": [
+        "aa6dcdd2c0640cfc11c590a9e13067202775e787489365f34cbb98a6da39d571",
+        "cbc9ae598024d75afa044706a8bbc5606c34fe27f2316d5bbb884207965f259b"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [
+            17
+          ],
+          "out": [
+            12
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": "wildcard",
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 2,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 3,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 2,
+          "free_unused": 2,
+          "ft_next": 3,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 4,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 3,
+          "free_unused": 3,
+          "ft_next": 4,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 5,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 4,
+          "free_unused": 4,
+          "ft_next": 5,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        }
+      ],
+      "receipt_sha256": {
+        "first_wildcard-comparison.json": "8e7e9d3955f3ba5e0f60c26e5d4ad519465f048f6fd274006baf6d84aa4c5e1d",
+        "first_wildcard-result.json": "cbf7c7941c537edae26752badbccaa6c0b00ff870f3db45c5ffaff5544a95ce6",
+        "first_wildcard-original-1.json": "71d0993f1a4da3eb6488c9efaa53bb686f4b960966014f58055434e4810d30cd",
+        "first_wildcard-original-2.json": "a27107da76768905bab4f0f9a381f5ee8ae3c769796f40a7e08e01fc47dae30f",
+        "first_wildcard-raw-1.json": "4b1c32d78e87c5024de0b20e6ed616a8792e4f9acf45736baa267cc5832c98b9",
+        "first_wildcard-raw-2.json": "fa438a0b52a4385b986439fd81165f3ef8f88e415ec6c2acf04ddfbe77a02cbb"
+      }
+    },
+    {
+      "case": "keep_avoid",
+      "window": 3,
+      "original_utility": 447.59999999999997,
+      "candidate_utility": 447.59999999999997,
+      "delta": 0.0,
+      "base_points": 447.59999999999997,
+      "actual_cp": 0.002500214552380953,
+      "score_evaluations": 768,
+      "seconds": 0.6337415999732912,
+      "initial_FT": 1,
+      "optional": {
+        "status": "skipped",
+        "reason": "no_distinct_legal_positive_pair",
+        "cap": 0.0,
+        "actual": 0.0,
+        "solver_calls": 0,
+        "cheap_pair_checks": 30,
+        "cheap_pair_cap": 30,
+        "hold_score_calls": 0,
+        "hold_score_states": 0
+      },
+      "lineup_states": 1524,
+      "original_value_digests": [
+        "f9e6ff2e44afafa0fe700279653f911230d3944002522f59a9c7f5e70d7841e6",
+        "3b740a49c534648e990d986ee7005afd307b888e46a33857f969adada16041bb"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [],
+          "out": [],
+          "bank_before": 10,
+          "bank_after": 10,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 149.2
+        },
+        {
+          "week": 2,
+          "in": [],
+          "out": [],
+          "bank_before": 10,
+          "bank_after": 10,
+          "ft_before": 2,
+          "free_unused": 2,
+          "ft_next": 3,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 149.2
+        },
+        {
+          "week": 3,
+          "in": [],
+          "out": [],
+          "bank_before": 10,
+          "bank_after": 10,
+          "ft_before": 3,
+          "free_unused": 3,
+          "ft_next": 4,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 149.2
+        }
+      ],
+      "receipt_sha256": {
+        "keep_avoid-comparison.json": "174adc5d9797fb173c81acdda81e65eb8e52d2192d88c43722e75e57e6f7b561",
+        "keep_avoid-result.json": "cccf0658d9614b6298f8df92e28b5281be1ec447e750a0d5f76cc996f2dc158d",
+        "keep_avoid-original-1.json": "db70ab8eb471525ab0f804e6e87bbb2fd2ace917030097f66f084c12732440f9",
+        "keep_avoid-original-2.json": "75c459dce3980d8739a911737e9875ac844e35647520c3f0526a3d30a4779264",
+        "keep_avoid-raw-1.json": "06a8dfd2a8b4e4ad80df54197a137c7051a911f6a1f64fc7c73c1aad40e7b4a0",
+        "keep_avoid-raw-2.json": "458745f8c2b32469f34e175fe5998ceaabbed22cc280b3c0a571cf4e1980b10b"
+      }
+    },
+    {
+      "case": "no_hits",
+      "window": 3,
+      "original_utility": 449.59999999999997,
+      "candidate_utility": 449.59999999999997,
+      "delta": 0.0,
+      "base_points": 449.59999999999997,
+      "actual_cp": 0.011487792439923027,
+      "score_evaluations": 768,
+      "seconds": 0.690777700045146,
+      "initial_FT": 0,
+      "optional": {
+        "status": "skipped",
+        "reason": "no_free_transfer_and_no_hits",
+        "cap": 0.0,
+        "actual": 0.0,
+        "solver_calls": 0,
+        "cheap_pair_checks": 0,
+        "cheap_pair_cap": 0,
+        "hold_score_calls": 0,
+        "hold_score_states": 0
+      },
+      "lineup_states": 1524,
+      "original_value_digests": [
+        "7ddab90b3a423b41765fbf0608f278c14cea53150d8a644f9149d977ed9cc9b9",
+        "fb3f6d62c5334367480d5cab3266e3c8036174e82908d56e041e38e73a2a4444"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [],
+          "out": [],
+          "bank_before": 10,
+          "bank_after": 10,
+          "ft_before": 0,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 149.2
+        },
+        {
+          "week": 2,
+          "in": [
+            17
+          ],
+          "out": [
+            12
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 0,
+          "ft_next": 1,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 3,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 1,
+          "free_unused": 1,
+          "ft_next": 2,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        }
+      ],
+      "receipt_sha256": {
+        "no_hits-comparison.json": "d1c0eacc9b9681c2e7bcb07b59cb3dd0fea366d6e5d593397db0f261a642c5d4",
+        "no_hits-result.json": "9da8de6b73b73049536f1ae2d2611bb1e316d69778c6a441b9bdade7d77d93d3",
+        "no_hits-original-1.json": "90984e7557a3e18aa712fb97deca25d4ff7c854532ed248c987e6dcd2b3a9dc3",
+        "no_hits-original-2.json": "031e4a96c5b80017f3fcfbccb964177c4bb9fe1b2d5924e127c96d68acd1dbf7",
+        "no_hits-raw-1.json": "4f1b552c5268aa8060f1fe0fab5c7c8c85fb2edb24d53375b96292e55984cb44",
+        "no_hits-raw-2.json": "48f87e6bc006a10c251fc4817598115f0ba0e4af380c7a62f1095df61d6ce975"
+      }
+    },
+    {
+      "case": "top100",
+      "window": 5,
+      "original_utility": 751.0,
+      "candidate_utility": 752.1999999999999,
+      "delta": 1.1999999999999318,
+      "base_points": 751.8,
+      "actual_cp": 0.07065835551646066,
+      "score_evaluations": 1921,
+      "seconds": 1.7525461999466643,
+      "initial_FT": 5,
+      "optional": {
+        "status": "OPTIMAL",
+        "reason": "retained",
+        "cap": 9.950263917588568,
+        "actual": 0.020922273105028706,
+        "solver_calls": 1,
+        "cheap_pair_checks": 30,
+        "cheap_pair_cap": 30,
+        "hold_score_calls": 1,
+        "hold_score_states": 2
+      },
+      "lineup_states": 3812,
+      "original_value_digests": [
+        "f373550994245ab5363ea735aa7aa2842a3072723ea4e7bf1c3a1864d3580f55",
+        "0ea1efc8b31da95cd1272db03d0535ad911da4b15dbd69fe28dda333b473d1c3"
+      ],
+      "original_raw_statuses": [
+        "OPTIMAL",
+        "OPTIMAL"
+      ],
+      "weekly_path": [
+        {
+          "week": 1,
+          "in": [
+            16
+          ],
+          "out": [
+            6
+          ],
+          "bank_before": 10,
+          "bank_after": 0,
+          "ft_before": 5,
+          "free_unused": 4,
+          "ft_next": 5,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 151.4
+        },
+        {
+          "week": 2,
+          "in": [
+            6,
+            17
+          ],
+          "out": [
+            12,
+            16
+          ],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 5,
+          "free_unused": 3,
+          "ft_next": 4,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 3,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 4,
+          "free_unused": 4,
+          "ft_next": 5,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 4,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 5,
+          "free_unused": 5,
+          "ft_next": 5,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        },
+        {
+          "week": 5,
+          "in": [],
+          "out": [],
+          "bank_before": 0,
+          "bank_after": 0,
+          "ft_before": 5,
+          "free_unused": 5,
+          "ft_next": 5,
+          "paid": 0,
+          "hits": 0.0,
+          "chip": null,
+          "selection_net_points": 150.2
+        }
+      ],
+      "receipt_sha256": {
+        "top100-comparison.json": "c0de7bd16f9b7c92d824f1d6e7f290797679bd576c67fd57c0e86d9794a2f2ea",
+        "top100-result.json": "965d71d9f8c6d896bfb4c718a3a1e5f817b01d4dccb7dd5037a0ec3629a1acb7",
+        "top100-original-1.json": "841ec485444ef9f53f6979df16fa65c1967b0e8eba396641dfa8b58c99d9ceda",
+        "top100-original-2.json": "be14168429b1c200a66b7cec10bffa78d4ef74b9d2908668bae31f71e23c724f",
+        "top100-raw-1.json": "ebeb76244ab95fc7d755cc4885c1a277ca675aa0d5c3a16aa6c2b236e18bfa7f",
+        "top100-raw-2.json": "aa6365093bbf0124756710dc4083e1d62211c423d14642f8559504bc2893f968"
+      }
+    }
+  ],
+  "limits": [
+    "Accepted refers only to these eight synthetic route cases.",
+    "Separate variable-price acquisition-lot/FH resource gates9-10 require their own existing test receipt; they were not executed or certified by this matrix.",
+    "The optional candidate fixes only the first squad and permits later transfers; the earlier all-week fixed witness is a different experiment.",
+    "This matrix uses more lineup scoring work and does not establish equal-total-work or equal-elapsed-time superiority.",
+    "Original128-per-week candidates are retained; no192-per-week expanded-scoring control was run.",
+    "The proxy ranks one pair and is not exact utility or a global optimality proof.",
+    "Observed-news branch fairness and nonanticipativity are outside this nominal-route matrix.",
+    "No calibration, realized FPL gain, model-fit, provider or live activation claim.",
+    "Only source text and generated receipts were read during this independent review; no solver, test, fit or raw input-data access."
+  ],
+  "receipt_sha256": {
+    "declaration.json": "fb8a64ed790d952cf8790b75e457f04eab0e3fbe39b226453371b8c7964177b5",
+    "result.json": "545549d0c1ead9b10e9b8c80b16273a91b502519b5f64e6b439c4ff996443ca7",
+    "events.jsonl": "7bfde2be2413305d61a6e8959f20032bcff076988598481caf75f5a2161dc9ba"
+  },
+  "separate_all_week_witness": {
+    "run_label": "math100-step72-autosub-probe01",
+    "result_sha256": "0dce7ddcc4d407a2c074a2e0db13ce287ce5726e901f385e4358f0c7e95827de",
+    "protocol_sha256": "199783a75838348b630df5f74f6e6afed6f44e8092e7a3f0d2849ef31fa20f5a",
+    "source_commit": "64362f2c06a1957ebaa12128ce74cd9157e0227f",
+    "fixed_swap": "DEF7 to DEF16 in every week",
+    "three_week_total": 453.0,
+    "five_week_total": 755.0,
+    "gains_vs_then_retained_originals": [
+      2.4,
+      4.0
+    ],
+    "separate_configured_CP_cap": 30.0,
+    "separate_actual_CP": 0.06951865481113721,
+    "separate_scores": 3072,
+    "included_in_eight_case_work": false
+  },
+  "published_artifacts": [
+    "docs/research/football_single_swap_2026_10_03.md",
+    "docs/research/football_single_swap_2026_10_03.json"
+  ]
+}

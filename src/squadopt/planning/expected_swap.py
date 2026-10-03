@@ -12,8 +12,9 @@ from dataclasses import replace
 from math import isfinite
 from numbers import Real
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 
+from squadopt.contracts.players import POSITIONS
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.optimization import OptimizationConfig, wall_clock_stopped_the_search
 from squadopt.planning.lineup_utility import improve_plan_lineups
@@ -120,7 +121,7 @@ def propose_expected_swap(
     ):
         return skip("invalid_initial_template")
     replacement: dict[object, object] = {}
-    for position in ("GK", "DEF", "MID", "FWD"):
+    for position in POSITIONS:
         incoming = sorted(
             (p for p in selected - held if first.at[p, "position"] == position),
             key=_stable_id_key,
@@ -146,7 +147,7 @@ def propose_expected_swap(
         or captain == vice
     ):
         return skip("invalid_initial_template")
-    for position in ("GK", "DEF", "MID", "FWD"):
+    for position in POSITIONS:
         count = sum(first.at[p, "position"] == position for p in xi)
         if not (
             optimization.starting_position_min[position]
@@ -195,8 +196,8 @@ def propose_expected_swap(
             if ids in retained_squads or not keep <= ids or ids & avoid:
                 continue
             if (
-                initial.bank_tenths + int(first.at[outgoing, "sell_price_tenths"])
-                < int(first.at[incoming, "buy_price_tenths"])
+                initial.bank_tenths + int(cast(int, first.at[outgoing, "sell_price_tenths"]))
+                < int(cast(int, first.at[incoming, "buy_price_tenths"]))
                 or max(Counter(first.loc[list(ids), "team_id"]).values())
                 > optimization.max_players_per_team
             ):
@@ -204,8 +205,8 @@ def propose_expected_swap(
             proxy = (
                 float(multipliers[outgoing])
                 * (
-                    float(first.at[incoming, "expected_points"])
-                    - float(first.at[outgoing, "expected_points"])
+                    float(cast(float, first.at[incoming, "expected_points"]))
+                    - float(cast(float, first.at[outgoing, "expected_points"]))
                 )
                 - hit
             )

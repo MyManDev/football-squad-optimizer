@@ -22,9 +22,17 @@ from numpy.typing import ArrayLike
 from scipy.stats import nbinom
 
 from squadopt.live.football_artifact import ARTIFACT_CONTRACT, forecast_digest
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+)
 from squadopt.prediction.football_components import role_component_record
-from squadopt.prediction.football_minutes_role import ROLE_COMPONENT_COLUMNS, RoleMinuteDistribution
+from squadopt.prediction.football_minutes_role import (
+    RETAINED_HISTORY_ROLE_FEATURE_VERSION,
+    ROLE_COMPONENT_COLUMNS,
+    RoleMinuteDistribution,
+)
 
 # A JSON protocol boundary, not an import dependency on the unmerged producer.
 # This reader names only the fields needed to prove and recompute its intervention.
@@ -393,10 +401,19 @@ class FixtureComponentBasis:
         if (
             served.get("contract_version") != ARTIFACT_CONTRACT
             or companion.get("contract_version") != FIXTURE_COMPONENTS_CONTRACT
-            or served.get("model_version") not in (FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSION)
+            or served.get("model_version")
+            not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS)
             or companion.get("model_version") != served.get("model_version")
         ):
             raise ValueError("Only the PR912 v1 fixture component contract is supported.")
+        role_metadata = served.get("role_metadata")
+        if served["model_version"] == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION and (
+            not isinstance(role_metadata, dict)
+            or role_metadata.get("role_feature_version") != RETAINED_HISTORY_ROLE_FEATURE_VERSION
+        ):
+            raise ValueError(
+                "Retained-history components require their explicit role feature identity."
+            )
         if companion.get("forecast_fingerprint") != served["fingerprint"]:
             raise ValueError("Companion belongs to a different forecast.")
         if any(companion.get(key) != served.get(key) or key not in served for key in _ID_FIELDS):
@@ -506,7 +523,7 @@ class FixtureComponentBasis:
         _validate_components(
             rows,
             str(served["season"]),
-            joint_role=served["model_version"] == JOINT_ROLE_MODEL_VERSION,
+            joint_role=served["model_version"] in JOINT_ROLE_MODEL_VERSIONS,
         )
         aggregate = _weekly_from_fixture_rows(weekly, rows, dict.fromkeys(players, 1.0))
         for col in ("expected_points", "appearance_probability"):
@@ -534,7 +551,7 @@ class FixtureComponentBasis:
     def fixture_rows(self) -> pd.DataFrame:
         frame = pd.DataFrame(cast(list[dict[str, object]], self.companion["rows"]))
         frame.attrs["season"] = str(self.served["season"])
-        frame.attrs["joint_role"] = self.served["model_version"] == JOINT_ROLE_MODEL_VERSION
+        frame.attrs["joint_role"] = self.served["model_version"] in JOINT_ROLE_MODEL_VERSIONS
         return frame
 
     @property

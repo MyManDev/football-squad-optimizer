@@ -91,6 +91,7 @@ identified below rather than being silently pooled with v1 evidence.
 
 | Artifact | Finding | PR |
 | --- | --- | --- |
+| [Bounded single-swap comparison](research/football_single_swap_2026_10_03.md) / [record](research/football_single_swap_2026_10_03.json) | Eight synthetic cases: first-week-only optional completion gains 1.6 in both 3/5-week autosub cases; Top100 selection gains 1.2 and base forecast points 0.8. Controls retain their original utility. Actual CP 0.261194 within shared cap 55; 9,348 scores versus 7,680 for the originals, so more lineup work is explicit. Separate all-week witness and variable-price resource gates are not this matrix; no realized FPL or observed-news claim. | This change |
 | [Direct DEFCON development](research/football_defcon_development.json) / [readout](research/football_defcon_development.md) | Fixed direct-tail candidate, 33 paired reused-data weeks with comparator parity; event and point losses retained separately, no promotion. | This change |
 | [Joint role and minutes](research/football_joint_role_minutes_2026_10_02.md) | 13 fixed development origins against the existing football model; minutes MAE 15.0313 to 14.6690, small point-error gains, mixed component and position results. No realized squad gain or independent superiority measured. | This change |
 | [Football component ablation](research/football_component_ablation.md) | 61 reused development weeks; component losses expose point-error cancellation. No candidate promoted. | #775 |
