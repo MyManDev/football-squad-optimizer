@@ -3,7 +3,8 @@
  * own device.
  *
  * It restates the one-week model the server builds (`squadopt/planning/optimizer.py`,
- * one week, no chip) over the numbers the server publishes for exactly that purpose
+ * one week, with or without a chip played that week) over the numbers the server
+ * publishes for exactly that purpose
  * (`squadopt/application/device_plan.py`): the table in the solver's order, the server's
  * integer objective coefficients, and the rules as numbers. The server's deterministic
  * tie-break is reproduced as three small follow-up solves. A parity test holds this
@@ -11,10 +12,12 @@
  */
 
 import type {
+  DeviceChip,
   DevicePlanAnswer,
   DevicePlanDocument,
   DevicePlanEntry,
   DevicePlanMove,
+  DevicePlanPlayer,
 } from "./types";
 
 /** The one-shot solver this model needs: HiGHS's legacy `solve` over LP text. */
@@ -43,6 +46,28 @@ interface TieBreak {
 
 interface BuildOptions {
   tieBreak?: TieBreak | null;
+  chip?: DeviceChip | null;
+}
+
+/**
+ * A chip's objective, from the planner's own model: a Bench Boost scores every squad
+ * member in full (the starter coefficient moves from the eleven to the fifteen), a Triple
+ * Captain counts the captain's coefficient once more, and a Wildcard or a Free Hit lifts
+ * the hits and the cap and scores as any week does. The planner's remainder for the bench
+ * is a non-negative coefficient; a document that carries a negative one is refused rather
+ * than scored on a model the planner does not use.
+ */
+function chipCoefficients(
+  player: DevicePlanPlayer,
+  chip: DeviceChip | null,
+): [number, number, number] {
+  const [squad, starter, captain] = player.coefficients;
+  if (chip === "bboost") {
+    if (starter < 0) throw new DevicePlanRefused("negative starter coefficient", "plan");
+    return [squad + starter, 0, captain];
+  }
+  if (chip === "3xc") return [squad, starter, 2 * captain];
+  return [squad, starter, captain];
 }
 
 /** Sum of rank times variable; rank is the player's place in the document's order. */
@@ -56,7 +81,7 @@ function rankSum(count: number, prefix: string): string {
 export function buildLp(
   document: DevicePlanDocument,
   entry: DevicePlanEntry,
-  { tieBreak = null }: BuildOptions = {},
+  { tieBreak = null, chip = null }: BuildOptions = {},
 ): string {
   const { players, rules } = document;
   const heldSet = new Set(entry.held);
@@ -67,12 +92,15 @@ export function buildLp(
 
   const objective: string[] = [];
   players.forEach((player, i) => {
-    const [squad, starter, captain] = player.coefficients;
+    const [squad, starter, captain] = chipCoefficients(player, chip);
     if (squad) objective.push(`${squad} ${s(i)}`);
     if (starter) objective.push(`${starter} ${x(i)}`);
     if (captain) objective.push(`${captain} ${c(i)}`);
   });
-  const primary = `${objective.join(PLUS)}${MINUS}${rules.hit_cost_scaled} paid`;
+  // A rebuild week pays no hits, so the paid transfers leave the objective.
+  const primary = rebuilds(chip)
+    ? objective.join(PLUS)
+    : `${objective.join(PLUS)}${MINUS}${rules.hit_cost_scaled} paid`;
 
   const rows: string[] = [];
   rows.push(`squad: ${sum(players.map((_, i) => s(i)))} = ${rules.squad_size}`);
@@ -141,7 +169,11 @@ export function buildLp(
  * club limit, the bank, the transfer line) do not bind a fifteen that is not being
  * chosen, exactly as the server's `best_eleven_points` reads a fifteen's worth.
  */
-export function buildLineupLp(document: DevicePlanDocument, squad: number[]): string {
+export function buildLineupLp(
+  document: DevicePlanDocument,
+  squad: number[],
+  chip: DeviceChip | null = null,
+): string {
   const { players, rules } = document;
   const inSquad = new Set(squad);
   const x = (i: number) => `x${i}`;
@@ -150,7 +182,7 @@ export function buildLineupLp(document: DevicePlanDocument, squad: number[]): st
   const sum = (terms: string[]) => (terms.length ? terms.join(PLUS) : "0 x0");
   const objective: string[] = [];
   for (const i of chosen) {
-    const [, starter, captain] = players[i]!.coefficients;
+    const [, starter, captain] = chipCoefficients(players[i]!, chip);
     if (starter) objective.push(`${starter} ${x(i)}`);
     if (captain) objective.push(`${captain} ${c(i)}`);
   }
@@ -165,7 +197,9 @@ export function buildLineupLp(document: DevicePlanDocument, squad: number[]): st
   }
   return [
     "Maximize",
-    ` obj: ${objective.join(PLUS)}`,
+    // Under a Bench Boost the fifteen's points are a constant and only the captain is
+    // chosen; the eleven is then whichever the solver names, which is what it is for.
+    ` obj: ${objective.length ? objective.join(PLUS) : "0 x0"}`,
     "Subject To",
     ...rows.map((row) => ` ${row}`),
     "Binary",
@@ -183,12 +217,21 @@ function selected(solution: Solution, document: DevicePlanDocument, prefix: stri
     .sort((a, b) => a - b);
 }
 
-/** The eleven with the captain doubled, on the document's own expected points. */
-function elevenPoints(document: DevicePlanDocument, startingXi: number[], captain: number): number {
+/**
+ * What a week scores on the document's own expected points: the eleven with the captain
+ * doubled; tripled under a Triple Captain; every one of the fifteen under a Bench Boost.
+ */
+function weekPoints(
+  document: DevicePlanDocument,
+  squad: number[],
+  startingXi: number[],
+  captain: number,
+  chip: DeviceChip | null,
+): number {
   const points = new Map(document.players.map((p) => [p.id, p.expected_points]));
   let total = 0;
-  for (const id of startingXi) total += points.get(id) ?? 0;
-  return total + (points.get(captain) ?? 0);
+  for (const id of chip === "bboost" ? squad : startingXi) total += points.get(id) ?? 0;
+  return total + (chip === "3xc" ? 2 : 1) * (points.get(captain) ?? 0);
 }
 
 export class DevicePlanRefused extends Error {
@@ -214,6 +257,7 @@ export function solvePlan(
   published: DevicePlanDocument,
   entry: DevicePlanEntry,
   now: () => number = () => performance.now(),
+  chip: DeviceChip | null = null,
 ): DevicePlanAnswer {
   const started = now();
   // The planner sorts its table by id before it solves and ranks ties in that order;
@@ -222,7 +266,7 @@ export function solvePlan(
     ...published,
     players: [...published.players].sort((a, b) => a.id - b.id),
   };
-  const first = solver.solve(buildLp(document, entry), EXACT);
+  const first = solver.solve(buildLp(document, entry, { chip }), EXACT);
   if (first.Status !== "Optimal") throw new DevicePlanRefused(first.Status, "plan");
   const primaryValue = Math.round(first.ObjectiveValue);
 
@@ -232,7 +276,7 @@ export function solvePlan(
   let last = first;
   for (const prefix of ["c", "x", "s"] as const) {
     const tier = solver.solve(
-      buildLp(document, entry, { tieBreak: { primaryValue, prefix, fixed } }),
+      buildLp(document, entry, { tieBreak: { primaryValue, prefix, fixed }, chip }),
       EXACT,
     );
     if (tier.Status !== "Optimal") throw new DevicePlanRefused(tier.Status, "tie-break");
@@ -243,12 +287,14 @@ export function solvePlan(
   // The value of fielding exactly a fifteen: its best eleven and captain on the same
   // objective, the basis every gain is on.
   const valueOf = (squad: number[]): number => {
-    const fixed = solver.solve(buildLineupLp(document, squad), EXACT);
+    const fixed = solver.solve(buildLineupLp(document, squad, chip), EXACT);
     if (fixed.Status !== "Optimal") throw new DevicePlanRefused(fixed.Status, "hold");
-    return elevenPoints(
+    return weekPoints(
       document,
+      squad,
       selected(fixed, document, "x"),
       selected(fixed, document, "c")[0]!,
+      chip,
     );
   };
 
@@ -258,8 +304,8 @@ export function solvePlan(
   const captain = selected(last, document, "c")[0]!;
   const transfersIn = squad.filter((id) => !heldSet.has(id));
   const transfersOut = entry.held.filter((id) => !squad.includes(id)).sort((a, b) => a - b);
-  const paid = Math.max(0, transfersIn.length - entry.free_transfers);
-  const expectedOwnPoints = elevenPoints(document, startingXi, captain);
+  const paid = rebuilds(chip) ? 0 : Math.max(0, transfersIn.length - entry.free_transfers);
+  const expectedOwnPoints = weekPoints(document, squad, startingXi, captain, chip);
   const holdPoints = valueOf(entry.held);
   const { moves, gain } = attributedMoves(
     document,
@@ -285,8 +331,27 @@ export function solvePlan(
     hold_points: holdPoints,
     moves,
     expected_gain_vs_hold: gain,
+    chip,
     seconds: (now() - started) / 1000,
   };
+}
+
+/** A Wildcard or a Free Hit: unlimited transfers, none of them paid. */
+export function rebuilds(chip: DeviceChip | null): boolean {
+  return chip === "wildcard" || chip === "freehit";
+}
+
+/**
+ * A chip week beside the member's own no-chip plan: what the chip week scores minus its
+ * hits, less the same for the plan without it. The server's `gain_vs_no_chip`, from the
+ * two plans the device solved.
+ */
+export function gainVsNoChip(withChip: DevicePlanAnswer, without: DevicePlanAnswer): number {
+  return (
+    withChip.expected_own_points -
+    withChip.transfer_hit_points -
+    (without.expected_own_points - without.transfer_hit_points)
+  );
 }
 
 /**

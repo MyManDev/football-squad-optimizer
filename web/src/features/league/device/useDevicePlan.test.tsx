@@ -20,6 +20,7 @@ import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
 import { solvePlan, type LpSolver } from "./planModel";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
+  deviceChip,
   deviceSolvable,
   useDevicePlan,
   type DeviceSolver,
@@ -129,14 +130,31 @@ function Harness({
 }
 
 describe("what the device can solve", () => {
-  it("is the plain pure-points plan over one week and nothing else", () => {
-    expect(deviceSolvable(REQUEST)).toBe(true);
-    expect(deviceSolvable({ ...REQUEST, window: 3 })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru", rivalEntryId: 2 })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, top100Weight: 20 })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, managersWord: true })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, chip: "bboost" })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, model: "football" })).toBe(false);
+  const squad = squadWith(entry);
+
+  it("is the pure-points plan over one week, with at most a held chip", () => {
+    expect(deviceSolvable(REQUEST, squad)).toBe(true);
+    expect(deviceSolvable({ ...REQUEST, window: 3 }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru", rivalEntryId: 2 }, squad)).toBe(
+      false,
+    );
+    expect(deviceSolvable({ ...REQUEST, top100Weight: 20 }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, managersWord: true }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, chip: "bboost" }, squad)).toBe(true);
+    expect(deviceSolvable({ ...REQUEST, model: "football" }, squad)).toBe(false);
+  });
+
+  it("takes a chip only where the squad document says the member can still play it", () => {
+    const used = structuredClone(squad);
+    used.chips!.states.bboost!.first_half!.state = "used";
+    expect(deviceChip({ ...REQUEST, chip: "bboost" }, used)).toBeUndefined();
+    expect(deviceChip({ ...REQUEST, chip: "3xc" }, used)).toBe("3xc");
+    expect(deviceChip(REQUEST, used)).toBeNull();
+    // A history the producer could not read offers no chip at all.
+    const unknown = { ...squad, chips: { known: false, gameweek: squad.gameweek, states: {} } };
+    expect(deviceChip({ ...REQUEST, chip: "3xc" }, unknown)).toBeUndefined();
+    expect(deviceChip({ ...REQUEST, chip: "3xc" }, { ...squad, chips: undefined })).toBeUndefined();
+    expect(deviceChip({ ...REQUEST, chip: "auto" }, squad)).toBeUndefined();
   });
 
   it("is offered only where the publisher wrote the member's inputs", () => {

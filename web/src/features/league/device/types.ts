@@ -5,6 +5,14 @@
 
 export const DEVICE_PLAN_CONTRACT_VERSION = "league_device_plan_v1";
 
+/** The chips a member may play in the decided week, as the game names them. */
+export const DEVICE_CHIPS = ["wildcard", "freehit", "bboost", "3xc"] as const;
+export type DeviceChip = (typeof DEVICE_CHIPS)[number];
+
+export function isDeviceChip(value: unknown): value is DeviceChip {
+  return typeof value === "string" && (DEVICE_CHIPS as readonly string[]).includes(value);
+}
+
 export interface DevicePlanPlayer {
   id: number;
   name: string;
@@ -79,6 +87,13 @@ export interface DevicePlanAnswer {
    */
   moves: DevicePlanMove[];
   expected_gain_vs_hold: number | null;
+  /** The chip the week was solved with, or null; every total above is on its basis. */
+  chip: DeviceChip | null;
+  /**
+   * With a chip: the chip week's points net of hits above the member's own no-chip plan,
+   * net of its hits. Absent without a chip.
+   */
+  gain_vs_no_chip?: number;
   seconds: number;
 }
 

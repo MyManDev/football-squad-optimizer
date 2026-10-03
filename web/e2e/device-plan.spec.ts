@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { chipPath } from "../src/features/league/advice/chipChoice";
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
-import { mockEntrySquadEnvelopes } from "../src/fixtures/league";
+import {
+  mockEntryAdviceChipEnvelope,
+  mockEntryAdviceIndex,
+  mockEntrySquadEnvelopes,
+} from "../src/fixtures/league";
 import { installLeagueMocks } from "./leagueMocks";
 
 // The whole device path in a real browser: the published inputs, the worker, the wasm
@@ -72,4 +77,80 @@ test("a member's plan is solved on the device and drawn as a computation result"
   expect(requested.length).toBeGreaterThan(0);
   const foreign = requested.filter((url) => !url.startsWith("http://127.0.0.1:4173/"));
   expect(foreign).toEqual([]);
+});
+
+test("a chip the member holds is solved on the device with its gain against the plain plan", async ({
+  page,
+}) => {
+  await installLeagueMocks(page);
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  const withInputs = {
+    ...squad,
+    payload: {
+      ...squad.payload,
+      source_snapshot_id: fixture.document.source_snapshot_id,
+      device_plan: member.entry,
+    },
+  };
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(withInputs),
+    }),
+  );
+  // The publish lists the chip, so the page offers it; its document is the publisher's.
+  const index = mockEntryAdviceIndex(ENTRY);
+  await page.route(/\/data\/league\/advice\/35249001\/index\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...index,
+        payload: {
+          ...index.payload,
+          chips: {
+            available: true,
+            paths: { "3xc": chipPath(ENTRY, "3xc") },
+            unavailable: [],
+            held: ["3xc"],
+          },
+        },
+      }),
+    }),
+  );
+  await page.route(
+    /\/data\/league\/advice\/35249001\/saf-puan\/1\/chip-3xc\.json(?:\?.*)?$/,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockEntryAdviceChipEnvelope(ENTRY, "3xc")),
+      }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: fixture.document,
+      }),
+    }),
+  );
+
+  await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
+  await expect(page.locator("main")).toContainText("Triple Captain bu hafta oynanıyor");
+  const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  // The captain tripled: the reference's captain scores once more than the plain plan,
+  // and the chip section states the gain the device measured against that plan.
+  const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
+  await expect(page.getByText(names.get(member.reference.captain)!).first()).toBeVisible();
+  await expect(page.locator("main")).toContainText(/Çipsiz kendi planına göre bu hafta ~\+/);
 });

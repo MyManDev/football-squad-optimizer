@@ -1,10 +1,11 @@
 /**
  * A member's one-week plan solved on the member's own device.
  *
- * Offered for exactly the selection the publisher wrote inputs for: this member's plain
- * pure-points plan over one week, from the fifteen the page shows. The shared document
- * is read when the member asks, the solve runs in a worker, and the answer is shown as
- * the advice document the page already reads. A new selection starts clean.
+ * Offered for the selections the published inputs describe: this member's plain
+ * pure-points plan over one week, from the fifteen the page shows, with or without a
+ * chip the member still holds played that week. The shared document is read when the
+ * member asks, the solve runs in a worker, and the answer is shown as the advice document
+ * the page already reads. A new selection starts clean.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +16,13 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
 import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
-import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
+import {
+  isDeviceChip,
+  isDevicePlanEntry,
+  type DeviceChip,
+  type DevicePlanDocument,
+  type DevicePlanEntry,
+} from "./types";
 
 export type DevicePlanPhase =
   | { phase: "idle" }
@@ -56,15 +63,37 @@ function createWorker(): DeviceSolver {
   }) as unknown as DeviceSolver;
 }
 
-/** The one selection the published inputs describe: pure points, one week, nothing switched on. */
-export function deviceSolvable(request: AdviceRequest): boolean {
+/**
+ * The chip the request asks to play, if it is one the device can solve: a chip the squad
+ * document says the member can still play this gameweek. Null for no chip; undefined for
+ * a chip the device cannot take.
+ */
+export function deviceChip(
+  request: AdviceRequest,
+  squad: Pick<EntrySquad, "chips">,
+): DeviceChip | null | undefined {
+  const chip = request.chip ?? null;
+  if (chip === null) return null;
+  if (!isDeviceChip(chip) || !squad.chips?.known) return undefined;
+  const halves = squad.chips.states[chip];
+  const playable =
+    halves !== undefined &&
+    Object.values(halves).some((half) => half !== null && half.state === "available");
+  return playable ? chip : undefined;
+}
+
+/**
+ * The selections the published inputs describe: pure points, one week, nothing switched
+ * on, with at most a chip the member holds.
+ */
+export function deviceSolvable(request: AdviceRequest, squad: Pick<EntrySquad, "chips">): boolean {
   return (
     request.strategy === "saf-puan" &&
     request.window === 1 &&
     (request.rivalEntryId ?? null) === null &&
     (request.top100Weight ?? 0) === 0 &&
     !(request.managersWord ?? false) &&
-    (request.chip ?? null) === null &&
+    deviceChip(request, squad) !== undefined &&
     (request.model ?? "current") === "current" &&
     !request.preferences
   );
@@ -83,7 +112,9 @@ export function useDevicePlan(
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
     : null;
-  const available = entry !== null && squad.source_snapshot_id !== null && deviceSolvable(request);
+  const available =
+    entry !== null && squad.source_snapshot_id !== null && deviceSolvable(request, squad);
+  const chip = deviceChip(request, squad) ?? null;
   // The state is keyed by the selection it was asked for: a new selection reads idle
   // without an effect, and a late reply for the old one is ignored by its generation.
   const [held, setHeld] = useState<{ key: string; state: DevicePlanPhase }>({
@@ -174,7 +205,7 @@ export function useDevicePlan(
           resolve(null);
         };
         try {
-          worker.postMessage({ id: run, document, entry });
+          worker.postMessage({ id: run, document, entry, chip });
         } catch {
           resolve(null);
         }
@@ -192,7 +223,7 @@ export function useDevicePlan(
         });
       }
     })();
-  }, [available, entry, loadDocument, createSolver, now, setState, squad]);
+  }, [available, entry, chip, loadDocument, createSolver, now, setState, squad]);
 
   return { available, state, run, reset };
 }
