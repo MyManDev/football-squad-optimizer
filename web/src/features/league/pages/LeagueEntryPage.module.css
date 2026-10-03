@@ -11,9 +11,31 @@
   line-height: 1.1;
 }
 
+.intro {
+  margin: 0;
+  font-size: var(--step-0);
+}
+
 .form {
   display: grid;
   gap: var(--space-3);
+}
+
+/* Where the number is found: closed until asked for, and a full-height target when it is. */
+.help > summary {
+  /* Kept a list item so the browser's own disclosure marker stays; the padding gives it
+     the height a thumb needs. */
+  padding-block: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.help > p {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  overflow-wrap: anywhere;
 }
 
 .hint {

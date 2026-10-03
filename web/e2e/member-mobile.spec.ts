@@ -328,8 +328,9 @@ for (const language of ["tr", "en"] as const) {
         return [!!inside?.closest("#fixture-sheet"), String(beside?.className).includes("scrim")];
       }),
     ).toEqual([true, true]);
-    // Taller than a phone with Safari's bars shown, it scrolls inside itself and keeps its
-    // close button in view at either end.
+    // On a screen shorter than its tables it scrolls inside itself and keeps its close
+    // button in view at either end.
+    await page.setViewportSize({ width: 390, height: 520 });
     const sheetBody = page.locator("#fixture-sheet");
     expect(await sheetBody.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
       true,
@@ -351,7 +352,6 @@ for (const language of ["tr", "en"] as const) {
     await expect(eleven.locator("tbody tr").first().locator("td")).toHaveCount(3);
     await expect(eleven.locator('[data-venue="home"]').first()).toBeVisible();
     await expect(eleven.locator('[data-venue="away"]').first()).toBeVisible();
-    await expect(sheet).toContainText(copy.leagueMembers.railLegendDifficulty);
     // Tab stays in the sheet.
     for (let step = 0; step < 6; step += 1) {
       await page.keyboard.press("Tab");

@@ -97,10 +97,11 @@ export function ExpectedLineup({ view }: { view: EntryAdvice }) {
             {copy[term]}: <strong className="num">{points(expectation[term], 1, locale)}</strong>
           </li>
         ))}
-        <li>
-          {copy.hits}:{" "}
-          <span className="num">{points(view.transfer_hit_points ?? 0, 1, locale)}</span>
-        </li>
+        {typeof view.transfer_hit_points === "number" ? (
+          <li>
+            {copy.hits}: <span className="num">{points(view.transfer_hit_points, 1, locale)}</span>
+          </li>
+        ) : null}
       </ul>
       <p>
         {copy.net}:{" "}

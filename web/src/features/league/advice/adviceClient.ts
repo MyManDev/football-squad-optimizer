@@ -48,7 +48,8 @@ export interface AdviceRequest {
 }
 
 /** Where an answer came from; the page shows capture identity, not a "cached" badge. */
-export type AdviceSource = "static" | "api-cache" | "static-fallback";
+/** Where a shown answer came from; `device` is a plan the member's own device solved. */
+export type AdviceSource = "static" | "api-cache" | "static-fallback" | "device";
 
 export type AdviceReadResult =
   | { kind: "advice"; envelope: LeagueViewEnvelope<EntryAdvice>; source: AdviceSource }

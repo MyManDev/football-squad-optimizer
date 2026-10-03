@@ -21,7 +21,6 @@ import type { AdviceJob } from "../advice/useAdviceJob";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
-import { ChipForecastCard } from "../components/ChipForecastCard";
 import { MemberFixtureRail, type RailPlacement } from "../components/MemberFixtureRail";
 import { DisclosureIcon, InfoIcon } from "../components/memberIcons";
 import { isMemberStrategy } from "../types";
@@ -58,7 +57,7 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 
 /**
  * The state of a request for this page's plan as one quiet line, for the decision heading:
- * it stays beside the result when the member scrolls past the settings. Nothing while
+ * it stays beside the result, while the settings sit further down the page. Nothing while
  * no request was made.
  */
 function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null {
@@ -110,6 +109,7 @@ function LeagueMemberContent({
   capabilities = null,
   computeService = "static",
   computePending = false,
+  deviceDependencies,
   rivalSquad = null,
   windowControl = null,
   deadlinePassed = null,
@@ -133,9 +133,9 @@ function LeagueMemberContent({
     selectionAvailable,
     computeAvailable,
     job,
+    device,
     request,
     shown,
-    computedForecast,
     rejectedContext,
     rejectedUnreadable,
   } = useMemberAdviceView(
@@ -149,6 +149,7 @@ function LeagueMemberContent({
       client,
       capabilities,
       computeService,
+      deviceDependencies,
     },
     searchParams,
   );
@@ -182,7 +183,10 @@ function LeagueMemberContent({
   ]
     .filter(Boolean)
     .join(" · ");
-  const echo = computeEcho(copy, job.state);
+  const echo =
+    shown?.source === "device"
+      ? copy.computeEcho(copy.computeEchoStates.device)
+      : computeEcho(copy, job.state);
   const dateTime = (iso: string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
       new Date(iso),
@@ -213,14 +217,9 @@ function LeagueMemberContent({
       codes={codes}
     />
   );
-  // What to make of the decision: the two honesty lines, how it was worked out and the
-  // member's history. Placed after the decision on a phone and after the squad elsewhere.
+  // What to make of the decision: how it was worked out and the member's history. Placed after the decision on a phone and after the squad elsewhere.
   const honesty = (
     <div key="honesty" className={styles.honestyBlock} data-mark="honesty">
-      <div className={styles.honestyLines}>
-        <p>{copy.honestyModel}</p>
-        <p>{copy.honestyDecision}</p>
-      </div>
       <details className={styles.how}>
         <summary className={styles.howSummary}>
           <InfoIcon />
@@ -267,6 +266,92 @@ function LeagueMemberContent({
     </div>
   );
 
+  // The plan's settings sit under the decision they change. A member opens the page to
+  // read this week's move; the controls that recompute it are one link away, not in front.
+  const planSettings = (
+    <section
+      id="plan-settings"
+      aria-labelledby="plan-settings-title"
+      className={styles.planSettings}
+      // The decision's "change settings" link lands here; focus follows it.
+      tabIndex={-1}
+    >
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        part="plan"
+      />
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        part="top100"
+      />
+      <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          part="advanced"
+        />
+        <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
+        <TemplatePicker
+          canApply={(params) => {
+            const offered = resolve(params);
+            return (
+              !adviceLoading &&
+              indexReadable &&
+              (offered.status === "ready" || offered.computable?.selection === true)
+            );
+          }}
+        />
+      </Tool>
+      <AdviceRequestPanel
+        dockClassName={styles.computeDock}
+        request={request}
+        job={job}
+        device={device}
+        selectionAvailable={
+          selectionAvailable &&
+          !selection.evidence.on &&
+          selection.top100.weight === 0 &&
+          selection.chip.chip === null
+        }
+        service={
+          selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
+        }
+        computable={computeAvailable}
+        pending={computePending}
+        published={
+          adviceLoading || !indexReadable
+            ? undefined
+            : selection.status === "not-listed" || selection.status === "declared-unavailable"
+              ? false
+              : selectionAvailable &&
+                  advice &&
+                  !adviceIssue &&
+                  !rejectedContext &&
+                  !rejectedUnreadable
+                ? true
+                : undefined
+        }
+        chipChosen={selection.chip.chip !== null}
+        deadlinePassed={deadlinePassed !== null}
+      />
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        part="notes"
+      />
+    </section>
+  );
+
   return (
     <div className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
@@ -304,89 +389,6 @@ function LeagueMemberContent({
           </p>
         ) : null}
 
-        <section
-          id="plan-settings"
-          aria-labelledby="plan-settings-title"
-          className={styles.planSettings}
-        >
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="plan"
-          />
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="top100"
-          />
-          <Tool title={copy.advancedSettings}>
-            <MemberDecisionControls
-              entryId={entryId}
-              members={members}
-              index={selection.status === "index-error" ? null : index}
-              capabilities={capabilities}
-              part="advanced"
-            />
-            <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-            <TemplatePicker
-              canApply={(params) => {
-                const offered = resolve(params);
-                return (
-                  !adviceLoading &&
-                  indexReadable &&
-                  (offered.status === "ready" || offered.computable?.selection === true)
-                );
-              }}
-            />
-          </Tool>
-          <AdviceRequestPanel
-            dockClassName={styles.computeDock}
-            request={request}
-            job={job}
-            selectionAvailable={
-              selectionAvailable &&
-              !selection.evidence.on &&
-              selection.top100.weight === 0 &&
-              selection.chip.chip === null
-            }
-            service={
-              selection.computable
-                ? "ready"
-                : computeService === "ready"
-                  ? "static"
-                  : computeService
-            }
-            computable={computeAvailable}
-            pending={computePending}
-            published={
-              adviceLoading || !indexReadable
-                ? undefined
-                : selection.status === "not-listed" || selection.status === "declared-unavailable"
-                  ? false
-                  : selectionAvailable &&
-                      advice &&
-                      !adviceIssue &&
-                      !rejectedContext &&
-                      !rejectedUnreadable
-                    ? true
-                    : undefined
-            }
-            chipChosen={selection.chip.chip !== null}
-            deadlinePassed={deadlinePassed !== null}
-          />
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="notes"
-          />
-        </section>
-
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
@@ -397,6 +399,11 @@ function LeagueMemberContent({
                 <p className={styles.selectionSummary} data-testid="member-selection-summary">
                   {selectionSummary}
                 </p>
+                {/* The settings now sit under the decision, so the way to them is named
+                    where the decision says which settings it was made under. */}
+                <a href="#plan-settings" className={styles.changePlan}>
+                  {copy.changePlan}
+                </a>
                 <p className={styles.echo} aria-live="polite">
                   {echo}
                 </p>
@@ -453,6 +460,8 @@ function LeagueMemberContent({
             </>
           ) : null}
         </section>
+
+        {planSettings}
 
         {viewer ? (
           <Card tone="muted" title={copy.viewerTitle}>
@@ -519,11 +528,6 @@ function LeagueMemberContent({
           </Tool>
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
-            <ChipForecastCard
-              published={indexReadable ? index?.chip_forecast : undefined}
-              computed={computedForecast}
-              squad={view}
-            />
           </Tool>
         </div>
       </div>

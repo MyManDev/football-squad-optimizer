@@ -57,6 +57,7 @@ from pathlib import Path
 from typing import Final
 
 from squadopt.application.entries import EntryPicks
+from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError, RenameRefusedError
 from squadopt.data.source_revision import is_source_revision, source_revision
@@ -879,14 +880,16 @@ def load_member_advice_record(
 
     directory = record_directory(root, season, gameweek, entry_id, snapshot_id)
     _refuse_legacy_layout(directory.parent)
-    if not directory.is_dir():
+    if not Path(addressable(directory)).is_dir():
         raise AdviceRecordError(f"No advice record at {directory}.")
     return _read_record(directory)
 
 
 def _read_record(directory: Path) -> dict[str, object]:
     verify_manifest(directory)
-    document: dict[str, object] = json.loads((directory / RECORD_FILE).read_text(encoding="utf-8"))
+    document: dict[str, object] = json.loads(
+        Path(addressable(directory / RECORD_FILE)).read_text(encoding="utf-8")
+    )
     return document
 
 
@@ -926,7 +929,7 @@ def recorded_captures(
 
     directory = entry_directory(root, season, gameweek, entry_id)
     _refuse_legacy_layout(directory)
-    if not directory.is_dir():
+    if not Path(addressable(directory)).is_dir():
         return ()
     captures: list[RecordCapture] = []
     for child in sorted(directory.iterdir()):
@@ -1077,7 +1080,7 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
 
     def _settled() -> Path:
         verify_manifest(directory)
-        existing = (directory / RECORD_FILE).read_bytes()
+        existing = Path(addressable(directory / RECORD_FILE)).read_bytes()
         if existing == payload:
             return directory
         recorded = json.loads(existing.decode("utf-8"))
@@ -1088,21 +1091,23 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
             return directory
         raise AdviceRecordConflictError(_conflict(directory, recorded, record))
 
-    if directory.exists():
+    if Path(addressable(directory)).exists():
         return _settled()
     with record_lock(directory):
         # Re-check under the lock: another writer may have landed the record between the
         # check above and the lock, and the second writer must not overwrite the first.
-        if directory.exists():
+        if Path(addressable(directory)).exists():
             return _settled()
         # Staging siblings of a capture directory live in the member's week directory, so
         # that is the directory swept for the ones a dead writer left behind.
         prune_stale_staging(Path(root) / season / f"gw{gameweek:02d}", f"entry-{entry_id}")
         staging = staging_directory(directory)
-        staging.mkdir(parents=True)
+        # The staging sibling and the files inside it have longer names than the record
+        # they become, so they are reached the way the landing rename already is.
+        Path(addressable(staging)).mkdir(parents=True)
         landed = False
         try:
-            (staging / RECORD_FILE).write_bytes(payload)
+            Path(addressable(staging / RECORD_FILE)).write_bytes(payload)
             write_manifest(staging, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
             verify_manifest(staging)
             # One rename: the record exists complete or does not exist at all. Windows
@@ -1116,7 +1121,7 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
                 replace_retrying(staging, directory)
                 landed = True
             except PermissionError:
-                if not directory.exists():
+                if not Path(addressable(directory)).exists():
                     raise
                 # The one refusal no retry survives: a record is already at this address.
                 # Under the lock that means another writer landed between the check above
@@ -1137,7 +1142,7 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
             # that are either incomplete or now redundant. Leaving one behind would leave
             # a half-written record beside the real ones for the stale sweep to find.
             if not landed:
-                shutil.rmtree(staging, ignore_errors=True)
+                shutil.rmtree(addressable(staging), ignore_errors=True)
     return directory
 
 

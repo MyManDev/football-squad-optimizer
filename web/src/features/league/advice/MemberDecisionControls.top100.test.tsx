@@ -193,6 +193,10 @@ describe("the Top 100 influence control", () => {
       const group = screen.getByRole("group", { name: TOP100_COPY[language].legend });
       const text = group.textContent ?? "";
       expect(text).toContain(TOP100_COPY[language].help);
+      // The explanation is there for whoever asks, folded so the row of settings reads first.
+      const help = screen.getByText(TOP100_COPY[language].helpTitle).closest("details")!;
+      expect(help.open).toBe(false);
+      expect(help).toHaveTextContent(TOP100_COPY[language].help);
       expect(text).not.toMatch(/%|per\s?cent|yüzde/i);
       unmount();
     }

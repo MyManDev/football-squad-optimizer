@@ -258,7 +258,8 @@ def test_central_referrals_are_disabled_before_any_inputs_provider_or_fetch(
 
     monkeypatch.setattr(acquire, "load_club_sources", refuse)
     monkeypatch.setattr(acquire, "read_snapshot", refuse)
-    monkeypatch.setattr(acquire, "build_coding_provider", refuse)
+    monkeypatch.setattr(acquire, "resolve_provider_config", refuse)
+    monkeypatch.setattr(acquire, "bind_coding_provider", refuse)
     assert (
         main(
             [

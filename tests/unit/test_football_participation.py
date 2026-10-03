@@ -12,6 +12,7 @@ from squadopt.application.football_participation import (
     participation_summary,
 )
 from squadopt.application.manager_words import (
+    MANAGERS_WORD_RULE_VERSION,
     SOURCE_CHECK_CITED_DOCUMENTS_HELD,
     ManagerWord,
     ManagerWords,
@@ -236,6 +237,42 @@ def test_football_cache_identity_includes_news_even_when_manager_constraint_swit
     assert first["model"]["participation_version"] == "football_participation_evidence_v3"
     assert first["model"]["fingerprint"] == forecast.fingerprint
     assert switch_identity(before, model="current") == switch_identity(after, model="current") == {}
+
+
+def test_football_cache_identity_names_the_news_rule_only_where_news_is_bound():
+    """The same table read under a different rule is a different input to the forecast.
+
+    A football answer with no news bound keeps the key it was written under.
+    """
+
+    forecast, _, words = _world()
+    bound = AdviceSwitchInputs(football=forecast, manager_words=words, rotation_table_sha256="a")
+    unbound = AdviceSwitchInputs(football=forecast)
+
+    assert (
+        switch_identity(bound, model="football")["model"]["news_rule_version"]
+        == MANAGERS_WORD_RULE_VERSION
+    )
+    assert "news_rule_version" not in switch_identity(unbound, model="football")["model"]
+
+
+def test_decision_information_revision_follows_the_news_rule_only_where_news_is_bound(
+    monkeypatch,
+):
+    """A plan shown under the old rule must be told it is stale by the information revision."""
+
+    from squadopt.platform import advice_switches
+
+    forecast, _, words = _world()
+    bound = AdviceSwitchInputs(football=forecast, manager_words=words, rotation_table_sha256="a")
+    unbound = AdviceSwitchInputs(football=forecast)
+    before_bound = bound.decision_information("snap")["revision"]
+    before_unbound = unbound.decision_information("snap")["revision"]
+
+    monkeypatch.setattr(advice_switches, "MANAGERS_WORD_RULE_VERSION", "managers_word_rule_v99")
+
+    assert bound.decision_information("snap")["revision"] != before_bound
+    assert unbound.decision_information("snap")["revision"] == before_unbound
 
 
 @pytest.mark.parametrize("disposition", ["stated_expected_absent", "stated_full_match_unavailable"])
