@@ -113,25 +113,25 @@ describe("member decision controls", () => {
     expect(option).toBeDisabled();
   });
 
-  it("enables the windows the index lists for pure points and states what they assume", () => {
+  it("enables the windows the index lists for pure points, without a limits sentence", () => {
     renderControls();
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /3 hafta/ })).toBeEnabled();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeEnabled();
     expect(
-      screen.getByText(/1\. hafta projeksiyonunu fikstür takvimi üzerinde tekrarlar/),
-    ).toBeInTheDocument();
+      screen.queryByText(/1\. hafta projeksiyonunu fikstür takvimi üzerinde tekrarlar/),
+    ).toBeNull();
 
     fireEvent.click(screen.getByRole("radio", { name: /3 hafta/ }));
     expect(screen.getByTestId("selection").textContent).toBe("-/3/-");
   });
 
-  it("keeps a rival strategy at one week, with the reason", () => {
+  it("keeps a rival strategy at one week, without stating a reason", () => {
     renderControls(`/league/members/${ENTRY}?mode=ortak-koru`);
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /3 hafta/ })).toBeDisabled();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeDisabled();
-    expect(screen.getByText(/rakip stratejisi hafta hafta oynanır/)).toBeInTheDocument();
+    expect(screen.queryByText(/rakip stratejisi hafta hafta oynanır/)).toBeNull();
   });
 
   it("writes a strategy change with a listed window into the shareable URL", () => {
@@ -192,7 +192,7 @@ describe("member decision controls", () => {
       expect(screen.getByRole("radio", { name: /3 weeks/ })).toBeEnabled();
     } else {
       expect(screen.getByRole("radio", { name: /3 weeks/ })).toBeDisabled();
-      expect(screen.getByText(/only where this publish solved them/)).toBeInTheDocument();
+      expect(screen.queryByText(/only where this publish solved them/)).toBeNull();
     }
   });
 
@@ -248,14 +248,18 @@ describe("member decision controls", () => {
     },
   );
 
-  it("says the rule is declared rather than measured, in both languages", () => {
+  it("names the rule's two inputs without a measurement caveat, in both languages", () => {
     const claims = [
+      [/A declared rule marks one option from two numbers/],
+      [/Tanımlı bir kural, iki sayıya bakarak/],
+    ] as const;
+    const caveats = [
       [/written down, not measured/, /nothing has tested whether following it does better/],
       [/Kural yazılı, ölçülmüş değil/, /uymanın uymamaktan daha iyi olduğu test edilmedi/],
     ] as const;
-    for (const [language, patterns] of [
-      ["en", claims[0]],
-      ["tr", claims[1]],
+    for (const [language, patterns, absent] of [
+      ["en", claims[0], caveats[0]],
+      ["tr", claims[1], caveats[1]],
     ] as const) {
       const { container, unmount } = renderControls(
         `/league/members/${ENTRY}`,
@@ -264,6 +268,7 @@ describe("member decision controls", () => {
       );
       const text = container.textContent ?? "";
       for (const pattern of patterns) expect(text).toMatch(pattern);
+      for (const pattern of absent) expect(text).not.toMatch(pattern);
       unmount();
     }
   });
@@ -377,7 +382,7 @@ describe("member decision controls", () => {
     // They wait behind a closed disclosure, and hold no input of their own.
     const notes = screen.getByText(MESSAGES.tr.leagueMembers.optionNotes).closest("details")!;
     expect(notes).not.toHaveAttribute("open");
-    expect(notes).toHaveTextContent(MESSAGES.tr.leagueMembers.rivalNote);
+    expect(notes).toHaveTextContent(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].name);
     expect(notesPart.container.querySelectorAll("input, select")).toHaveLength(0);
     notesPart.unmount();
 

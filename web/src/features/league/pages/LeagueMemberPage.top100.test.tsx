@@ -132,7 +132,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(container.textContent).toContain(TOP100_COPY.en.cost("0.0"));
   });
 
-  it("states only the ceiling when a proof is missing, and says why", () => {
+  it("states only the ceiling when a proof is missing, without saying why", () => {
     const { container } = renderPage(
       "en",
       weighted(30, false, {
@@ -146,8 +146,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.en.costAtMost("1.7"));
     expect(page).not.toContain(TOP100_COPY.en.cost("1.7"));
-    expect(page).toContain(TOP100_COPY.en.unproven);
-    expect(page).not.toContain(MESSAGES.en.leagueMembers.unprovenPlanGapUnknown);
+    expect(page).not.toMatch(/finish(ing)? its proof|proof is incomplete|Proof incomplete/i);
   });
 
   it("states no price when the plan it is measured against is unproven", () => {
@@ -167,19 +166,19 @@ describe("a Top 100 weighted plan on the advice card", () => {
       "mode=saf-puan&window=1&top100=30",
     );
     const page = container.textContent ?? "";
+    expect(page).toContain("Your gameweek");
     expect(page).not.toContain(TOP100_COPY.en.costAtMost("2.7"));
     expect(page).not.toContain(TOP100_COPY.en.cost("0.2"));
-    expect(page).not.toContain(TOP100_COPY.en.unproven);
-    expect(page).toContain(MESSAGES.en.leagueMembers.unprovenPlanGapUnknown);
-    expect(page).toContain(MESSAGES.en.leagueMembers.controlUnprovenBody("2.5"));
+    expect(page).not.toMatch(/finish(ing)? its proof|proof is incomplete|Proof incomplete/i);
+    expect(page).not.toMatch(/was not proven optimal/);
   });
 
   it.each([
-    ["en", "0.2", "2.5"],
-    ["tr", "0,2", "2,5"],
+    ["en", "0.2"],
+    ["tr", "0,2"],
   ] as const)(
     "does not point at a price it does not print when the setting changed the plan, in %s",
-    (language, price, gap) => {
+    (language, price) => {
       const advice = weighted(30, false, {
         control_solver_status: "FEASIBLE",
         control_optimality_gap: 2.5,
@@ -194,7 +193,9 @@ describe("a Top 100 weighted plan on the advice card", () => {
       const page = container.textContent ?? "";
       expect(page).not.toContain(TOP100_COPY[language].cost(price));
       expect(page).not.toContain(TOP100_COPY[language].costAtMost(price));
-      expect(page).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+      expect(page).not.toMatch(
+        language === "tr" ? /en iyi diye kanıtlanamadı/ : /was not proven optimal/,
+      );
     },
   );
 

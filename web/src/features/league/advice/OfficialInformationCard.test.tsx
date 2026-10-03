@@ -68,7 +68,13 @@ it.each(["tr", "en"] as const)("shows source date separately from check time in 
   expect(card.querySelectorAll("time")).toHaveLength(2);
   expect(card.querySelector("a")).toHaveAttribute("href", information.source_url);
   expect(card).toHaveTextContent(
+    language === "tr" ? "Bu değerler FPL kaydından gelir." : "These values come from FPL.",
+  );
+  expect(card).not.toHaveTextContent(
     language === "tr" ? "ilk 11’de başlama garantisi" : "do not guarantee a start",
+  );
+  expect(card).not.toHaveTextContent(
+    language === "tr" ? "Sunucunun çalışıyor olması" : "A healthy server",
   );
   expect(isAdvicePayload(view)).toBe(true);
 });
@@ -99,7 +105,8 @@ it("announces changed decision information without replacing the shown plan or c
     </LanguageProvider>,
   );
   expect(screen.getByRole("status")).toHaveTextContent("Hesapla");
-  expect(screen.getByRole("status")).toHaveTextContent("kendiliğinden değiştirilmedi");
+  expect(screen.getByRole("status")).toHaveTextContent("karar girdileri değişmiş");
+  expect(screen.getByRole("status")).not.toHaveTextContent("kendiliğinden değiştirilmedi");
 });
 
 it("does not announce unchanged information or another capture as this plan's update", () => {
@@ -152,12 +159,12 @@ it.each(["tr", "en"] as const)(
       decision.observed_at,
       latest.observed_at,
     ]);
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr"
         ? "bir açıklamanın uygulandığı veya puanların değiştiği anlamına gelmez"
         : "does not mean a statement was applied or points changed",
     );
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr" ? "gösterilen plan korunur" : "displayed plan is retained",
     );
     expect(detail).not.toHaveTextContent(decision.revision);

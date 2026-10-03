@@ -144,6 +144,9 @@ for (const [window, top100, width] of [
       `/league/members/35249001?mode=saf-puan&window=${window}&top100=${top100}&model=football`,
     );
     await expect(page.getByTestId("new-information-notice")).toContainText(
+      "karar girdileri değişmiş",
+    );
+    await expect(page.getByTestId("new-information-notice")).not.toContainText(
       "kendiliğinden değiştirilmedi",
     );
     const facts = page.getByTestId("official-information");

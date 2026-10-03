@@ -8,15 +8,14 @@
  * producer chose is the default and is labelled as such. Where it named no default, no
  * rival is shown as chosen — the request would name none, and a control that displayed
  * one would demand a choice the member appeared to have made. Windows are enabled only
- * where the index lists them — pure points at three and five weeks when this publish
- * solved them — and the note says what a longer window assumes; a rival strategy stays at
- * one week, and a window nobody computed is shown disabled rather than hidden. A window
- * carried in from another strategy falls back to one the index lists, and says it did.
+ * where the index lists them (pure points at three and five weeks when this publish
+ * solved them); a rival strategy stays at one week, and a window nobody computed is
+ * shown disabled rather than hidden. A window carried in from another strategy falls
+ * back to one the index lists.
  *
  * One option may carry the producer's declared rule as a label: the rule reads the
  * member's points gap to their rival and the gameweeks left, and names one of the three.
- * It marks, it does not choose — the checked option is still whatever the URL says — and
- * the note beside it says the rule is written down rather than measured.
+ * It marks, it does not choose: the checked option is still whatever the URL says.
  *
  * The Top 100 influence is a row of weights beside the manager's word. Each one is a
  * file the producer solved for this member on the one-week pure-points plan; a weight
@@ -399,18 +398,11 @@ export function MemberDecisionControls({
         ) : null}
         {needsRival ? (
           <>
-            <p>{copy.rivalNote}</p>
             {windows.length > 1 ? <p>{top100Copy.rivalWindows}</p> : null}
             {(computable?.rivals.length ?? 0) > 0 ? <p>{computeCopy.rivalComputable}</p> : null}
           </>
         ) : null}
-        <p>
-          {selection.request.model === "football"
-            ? copy.modelWindowNote
-            : windows.length > 1
-              ? copy.windowLimits
-              : copy.windowNotComputed}
-        </p>
+        {selection.request.model === "football" ? <p>{copy.modelWindowNote}</p> : null}
         {showModel ? <p>{copy.modelNote}</p> : null}
         {computable && computable.strategies.length > 0 ? <p>{computeCopy.controlsNote}</p> : null}
       </div>

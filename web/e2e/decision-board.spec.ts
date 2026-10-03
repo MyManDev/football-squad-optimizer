@@ -43,7 +43,7 @@ for (const language of ["tr", "en"] as const) {
     await expect(pin).toBeEnabled();
     await pin.click();
     const first = page.getByRole("region", { name: "Plan A", exact: true });
-    // Main comparisons and uncertainty stay visible while secondary costs are folded.
+    // Main comparisons stay visible while secondary costs are folded; no proof sentence.
     await expect(first.getByRole("radio")).not.toBeChecked();
     await expect(
       first.getByText(tr ? "İlk hafta net beklenen puan" : "First-week net expected points"),
@@ -57,7 +57,15 @@ for (const language of ["tr", "en"] as const) {
           ? "Geçerli plan bulundu; en iyi çözüm olduğu kanıtlanmadı."
           : "A feasible plan was found; optimality is not proved.",
       ),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(
+      first.getByText(
+        tr
+          ? "Seçilen model ve kısıtlar altında optimum; gerçek puan garantisi değil."
+          : "Optimal under the selected model and constraints, not guaranteed actual points.",
+      ),
+    ).toHaveCount(0);
+    await expect(first.getByText(tr ? "Planın varsayımları" : "Plan assumptions")).toHaveCount(0);
     const costs = first.getByText(tr ? "Pencere transfer cezası" : "Horizon transfer hits", {
       exact: true,
     });

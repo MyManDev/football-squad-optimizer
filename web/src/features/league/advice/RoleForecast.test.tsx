@@ -49,9 +49,12 @@ it.each(["tr", "en"] as const)(
     );
     expect(section.textContent).not.toMatch(AS_A_CHANCE);
     expect(section).toHaveTextContent(
+      language === "tr" ? "geçmiş maçlardaki ilk 11" : "past records of starts",
+    );
+    expect(section).not.toHaveTextContent(
       language === "tr" ? "kesinleşmiş bir ilk 11 değildir" : "not a confirmed lineup",
     );
-    expect(section).toHaveTextContent(
+    expect(section).not.toHaveTextContent(
       language === "tr" ? "Bağımsız doğruluk ölçümü" : "Independent accuracy validation",
     );
     expect(section).toHaveTextContent(
@@ -145,13 +148,15 @@ it.each(["tr", "en"] as const)(
     expect(detail).toHaveTextContent(
       language === "tr" ? "Toplam oyuncu puanı: 2,30" : "Total player points: 2.30",
     );
-    expect(detail).toHaveTextContent(language === "tr" ? "yalnızca bu maç" : "this fixture only");
-    expect(detail).toHaveTextContent(
-      language === "tr"
-        ? "kaptan çarpanı ve Top100 seçim ağırlığı öncesidir"
-        : "before captain multipliers and Top100 selection weighting",
+    expect(detail).not.toHaveTextContent(
+      language === "tr" ? "yalnızca bu maç" : "this fixture only",
     );
     expect(detail).toHaveTextContent(
+      language === "tr"
+        ? "Kaptan çarpanı ve Top100 ağırlığı öncesidir"
+        : "Before the captain multiplier and the Top100 weight",
+    );
+    expect(detail).not.toHaveTextContent(
       language === "tr" ? "zaten bir kez uygulanmıştır" : "already applied once",
     );
   },

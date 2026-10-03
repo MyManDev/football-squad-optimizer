@@ -20,15 +20,11 @@ const COPY = {
     observed: "Kaynak kontrol edildi",
     noDate: "Tarih bildirilmedi",
     rowDate: "Kaydın kaynak tarihi",
-    rowDateNote: "Bu tarih kaydın son güncellenme zamanı olmayabilir.",
     source: "Resmi Premier League kaynağı",
     detail: "Ayrıntı kaynağı",
     injury: "Kaynağın belirttiği durum",
     noInjury: "Durum belirtilmedi",
     empty: "Bu plandaki oyuncular için gösterilecek kaynak kaydı yok.",
-    limit:
-      "Listede bulunmamak, oyuncunun sağlıklı veya kesin oynayacak olduğu anlamına gelmez. Bu kayıtlar tek başına yokluk, ilk 11 veya dakika tahmini oluşturmaz; doğrulanmış hoca açıklamalarından ayrı gösterilir.",
-    timeNote: "Kontrol zamanı, kaynak haberinin yayın zamanı değildir.",
   },
   en: {
     title: "Premier League injury list",
@@ -42,15 +38,11 @@ const COPY = {
     observed: "Source checked",
     noDate: "Date not reported",
     rowDate: "Record's source date",
-    rowDateNote: "This may not be the record's latest update time.",
     source: "Official Premier League source",
     detail: "Details source",
     injury: "Condition stated by the source",
     noInjury: "Condition not stated",
     empty: "No source records to display for the players in this plan.",
-    limit:
-      "Not being listed does not mean a player is healthy or certain to play. These records alone do not establish absence, a start, or expected minutes; they are shown separately from verified coach statements.",
-    timeNote: "The check time is not the source news publication time.",
   },
 };
 
@@ -83,7 +75,6 @@ export function OfficialInjuryCard({
         <br />
         {copy.observed}: {stamp(data.observed_at)}
       </p>
-      <p className={styles.muted}>{copy.timeNote}</p>
       <ul className={styles.assumptionList}>
         {data.missing_clubs.length > 0 && (
           <li>
@@ -101,7 +92,6 @@ export function OfficialInjuryCard({
           </li>
         )}
       </ul>
-      <p className={styles.honesty}>{copy.limit}</p>
       <a href={data.source_url} target="_blank" rel="noreferrer">
         {copy.source}
       </a>
@@ -116,8 +106,7 @@ export function OfficialInjuryCard({
                 {copy.injury}: {fact.injury || copy.noInjury}
               </p>
               <p>
-                {copy.rowDate}: {stamp(fact.source_date)}{" "}
-                <span className={styles.muted}>{copy.rowDateNote}</span>
+                {copy.rowDate}: {stamp(fact.source_date)}
               </p>
               {fact.details_urls.filter(safeInjurySourceUrl).map((url, link) => (
                 <p key={url}>

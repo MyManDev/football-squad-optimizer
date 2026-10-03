@@ -106,8 +106,8 @@ export function DecisionPreferencesPanel({
     <Card title={tr ? "Karar tercihlerim" : "My decision preferences"}>
       <p>
         {tr
-          ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir. Oyuncuyu tutmak ilk 11 garantisi değildir. Tahmin puanları değişmez; çözücü bu sınırlar içinde karar verir."
-          : "These constraints apply throughout the selected 1, 3 or 5 weeks. Keeping a player does not guarantee a start. Forecast points stay unchanged; the optimizer decides within these limits."}
+          ? "Bu kurallar seçtiğiniz 1, 3 veya 5 haftanın tamamında geçerlidir; çözücü bu sınırlar içinde karar verir."
+          : "These constraints apply throughout the selected 1, 3 or 5 weeks; the optimizer decides within these limits."}
       </p>
       {!available && (
         <p>
@@ -126,8 +126,8 @@ export function DecisionPreferencesPanel({
       {conflict && (
         <p role="alert">
           {tr
-            ? "Tercihler geçersiz veya seçiminizle çelişiyor. Saf puanı seçin, teknik direktör yorumunu kapatın; çipleri saklarken başka çip seçmeyin. Tercihler sessizce kaldırılmaz."
-            : "Invalid or conflicting preferences. Select pure points, turn manager news off and do not choose a chip while saving chips. Preferences are never silently discarded."}
+            ? "Tercihler geçersiz veya seçiminizle çelişiyor. Saf puanı seçin, teknik direktör yorumunu kapatın; çipleri saklarken başka çip seçmeyin."
+            : "Invalid or conflicting preferences. Select pure points, turn manager news off and do not choose a chip while saving chips."}
         </p>
       )}
       <fieldset className={styles.fieldset} disabled={!available || !selected.valid}>
@@ -159,8 +159,8 @@ export function DecisionPreferencesPanel({
         </label>
         <p>
           {tr
-            ? "Kadroya alma seçimi, oyuncu zaten kadrodaysa ilk hafta çıkarılmasını da gerektirir. Bu kısıtlar bütçe veya transfer haklarıyla çelişirse plan üretilemez."
-            : "Avoid also requires selling an already owned player in the first week. Conflicts with budget or transfer rights may leave no feasible plan."}
+            ? "Kadroya alma seçimi, oyuncu zaten kadrodaysa ilk hafta çıkarılmasını da gerektirir."
+            : "Avoid also requires selling an already owned player in the first week."}
         </p>
         <label className={styles.rivalField}>
           {tr ? "Alınmayacak oyuncunun takımı" : "Avoid player's team"}

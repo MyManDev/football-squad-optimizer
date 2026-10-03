@@ -63,7 +63,8 @@ describe("the advice card shows a window week by week", () => {
     expect(screen.getByRole("list", { name: MESSAGES.tr.squad.pitchLabel })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: MESSAGES.tr.leagueMembers.viewList }));
     expect(screen.getByRole("region", { name: "Bu haftaki kadron" })).toBeInTheDocument();
-    expect(screen.getByText("Kanıt tamamlanamadı")).toBeInTheDocument();
+    // The plan is FEASIBLE, and the page no longer says so.
+    expect(screen.queryByText("Kanıt tamamlanamadı")).toBeNull();
   });
 
   it.each(["tr", "en"] as const)(

@@ -22,6 +22,26 @@ import type { LeagueMemberViewProps } from "./memberPageTypes";
 
 const ENTRY = 35249001;
 const clients: QueryClient[] = [];
+// The proof caveats the member page used to print for a FEASIBLE plan or control, by literal:
+// none of them may come back under any key.
+const PROOF_CAVEATS: Record<Language, readonly RegExp[]> = {
+  tr: [
+    /Kanıt tamamlanamadı/,
+    /kanıtı tamamlayamadı/,
+    /en iyi olduğu kanıtlanamadı/,
+    /en iyi diye kanıtlanamadı/,
+    /fiyat belirtilmiyor/,
+    /Karar vermeden önce gösterilen on biri/,
+  ],
+  en: [
+    /Proof incomplete/,
+    /could not finish the proof/,
+    /proof for this plan is incomplete/,
+    /was not proven optimal/,
+    /no price is stated/,
+    /Review the shown lineup and transfers before deciding/,
+  ],
+};
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -159,16 +179,17 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
   });
 
   it.each(["plan", "control", "both", "neither"] as const)(
-    "shows one next step when %s proof is unfinished",
+    "shows no proof caveat when %s proof is unfinished",
     (kind) => {
       const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
       advice.payload.solver_status = kind === "plan" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
       advice.payload.control_solver_status =
         kind === "control" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
-      showAdvice(language, advice);
-      expect(screen.queryAllByText(copy.unprovenPlanNextStep)).toHaveLength(
-        kind === "neither" ? 0 : 1,
-      );
+      const { container } = showAdvice(language, advice);
+      expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
+      for (const sentence of PROOF_CAVEATS[language]) {
+        expect(container.textContent).not.toMatch(sentence);
+      }
     },
   );
 
@@ -307,15 +328,17 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     },
   );
 
-  it("keeps absent FEASIBLE gaps unknown", () => {
+  it("says nothing about absent FEASIBLE gaps", () => {
     const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
     advice.payload.solver_status = "FEASIBLE";
     advice.payload.control_solver_status = "FEASIBLE";
     advice.payload.optimality_gap = null;
     delete advice.payload.control_optimality_gap;
-    showAdvice(language, advice);
-    expect(screen.getByText(copy.unprovenPlanGapUnknown)).toBeInTheDocument();
-    expect(screen.getByText(copy.controlGapUnknown)).toBeInTheDocument();
+    const { container } = showAdvice(language, advice);
+    expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
+    for (const sentence of PROOF_CAVEATS[language]) {
+      expect(container.textContent).not.toMatch(sentence);
+    }
   });
 
   it.each(["moves", "generated_at_utc"] as const)(
@@ -333,17 +356,17 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     },
   );
 
-  it("preserves measured zero gaps", () => {
+  it("says nothing about measured zero gaps either", () => {
     const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
     advice.payload.solver_status = "FEASIBLE";
     advice.payload.control_solver_status = "FEASIBLE";
     advice.payload.optimality_gap = 0;
     advice.payload.control_optimality_gap = 0;
-    showAdvice(language, advice);
-    const zero = points(0, 1, language === "tr" ? "tr-TR" : "en-GB");
-    expect(screen.getByText(copy.unprovenPlanBody(zero))).toBeInTheDocument();
-    expect(screen.getByText(copy.controlUnprovenBody(zero))).toBeInTheDocument();
-    expect(screen.queryByText(copy.unprovenPlanGapUnknown)).not.toBeInTheDocument();
+    const { container } = showAdvice(language, advice);
+    expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
+    for (const sentence of PROOF_CAVEATS[language]) {
+      expect(container.textContent).not.toMatch(sentence);
+    }
   });
 
   it("does not invent an applied overlap bound or alternative hit points", () => {

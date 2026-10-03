@@ -462,12 +462,15 @@ describe("the proof stamp", () => {
     expect(box.nextElementSibling).toBeNull();
   });
 
-  it("keeps the unproven badge and the gap sentence for a plan found without a proof", () => {
-    show("tr", { advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }) });
+  it("shows neither the stamp nor a proof caveat for a plan found without a proof", () => {
+    const { container } = show("tr", {
+      advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }),
+    });
     const copy = MESSAGES.tr.leagueMembers;
     expect(screen.queryByText(copy.stampOptimal)).toBeNull();
-    expect(screen.getAllByText(copy.unprovenPlanBadge)).toHaveLength(1);
-    expect(screen.getByText(copy.unprovenPlanBody("1,3"))).toBeInTheDocument();
+    expect(screen.queryByText("Kanıt tamamlanamadı")).toBeNull();
+    expect(screen.queryByText(/kanıtı tamamlayamadı/)).toBeNull();
+    expect(container.textContent).not.toMatch(/en iyisi olduğu gösterilmiş/);
   });
 
   it("claims nothing for a status that is neither", () => {
@@ -475,7 +478,7 @@ describe("the proof stamp", () => {
     delete (advice.payload as { solver_status?: string }).solver_status;
     show("en", { advice });
     expect(screen.queryByText(MESSAGES.en.leagueMembers.stampOptimal)).toBeNull();
-    expect(screen.queryByText(MESSAGES.en.leagueMembers.unprovenPlanBadge)).toBeNull();
+    expect(screen.queryByText("Proof incomplete")).toBeNull();
   });
 });
 
@@ -517,15 +520,16 @@ describe("honesty and the tools", () => {
     const how = screen.getByText(copy.howComputed).closest("details")!;
     expect(how).not.toHaveAttribute("open");
     for (const sentence of [
-      copy.honestyRule,
       copy.independentAdviceRule,
       copy.lineupRule,
       copy.moveRowsBasis,
       copy.diagnosticOnly,
-      copy.freshnessNote,
     ]) {
       expect(within(how).getByText(sentence)).not.toBeVisible();
     }
+    // The caveat sentences that used to open and close the disclosure are gone.
+    expect(within(how).queryByText(/kanıtın kapsamını belirtir/)).toBeNull();
+    expect(within(how).queryByText(/tahmini yenilemez/)).toBeNull();
     // The week's hit charge is said once, in the disclosure.
     expect(within(how).getAllByText(/beklenen puan maliyeti/)).toHaveLength(1);
   });

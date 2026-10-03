@@ -12,14 +12,13 @@ import type { WindowSize } from "../../../lib/decisionVocabulary";
  * What it may say: that a selection was not computed ahead of time and can be computed
  * now, about how long a computation took when it was measured, that the page can be left
  * open, and, when something fails, what happened in a sentence the member can act on. A
- * duration is "about" and never a promise. A failure is said from the service's stable
- * code; the code itself and the service's own text are never shown.
+ * duration is "about". A failure is said from the service's stable code; the code itself
+ * and the service's own text are never shown.
  */
 export interface ComputeCopy {
   notPrecomputed: string;
   notComputable: string;
   chipUnavailable: string;
-  chipDurationUnknown: string;
   duration: Record<WindowSize, string>;
   durationNote: string;
   leaveOpen: string;
@@ -62,14 +61,12 @@ const en: ComputeCopy = {
     "The service does not compute this selection right now. Change the selection to use Compute.",
   chipUnavailable:
     "The service cannot confirm this chip is available for this selection. The published plan, if any, remains available to read.",
-  chipDurationUnknown: "The time to compute a chosen chip has not been measured.",
   duration: {
     1: "A one-week plan takes between a few seconds and half a minute to compute; a rival strategy and the settings you switch on make it longer.",
     3: "A 3-week plan takes about a minute and a half to compute, and up to two and a half minutes for a rival strategy.",
-    5: "A 5-week pure points plan takes about three and a half minutes to compute; a rival strategy was not measured.",
+    5: "A 5-week pure points plan takes about three and a half minutes to compute.",
   },
-  durationNote:
-    "These times were measured once and are not a promise; other computations ahead of yours make the wait longer.",
+  durationNote: "If another calculation is queued ahead of yours, the wait is longer.",
   leaveOpen:
     "You can leave this page open; the plan appears here when the computation finishes. If you reload, the wait picks up where it was.",
   serviceUnreachable:
@@ -149,14 +146,12 @@ const tr: ComputeCopy = {
   notComputable: "Servis bu seçimi şu an hesaplamıyor. Hesapla için seçimi değiştir.",
   chipUnavailable:
     "Servis bu seçim için çipin kullanılabilir olduğunu doğrulayamıyor. Yayımlanmış plan varsa okunabilir.",
-  chipDurationUnknown: "Seçilen çipin hesaplama süresi ölçülmedi.",
   duration: {
     1: "Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer; rakip stratejisi ve açtığın ayarlar süreyi uzatır.",
     3: "3 haftalık planın hesabı yaklaşık bir buçuk dakika, rakip stratejisinde iki buçuk dakikaya kadar sürer.",
-    5: "5 haftalık saf puan planının hesabı yaklaşık üç buçuk dakika sürer; rakip stratejisinde ölçülmedi.",
+    5: "5 haftalık saf puan planının hesabı yaklaşık üç buçuk dakika sürer.",
   },
-  durationNote:
-    "Bu süreler bir kez ölçüldü, söz değildir; sırada senden önce başka hesap varsa bekleme uzar.",
+  durationNote: "Sırada senden önce başka hesap varsa bekleme uzar.",
   leaveOpen:
     "Sayfayı açık bırakabilirsin; hesap bitince plan burada görünür. Sayfayı yenilersen bekleme kaldığı yerden sürer.",
   serviceUnreachable:

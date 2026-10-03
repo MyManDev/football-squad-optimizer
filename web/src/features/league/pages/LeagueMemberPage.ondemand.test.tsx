@@ -401,7 +401,8 @@ describe("a published selection, with the service answering", () => {
       capabilities: { ...CAPABILITIES, chipsByEntry: { [ENTRY]: ["bboost"] } },
     });
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
-    expect(container).toHaveTextContent(computeCopy.chipDurationUnknown);
+    // Neither a measured duration nor a sentence saying none was measured.
+    expect(container).not.toHaveTextContent("hesaplama süresi ölçülmedi");
     expect(container).not.toHaveTextContent(computeCopy.duration[1]);
     await pressCompute();
     expect(client.requests[0]).toMatchObject({ chip: "bboost" });

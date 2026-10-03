@@ -54,7 +54,8 @@ test("at 1440 the table, the system's record and the viewer's chips share one sc
   const karneBox = (await karne.boundingBox())!;
   expect(karneBox.x).toBeGreaterThanOrEqual(tableBox.x + tableBox.width);
   expect(karneBox.y).toBeLessThan(tableBox.y + tableBox.height);
-  await expect(karne.getByText(copy.karneCaption)).toBeVisible();
+  await expect(karne.getByText(copy.karneLede)).toBeVisible();
+  await expect(karne.getByText(/senin kadron değil/)).toHaveCount(0);
   // The full scoreboard is a wide table: closed, and once opened it reads across both
   // columns without scrolling sideways instead of squeezing into the record's column.
   const full = page.locator("main details", { hasText: copy.karneFull });

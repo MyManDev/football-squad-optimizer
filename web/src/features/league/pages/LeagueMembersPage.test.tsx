@@ -333,7 +333,7 @@ describe("league member surfaces", () => {
     expect(screen.getByDisplayValue("ortak-koru")).toBeChecked();
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
+    expect(screen.getByText(/Önerin senin kadrondan/)).toBeInTheDocument();
     const transferCard = screen
       .getByRole("heading", { name: "Ücretsiz transfer hakkı" })
       .closest("section");

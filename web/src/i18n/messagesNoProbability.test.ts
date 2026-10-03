@@ -207,32 +207,18 @@ const INLINE = PRODUCTION.filter((path) => path.endsWith(".tsx")).flatMap(inline
 // playing value: 75/100", under the same label the FPL card uses. It is not worded as a
 // chance and carries no percent marker, so it needs no exemption from the guard.
 
-// Conditional scenario bounds are explicitly denied the meaning of an outcome CI.
-// Role explanations have no exception: modeled role probabilities remain internal.
-const SCENARIO_DENIALS: Record<string, readonly string[]> = {
-  "features/league/advice/InformationReview.tsx": [
-    "Bu aralık maç sonucu için bir güven aralığı değildir. Haberin ne zaman geleceğine olasılık atanmadı; banka ve kalan transfere ek puan yazılmadı.",
-    "This is not a confidence interval for match outcomes. No news-arrival probability or extra point value for bank/free transfers was assigned.",
-  ],
-};
-const isScenarioDenial = ({ at, text }: { at: string; text: string }) =>
-  Object.entries(SCENARIO_DENIALS).some(
-    ([path, labels]) => at.startsWith(`${path}:`) && labels.includes(text),
-  );
-
+// No inline sentence is exempt from the guard: the scenario bounds of the information
+// review and the role explanations carry no chance wording, so nothing needs an exception
+// and modeled role probabilities remain internal.
 describe("every string a production component writes inline", () => {
-  it("limits scenario denials to their exact surface without a role-estimate exception", () => {
-    expect(
-      INLINE.filter(isScenarioDenial)
-        .map(({ text }) => text)
-        .sort(),
-    ).toEqual(Object.values(SCENARIO_DENIALS).flat().sort());
-    expect(isScenarioDenial({ at: "elsewhere.tsx:1", text: "%" })).toBe(false);
-    expect(isScenarioDenial({ at: "features/league/advice/RoleForecast.tsx:1", text: "%" })).toBe(
-      false,
-    );
-    for (const path of Object.keys(SCENARIO_DENIALS)) {
-      expect(isScenarioDenial({ at: `${path}:1`, text: "Win probability 80%" })).toBe(false);
+  it("needs no exemption for the scenario surfaces", () => {
+    for (const path of [
+      "features/league/advice/InformationReview.tsx",
+      "features/league/advice/RoleForecast.tsx",
+    ]) {
+      const inline = INLINE.filter(({ at }) => at.startsWith(`${path}:`));
+      expect(inline.length).toBeGreaterThan(0);
+      expect(inline.filter(({ text }) => AS_A_CHANCE.test(text))).toEqual([]);
     }
   });
   it("names FPL's playing value as the source's figure, with no chance wording or marker", () => {
@@ -252,9 +238,9 @@ describe("every string a production component writes inline", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const offenders = INLINE.filter((entry) => !isScenarioDenial(entry))
-      .filter(({ text }) => AS_A_CHANCE.test(text))
-      .map(({ at, text }) => `${at}: ${text}`);
+    const offenders = INLINE.filter(({ text }) => AS_A_CHANCE.test(text)).map(
+      ({ at, text }) => `${at}: ${text}`,
+    );
     expect(offenders).toEqual([]);
   });
 });
