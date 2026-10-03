@@ -1,0 +1,451 @@
+{
+  "version": "role_reference_development_report_v1",
+  "status": "draft_from_completed_generated_artifacts",
+  "source_commit": "49b451ae011eba21e59a0932e3deea9333a1ca7d",
+  "measurement_contract": "football_joint_role_measurement_v2",
+  "source_sha256": {
+    "scripts/measure_football_role_minutes.py": "5a3f3964c37aa29ce57a445fd6f7498b9a7b94b4cf2ff1299bbb82b3f896fd20",
+    "src/squadopt/application/football_live.py": "c934958666cb936aebf8e2ce82ec41ca5d6c99ec74723c73d6cc8eb77d1c7774",
+    "src/squadopt/data/sources/football_history.py": "dfad934c7cb6c1ca5ee6a7ca3e7574f25845e0257600fc95a109f5beb57ed84a",
+    "src/squadopt/prediction/football.py": "3e71ad27a941c004bc196ff8f12ac48d73187c541f52907d002718edc42a4f6c",
+    "src/squadopt/prediction/football_features.py": "af24356b989fc13c7f23940a01ea2371265c9bc5c7dddbd9b6c759e9ef2317b9",
+    "src/squadopt/prediction/football_minutes_role.py": "a4fd0f0e799b64a81429875593e549572d657218511a58f7b63d8b6e4e77530b"
+  },
+  "generated_artifact_sha256": {
+    "result.json": "136e719c4e9b0ada69ee8078db577e3b84ab905c4c1d39a2269f139d8d5e0ec8",
+    "operator-scope.json": "f2f5111969aaab3d36fad6c9d70a315a29f92742e7256156624784e3e79a7890",
+    "role-comparison.json": "06285f572541c6591fb0c3b936295c9338e3f7d2655167542b49edaf916e60f2",
+    "role-scores.json": "fb2d184ebe3d33fea1e90dbc3f95cb2e75b142bd55403466edec946a87949352",
+    "role-diagnostics.json": "66c706bc5c11fdbe390e6aa1213a7358fef63cd8105fc81d88e0d104eaa2ab98",
+    "scores.json": "d3fa576840c5e6da386349c212d890356f24d229016201adff049e349dbc15a7",
+    "comparison.json": "0e204f3ecac8e8c6ca58ae56bfdfa6db15af2846efe96a71a2f0299789f1ae77",
+    "fit-attempts.jsonl": "1dbf428933d483aa45291d7bcb9dccc5b8314cef200f787bdff0f36b40572f3f",
+    "protocol.json": "f405a2100c15b736428f1445e58b0ea273e3450498f349d21278c61119c026a3",
+    "folds.json": "01628f895a68437b0d6b4acab2190b333425b1128f47943b70d360ac58a2c107",
+    "budgets.json": "2f7bb1710510256512ae1eb6b5617dc3bfe18d6bdf1f226acd2113b466781e4a",
+    "current-evidence.json": "8713b88d79dff046ccafa89e38793cd9e91d8b05b3f856d07357acc023b4b544",
+    "input-hashes.json": "5f9891b99b1236972614a4612e4a8854ddc27d9c8d06ff0cb453c6b9da561cc8",
+    "source-hashes.json": "dbae26ab67f11ca01c99dbba94915e8975fc978b71c75d252f7a32d3f41efc22",
+    "math100-role-measure02-independent-review.json": "6e11a5239b7d4aa433442ffe49629246a0e1adf8ebd23ec2a173208025f4486d"
+  },
+  "scope": {
+    "historical_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "prior_only_season": "2022-23",
+    "historical_origins": [
+      [
+        "2023-24",
+        11
+      ],
+      [
+        "2023-24",
+        19
+      ],
+      [
+        "2023-24",
+        27
+      ],
+      [
+        "2023-24",
+        35
+      ],
+      [
+        "2024-25",
+        11
+      ],
+      [
+        "2024-25",
+        19
+      ],
+      [
+        "2024-25",
+        27
+      ],
+      [
+        "2024-25",
+        35
+      ]
+    ],
+    "current_evidence": {
+      "status": "available",
+      "snapshot_id": "fpl-live-20261001T233218Z-7945d6b3c732",
+      "fingerprint": "7945d6b3c732bd3e38bd11009d32070f733e93d9dbc3570d69f53d1b21452e8d",
+      "captured_at_utc": "2026-10-01T23:32:18.344567Z",
+      "payload_sha256": {
+        "bootstrap-static.json": "4a4ff5144ba70f76742a6609654e808362b638d9127b9e93baef03985cbc134a",
+        "event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+        "event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+        "event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+        "event-gw04-live.json": "a4ebf3dac44cb598e6f62a1dd5333e3d5ce7206303dbda62f513830ae7cfd095",
+        "event-gw05-live.json": "aeee6dd5b56567b04ef9b4e5b9828ee4d81e094803dc0e6553cd3b394178c6dd",
+        "fixtures.json": "113c3c674e681542b8a7926a02036cab9d438f7f1c0bd5d4410afa367a31ad04"
+      },
+      "gameweeks": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": 3191
+    },
+    "cutoff_policy": "first_target_kickoff_minus_90_minutes; earlier_gameweeks_only; kickoff_plus_3h_settlement_proxy",
+    "historical_archive_files_opened": 12,
+    "excluded_2025_26_access": false,
+    "provider_calls": 0,
+    "live_changes": false,
+    "independent_holdout": false,
+    "promotion": false,
+    "realized_fpl_gain_measured": false
+  },
+  "work": {
+    "completed_origins": 13,
+    "candidate_fit_attempts": 13,
+    "reference_additional_fits": 0,
+    "diagnostic_additional_fits": 0,
+    "prior_interrupted_attempts_upper_bound": 1,
+    "combined_attempts_upper_bound": 14,
+    "completed_run_preparation_seconds": 55.250536200008355,
+    "completed_fit_seconds_sum": 44.20798589999322,
+    "prior_interrupted_elapsed_seconds": null,
+    "completed_run_total_wall_seconds": 112.84519869997166,
+    "timing_interpretation": "Total wall time includes preparation; do not add them. Earlier interrupted elapsed time is unreported."
+  },
+  "old_output_equality": {
+    "scores.json": {
+      "byte_identical": true,
+      "sha256": "d3fa576840c5e6da386349c212d890356f24d229016201adff049e349dbc15a7"
+    },
+    "comparison.json": {
+      "byte_identical": true,
+      "sha256": "0e204f3ecac8e8c6ca58ae56bfdfa6db15af2846efe96a71a2f0299789f1ae77"
+    }
+  },
+  "role_reference": {
+    "law": [
+      "1-q",
+      "q*r",
+      "q*(1-r)"
+    ],
+    "r": "causal_training_starts_1 / causal_training_known_positive_minute_starts",
+    "shared_q_exactly_equal": true,
+    "training_pool": "all_positions",
+    "paired_scored_target_rows": 9419,
+    "target_positive_known_start_rows": 3965,
+    "target_unknown_role_rows": 0,
+    "aggregation": "equal_origin_means; repeated players and training populations are not independent observations",
+    "all_origins": [
+      {
+        "position": "ALL",
+        "metric": "role_nll",
+        "reported_origins": 13,
+        "paired_origins": 13,
+        "unpaired_origins": 0,
+        "paired_scored_rows": 9419,
+        "pooled_empirical_role": 0.6414836191404306,
+        "joint_role": 0.5643263254574495,
+        "joint_minus_pooled": -0.07715729368298116,
+        "negative_deltas": 12,
+        "positive_deltas": 1,
+        "ties": 0,
+        "interpretation": "lower_loss_is_better_shared_appearance"
+      },
+      {
+        "position": "ALL",
+        "metric": "role_brier",
+        "reported_origins": 13,
+        "paired_origins": 13,
+        "unpaired_origins": 0,
+        "paired_scored_rows": 9419,
+        "pooled_empirical_role": 0.335656695916687,
+        "joint_role": 0.3002256287826803,
+        "joint_minus_pooled": -0.03543106713400675,
+        "negative_deltas": 12,
+        "positive_deltas": 1,
+        "ties": 0,
+        "interpretation": "lower_loss_is_better_shared_appearance"
+      }
+    ],
+    "cohorts": [
+      {
+        "cohort": "historical_8",
+        "position": "ALL",
+        "metric": "role_nll",
+        "origins": 8,
+        "rows": 6228,
+        "pooled": 0.5254808561057157,
+        "joint": 0.4479942247742749,
+        "delta": -0.07748663133144083,
+        "wins": 8,
+        "losses": 0,
+        "ties": 0,
+        "worse_origins": []
+      },
+      {
+        "cohort": "historical_8",
+        "position": "ALL",
+        "metric": "role_brier",
+        "origins": 8,
+        "rows": 6228,
+        "pooled": 0.27944567337777554,
+        "joint": 0.24606767360625945,
+        "delta": -0.03337799977151609,
+        "wins": 8,
+        "losses": 0,
+        "ties": 0,
+        "worse_origins": []
+      },
+      {
+        "cohort": "current_5",
+        "position": "ALL",
+        "metric": "role_nll",
+        "origins": 5,
+        "rows": 3191,
+        "pooled": 0.8270880399959746,
+        "joint": 0.7504576865505289,
+        "delta": -0.07663035344544566,
+        "wins": 4,
+        "losses": 1,
+        "ties": 0,
+        "worse_origins": [
+          "2026-27-gw01"
+        ]
+      },
+      {
+        "cohort": "current_5",
+        "position": "ALL",
+        "metric": "role_brier",
+        "origins": 5,
+        "rows": 3191,
+        "pooled": 0.4255943319789453,
+        "joint": 0.3868783570649535,
+        "delta": -0.0387159749139918,
+        "wins": 4,
+        "losses": 1,
+        "ties": 0,
+        "worse_origins": [
+          "2026-27-gw01"
+        ]
+      }
+    ]
+  },
+  "missing_start_labels": {
+    "count_scope": "positive-minute rows with a recorded binary starts label; counts refer only to retained supervised training or scored targets",
+    "training_counts_overlap": true,
+    "origin_counts": [
+      {
+        "origin": "2023-24-gw11",
+        "cutoff_utc": "2023-11-04T11:00:00+00:00",
+        "training_positive_known": 3011,
+        "training_positive_unknown": 0,
+        "target_rows": 733
+      },
+      {
+        "origin": "2023-24-gw19",
+        "cutoff_utc": "2023-12-26T11:00:00+00:00",
+        "training_positive_known": 5319,
+        "training_positive_unknown": 0,
+        "target_rows": 771
+      },
+      {
+        "origin": "2023-24-gw27",
+        "cutoff_utc": "2024-03-02T13:30:00+00:00",
+        "training_positive_known": 7705,
+        "training_positive_unknown": 0,
+        "target_rows": 832
+      },
+      {
+        "origin": "2023-24-gw35",
+        "cutoff_utc": "2024-04-27T10:00:00+00:00",
+        "training_positive_known": 10054,
+        "training_positive_unknown": 0,
+        "target_rows": 960
+      },
+      {
+        "origin": "2024-25-gw11",
+        "cutoff_utc": "2024-11-09T13:30:00+00:00",
+        "training_positive_known": 14436,
+        "training_positive_unknown": 0,
+        "target_rows": 678
+      },
+      {
+        "origin": "2024-25-gw19",
+        "cutoff_utc": "2024-12-29T13:00:00+00:00",
+        "training_positive_known": 16835,
+        "training_positive_unknown": 0,
+        "target_rows": 709
+      },
+      {
+        "origin": "2024-25-gw27",
+        "cutoff_utc": "2025-02-25T18:00:00+00:00",
+        "training_positive_known": 19297,
+        "training_positive_unknown": 0,
+        "target_rows": 764
+      },
+      {
+        "origin": "2024-25-gw35",
+        "cutoff_utc": "2025-05-02T17:30:00+00:00",
+        "training_positive_known": 21721,
+        "training_positive_unknown": 0,
+        "target_rows": 781
+      },
+      {
+        "origin": "2026-27-gw01",
+        "cutoff_utc": "2026-08-21T17:30:00+00:00",
+        "training_positive_known": 22950,
+        "training_positive_unknown": 0,
+        "target_rows": 593
+      },
+      {
+        "origin": "2026-27-gw02",
+        "cutoff_utc": "2026-08-28T17:30:00+00:00",
+        "training_positive_known": 23256,
+        "training_positive_unknown": 0,
+        "target_rows": 618
+      },
+      {
+        "origin": "2026-27-gw03",
+        "cutoff_utc": "2026-09-04T17:30:00+00:00",
+        "training_positive_known": 23566,
+        "training_positive_unknown": 0,
+        "target_rows": 654
+      },
+      {
+        "origin": "2026-27-gw04",
+        "cutoff_utc": "2026-09-12T12:30:00+00:00",
+        "training_positive_known": 23873,
+        "training_positive_unknown": 0,
+        "target_rows": 659
+      },
+      {
+        "origin": "2026-27-gw05",
+        "cutoff_utc": "2026-09-18T17:30:00+00:00",
+        "training_positive_known": 24180,
+        "training_positive_unknown": 0,
+        "target_rows": 667
+      }
+    ],
+    "missing_training_cells": 0,
+    "missing_at_random_established": false
+  },
+  "diagnostics": {
+    "bin_edges": [
+      0.0,
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      1.0
+    ],
+    "bin_closure": "left_closed_right_open; last_bin_includes_one",
+    "appearance_population": "known_zero_or_positive_binary_start_rows",
+    "conditional_population": "observed_positive_binary_start_rows_with_q_gt_zero",
+    "q_zero_policy": "undefined_counted_and_excluded; no_probability_floor",
+    "log_floor": 1e-12,
+    "integrity": {
+      "all_q_identical": true,
+      "all_complete": true,
+      "failures": [],
+      "diagnostic_records": 130,
+      "q_zero_conditional_rows": 0,
+      "unknown_evaluation_role_rows": 0,
+      "all_observed_floor_active_rows": 0
+    },
+    "current_gw1": {
+      "role_losses": {
+        "pooled_empirical_role": {
+          "role_nll": 1.509995185883592,
+          "role_brier": 0.7572014670016625
+        },
+        "joint_role": {
+          "role_nll": 1.584764215634885,
+          "role_brier": 0.7604865010805957
+        }
+      },
+      "appearance": {
+        "rows": 593,
+        "nll": 1.2000623885555437,
+        "brier": 0.34913684413098633
+      },
+      "conditional_start": {
+        "pooled_empirical_role": {
+          "rows": 306,
+          "nll": 0.6006214013579497,
+          "brier": 0.20513838457193578
+        },
+        "joint_role": {
+          "rows": 306,
+          "nll": 0.7455169394053899,
+          "brier": 0.2692932356497262
+        }
+      },
+      "appearance_low_bin": {
+        "lower": 0.0,
+        "upper": 0.1,
+        "upper_inclusive": false,
+        "count": 375,
+        "mean_pred": 0.03408381680044853,
+        "event_rate": 0.42133333333333334
+      },
+      "joint_conditional_high_bins": [
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "upper_inclusive": false,
+          "count": 31,
+          "mean_pred": 0.8459368133138553,
+          "event_rate": 0.7419354838709677
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "upper_inclusive": true,
+          "count": 66,
+          "mean_pred": 0.9522248777536791,
+          "event_rate": 0.8787878787878788
+        }
+      ],
+      "paired_nll_interpretation": "Shared appearance contributes to absolute loss but cancels from the paired joint-minus-pooled role NLL difference; the loss is a conditional-role weakness."
+    },
+    "bin_interpretation": "Descriptive counts and means, not a significance test or a fitted calibration correction; direction varies by origin and position."
+  },
+  "pending_hypotheses": [
+    {
+      "name": "one_prespecified_scalar_temperature_procedure",
+      "status": "unexecuted_draft_no_selected_temperature_no_result",
+      "preserved": [
+        "appearance_q",
+        "zero_mass",
+        "conditional_minute_laws"
+      ],
+      "claim": "Requires causal inner validation and a predefined acceptance rule; no grid or position exceptions selected from these bins."
+    },
+    {
+      "name": "retained_history_support_semantics",
+      "status": "pending_synthetic_validation_no_measured_improvement",
+      "claim": "Do not attribute current GW1 error to missing prior-season support without a separate test."
+    }
+  ],
+  "limitations": [
+    "Retrospective development data, not independent predictive superiority evidence.",
+    "Final historical fixtures and reconstructed observed player population, not archived deadline rosters.",
+    "Current capture uses its recorded roster; former/transferred player coverage can be incomplete.",
+    "Three-hour settlement proxy and 90-minute deadline proxy are not verified historical publication times.",
+    "Frozen v1 control has no start/cameo law; its role scores remain null.",
+    "The separate pooled role reference reuses control appearance; it is not a standalone model or independent calibration evidence.",
+    "Points residual stays fixed per appearance; it is not decomposed into minute-specific events.",
+    "Retrospective development receipts; no independent holdout or realized FPL gain.",
+    "Losses use equal-origin means; descriptive bins below pool row counts and are not a calibration significance test.",
+    "Retained training counts overlap across origins and must not be added as unique observations.",
+    "No actual archive, capture, provider or live files were opened during this independent review."
+  ],
+  "report_scope": "completed math100-role-measure02 only; later experiment drafts and results excluded"
+}
