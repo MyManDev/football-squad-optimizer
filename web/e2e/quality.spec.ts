@@ -105,12 +105,12 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("link", { name: "Deniz Aral" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", language);
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
-    // The sidebar's navigation and its operations link are the whole chrome.
+    // The sidebar's navigation is the whole chrome.
     expect(
       await page
         .locator("#sidebar a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/league/members", "/fixtures", "/contribute", "/status"]);
+    ).toEqual(["/", "/league/members", "/fixtures", "/contribute"]);
     await expect(
       page.locator(
         'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
@@ -124,7 +124,7 @@ test("a member page's sidebar adds only its member block to the chrome", async (
   await page.goto("/league/members/35249001");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
   // The member block goes back to the member list; the rest is the navigation with this
-  // member's week and squad, and the operations link.
+  // member's week and squad.
   expect(
     await page
       .locator("#sidebar a")
@@ -136,7 +136,6 @@ test("a member page's sidebar adds only its member block to the chrome", async (
     "/league/members",
     "/fixtures",
     "/contribute",
-    "/status",
   ]);
   await expect(
     page.locator(

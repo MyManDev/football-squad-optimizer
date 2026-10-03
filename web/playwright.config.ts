@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { rememberedLeague } from "./e2e/leagueState";
+
+const baseURL = "http://127.0.0.1:4173";
+
 export default defineConfig({
   testDir: "./e2e",
   testIgnore: ["**/advice-backend.spec.ts", "**/live-smoke.spec.ts"], // separate opt-in configs
@@ -7,7 +11,9 @@ export default defineConfig({
   fullyParallel: true,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
+    // Every league address sits behind the league number; the specs open it already given.
+    storageState: rememberedLeague(baseURL),
     trace: "retain-on-failure",
   },
   webServer: {

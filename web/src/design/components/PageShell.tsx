@@ -19,7 +19,6 @@ import {
   MenuIcon,
   NavIcon,
   PlanIcon,
-  StatusIcon,
 } from "../shell/icons";
 import { useShellLayout } from "../shell/layout";
 import { memberAt, memberInContext, navItems, type MemberContext } from "../shell/nav";
@@ -89,7 +88,7 @@ function useScrollToHash(hash: string, key: string) {
  * bar exists only in the phone layout; everything else is rendered once in every layout.
  *
  * The sidebar holds the brand, the WHO slot, the navigation, the PLAN slot and a footer
- * with the language switch and the operations link. A page fills the two slots through
+ * with the language switch. A page fills the two slots through
  * `ShellPortal`; the shell reads no document of its own.
  *
  * `viewerEntryId` is the member the visitor said they are, held in memory only; with no
@@ -375,10 +374,6 @@ export function PageShell({
               ) : null}
               <div className={styles.footer}>
                 <LanguageToggle vertical={rail} />
-                <NavLink to="/status" className={styles.status} onClick={closeDrawer}>
-                  {rail ? <StatusIcon /> : null}
-                  <span className={rail ? "visually-hidden" : undefined}>{copy.operations}</span>
-                </NavLink>
               </div>
             </div>
           </div>

@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
+import { NO_LEAGUE } from "./leagueState";
+
+// This is the first visit: no league remembered.
+test.use({ storageState: NO_LEAGUE });
 
 for (const language of ["tr", "en"] as const) {
   test(`the league allowlist rejects unsupported IDs without fetching in ${language}`, async ({

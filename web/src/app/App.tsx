@@ -24,6 +24,9 @@ const LeagueEntryPage = lazy(() =>
 const LeaguePage = lazy(() =>
   import("../features/league/pages/LeaguePage").then((m) => ({ default: m.LeaguePage })),
 );
+const LeagueGate = lazy(() =>
+  import("../features/league/pages/LeagueGate").then((m) => ({ default: m.LeagueGate })),
+);
 const LeagueMembersPage = lazy(() =>
   import("../features/league/pages/LeagueMembersPage").then((m) => ({
     default: m.LeagueMembersPage,
@@ -82,12 +85,37 @@ function LocalizedApp({ basename }: { basename: string }) {
                 <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
                 <Route path="/rivals" element={<RivalsPage />} />
                 <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
-                <Route path="/league" element={<LeaguePage />} />
-                <Route path="/league/members" element={<LeagueMembersPage />} />
-                <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
+                <Route
+                  path="/league"
+                  element={
+                    <LeagueGate>
+                      <LeaguePage />
+                    </LeagueGate>
+                  }
+                />
+                <Route
+                  path="/league/members"
+                  element={
+                    <LeagueGate>
+                      <LeagueMembersPage />
+                    </LeagueGate>
+                  }
+                />
+                <Route
+                  path="/league/members/:entryId"
+                  element={
+                    <LeagueGate>
+                      <LeagueMemberPage />
+                    </LeagueGate>
+                  }
+                />
                 <Route
                   path="/league/members/:entryId/history"
-                  element={<LeagueMemberHistoryPage />}
+                  element={
+                    <LeagueGate>
+                      <LeagueMemberHistoryPage />
+                    </LeagueGate>
+                  }
                 />
                 <Route path="/fixtures" element={<FixturesPage />} />
                 <Route path="/contribute" element={<ContributePage />} />

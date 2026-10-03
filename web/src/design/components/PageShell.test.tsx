@@ -128,14 +128,15 @@ describe("the app shell on a desktop", () => {
         "page",
       );
       const aside = screen.getByRole("complementary", { name: copy.sidebar });
-      const status = within(aside).getByRole("link", { name: copy.operations });
-      expect(status).toHaveAttribute("href", "/status");
       const hrefs = within(aside)
         .getAllByRole("link")
         .map((link) => link.getAttribute("href"));
-      expect(hrefs).toEqual(["/", "/league/members", "/fixtures", "/contribute", "/status"]);
+      expect(hrefs).toEqual(["/", "/league/members", "/fixtures", "/contribute"]);
+      // The operations, analysis and admin surfaces are reachable by address only.
       expect(
-        document.querySelector('a[href="/league"], a[href="/admin"], a[href^="/gw/"]'),
+        document.querySelector(
+          'a[href="/status"], a[href="/league"], a[href="/admin"], a[href^="/gw/"]',
+        ),
       ).toBeNull();
     },
   );
@@ -205,7 +206,6 @@ describe("the app shell on a desktop", () => {
       TR.fixtures,
       TR.contribute,
     ]);
-    expect(screen.getByRole("link", { name: TR.operations })).toHaveAttribute("href", "/status");
     expect(screen.getByRole("group", { name: "Dil" })).toHaveClass("vertical");
     first.unmount();
 
@@ -231,7 +231,6 @@ describe("the app shell on a desktop", () => {
       ...navLinks(),
       screen.getByRole("button", { name: /^TR/ }),
       screen.getByRole("button", { name: /^EN/ }),
-      screen.getByRole("link", { name: TR.operations }),
       screen.getByRole("button", { name: "page action" }),
     ];
     for (const element of expected) {
