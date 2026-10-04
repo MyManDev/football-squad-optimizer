@@ -78,8 +78,24 @@ function cases(ROOT: string): { cases: Case[]; withInputs: number } {
 const trees = shippedTrees()
   .map(({ path, root }) => ({ path, root, tree: cases(root) }))
   .filter(({ tree }) => tree.cases.length > 0);
-const ids = (players: Array<{ player_id: number }>) =>
-  players.map((p) => p.player_id).sort((a, b) => a - b);
+const ids = (players: Array<{ player_id: number }>) => players.map((p) => p.player_id);
+
+/**
+ * A player as the planner sees him: position, price and objective coefficients. Two
+ * players alike in all three are interchangeable, and an optimum may hold either: the
+ * first weekly-run tree under the directory had the server bench one 4.0 goalkeeper and
+ * the device another with the same coefficients, on an otherwise identical Wildcard.
+ * Plans are compared by these keys and nothing looser; every number must still match.
+ */
+function plannerKey(document: DevicePlanDocument): (id: number | null) => string {
+  const keys = new Map(
+    document.players.map((p) => [
+      p.id,
+      `${p.position}|${p.buy_tenths}|${p.coefficients.join(",")}`,
+    ]),
+  );
+  return (id) => (id === null ? "no player" : (keys.get(id) ?? `player ${id}`));
+}
 
 /**
  * The planner's objective of a published plan, on the document's integer scale: the
@@ -162,24 +178,55 @@ describe.skipIf(trees.length === 0)("the shipped chip plans", () => {
             );
             return;
           }
-          expect(answer.starting_xi).toEqual(ids(published.starting_xi!));
-          expect(answer.captain).toBe(published.captain!.player_id);
-          expect(answer.vice_captain).toBe(published.vice_captain!.player_id);
-          expect(answer.bench).toEqual(published.bench!.map((p) => p.player_id));
-          expect(answer.transfers_in).toEqual(ids(published.moves.map((m) => m.player_in!)));
-          expect(answer.transfers_out).toEqual(ids(published.moves.map((m) => m.player_out!)));
+          const key = plannerKey(document);
+          const set = (players: number[]) => players.map(key).sort();
+          expect(set(answer.starting_xi)).toEqual(set(ids(published.starting_xi!)));
+          expect(key(answer.captain)).toBe(key(published.captain!.player_id));
+          expect(key(answer.vice_captain)).toBe(key(published.vice_captain!.player_id));
+          expect(answer.bench.map(key)).toEqual(ids(published.bench!).map(key));
+          expect(set(answer.transfers_in)).toEqual(
+            set(ids(published.moves.map((m) => m.player_in!))),
+          );
+          expect(set(answer.transfers_out)).toEqual(
+            set(ids(published.moves.map((m) => m.player_out!))),
+          );
           expect(answer.transfer_hit_points).toBe(published.transfer_hit_points ?? 0);
           expect(answer.expected_own_points).toBeCloseTo(published.expected_own_points!, 6);
           if (published.expected_gain_vs_hold == null)
             expect(answer.expected_gain_vs_hold).toBeNull();
           else expect(answer.expected_gain_vs_hold).toBeCloseTo(published.expected_gain_vs_hold, 6);
-          expect(answer.moves.map((m) => [m.out, m.in])).toEqual(
-            published.moves.map((m) => [m.player_out!.player_id, m.player_in!.player_id]),
-          );
-          for (const [index, move] of answer.moves.entries()) {
-            const expected = published.moves[index]!.expected_points_delta;
-            if (expected === null) expect(move.gain).toBeNull();
-            else expect(move.gain).toBeCloseTo(expected, 6);
+          const fifteen = (xi: number[], bench: number[]) =>
+            [...xi, ...bench].sort((a, b) => a - b).join();
+          const swapped =
+            fifteen(answer.starting_xi, answer.bench) !==
+            fifteen(ids(published.starting_xi!), ids(published.bench!));
+          if (!swapped) {
+            expect(answer.moves.map((m) => [m.out, m.in])).toEqual(
+              published.moves.map((m) => [m.player_out!.player_id, m.player_in!.player_id]),
+            );
+            for (const [index, move] of answer.moves.entries()) {
+              const expected = published.moves[index]!.expected_points_delta;
+              if (expected === null) expect(move.gain).toBeNull();
+              else expect(move.gain).toBeCloseTo(expected, 6);
+            }
+          } else {
+            // Within a position the outgoing and incoming players are paired by id, so a tie
+            // swapped in pairs them differently; each position's moves must gain the same.
+            const position = new Map(document.players.map((p) => [p.id, p.position]));
+            const gained = (moves: Array<[number | null, number | null]>) => {
+              const totals: Record<string, number> = {};
+              for (const [into, gain] of moves) {
+                const at = position.get(into ?? -1) ?? "none";
+                totals[at] = (totals[at] ?? 0) + (gain ?? 0);
+              }
+              return totals;
+            };
+            const mine = gained(answer.moves.map((m) => [m.in, m.gain]));
+            const theirs = gained(
+              published.moves.map((m) => [m.player_in!.player_id, m.expected_points_delta]),
+            );
+            expect(Object.keys(mine).sort()).toEqual(Object.keys(theirs).sort());
+            for (const at of Object.keys(theirs)) expect(mine[at]).toBeCloseTo(theirs[at]!, 6);
           }
           expect(answer.gain_vs_no_chip).toBeCloseTo(published.chip_choice!.gain_vs_no_chip, 6);
         },
