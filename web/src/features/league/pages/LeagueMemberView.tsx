@@ -1,3 +1,5 @@
+import { memberAddress, memberHistoryAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -118,6 +120,7 @@ function LeagueMemberContent({
   leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   const layout = useShellLayout();
   const shell = useShell();
@@ -246,7 +249,9 @@ function LeagueMemberContent({
       </details>
       {view.league_id === 352490 ? (
         <p className={styles.historyLink}>
-          <Link to={`/league/members/${entryId}/history`}>{messages.suggestionHistory.title}</Link>
+          <Link to={memberHistoryAddress(leagueId, entryId)}>
+            {messages.suggestionHistory.title}
+          </Link>
         </p>
       ) : null}
     </div>
@@ -477,7 +482,7 @@ function LeagueMemberContent({
                     : `#${viewer.entryId}`,
                 )}
               </strong>{" "}
-              <Link className={styles.viewerAction} to="/league/members">
+              <Link className={styles.viewerAction} to={membersAddress(leagueId)}>
                 {copy.viewerChange}
               </Link>{" "}
               <button
@@ -485,7 +490,7 @@ function LeagueMemberContent({
                 className={styles.viewerClear}
                 onClick={() => {
                   clear();
-                  navigate("/league/members", { replace: true });
+                  navigate(membersAddress(leagueId), { replace: true });
                 }}
               >
                 {copy.viewerClear}
@@ -494,7 +499,7 @@ function LeagueMemberContent({
             {viewer.entryId !== entryId ? (
               <p className={styles.notice}>
                 <strong>{copy.notYourPageTitle}</strong> {copy.notYourPageBody}{" "}
-                <Link to={`/league/members/${viewer.entryId}`}>{copy.notYourPageLink}</Link>
+                <Link to={memberAddress(leagueId, viewer.entryId)}>{copy.notYourPageLink}</Link>
               </p>
             ) : null}
           </Card>

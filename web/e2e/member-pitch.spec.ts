@@ -109,7 +109,7 @@ async function open(page: Page, width: number, height: number, plan = PLAN, live
     );
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
-  await page.goto(`/league/members/${ENTRY}`);
+  await page.goto(`/league/352490/members/${ENTRY}`);
   await expect(
     page.getByRole("heading", { name: copy.leagueMembers.squadAfterTitle }),
   ).toBeVisible();

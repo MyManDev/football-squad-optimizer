@@ -67,6 +67,10 @@ export function openCalendar() {
 export async function installLeagueMocks(page: Page) {
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.route("**/data/fixtures.json", (route) => fulfill(route, openCalendar()));
+  // No league directory: the site from before it, whose one league under `data/league/`
+  // the directory fallback reads. The 404 keeps that fallback deterministic whatever the
+  // preview server answers for an unpublished path.
+  await page.route("**/data/leagues.json", missing);
   await page.route("**/data/league/members.json", (route) =>
     fulfill(route, mockLeagueMembersEnvelope),
   );

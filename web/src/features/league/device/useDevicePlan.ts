@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { loadDevicePlan, loadEntrySquad } from "../data";
+import { useLeague } from "../useLeague";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
@@ -73,9 +73,10 @@ export function useDevicePlan(
   request: AdviceRequest,
   dependencies: DevicePlanDependencies = {},
 ): DevicePlan {
+  const { tree } = useLeague();
   const {
-    loadDocument = loadDevicePlan,
-    loadRival = loadEntrySquad,
+    loadDocument = () => tree.devicePlan(),
+    loadRival = (entryId: number) => tree.entrySquad(entryId),
     createSolver = createWorker,
     now = () => new Date(),
   } = dependencies;

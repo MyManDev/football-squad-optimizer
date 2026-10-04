@@ -60,7 +60,7 @@ test("a member's plan is solved on the device and drawn as a computation result"
     if (response.url().endsWith(".wasm")) wasm.push(`${response.status()} ${response.url()}`);
   });
 
-  await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
   pressed = true;
@@ -141,7 +141,7 @@ test("a chip the member holds is solved on the device with its gain against the 
     }),
   );
 
-  await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
   await expect(page.locator("main")).toContainText("Triple Captain bu hafta oynanıyor");
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
@@ -220,7 +220,7 @@ test("a rival strategy is solved on the device against the rival's published ele
     }),
   );
 
-  await page.goto(`/league/members/${ENTRY}?mode=fark-yarat&window=1&rival=${RIVAL}`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=fark-yarat&window=1&rival=${RIVAL}`);
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
   await button.click();

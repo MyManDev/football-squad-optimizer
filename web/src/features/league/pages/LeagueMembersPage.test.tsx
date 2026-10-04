@@ -12,15 +12,20 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { LeagueMembersView } from "./LeagueMembersPage";
+import { withLeague } from "../../../testSupport/league";
 import { assertMembers } from "../publicationShape";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 
 afterEach(cleanup);
 
-function renderPage(node: React.ReactNode, path = "/league/members", language: Language = "tr") {
+function renderPage(
+  node: React.ReactNode,
+  path = "/league/352490/members",
+  language: Language = "tr",
+) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{withLeague(node)}</MemoryRouter>
     </LanguageProvider>,
   );
 }
@@ -59,7 +64,7 @@ describe("league member points", () => {
       assertMembers(value);
       const { container } = renderPage(
         <LeagueMembersView envelope={value} />,
-        "/league/members",
+        "/league/352490/members",
         language,
       );
       const copy = MESSAGES[language].leagueMembers;
@@ -219,7 +224,7 @@ describe("league member surfaces", () => {
           squad={mockEntrySquadEnvelopes[entryId]!}
           advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
         />,
-        `/league/members/${entryId}`,
+        `/league/352490/members/${entryId}`,
         language,
       );
       expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
@@ -312,7 +317,7 @@ describe("league member surfaces", () => {
     expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.getByRole("link", { name: "Deniz Aral" })).toHaveAttribute(
       "href",
-      "/league/members/35249001",
+      "/league/352490/members/35249001",
     );
     expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
   });
@@ -326,7 +331,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={advice}
       />,
-      `/league/members/${entryId}?mode=ortak-koru&window=1`,
+      `/league/352490/members/${entryId}?mode=ortak-koru&window=1`,
     );
 
     expect(screen.getAllByText("örnek veri").length).toBeGreaterThan(0);
@@ -353,7 +358,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "ortak-koru", 1)}
       />,
-      `/league/members/${entryId}?mode=ortak-koru`,
+      `/league/352490/members/${entryId}?mode=ortak-koru`,
     );
     expect(screen.getByText(/beklenen puandan vazgeçiyor/)).toBeInTheDocument();
     expect(screen.getByText(/kadrosuna göre fiyatlandı/)).toBeInTheDocument();
@@ -365,7 +370,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
-      `/league/members/${entryId}`,
+      `/league/352490/members/${entryId}`,
     );
     expect(screen.queryByText(/beklenen puandan vazgeçiyor/)).not.toBeInTheDocument();
   });
@@ -378,7 +383,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
-      `/league/members/${entryId}`,
+      `/league/352490/members/${entryId}`,
     );
 
     expect(screen.getByText("Bu üye için kadro bulunmuyor.")).toBeInTheDocument();
@@ -435,7 +440,7 @@ describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language
     };
     renderPage(
       <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} index={index} />,
-      `/league/members/${entryId}?mode=fark-yarat&rival=${rivalId}`,
+      `/league/352490/members/${entryId}?mode=fark-yarat&rival=${rivalId}`,
       language,
     );
     const copy = MESSAGES[language].leagueMembers;

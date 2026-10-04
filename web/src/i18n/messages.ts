@@ -285,8 +285,7 @@ const en = {
     leagueInvalid: "Enter a league number or an FPL league link.",
     leagueUnavailable:
       "League member data is not published yet; it arrives with the next decision publish.",
-    leagueMismatch: (leagueId: number) =>
-      `This site precomputes league ${leagueId} only; that is the league it can open.`,
+    leagueMismatch: (leagueId: number) => `This site does not publish league ${leagueId}.`,
     diagnostic: "diagnostic",
     diagnosticTitle: (weeks: number) =>
       `The league-relative ${weeks}-week result is a diagnostic, never a chance of winning.`,
@@ -521,9 +520,10 @@ const en = {
     submit: "Find league",
     invalid: "Enter a positive whole-number league ID.",
     loading: "Reading the published league…",
-    unsupported: "Only league 352490 is supported for now.",
+    unsupported: (leagueId: number) => `This site does not publish league ${leagueId}.`,
     missing: "The published league document is unavailable. Try again later.",
     failed: "The published league data could not be read. Try again.",
+    directoryUnreadable: "The list of published leagues could not be read. Try again.",
   },
   memberResources: {
     transfersTitle: "Free transfers",
@@ -1366,8 +1366,7 @@ const tr: MessageSchema<typeof en> = {
     leagueConnect: "Bağlan",
     leagueInvalid: "Bir lig numarası ya da FPL lig bağlantısı gir.",
     leagueUnavailable: "Lig üyesi verisi henüz yayınlanmadı; bir sonraki karar yayınıyla gelir.",
-    leagueMismatch: (leagueId) =>
-      `Bu site yalnızca ${leagueId} numaralı ligi hesaplar; açabildiği lig o.`,
+    leagueMismatch: (leagueId) => `Bu site ${leagueId} numaralı ligi yayımlamıyor.`,
     diagnostic: "diagnostik",
     diagnosticTitle: (weeks) =>
       `Lig-içi ${weeks} haftalık sonuç bir teşhis göstergesidir; kazanma ihtimali değildir.`,
@@ -1602,9 +1601,10 @@ const tr: MessageSchema<typeof en> = {
     submit: "Ligi bul",
     invalid: "Pozitif tam sayı olan bir lig numarası gir.",
     loading: "Yayımlanan lig okunuyor…",
-    unsupported: "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
+    unsupported: (leagueId) => `Bu site ${leagueId} numaralı ligi yayımlamıyor.`,
     missing: "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene.",
     failed: "Yayımlanan lig verisi okunamadı. Yeniden dene.",
+    directoryUnreadable: "Yayımlanan liglerin listesi okunamadı. Yeniden dene.",
   },
   memberResources: {
     transfersTitle: "Ücretsiz transfer hakkı",

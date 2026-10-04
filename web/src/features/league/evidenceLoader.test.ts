@@ -4,10 +4,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { loadEntryAdviceEvidence } from "./data";
+import { exampleTree } from "../../testSupport/league";
 import { LeagueDataError } from "./dataErrors";
 
-describe("loadEntryAdviceEvidence", () => {
+const loadEntryAdviceEvidence = exampleTree.entryAdviceEvidence;
+
+describe("tree.entryAdviceEvidence", () => {
   it("refuses any path other than the member's own switched-on plan", async () => {
     await expect(
       loadEntryAdviceEvidence(101, "advice/202/saf-puan/1/hoca-sozu.json"),

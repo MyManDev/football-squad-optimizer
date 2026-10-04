@@ -17,6 +17,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 /**
  * A row's figure and its unit: "8,0 xP" on screen, with "xP" hidden from a screen reader and
@@ -48,12 +49,14 @@ function renderAdvice(
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
-        <LeagueMemberView
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={squad}
-          advice={advice}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+        {withLeague(
+          <LeagueMemberView
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            squad={squad}
+            advice={advice}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

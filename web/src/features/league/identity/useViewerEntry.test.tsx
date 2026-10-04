@@ -8,6 +8,7 @@ import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { LeagueMembersView } from "../pages/LeagueMembersPage";
 import { readViewerEntry, writeViewerEntry } from "./useViewerEntry";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -18,8 +19,8 @@ beforeEach(() => {
 function renderMembers() {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={["/league/members"]}>
-        <LeagueMembersView envelope={mockLeagueMembersEnvelope} />
+      <MemoryRouter initialEntries={["/league/352490/members"]}>
+        {withLeague(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />)}
       </MemoryRouter>
     </LanguageProvider>,
   );

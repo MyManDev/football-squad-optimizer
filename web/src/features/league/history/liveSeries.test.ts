@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOverview";
+import { exampleTree } from "../../../testSupport/league";
 import type { Scoreboard } from "../types";
 import {
   loadLiveSeries,
@@ -135,7 +136,7 @@ describe("member-week series", () => {
         }),
     );
     vi.stubGlobal("fetch", fetcher);
-    const result = await loadLiveSeries(view);
+    const result = await loadLiveSeries(exampleTree, view);
     expect(result).toMatchObject({
       unavailableMembers: 1,
       remaining: null,

@@ -141,7 +141,7 @@ for (const [window, top100, width] of [
       });
     });
     await page.goto(
-      `/league/members/35249001?mode=saf-puan&window=${window}&top100=${top100}&model=football`,
+      `/league/352490/members/35249001?mode=saf-puan&window=${window}&top100=${top100}&model=football`,
     );
     await expect(page.getByTestId("new-information-notice")).toContainText(
       "karar girdileri değişmiş",

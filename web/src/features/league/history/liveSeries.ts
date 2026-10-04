@@ -1,4 +1,4 @@
-import { withRequestDeadline } from "../../../data/request";
+import type { LeagueTree } from "../data";
 import { LeagueDataError } from "../dataErrors";
 import type { Scoreboard } from "../types";
 import { checkedHistory, loadSuggestionHistory, type SuggestionHistory } from "./historyData";
@@ -106,12 +106,16 @@ export function remainingWeeks(
   return Math.max(0, row.required_week_clusters - series.weekClusters);
 }
 
-export async function loadLiveSeries(view: Scoreboard, signal?: AbortSignal) {
+export async function loadLiveSeries(
+  tree: Pick<LeagueTree, "raw" | "league">,
+  view: Scoreboard,
+  signal?: AbortSignal,
+) {
   const entries = [
     ...new Set(view.gameweeks.flatMap((week) => week.members.map((row) => row.entry_id))),
   ];
   const results = await Promise.allSettled(
-    entries.map((id) => loadSuggestionHistory(id, { signal })),
+    entries.map((id) => loadSuggestionHistory(tree, id, { signal })),
   );
   signal?.throwIfAborted();
   const histories: SuggestionHistory[] = [];
@@ -128,16 +132,7 @@ export async function loadLiveSeries(view: Scoreboard, signal?: AbortSignal) {
   const series = summarizeLiveSeries(histories, view);
   let horizon: unknown = null;
   try {
-    horizon = await withRequestDeadline(
-      async (requestSignal) => {
-        const response = await fetch(`${import.meta.env.BASE_URL}data/league/series-horizon.json`, {
-          cache: "no-cache",
-          signal: requestSignal,
-        });
-        return response.ok ? await response.json() : null;
-      },
-      { signal },
-    );
+    horizon = await tree.raw("series-horizon.json", { signal });
   } catch {
     signal?.throwIfAborted();
   }

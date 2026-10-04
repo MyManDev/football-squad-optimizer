@@ -17,6 +17,7 @@ import type { ScoreboardState } from "../components/karne";
 import { writeViewerEntry } from "../identity/useViewerEntry";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMembersView } from "./LeagueMembersPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => writeViewerEntry(null));
@@ -33,8 +34,8 @@ function show(
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={["/league/members"]}>
-        <LeagueMembersView envelope={mockLeagueMembersEnvelope} {...props} />
+      <MemoryRouter initialEntries={["/league/352490/members"]}>
+        {withLeague(<LeagueMembersView envelope={mockLeagueMembersEnvelope} {...props} />)}
       </MemoryRouter>
     </LanguageProvider>,
   );

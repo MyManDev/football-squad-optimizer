@@ -275,7 +275,7 @@ for (const [window, width, modelVersion] of [
       });
     });
     await page.goto(
-      `/league/members/35249001?mode=saf-puan&window=${window}&top100=20&model=football`,
+      `/league/352490/members/35249001?mode=saf-puan&window=${window}&top100=20&model=football`,
     );
     const region = page.getByTestId("information-review");
     await expect(region).toBeVisible();

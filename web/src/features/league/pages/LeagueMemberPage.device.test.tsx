@@ -29,6 +29,9 @@ import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { exampleTree, withLeague } from "../../../testSupport/league";
+import type { RequestOptions } from "../../../data/request";
+import { StaticOnlyAdviceClient } from "../advice/adviceClient";
 
 afterEach(cleanup);
 
@@ -113,6 +116,10 @@ class ServiceClient implements AdviceClient {
   async readAdvice(): Promise<AdviceReadResult> {
     return { kind: "not-computed" };
   }
+  /** The published baseline is the example tree's document, as the static client reads it. */
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return new StaticOnlyAdviceClient(exampleTree.entryAdvice).readPublished(request, options);
+  }
   async requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
     return {
       kind: "advice",
@@ -128,26 +135,28 @@ class ServiceClient implements AdviceClient {
 function renderView(squad: LeagueViewEnvelope<EntrySquad>, search = "mode=saf-puan&window=1") {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
         <SwitchWindow />
-        <LeagueMemberView
-          squad={squad}
-          advice={null}
-          adviceIssue="not-listed"
-          members={MEMBERS}
-          index={INDEX}
-          client={new ServiceClient()}
-          deviceDependencies={{
-            loadDocument: async () => ({
-              contract_version: "provisional_league_ui_v1",
-              generated_at_utc: "2026-10-03T00:00:00Z",
-              source_kind: "live",
-              payload: document,
-            }),
-            createSolver: () => new CannedSolver(),
-            now: () => new Date("2026-10-03T01:02:03Z"),
-          }}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={squad}
+            advice={null}
+            adviceIssue="not-listed"
+            members={MEMBERS}
+            index={INDEX}
+            client={new ServiceClient()}
+            deviceDependencies={{
+              loadDocument: async () => ({
+                contract_version: "provisional_league_ui_v1",
+                generated_at_utc: "2026-10-03T00:00:00Z",
+                source_kind: "live",
+                payload: document,
+              }),
+              createSolver: () => new CannedSolver(),
+              now: () => new Date("2026-10-03T01:02:03Z"),
+            }}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

@@ -97,9 +97,12 @@ function useScrollToHash(hash: string, key: string) {
 export function PageShell({
   children,
   viewerEntryId = null,
+  chosenLeagueId = null,
 }: {
   children: ReactNode;
   viewerEntryId?: number | null;
+  /** The league the visitor opened by its number, for the member links outside a league page. */
+  chosenLeagueId?: number | null;
 }) {
   const { messages } = useLanguage();
   const copy = messages.shell;
@@ -142,9 +145,13 @@ export function PageShell({
   if (here) {
     const search = here.search ?? (lastSeen?.entryId === here.entryId ? lastSeen.search : "");
     if (lastSeen?.entryId !== here.entryId || lastSeen.search !== search)
-      setLastSeen({ entryId: here.entryId, search });
+      setLastSeen({ leagueId: here.leagueId, entryId: here.entryId, search });
   }
-  const items = navItems(location, memberInContext(location, viewerEntryId, lastSeen));
+  const items = navItems(
+    location,
+    memberInContext(location, viewerEntryId, lastSeen, chosenLeagueId),
+    chosenLeagueId,
+  );
 
   const closeOverlays = useCallback(() => {
     setDrawerOpen(false);

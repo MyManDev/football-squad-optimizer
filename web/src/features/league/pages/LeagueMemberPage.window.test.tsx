@@ -20,6 +20,7 @@ import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { isAdvicePayload } from "../advice/adviceShape";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -28,12 +29,16 @@ const ENTRY = 35249001;
 function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | "en" = "tr") {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?window=${advice.payload.window}`]}>
-        <LeagueMemberView
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-        />
+      <MemoryRouter
+        initialEntries={[`/league/352490/members/${ENTRY}?window=${advice.payload.window}`]}
+      >
+        {withLeague(
+          <LeagueMemberView
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

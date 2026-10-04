@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { WindowSize } from "../../../lib/decisionVocabulary";
 import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
-import { AdviceApiError, StaticOnlyAdviceClient, newIdempotencyKey } from "./adviceClient";
+import { AdviceApiError, newIdempotencyKey } from "./adviceClient";
 import {
   adviceRequestKey,
   forgetJob,
@@ -282,7 +282,7 @@ export function useAdviceJob(
           let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
           try {
             const published = allowPublishedBaseline
-              ? await new StaticOnlyAdviceClient().readAdvice(
+              ? await client.readPublished(
                   {
                     ...request,
                     strategy: "saf-puan",

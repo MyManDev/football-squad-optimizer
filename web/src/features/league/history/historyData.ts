@@ -1,5 +1,6 @@
-import { withRequestDeadline, type RequestOptions } from "../../../data/request";
-import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
+import type { LeagueTree } from "../data";
+import type { RequestOptions } from "../../../data/request";
+import { LeagueDataError } from "../dataErrors";
 import { isMemberStrategy } from "../types";
 import { isMemberChip } from "../advice/chipChoice";
 import { isTop100Weight } from "../advice/top100";
@@ -69,7 +70,7 @@ export interface SuggestionHistory {
   contract_version: "weekly_suggestion_history_v1";
   generated_at_utc: string;
   payload: {
-    league_id: 352490;
+    league_id: number;
     entry_id: number;
     season: string;
     as_of_snapshot_id: string;
@@ -105,7 +106,15 @@ function score(value: unknown): WeeklyScore {
 }
 
 /** Validate identity, settled state and published arithmetic before displaying a score. */
-export function checkedHistory(value: unknown, entryId: number): SuggestionHistory {
+/**
+ * The history document as the page reads it, for `entryId` and, when given, for the
+ * league `leagueId`: a tree never carries another league's history.
+ */
+export function checkedHistory(
+  value: unknown,
+  entryId: number,
+  leagueId?: number,
+): SuggestionHistory {
   const envelope = object(value);
   requireThat(
     envelope.contract_version === "weekly_suggestion_history_v1" &&
@@ -113,7 +122,9 @@ export function checkedHistory(value: unknown, entryId: number): SuggestionHisto
   );
   const payload = object(envelope.payload);
   requireThat(
-    payload.league_id === 352490 &&
+    Number.isSafeInteger(payload.league_id) &&
+      (payload.league_id as number) > 0 &&
+      (leagueId === undefined || payload.league_id === leagueId) &&
       payload.entry_id === entryId &&
       Number.isSafeInteger(entryId) &&
       entryId > 0,
@@ -281,26 +292,11 @@ export function checkedHistory(value: unknown, entryId: number): SuggestionHisto
 }
 
 export async function loadSuggestionHistory(
+  tree: Pick<LeagueTree, "raw" | "league">,
   entryId: number,
   options?: RequestOptions,
 ): Promise<SuggestionHistory> {
   requireThat(Number.isSafeInteger(entryId) && entryId > 0);
-  const relative = `data/league/history/${entryId}.json`;
-  return withRequestDeadline(async (signal) => {
-    const response = await fetch(`${import.meta.env.BASE_URL}${relative}`, {
-      cache: "no-cache",
-      signal,
-    });
-    if (response.status === 404) throw new LeagueDataMissing(relative);
-    if (!response.ok) throw new LeagueDataError(`History unavailable (${response.status}).`);
-    const body = await response.text();
-    if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) throw new LeagueDataMissing(relative);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(body);
-    } catch {
-      throw new LeagueDataError("History is not valid JSON.");
-    }
-    return checkedHistory(parsed, entryId);
-  }, options);
+  const parsed = await tree.raw(`history/${entryId}.json`, options);
+  return checkedHistory(parsed, entryId, tree.league.leagueId);
 }

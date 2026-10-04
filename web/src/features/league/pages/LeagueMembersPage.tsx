@@ -1,3 +1,5 @@
+import { memberAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { Link, useNavigate } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -101,6 +103,7 @@ export function LeagueMembersView({
   deadlinePassed?: boolean;
 }) {
   const { locale, messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   const { viewer, select, clear } = useViewerEntry();
   const navigate = useNavigate();
@@ -165,7 +168,7 @@ export function LeagueMembersView({
                   <>
                     <Link
                       className={styles.viewerAction}
-                      to={`/league/members/${viewerRow.entry_id}`}
+                      to={memberAddress(leagueId, viewerRow.entry_id!)}
                     >
                       {copy.viewerOpenMine}
                     </Link>{" "}
@@ -239,7 +242,7 @@ export function LeagueMembersView({
                         <span className={styles.manager}>
                           <Link
                             className={styles.memberLink}
-                            to={`/league/members/${member.entry_id}`}
+                            to={memberAddress(leagueId, member.entry_id!)}
                           >
                             {member.manager_name ?? copy.unknownMember}
                           </Link>
@@ -257,7 +260,7 @@ export function LeagueMembersView({
                             )}
                             onClick={() => {
                               select(member.entry_id);
-                              navigate(`/league/members/${member.entry_id}`);
+                              navigate(memberAddress(leagueId, member.entry_id!));
                             }}
                           >
                             {copy.viewerSelect}

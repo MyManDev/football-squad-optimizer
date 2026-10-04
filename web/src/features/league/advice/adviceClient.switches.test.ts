@@ -12,6 +12,7 @@ import {
   mockEntryAdviceEvidenceEnvelope,
   mockEntryAdviceTop100Envelope,
 } from "../../../fixtures/league";
+import { exampleTree } from "../../../testSupport/league";
 import {
   AdviceApiError,
   FallbackAdviceClient,
@@ -312,12 +313,12 @@ describe("capabilities", () => {
   ])("is no capabilities at all when %s", async (_name, respond) => {
     const client = new FallbackAdviceClient(
       new HttpAdviceClient("https://api.example", respond),
-      new StaticOnlyAdviceClient(),
+      new StaticOnlyAdviceClient(exampleTree.entryAdvice),
     );
     await expect(client.readCapabilities(352490)).resolves.toBeNull();
   });
 
   it("is not something the static client can be asked", () => {
-    expect("readCapabilities" in new StaticOnlyAdviceClient()).toBe(false);
+    expect("readCapabilities" in new StaticOnlyAdviceClient(exampleTree.entryAdvice)).toBe(false);
   });
 });

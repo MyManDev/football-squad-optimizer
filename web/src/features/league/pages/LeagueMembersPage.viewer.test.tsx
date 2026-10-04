@@ -9,6 +9,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { LeagueMembersView } from "./LeagueMembersPage";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { readViewerEntry, writeViewerEntry } from "../identity/useViewerEntry";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -24,13 +25,13 @@ describe("the viewer claim on the members page", () => {
     writeViewerEntry(first.entry_id);
     render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={["/league/members"]}>
-          <LeagueMembersView envelope={mockLeagueMembersEnvelope} />
+        <MemoryRouter initialEntries={["/league/352490/members"]}>
+          {withLeague(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />)}
         </MemoryRouter>
       </LanguageProvider>,
     );
     const link = screen.getByRole("link", { name: "Kadromu aç →" });
-    expect(link).toHaveAttribute("href", `/league/members/${first.entry_id}`);
+    expect(link).toHaveAttribute("href", `/league/352490/members/${first.entry_id}`);
   });
 });
 
@@ -41,8 +42,8 @@ function CurrentPath() {
 function openMembers(language: Language = "tr") {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={["/league/members"]}>
-        <LeagueMembersView envelope={mockLeagueMembersEnvelope} />
+      <MemoryRouter initialEntries={["/league/352490/members"]}>
+        {withLeague(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />)}
         <CurrentPath />
       </MemoryRouter>
     </LanguageProvider>,
@@ -74,7 +75,7 @@ describe.each(["tr", "en"] as const)("member selection in %s", (language) => {
       source: "self-selected",
     });
     expect(screen.getByLabelText("Current path")).toHaveTextContent(
-      `/league/members/${firstMember.entry_id}`,
+      `/league/352490/members/${firstMember.entry_id}`,
     );
   });
 
@@ -99,7 +100,7 @@ it.each([null, firstMember.entry_id])(
     openMembers();
     fireEvent.click(screen.getByRole("link", { name: secondMember.manager_name! }));
     expect(screen.getByLabelText("Current path")).toHaveTextContent(
-      `/league/members/${secondMember.entry_id}`,
+      `/league/352490/members/${secondMember.entry_id}`,
     );
     expect(readViewerEntry()?.entryId ?? null).toBe(claimed);
   },

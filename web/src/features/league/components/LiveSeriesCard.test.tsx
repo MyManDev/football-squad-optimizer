@@ -5,6 +5,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { LiveSeriesCard } from "./LiveSeriesCard";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
@@ -28,7 +29,9 @@ describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
       const { container } = render(
         <MemoryRouter>
           <LanguageProvider initialLanguage={language}>
-            <LiveSeriesCard series={series} remaining={remaining} unavailableMembers={1} />
+            {withLeague(
+              <LiveSeriesCard series={series} remaining={remaining} unavailableMembers={1} />,
+            )}
           </LanguageProvider>
         </MemoryRouter>,
       );
@@ -42,7 +45,7 @@ describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
       expect(screen.getByText(copy.missing(1))).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "101" })).toHaveAttribute(
         "href",
-        "/league/members/101/history",
+        "/league/352490/members/101/history",
       );
       expect(container.textContent).not.toMatch(AS_A_CHANCE);
     },
@@ -64,7 +67,7 @@ describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
       const { container } = render(
         <MemoryRouter>
           <LanguageProvider initialLanguage={language}>
-            <LiveSeriesCard series={series} remaining={null} unavailableMembers={0} />
+            {withLeague(<LiveSeriesCard series={series} remaining={null} unavailableMembers={0} />)}
           </LanguageProvider>
         </MemoryRouter>,
       );
