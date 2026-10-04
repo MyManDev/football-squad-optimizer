@@ -432,3 +432,69 @@ describe("member decision controls", () => {
     }
   });
 });
+
+describe("the device's statement beside the publish", () => {
+  // A publish that solved pure points only: no rival strategy, no rival listed.
+  const plainIndex: EntryAdviceIndex = {
+    ...mockEntryAdviceIndex(ENTRY).payload,
+    strategies: ["saf-puan"],
+    windows: { "saf-puan": [1] },
+    rival_entry_ids: [],
+    default_rival_entry_id: null,
+    computed: [],
+    unavailable: [],
+  };
+  const humans = MEMBERS.filter(
+    (member) => member.member_kind === "human" && member.entry_id !== ENTRY,
+  ).map((member) => member.entry_id as number);
+
+  it("offers a rival strategy and every league member as its rival where the device solves them", () => {
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={plainIndex}
+            onDevice={{
+              strategies: ["saf-puan", "ortak-koru", "fark-yarat"],
+              windows: [1],
+              rivals: humans,
+            }}
+          />
+          <Selection />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const differential = screen.getByRole("radio", { name: /Fark yarat/ });
+    expect(differential).toBeEnabled();
+    fireEvent.click(differential);
+    // The window stays at the default one week, which the device offers.
+    expect(screen.getByTestId("selection")).toHaveTextContent("fark-yarat/-/-");
+    // Options are named by team, not id; the values are the ids.
+    const select = screen.getByRole("combobox");
+    const enabled = [...select.querySelectorAll("option")].filter((option) => !option.disabled);
+    // Every member is selectable; the empty "choose a rival" entry stays beside them.
+    expect(
+      enabled
+        .map((option) => option.value)
+        .filter(Boolean)
+        .map(Number),
+    ).toEqual(humans);
+    fireEvent.change(select, { target: { value: String(humans[0]) } });
+    expect(screen.getByTestId("selection")).toHaveTextContent(`fark-yarat/-/${humans[0]}`);
+  });
+
+  it("offers nothing beyond the publish without the device's statement", () => {
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+          <MemberDecisionControls entryId={ENTRY} members={MEMBERS} index={plainIndex} />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    // The publish solved pure points only, so no rival strategy is on the page at all.
+    expect(screen.queryByRole("radio", { name: /Fark yarat/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Ortak çekirdeği koru/ })).toBeNull();
+  });
+});

@@ -134,6 +134,7 @@ function LeagueMemberContent({
     computeAvailable,
     job,
     device,
+    onDevice,
     request,
     shown,
     rejectedContext,
@@ -279,6 +280,7 @@ function LeagueMemberContent({
         members={members}
         index={selection.status === "index-error" ? null : index}
         capabilities={capabilities}
+        onDevice={onDevice}
         part="plan"
       />
       <MemberDecisionControls
@@ -286,6 +288,7 @@ function LeagueMemberContent({
         members={members}
         index={selection.status === "index-error" ? null : index}
         capabilities={capabilities}
+        onDevice={onDevice}
         part="top100"
       />
       <Tool title={copy.advancedSettings}>
@@ -294,6 +297,7 @@ function LeagueMemberContent({
           members={members}
           index={selection.status === "index-error" ? null : index}
           capabilities={capabilities}
+          onDevice={onDevice}
           part="advanced"
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
@@ -345,6 +349,7 @@ function LeagueMemberContent({
         members={members}
         index={selection.status === "index-error" ? null : index}
         capabilities={capabilities}
+        onDevice={onDevice}
         part="notes"
       />
     </section>

@@ -5,15 +5,11 @@
  * device's statement, made from the member's published inputs and the league's members.
  */
 
-import { rivalCandidates } from "../advice/adviceSelection";
+import { rivalCandidates, type DeviceComputable } from "../advice/adviceSelection";
 import type { EntrySquad, EntryView } from "../types";
 import { isDevicePlanEntry, RIVAL_STRATEGIES } from "./types";
 
-export interface DeviceComputable {
-  strategies: Array<"saf-puan" | (typeof RIVAL_STRATEGIES)[number]>;
-  windows: 1[];
-  rivals: number[];
-}
+export type { DeviceComputable } from "../advice/adviceSelection";
 
 /** The device's statement for this member, or undefined where the publish wrote no inputs. */
 export function deviceComputable(

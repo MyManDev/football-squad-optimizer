@@ -250,6 +250,7 @@ export function useMemberAdviceView(
     computeAvailable,
     job: jobForPanel,
     device,
+    onDevice,
     request,
     shown,
     rejectedContext,

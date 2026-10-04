@@ -56,7 +56,11 @@ import {
 import { CHIP_NAMES } from "../chipShape";
 import { DisclosureIcon } from "../components/memberIcons";
 import type { AdviceCapabilities } from "./adviceCapabilities";
-import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
+import {
+  type DeviceComputable,
+  EVIDENCE_PARAMETER,
+  resolvePublishedAdvice,
+} from "./adviceSelection";
 import { AUTOMATIC_CHIP_OFFERED, CHIP_PARAMETER } from "./chipChoice";
 import { CHIP_COPY, chipReason, chipsUnavailable } from "./chipCopy";
 import { COMPUTE_COPY } from "./computeCopy";
@@ -73,12 +77,15 @@ export function MemberDecisionControls({
   members,
   index,
   capabilities = null,
+  onDevice,
   part,
 }: {
   entryId: number;
   members: EntryView[];
   index: EntryAdviceIndex | null;
   capabilities?: AdviceCapabilities | null;
+  /** What the member's device computes from this publish's inputs, beside the service. */
+  onDevice?: DeviceComputable;
   part?: DecisionControlsPart;
 }) {
   const { language, locale, messages } = useLanguage();
@@ -93,6 +100,7 @@ export function MemberDecisionControls({
       index,
       undefined,
       capabilities,
+      onDevice,
     );
   const selection = resolve(searchParams);
   // What the service adds to the published menu; nothing at all on a static build.
@@ -102,7 +110,6 @@ export function MemberDecisionControls({
   const candidates = members.filter(
     (member) => member.member_kind === "human" && member.entry_id !== entryId,
   );
-  const onDevice = selection.onDevice;
   const rivalIds = [
     ...new Set([
       ...selection.rivals.map((rival) => rival.entryId),

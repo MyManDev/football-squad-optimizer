@@ -141,7 +141,14 @@ export function useDevicePlan(
         if (selection.kind === "rival") {
           // The rival's eleven comes from their own entry document, held to the same
           // capture as the member's; a document naming no captain cannot be scored.
-          const rivalSquad = (await loadRival(selection.rivalEntryId)).payload;
+          let rivalSquad: EntrySquad;
+          try {
+            rivalSquad = (await loadRival(selection.rivalEntryId)).payload;
+          } catch {
+            // The rival's document, not the device inputs, is what is missing.
+            if (alive()) setState({ phase: "failed" });
+            return;
+          }
           if (rivalSquad.source_snapshot_id !== squad.source_snapshot_id) {
             if (alive()) setState({ phase: "other-capture" });
             return;
