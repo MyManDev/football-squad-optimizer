@@ -1,8 +1,9 @@
 /**
  * The device's answer as the advice document the page already reads: the same fields
- * the published one-week pure-points plan carries, with a chip played where one was
- * asked for, built from the two published inputs and what the solve proved. Nothing is
- * stated that the solve did not prove or the documents do not say.
+ * the published one-week pure-points plan carries, with a chip played or a rival
+ * strategy's account where one was asked for, built from the published inputs and what
+ * the solve proved. Nothing is stated that the solve did not prove or the documents do
+ * not say.
  */
 
 import type { AdvicePlayer, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
@@ -52,7 +53,7 @@ export function deviceAdviceEnvelope(
     season: document.season,
     gameweek,
     entry_id: squad.entry.entry_id,
-    mode: "saf-puan",
+    mode: answer.rival?.mode ?? "saf-puan",
     window: 1,
     source_snapshot_id: document.source_snapshot_id,
     moves: answer.moves.map((move, index) => ({
@@ -77,6 +78,25 @@ export function deviceAdviceEnvelope(
     data_quality: missing.length ? "partial" : "complete",
     missing_fields: missing,
   };
+  if (answer.rival !== undefined) {
+    // The band's account, as the server publishes it: every solve here was proved, so
+    // the price carries its ceiling and the control its proof.
+    const rival = answer.rival;
+    payload.rival_entry_id = rival.rival_entry_id;
+    payload.rival_label = `entry-${rival.rival_entry_id}`;
+    payload.expected_points_cost = rival.expected_points_cost;
+    payload.expected_points_cost_ceiling = rival.expected_points_cost_ceiling;
+    payload.overlap_count = rival.overlap_count;
+    payload.expected_gap_vs_rival = rival.expected_gap_vs_rival;
+    payload.captain_agreement = rival.captain_agreement;
+    payload.transfer_cap = rival.transfer_cap;
+    payload.overlap_target = rival.overlap_target;
+    payload.overlap_applied = rival.overlap_applied;
+    payload.plan_kind = rival.plan_kind;
+    payload.alternative_plan = rival.alternative_plan;
+    payload.control_solver_status = "OPTIMAL";
+    payload.control_optimality_gap = 0;
+  }
   if (answer.chip !== null && answer.gain_vs_no_chip !== undefined) {
     // The chip is measured against the member's own no-chip plan, which the device
     // solved beside it and proved; the windows are the ones the squad document states.

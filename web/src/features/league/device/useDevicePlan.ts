@@ -1,28 +1,26 @@
 /**
  * A member's one-week plan solved on the member's own device.
  *
- * Offered for the selections the published inputs describe: this member's plain
- * pure-points plan over one week, from the fifteen the page shows, with or without a
- * chip the member still holds played that week. The shared document is read when the
- * member asks, the solve runs in a worker, and the answer is shown as the advice document
- * the page already reads. A new selection starts clean.
+ * Offered for the selections the published inputs describe (`selection.ts`): this
+ * member's plain pure-points plan over one week, from the fifteen the page shows, with a
+ * chip the member still holds played that week, or a rival strategy against a named rival
+ * whose entry document gives their eleven. The shared document (and the rival's) is read
+ * when the member asks, the solve runs in a worker, and the answer is shown as the advice
+ * document the page already reads. A new selection starts clean.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { loadDevicePlan } from "../data";
+import { loadDevicePlan, loadEntrySquad } from "../data";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
 import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
-import {
-  isDeviceChip,
-  isDevicePlanEntry,
-  type DeviceChip,
-  type DevicePlanDocument,
-  type DevicePlanEntry,
-} from "./types";
+import { deviceSelection, rivalFromSquad } from "./selection";
+import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
+
+export { deviceChip, deviceSelection } from "./selection";
 
 export type DevicePlanPhase =
   | { phase: "idle" }
@@ -53,6 +51,8 @@ export interface DeviceSolver {
 
 export interface DevicePlanDependencies {
   loadDocument?: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
+  /** The rival's entry document, for a rival strategy. */
+  loadRival?: (entryId: number) => Promise<LeagueViewEnvelope<EntrySquad>>;
   createSolver?: () => DeviceSolver;
   now?: () => Date;
 }
@@ -63,49 +63,9 @@ function createWorker(): DeviceSolver {
   }) as unknown as DeviceSolver;
 }
 
-/**
- * The chip the request asks to play, if it is one the device can solve: a chip the squad
- * document says the member can still play this gameweek. Null for no chip; undefined for
- * a chip the device cannot take.
- */
-export function deviceChip(
-  request: AdviceRequest,
-  squad: Pick<EntrySquad, "chips">,
-): DeviceChip | null | undefined {
-  const chip = request.chip ?? null;
-  if (chip === null) return null;
-  if (!isDeviceChip(chip) || !squad.chips?.known) return undefined;
-  const halves = squad.chips.states[chip];
-  const gameweek = squad.chips.gameweek;
-  // As the server reads the member's chip menu: a half still available whose window
-  // holds the decided gameweek.
-  const playable =
-    halves !== undefined &&
-    Object.values(halves).some(
-      (half) =>
-        half !== null &&
-        half.state === "available" &&
-        half.start_event <= gameweek &&
-        gameweek <= half.stop_event,
-    );
-  return playable ? chip : undefined;
-}
-
-/**
- * The selections the published inputs describe: pure points, one week, nothing switched
- * on, with at most a chip the member holds.
- */
+/** Whether this request is one the device solves from the published inputs. */
 export function deviceSolvable(request: AdviceRequest, squad: Pick<EntrySquad, "chips">): boolean {
-  return (
-    request.strategy === "saf-puan" &&
-    request.window === 1 &&
-    (request.rivalEntryId ?? null) === null &&
-    (request.top100Weight ?? 0) === 0 &&
-    !(request.managersWord ?? false) &&
-    deviceChip(request, squad) !== undefined &&
-    (request.model ?? "current") === "current" &&
-    !request.preferences
-  );
+  return deviceSelection(request, squad) !== null;
 }
 
 export function useDevicePlan(
@@ -115,15 +75,15 @@ export function useDevicePlan(
 ): DevicePlan {
   const {
     loadDocument = loadDevicePlan,
+    loadRival = loadEntrySquad,
     createSolver = createWorker,
     now = () => new Date(),
   } = dependencies;
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
     : null;
-  const available =
-    entry !== null && squad.source_snapshot_id !== null && deviceSolvable(request, squad);
-  const chip = deviceChip(request, squad) ?? null;
+  const selection = deviceSelection(request, squad);
+  const available = entry !== null && squad.source_snapshot_id !== null && selection !== null;
   // The state is keyed by the selection it was asked for: a new selection reads idle
   // without an effect, and a late reply for the old one is ignored by its generation.
   const [held, setHeld] = useState<{ key: string; state: DevicePlanPhase }>({
@@ -168,15 +128,31 @@ export function useDevicePlan(
   );
 
   const run = useCallback(() => {
-    if (!available || entry === null) return;
+    if (!available || entry === null || selection === null) return;
     const run = ++generation.current;
     const alive = () => generation.current === run;
     setState({ phase: "loading" });
     void (async () => {
       let document: DevicePlanDocument;
+      let strategy: DevicePlanRequest["strategy"] = null;
       try {
         const envelope = await loadDocument();
         document = envelope.payload;
+        if (selection.kind === "rival") {
+          // The rival's eleven comes from their own entry document, held to the same
+          // capture as the member's; a document naming no captain cannot be scored.
+          const rivalSquad = (await loadRival(selection.rivalEntryId)).payload;
+          if (rivalSquad.source_snapshot_id !== squad.source_snapshot_id) {
+            if (alive()) setState({ phase: "other-capture" });
+            return;
+          }
+          const rival = rivalFromSquad(selection.rivalEntryId, rivalSquad);
+          if (rival === null) {
+            if (alive()) setState({ phase: "refused", status: "rival captain unknown" });
+            return;
+          }
+          strategy = { name: selection.strategy, rival };
+        }
       } catch (error) {
         if (alive()) {
           setState({ phase: error instanceof LeagueDataMissing ? "unpublished" : "failed" });
@@ -189,6 +165,7 @@ export function useDevicePlan(
         setState({ phase: "other-capture" });
         return;
       }
+      const chip = selection.kind === "chip" ? selection.chip : null;
       // A worker that cannot be created, load or evaluate answers as a failure, and the
       // next press creates a fresh one rather than reusing a dead worker.
       let worker: DeviceSolver;
@@ -214,7 +191,7 @@ export function useDevicePlan(
           resolve(null);
         };
         try {
-          worker.postMessage({ id: run, document, entry, chip });
+          worker.postMessage({ id: run, document, entry, chip, strategy });
         } catch {
           resolve(null);
         }
@@ -232,7 +209,7 @@ export function useDevicePlan(
         });
       }
     })();
-  }, [available, entry, chip, loadDocument, createSolver, now, setState, squad]);
+  }, [available, entry, selection, loadDocument, loadRival, createSolver, now, setState, squad]);
 
   return { available, state, run, reset };
 }

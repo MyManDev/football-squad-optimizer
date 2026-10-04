@@ -102,34 +102,65 @@ export function MemberDecisionControls({
   const candidates = members.filter(
     (member) => member.member_kind === "human" && member.entry_id !== entryId,
   );
+  const onDevice = selection.onDevice;
   const rivalIds = [
-    ...new Set([...selection.rivals.map((rival) => rival.entryId), ...(computable?.rivals ?? [])]),
+    ...new Set([
+      ...selection.rivals.map((rival) => rival.entryId),
+      ...(computable?.rivals ?? []),
+      ...(onDevice?.rivals ?? []),
+    ]),
   ];
   const defaultRival = index?.default_rival_entry_id ?? null;
-  const windows = [...new Set([...selection.windows, ...(computable?.windows ?? [])])];
-  const strategies = [...new Set([...selection.strategies, ...(computable?.strategies ?? [])])];
-  // A rival can be chosen where its file was published or, for a window the service
-  // computes, against any member it lists.
+  const windows = [
+    ...new Set([
+      ...selection.windows,
+      ...(computable?.windows ?? []),
+      ...(onDevice && isMemberStrategy(strategy) && onDevice.strategies.includes(strategy)
+        ? onDevice.windows
+        : []),
+    ]),
+  ];
+  const strategies = [
+    ...new Set([
+      ...selection.strategies,
+      ...(computable?.strategies ?? []),
+      ...(onDevice?.strategies ?? []),
+    ]),
+  ];
+  // A rival can be chosen where its file was published or, for a window the service or
+  // the device computes, against any member either lists.
   const rivalSelectable = (rivalId: number) =>
     !!selection.rivals.find((rival) => rival.entryId === rivalId)?.path ||
     (!!computable &&
       computable.windows.includes(windowSize) &&
       computable.rivals.includes(rivalId) &&
       // A pair the producer declared impossible stays off: the service solves the same band.
+      !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason) ||
+    (!!onDevice &&
+      isMemberStrategy(strategy) &&
+      onDevice.strategies.includes(strategy) &&
+      onDevice.windows.includes(windowSize) &&
+      onDevice.rivals.includes(rivalId) &&
       !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason);
 
   function strategySelection(slug: string) {
     const next = new URLSearchParams(searchParams);
     next.set("mode", slug);
     const offered = resolve(next);
-    const offeredWindows = [...offered.windows, ...(offered.computable?.windows ?? [])];
+    const offeredWindows = [
+      ...offered.windows,
+      ...(offered.computable?.windows ?? []),
+      ...(offered.onDevice && isMemberStrategy(slug) && offered.onDevice.strategies.includes(slug)
+        ? offered.onDevice.windows
+        : []),
+    ];
     if (!offeredWindows.includes(offered.request.window) && offeredWindows[0]) {
       next.set("window", String(offeredWindows[0]));
     }
     return { next, offered: resolve(next) };
   }
 
-  /** A strategy is offered where the publish solved it or the service computes it. */
+  /** A strategy is offered where the publish solved it, the service or the device computes it. */
   function strategyOffered(slug: string): boolean {
     const { offered } = strategySelection(slug);
     const publishedHere =
@@ -139,7 +170,12 @@ export function MemberDecisionControls({
       !!offered.computable &&
       offered.computable.windows.length > 0 &&
       (!strategyNeedsRival(slug) || offered.computable.rivals.length > 0);
-    return publishedHere || computedHere;
+    const onDeviceHere =
+      !!offered.onDevice &&
+      isMemberStrategy(slug) &&
+      offered.onDevice.strategies.includes(slug) &&
+      (!strategyNeedsRival(slug) || offered.onDevice.rivals.length > 0);
+    return publishedHere || computedHere || onDeviceHere;
   }
 
   function update(changes: Record<string, string | null>): void {
