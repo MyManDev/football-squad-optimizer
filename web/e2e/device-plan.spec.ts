@@ -44,7 +44,8 @@ test("a member's plan is solved on the device and drawn as a computation result"
         contract_version: "provisional_league_ui_v1",
         generated_at_utc: "2026-10-03T00:00:00Z",
         source_kind: "live",
-        payload: fixture.document,
+        // The synthetic instances name league 1; the producer writes the league's own id.
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
       }),
     }),
   );
@@ -136,7 +137,8 @@ test("a chip the member holds is solved on the device with its gain against the 
         contract_version: "provisional_league_ui_v1",
         generated_at_utc: "2026-10-03T00:00:00Z",
         source_kind: "live",
-        payload: fixture.document,
+        // The synthetic instances name league 1; the producer writes the league's own id.
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
       }),
     }),
   );

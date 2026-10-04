@@ -77,7 +77,7 @@ function LocalizedApp({ basename }: { basename: string }) {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
-        <PageShell viewerEntryId={viewer?.entryId ?? null} chosenLeagueId={leagueId}>
+        <PageShell viewer={viewer} chosenLeagueId={leagueId}>
           <RouteErrorBoundary>
             <Suspense fallback={<EmptyState title={messages.common.loading} />}>
               <Routes>

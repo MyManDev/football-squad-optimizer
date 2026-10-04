@@ -32,7 +32,7 @@ import styles from "./LeagueMembersPage.module.css";
 export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const { viewer } = useViewerEntry();
+  const { viewer } = useViewerEntry(useLeagueId());
   const query = useLeagueMembers();
   // The system's record beside the table; the same document /league reads, without the
   // member histories that page also fetches.
@@ -105,7 +105,7 @@ export function LeagueMembersView({
   const { locale, messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
-  const { viewer, select, clear } = useViewerEntry();
+  const { viewer, select, clear } = useViewerEntry(leagueId);
   const navigate = useNavigate();
   const view = envelope.payload;
   // A published example can include our virtual team; the visitor list is for members.

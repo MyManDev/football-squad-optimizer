@@ -21,7 +21,13 @@ import {
   PlanIcon,
 } from "../shell/icons";
 import { useShellLayout } from "../shell/layout";
-import { memberAt, memberInContext, navItems, type MemberContext } from "../shell/nav";
+import {
+  memberAt,
+  memberInContext,
+  navItems,
+  type MemberContext,
+  type ViewerClaim,
+} from "../shell/nav";
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
 import styles from "./PageShell.module.css";
@@ -91,16 +97,16 @@ function useScrollToHash(hash: string, key: string) {
  * with the language switch. A page fills the two slots through
  * `ShellPortal`; the shell reads no document of its own.
  *
- * `viewerEntryId` is the member the visitor said they are, held in memory only; with no
- * member in the address, 'Bu hafta' opens that member's page.
+ * `viewer` is the member the visitor said they are, in the league they said it in, held
+ * in memory only; with no member in the address, 'Bu hafta' opens that member's page.
  */
 export function PageShell({
   children,
-  viewerEntryId = null,
+  viewer = null,
   chosenLeagueId = null,
 }: {
   children: ReactNode;
-  viewerEntryId?: number | null;
+  viewer?: ViewerClaim | null;
   /** The league the visitor opened by its number, for the member links outside a league page. */
   chosenLeagueId?: number | null;
 }) {
@@ -147,11 +153,7 @@ export function PageShell({
     if (lastSeen?.entryId !== here.entryId || lastSeen.search !== search)
       setLastSeen({ leagueId: here.leagueId, entryId: here.entryId, search });
   }
-  const items = navItems(
-    location,
-    memberInContext(location, viewerEntryId, lastSeen, chosenLeagueId),
-    chosenLeagueId,
-  );
+  const items = navItems(location, memberInContext(location, viewer, lastSeen), chosenLeagueId);
 
   const closeOverlays = useCallback(() => {
     setDrawerOpen(false);

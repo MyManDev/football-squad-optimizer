@@ -57,7 +57,7 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
   const copy = MESSAGES[language].leagueEntry;
   it("connects through published data without changing the existing viewer selection", async () => {
     const viewer = 35249001;
-    writeViewerEntry(viewer);
+    writeViewerEntry({ leagueId: 352490, entryId: viewer });
     const fetcher = legacySite();
     open(language);
     expect(fetcher).not.toHaveBeenCalled();

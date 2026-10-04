@@ -82,6 +82,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const advice = useQuery({
     queryKey: [
       "provisional-entry-advice",
+      league.leagueId,
       entryId,
       request.strategy,
       request.window,
@@ -140,6 +141,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const windowControl = useQuery({
     queryKey: [
       "published-window-control",
+      league.leagueId,
       entryId,
       request.window,
       request.season,

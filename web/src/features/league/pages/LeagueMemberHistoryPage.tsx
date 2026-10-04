@@ -90,7 +90,7 @@ export function LeagueMemberHistoryView({
           {season} · #{entryId}
         </p>
         <h1>{copy.title}</h1>
-        <p>{copy.scope}</p>
+        <p>{copy.scope(leagueId)}</p>
         <p className={styles.muted}>
           {copy.outcomeAsOf}: {utcShort(history.generated_at_utc, locale)}
         </p>

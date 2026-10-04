@@ -126,7 +126,7 @@ function LeagueMemberContent({
   const shell = useShell();
   const view = squad.payload;
   const [searchParams] = useSearchParams();
-  const { viewer, clear } = useViewerEntry();
+  const { viewer, clear } = useViewerEntry(leagueId);
   const navigate = useNavigate();
   const {
     entryId,
@@ -247,7 +247,7 @@ function LeagueMemberContent({
           ) : null}
         </div>
       </details>
-      {view.league_id === 352490 ? (
+      {view.league_id === leagueId ? (
         <p className={styles.historyLink}>
           <Link to={memberHistoryAddress(leagueId, entryId)}>
             {messages.suggestionHistory.title}

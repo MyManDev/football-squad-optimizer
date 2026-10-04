@@ -4,7 +4,8 @@ import { Navigate, useLocation, useParams } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
-import { legacyLeagueAddress } from "../../../lib/leagueAddresses";
+import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddresses";
+import { LeagueDataMissing } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
 import { useChosenLeague } from "../identity/useChosenLeague";
 import { LeagueProvider } from "../LeagueProvider";
@@ -23,7 +24,8 @@ export function LeagueGate({ children }: { children: ReactNode }) {
   const { leagueId: parameter } = useParams();
   const location = useLocation();
   const { leagueId: chosen, choose } = useChosenLeague();
-  const named = parameter === undefined ? null : Number(parameter);
+  // The number as the sidebar and the links read it: digits, or no league at all.
+  const named = parameter === undefined ? null : leagueIdInAddress(location.pathname);
   const directory = useQuery({
     queryKey: leagueKeys.directory(),
     queryFn: () => loadLeagueDirectory(),
@@ -38,17 +40,30 @@ export function LeagueGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (league !== null && chosen !== league.leagueId) choose(league.leagueId);
   }, [league, chosen, choose]);
-  if (named === null) {
+  if (parameter === undefined) {
     // The old shape of the address: the chosen league's version of it, or the form.
     const legacy = chosen === null ? null : legacyLeagueAddress(location.pathname, chosen);
     if (legacy !== null)
       return <Navigate to={`${legacy}${location.search}${location.hash}`} replace />;
     return <LeagueEntryPage inPlace />;
   }
-  if (!Number.isSafeInteger(named) || named <= 0) return <LeagueEntryPage inPlace />;
+  if (named === null) return <LeagueEntryPage inPlace />;
   if (directory.isPending) return <EmptyState title={messages.common.loading} />;
-  // A directory that could not be read says so: the league may well be published.
-  if (directory.isError) return <EmptyState title={messages.leagueEntry.directoryUnreadable} />;
+  if (directory.isError) {
+    // A directory that could not be read says so: the league may well be published.
+    const missing = directory.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState
+        title={
+          missing ? messages.leagueEntry.directoryMissing : messages.leagueEntry.directoryUnreadable
+        }
+      >
+        <button type="button" onClick={() => void directory.refetch()}>
+          {messages.leagueEntry.retry}
+        </button>
+      </EmptyState>
+    );
+  }
   if (league === null) return <LeagueEntryPage inPlace />;
   return <LeagueProvider league={league}>{children}</LeagueProvider>;
 }

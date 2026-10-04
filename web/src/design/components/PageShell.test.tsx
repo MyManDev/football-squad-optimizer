@@ -27,13 +27,13 @@ function LocationProbe() {
 function renderShell({
   path = "/",
   language = "tr",
-  viewerEntryId = null,
+  viewer = null,
   chosenLeagueId = null,
   page = <p>page</p>,
 }: {
   path?: string;
   language?: Language;
-  viewerEntryId?: number | null;
+  viewer?: { leagueId: number; entryId: number } | null;
   chosenLeagueId?: number | null;
   page?: ReactNode;
 } = {}) {
@@ -41,7 +41,7 @@ function renderShell({
   const view = render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[path]}>
-        <PageShell viewerEntryId={viewerEntryId} chosenLeagueId={chosenLeagueId}>
+        <PageShell viewer={viewer} chosenLeagueId={chosenLeagueId}>
           {page}
         </PageShell>
         <LocationProbe />
@@ -185,8 +185,12 @@ describe("the app shell on a desktop", () => {
     expect(Object.keys(window.localStorage)).not.toContain("squadopt.member");
   });
 
-  it("opens the member the visitor claimed, in the chosen league, when the address names none", () => {
-    renderShell({ path: "/fixtures", viewerEntryId: 42, chosenLeagueId: LEAGUE });
+  it("opens the member the visitor claimed, in the claim's league, when the address names none", () => {
+    renderShell({
+      path: "/fixtures",
+      viewer: { leagueId: LEAGUE, entryId: 42 },
+      chosenLeagueId: LEAGUE,
+    });
     expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
       "href",
       `${MEMBERS}/42`,
@@ -198,10 +202,17 @@ describe("the app shell on a desktop", () => {
     expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
   });
 
-  it("has no page for a claimed member while no league is chosen", () => {
-    renderShell({ path: "/fixtures", viewerEntryId: 42 });
-    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute("href", "/");
-    expect(screen.queryByRole("link", { name: TR.squad })).toBeNull();
+  it("opens the claimed member's page in the claim's league whatever league is chosen", () => {
+    renderShell({
+      path: "/fixtures",
+      viewer: { leagueId: 7, entryId: 42 },
+      chosenLeagueId: LEAGUE,
+    });
+    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
+      "href",
+      "/league/7/members/42",
+    );
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
   });
 
   it("collapses to the icon rail and remembers that in this browser", async () => {

@@ -22,7 +22,7 @@ describe("the viewer claim on the members page", () => {
     const first = mockLeagueMembersEnvelope.payload.members.find(
       (member) => member.member_kind === "human",
     )!;
-    writeViewerEntry(first.entry_id);
+    writeViewerEntry({ leagueId: 352490, entryId: first.entry_id });
     render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter initialEntries={["/league/352490/members"]}>
@@ -70,6 +70,7 @@ describe.each(["tr", "en"] as const)("member selection in %s", (language) => {
       }),
     );
     expect(readViewerEntry()).toEqual({
+      leagueId: 352490,
       entryId: firstMember.entry_id,
       verified: false,
       source: "self-selected",
@@ -80,7 +81,7 @@ describe.each(["tr", "en"] as const)("member selection in %s", (language) => {
   });
 
   it("keeps clear available for a saved member absent from the publication", () => {
-    writeViewerEntry(99999999);
+    writeViewerEntry({ leagueId: 352490, entryId: 99999999 });
     openMembers(language);
     expect(screen.getByText(copy.viewerMissing)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.viewerChange })).toHaveAttribute(
@@ -96,7 +97,7 @@ describe.each(["tr", "en"] as const)("member selection in %s", (language) => {
 it.each([null, firstMember.entry_id])(
   "ordinary public member links preserve claim %s",
   (claimed) => {
-    if (claimed !== null) writeViewerEntry(claimed);
+    if (claimed !== null) writeViewerEntry({ leagueId: 352490, entryId: claimed });
     openMembers();
     fireEvent.click(screen.getByRole("link", { name: secondMember.manager_name! }));
     expect(screen.getByLabelText("Current path")).toHaveTextContent(

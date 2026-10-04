@@ -75,8 +75,8 @@ export function LeaguePage() {
       </StatRow>
 
       <Card
-        title={messages.leagueMembers.linkTitle}
-        aside={messages.leagueMembers.leagueNumber(352490)}
+        title={messages.leagueMembers.linkTitle(leagueId)}
+        aside={messages.leagueMembers.leagueNumber(leagueId)}
       >
         <p className={styles.para}>{messages.leagueMembers.linkBody}</p>
         <p className={styles.para}>

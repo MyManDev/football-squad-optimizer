@@ -140,6 +140,41 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(readChosenLeague()).toBe(LEAGUE);
   });
 
+  it("reads the number as the links spell it: digits only", async () => {
+    const fetcher = legacySite();
+    open(language, `/league/0x${LEAGUE.toString(16)}/members/${ENTRY}`);
+    expect(await screen.findByRole("heading", { name: copy.title })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
+    expect(asked(fetcher)).toEqual([]);
+  });
+
+  it("says when the directory could not be read, and reads it again on request", async () => {
+    let failures = 1;
+    const fetcher = stubFetchByUrl([
+      ["/data/leagues.json", notFound],
+      [
+        "/data/league/members.json",
+        () => (failures-- > 0 ? new Response("", { status: 503 }) : jsonResponse(published)),
+      ],
+    ]);
+    open(language, memberAddress(LEAGUE, ENTRY));
+    expect(await screen.findByText(copy.directoryUnreadable)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: copy.title })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: copy.retry }));
+    expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    expect(asked(fetcher).filter((url) => url === "data/league/members.json")).toHaveLength(2);
+  });
+
+  it("says when nothing is published rather than asking for another league", async () => {
+    stubFetchByUrl([
+      ["/data/leagues.json", notFound],
+      ["/data/league/members.json", notFound],
+    ]);
+    open(language, memberAddress(LEAGUE, ENTRY));
+    expect(await screen.findByText(copy.directoryMissing)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: copy.title })).toBeNull();
+  });
+
   it("keeps an unsupported number out of the gate", async () => {
     const fetcher = legacySite();
     open(language);

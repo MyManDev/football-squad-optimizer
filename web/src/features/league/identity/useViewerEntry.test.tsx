@@ -67,6 +67,20 @@ describe("the viewer claim", () => {
     expect(document.body).not.toHaveTextContent("· sen");
   });
 
+  it("a claim made in another league is nobody here", () => {
+    writeViewerEntry({ leagueId: 7, entryId: 35249001 });
+    renderMembers();
+    expect(claimedRow()).toBeNull();
+    expect(document.body).not.toHaveTextContent("· sen");
+    // The claim itself stands, for the league it was made in.
+    expect(readViewerEntry()).toEqual({
+      leagueId: 7,
+      entryId: 35249001,
+      verified: false,
+      source: "self-selected",
+    });
+  });
+
   it("previous stored selections are ignored", () => {
     window.localStorage.setItem("squadopt.viewer", JSON.stringify({ entryId: 35249001 }));
     expect(readViewerEntry()).toBeNull();

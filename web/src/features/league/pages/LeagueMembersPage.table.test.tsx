@@ -192,7 +192,7 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
   });
 
   it("marks the viewer's own row and fills the score bug from the published row", () => {
-    writeViewerEntry(leader.entry_id);
+    writeViewerEntry({ leagueId: 352490, entryId: leader.entry_id });
     show({}, language);
     const own = rowOf(leader.manager_name!);
     expect(own).toHaveAttribute("aria-current", "true");
@@ -212,7 +212,7 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
   });
 
   it("adds the viewer's chips, bank and chaser once their squad document is read", () => {
-    writeViewerEntry(leader.entry_id);
+    writeViewerEntry({ leagueId: 352490, entryId: leader.entry_id });
     const squad = mockEntrySquadEnvelopes[leader.entry_id!]!;
     show({ viewerSquad: squad }, language);
     const resources = MESSAGES[language].memberResources;
@@ -233,7 +233,7 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
   });
 
   it("names the chaser without a distance, and without a stray comma, when a total is unknown", () => {
-    writeViewerEntry(leader.entry_id);
+    writeViewerEntry({ leagueId: 352490, entryId: leader.entry_id });
     const envelope = structuredClone(mockLeagueMembersEnvelope);
     envelope.payload.members.find((member) => member.entry_id === second.entry_id)!.total_points =
       null;
@@ -243,7 +243,7 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
   });
 
   it("ignores a squad document that belongs to someone else", () => {
-    writeViewerEntry(leader.entry_id);
+    writeViewerEntry({ leagueId: 352490, entryId: leader.entry_id });
     show({ viewerSquad: mockEntrySquadEnvelopes[second.entry_id!]! }, language);
     expect(
       screen.queryByRole("heading", { name: MESSAGES[language].memberResources.chipsTitle }),

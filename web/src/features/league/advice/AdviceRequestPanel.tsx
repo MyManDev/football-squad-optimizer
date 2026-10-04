@@ -121,7 +121,7 @@ export function AdviceRequestPanel({
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
-  const { viewer } = useViewerEntry();
+  const { viewer } = useViewerEntry(request.leagueId);
   const { state, compute } = job;
   const isSelf = viewer !== null && viewer.entryId === request.entryId;
   const supported =

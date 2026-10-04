@@ -24,6 +24,12 @@ export interface MemberContext {
   search: string;
 }
 
+/** The member the visitor said they are, in the league they said it in. */
+export interface ViewerClaim {
+  leagueId: number;
+  entryId: number;
+}
+
 export interface Place {
   pathname: string;
   search: string;
@@ -62,9 +68,8 @@ export function memberAt(
  */
 export function memberInContext(
   place: Place,
-  viewerEntryId: number | null,
+  viewer: ViewerClaim | null,
   lastSeen: MemberContext | null,
-  chosenLeagueId: number | null = null,
 ): MemberContext | null {
   const planFor = (entryId: string) => (lastSeen?.entryId === entryId ? lastSeen.search : "");
   const here = memberAt(place);
@@ -75,11 +80,10 @@ export function memberInContext(
       search: here.search ?? planFor(here.entryId),
     };
   }
-  // The member the visitor said they are belongs to the league they chose; without a
-  // league there is no address for them.
-  if (viewerEntryId !== null && chosenLeagueId !== null) {
-    const entryId = String(viewerEntryId);
-    return { leagueId: chosenLeagueId, entryId, search: planFor(entryId) };
+  // The member the visitor said they are, in the league they said it in.
+  if (viewer !== null) {
+    const entryId = String(viewer.entryId);
+    return { leagueId: viewer.leagueId, entryId, search: planFor(entryId) };
   }
   return lastSeen;
 }
@@ -93,7 +97,9 @@ export function navItems(
   const onMemberPage = member !== null && MEMBER_PAGE.exec(pathname)?.[2] === member.entryId;
   const onSquad = onMemberPage && place.hash === SQUAD_HASH;
   const memberPath = member ? memberAddress(member.leagueId, member.entryId, member.search) : null;
-  const leagueId = leagueIdInAddress(pathname) ?? member?.leagueId ?? chosenLeagueId;
+  // The league in the address, else the one the visitor opened last (the gate chooses it
+  // on every numbered address), else the league of the member in context.
+  const leagueId = leagueIdInAddress(pathname) ?? chosenLeagueId ?? member?.leagueId ?? null;
   const leaguePath = leagueId === null ? "/" : membersAddress(leagueId);
 
   const items: NavItem[] = [

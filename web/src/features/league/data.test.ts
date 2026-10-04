@@ -96,6 +96,14 @@ describe("tree.scoreboard", () => {
     expect(envelope.payload.season).toBe("2026-27");
   });
 
+  it("refuses a document of another league under the tree's path", async () => {
+    const other = { ...published, payload: { ...published.payload, league_id: 7 } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(other))));
+    const tree = createLeagueTree({ ...EXAMPLE_LEAGUE, path: "leagues/352490" });
+
+    await expect(tree.scoreboard()).rejects.toThrow(/league 7's, not league 352490's/);
+  });
+
   it("raises LeagueDataMissing on a 404, the normal state before the first weekly run", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
     await expect(loadScoreboard()).rejects.toBeInstanceOf(LeagueDataMissing);

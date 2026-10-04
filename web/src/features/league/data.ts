@@ -96,13 +96,30 @@ async function mockModule() {
   return import("../../fixtures/league");
 }
 
+/**
+ * The envelope, when the league its payload names is the tree's. A directory line that
+ * points at another league's tree, or a tree that mixes leagues, would otherwise render
+ * one league's table and advice under another league's address.
+ */
+function ownLeague<T>(envelope: LeagueViewEnvelope<T>, leagueId: number): LeagueViewEnvelope<T> {
+  const payload: unknown = envelope.payload;
+  if (payload && typeof payload === "object" && "league_id" in payload) {
+    const named = (payload as { league_id?: unknown }).league_id;
+    if (typeof named === "number" && named !== leagueId) {
+      throw new LeagueDataError(`The document is league ${named}'s, not league ${leagueId}'s.`);
+    }
+  }
+  return envelope;
+}
+
 export function createLeagueTree(league: LeagueRef): LeagueTree {
   const base = `${import.meta.env.BASE_URL}data/${league.path}/`;
   async function read<T>(
     relative: string,
     options?: RequestOptions,
   ): Promise<LeagueViewEnvelope<T>> {
-    return assertEnvelope((await fetchDocument(base, relative, options)) as LeagueViewEnvelope<T>);
+    const envelope = assertEnvelope<T>(await fetchDocument(base, relative, options));
+    return ownLeague(envelope, league.leagueId);
   }
 
   /**

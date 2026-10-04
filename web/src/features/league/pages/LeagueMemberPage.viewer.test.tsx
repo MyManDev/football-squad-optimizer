@@ -20,7 +20,7 @@ describe.each(["tr", "en"] as const)("selected member controls in %s", (language
     const claimed = 35249001;
     const viewed = 35249002;
     const copy = MESSAGES[language].leagueMembers;
-    writeViewerEntry(claimed);
+    writeViewerEntry({ leagueId: 352490, entryId: claimed });
     render(
       <LanguageProvider initialLanguage={language}>
         <MemoryRouter initialEntries={[`/league/352490/members/${viewed}`]}>

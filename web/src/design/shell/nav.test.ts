@@ -87,22 +87,26 @@ describe("the sidebar's navigation", () => {
     expect(items[0]).toEqual({ key: "thisWeek", to: `${MEMBERS}/12`, active: false });
   });
 
-  it("falls back to the claimed member in the chosen league, then to the member page last opened", () => {
+  it("falls back to the claimed member in the claim's league, then to the member page last opened", () => {
     const lastSeen = { leagueId: LEAGUE, entryId: "5", search: "?window=3" };
-    expect(memberInContext(at("/fixtures"), 9, lastSeen, LEAGUE)).toEqual({
+    const claim = (entryId: number, leagueId = LEAGUE) => ({ leagueId, entryId });
+    expect(memberInContext(at("/fixtures"), claim(9), lastSeen)).toEqual({
       leagueId: LEAGUE,
       entryId: "9",
       search: "",
     });
-    expect(memberInContext(at("/fixtures"), 5, lastSeen, LEAGUE)).toEqual(lastSeen);
-    expect(memberInContext(at("/fixtures"), null, lastSeen, LEAGUE)).toEqual(lastSeen);
-    expect(memberInContext(at("/fixtures"), null, null, LEAGUE)).toBeNull();
-    // A claimed member with no chosen league has no address; the last page opened stands.
-    expect(memberInContext(at("/fixtures"), 9, lastSeen)).toEqual(lastSeen);
-    expect(memberInContext(at("/fixtures"), 9, null)).toBeNull();
+    // A claim made in another league opens that league's page.
+    expect(memberInContext(at("/fixtures"), claim(9, 7), lastSeen)).toEqual({
+      leagueId: 7,
+      entryId: "9",
+      search: "",
+    });
+    expect(memberInContext(at("/fixtures"), claim(5), lastSeen)).toEqual(lastSeen);
+    expect(memberInContext(at("/fixtures"), null, lastSeen)).toEqual(lastSeen);
+    expect(memberInContext(at("/fixtures"), null, null)).toBeNull();
     // The address wins over both.
     expect(
-      memberInContext(at("/league/7/members/3", "?mode=ortak-koru"), 9, lastSeen, LEAGUE),
+      memberInContext(at("/league/7/members/3", "?mode=ortak-koru"), claim(9), lastSeen),
     ).toEqual({ leagueId: 7, entryId: "3", search: "?mode=ortak-koru" });
     // A history page returns to the plan last seen for that member only.
     expect(memberInContext(at(`${MEMBERS}/5/history`), null, lastSeen)).toEqual(lastSeen);
