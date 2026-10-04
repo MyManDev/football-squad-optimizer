@@ -28,6 +28,7 @@ from squadopt.live import football_artifact, football_observations, recommendati
 from squadopt.optimization import optimizer as squad_optimizer
 from squadopt.planning import models, pricing
 from squadopt.planning import optimizer as planning_optimizer
+from squadopt.platform import advice_switches, capture_context
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 PROTOCOL = REPOSITORY / "docs" / "research" / "planner_policy_chain_prereg.md"
@@ -56,17 +57,35 @@ def _protocol() -> str:
         "Two captures at the same latest instant make the week missing.",
         "the runner decides gameweek g only after its deadline, refuses an earlier decision, and"
         " decides weeks in order, each once.",
-        "Its model version must be one this protocol admits, `football_team_share_v1` or"
-        " `football_joint_role_minutes_v1`, and one the reader at the frozen commit accepts",
-        "the two are never relabelled as one",
+        "read and bound as the service binds it: `load_switch_inputs`",
+        "is missing for the reason the service states, which the receipt records",
+        "must be one this protocol admits, `football_team_share_v1`,"
+        " `football_joint_role_minutes_v1` or `football_joint_role_retained_history_v1`, and one"
+        " the reader at the frozen commit accepts",
+        "`football_contextual_v3`, which that reader also accepts, was never served and is not"
+        " admitted",
+        "before any reader runs, so a week of any other version is missing as that and never as"
+        " unreadable",
+        "no two are ever relabelled as one",
         "Each contrast is also reported for each admitted model version on its own weeks",
         "served under a model version rule 6 does not admit",
         "so this protocol asserts none. Each receipt records them from the artifact itself",
         "A field the artifact does not carry is recorded as absent and never filled in.",
         "The runner reads the file's bytes once, records their sha256",
         "The artifact is never rebuilt, never borrowed from another capture and never written to.",
-        "The decision step uses no archive, no handoff, no member or entry payload and nothing"
-        " captured after the week's deadline enters a decision.",
+        "The decision step uses no archive, no member or entry payload, and nothing captured after"
+        " the week's deadline enters a decision.",
+        "The served baseline handoff is read only for its fingerprint, which a ready bundle must"
+        " match as it must when served (rule 6); no handoff projection enters a decision.",
+        "this protocol asserts nothing about it, and the chain neither fits nor reads that history",
+        "the manager's word switch is off",
+        "reaches every arm alike",
+        "one the service refuses to bind (rule 6)",
+        "`ready_bundle_sha256`, `handoff_fingerprint`, `rotation_table_sha256`,"
+        " `components_sha256`, whether each bound, the decision information revision",
+        "its `training_selection`, and from `role_metadata` the role model's `version` and"
+        " `role_feature_version`",
+        "the chain does not separate the planner from that binding",
         "Later captures are read only for the deadlines they state (rule 5)",
         "never the feature commit that wrote it",
         "before 2026-10-07T00:00:00Z and 2026-10-09T00:00:00Z",
@@ -176,6 +195,8 @@ def test_every_rule_the_protocol_cites_by_number_exists() -> None:
         (recommendation, "read_inputs"),
         (snapshots, "read_snapshot"),
         (football_artifact, "read_football_forecast"),
+        (advice_switches, "load_switch_inputs"),
+        (capture_context, "handoff_fingerprint_for"),
         (football_observations, "availability_observations"),
         (rules, "read_season_rules"),
         (lineup_publication, "lineup_fields"),
