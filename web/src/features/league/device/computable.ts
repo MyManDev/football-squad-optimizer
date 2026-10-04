@@ -6,6 +6,7 @@
  */
 
 import { rivalCandidates, type DeviceComputable } from "../advice/adviceSelection";
+import { isTop100Weight } from "../advice/top100";
 import type { EntrySquad, EntryView } from "../types";
 import { isDevicePlanEntry, RIVAL_STRATEGIES } from "./types";
 
@@ -23,5 +24,6 @@ export function deviceComputable(
     rivals: rivalCandidates(members, squad.entry.entry_id)
       .map((member) => member.entry_id)
       .filter((id): id is number => typeof id === "number"),
+    top100Weights: [0, ...(squad.device_plan.top100_weights ?? []).filter(isTop100Weight)],
   };
 }

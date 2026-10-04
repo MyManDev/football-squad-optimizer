@@ -10,6 +10,7 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import type { EntrySquad, EntrySquadPlayer } from "../types";
 import {
   isDeviceChip,
+  isDevicePlanEntry,
   isRivalStrategy,
   type DeviceChip,
   type DeviceRival,
@@ -19,7 +20,8 @@ import {
 export type DeviceSelection =
   | { kind: "plain" }
   | { kind: "chip"; chip: DeviceChip }
-  | { kind: "rival"; strategy: RivalStrategy; rivalEntryId: number };
+  | { kind: "rival"; strategy: RivalStrategy; rivalEntryId: number }
+  | { kind: "top100"; weight: number };
 
 /**
  * The chip the request asks to play, if it is one the device can solve: a chip the squad
@@ -51,11 +53,10 @@ export function deviceChip(
 /** The selection the device would solve for this request, or null where it is the service's. */
 export function deviceSelection(
   request: AdviceRequest,
-  squad: Pick<EntrySquad, "chips">,
+  squad: Pick<EntrySquad, "chips" | "device_plan">,
 ): DeviceSelection | null {
   if (
     request.window !== 1 ||
-    (request.top100Weight ?? 0) !== 0 ||
     (request.managersWord ?? false) ||
     (request.model ?? "current") !== "current" ||
     request.preferences
@@ -65,6 +66,16 @@ export function deviceSelection(
   const chip = deviceChip(request, squad);
   if (chip === undefined) return null;
   const rivalEntryId = request.rivalEntryId ?? null;
+  const weight = request.top100Weight ?? 0;
+  if (weight !== 0) {
+    // The weight applies to the one-week pure-points plan only, where the document
+    // carries it; the entry block names the weights it does.
+    const offered = isDevicePlanEntry(squad.device_plan)
+      ? (squad.device_plan.top100_weights ?? [])
+      : [];
+    if (request.strategy !== "saf-puan" || rivalEntryId !== null || chip !== null) return null;
+    return offered.includes(weight) ? { kind: "top100", weight } : null;
+  }
   if (request.strategy === "saf-puan") {
     if (rivalEntryId !== null) return null;
     return chip === null ? { kind: "plain" } : { kind: "chip", chip };

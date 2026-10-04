@@ -12,6 +12,8 @@ import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanPlayer } from "./t
 export const DEVICE_SOLVER = "highs-wasm";
 /** The server's name for how a chip's gain is measured: this gameweek's expected points. */
 export const CHIP_CHOICE_BASIS = "one_week_expected_points_v1";
+/** The server's name for what a Top 100 price is measured on: the base model's points. */
+export const TOP100_PRICE_BASIS = "base_model_pure_points_v1";
 
 function position(value: string): AdvicePlayer["position"] {
   return value === "GK" || value === "DEF" || value === "MID" || value === "FWD" ? value : "UNK";
@@ -78,6 +80,33 @@ export function deviceAdviceEnvelope(
     data_quality: missing.length ? "partial" : "complete",
     missing_fields: missing,
   };
+  if (answer.top100 !== undefined) {
+    // The weight's account: the price on base points against the member's own plan, the
+    // rows' reasons, and the counts' source as the document states it.
+    const top100 = answer.top100;
+    payload.expected_points_cost = top100.expected_points_cost;
+    payload.expected_points_cost_ceiling = top100.expected_points_cost_ceiling;
+    payload.control_solver_status = "OPTIMAL";
+    payload.control_optimality_gap = 0;
+    payload.moves = payload.moves.map((move, index) => ({
+      ...move,
+      reason_code: top100.reasons[index] ?? move.reason_code,
+    }));
+    const source = document.rules.top100;
+    payload.top100 = {
+      weight: top100.weight,
+      changed: top100.changed,
+      price_basis: TOP100_PRICE_BASIS,
+      ...(source
+        ? {
+            cohort_snapshot_id: source.cohort_snapshot_id,
+            picks_snapshot_id: source.picks_snapshot_id,
+            table_sha256: source.table_sha256,
+            picks_gameweek: source.picks_gameweek,
+          }
+        : {}),
+    };
+  }
   if (answer.rival !== undefined) {
     // The band's account, as the server publishes it: every solve here was proved, so
     // the price carries its ceiling and the control its proof.

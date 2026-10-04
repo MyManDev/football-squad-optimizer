@@ -84,7 +84,11 @@ export function useMemberAdviceView(
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
   // The chip the page shows is the selection's; without the service's capabilities the
   // request carries none, so the device is asked for the selection, chip included.
-  const deviceRequest = { ...request, chip: request.chip ?? selection.chip.chip };
+  const deviceRequest = {
+    ...request,
+    chip: request.chip ?? selection.chip.chip,
+    top100Weight: request.top100Weight ?? selection.top100.weight,
+  };
   const deviceJob = useDevicePlan(view, deviceRequest, deviceDependencies);
   const requestKey = [
     adviceRequestKey(request),

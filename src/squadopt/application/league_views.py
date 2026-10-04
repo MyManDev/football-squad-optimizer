@@ -1168,6 +1168,7 @@ def _device_plan_block(
     projection: Projection,
     rules: SeasonRules,
     prices: Mapping[int, int],
+    top100: Top100Counts | None = None,
 ) -> dict[str, object] | None:
     """One member's device-plan inputs, or ``None`` where the live path would not plan.
 
@@ -1180,7 +1181,7 @@ def _device_plan_block(
         held = held_squad_from_picks(picks, current_prices=prices)
     except (EntryError, DataError):
         return None
-    return device_plan_entry(inputs, projection, held, rules)
+    return device_plan_entry(inputs, projection, held, rules, top100=top100)
 
 
 def _suggested_strategy(
@@ -1567,7 +1568,9 @@ def build_league_views(
         # device: the fifteen, the spending power, the free transfers and the sale prices
         # exactly as the published plan was held to them. Absent where the live path
         # would refuse to plan, so the device never solves a problem the server did not.
-        squad_payload["device_plan"] = _device_plan_block(picks, inputs, projection, rules, prices)
+        squad_payload["device_plan"] = _device_plan_block(
+            picks, inputs, projection, rules, prices, top100_counts
+        )
         squad_path.write_text(
             json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
             encoding="utf-8",
@@ -2075,7 +2078,10 @@ def build_league_views(
     written.append(members_path.name)
     # The shared side of every member's one-week problem: the capture's table in solver
     # order with the server's integer coefficients, and the rules as numbers.
-    _write(DEVICE_PLAN_DOCUMENT, device_plan_table(inputs, projection, rules, league_id=league_id))
+    _write(
+        DEVICE_PLAN_DOCUMENT,
+        device_plan_table(inputs, projection, rules, league_id=league_id, top100=top100_counts),
+    )
 
     # Whatever this run did not produce is not this week's advice, and the tree it wrote
     # into is last week's. Removed after members.json rather than before the renders, so a

@@ -31,6 +31,10 @@ export interface DevicePlanPlayer {
   expected_points: number;
   /** (squad, starter, captain): the server's exact integer objective coefficients. */
   coefficients: [number, number, number];
+  /** With `rules.top100`: how many of the cohort started him last gameweek. */
+  top100_count?: number;
+  /** With `rules.top100`: his weighted points on the integer scale, by weight as text. */
+  top100_scaled?: Record<string, number>;
 }
 
 export interface DevicePlanRules {
@@ -52,6 +56,15 @@ export interface DevicePlanRules {
   strategies?: Partial<
     Record<RivalStrategy, { overlap_floor: number | null; overlap_ceiling: number | null }>
   >;
+  /** The Top 100 influence's inputs, where the week has them. */
+  top100?: {
+    weights: number[];
+    cohort_size: number;
+    cohort_snapshot_id: string;
+    picks_snapshot_id: string;
+    table_sha256: string;
+    picks_gameweek: number;
+  };
 }
 
 /** `league/device-plan.json`: the capture's table in solver order, and the rules as numbers. */
@@ -97,6 +110,17 @@ export interface DeviceRivalFields {
   captain_agreement: boolean;
 }
 
+/** What a Top 100 weight publishes beyond the plan: the price on base points and each row's reason. */
+export interface DeviceTop100Fields {
+  weight: number;
+  /** Whether the weighted choice differs from the pure-points plan in a move, the eleven or the captain. */
+  changed: boolean;
+  expected_points_cost: number;
+  expected_points_cost_ceiling: number;
+  /** One per move row, in the rows' order: `points_gain` or `top100_preference`. */
+  reasons: Array<"points_gain" | "top100_preference">;
+}
+
 /** One member's side of the problem, from `entries/<id>.json`. */
 export interface DevicePlanEntry {
   held: number[];
@@ -104,6 +128,8 @@ export interface DevicePlanEntry {
   free_transfers: number;
   /** Sale price of each held player, keyed by player id as text. */
   sell_tenths: Record<string, number>;
+  /** The Top 100 weights the shared document carries; absent where the week has none. */
+  top100_weights?: number[];
 }
 
 /** What the device's solve proved, in player ids. */
@@ -141,6 +167,8 @@ export interface DevicePlanAnswer {
   gain_vs_no_chip?: number;
   /** With a rival strategy: the band's account. Absent for the plain plan and a chip. */
   rival?: DeviceRivalFields;
+  /** With a Top 100 weight: its account. */
+  top100?: DeviceTop100Fields;
   seconds: number;
 }
 
@@ -174,7 +202,22 @@ function isPlayer(value: unknown): value is DevicePlanPlayer {
     finite(value.expected_points) &&
     Array.isArray(value.coefficients) &&
     value.coefficients.length === 3 &&
-    value.coefficients.every(finite)
+    value.coefficients.every(finite) &&
+    (value.top100_count === undefined || finite(value.top100_count)) &&
+    (value.top100_scaled === undefined || numberMap(value.top100_scaled))
+  );
+}
+
+function isTop100Rules(value: unknown): boolean {
+  if (!record(value)) return false;
+  return (
+    Array.isArray(value.weights) &&
+    value.weights.every(finite) &&
+    finite(value.cohort_size) &&
+    typeof value.cohort_snapshot_id === "string" &&
+    typeof value.picks_snapshot_id === "string" &&
+    typeof value.table_sha256 === "string" &&
+    finite(value.picks_gameweek)
   );
 }
 
@@ -209,6 +252,7 @@ export function isDevicePlanDocument(value: unknown): value is DevicePlanDocumen
     finite(rules.hit_points_charged) &&
     (rules.hit_charged_scaled === undefined || finite(rules.hit_charged_scaled)) &&
     (rules.strategies === undefined || isBands(rules.strategies)) &&
+    (rules.top100 === undefined || isTop100Rules(rules.top100)) &&
     finite(rules.expected_points_scale) &&
     rules.expected_points_scale > 0 &&
     Array.isArray(value.players) &&
@@ -224,6 +268,8 @@ export function isDevicePlanEntry(value: unknown): value is DevicePlanEntry {
     value.held.every(finite) &&
     finite(value.bank_tenths) &&
     finite(value.free_transfers) &&
-    numberMap(value.sell_tenths)
+    numberMap(value.sell_tenths) &&
+    (value.top100_weights === undefined ||
+      (Array.isArray(value.top100_weights) && value.top100_weights.every(finite)))
   );
 }
