@@ -361,7 +361,8 @@ def test_a_site_with_a_directory_is_checked_tree_by_tree(
     assert "ok  200 json   /data/leagues/7/members.json" in output
     assert "ok  404 absent /data/leagues/352490/entries/0.json" in output
     assert "ok  404 absent /data/leagues/7/entries/0.json" in output
-    assert "/league/members/0" not in asked
+    # The address from before the number is served on every site; the legacy tree is not.
+    assert "/league/members/0" in asked
     assert "/data/league/members.json" not in asked
     assert "ALL GOOD" in output
 
@@ -400,7 +401,11 @@ def test_a_directory_that_cannot_be_read_is_a_counted_failure(
 
 
 def test_the_verifier_checks_the_same_routes_the_deployment_smoke_does() -> None:
-    """The two lists drifted once: `/fixtures` was added to one and not the other."""
+    """The two lists drifted once: `/fixtures` was added to one and not the other.
+
+    The static checks are compared in order; the checks a tree adds are compared by
+    reading the smoke's templates with one directory line and one legacy tree.
+    """
 
     source = (ROOT / "web/scripts/smoke-deployment.mjs").read_text(encoding="utf-8")
     block = source.split("export const SMOKE_CHECKS = [", 1)[1].split("\n];", 1)[0]
@@ -408,10 +413,28 @@ def test_the_verifier_checks_the_same_routes_the_deployment_smoke_does() -> None
     kinds = re.findall(r'kind:\s*"([^"]+)"', block)
     assert len(paths) == len(kinds), block
     named = dict(zip(paths, kinds, strict=True))
-    # The deployment smoke checks the legacy tree until the site publishes a directory.
-    assert sorted(path for path, kind in named.items() if kind == "html") == sorted(_ROUTES)
-    assert sorted(path for path, kind in named.items() if kind == "json") == sorted(_DOCUMENTS)
-    assert [path for path, kind in named.items() if kind == "absent"] == [_ABSENT]
+    assert [path for path, kind in named.items() if kind == "html"] == verify_live.ROUTES
+    assert [path for path, kind in named.items() if kind == "json"] == verify_live.DOCUMENTS
+    directory = re.search(r'DIRECTORY = "([^"]+)"', source)
+    legacy = re.search(r'LEGACY_TREE = "([^"]+)"', source)
+    assert directory is not None and directory.group(1) == verify_live.DIRECTORY
+    assert legacy is not None and legacy.group(1) == verify_live.LEGACY_TREE
+
+    tree_block = source.split("export function treeChecks(", 1)[1].split("\n}\n", 1)[0]
+    templates = re.findall(r"path: `([^`]+)`", tree_block)
+    tree_kinds = re.findall(r'kind:\s*"([^"]+)"', tree_block)
+    assert len(templates) == len(tree_kinds), tree_block
+    for league_id, tree in ((7, "leagues/7"), (None, "league")):
+        rendered = [
+            (template.replace("${leagueId}", str(league_id)).replace("${path}", tree), kind)
+            for template, kind in zip(templates, tree_kinds, strict=True)
+            if league_id is not None or "${leagueId}" not in template
+        ]
+        routes, documents, (absent,) = verify_live.smoke_checks([(league_id, tree)])
+        assert [p for p, k in rendered if k == "html"] == routes[len(verify_live.ROUTES) :]
+        expected_documents = documents[len(verify_live.DOCUMENTS) :]
+        assert [p for p, k in rendered if k == "json"] == expected_documents
+        assert [p for p, k in rendered if k == "absent"] == [absent]
 
 
 def test_a_week_that_did_not_settle_fails_instead_of_being_printed(

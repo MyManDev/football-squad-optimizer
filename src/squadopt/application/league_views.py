@@ -878,8 +878,10 @@ class LeagueViewsReport:
     gameweek: int
     members: tuple[MemberViewResult, ...]
     files: tuple[str, ...]
-    #: The league's name and the publication stamp, as members.json carries them: what the
-    #: site's league directory lists beside the tree's path.
+    #: The league's name and this publication's stamp, as members.json carries them: what
+    #: the site's league directory lists beside the tree's path. A settled publish rewrites
+    #: the members document's stamp, not the directory's, which stays the league
+    #: publication's.
     league_name: str = ""
     generated_at_utc: str = ""
     #: Documents from an earlier publish that this run removed because it did not produce

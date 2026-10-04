@@ -41,6 +41,9 @@ ROUTES = [
     "/moves",
     "/rivals",
     "/league",
+    # A nested client-side route is the first thing a path-scoped not-found rule would
+    # break; the address from before the league number is served on every site.
+    "/league/members/0",
     "/status",
     "/fixtures",
 ]
@@ -156,18 +159,16 @@ def published_trees() -> tuple[list[Tree], bool]:
 def smoke_checks(trees: list[Tree]) -> tuple[list[str], list[str], list[str]]:
     """The routes, documents and absent documents the smoke checks for these trees.
 
-    Each league adds its member page by its address (a nested client-side route is the first
-    thing a path-scoped not-found rule would break), its members document, and the entry 0
-    document it must refuse.
+    Each listed league adds its member page by its numbered address, and every tree adds
+    its members document and the entry 0 document it must refuse.
     """
 
     routes = [*ROUTES]
     documents = [*DOCUMENTS]
     absent: list[str] = []
     for league_id, tree in trees:
-        routes.append(
-            "/league/members/0" if league_id is None else f"/league/{league_id}/members/0"
-        )
+        if league_id is not None:
+            routes.append(f"/league/{league_id}/members/0")
         documents.append(f"/data/{tree}/members.json")
         absent.append(f"/data/{tree}/entries/0.json")
     return routes, documents, absent
@@ -204,42 +205,50 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     print("\n== content ==")
     # Every nested read below is type-checked: a document of the wrong shape inside is a
     # counted failure, where it used to end the run in an AttributeError.
-    # The accepted stamp is the first tree's: a publication stamps every tree it writes.
-    _first_id, first_tree = trees[0]
-    path = f"/data/{first_tree}/members.json"
-    document = _document(path)
-    read = _payload(document, path)
-    members = _objects(read, "members", path)
-    failures += members is None
-    payload = read or {}
-    generated = (document or {}).get("generated_at_utc", "")
-    matches = generated == accepted_generated_at
-    failures += not matches
-    print(
-        f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}"
-        f"  (must equal accepted {accepted_generated_at})"
-    )
-    print(
-        f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
-        f" members={None if members is None else len(members)}"
-    )
-    movement: dict[str, int] = {}
-    for member in members or []:
-        value = member.get("movement")
-        # A value that is not text is shown as written, and cannot fail as a dictionary key.
-        key = value if isinstance(value, str) else repr(value)
-        movement[key] = movement.get(key, 0) + 1
-    print(f"  movement={movement}")
+    # One publication writes every tree with one stamp, so every tree must carry the
+    # accepted one; the week claims below are read from each tree too.
+    payloads: list[dict[str, Any]] = []
+    settled_by_tree: list[list[Any]] = []
+    for _league_id, tree in trees:
+        if len(trees) > 1:
+            print(f"  -- {tree}")
+        path = f"/data/{tree}/members.json"
+        document = _document(path)
+        read = _payload(document, path)
+        members = _objects(read, "members", path)
+        failures += members is None
+        payload = read or {}
+        payloads.append(payload)
+        generated = (document or {}).get("generated_at_utc", "")
+        matches = generated == accepted_generated_at
+        failures += not matches
+        print(
+            f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}"
+            f"  (must equal accepted {accepted_generated_at})"
+        )
+        print(
+            f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
+            f" members={None if members is None else len(members)}"
+        )
+        movement: dict[str, int] = {}
+        for member in members or []:
+            value = member.get("movement")
+            # A value that is not text is shown as written, and cannot fail as a dictionary
+            # key.
+            key = value if isinstance(value, str) else repr(value)
+            movement[key] = movement.get(key, 0) + 1
+        print(f"  movement={movement}")
 
-    path = f"/data/{first_tree}/scoreboard.json"
-    weeks = _objects(_payload(_document(path), path), "gameweeks", path)
-    failures += weeks is None
-    settled = [
-        week.get("gameweek")
-        for week in weeks or []
-        if week.get("finished") and week.get("data_checked")
-    ]
-    print(f"  scoreboard gameweeks={None if weeks is None else len(weeks)} settled={settled}")
+        path = f"/data/{tree}/scoreboard.json"
+        weeks = _objects(_payload(_document(path), path), "gameweeks", path)
+        failures += weeks is None
+        settled = [
+            week.get("gameweek")
+            for week in weeks or []
+            if week.get("finished") and week.get("data_checked")
+        ]
+        settled_by_tree.append(settled)
+        print(f"  scoreboard gameweeks={None if weeks is None else len(weeks)} settled={settled}")
 
     # The season is the one the site index names as latest, so the status document is found
     # again when the season turns over instead of being read from last season's path.
@@ -266,10 +275,13 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
         # Printing the settled weeks is not checking them: before this, a release that
         # published an unsettled week returned ALL GOOD.
         for label, ok in (
-            (f"scoreboard settles gameweek {settled_gameweek}", settled_gameweek in settled),
+            (
+                f"scoreboard settles gameweek {settled_gameweek}",
+                all(settled_gameweek in settled for settled in settled_by_tree),
+            ),
             (
                 f"members.json scored_gameweek is {settled_gameweek}",
-                payload.get("scored_gameweek") == settled_gameweek,
+                all(payload.get("scored_gameweek") == settled_gameweek for payload in payloads),
             ),
             (
                 f"status moved past gameweek {settled_gameweek}",

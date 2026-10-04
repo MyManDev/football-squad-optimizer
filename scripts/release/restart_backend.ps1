@@ -84,13 +84,33 @@ function Published-Document([string]$relative, [switch]$Public, [string]$Ref = "
     if ($Ref) { return ((Git-Read -arguments @('show', "${Ref}:web/public/data/$relative")) | ConvertFrom-Json) }
     return Read-Json (Join-Path $SiteDataRoot ($relative -replace '/', '\'))
 }
+function Published-Directory-Exists([switch]$Public, [string]$Ref = "") {
+    # Whether the site publishes data/leagues.json. Only an absent document is a site from
+    # before the directory; any other failure to read it is a failure of this check.
+    if ($Public) {
+        try {
+            $null = Invoke-WebRequest -Uri "$publicRoot/data/leagues.json" -UseBasicParsing -TimeoutSec 15 -Headers $headers -Method Head
+            return $true
+        } catch [System.Net.WebException] {
+            $response = $_.Exception.Response
+            if ($null -ne $response -and [int]$response.StatusCode -eq 404) { return $false }
+            throw
+        }
+    }
+    if ($Ref) {
+        $null = & git --no-optional-locks -C $RepoRoot cat-file -e "${Ref}:web/public/data/leagues.json" 2>$null
+        return ($LASTEXITCODE -eq 0)
+    }
+    return (Test-Path -LiteralPath (Join-Path $SiteDataRoot 'leagues.json') -PathType Leaf)
+}
 function Published-Trees([switch]$Public, [string]$Ref = "") {
     # The league trees the site publishes, by their paths under data/: every line of the
     # directory (data/leagues.json), or the one legacy tree of a site from before it.
-    try { $directory = Published-Document 'leagues.json' -Public:$Public -Ref $Ref }
-    catch { return @('league') }
-    if ($null -eq $directory) { return @('league') }
+    if (-not (Published-Directory-Exists -Public:$Public -Ref $Ref)) { return @('league') }
+    $directory = Published-Document 'leagues.json' -Public:$Public -Ref $Ref
+    if ($null -eq $directory -or -not ($directory.PSObject.Properties.Name -contains 'contract_version')) { throw "data/leagues.json is not a league directory." }
     if ($directory.contract_version -ne 'league_directory_v1') { throw "data/leagues.json is not a league directory." }
+    if (-not ($directory.PSObject.Properties.Name -contains 'payload') -or $null -eq $directory.payload -or -not ($directory.payload.PSObject.Properties.Name -contains 'leagues')) { throw "data/leagues.json lists no league." }
     $trees = @()
     foreach ($row in $directory.payload.leagues) {
         $tree = [string]$row.path

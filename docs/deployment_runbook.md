@@ -552,9 +552,10 @@ and nothing else on the list would notice.
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and the league's `members.json`. The site's league
 directory, `/data/leagues.json`, says which league trees it publishes (`data/leagues/<league
-id>/`); the verifier reads it first and checks every listed tree. A site from before the
-directory answers 404 there and publishes the one tree under `/data/league/`, which is what
-the deployment smoke still names until the directory is live.
+id>/`); the smoke and the verifier read it first and check every listed tree, each by its
+numbered member page (`/league/<id>/members/0`), its members document and its absent entry
+0. A site from before the directory answers 404 there and publishes the one tree under
+`/data/league/`, which is then checked in the same way.
 
 **The tenth is the opposite check, and reading it as a 200 inverts it.**
 The tree's `entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that

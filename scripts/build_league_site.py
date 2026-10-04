@@ -231,6 +231,8 @@ def main() -> int:
             print(f"  removed       {path}  (not produced by this run)")
         if result.top100_note:
             print(f"  top100        {result.top100_note}")
+        if result.legacy_tree:
+            print(f"  legacy tree   {result.legacy_tree}  (data/league from before the directory)")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(

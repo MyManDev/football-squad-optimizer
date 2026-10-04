@@ -40,7 +40,7 @@ checkout at ``origin/develop``::
     python -m scripts.build_site --season 2026-27 --out <dir>
 
 ``scripts.build_site`` writes the settled season views over that copy and leaves the members'
-``league/`` tree and the rest as the site carries them, which is what the settled publish did
+league trees and the rest as the site carries them, which is what the settled publish did
 when it ran that build inside the publication worktree. ``python -m scripts.build_settled_site``
 builds only the 2026-27 gameweek 5 candidate. A candidate that lacks a top-level entry of the
 carried tree is refused, because the copy would delete it from the site.
@@ -522,7 +522,7 @@ def _publish_candidate(
 
     A settled candidate is the carried tree with the settled views written over it, so it
     holds every top-level entry the publication worktree carries. One that lacks any of them
-    (the members' ``league/`` tree above all, which a ``scripts.build_site`` run into an empty
+    (the members' league trees above all, which a ``scripts.build_site`` run into an empty
     directory never writes) is refused before a commit: the copy would delete it from the
     site.
     """

@@ -5,6 +5,12 @@ import { fileURLToPath } from "node:url";
 // whatever its status line says, so an absent document must not contain it.
 const SHELL_ELEMENT = 'id="root"';
 
+// The site's league directory says which league trees it publishes; a site from before
+// the directory answers 404 here and publishes the one legacy tree. Mirrored by
+// scripts/release/verify_live.py, and a test holds the two in step.
+export const DIRECTORY = "/data/leagues.json";
+export const LEGACY_TREE = "league";
+
 export const SMOKE_CHECKS = [
   { path: "/", kind: "html" },
   { path: "/moves", kind: "html" },
@@ -15,17 +21,47 @@ export const SMOKE_CHECKS = [
   { path: "/status", kind: "html" },
   { path: "/fixtures", kind: "html" },
   { path: "/data/index.json", kind: "json", revalidates: true },
-  {
-    path: "/data/league/members.json",
+];
+
+/** The checks one league tree adds: its member page by number, its members, its absent entry 0. */
+export function treeChecks({ leagueId, path }) {
+  const checks = [];
+  if (leagueId !== null) checks.push({ path: `/league/${leagueId}/members/0`, kind: "html" });
+  checks.push({
+    path: `/data/${path}/members.json`,
     kind: "json",
     revalidates: true,
     requires: (published) => (published?.payload?.members ?? []).length > 0,
     requirement: "at least one league member",
-  },
-  // Entry 0 is not an FPL entry, so this document can never be published. Served as the shell
-  // with a 200, a publication that never happened is indistinguishable from a corrupt one.
-  { path: "/data/league/entries/0.json", kind: "absent" },
-];
+  });
+  // Entry 0 is not an FPL entry, so this document can never be published. Served as the
+  // shell with a 200, a publication that never happened is indistinguishable from a corrupt
+  // one.
+  checks.push({ path: `/data/${path}/entries/0.json`, kind: "absent" });
+  return checks;
+}
+
+/** The trees the deployment publishes, read from its directory; the legacy tree on a 404. */
+export async function publishedTrees(baseUrl, fetchImpl) {
+  const response = await fetchImpl(new URL(DIRECTORY, baseUrl), {
+    headers: { "cache-control": "no-cache" },
+    redirect: "error",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (response.status === 404) return [{ leagueId: null, path: LEGACY_TREE }];
+  if (!response.ok) throw new Error(`the league directory answered HTTP ${response.status}`);
+  const document = await response.json();
+  const rows = document?.payload?.leagues;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("the league directory lists no league");
+  }
+  return rows.map((row) => {
+    if (typeof row?.path !== "string" || !Number.isInteger(row?.league_id)) {
+      throw new Error("the league directory has a line that is not a published league");
+    }
+    return { leagueId: row.league_id, path: row.path };
+  });
+}
 
 function deploymentUrl(value) {
   const url = new URL(value);
@@ -94,8 +130,10 @@ export async function smokeDeployment(
   { fetchImpl = fetch, sleep = delay, attempts = 7 } = {},
 ) {
   const baseUrl = deploymentUrl(value);
+  const trees = await publishedTrees(baseUrl, fetchImpl);
+  const checks = [...SMOKE_CHECKS, ...trees.flatMap(treeChecks)];
   await Promise.all(
-    SMOKE_CHECKS.map((check) => checkEndpoint(baseUrl, check, { fetchImpl, sleep, attempts })),
+    checks.map((check) => checkEndpoint(baseUrl, check, { fetchImpl, sleep, attempts })),
   );
 }
 

@@ -200,7 +200,8 @@ class FileLeagueDirectory:
         try:
             if league_id is None:
                 return published_league_trees(self._root)
-            return [find_league_tree(self._root, league_id)]
+            tree = find_league_tree(self._root, league_id)
+            return [] if tree is None else [tree]
         except (LeagueDirectoryError, ValueError, OSError) as error:
             raise AdviceBackendNotReadyError(
                 "The published league directory is unreadable."
@@ -258,8 +259,10 @@ class FileLeagueDirectory:
         return payload
 
     def league(self, league_id: int) -> Mapping[str, object] | None:
-        (tree,) = self._trees(league_id)
-        payload = self._read(tree)
+        trees = self._trees(league_id)
+        if not trees:
+            return None
+        payload = self._read(trees[0])
         return payload if payload is not None and payload["league_id"] == league_id else None
 
     def _published(self) -> list[Mapping[str, object]]:

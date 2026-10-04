@@ -2,14 +2,18 @@
 
 A site publishes ``data/leagues.json``, the directory, and one tree per league under
 ``data/leagues/<league_id>/`` (members.json, entries/, advice/, scoreboard.json, the
-device-plan document, history/). The web reads the directory first; a site from before it
-carried one league under ``data/league/`` and is read as a directory of one. Every writer
-and reader of a league tree takes its path from here, so no module spells the layout.
+device-plan document, history/). The directory is the set of leagues the last publication
+rendered: one run renders every league from one capture for one week, and writes the
+directory whole. Readers read the directory first; a site from before it carried one
+league under ``data/league/`` and is read as a directory of one, and the first
+publication into the new layout adopts that tree as the league's own. Every writer and
+reader of a league tree takes its path from here, so no module spells the layout.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
@@ -112,21 +116,25 @@ def read_league_directory(site_data_root: Path) -> list[PublishedLeague]:
 
 def write_league_directory(
     site_data_root: Path,
-    league: PublishedLeague,
+    leagues: Iterable[PublishedLeague],
     *,
     generated_at_utc: str,
     source_kind: str = "live",
 ) -> Path:
-    """Add or replace one league's line and write the directory, sorted by league id.
+    """Write the directory: exactly the leagues given, sorted by league id.
 
-    The other leagues' lines are kept as they were: a publication renders one league and
-    must not forget the rest of the site.
+    The directory is what the last publication rendered, so it is written whole; a league
+    the run did not render is not listed, and every line is checked the way a reader
+    checks it before it is written, so no line can be written that no reader accepts.
     """
 
-    kept = [
-        row for row in read_league_directory(site_data_root) if row.league_id != league.league_id
-    ]
-    leagues = sorted([*kept, league], key=lambda row: row.league_id)
+    rows = sorted((_published(league.as_record()) for league in leagues), key=lambda r: r.league_id)
+    if not rows:
+        raise LeagueDirectoryError("A directory lists at least one league.")
+    if len({row.league_id for row in rows}) != len(rows):
+        raise LeagueDirectoryError("A directory lists a league once.")
+    if len({row.path for row in rows}) != len(rows):
+        raise LeagueDirectoryError("Two leagues cannot share a tree.")
     target = Path(site_data_root) / LEAGUE_DIRECTORY_FILE
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
@@ -135,7 +143,7 @@ def write_league_directory(
                 "contract_version": LEAGUE_DIRECTORY_CONTRACT_VERSION,
                 "generated_at_utc": generated_at_utc,
                 "source_kind": source_kind,
-                "payload": {"leagues": [row.as_record() for row in leagues]},
+                "payload": {"leagues": [row.as_record() for row in rows]},
             },
             indent=2,
         )
@@ -146,17 +154,45 @@ def write_league_directory(
     return target
 
 
-def find_league_tree(site_data_root: Path, league_id: int) -> Path:
-    """The tree a reader opens for a league: the directory's line, else the legacy tree.
+def _tree_path(site_data_root: Path, league: PublishedLeague) -> Path:
+    return Path(site_data_root) / Path(*PurePosixPath(league.path).parts)
 
-    A site from before the directory has one league under ``data/league/``; it is read
-    for any id its members document names, which the caller checks.
+
+def legacy_tree_league_id(site_data_root: Path) -> int | None:
+    """The league the legacy tree names, or None where there is no legacy tree.
+
+    A members document that cannot be read names no league; the caller decides whether
+    an unreadable tree is a refusal.
     """
 
-    for league in read_league_directory(site_data_root):
+    members = Path(site_data_root) / LEGACY_TREE / "members.json"
+    if not members.is_file():
+        return None
+    try:
+        document = json.loads(members.read_text(encoding="utf-8"))
+        league_id = document["payload"]["league_id"]
+    except (ValueError, KeyError, TypeError, OSError):
+        return None
+    return league_id if isinstance(league_id, int) and not isinstance(league_id, bool) else None
+
+
+def find_league_tree(site_data_root: Path, league_id: int) -> Path | None:
+    """The tree a reader opens for a league, or None where the site does not publish it.
+
+    The directory's line for the league. A site from before the directory has one league
+    under ``data/league/``, read for any id: its members document names the league, and
+    the caller checks it (an unreadable one is the caller's refusal, not an absence). A
+    directory that does not list the league is a site that does not publish it, legacy
+    tree or not.
+    """
+
+    leagues = read_league_directory(site_data_root)
+    if not leagues:
+        return Path(site_data_root) / LEGACY_TREE
+    for league in leagues:
         if league.league_id == league_id:
-            return Path(site_data_root) / Path(*PurePosixPath(league.path).parts)
-    return Path(site_data_root) / LEGACY_TREE
+            return _tree_path(site_data_root, league)
+    return None
 
 
 def published_league_trees(site_data_root: Path) -> list[Path]:
@@ -166,19 +202,22 @@ def published_league_trees(site_data_root: Path) -> list[Path]:
     leagues = read_league_directory(site_data_root)
     if not leagues:
         return [Path(site_data_root) / LEGACY_TREE]
-    return [Path(site_data_root) / Path(*PurePosixPath(league.path).parts) for league in leagues]
+    return [_tree_path(site_data_root, league) for league in leagues]
 
 
 def single_league_tree(site_data_root: Path, league_id: int | None = None) -> Path:
     """The one tree a single-league reader opens.
 
-    With an id, that league's tree (the directory's line, else the legacy tree). Without
-    one, the only league the directory lists, or the legacy tree where the site publishes
-    no directory; a directory listing several leagues needs the id.
+    With an id, that league's tree, which the site must publish. Without one, the only
+    league the directory lists, or the legacy tree where the site publishes no directory;
+    a directory listing several leagues needs the id.
     """
 
     if league_id is not None:
-        return find_league_tree(site_data_root, league_id)
+        tree = find_league_tree(site_data_root, league_id)
+        if tree is None:
+            raise LeagueDirectoryError(f"The site does not publish league {league_id}.")
+        return tree
     leagues = read_league_directory(site_data_root)
     if len(leagues) > 1:
         raise LeagueDirectoryError(
@@ -186,5 +225,5 @@ def single_league_tree(site_data_root: Path, league_id: int | None = None) -> Pa
             "say which one."
         )
     if leagues:
-        return Path(site_data_root) / Path(*PurePosixPath(leagues[0].path).parts)
+        return _tree_path(site_data_root, leagues[0])
     return Path(site_data_root) / LEGACY_TREE

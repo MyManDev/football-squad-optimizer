@@ -129,6 +129,8 @@ def _tree_name(request: SettledPublicationRequest) -> str:
     """
 
     tree = find_league_tree(request.accepted_dir / "data", request.league_id)
+    if tree is None:
+        raise DataError(f"The accepted tree does not publish league {request.league_id}.")
     return tree.relative_to(request.accepted_dir).as_posix()
 
 
@@ -184,12 +186,15 @@ def _preflight(
     ids = EntryRegistry.load(request.registry_path).ids()
     if len(ids) != 15 or len(rows) != 15 or {row.get("entry_id") for row in rows} != set(ids):
         raise DataError("The accepted tree and registry must identify the same fifteen members.")
+    tree = _tree_name(request)
     for path, content in accepted.items():
         if Path(path).name == "recommendation.json":
             decision_week = _document(content, path)["payload"].get("gameweek")
             if not isinstance(decision_week, int) or decision_week > request.gameweek:
                 raise DataError(f"Later or unreadable decision in accepted tree: {path}")
-        if "advice" in Path(path).parts and path.endswith(".json"):
+        # The league's own advice is of the settled week; another league's tree keeps
+        # its own week and is carried unchanged.
+        if path.startswith(f"{tree}/advice/") and path.endswith(".json"):
             advice = _document(content, path)["payload"]
             if advice.get("gameweek") != request.gameweek:
                 raise DataError(f"Advice outside the accepted GW5 decision: {path}")

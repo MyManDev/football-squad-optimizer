@@ -748,7 +748,11 @@ def run_checks(tree: Tree) -> list[str]:
 
 
 def published_trees(root: str) -> list[str]:
-    """The trees the site publishes: every line of its directory, else the legacy tree."""
+    """The trees the site publishes: every line of its directory, else the legacy tree.
+
+    A directory that cannot be read, or lists a line that is not a published league, is a
+    ``ValueError`` naming the problem; the caller prints it as the finding it is.
+    """
 
     root = root.rstrip("/")
     if root.startswith(("https://", "http://")):
@@ -757,16 +761,22 @@ def published_trees(root: str) -> list[str]:
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
-                document = json.loads(response.read().decode("utf-8"))
+                raw = response.read().decode("utf-8")
         except urllib.error.HTTPError as error:
             if error.code == 404:
                 return [LEGACY_TREE]
-            raise
+            raise ValueError(f"{LEAGUE_DIRECTORY_FILE} answered HTTP {error.code}") from error
+        except (urllib.error.URLError, OSError) as error:
+            raise ValueError(f"{LEAGUE_DIRECTORY_FILE} could not be read: {error}") from error
     else:
         target = Path(root) / LEAGUE_DIRECTORY_FILE
         if not target.is_file():
             return [LEGACY_TREE]
-        document = json.loads(target.read_text(encoding="utf-8"))
+        raw = target.read_text(encoding="utf-8")
+    try:
+        document = json.loads(raw)
+    except ValueError as error:
+        raise ValueError(f"{LEAGUE_DIRECTORY_FILE} does not parse as JSON") from error
     if (
         not isinstance(document, dict)
         or document.get("contract_version") != LEAGUE_DIRECTORY_CONTRACT_VERSION
@@ -774,9 +784,12 @@ def published_trees(root: str) -> list[str]:
         or not isinstance(document["payload"].get("leagues"), list)
     ):
         raise ValueError(f"{LEAGUE_DIRECTORY_FILE} is not a league directory")
-    paths = [
-        str(row.get("path")) for row in document["payload"]["leagues"] if isinstance(row, dict)
-    ]
+    paths: list[str] = []
+    for row in document["payload"]["leagues"]:
+        path = row.get("path") if isinstance(row, dict) else None
+        if not isinstance(path, str) or not path or path.startswith("/") or ".." in path.split("/"):
+            raise ValueError(f"{LEAGUE_DIRECTORY_FILE} lists a line without a usable tree path")
+        paths.append(path)
     if not paths:
         raise ValueError(f"{LEAGUE_DIRECTORY_FILE} lists no league")
     return paths
@@ -790,13 +803,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     failed = False
-    for path in published_trees(args.root):
+    try:
+        trees = published_trees(args.root)
+    except ValueError as error:
+        print(f"BAD {error}")
+        return 1
+    for path in trees:
         tree = Tree(args.root, path)
         if not tree.live and not (tree.directory / "members.json").is_file():
-            print(
-                f"Missing {tree.directory / 'members.json'}; "
-                "pass the site's data directory, such as <preview>/data."
-            )
+            if path == LEGACY_TREE:
+                print(
+                    f"Missing {tree.directory / 'members.json'}; "
+                    "pass the site's data directory, such as <preview>/data."
+                )
+            else:
+                members = tree.directory / "members.json"
+                print(f"BAD the directory lists {path} but {members} is missing")
             return 1
         print(f"== {path}")
         if run_checks(tree):
