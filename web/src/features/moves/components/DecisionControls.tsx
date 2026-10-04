@@ -53,17 +53,17 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
     }
   }
 
-  const competitive = mode !== "saf-puan";
   const liveControl = windowSize === 1;
   const evidence = readHorizonEvidence(horizonEvidence);
   const evidenceRow = evidence?.horizons.find((row) => row.horizon === windowSize);
+  // What the batch did for this window, where it ran; nothing is said where it did not.
   const horizonBody = liveControl
     ? evidenceRow && evidence?.ledger_control_verified
       ? copy.liveEvidenceBody
-      : copy.liveControlBody
+      : null
     : evidenceRow
       ? copy.shadowEvidenceBody(evidenceRow.solver_status, evidenceRow.solver_proof_status)
-      : copy.researchShadowBody;
+      : null;
 
   return (
     <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
@@ -156,19 +156,10 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
         <span>
           <strong>
             {liveControl ? copy.liveControlTitle : copy.researchShadowTitle(windowSize)}
-          </strong>{" "}
-          {horizonBody}
+          </strong>
+          {horizonBody ? <> {horizonBody}</> : null}
         </span>
       </div>
-
-      {competitive ? (
-        <div className={styles.diagnostic} role="note">
-          <Badge tone="warn">{copy.diagnostic}</Badge>
-          <span>
-            <strong>{copy.diagnosticTitle(windowSize)}</strong> {copy.diagnosticBody}
-          </span>
-        </div>
-      ) : null}
 
       <p className={styles.sourceNote}>
         {copy.sourceBefore}

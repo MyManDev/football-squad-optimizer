@@ -23,14 +23,14 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { CATALOGUES } from "../testSupport/catalogues";
-import { AS_A_CHANCE } from "../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../testSupport/honesty";
 import type { Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
 
-// No entry is exempt. Two denials once were ("... never a chance of winning." on /moves and
-// "... rather than a probability nobody measured." on /rivals); a denial still puts the
-// word on the page, so both were rewritten without it.
+// No entry is exempt. Two denials once were (a "never a chance of winning" note on /moves and
+// a "rather than a probability nobody measured" clause on /rivals); a denial still puts the
+// word on the page, so the note is gone and the clause was rewritten without it.
 
 /**
  * Stands in for any argument a message function takes. It answers 1 to every primitive
@@ -113,16 +113,29 @@ describe("every string in both message catalogues", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("words the two former denials without the thing they denied", () => {
-    for (const path of [
-      "en.decision.diagnosticTitle",
-      "tr.decision.diagnosticTitle",
-      "en.rivals.noRivalAfterStatus",
-      "tr.rivals.noRivalAfterStatus",
-    ]) {
-      expect(catalogue.get(path)).toBeDefined();
-      expect(catalogue.get(path)).not.toMatch(AS_A_CHANCE);
+  it("words the former denials without the thing they denied, or drops them", () => {
+    for (const language of LANGUAGES) {
+      expect(catalogue.get(`${language}.rivals.noRivalAfterStatus`)).not.toMatch(AS_A_CHANCE);
+      expect(catalogue.has(`${language}.decision.diagnosticTitle`)).toBe(false);
     }
+  });
+
+  it("carries no caveat, limit, scope or what-this-proves sentence", () => {
+    const offenders = [...catalogue]
+      .filter(([, text]) => AS_A_CAVEAT.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    // The keys that held only such a sentence are gone, not emptied.
+    for (const language of LANGUAGES)
+      for (const key of [
+        "decision.diagnosticBody",
+        "decision.researchShadowBody",
+        "decision.liveControlBody",
+        "league.note",
+        "league.comparisonMissing",
+        "liveSeries.limits",
+      ])
+        expect(catalogue.has(`${language}.${key}`)).toBe(false);
   });
 
   it("names no raw capture field in a sentence", () => {
@@ -240,6 +253,13 @@ describe("every string a production component writes inline", () => {
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
     const offenders = INLINE.filter(({ text }) => AS_A_CHANCE.test(text)).map(
+      ({ at, text }) => `${at}: ${text}`,
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("writes no caveat, limit, scope or what-this-proves sentence", () => {
+    const offenders = INLINE.filter(({ text }) => AS_A_CAVEAT.test(text)).map(
       ({ at, text }) => `${at}: ${text}`,
     );
     expect(offenders).toEqual([]);

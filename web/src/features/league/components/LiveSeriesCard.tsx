@@ -49,7 +49,6 @@ export function LiveSeriesCard({
             ? copy.remaining(remaining)
             : copy.reached}
       </p>
-      <p className={styles.notice}>{copy.limits}</p>
       {unavailableMembers > 0 && <p>{copy.missing(unavailableMembers)}</p>}
       {series.meanDifference !== null && (
         <p>{copy.mean(signedPoints(series.meanDifference, 1, locale))}</p>

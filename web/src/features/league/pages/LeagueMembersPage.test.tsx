@@ -207,13 +207,16 @@ describe("league member points", () => {
   });
 });
 
+/** The system squad's score explanation, which no member surface carries. */
+const SYSTEM_SCORE_NOTE = /recorded squad net|kaydedilen kadro neti/i;
+
 describe("league member surfaces", () => {
   it.each(["tr", "en"] as const)(
     "keeps member surfaces free of the system squad and its comparisons in %s",
     (language) => {
       const copy = MESSAGES[language];
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
-      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
+      expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
       expect(screen.queryByText(copy.leagueMembers.systemTeamBadge)).not.toBeInTheDocument();
       cleanup();
@@ -227,7 +230,7 @@ describe("league member surfaces", () => {
         `/league/352490/members/${entryId}`,
         language,
       );
-      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
+      expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
       expect(
         screen.queryByRole("heading", {
           name: /Recorded score difference|Kaydedilen puan farkı/,
@@ -248,7 +251,7 @@ describe("league member surfaces", () => {
         })}
       />,
     );
-    expect(screen.queryByText(MESSAGES.tr.league.note)).not.toBeInTheDocument();
+    expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
   });
 
   it("lists only the published human members when the live envelope has no system row", () => {

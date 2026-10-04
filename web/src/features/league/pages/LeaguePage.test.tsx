@@ -16,7 +16,7 @@ import { unsettledLedgerFixture } from "../../../fixtures/ledger";
 import { unsettledRecommendationFixture } from "../../../fixtures/settledRecommendation";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
-import { AS_A_CHANCE } from "../../../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { stubTree, withLeague } from "../../../testSupport/league";
 import type { LeagueTree } from "../data";
 import { LeagueDataMissing } from "../dataErrors";
@@ -25,6 +25,7 @@ import { LeaguePage } from "./LeaguePage";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  leagueMissing = false;
 });
 
 const [most, least] = unsettledRecommendationFixture.starting_xi;
@@ -59,6 +60,9 @@ function loaded<T>(payload: T): Loaded<T> {
   return { payload, generatedAtUtc: "2026-10-02T10:00:00Z" };
 }
 
+/** Whether this build carries no league comparison. */
+let leagueMissing = false;
+
 const client: DataClient = {
   getIndex: async () =>
     loaded({ latest: { season, gameweek: 5 }, seasons: [season] } as unknown as SiteIndex),
@@ -69,7 +73,10 @@ const client: DataClient = {
     throw new Error("not used");
   },
   getLedger: async () => loaded(ledger),
-  getLeague: async () => loaded(league),
+  getLeague: async () => {
+    if (leagueMissing) throw new Error("league.json is not in this build.");
+    return loaded(league);
+  },
   getStatus: async () => {
     throw new Error("not used");
   },
@@ -105,5 +112,19 @@ describe.each(["tr", "en"] as const)("the league page in %s", (language) => {
     expect(text).not.toMatch(/selected_by_percent/);
     expect(text).not.toMatch(/does not follow it|takip etmez/);
     expect(text).not.toMatch(AS_A_CHANCE);
+    expect(text).not.toMatch(AS_A_CAVEAT);
+    // The comparability caveat beside the recorded net is gone too.
+    expect(text).not.toMatch(/autosubs|otomatik değişiklik/);
+  });
+
+  it("leaves the comparison out, without a caveat, where the build carries none", async () => {
+    leagueMissing = true;
+    const { container } = renderLeague(language);
+    const copy = MESSAGES[language].league;
+    expect(await screen.findByText(copy.firstRow)).toBeInTheDocument();
+    expect(screen.queryByText(copy.againstLeague)).toBeNull();
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(AS_A_CAVEAT);
+    expect(text).not.toMatch(/claimed here|iddia gösterilmiyor|autosubs|otomatik değişiklik/);
   });
 });

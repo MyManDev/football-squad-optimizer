@@ -97,13 +97,7 @@ export function LeaguePage() {
         </Card>
       ) : null}
 
-      {league.data ? (
-        <AgainstTheLeague view={league.data.payload} />
-      ) : (
-        <Card tone="muted" title={copy.againstLeague}>
-          <p className={styles.para}>{copy.comparisonMissing}</p>
-        </Card>
-      )}
+      {league.data ? <AgainstTheLeague view={league.data.payload} /> : null}
 
       {view.rows.length === 0 ? (
         <EmptyState title={messages.common.noDecisionRecorded}>{copy.firstRow}</EmptyState>
@@ -142,8 +136,6 @@ export function LeaguePage() {
           <p className={styles.note}>{copy.modeNote}</p>
         </Card>
       )}
-
-      {!league.data && <p className={styles.note}>{copy.note}</p>}
     </div>
   );
 }
@@ -166,7 +158,6 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
   return (
     <>
       <Card title={copy.againstLeague} aside={copy.weeklySummary(view.source_snapshot_id)}>
-        <p className={styles.note}>{copy.note}</p>
         <p className={styles.para}>
           {verdictText(messages, view.verdict_code, view.verdict_params, view.verdict)}
         </p>

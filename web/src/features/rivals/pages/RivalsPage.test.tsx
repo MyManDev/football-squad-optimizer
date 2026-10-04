@@ -15,7 +15,7 @@ import type { PoolView, SiteIndex } from "../../../data/schema";
 import { unsettledRecommendationFixture } from "../../../fixtures/settledRecommendation";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
-import { AS_A_CHANCE } from "../../../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { RivalsPage } from "./RivalsPage";
 
 afterEach(cleanup);
@@ -73,12 +73,17 @@ function renderRivals(language: Language) {
 }
 
 describe.each(["tr", "en"] as const)("the rivals page in %s", (language) => {
-  it("says no rival was scored without naming a probability", async () => {
+  it("says no rival was scored without naming a probability or what is not built yet", async () => {
     const { container } = renderRivals(language);
     const copy = MESSAGES[language].rivals;
     expect(await screen.findByText(copy.noRivalTitle)).toBeInTheDocument();
     expect(container).toHaveTextContent(copy.noRivalAfterStatus.trim());
     expect(container.textContent ?? "").not.toMatch(AS_A_CHANCE);
     expect(container.textContent ?? "").not.toMatch(/olasılık|probability/i);
+    // Nothing about what is not built yet, either.
+    expect(container.textContent ?? "").not.toMatch(AS_A_CAVEAT);
+    expect(container.textContent ?? "").not.toMatch(
+      /wired up|until then|bağlanacak|o zamana kadar/i,
+    );
   });
 });
