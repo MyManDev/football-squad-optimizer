@@ -45,6 +45,7 @@ from squadopt.contracts.league_tree import (
     read_league_directory,
     write_league_directory,
 )
+from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -330,7 +331,8 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
     if target.exists():
         raise LeagueDirectoryError(f"{target} exists beside the legacy tree {legacy}.")
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(legacy), str(target))
+    # The one rename helper: it waits out the handle Windows may still hold on the tree.
+    replace_retrying(legacy, target)
     return ("adopted", target)
 
 
