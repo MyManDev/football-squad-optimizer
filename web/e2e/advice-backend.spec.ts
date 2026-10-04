@@ -78,7 +78,12 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await leagueField.fill("123");
   await findLeague.click();
   await expect(page.getByRole("status")).toHaveText("Bu site 123 numaralı ligi yayımlamıyor.");
-  expect(leagueRequests).toEqual([]);
+  // Only the directory was read (the absent list, then the legacy tree's record); nothing
+  // of league 123, and nothing of the backend, was asked for.
+  expect(leagueRequests).toEqual([
+    `${context.webOrigin}/data/leagues.json`,
+    `${context.webOrigin}/data/league/members.json`,
+  ]);
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
   await expect(page).toHaveURL("/league/352490/members");
