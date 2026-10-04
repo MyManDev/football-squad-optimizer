@@ -290,6 +290,46 @@ describe("a rival strategy solved on the member's device", () => {
         { timeout: 30_000 },
       );
       for (const sentence of contradictions) expect(container).not.toHaveTextContent(sentence);
+      // The plan is on the page; the offer to compute it here has done its work.
+      expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableDevice);
+    },
+    60_000,
+  );
+
+  it.each([
+    { ending: "failed", service: "unreachable" },
+    { ending: "refused", service: "unreachable" },
+    { ending: "unpublished", service: "unreachable" },
+    { ending: "other-capture", service: "unreachable" },
+    { ending: "failed", service: "static" },
+  ] as const)(
+    "stops offering the device once a run ends without a plan ($ending, service $service)",
+    async ({ ending, service }) => {
+      if (ending === "failed" || ending === "refused") workerAnswer = ending;
+      const { container } = renderPage(`mode=fark-yarat&window=1&rival=${RIVAL}`, {
+        service,
+        devicePlan:
+          ending === "unpublished"
+            ? "missing"
+            : ending === "other-capture"
+              ? "other-capture"
+              : "published",
+      });
+      await waitFor(() => expect(deviceButton()).not.toBeNull());
+      if (service === "unreachable")
+        await waitFor(() =>
+          expect(container).toHaveTextContent(computeCopy.serviceUnreachableDevice),
+        );
+      await act(async () => deviceButton()!.click());
+      await waitFor(() =>
+        expect(container.querySelector(`[data-device-state='${ending}']`)).not.toBeNull(),
+      );
+      expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableDevice);
+      if (service === "unreachable")
+        expect(container).toHaveTextContent(computeCopy.serviceUnreachableAbsent);
+      // The decision area says what is published for this selection; it is not left empty.
+      const decision = screen.getByRole("region", { name: copy.decisionTitle });
+      expect(decision).toHaveTextContent(copy.publicationStates["not-listed"].title);
     },
     60_000,
   );

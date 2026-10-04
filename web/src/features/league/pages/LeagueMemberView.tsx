@@ -15,6 +15,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
+import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
@@ -162,11 +163,12 @@ function LeagueMemberContent({
   );
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
-  // The same holds for a selection the member's device solves while the week is open.
+  // The same holds for a selection the member's device solves while the week is open,
+  // until a run ends without a plan: the card then says what is published again.
   const computeOnly =
     selection.status === "not-listed" &&
     ((computeAvailable && selection.computable !== undefined) ||
-      (device.available && deadlinePassed === null));
+      (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );

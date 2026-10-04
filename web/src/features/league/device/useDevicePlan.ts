@@ -32,6 +32,20 @@ export type DevicePlanPhase =
   | { phase: "unpublished" }
   | { phase: "failed" };
 
+/**
+ * Whether the device's last run ended without a plan: it failed, refused the selection,
+ * found inputs from another capture or found none. The page then stops offering the
+ * device as the way to this selection and says what it would say without it.
+ */
+export function deviceEndedWithoutPlan(state: DevicePlanPhase): boolean {
+  return (
+    state.phase === "failed" ||
+    state.phase === "refused" ||
+    state.phase === "other-capture" ||
+    state.phase === "unpublished"
+  );
+}
+
 export interface DevicePlan {
   /** Whether this selection is one the device can solve from the published inputs. */
   available: boolean;

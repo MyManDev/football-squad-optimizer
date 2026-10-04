@@ -34,7 +34,7 @@ import { useViewerEntry } from "../identity/useViewerEntry";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
 import { COMPUTE_COPY, failureSentence } from "./computeCopy";
-import type { DevicePlan } from "../device/useDevicePlan";
+import { deviceEndedWithoutPlan, type DevicePlan } from "../device/useDevicePlan";
 import type { AdviceJob, EarlierAnswer } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
@@ -131,9 +131,23 @@ export function AdviceRequestPanel({
     (service === "ready"
       ? computable
       : service !== "other-capture" && selectionAvailable && canComputeAdvice(request));
-  // The member's device solves this selection: no note calls it unsupported or tells the
-  // member to pick a published one instead, and the device's button is the way to it.
-  const onDevice = device?.available === true && !deadlinePassed;
+  // The member's device solves this selection: no note calls it unsupported, and until it
+  // has run the notes offer it rather than send the member to a published option. Once it
+  // has answered there is nothing to add; after a run that ended without a plan the notes
+  // say what they would say without it, beside the device's own sentence.
+  const deviceOffered = device?.available === true && !deadlinePassed;
+  const deviceAnswered = deviceOffered && device.state.phase === "done";
+  const deviceStillOffered = deviceOffered && !deviceEndedWithoutPlan(device.state);
+  const unreachableNote =
+    published === true
+      ? computeCopy.serviceUnreachablePublished
+      : published === false
+        ? deviceAnswered
+          ? null
+          : deviceStillOffered
+            ? computeCopy.serviceUnreachableDevice
+            : computeCopy.serviceUnreachableAbsent
+        : computeCopy.serviceUnreachable;
 
   return (
     <>
@@ -227,7 +241,11 @@ export function AdviceRequestPanel({
             {computeCopy.deadlinePassedCompute}
           </p>
         ) : null}
-        {!deadlinePassed && !supported && !pending && !onDevice && service !== "other-capture" ? (
+        {!deadlinePassed &&
+        !supported &&
+        !pending &&
+        !deviceOffered &&
+        service !== "other-capture" ? (
           <p role="note" className={styles.note}>
             {service !== "ready"
               ? copy.computeUnsupportedSelection
@@ -236,15 +254,9 @@ export function AdviceRequestPanel({
                 : computeCopy.notComputable}
           </p>
         ) : null}
-        {!deadlinePassed && !pending && service === "unreachable" ? (
+        {!deadlinePassed && !pending && service === "unreachable" && unreachableNote !== null ? (
           <p role="note" className={styles.note}>
-            {published === true
-              ? computeCopy.serviceUnreachablePublished
-              : published === false
-                ? onDevice
-                  ? computeCopy.serviceUnreachableDevice
-                  : computeCopy.serviceUnreachableAbsent
-                : computeCopy.serviceUnreachable}
+            {unreachableNote}
           </p>
         ) : null}
         {!deadlinePassed && service === "other-capture" ? (
