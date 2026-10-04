@@ -71,9 +71,9 @@ def test_real_weekly_services_complete_and_resume_without_rebuilding(tmp_path: P
     settled = doc["stages"][2]["value"]
     assert settled["gameweeks_exported"] == [] and settled["skipped"]
     assert not operation.paths.records.exists()
-    members = json.loads((operation.paths.out / "data/league/members.json").read_bytes())
+    members = json.loads((operation.paths.out / "data/leagues/352490/members.json").read_bytes())
     assert members["payload"]["gameweek"] == 2 and members["payload"]["season"] == "2026-27"
-    entry = json.loads((operation.paths.out / "data/league/entries/101.json").read_bytes())
+    entry = json.loads((operation.paths.out / "data/leagues/352490/entries/101.json").read_bytes())
     assert entry["payload"]["source_snapshot_id"] == operation.request.snapshot_id
     before = fingerprint_paths([operation.paths.out])
     resumed = weekly.WeeklyOperations(
@@ -201,7 +201,7 @@ def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_canno
     assert public.read_text() == "previous publication"
     monkeypatch.setattr(weekly, "publish_scoreboard", actual_scoreboard)
     assert weekly.main([*args, "--resume"]) == 0
-    assert (paths.journal / "git-resume/preview/data/league/members.json").is_file()
+    assert (paths.journal / "git-resume/preview/data/leagues/352490/members.json").is_file()
     source.write_text("unrelated source edit")
     assert weekly.main([*args, "--resume"]) == 1
 
@@ -690,11 +690,13 @@ def test_the_publication_is_the_preview_byte_for_byte(
         str(published),
     )
     assert tree_digests(published / "web/public/data") == tree_digests(preview)
-    history = json.loads((preview / "league/history/101.json").read_bytes())
+    history = json.loads((preview / "leagues/352490/history/101.json").read_bytes())
     assert [week["gameweek"] for week in history["payload"]["weeks"]] == [2]
-    assert (published / "web/public/data/league/history/101.json").read_bytes() == (
-        preview / "league/history/101.json"
+    assert (published / "web/public/data/leagues/352490/history/101.json").read_bytes() == (
+        preview / "leagues/352490/history/101.json"
     ).read_bytes()
+    directory = json.loads((published / "web/public/data/leagues.json").read_bytes())
+    assert [row["path"] for row in directory["payload"]["leagues"]] == ["leagues/352490"]
     snapshot = args[args.index("--snapshot-id") + 1]
     assert (paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json").is_file()
     doc = json.loads((paths.journal / "shipped/run.json").read_bytes())
@@ -715,7 +717,7 @@ def test_record_advice_without_publish_records_every_rendered_member(
     assert weekly.main([*args, "--record-advice", "--run-id", "recorded"]) == 0
     receipt = json.loads((paths.journal / "recorded/run.json").read_bytes())
     assert "publish" not in [stage["name"] for stage in receipt["stages"]]
-    entries = paths.journal / "recorded/preview/data/league/entries"
+    entries = paths.journal / "recorded/preview/data/leagues/352490/entries"
     rendered = list(entries.glob("*.json"))
     assert rendered
     snapshot = args[args.index("--snapshot-id") + 1]
@@ -835,7 +837,7 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
     snapshot = args[args.index("--snapshot-id") + 1]
     record = paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json"
     assert json.loads(record.read_bytes())["state"]["source_snapshot_id"] == snapshot
-    history = paths.journal / "refused/preview/data/league/history/101.json"
+    history = paths.journal / "refused/preview/data/leagues/352490/history/101.json"
     assert [w["gameweek"] for w in json.loads(history.read_bytes())["payload"]["weeks"]] == [2]
 
 

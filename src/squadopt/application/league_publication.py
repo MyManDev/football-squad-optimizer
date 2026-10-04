@@ -34,6 +34,12 @@ from squadopt.application.weekly_suggestion_eval import (
     published_advice_captures,
     published_page_captures,
 )
+from squadopt.contracts.league_tree import (
+    PublishedLeague,
+    league_tree,
+    league_tree_dir,
+    write_league_directory,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -324,7 +330,7 @@ def publish_prepared_league(
                     history.source_id,
                 )
             )
-    out_dir = request.out_dir / "data" / "league"
+    out_dir = league_tree_dir(request.out_dir / "data", request.league_id)
     manager_words = load_publication_manager_words(request)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
         season,
@@ -398,6 +404,19 @@ def publish_prepared_league(
                     request.snapshot_id,
                 )
                 outputs.extend(path for path in directory.iterdir() if path.is_file())
+    # The site's directory names this league and its tree beside the others it serves.
+    directory = write_league_directory(
+        request.out_dir / "data",
+        PublishedLeague(
+            league_id=report.league_id,
+            league_name=report.league_name,
+            season=report.season,
+            gameweek=report.gameweek,
+            path=league_tree(report.league_id).as_posix(),
+        ),
+        generated_at_utc=report.generated_at_utc,
+    )
+    outputs.append(directory)
     return LeaguePublicationResult(
         snapshot_id=request.snapshot_id,
         season=season,

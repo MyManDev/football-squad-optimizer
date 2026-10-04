@@ -219,8 +219,24 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert all(path.is_file() for path in first.output_paths)
     assert any(path.name == "advice.json" for path in first.output_paths)
     assert any(path.name == "manifest.json" for path in first.output_paths)
-    history = request.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
+    tree = request.out_dir / "data/leagues/352490"
+    history = tree / "history" / f"{member_fixture.ENTRY_ID}.json"
     assert history in first.output_paths
+    # The site's directory lists the league beside its tree.
+    directory = request.out_dir / "data/leagues.json"
+    assert directory in first.output_paths
+    listed = json.loads(directory.read_text(encoding="utf-8"))
+    assert listed["contract_version"] == "league_directory_v1"
+    assert listed["payload"]["leagues"] == [
+        {
+            "league_id": 352490,
+            "league_name": first.report.league_name,
+            "season": first.season,
+            "gameweek": first.gameweek,
+            "path": "leagues/352490",
+        }
+    ]
+    assert listed["generated_at_utc"] == "2026-08-27T10:00:00Z"
     document = json.loads(history.read_text(encoding="utf-8"))
     assert document["payload"]["weeks"][0]["status"] == "unsettled"
     assert document["payload"]["weeks"][0]["advice_generated_at_utc"] == "2026-08-27T10:00:00Z"
@@ -230,19 +246,19 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
         second = publish_league(parallel, mapper=mapper)
     assert first.report.files == second.report.files
     for output in (request.out_dir, parallel.out_dir):
-        index = output / "data/league/advice" / str(member_fixture.ENTRY_ID) / "index.json"
+        index = output / "data/leagues/352490/advice" / str(member_fixture.ENTRY_ID) / "index.json"
         forecast = json.loads(index.read_text(encoding="utf-8"))["payload"]["chip_forecast"]
         assert forecast["status"] == "available", forecast
         assert forecast["source_snapshot_id"] == request.snapshot_id
         assert forecast["forecast"]["chips"]
     for name in first.report.files:
-        assert (request.out_dir / "data/league" / name).read_bytes() == (
-            parallel.out_dir / "data/league" / name
+        assert (tree / name).read_bytes() == (
+            parallel.out_dir / "data/leagues/352490" / name
         ).read_bytes()
     assert (
         history.read_bytes()
         == (
-            parallel.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
+            parallel.out_dir / "data/leagues/352490/history" / f"{member_fixture.ENTRY_ID}.json"
         ).read_bytes()
     )
 
@@ -284,7 +300,7 @@ def test_the_history_counts_only_the_captures_the_published_trees_carried(
         deadline_utc=deadline_utc,
     )
     assert unproven is not None and unproven["capture"]["snapshot_id"] == "unpublished-gw1"
-    league = request.out_dir / "data/league"
+    league = request.out_dir / "data/leagues/352490"
     page = {"payload": {"gameweek": 1, "source_snapshot_id": "published-gw1"}}
     (league / "entries").mkdir(parents=True)
     (league / "entries" / f"{entry_id}.json").write_text(json.dumps(page), encoding="utf-8")
@@ -321,7 +337,7 @@ def test_scoreboard_service_uses_the_named_capture_and_returns_the_written_path(
             now_utc="2026-08-27T10:00:00Z",
         )
     )
-    assert result.output_paths == (request.out_dir / "data/league/scoreboard.json",)
+    assert result.output_paths == (request.out_dir / "data/leagues/352490/scoreboard.json",)
     assert result.snapshot_id == request.snapshot_id
     raw = result.target.read_bytes()
     assert json.loads(raw)["payload"]["source_snapshot_id"] == request.snapshot_id

@@ -3,10 +3,10 @@
 What a member's one-week plan needs, published so the member's own device can solve it.
 Two documents, both inside the `provisional_league_ui_v1` envelope the league tree uses:
 
-- `data/league/device-plan.json`, one per publication: the capture's projection table in
+- `data/leagues/<league id>/device-plan.json`, one per publication: the capture's projection table in
   the order the server's solver sees it, the server's integer objective coefficients, and
   the season's rules and the member planning policy as numbers.
-- `device_plan` on `data/league/entries/<id>.json`, one per member: the fifteen, the bank
+- `device_plan` on `data/leagues/<league id>/entries/<id>.json`, one per member: the fifteen, the bank
   after the spending-power rule, the free transfers under the cap, and the sale price of
   each held player. Present on every entry document a build writes, since a rendered
   member has passed the same preparation for the baseline plan; `null` is the guard for a
