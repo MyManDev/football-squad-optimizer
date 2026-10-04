@@ -199,6 +199,8 @@ export interface DeviceComputable {
   strategies: MemberStrategy[];
   windows: WindowSize[];
   rivals: number[];
+  /** The Top 100 weights the device solves for the one-week pure-points plan; zero always. */
+  top100Weights: Top100Weight[];
 }
 
 export interface ComputableAdvice {
@@ -721,7 +723,7 @@ function resolveFromIndex(
     const switched = evidenceAsked && evidencePath !== null && window === 1;
     // The Top 100 menu is the same plan at another setting. A setting whose file this
     // selection cannot read shows the plan at 0, and the controls say so.
-    const { path: weightedPath, ...top100 } = top100For(
+    const { path: weightedPath, ...published100 } = top100For(
       result.top100,
       index,
       entryId,
@@ -729,6 +731,20 @@ function resolveFromIndex(
       switched,
       top100Asked.weight,
     );
+    // A weight the publish did not solve but the device computes stays the asked one:
+    // the selection is then not listed until the device answers it.
+    const onDeviceWeight =
+      published100.weight === 0 &&
+      top100Asked.weight !== 0 &&
+      window === 1 &&
+      !switched &&
+      onDevice?.top100Weights.includes(top100Asked.weight) === true;
+    const top100 = onDeviceWeight
+      ? { ...published100, weight: top100Asked.weight, notOffered: false }
+      : published100;
+    if (onDeviceWeight) {
+      return { ...result, status: "not-listed", path: null, top100 };
+    }
     // A chosen chip is the plain one-week plan with that chip forced, and combines with
     // nothing: with the word on or a setting above 0 the chip is left out and the
     // controls say so.

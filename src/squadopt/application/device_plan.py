@@ -23,6 +23,7 @@ from collections.abc import Mapping
 from typing import Final
 
 from squadopt.application.strategies.catalog import STRATEGY_CATALOG
+from squadopt.application.top100_weight import TOP100_WEIGHTS, Top100Counts, weighted_projection
 from squadopt.contracts.players import sort_players_by_id
 from squadopt.data.errors import DataSourceError
 from squadopt.live.recommendation import Projection, RecommendationInputs
@@ -36,6 +37,7 @@ from squadopt.live.transfers import (
 )
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
+from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE
 
 DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
 DEVICE_PLAN_DOCUMENT: Final = "device-plan.json"
@@ -48,8 +50,16 @@ def device_plan_table(
     *,
     league_id: int,
     optimization: OptimizationConfig | None = None,
+    top100: Top100Counts | None = None,
 ) -> dict[str, object]:
     """The capture's table and rules, as the member path's solver receives them.
+
+    With ``top100``, the week's Top 100 counts: each player's start count and, for every
+    weight the menu offers, his weighted points on the objective's integer scale, scaled
+    exactly as the server scales them (``weighted_projection`` then
+    ``scale_expected_points``), so a device chooses on the same integers the server
+    chooses on. The device derives the bench coefficient from the integer by the
+    server's own rounding rule and never multiplies a float.
 
     The players are sorted by id, the order the planner sorts its own table into before
     it solves: the server breaks ties between equal plans by rank in that order, and a
@@ -68,6 +78,19 @@ def device_plan_table(
     )
     coefficients = objective_coefficients(table["expected_points"].tolist(), settings)
     policy = member_planning_policy(rules)
+    weights = tuple(weight for weight in TOP100_WEIGHTS if weight != 0)
+    weighted_scaled: dict[int, dict[str, int]] = {}
+    if top100 is not None:
+        for weight in weights:
+            weighted = sort_players_by_id(
+                weighted_projection(projection, top100.counts, weight).table
+            )
+            for player, points in zip(
+                weighted["player_id"].tolist(), weighted["expected_points"].tolist(), strict=True
+            ):
+                weighted_scaled.setdefault(int(str(player)), {})[str(weight)] = (
+                    scale_expected_points(points, settings.expected_points_scale)
+                )
     return {
         "contract_version": DEVICE_PLAN_CONTRACT_VERSION,
         "league_id": int(league_id),
@@ -108,6 +131,19 @@ def device_plan_table(
                 if strategy.constraints.overlap_floor is not None
                 or strategy.constraints.overlap_ceiling is not None
             },
+            # The Top 100 influence's inputs, where the week has them: the weights the
+            # menu offers, the cohort the counts are out of, and where the counts came from.
+            **(
+                {}
+                if top100 is None
+                else {
+                    "top100": {
+                        "weights": list(weights),
+                        "cohort_size": ELITE_COHORT_SIZE,
+                        **top100.source_record(),
+                    }
+                }
+            ),
         },
         "players": [
             {
@@ -120,6 +156,14 @@ def device_plan_table(
                 "expected_points": float(str(row.expected_points)),
                 # (squad, starter, captain): the server's exact integer coefficients.
                 "coefficients": list(coefficients[index]),
+                **(
+                    {}
+                    if top100 is None
+                    else {
+                        "top100_count": int(top100.counts.get(int(str(row.player_id)), 0)),
+                        "top100_scaled": weighted_scaled.get(int(str(row.player_id)), {}),
+                    }
+                ),
             }
             for index, row in enumerate(table.itertuples(index=False))
         ],
@@ -131,6 +175,8 @@ def device_plan_entry(
     projection: Projection,
     held: HeldSquad,
     rules: SeasonRules,
+    *,
+    top100: Top100Counts | None = None,
 ) -> dict[str, object] | None:
     """One member's side of the problem, or ``None`` where the live path would not plan.
 
@@ -145,7 +191,11 @@ def device_plan_entry(
     except DataSourceError:
         return None
     sell: Mapping[int, int] = prepared.sell_prices_tenths
+    weights = [weight for weight in TOP100_WEIGHTS if weight != 0]
     return {
+        # The weights the shared document carries this week, so a page can offer them
+        # before it reads the document; none where the week has no counts.
+        **({} if top100 is None else {"top100_weights": weights}),
         "held": [int(player) for player in held.squad_player_ids],
         "bank_tenths": int(prepared.bank_tenths),
         "free_transfers": int(prepared.free_transfers),

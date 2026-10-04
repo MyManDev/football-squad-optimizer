@@ -198,7 +198,14 @@ export function useDevicePlan(
           resolve(null);
         };
         try {
-          worker.postMessage({ id: run, document, entry, chip, strategy });
+          worker.postMessage({
+            id: run,
+            document,
+            entry,
+            chip,
+            strategy,
+            top100Weight: selection.kind === "top100" ? selection.weight : 0,
+          });
         } catch {
           resolve(null);
         }

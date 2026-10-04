@@ -7,6 +7,7 @@ import type { LpSolver } from "./lp/problem";
 import { DevicePlanRefused, solvePlan } from "./solve/week";
 import { gainVsNoChip } from "./strategies/chips";
 import { solveRival } from "./strategies/rival";
+import { solveTop100 } from "./strategies/top100";
 import type {
   DeviceChip,
   DevicePlanAnswer,
@@ -24,6 +25,8 @@ export interface DevicePlanRequest {
   chip?: DeviceChip | null;
   /** A rival strategy against the named rival; null for the pure-points plan. */
   strategy?: { name: RivalStrategy; rival: DeviceRival } | null;
+  /** A Top 100 weight the plan is chosen on; 0 or absent for the base points. */
+  top100Weight?: number;
 }
 
 /**
@@ -34,9 +37,22 @@ export interface DevicePlanRequest {
  */
 export function solveRequest(
   solver: LpSolver,
-  { document, entry, chip = null, strategy = null }: Omit<DevicePlanRequest, "id">,
+  {
+    document,
+    entry,
+    chip = null,
+    strategy = null,
+    top100Weight = 0,
+  }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
 ): DevicePlanAnswer {
+  if (top100Weight !== 0) {
+    // The weight applies to the one-week pure-points plan only, as on the server.
+    if (chip !== null || strategy !== null) {
+      throw new DevicePlanRefused("a weight with a chip or a rival strategy", "plan");
+    }
+    return solveTop100(solver, document, entry, top100Weight, now);
+  }
   if (strategy !== null) {
     if (chip !== null) throw new DevicePlanRefused("a chip with a rival strategy", "plan");
     return solveRival(solver, document, entry, strategy.rival, strategy.name, now);
