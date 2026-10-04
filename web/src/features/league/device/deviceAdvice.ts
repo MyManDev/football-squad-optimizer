@@ -9,7 +9,6 @@
 import type { AdvicePlayer, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanAnswer, DevicePlanDocument, DevicePlanPlayer } from "./types";
 
-export const DEVICE_SOLVER = "highs-wasm";
 /** The server's name for how a chip's gain is measured: this gameweek's expected points. */
 export const CHIP_CHOICE_BASIS = "one_week_expected_points_v1";
 /** The server's name for what a Top 100 price is measured on: the base model's points. */

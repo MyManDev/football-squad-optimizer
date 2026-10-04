@@ -63,7 +63,6 @@ const en = {
     forecast: "Expected",
     realized: "Actual",
     error: "Actual − Expected",
-    minutes: "Minutes",
     playerNote:
       "Expected and actual are each player's unmultiplied points. The captain label shows the applied multiplier.",
     evidence: "Record details",
@@ -90,7 +89,6 @@ const en = {
     closed: "CLOSED",
     dayShort: "d",
     none: "None.",
-    rawJson: "Raw JSON",
     pageFailed: "This page could not be drawn.",
     pageFailedBody:
       "The site may have been updated since this tab opened. Reloading fetches the current version.",
@@ -110,7 +108,6 @@ const en = {
     expandSidebar: "Expand sidebar",
     openMenu: "Open menu",
     closeMenu: "Close menu",
-    openFixtures: "Open fixtures",
     closeFixtures: "Close fixtures",
     changeMember: "Change member",
     changePlan: "Change the plan and compute",
@@ -120,7 +117,6 @@ const en = {
   admin: {
     title: "Admin",
     notice: "This admin page is unlisted, not protected; anyone with its address can open it.",
-    analysis: "Measurement archive",
     status: "Operational state",
     decisions: "Decision log (GitHub)",
   },
@@ -681,45 +677,6 @@ const en = {
     windowWeekOf: (gameweek: number) => `GW${gameweek}`,
     windowHits: "Hit points",
     windowPoints: "Expected points",
-    // Only exact published limit keys receive these reviewed explanations.
-    statedLimits: {
-      "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
-        "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.",
-      "Experimental football model; independent predictive superiority is unverified.":
-        "Experimental football model; independent predictive superiority is unverified.",
-      "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.":
-        "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.",
-      "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
-        "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
-      "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
-        "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.",
-      "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
-        "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.",
-      "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
-        "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
-      "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
-        "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.",
-      "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
-        "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.",
-      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
-        "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
-      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
-        "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
-      "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.":
-        "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.",
-      "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.":
-        "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.",
-      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
-        "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
-      "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
-        "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
-      "Prices are held at the captured values; no price change is modelled.":
-        "Prices are held at the captured values; no price change is modelled.",
-      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
-        "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
-      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.":
-        "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.",
-    } as Record<string, string>,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
@@ -823,11 +780,7 @@ const en = {
     emptySquadBody: "The published member record does not contain squad data.",
     independentAdviceRule:
       "Your advice is calculated from your squad and selected strategy. Every member is evaluated under the same decision rules.",
-    squadoptComparisonTitle: "Recorded score difference",
-    squadoptComparison: (difference: string) =>
-      `Your point difference from SquadOpt's squad this gameweek: ${difference}`,
     noMove: "The published plan recommends no transfers.",
-    noAdviceMissingData: "Advice is withheld because the source squad is incomplete.",
     diagnosticOnly:
       "The two starting XIs use the same projection. Shared players with equal multipliers cancel out; the remaining expected points, captain multipliers and this plan’s transfer hits determine the expected gap.",
     out: "Out",
@@ -1153,7 +1106,6 @@ const tr: MessageSchema<typeof en> = {
     forecast: "Beklenen",
     realized: "Gerçekleşen",
     error: "Gerçekleşen − Beklenen",
-    minutes: "Dakika",
     playerNote:
       "Beklenen ve gerçekleşen değerler oyuncunun çarpansız puanıdır. Uygulanan çarpan kaptan etiketinde gösterilir.",
     evidence: "Kayıt ayrıntıları",
@@ -1180,7 +1132,6 @@ const tr: MessageSchema<typeof en> = {
     closed: "KAPANDI",
     dayShort: "g",
     none: "Yok.",
-    rawJson: "Ham JSON",
     pageFailed: "Bu sayfa çizilemedi.",
     pageFailedBody:
       "Site bu sekme açıldıktan sonra güncellenmiş olabilir. Yeniden yüklemek güncel sürümü getirir.",
@@ -1200,7 +1151,6 @@ const tr: MessageSchema<typeof en> = {
     expandSidebar: "Kenar çubuğunu aç",
     openMenu: "Menüyü aç",
     closeMenu: "Menüyü kapat",
-    openFixtures: "Fikstürü aç",
     closeFixtures: "Fikstürü kapat",
     changeMember: "Üye değiştir",
     changePlan: "Planı değiştir ve hesapla",
@@ -1211,7 +1161,6 @@ const tr: MessageSchema<typeof en> = {
     title: "Yönetim",
     notice:
       "Bu yönetim sayfası menüde listelenmez, korumalı değildir; adresini bilen herkes açabilir.",
-    analysis: "Ölçüm arşivi",
     status: "Operasyon durumu",
     decisions: "Karar kaydı (GitHub)",
   },
@@ -1751,45 +1700,6 @@ const tr: MessageSchema<typeof en> = {
     windowWeekOf: (gameweek) => `OH${gameweek}`,
     windowHits: "Transfer cezası",
     windowPoints: "Beklenen puan",
-    // Only exact published limit keys receive these reviewed explanations.
-    statedLimits: {
-      "Each future fixture is forecast separately from captured history; blank weeks are zero only in that week. No future outcomes or injury updates are assumed.":
-        "Gelecek her maçın tahmini, kayıtlı geçmiş verilerinden ayrı hesaplanır; maçsız haftalarda yalnız o haftanın puanı sıfırdır. Gelecekteki maç sonuçları veya sakatlık güncellemeleri varsayılmaz.",
-      "Experimental football model; independent predictive superiority is unverified.":
-        "Deneysel futbol modelinin daha başarılı tahminler ürettiği bağımsız olarak doğrulanmadı.",
-      "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.":
-        "Önceki futbol tahminleri, bir oyuncunun yokluğunu sonraki haftalara da taşımış olabilir. Oyuncunun oynadığı durumdaki puan tahmini bilinmeden bu güncelleme o değerleri geri yüklemez.",
-      "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.":
-        "Tam planlar, beklenen otomatik değişiklik puanları ve kaptan oynamazsa yardımcı kaptanın ek puanı dahil edilerek karşılaştırılır. Sınırlı arama, mümkün olan en iyi planı veya gelecekteki başarıyı kanıtlamaz.",
-      "This experimental plan compares today's actions under two possible updates before the next deadline. Later transfers are conditional plans, not certain moves. The information timing is an assumption, not a measured recovery forecast.":
-        "Bu deneysel plan, bir sonraki karar gününden önce gelebilecek iki bilgi durumunda bugünkü hamleleri karşılaştırır. Sonraki transferler koşula bağlıdır. Haberin ne zaman netleşeceği bir varsayımdır; ölçülmüş iyileşme tahmini değildir.",
-      "The information comparison could not be completed within its shared search budget; the complete baseline plan is retained.":
-        "Bilgi karşılaştırması ortak hesaplama bütçesinde tamamlanamadı; tam başlangıç planı korunuyor.",
-      "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.":
-        "Bu deneysel plan, hafta hafta kurulan başlangıç planını tüm pencereyi birlikte arayan yöntemle karşılaştırır. Başlangıç planı ancak pencerenin tamamı için geçerliliği doğrulanırsa korunur. Gelecekteki başarısı henüz ölçülmedi.",
-      "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.":
-        "Hafta hafta başlangıç planı tamamlanamadı; bu sonuç kalan bütçeyle standart pencere aramasından üretildi.",
-      "The football model divides each club's forecast goals and assists among all of its players before availability is applied. What availability then removes from a player the capture marks as unavailable or doubtful is not passed to his teammates, so at a club with absentees its players together are credited with fewer goals and assists than the model forecasts for the club.":
-        "Futbol modeli her kulübün tahmin edilen gol ve asistlerini, oynayabilirlik uygulanmadan önce kulübün bütün oyuncuları arasında paylaştırır. Oynayabilirliğin, veri kesitinde oynayamaz ya da şüpheli görünen bir oyuncudan düşürdüğü kısım takım arkadaşlarına aktarılmaz; bu yüzden eksik oyuncusu olan bir kulüpte oyunculara toplamda, modelin kulüp için tahmin ettiğinden daha az gol ve asist yazılır.",
-      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
-        "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için veri kesitindeki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
-      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
-        "Oynayabilirlik bir kez, veri kesitinden uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
-      "Each week allows one transfer, or up to two when both use banked free transfers. Wildcard and Free Hit weeks can rebuild the squad; the one-week plan has no such cap.":
-        "Her hafta bir transfer; birikmiş en az iki ücretsiz hakkın varsa ikisini kullanarak iki transfer yapılabilir. Wildcard ve Free Hit haftalarında kadro yeniden kurulabilir; tek haftalık planda bu sınır yoktur.",
-      "Chip and no-chip candidates use the same expected lineup score, including autosubs and vice-captain cover. Automatic chip plans do not yet branch on future news.":
-        "Çipli ve çipsiz adaylar, otomatik yedek değişimi ve yardımcı kaptan katkısı dahil aynı beklenen ilk 11 puanıyla karşılaştırılır. Otomatik çip planları henüz gelecekteki haber durumlarına göre dallanmaz.",
-      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
-        "Pencere içindeki her hafta, ilki dahil, bir transferle sınırlıdır (wildcard haftası hariç); bir haftalık planda böyle bir sınır yoktur.",
-      "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
-        "Top-100 düzeltmesi ilk haftanın sayılarının içindedir ve tekrar onu sonraki her haftaya taşır.",
-      "Prices are held at the captured values; no price change is modelled.":
-        "Fiyatlar veri kesitindeki değerlerde tutulur; fiyat değişimi modellenmez.",
-      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
-        "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
-      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.":
-        "Mevcut model, savunma katkısı (DEFCON) puanı verilmeyen sezonlarla eğitildi; bu yüzden bu puanları tahmin etmez.",
-    },
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
@@ -1890,11 +1800,7 @@ const tr: MessageSchema<typeof en> = {
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
     independentAdviceRule:
       "Önerin senin kadrondan, seçtiğin stratejiye göre hesaplanır. Her üye aynı karar kurallarıyla değerlendirilir.",
-    squadoptComparisonTitle: "Kaydedilen puan farkı",
-    squadoptComparison: (difference) =>
-      `SquadOpt'un bu haftaki kadrosuyla puan farkın: ${difference}`,
     noMove: "Yayımlanan plan transfer önermiyor.",
-    noAdviceMissingData: "Kaynak kadro eksik olduğu için öneri gösterilmiyor.",
     diagnosticOnly:
       "İki ilk 11 aynı projeksiyonla karşılaştırılır. Aynı çarpana sahip ortak oyuncuların katkıları sadeleşir; kalan beklenen puanlar, kaptan çarpanları ve bu planın transfer cezaları beklenen farkı belirler.",
     out: "Çıkan",

@@ -509,10 +509,12 @@ def test_a_variant_that_fails_is_recorded_at_its_address(
     assert "Top 100 influence 50 not solved: The strategy's window at 0 did not solve." in note
 
 
-def test_the_site_holds_the_new_limit_sentences_verbatim() -> None:
+def test_the_site_keeps_no_translation_of_the_limit_sentences() -> None:
+    """A stated limit is not drawn on a member page, so the page keeps no table of them."""
+
     text = WEB_COPY.read_text(encoding="utf-8")
     for sentence in (TOP100_WINDOW_LIMIT, RIVAL_WINDOW_LIMIT):
-        assert text.count(json.dumps(sentence)) == 3, sentence
+        assert json.dumps(sentence) not in text, sentence
 
 
 # -- the review's fixes -------------------------------------------------------------------

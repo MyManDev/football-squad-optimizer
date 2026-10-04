@@ -3,9 +3,10 @@ import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/typ
 import { MESSAGES } from "../src/i18n/messages";
 import { figure } from "../src/lib/format";
 
-// publish_series_horizon in application/weekly_suggestion_eval.py omits this
-// document until the settled series supports a horizon. Only its 404 is absence.
-const OPTIONAL_DOCUMENTS = new Set(["/data/league/series-horizon.json"]);
+// Documents whose 404 is absence: the league directory on a site from before it, and the
+// series horizon, which publish_series_horizon in application/weekly_suggestion_eval.py
+// omits until the settled series supports a horizon (added once the tree is known).
+const OPTIONAL_DOCUMENTS = new Set(["/data/leagues.json"]);
 
 // Normal offline smoke discovery skips this file; only the live config runs it.
 test.skip(!process.env.LIVE_BASE_URL || Boolean(process.env.CI), "Manual live release check only.");
@@ -62,7 +63,17 @@ test("published league and member journey works without submitting a solve", asy
     return route.continue();
   });
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
-  const membersResponse = await page.request.get("/data/league/members.json");
+  // The league's tree: the directory's first line, or the one tree of a site from before it.
+  const directoryResponse = await page.request.get("/data/leagues.json");
+  let tree = "league";
+  if (directoryResponse.status() === 200) {
+    const directory = (await directoryResponse.json()) as {
+      payload: { leagues: { league_id: number; path: string }[] };
+    };
+    tree = directory.payload.leagues[0]!.path;
+  } else expect(directoryResponse.status()).toBe(404);
+  OPTIONAL_DOCUMENTS.add(`/data/${tree}/series-horizon.json`);
+  const membersResponse = await page.request.get(`/data/${tree}/members.json`);
   expect(membersResponse.status()).toBe(200);
   const members = (await membersResponse.json()) as {
     payload: { league_id: number; members: { member_kind: string; entry_id: number }[] };
@@ -70,18 +81,18 @@ test("published league and member journey works without submitting a solve", asy
   const member = members.payload.members.find((entry) => entry.member_kind === "human");
   expect(member, "a published human member is required").toBeDefined();
   const entryId = member!.entry_id;
-  // The live tree is the one from before the directory; its league number is in its record.
+  // The league's number is in its own members record.
   const league = members.payload.league_id;
-  const published = await page.request.get(`/data/league/advice/${entryId}/saf-puan/1.json`);
+  const published = await page.request.get(`/data/${tree}/advice/${entryId}/saf-puan/1.json`);
   expect(published.status()).toBe(200);
   const advice = (await published.json()) as LeagueViewEnvelope<EntryAdvice>;
   expect(advice.payload.starting_xi).toHaveLength(11);
 
   const pendingDocuments = new Set([
-    "/data/league/series-horizon.json",
+    `/data/${tree}/series-horizon.json`,
     ...members.payload.members
       .filter((entry) => entry.member_kind === "human")
-      .map((entry) => `/data/league/history/${entry.entry_id}.json`),
+      .map((entry) => `/data/${tree}/history/${entry.entry_id}.json`),
   ]);
   // Register before navigation; a fast table must not hide late document failures.
   const documentReads = [...pendingDocuments].map(async (path) => {
@@ -139,10 +150,12 @@ test("published league and member journey works without submitting a solve", asy
   for (const selector of [
     'input[name="strategy"][value="saf-puan"]',
     'input[name="window"][value="1"]',
-    'input[name="top100"][value="0"]',
     'input[name="chip"][value=""]',
   ])
     await expect(page.locator(selector)).toBeEnabled();
+  // The Top 100 menu is offered by the compute service; with the PC backend down the page
+  // has nothing to offer it from, so it is checked only when the service answered.
+  if (capabilitiesUrl) await expect(page.locator('input[name="top100"][value="0"]')).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath("member.png"), fullPage: true });
 
   if (process.env.LIVE_SMOKE_COMPUTE === "1") {
@@ -181,7 +194,7 @@ test("published league and member journey works without submitting a solve", asy
   await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}/history$`));
   await expect(page.locator("main h1")).toBeVisible();
   await page.waitForLoadState("networkidle");
-  const historyResponse = await page.request.get(`/data/league/history/${entryId}.json`);
+  const historyResponse = await page.request.get(`/data/${tree}/history/${entryId}.json`);
   expect(historyResponse.status()).toBe(200);
   const history = (await historyResponse.json()) as { payload: { weeks: { gameweek: number }[] } };
   if (history.payload.weeks.length) {

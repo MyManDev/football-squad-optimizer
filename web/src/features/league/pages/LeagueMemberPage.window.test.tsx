@@ -73,20 +73,17 @@ describe("the advice card shows a window week by week", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "holds a sentence for each published limit and lists none on the page in %s",
+    "lists none of the published limits on the page in %s",
     (language) => {
       const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 5);
       const copy = MESSAGES[language].leagueMembers;
-      for (const sentence of WINDOW_STATED_LIMITS) {
-        expect(Object.hasOwn(copy.statedLimits, sentence), sentence).toBe(true);
-      }
       const { container } = renderAdvice(advice, language);
       const section = screen.getByRole("region", { name: copy.windowTitle(5) });
       expect(container).not.toHaveTextContent(
         /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
       );
       for (const sentence of WINDOW_STATED_LIMITS) {
-        expect(container).not.toHaveTextContent(copy.statedLimits[sentence]!);
+        expect(container).not.toHaveTextContent(sentence);
       }
       expect(
         within(section).getByRole("columnheader", { name: copy.windowHits }),
@@ -166,7 +163,6 @@ describe("the advice card shows a window week by week", () => {
     "shows no assumptions under a one-week plan whose only limit is the chip one in %s",
     (language) => {
       const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
-      const copy = MESSAGES[language].leagueMembers;
       expect(advice.payload.stated_limits).toEqual([NO_CHIP_STATED_LIMIT]);
       renderAdvice(advice, language);
 
@@ -174,7 +170,7 @@ describe("the advice card shows a window week by week", () => {
       expect(document.body).not.toHaveTextContent(
         /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
       );
-      expect(document.body).not.toHaveTextContent(copy.statedLimits[NO_CHIP_STATED_LIMIT]!);
+      expect(document.body).not.toHaveTextContent(NO_CHIP_STATED_LIMIT);
     },
   );
 });

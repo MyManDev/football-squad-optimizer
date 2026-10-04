@@ -3,7 +3,6 @@ import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
 import type { DecisionInformation } from "./informationFacts";
 import styles from "../pages/LeagueMemberPage.module.css";
-import { OfficialInjuryCard } from "./OfficialInjuryCard";
 
 const COPY = {
   tr: {
@@ -152,18 +151,12 @@ export function NewInformationNotice({
 /**
  * The central league injury source is disabled in production (the producer's
  * ``OFFICIAL_INJURY_SOURCE_ENABLED`` is False, with no override). The page mirrors that:
- * a payload carrying the central card is not drawn, whoever built it.
+ * a payload's `official_injuries` is validated and never drawn, whoever built it.
  */
-export const OFFICIAL_INJURY_CARD_ENABLED = false;
-
 export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
   const { language, locale } = useLanguage();
   const feed = view.official_information;
-  if (!feed) {
-    return OFFICIAL_INJURY_CARD_ENABLED ? (
-      <OfficialInjuryCard data={view.official_injuries} />
-    ) : null;
-  }
+  if (!feed) return null;
   const copy = COPY[language];
   const flagged = feed.players.filter(
     (p) =>
@@ -214,14 +207,6 @@ export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
           ))}
         </ul>
       )}
-      {OFFICIAL_INJURY_CARD_ENABLED ? (
-        <OfficialInjuryCard
-          data={view.official_injuries}
-          playerNames={Object.fromEntries(
-            feed.players.map((player) => [player.player_id, player.name]),
-          )}
-        />
-      ) : null}
     </details>
   );
 }

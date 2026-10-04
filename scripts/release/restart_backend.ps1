@@ -98,8 +98,18 @@ function Published-Directory-Exists([switch]$Public, [string]$Ref = "") {
         }
     }
     if ($Ref) {
-        $null = & git --no-optional-locks -C $RepoRoot cat-file -e "${Ref}:web/public/data/leagues.json" 2>$null
-        return ($LASTEXITCODE -eq 0)
+        # git answers an absent path on stderr. Under the script's Stop preference, Windows
+        # PowerShell 5.1 turns a native stderr line into a terminating error even when it is
+        # redirected, so the preference is relaxed for this one call and the exit code read.
+        $preference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $null = & git --no-optional-locks -C $RepoRoot cat-file -e "${Ref}:web/public/data/leagues.json" 2>$null
+            $present = ($LASTEXITCODE -eq 0)
+        } finally {
+            $ErrorActionPreference = $preference
+        }
+        return $present
     }
     return (Test-Path -LiteralPath (Join-Path $SiteDataRoot 'leagues.json') -PathType Leaf)
 }

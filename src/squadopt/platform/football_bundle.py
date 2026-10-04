@@ -286,11 +286,30 @@ def _site_files(tree: Path) -> dict[str, Path]:
     return result
 
 
+#: Where a sealed site's member documents sit inside the bundle: the league's tree as the
+#: site publishes it, the legacy ``league`` or ``leagues/<league id>``.
+_SITE_MEMBERS = re.compile(r"site/(league|leagues/[1-9][0-9]*)/members\.json")
+
+
+def _site_folder(prefix: str, records: dict[str, object]) -> str:
+    """The sealed tree's folder, read from the members record; the legacy one when it
+    names no tree, so a record of any other shape is refused by the role check."""
+
+    members = records.get("site_members")
+    path = members.get("path") if isinstance(members, dict) else None
+    if isinstance(path, str) and path.startswith(prefix):
+        match = _SITE_MEMBERS.fullmatch(path.removeprefix(prefix))
+        if match is not None:
+            return f"site/{match.group(1)}/"
+    return "site/league/"
+
+
 def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str, Path]:
     if not isinstance(records, dict):
         raise ValueError("Bundle file records must be an object.")
     result = {}
     prefix = snapshot_id + ".bundle/"
+    site = prefix + _site_folder(prefix, records)
     for role, entry in records.items():
         if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
             raise ValueError("Bundle file entries require a path and digest.")
@@ -299,10 +318,10 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
             "forecast": snapshot_id + ".json",
             "components": snapshot_id + ".components.json",
             "handoff": prefix + "handoff.json",
-            "site_members": prefix + "site/league/members.json",
+            "site_members": site + "members.json",
         }.get(role)
         if re.fullmatch(r"site_entry_[1-9][0-9]*", role):
-            expected = prefix + "site/league/entries/" + role.removeprefix("site_entry_") + ".json"
+            expected = site + "entries/" + role.removeprefix("site_entry_") + ".json"
         if expected is None:
             if (
                 role not in _OPTIONAL

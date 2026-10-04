@@ -1,6 +1,7 @@
 """Offline ready-marker checks over real synthetic capture/pair/news/site readers."""
 
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -193,6 +194,41 @@ def test_ready_marker_is_last_and_replays_exact_bytes(case, monkeypatch):
     assert all(not Path(row["path"]).is_absolute() for row in record["files"].values())
     assert record["news"] is None
     assert len([key for key in result.files if key.startswith("site_entry")]) == 2
+
+
+def test_a_site_with_the_league_directory_seals_and_reads_back(case):
+    """The first publication into the directory layout moves the tree to leagues/<id>/;
+    the bundle seals it there, and the reader takes the folder from the sealed record."""
+
+    site = case["site_data_root"]
+    (site / "leagues").mkdir()
+    (site / "league").rename(site / "leagues" / "1")
+    directory = {
+        "contract_version": "league_directory_v1",
+        "generated_at_utc": "2026-09-22T13:00:00Z",
+        "payload": {
+            "leagues": [
+                {
+                    "league_id": 1,
+                    "league_name": "Synthetic",
+                    "season": "2026-27",
+                    "gameweek": 6,
+                    "path": "leagues/1",
+                }
+            ]
+        },
+    }
+    dump(site / "leagues.json", directory)
+    result = bundle.seal_football_bundle(**case)
+    record = json.loads(marker(case).read_bytes())
+    assert record["files"]["site_members"]["path"].endswith(".bundle/site/leagues/1/members.json")
+    assert read(case).fingerprint == result.fingerprint
+    # A record naming a tree no site publishes is refused, as any other unexpected path.
+    record["files"]["site_members"]["path"] = record["files"]["site_members"]["path"].replace(
+        "leagues/1", "leagues/x"
+    )
+    with pytest.raises(ValueError, match="unexpected filename"):
+        bundle._relative_files(marker(case), case["snapshot_id"], record["files"])
 
 
 @pytest.mark.parametrize(
@@ -458,3 +494,34 @@ def test_disabled_central_source_cannot_be_sealed_or_read(case, monkeypatch):
     )
     with pytest.raises(ValueError, match="central official injury source is disabled"):
         read(case)
+
+
+def test_a_site_with_several_leagues_seals_the_league_it_is_told(case):
+    site = case["site_data_root"]
+    (site / "leagues").mkdir()
+    (site / "league").rename(site / "leagues" / "1")
+    shutil.copytree(site / "leagues" / "1", site / "leagues" / "2")
+    rows = [
+        {
+            "league_id": league,
+            "league_name": "Synthetic",
+            "season": "2026-27",
+            "gameweek": 6,
+            "path": f"leagues/{league}",
+        }
+        for league in (1, 2)
+    ]
+    dump(
+        site / "leagues.json",
+        {
+            "contract_version": "league_directory_v1",
+            "generated_at_utc": "2026-09-22T13:00:00Z",
+            "payload": {"leagues": rows},
+        },
+    )
+    with pytest.raises(ValueError, match="lists 2 leagues"):
+        bundle.seal_football_bundle(**case)
+    result = bundle.seal_football_bundle(**case, league_id=1)
+    record = json.loads(marker(case).read_bytes())
+    assert record["files"]["site_members"]["path"].endswith(".bundle/site/leagues/1/members.json")
+    assert read(case).fingerprint == result.fingerprint

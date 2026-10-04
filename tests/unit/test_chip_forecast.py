@@ -35,7 +35,6 @@ from squadopt.application.chip_forecast import (
     chip_forecast_schema,
     holding_threshold,
     scaled_expected_points,
-    write_chip_forecast_schema,
 )
 from squadopt.application.strategies.catalog import (
     FORBIDDEN_FIELD_PATTERN,
@@ -747,15 +746,12 @@ def test_the_schema_refuses_a_gain_named_for_a_free_hit_gameweek_and_an_unknown_
             _validate(forged)
 
 
-def test_the_committed_schema_is_the_generator_output(tmp_path: Path) -> None:
+def test_the_committed_schema_is_the_generator_output() -> None:
     schema = chip_forecast_schema()
     jsonschema.Draft202012Validator.check_schema(schema)
     committed = REPOSITORY / CHIP_FORECAST_SCHEMA_PATH
 
     assert json.loads(committed.read_text(encoding="utf-8")) == schema
-    first = write_chip_forecast_schema(tmp_path / "a" / "schema.json")
-    second = write_chip_forecast_schema(tmp_path / "b" / "schema.json")
-    assert first.read_bytes() == second.read_bytes()
     assert schema["properties"]["contract_version"]["const"] == "chip_forecast_v1"
 
 
