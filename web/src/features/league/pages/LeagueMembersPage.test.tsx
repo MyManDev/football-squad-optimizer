@@ -459,10 +459,10 @@ describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language
     );
     if (kind === "within_free_transfers")
       expect(paragraph).toHaveTextContent(
-        language === "tr"
-          ? "yayımlanan transfer cezası 0 puan"
-          : "published transfer penalties 0 points",
+        language === "tr" ? "transfer cezası 0 puan" : "transfer penalties 0 points",
       );
+    // The hits are the plan's own, whether a publish or the member's device solved it.
+    expect(paragraph).not.toHaveTextContent(/published|yayımlanan/i);
     if (solver === "FEASIBLE")
       expect(paragraph).toHaveTextContent(language === "tr" ? "maliyet en fazla" : "cost at most");
   });

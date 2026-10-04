@@ -283,8 +283,7 @@ const en = {
       "League member data is not published yet; it arrives with the next decision publish.",
     leagueMismatch: (leagueId: number) => `This site does not publish league ${leagueId}.`,
     diagnostic: "diagnostic",
-    diagnosticTitle: (weeks: number) =>
-      `The league-relative ${weeks}-week result is a diagnostic, never a chance of winning.`,
+    diagnosticTitle: (weeks: number) => `The league-relative ${weeks}-week result is a diagnostic.`,
     diagnosticBody:
       "The scenarios price only part of the crowd's measured +7.19 points/week edge, so the competitive horizon is directional only.",
     sourceBefore: "Price labels come from the zero-point budget cell of the ",
@@ -333,7 +332,7 @@ const en = {
     noRivalBeforeStatus:
       "A rival comparison needs two things this gameweek does not have: a decision whose risk view was evaluated (this one is ",
     noRivalAfterStatus:
-      "), and a rival squad to score in the same scenarios. Both are being wired up: the template rival comes from the capture's ownership, mini-league rivals from the entry data. Until then this page shows the projections below rather than a probability nobody measured.",
+      "), and a rival squad to score in the same scenarios. Both are being wired up: the template rival comes from the capture's ownership, mini-league rivals from the entry data. Until then this page shows the projections below.",
     linksBefore: "Where the squad itself came from is on ",
     squadPage: "the squad page",
     linksMiddle: "; how the season compares with everyone else is on ",
@@ -391,8 +390,6 @@ const en = {
     differentialNote: (threshold: number) => `starters owned by ${threshold}% or less`,
     mostOwned: "Most Owned",
     leastOwned: "least owned",
-    ownershipNote:
-      "Ownership is the capture's selected_by_percent at decision time; it moves after the deadline and this page does not follow it.",
     openingSquad: "Opening Squad",
     transferCount: (count: number) => `${count} transfer${count === 1 ? "" : "s"}`,
     deadline: "deadline",
@@ -683,15 +680,15 @@ const en = {
     planWithinFree: (cap: number, target: number, applied: number) =>
       `Free-transfer allowance ${cap}, no transfer penalties: requested overlap bound ${target}, applied overlap bound ${applied}.`,
     planWithHits: (cap: number, target: number) =>
-      `Plan allowing paid transfers: free-transfer allowance ${cap}, requested overlap bound ${target}. Published transfer penalties are included in the price.`,
+      `Plan allowing paid transfers: free-transfer allowance ${cap}, requested overlap bound ${target}. Transfer penalties are included in the price.`,
     alternativeWithHits: (applied: number, hits: string, cost: string) =>
-      `Alternative allowing paid transfers: applied overlap bound ${applied}; published transfer penalties ${hits} points, cost ${cost} expected points against pure points.`,
+      `Alternative allowing paid transfers: applied overlap bound ${applied}; transfer penalties ${hits} points, cost ${cost} expected points against pure points.`,
     alternativeWithinFree: (applied: number, cost: string) =>
       `Alternative within free transfers: applied overlap bound ${applied}; cost ${cost} expected points against pure points.`,
     // The same two sentences where a proof is missing: the figure is the most the
     // candidate could have cost, never a claimed exact cost.
     alternativeWithHitsAtMost: (applied: number, hits: string, cost: string) =>
-      `Alternative allowing paid transfers: applied overlap bound ${applied}; published transfer penalties ${hits} points, cost at most ${cost} expected points against pure points.`,
+      `Alternative allowing paid transfers: applied overlap bound ${applied}; transfer penalties ${hits} points, cost at most ${cost} expected points against pure points.`,
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Alternative within free transfers: applied overlap bound ${applied}; cost at most ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
@@ -1319,8 +1316,7 @@ const tr: MessageSchema<typeof en> = {
     leagueUnavailable: "Lig üyesi verisi henüz yayınlanmadı; bir sonraki karar yayınıyla gelir.",
     leagueMismatch: (leagueId) => `Bu site ${leagueId} numaralı ligi yayımlamıyor.`,
     diagnostic: "diagnostik",
-    diagnosticTitle: (weeks) =>
-      `Lig-içi ${weeks} haftalık sonuç bir teşhis göstergesidir; kazanma ihtimali değildir.`,
+    diagnosticTitle: (weeks) => `Lig-içi ${weeks} haftalık sonuç bir teşhis göstergesidir.`,
     diagnosticBody:
       "Senaryolar kalabalığın ölçülen +7,19 puan/hafta üstünlüğünü yalnız kısmen fiyatlıyor; bu nedenle rekabetçi pencere yalnız yön gösterir.",
     sourceBefore: "Fiyat etiketleri ",
@@ -1370,7 +1366,7 @@ const tr: MessageSchema<typeof en> = {
     noRivalBeforeStatus:
       "Rakip karşılaştırması için bu haftada eksik iki şey var: risk görünümü değerlendirilmiş bir karar (bu kararın durumu ",
     noRivalAfterStatus:
-      ") ve aynı senaryolarda puanlanacak bir rakip kadro. Şablon rakip capture sahipliğinden, mini lig rakipleri entry verisinden bağlanacak. O zamana kadar ölçülmemiş bir olasılık yerine aşağıdaki projeksiyonlar gösterilir.",
+      ") ve aynı senaryolarda puanlanacak bir rakip kadro. Şablon rakip capture sahipliğinden, mini lig rakipleri entry verisinden bağlanacak. O zamana kadar aşağıdaki projeksiyonlar gösterilir.",
     linksBefore: "Kadronun nasıl oluştuğu ",
     squadPage: "kadro sayfasında",
     linksMiddle: "; sezonun diğer oyuncularla karşılaştırması ",
@@ -1427,8 +1423,6 @@ const tr: MessageSchema<typeof en> = {
     differentialNote: (threshold) => `%${threshold} veya daha az sahiplikli ilk 11 oyuncuları`,
     mostOwned: "En Yüksek Sahiplik",
     leastOwned: "en düşük sahiplik",
-    ownershipNote:
-      "Sahiplik, karar anındaki capture'ın selected_by_percent değeridir; son tarihten sonra değişir ve bu sayfa onu takip etmez.",
     openingSquad: "Açılış Kadrosu",
     transferCount: (count) => `${count} transfer`,
     deadline: "son tarih",
@@ -1706,13 +1700,13 @@ const tr: MessageSchema<typeof en> = {
     planWithinFree: (cap: number, target: number, applied: number) =>
       `Ücretsiz transfer hakkı ${cap}, transfer cezası yok: istenen ortak oyuncu sınırı ${target}, uygulanan ortak oyuncu sınırı ${applied}.`,
     planWithHits: (cap: number, target: number) =>
-      `Transfer cezalarına izin veren plan: ücretsiz transfer hakkı ${cap}, istenen ortak oyuncu sınırı ${target}. Yayımlanan transfer cezaları fiyata dahildir.`,
+      `Transfer cezalarına izin veren plan: ücretsiz transfer hakkı ${cap}, istenen ortak oyuncu sınırı ${target}. Transfer cezaları fiyata dahildir.`,
     alternativeWithHits: (applied: number, hits: string, cost: string) =>
-      `Transfer cezalarına izin veren alternatif: uygulanan ortak oyuncu sınırı ${applied}; yayımlanan transfer cezası ${hits} puan, saf puana göre maliyet ${cost} beklenen puan.`,
+      `Transfer cezalarına izin veren alternatif: uygulanan ortak oyuncu sınırı ${applied}; transfer cezası ${hits} puan, saf puana göre maliyet ${cost} beklenen puan.`,
     alternativeWithinFree: (applied: number, cost: string) =>
       `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet ${cost} beklenen puan.`,
     alternativeWithHitsAtMost: (applied: number, hits: string, cost: string) =>
-      `Transfer cezalarına izin veren alternatif: uygulanan ortak oyuncu sınırı ${applied}; yayımlanan transfer cezası ${hits} puan, saf puana göre maliyet en fazla ${cost} beklenen puan.`,
+      `Transfer cezalarına izin veren alternatif: uygulanan ortak oyuncu sınırı ${applied}; transfer cezası ${hits} puan, saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     templatesTitle: "Oyun şablonları",

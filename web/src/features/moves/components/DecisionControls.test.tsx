@@ -119,6 +119,19 @@ describe("DecisionControls", () => {
     expect(screen.getByText("maliyet 1,5 puan")).toBeInTheDocument();
   });
 
+  it("says a competitive window is a diagnostic without naming a chance, in both languages", () => {
+    const turkish = renderControls("/moves?mode=asiri-agresif&window=5").container;
+    expect(turkish).toHaveTextContent("Lig-içi 5 haftalık sonuç bir teşhis göstergesidir.");
+    const turkishText = turkish.textContent ?? "";
+    cleanup();
+    const english = renderEnglishControls("/moves?mode=agresif&window=3").container;
+    expect(english).toHaveTextContent("The league-relative 3-week result is a diagnostic.");
+    for (const text of [turkishText, english.textContent ?? ""]) {
+      expect(text).not.toMatch(AS_A_CHANCE);
+      expect(text).not.toMatch(/ihtimal|chance/i);
+    }
+  });
+
   it("prices every mode in points only, in both languages", () => {
     const turkish = renderControls().container.textContent ?? "";
     cleanup();

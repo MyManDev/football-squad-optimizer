@@ -28,23 +28,9 @@ import type { Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
 
-/**
- * The only exempt entries, keyed by catalogue path and listed rather than pattern-matched.
- *
- * Both are denials: each tells the reader that the site does not publish a probability, and
- * a denial has to name the thing it refuses in order to refuse it. They are held to that by
- * the second test below, which fails if one of them ever stops matching the guard, so the
- * exemption cannot quietly become cover for a claim.
- *
- *   decision.diagnosticTitle   "... is a diagnostic, never a chance of winning."
- *   rivals.noRivalAfterStatus  "... rather than a probability nobody measured."
- */
-const DENIALS: readonly string[] = [
-  "en.decision.diagnosticTitle",
-  "tr.decision.diagnosticTitle",
-  "en.rivals.noRivalAfterStatus",
-  "tr.rivals.noRivalAfterStatus",
-];
+// No entry is exempt. Two denials once were ("... never a chance of winning." on /moves and
+// "... rather than a probability nobody measured." on /rivals); a denial still puts the
+// word on the page, so both were rewritten without it.
 
 /**
  * Stands in for any argument a message function takes. It answers 1 to every primitive
@@ -121,12 +107,31 @@ describe("every string in both message catalogues", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const exempt = new Set(DENIALS);
     const offenders = [...catalogue]
-      .filter(([path]) => !exempt.has(path))
       .filter(([, text]) => AS_A_CHANCE.test(text))
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
+  });
+
+  it("words the two former denials without the thing they denied", () => {
+    for (const path of [
+      "en.decision.diagnosticTitle",
+      "tr.decision.diagnosticTitle",
+      "en.rivals.noRivalAfterStatus",
+      "tr.rivals.noRivalAfterStatus",
+    ]) {
+      expect(catalogue.get(path)).toBeDefined();
+      expect(catalogue.get(path)).not.toMatch(AS_A_CHANCE);
+    }
+  });
+
+  it("names no raw capture field in a sentence", () => {
+    const offenders = [...catalogue]
+      .filter(([, text]) => /selected_by_percent/.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    for (const language of LANGUAGES)
+      expect(catalogue.has(`${language}.league.ownershipNote`)).toBe(false);
   });
 
   it("never writes the Top 100 setting as a share, a winner or a gain", () => {
@@ -153,12 +158,6 @@ describe("every string in both message catalogues", () => {
       )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
-  });
-
-  it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {
-    const text = catalogue.get(path);
-    expect(text).toBeDefined();
-    expect(text).toMatch(AS_A_CHANCE);
   });
 
   it("no longer carries the keys that existed only to label a probability", () => {

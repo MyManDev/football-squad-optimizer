@@ -197,7 +197,7 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
           </StatRow>
           <p className={styles.sub}>
             {copy.mostOwned}: {owned(ownership.most_owned_starter)} · {copy.leastOwned}:{" "}
-            {owned(ownership.least_owned_starter)}. {copy.ownershipNote}
+            {owned(ownership.least_owned_starter)}.
           </p>
         </Card>
       )}
