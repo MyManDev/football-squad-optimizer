@@ -4,11 +4,12 @@ The service reads already captured inputs and writes the existing league/advice 
 Scheduling, process pools, argument parsing and console output are supplied by callers.
 """
 
+import json
 import shutil
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from squadopt.application.advice import member_horizon_builder
 from squadopt.application.advice_record import record_directory
@@ -350,6 +351,101 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
     return ("adopted", target)
 
 
+def records_advice_for(league_id: int) -> bool:
+    """Whether a publication of ``league_id`` may write the advice record.
+
+    The record is keyed by season, gameweek, entry and capture, not by league, and the
+    member histories read it for one league (``weekly_suggestion_eval``). A member of two
+    leagues would otherwise be recorded twice for one capture with different documents,
+    which the record refuses. Until the record carries the league, the other leagues are
+    rendered and published without one.
+    """
+
+    return league_id == SUPPORTED_LEAGUE_ID
+
+
+def settle_legacy_tree(
+    site_data_root: Path, league_ids: Sequence[int]
+) -> tuple[str, int | None] | None:
+    """Settle a tree from before the league directory before any league renders.
+
+    ``("adopted", league)`` when the site has no directory and the legacy tree names one
+    of ``league_ids``: it moves to that league's path, histories included. ``("removed",
+    None)`` when a directory already lists the site's trees: the legacy tree is a leftover
+    nothing reads. None when there is no legacy tree. A legacy tree that names no league,
+    or a league this publication does not render, is refused: nothing here can say whose
+    it is, and its member histories are not to be dropped.
+    """
+
+    root = Path(site_data_root)
+    legacy = root / LEGACY_TREE
+    if not legacy.is_dir():
+        return None
+    if read_league_directory(root):
+        shutil.rmtree(legacy)
+        return ("removed", None)
+    named = legacy_tree_league_id(root)
+    if named is None:
+        raise LeagueDirectoryError(
+            f"{legacy} has no readable members.json naming its league; it cannot be adopted."
+        )
+    if named not in league_ids:
+        raise LeagueDirectoryError(
+            f"{legacy} names league {named}, which this publication does not render; it "
+            "cannot be adopted."
+        )
+    adopt_legacy_tree(root, named)
+    return ("adopted", named)
+
+
+def league_tree_capture(tree: Path) -> str | None:
+    """The capture a published tree was rendered from: its first human entry's
+    ``source_snapshot_id``; None when the tree names no member or cannot be read."""
+
+    try:
+        members = json.loads((Path(tree) / "members.json").read_text(encoding="utf-8"))
+        rows = members["payload"]["members"]
+        entry_id = next(
+            row["entry_id"]
+            for row in rows
+            if isinstance(row, dict) and row.get("member_kind") == "human"
+        )
+        entry = json.loads(
+            (Path(tree) / "entries" / f"{entry_id}.json").read_text(encoding="utf-8")
+        )
+        capture = entry["payload"]["source_snapshot_id"]
+    except (OSError, ValueError, KeyError, TypeError, StopIteration):
+        return None
+    return capture if isinstance(capture, str) else None
+
+
+def leagues_beside(site_data_root: Path, league_id: int, snapshot_id: str) -> list[PublishedLeague]:
+    """The other leagues a build of ``league_id`` alone keeps in the site's directory.
+
+    A league whose tree is gone is not kept. One rendered from another capture refuses
+    the build: the site would serve two captures at once, which the backend and the
+    release check both refuse; every league is rebuilt together by the weekly run.
+    """
+
+    root = Path(site_data_root)
+    kept: list[PublishedLeague] = []
+    for line in read_league_directory(root):
+        if line.league_id == league_id:
+            continue
+        tree = root / Path(*PurePosixPath(line.path).parts)
+        if not (tree / "members.json").is_file():
+            continue
+        capture = league_tree_capture(tree)
+        if capture != snapshot_id:
+            raise DataError(
+                f"The site lists league {line.league_id} rendered from capture {capture}; "
+                f"building league {league_id} alone from {snapshot_id} would leave the site "
+                "on two captures. Rebuild every league with the weekly run's league list."
+            )
+        kept.append(line)
+    return kept
+
+
 def publish_prepared_league(
     prepared: PreparedLeaguePublication,
     *,
@@ -395,7 +491,7 @@ def publish_prepared_league(
     site_data = request.out_dir / "data"
     # A tree from before the directory is this league's: adopted before anything reads
     # or writes the league's path, so its histories carry over.
-    legacy = adopt_legacy_tree(site_data, request.league_id)
+    legacy = settle_legacy_tree(site_data, (request.league_id,))
     out_dir = league_tree_dir(site_data, request.league_id)
     manager_words = load_publication_manager_words(request)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (

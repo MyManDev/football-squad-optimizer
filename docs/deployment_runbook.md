@@ -222,9 +222,11 @@ sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
 ```
 
 Replace the example's site PR, unused tag, release branch, content timestamp and
-summary with the accepted publication. Read the exact `generated_at_utc` from
-the league's `members.json` (`web/public/data/leagues/<league id>/`) in that accepted
-candidate tree. Verification
+summary with the accepted publication. Read the exact value of
+the publication's `generated_at_utc`: on a site with the league directory, the one in
+`data/leagues.json` (written last, after every league; each league's `members.json` is
+stamped after its own solves and may be older, never newer), and on a site from before
+the directory, the one in `data/league/members.json`, in that accepted candidate tree. Verification
 requires equality: the same tag can be re-dispatched, an older rollback refuses,
 and a fix release requires its own accepted stamp. A matching stamp identifies
 the publication claimed by that document; it is not a whole-tree byte comparison.
@@ -501,7 +503,7 @@ Release
   tag:                site-<season>-gw<NN>-<kind>      (the annotated tag; `git show <tag>`)
   main commit:        <sha>                            (`git rev-parse <tag>^{commit}`)
   site PR:            #<n>, merged <instant>           (the queue's merge)
-  accepted stamp:     <generated_at_utc>               (from members.json, verified equal)
+  accepted stamp:     <generated_at_utc>               (from leagues.json, or the legacy members.json; verified equal)
 Backend
   launcher commit:    <sha>                            (printed by restart_backend.ps1)
   restarted at:       <instant>

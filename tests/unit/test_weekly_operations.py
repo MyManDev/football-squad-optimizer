@@ -10,21 +10,65 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+import tests.unit.test_backend_runtime as handoff_fixture
 from tests.unit.test_publication_services import publication_world
 
 from squadopt.application import weekly_plan
 from squadopt.application.build import _recent_events
 from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_artifact
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
+from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.platform import weekly_operations as weekly
 from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths, inspect_run
 from squadopt.platform.weekly_publish import tree_digests
 
 
+def _standings_page(league_id: int, *entries: int) -> bytes:
+    rows = [
+        {"entry": entry, "entry_name": f"Team {entry}", "player_name": "M", "rank": rank}
+        for rank, entry in enumerate(entries, start=1)
+    ]
+    return json.dumps(
+        {
+            "league": {"id": league_id, "name": f"League {league_id}"},
+            "standings": {"has_next": False, "results": rows},
+        }
+    ).encode("utf-8")
+
+
 def world(
-    tmp_path: Path, *, rotation: bool = False, league_ids: tuple[int, ...] | None = None
+    tmp_path: Path,
+    *,
+    rotation: bool = False,
+    league_ids: tuple[int, ...] | None = None,
+    pages: dict[int, tuple[int, ...]] | None = None,
+    seeded_from: tuple[int, ...] | None = None,
+    record_advice: bool = False,
 ) -> weekly.WeeklyOperations:
+    """The synthetic weekly run; ``pages`` re-captures it with those standings pages (and
+    a handoff for that capture), ``seeded_from`` records the registry's seed leagues."""
+
     publication = publication_world(tmp_path)
+    if pages is not None:
+        snapshot = read_snapshot(publication.snapshot_root, publication.snapshot_id)
+        payloads = dict(snapshot.payloads)
+        for league_id, entries in pages.items():
+            payloads[f"league-{league_id}-standings.json"] = _standings_page(league_id, *entries)
+        recaptured = write_snapshot(
+            publication.snapshot_root,
+            source="fpl-live",
+            captured_at_utc=snapshot.metadata.captured_at_utc,
+            payloads=payloads,
+        ).snapshot_id
+        publication = replace(
+            publication,
+            snapshot_id=recaptured,
+            handoff_path=handoff_fixture._handoff(tmp_path / "recaptured-handoffs", recaptured),
+        )
+    if seeded_from is not None:
+        registry = json.loads(publication.registry_path.read_text(encoding="utf-8"))
+        registry["seeded_from_leagues"] = list(seeded_from)
+        publication.registry_path.write_text(json.dumps(registry), encoding="utf-8")
     snapshots = tmp_path / "weekly-snapshots"
     shutil.copytree(
         publication.snapshot_root / publication.snapshot_id, snapshots / publication.snapshot_id
@@ -52,22 +96,40 @@ def world(
         run_id="synthetic",
         repository_commit="b" * 40,
         handoff=publication.handoff_path,
+        record_advice=record_advice,
     )
+
+
+TWO = (352490, 7)
 
 
 def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
     tmp_path: Path,
 ) -> None:
     """Every league of the list is rendered from the one capture into its own tree, with
-    its own scoreboard, and the site's directory names them all."""
+    its own scoreboard; the site's directory names them all and carries the publication
+    stamp; a member of both leagues is recorded once, for the league the record names."""
 
-    operation = world(tmp_path, league_ids=(352490, 7))
+    operation = world(
+        tmp_path,
+        league_ids=TWO,
+        pages={352490: (101,), 7: (101,)},
+        seeded_from=TWO,
+        record_advice=True,
+    )
     receipt = operation.execute()
     doc = json.loads(receipt.read_bytes())
     assert doc["status"] == "completed"
     stages = {stage["name"]: stage["value"] for stage in doc["stages"]}
-    assert sorted(stages["league"]["leagues"]) == ["352490", "7"]
+    league = stages["league"]
+    assert sorted(league["leagues"]) == ["352490", "7"]
+    assert league["leagues"]["352490"]["advice_recorded"] is True
+    assert league["leagues"]["7"]["advice_recorded"] is False
+    assert league["advice_recorded"] is True
     assert sorted(stages["scoreboard"]["ours_kept_from_published"]) == ["352490", "7"]
+    records = sorted(operation.paths.records.rglob("advice.json"))
+    assert len(records) == 1
+    assert json.loads(records[0].read_bytes())["league_id"] == 352490
     data = operation.paths.out / "data"
     directory = json.loads((data / "leagues.json").read_bytes())
     assert [row["league_id"] for row in directory["payload"]["leagues"]] == [7, 352490]
@@ -75,51 +137,92 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
         "leagues/7",
         "leagues/352490",
     ]
-    stamps = set()
-    for league_id in (352490, 7):
+    stamps = []
+    for league_id in TWO:
         tree = data / "leagues" / str(league_id)
         members = json.loads((tree / "members.json").read_bytes())
         assert members["payload"]["league_id"] == league_id
         assert (tree / "entries" / "101.json").is_file()
         assert (tree / "scoreboard.json").is_file()
-        stamps.add(members["generated_at_utc"])
-    # One publication, one stamp: every tree and the directory carry it.
-    assert stamps == {directory["generated_at_utc"]}
+        stamps.append(members["generated_at_utc"])
+    # Each league is stamped after its own solves; the directory, written by the last
+    # league, carries the latest stamp, which is what the release check reads.
+    assert directory["generated_at_utc"] == max(stamps)
+    assert all(stamp <= directory["generated_at_utc"] for stamp in stamps)
     assert not (data / "league").exists()
-    # The record names one league; the other is rendered and published, not recorded.
-    assert stages["league"]["leagues"]["352490"]["advice_recorded"] is False
-    assert stages["league"]["leagues"]["7"]["advice_recorded"] is False
+
+
+def test_a_list_without_the_league_the_record_names_records_nothing_and_says_so(
+    tmp_path: Path,
+) -> None:
+    operation = world(
+        tmp_path, league_ids=(7,), pages={7: (101,)}, seeded_from=(7,), record_advice=True
+    )
+    doc = json.loads(operation.execute().read_bytes())
+    league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
+    assert league["advice_recorded"] is False
+    assert list(operation.paths.records.rglob("advice.json")) == []
+    log = "".join(
+        path.read_text(encoding="utf-8") for path in operation.paths.log_root.rglob("*.jsonl")
+    )
+    assert "tick.week.advice_record.skipped" in log
+
+
+@pytest.mark.parametrize(
+    ("pages", "seeded_from", "said"),
+    [
+        pytest.param({352490: (101,)}, TWO, "no standings page for league(s) 7", id="page"),
+        pytest.param(
+            {352490: (101,), 7: (101,)}, (352490,), "not seeded from league(s) 7", id="seed"
+        ),
+    ],
+)
+def test_a_capture_that_cannot_tell_the_leagues_apart_stops_before_any_solve(
+    tmp_path: Path, pages: dict[int, tuple[int, ...]], seeded_from: tuple[int, ...], said: str
+) -> None:
+    operation = world(tmp_path, league_ids=TWO, pages=pages, seeded_from=seeded_from)
+    with pytest.raises(WeekError, match=re.escape(said)):
+        operation.execute()
+    assert not (operation.paths.out / "data" / "leagues.json").exists()
+
+
+def _legacy_tree(operation: weekly.WeeklyOperations, members: str) -> Path:
+    legacy = operation.paths.out / "data" / "league"
+    legacy.mkdir(parents=True)
+    (legacy / "members.json").write_text(members, encoding="utf-8")
+    return legacy
 
 
 def test_a_tree_from_before_the_directory_is_adopted_whatever_the_order_of_the_list(
     tmp_path: Path,
 ) -> None:
-    operation = world(tmp_path, league_ids=(7, 352490))
-    legacy = operation.paths.out / "data" / "league"
-    legacy.mkdir(parents=True)
-    (legacy / "members.json").write_text(
-        json.dumps({"payload": {"league_id": 352490, "members": []}}), encoding="utf-8"
+    operation = world(
+        tmp_path, league_ids=(7, 352490), pages={352490: (101,), 7: (101,)}, seeded_from=TWO
     )
-    receipt = operation.execute()
-    doc = json.loads(receipt.read_bytes())
+    legacy = _legacy_tree(operation, json.dumps({"payload": {"league_id": 352490, "members": []}}))
+    doc = json.loads(operation.execute().read_bytes())
     assert doc["status"] == "completed"
-    stages = {stage["name"]: stage["value"] for stage in doc["stages"]}
-    assert stages["league"]["leagues"]["352490"]["legacy_tree"] == "adopted"
-    assert stages["league"]["leagues"]["7"]["legacy_tree"] == ""
+    league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
+    assert league["legacy_tree"] == {"outcome": "adopted", "league_id": 352490}
     assert not legacy.exists()
     assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
 
 
-def test_a_legacy_tree_of_a_league_the_list_does_not_have_stops_the_run(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("members", "said"),
+    [
+        pytest.param(
+            json.dumps({"payload": {"league_id": 352490}}), "names league 352490", id="other"
+        ),
+        pytest.param("{", "no readable members.json", id="unreadable"),
+    ],
+)
+def test_a_legacy_tree_no_league_of_the_list_can_adopt_stops_the_run(
+    tmp_path: Path, members: str, said: str
 ) -> None:
-    operation = world(tmp_path, league_ids=(7,))
-    legacy = operation.paths.out / "data" / "league"
-    legacy.mkdir(parents=True)
-    (legacy / "members.json").write_text(
-        json.dumps({"payload": {"league_id": 352490, "members": []}}), encoding="utf-8"
-    )
-    with pytest.raises(weekly.WeekError, match="names league 352490"):
+    operation = world(tmp_path, league_ids=(7,), pages={7: (101,)}, seeded_from=(7,))
+    legacy = _legacy_tree(operation, members)
+    with pytest.raises(WeekError, match=said):
         operation.execute()
     assert legacy.is_dir()
 
@@ -1076,6 +1179,27 @@ def test_no_advice_record_publishes_and_says_it_recorded_nothing(
     assert len(skipped) == 1 and skipped[0].fields["reason"] == "--no-advice-record"
     # A resume repeats the original options, so it cannot quietly start recording.
     assert weekly.main([*args, "--publish", "--run-id", "unrecorded", "--resume"]) == 1
+
+
+def test_the_league_list_is_read_relative_to_the_workspace(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "config").mkdir(parents=True)
+    (workspace / "config" / "leagues.json").write_text(
+        json.dumps({"contract_version": "league_list_v1", "leagues": [{"league_id": 7}]}),
+        encoding="utf-8",
+    )
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    arguments = ["--workspace", str(workspace), "--season", "2026-27", "--gameweek", "5"]
+    weekly.main([*arguments, "--dry-run", "--league-list", "config/leagues.json"])
+    assert "leagues 7" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as error:
+        weekly.main([*arguments, "--dry-run", "--league", "7", "--league", "7"])
+    assert error.value.code == 2
+    assert "names a league twice" in capsys.readouterr().err
 
 
 def test_the_leagues_come_from_the_list_or_the_flag_but_not_both(

@@ -173,6 +173,9 @@ class EntryRegistry:
 
     entries: tuple[EntryRegistration, ...]
     contract_version: str = ENTRY_REGISTRY_CONTRACT_VERSION
+    #: The leagues the seed read the members from, as it recorded them; empty for a
+    #: registry written by hand or before the seed recorded its leagues.
+    seeded_from: tuple[int, ...] = ()
 
     @classmethod
     def load(cls, path: Path) -> "EntryRegistry":
@@ -195,7 +198,15 @@ class EntryRegistry:
                     registered_at_utc=str(item.get("registered_at_utc", "")),
                 )
             )
-        return cls(entries=tuple(entries))
+        leagues = document.get("seeded_from_leagues")
+        if leagues is None and "seeded_from_league" in document:
+            leagues = [document["seeded_from_league"]]
+        seeded: list[int] = []
+        for league_id in leagues or []:
+            if isinstance(league_id, bool) or not isinstance(league_id, int) or league_id < 1:
+                raise EntryError(f"{path} names a seed league that is not a league id.")
+            seeded.append(league_id)
+        return cls(entries=tuple(entries), seeded_from=tuple(seeded))
 
     def ids(self) -> tuple[int, ...]:
         return tuple(sorted(e.entry_id for e in self.entries))
@@ -205,13 +216,22 @@ class EntryRegistry:
 
         The registry holds every member of every league the site serves; a league's
         publication renders its own members only. A capture without the league's page
-        (one taken before the league endpoint was wired in) names nobody, and the whole
-        registry stands, which is what a single-league site always had.
+        (one taken before the league endpoint was wired in) says nothing about who is in
+        the league: the registry stands for the league only when it was seeded from that
+        league alone (or names no seed, as a hand-written one-league registry does).
+        Otherwise the members of the other leagues would be rendered as this league's.
         """
 
         name = f"league-{league_id}-standings.json"
         if name not in payloads:
-            return self
+            if self.seeded_from in ((), (league_id,)):
+                return self
+            seeded = ", ".join(str(seed) for seed in self.seeded_from)
+            raise EntryError(
+                f"The capture holds no standings page for league {league_id}, and the "
+                f"registry holds the members of leagues {seeded}: which of them are in "
+                f"league {league_id} is not known."
+            )
         members = {
             row.entry_id for row in fpl_league_standings(payloads[name], league_id=league_id)
         }

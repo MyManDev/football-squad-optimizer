@@ -11,16 +11,32 @@ python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --le
 `config/leagues.json` (`league_list_v1`) is the one place that says which classic leagues the
 site serves; `--league <id>`, repeatable, names them on the command line instead (the list
 path is relative to `--workspace`). Every league in the list is rendered from the one
-capture into its own tree (`data/leagues/<league id>/`), with its own scoreboard, every
-tree carrying the one publication stamp, and the site's directory (`data/leagues.json`)
-lists them all. A league renders the registered entries its captured standings page names.
-The first run over a new list captures first (the capture reads a league's standings
-without its members being registered), then `scripts.seed_entry_registry --league-list
-config/leagues.json` registers every member of every league, once each. The advice record
-and the member histories name one league (`weekly_suggestion_eval.SUPPORTED_LEAGUE_ID`);
-the other leagues are rendered and published, not recorded, until the record contract
-carries the league. By hand, `scripts.build_league_site --league <id>` rebuilds one league
-and keeps the others listed as long as their trees are there.
+capture into its own tree (`data/leagues/<league id>/`), with its own scoreboard, and the
+site's directory (`data/leagues.json`) lists them all. Each league is stamped after its own
+solves; the directory, written by the last league, carries the latest stamp, which is the
+publication's. A league renders the registered entries its captured standings page names.
+
+With more than one league, the capture stage refuses a capture that lacks a listed league's
+standings page and a registry not seeded from every listed league, before any solve. So the
+first run over a new list stops there, after its capture: seed the registry from that
+capture (`python -m scripts.seed_entry_registry --league-list config/leagues.json
+--snapshot-id <that capture>`, which registers every member of every league once) and start
+a new run (new `--run-id`, no `--snapshot-id`): the registry is a capture input, so a resume
+is refused, and only a new capture holds the new members' picks.
+
+The advice record and the member histories name one league
+(`weekly_suggestion_eval.SUPPORTED_LEAGUE_ID`); the other leagues are rendered and published,
+not recorded, until the record contract carries the league. The league receipt says so per
+league (`leagues.<id>.advice_recorded`), and its top-level `advice_recorded` is whether any
+league was recorded; a run asked to record whose list has none of them records nothing and
+logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed` and
+`top100_note` sit under `leagues.<id>`; `legacy_tree` (top level) says what became of a tree
+from before the directory.
+
+By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
+keeps the other leagues the directory lists only when their trees were rendered from the same
+capture, and refuses otherwise (the site would serve two captures); it records advice only
+for the league the record names.
 
 `--decide` is deliberately absent from that line. It is the members' loop that runs every
 week; our own squad is a separate decision with a precondition that is not currently met
@@ -100,7 +116,7 @@ points scaled by `1 + w/100 * count/100` and every number in it is scored on the
 projection; the price is the base-model difference against the member's own plan at 0. The
 index's `top100` block names the files, or says why there are none
 (`no_top100_this_run`, `top100_inputs_refused`, `published_plan_carries_top100`), and the
-league receipt's `top100_note` carries the refusal. The export passes the handoff's own gate
+league receipt's `leagues.<id>.top100_note` carries the refusal. The export passes the handoff's own gate
 before anything is solved, so the menu needs a live capture taken **after** the Top-100
 export. **The published plan must stay at 0, so a week that offers the menu is run with
 `--projection component-only`**: the default `component` bakes the frozen uplift into the

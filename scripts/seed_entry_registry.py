@@ -148,7 +148,11 @@ def main() -> int:
         parser.error("--league and --league-list name the leagues two ways; use one")
     try:
         if arguments.league_list is not None:
-            league_ids: tuple[int, ...] = read_league_list(arguments.league_list)
+            listed = Path(arguments.league_list)
+            # Relative to the repository, like the snapshot and registry roots.
+            league_ids: tuple[int, ...] = read_league_list(
+                listed if listed.is_absolute() else REPOSITORY_ROOT / listed
+            )
         else:
             league_ids = tuple(arguments.league or ())
     except LeagueListError as error:

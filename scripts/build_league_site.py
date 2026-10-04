@@ -30,7 +30,7 @@ post-deadline picture the league's own standings page already shows.
 import argparse
 import sys
 from dataclasses import replace
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from squadopt.application.advice_record import AdviceRecordConflictError
 from squadopt.application.capture_entries import CapturePicksProvider as CapturePicksProvider
@@ -38,8 +38,10 @@ from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     ModePathsSummary,
     PreparedLeaguePublication,
+    leagues_beside,
     prepare_league_publication,
     publish_prepared_league,
+    records_advice_for,
 )
 from squadopt.application.league_publication import (
     last_scored_gameweek as last_scored_gameweek,
@@ -50,7 +52,7 @@ from squadopt.application.league_publication import (
 from squadopt.application.league_publication import (
     resolve_live_snapshot_id as resolve_live_snapshot_id,
 )
-from squadopt.contracts.league_tree import league_tree_dir, read_league_directory
+from squadopt.contracts.league_tree import league_tree_dir
 from squadopt.data.errors import DataError
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
@@ -180,6 +182,13 @@ def main() -> int:
     if arguments.workers < 1:
         parser.error("--workers must be at least 1")
 
+    # The advice record names one league; another league is published without one.
+    recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
+    if not arguments.no_advice_record and not recorded:
+        print(
+            f"League {arguments.league} is published without an advice record: the record "
+            "names one league until it carries the league."
+        )
     try:
         snapshot_root = Path(arguments.snapshot_root)
         snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
@@ -193,7 +202,7 @@ def main() -> int:
             season=arguments.season,
             handoff_path=arguments.in_season_projection,
             mode_residuals=arguments.mode_residuals,
-            record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
+            record_root=Path(arguments.advice_record_root) if recorded else None,
             history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
             rotation_evidence=arguments.rotation_evidence,
@@ -210,15 +219,10 @@ def main() -> int:
         if arguments.dry_run:
             print("Dry run: nothing written.")
             return 0
-        # A by-hand build of one league keeps the other leagues the site lists, as long
-        # as their trees are there: the directory is written whole.
-        site_data = request.out_dir / "data"
-        beside = [
-            line
-            for line in read_league_directory(site_data)
-            if line.league_id != request.league_id
-            and (site_data / Path(*PurePosixPath(line.path).parts) / "members.json").is_file()
-        ]
+        # A by-hand build of one league keeps the other leagues the site lists when their
+        # trees are there and were rendered from the same capture; another capture is
+        # refused, before anything is solved.
+        beside = leagues_beside(request.out_dir / "data", request.league_id, snapshot_id)
         with league_mapper(replace(request, season=prepared.season), arguments.workers) as mapper:
             result = publish_prepared_league(
                 prepared, mapper=mapper, on_mode_paths=_mode_note, beside=beside

@@ -18,11 +18,13 @@ from typing import Any
 
 from squadopt.application.advice_record import load_member_advice_record, record_directory
 from squadopt.application.commands import DecideRequest, decide
+from squadopt.application.entries import EntryRegistry
 from squadopt.application.evidence_io import write_json
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
-    adopt_legacy_tree,
     publish_league,
+    records_advice_for,
+    settle_legacy_tree,
 )
 from squadopt.application.player_evidence import PlayerEvidenceRequest, export_player_evidence
 from squadopt.application.projection_handoff import build as build_handoff
@@ -49,14 +51,8 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
-from squadopt.application.weekly_suggestion_eval import SUPPORTED_LEAGUE_ID
 from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
-from squadopt.contracts.league_tree import (
-    LEGACY_TREE,
-    PublishedLeague,
-    legacy_tree_league_id,
-    read_league_directory,
-)
+from squadopt.contracts.league_tree import LeagueDirectoryError, PublishedLeague
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -461,6 +457,7 @@ class WeeklyOperations:
         week, deadline, captured_at = capture_deadline(self.paths.snapshots, identifier)
         if week != self.request.gameweek:
             raise WeekError(f"Capture is open for gameweek {week}, not {self.request.gameweek}.")
+        self._refuse_leagues_the_capture_cannot_tell_apart(identifier)
         lead = (
             datetime.fromisoformat(deadline.replace("Z", "+00:00"))
             - datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
@@ -660,9 +657,7 @@ class WeeklyOperations:
             "decide", {"snapshot_id": result.snapshot_id, "mode": result.mode}, result.output_paths
         )
 
-    def _league_request(
-        self, league_id: int, record: bool, now: datetime
-    ) -> LeaguePublicationRequest:
+    def _league_request(self, league_id: int, record: bool) -> LeaguePublicationRequest:
         return LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
@@ -670,7 +665,6 @@ class WeeklyOperations:
             self.paths.registry,
             self.paths.out,
             league_id,
-            now=now,
             season=self.request.season,
             gameweek=self.request.gameweek,
             handoff_path=Path(self.values["handoff"]["path"]),
@@ -693,6 +687,36 @@ class WeeklyOperations:
             ),
         )
 
+    def _refuse_leagues_the_capture_cannot_tell_apart(self, identifier: str) -> None:
+        """A run over several leagues needs every league's standings page in the capture
+        and a registry seeded from every league, or one league's members are rendered as
+        another's. Refused here, before any projection or solve is spent."""
+
+        leagues = self.request.league_ids
+        if len(leagues) < 2:
+            return
+        payloads = read_snapshot(self.paths.snapshots, identifier).payloads
+        missing = [
+            league for league in leagues if f"league-{league}-standings.json" not in payloads
+        ]
+        if missing:
+            raise WeekError(
+                f"Capture {identifier} holds no standings page for league(s) "
+                f"{', '.join(map(str, missing))}; a run over several leagues reads each "
+                "league's members from its page. Take a new capture (run without --snapshot-id)."
+            )
+        registry = EntryRegistry.load(self.paths.registry)
+        unseeded = [league for league in leagues if league not in registry.seeded_from]
+        if unseeded:
+            raise WeekError(
+                f"The entry registry was not seeded from league(s) "
+                f"{', '.join(map(str, unseeded))}. Seed it from this capture "
+                "(python -m scripts.seed_entry_registry --league-list "
+                f"{LEAGUE_LIST_FILE.as_posix()} --snapshot-id {identifier}), then start a "
+                "new run: it takes a capture "
+                "holding every member's picks."
+            )
+
     def _league(self) -> WeeklyStageResult:
         # Publication or explicit recording writes the record before history reads it,
         # unless --no-advice-record turned it off. The publish stage copies this preview
@@ -704,30 +728,20 @@ class WeeklyOperations:
         leagues: dict[str, dict[str, object]] = {}
         beside: list[PublishedLeague] = []
         gameweek: int | None = None
-        # One publication, one stamp: every tree and the directory carry the same
-        # generated_at_utc, which is what the release check reads.
-        now = datetime.now(UTC).replace(microsecond=0)
-        site_data = self.paths.out / "data"
-        # A tree from before the league directory is adopted by the league it names,
-        # before any league renders, whatever the order of the list; one naming a league
-        # the list does not have is refused here rather than by the first league.
-        legacy_league = legacy_tree_league_id(site_data)
-        adopted: dict[str, str] = {}
-        if legacy_league is not None and not read_league_directory(site_data):
-            if legacy_league not in self.request.league_ids:
-                raise WeekError(
-                    f"{site_data / LEGACY_TREE} names league {legacy_league}, which the "
-                    "league list does not have; it cannot be adopted."
-                )
-            outcome = adopt_legacy_tree(site_data, legacy_league)
-            if outcome is not None:
-                adopted[str(legacy_league)] = outcome[0]
+        # A tree from before the league directory is settled before any league renders,
+        # whatever the order of the list: adopted by the league it names, or removed as a
+        # leftover beside a directory; one that names a league the list does not have is
+        # refused here rather than by the first league.
+        try:
+            legacy = settle_legacy_tree(self.paths.out / "data", self.request.league_ids)
+        except LeagueDirectoryError as error:
+            raise WeekError(str(error)) from error
         for league_id in self.request.league_ids:
-            # The advice record and the history name one league today
-            # (weekly_suggestion_eval.SUPPORTED_LEAGUE_ID); the other leagues are rendered
-            # and published, not recorded, until the record contract carries the league.
-            recorded = record and league_id == SUPPORTED_LEAGUE_ID
-            request = self._league_request(league_id, recorded, now)
+            # Each league is stamped after its own solves (the stamp is when the advice
+            # was published, read against the deadline); the directory the last league
+            # writes carries the latest stamp, and the release check reads that one.
+            recorded = record and records_advice_for(league_id)
+            request = self._league_request(league_id, recorded)
             with league_mapper(request, self.request.workers) as mapper:
                 result = publish_league(request, mapper=mapper, beside=beside)
             if result.published is not None:
@@ -747,15 +761,28 @@ class WeeklyOperations:
                 "removed": list(result.report.removed),
                 # Empty when the Top 100 menu was offered or never asked for.
                 "top100_note": result.top100_note,
-                # A tree from before the league directory, adopted or removed.
-                "legacy_tree": adopted.get(str(league_id), result.legacy_tree),
             }
+        # Whether this run recorded advice at all, which the publish stage requires: a run
+        # asked to record whose leagues the record does not name recorded nothing, and
+        # says so where the status page reads.
+        recorded_any = any(bool(row["advice_recorded"]) for row in leagues.values())
+        if record and not recorded_any and getattr(self, "log", None) is not None:
+            self.log.event(
+                "tick.week.advice_record.skipped",
+                reason="no league of the list is the one the advice record names",
+                leagues=list(self.request.league_ids),
+                capture=self._capture_id(),
+            )
         return WeeklyStageResult(
             tuple(sorted(set(outputs))),
             {
                 "snapshot_id": self._capture_id(),
                 "gameweek": gameweek,
-                "advice_recorded": record,
+                "advice_recorded": recorded_any,
+                # A tree from before the league directory, and what became of it.
+                "legacy_tree": (
+                    None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}
+                ),
                 "leagues": leagues,
             },
         )

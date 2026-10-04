@@ -19,11 +19,17 @@ from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    leagues_beside,
     prepare_league_publication,
     publish_league,
+    settle_legacy_tree,
 )
 from squadopt.application.site_publication import SitePublicationRequest, publish_site
-from squadopt.contracts.league_tree import LeagueDirectoryError
+from squadopt.contracts.league_tree import (
+    LeagueDirectoryError,
+    PublishedLeague,
+    write_league_directory,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.vaastav import SUPPORTED_SEASONS
@@ -371,6 +377,83 @@ def test_a_league_renders_the_members_its_standings_page_names(tmp_path: Path) -
         )
     )
     assert board.target == request.out_dir / "data/leagues/9/scoreboard.json"
+
+
+def test_a_league_renders_only_the_registered_entries_its_page_names(tmp_path: Path) -> None:
+    """With two registered entries and a page naming one, the league prepares that one,
+    and its scoreboard lists that one."""
+
+    request = publication_world(tmp_path)
+    registry = json.loads(request.registry_path.read_text(encoding="utf-8"))
+    registry["entries"].append({"entry_id": 202, "label": "the other league's member"})
+    request.registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    payloads["league-9-standings.json"] = _standings_page(9, member_fixture.ENTRY_ID)
+    other = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    prepared = prepare_league_publication(replace(request, snapshot_id=other, league_id=9))
+    assert [entry.entry_id for entry in prepared.registrations] == [member_fixture.ENTRY_ID]
+    board = scoreboard.publish_scoreboard(
+        scoreboard.ScoreboardPublicationRequest(
+            snapshot_root=request.snapshot_root,
+            snapshot_id=other,
+            registry_path=request.registry_path,
+            ledger_root=tmp_path / "empty-ledger",
+            out_dir=request.out_dir,
+            league_id=9,
+            season=request.season,
+            now_utc="2026-08-27T10:00:00Z",
+        )
+    )
+    assert board.document["payload"]["registered_members"] == 1
+
+
+def _tree(root: Path, league_id: int, capture: str) -> PublishedLeague:
+    tree = root / "leagues" / str(league_id)
+    (tree / "entries").mkdir(parents=True)
+    members = {"payload": {"members": [{"member_kind": "human", "entry_id": 5}]}}
+    (tree / "members.json").write_text(json.dumps(members), encoding="utf-8")
+    entry = {"payload": {"source_snapshot_id": capture}}
+    (tree / "entries" / "5.json").write_text(json.dumps(entry), encoding="utf-8")
+    return PublishedLeague(league_id, f"League {league_id}", "2026-27", 2, f"leagues/{league_id}")
+
+
+def test_a_build_of_one_league_keeps_the_others_of_its_capture_and_refuses_another(
+    tmp_path: Path,
+) -> None:
+    lines = [_tree(tmp_path, 7, "capture-a"), _tree(tmp_path, 9, "capture-a")]
+    write_league_directory(tmp_path, [*lines, _published_line(11)], generated_at_utc="x")
+    # League 11's tree is gone, so it is not kept; 9 is the league being built.
+    assert leagues_beside(tmp_path, 9, "capture-a") == [lines[0]]
+    with pytest.raises(DataError, match="two captures"):
+        leagues_beside(tmp_path, 9, "capture-b")
+
+
+def _published_line(league_id: int) -> PublishedLeague:
+    return PublishedLeague(league_id, f"League {league_id}", "2026-27", 2, f"leagues/{league_id}")
+
+
+def test_the_legacy_tree_is_settled_before_any_league_renders(tmp_path: Path) -> None:
+    assert settle_legacy_tree(tmp_path, (1,)) is None
+    legacy = tmp_path / "league"
+    legacy.mkdir()
+    (legacy / "members.json").write_text("{", encoding="utf-8")
+    with pytest.raises(LeagueDirectoryError, match=r"no readable members.json"):
+        settle_legacy_tree(tmp_path, (1,))
+    (legacy / "members.json").write_text(json.dumps(_legacy_members(5)), encoding="utf-8")
+    with pytest.raises(LeagueDirectoryError, match="names league 5"):
+        settle_legacy_tree(tmp_path, (1, 2))
+    assert settle_legacy_tree(tmp_path, (1, 5)) == ("adopted", 5)
+    assert (tmp_path / "leagues" / "5" / "members.json").is_file()
+    write_league_directory(tmp_path, [_published_line(5)], generated_at_utc="x")
+    legacy.mkdir()
+    assert settle_legacy_tree(tmp_path, (1,)) == ("removed", None)
+    assert not legacy.exists()
 
 
 def test_a_tree_from_before_the_directory_is_adopted_with_its_histories(
