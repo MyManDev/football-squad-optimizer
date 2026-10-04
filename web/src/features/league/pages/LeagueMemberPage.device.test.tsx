@@ -24,7 +24,7 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "../advice/adviceClient";
-import type { DevicePlanReply, DevicePlanRequest } from "../device/devicePlan.worker";
+import type { DevicePlanReply, DevicePlanRequest } from "../device/deviceSolver.worker";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";

@@ -4,8 +4,9 @@
  * capture on screen, and dropped by a new selection or a service computation.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -17,7 +18,7 @@ import { isAdvicePayload } from "../advice/adviceShape";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
-import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
+import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import type { LpSolver } from "./lp/problem";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
@@ -130,6 +131,17 @@ function Harness({
     </div>
   );
 }
+
+describe("the worker", () => {
+  it("ships under its own file name, not the one an edge holds broken", () => {
+    // The browser caches the built file by name; devicePlan.worker's was cached as HTML.
+    const source = readFileSync(join(__dirname, "useDevicePlan.ts"), "utf8");
+    expect(source).toContain('new URL("./deviceSolver.worker.ts", import.meta.url)');
+    expect(source).not.toContain("devicePlan.worker");
+    expect(existsSync(join(__dirname, "deviceSolver.worker.ts"))).toBe(true);
+    expect(existsSync(join(__dirname, "devicePlan.worker.ts"))).toBe(false);
+  });
+});
 
 describe("what the device can solve", () => {
   const squad = squadWith(entry);

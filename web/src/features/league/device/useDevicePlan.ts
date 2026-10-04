@@ -16,7 +16,7 @@ import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
-import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
+import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import { deviceSelection, rivalFromSquad } from "./selection";
 import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
 
@@ -58,7 +58,8 @@ export interface DevicePlanDependencies {
 }
 
 function createWorker(): DeviceSolver {
-  return new Worker(new URL("./devicePlan.worker.ts", import.meta.url), {
+  // The worker's file name is part of what the browser caches; renaming it changes its URL.
+  return new Worker(new URL("./deviceSolver.worker.ts", import.meta.url), {
     type: "module",
   }) as unknown as DeviceSolver;
 }
