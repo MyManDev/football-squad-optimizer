@@ -595,15 +595,17 @@ def test_the_weekly_run_builds_the_panel_in_the_stages_item_7_names() -> None:
         for stage in stages
         if (count := builds.count((module, f"WeeklyOperations.{stage}"))) > 0
     }
-    assert building == {"_capture": 1, "_handoff": 2, "_league": 1}
-    assert sum(building.values()) == 4
+    # The league stage builds once per league of the list; the scan counts a loop whose
+    # body builds as more than once (2), and the item says "once per league".
+    assert building == {"_capture": 1, "_handoff": 2, "_league": 2}
 
     item = _item("7")
     for phrase in (
-        "(`platform/weekly_operations.py`) builds it up to four times in its own process",
+        "(`platform/weekly_operations.py`) builds it up to four times in its own process "
+        "for a one-league list",
         "once in the capture stage",
         "twice in the handoff stage",
-        "once in the league stage's parent",
+        "once per league in the league stage's parent",
         "No other stage builds one",
     ):
         assert phrase in item, f"Item 7 must say how the weekly run builds the panel: {phrase!r}."
