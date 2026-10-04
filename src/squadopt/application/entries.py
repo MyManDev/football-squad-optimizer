@@ -25,7 +25,6 @@ from typing import Final, Protocol
 
 import pandas as pd
 
-from squadopt.application.views import _View
 from squadopt.evaluation import FrozenSquadDecision
 from squadopt.live.free_hit import FREE_HIT_CHIP, played_free_hit_last_week
 from squadopt.live.rules import CHIP_NAMES, SeasonRules
@@ -386,21 +385,3 @@ def frozen_decision_from_picks(
         vice_captain_id=translated[picks.vice_captain],
         completion_policy="captured_entry_v1",
     )
-
-
-@dataclass(frozen=True, slots=True)
-class EntryView(_View):
-    """The page an entry sees: who they are, what they hold, and the decision proposed."""
-
-    entry_id: int
-    label: str
-    season: str
-    gameweek: int
-    held_squad: Sequence[int]
-    held_captain: int
-    bank_tenths: int
-    free_transfers: int
-    chips_used: Mapping[str, Sequence[int]]
-    recommendation_path: str
-    """Relative site path of the RecommendationView computed for this entry."""
-    source_snapshot_id: str | None

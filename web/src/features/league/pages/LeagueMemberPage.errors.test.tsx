@@ -413,7 +413,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     advice.payload.data_quality = "partial";
     showAdvice(language, advice);
     expect(screen.getByText(copy.noMove)).toBeInTheDocument();
-    expect(screen.queryByText(copy.noAdviceMissingData)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Advice is withheld|öneri gösterilmiyor/)).not.toBeInTheDocument();
   });
 
   it("preserves a zero overlap bound, measured hit points and plan cost", () => {

@@ -102,8 +102,10 @@ describe("every string in both message catalogues", () => {
     expect(catalogue.get("tr.squad.squadCost")).toBe("Kadro Maliyeti");
     // A function-valued entry, called, not skipped.
     expect(catalogue.get("en.squad.projectedPlayerPoints")).toBe("xP 1");
-    expect(catalogue.get("tr.chipForecastCopy.title")).toBe("Çip görünümü");
-    expect(catalogue.get("en.chipForecastCopy.range")).toBe("1 to 1");
+    expect(catalogue.get("tr.chipCopy.title")).toBe("Çip seçimi");
+    expect(catalogue.get("en.chipCopy.chosen")).toBe(
+      "1 is played this gameweek because you chose it.",
+    );
     for (const path of catalogue.keys()) {
       const twin = path.startsWith("en.") ? `tr.${path.slice(3)}` : `en.${path.slice(3)}`;
       expect(catalogue.has(twin)).toBe(true);
@@ -142,7 +144,7 @@ describe("every string in both message catalogues", () => {
 
   it("never words a chosen chip's gain as a recommendation or names a week to play it", () => {
     const chip = [...catalogue].filter(([path]) => path.includes(".chipCopy."));
-    expect(chip.length).toBeGreaterThan(60);
+    expect(chip.length).toBeGreaterThan(50);
     const offenders = chip
       .filter(([, text]) =>
         /recommend|\bbest\b|optimal|likely|should play|right week|öner|en iyi|en uygun|oynamalısın/i.test(

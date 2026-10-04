@@ -305,7 +305,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(page).toContain(TOP100_COPY.tr.strategyCostAtMost("12,5"));
     expect(page).not.toContain(TOP100_COPY.tr.strategyCost("12,5"));
     expect(page).not.toContain(TOP100_COPY.tr.limit(20));
-    for (const sentence of Object.values(TOP100_COPY.tr.variantLimits)) {
+    for (const sentence of advice.payload.stated_limits ?? []) {
       expect(page).not.toContain(sentence);
     }
     expect(section(container)).toContain(TOP100_COPY.tr.weightLine(20));

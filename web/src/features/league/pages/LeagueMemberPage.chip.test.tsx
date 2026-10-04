@@ -128,7 +128,9 @@ describe("a chosen chip on the advice card", () => {
     expect(text).not.toContain(CHIP_COPY.tr.freeHit);
     // The plan's published limits are not listed on the page.
     const page = container.textContent ?? "";
-    expect(page).not.toContain(CHIP_COPY.tr.limits[chosen("bboost", 0).payload.stated_limits![0]!]);
+    for (const sentence of chosen("bboost", 0).payload.stated_limits!) {
+      expect(page).not.toContain(sentence);
+    }
   });
 
   it("states the same in English, and the Free Hit's one-week squad", () => {
@@ -144,7 +146,7 @@ describe("a chosen chip on the advice card", () => {
     expect(text).toContain(CHIP_COPY.en.freeHit);
     const page = container.textContent ?? "";
     for (const sentence of chosen("freehit", 0).payload.stated_limits!) {
-      expect(page).not.toContain(CHIP_COPY.en.limits[sentence]);
+      expect(page).not.toContain(sentence);
     }
   });
 
