@@ -9,11 +9,18 @@ python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --le
 ```
 
 `config/leagues.json` (`league_list_v1`) is the one place that says which classic leagues the
-site serves; `--league <id>`, repeatable, names them on the command line instead. Every
-league in the list is rendered from the one capture into its own tree
-(`data/leagues/<league id>/`), with its own scoreboard, and the site's directory
-(`data/leagues.json`) lists them all. `scripts.seed_entry_registry --league-list
-config/leagues.json` seeds the registry with every member of every league, once each.
+site serves; `--league <id>`, repeatable, names them on the command line instead (the list
+path is relative to `--workspace`). Every league in the list is rendered from the one
+capture into its own tree (`data/leagues/<league id>/`), with its own scoreboard, every
+tree carrying the one publication stamp, and the site's directory (`data/leagues.json`)
+lists them all. A league renders the registered entries its captured standings page names.
+The first run over a new list captures first (the capture reads a league's standings
+without its members being registered), then `scripts.seed_entry_registry --league-list
+config/leagues.json` registers every member of every league, once each. The advice record
+and the member histories name one league (`weekly_suggestion_eval.SUPPORTED_LEAGUE_ID`);
+the other leagues are rendered and published, not recorded, until the record contract
+carries the league. By hand, `scripts.build_league_site --league <id>` rebuilds one league
+and keeps the others listed as long as their trees are there.
 
 `--decide` is deliberately absent from that line. It is the members' loop that runs every
 week; our own squad is a separate decision with a precondition that is not currently met

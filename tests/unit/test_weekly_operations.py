@@ -75,13 +75,53 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
         "leagues/7",
         "leagues/352490",
     ]
+    stamps = set()
     for league_id in (352490, 7):
         tree = data / "leagues" / str(league_id)
         members = json.loads((tree / "members.json").read_bytes())
         assert members["payload"]["league_id"] == league_id
         assert (tree / "entries" / "101.json").is_file()
         assert (tree / "scoreboard.json").is_file()
+        stamps.add(members["generated_at_utc"])
+    # One publication, one stamp: every tree and the directory carry it.
+    assert stamps == {directory["generated_at_utc"]}
     assert not (data / "league").exists()
+    # The record names one league; the other is rendered and published, not recorded.
+    assert stages["league"]["leagues"]["352490"]["advice_recorded"] is False
+    assert stages["league"]["leagues"]["7"]["advice_recorded"] is False
+
+
+def test_a_tree_from_before_the_directory_is_adopted_whatever_the_order_of_the_list(
+    tmp_path: Path,
+) -> None:
+    operation = world(tmp_path, league_ids=(7, 352490))
+    legacy = operation.paths.out / "data" / "league"
+    legacy.mkdir(parents=True)
+    (legacy / "members.json").write_text(
+        json.dumps({"payload": {"league_id": 352490, "members": []}}), encoding="utf-8"
+    )
+    receipt = operation.execute()
+    doc = json.loads(receipt.read_bytes())
+    assert doc["status"] == "completed"
+    stages = {stage["name"]: stage["value"] for stage in doc["stages"]}
+    assert stages["league"]["leagues"]["352490"]["legacy_tree"] == "adopted"
+    assert stages["league"]["leagues"]["7"]["legacy_tree"] == ""
+    assert not legacy.exists()
+    assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
+
+
+def test_a_legacy_tree_of_a_league_the_list_does_not_have_stops_the_run(
+    tmp_path: Path,
+) -> None:
+    operation = world(tmp_path, league_ids=(7,))
+    legacy = operation.paths.out / "data" / "league"
+    legacy.mkdir(parents=True)
+    (legacy / "members.json").write_text(
+        json.dumps({"payload": {"league_id": 352490, "members": []}}), encoding="utf-8"
+    )
+    with pytest.raises(weekly.WeekError, match="names league 352490"):
+        operation.execute()
+    assert legacy.is_dir()
 
 
 def test_real_weekly_services_complete_and_resume_without_rebuilding(tmp_path: Path) -> None:

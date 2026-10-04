@@ -155,6 +155,8 @@ def main() -> int:
         parser.error(str(error))
     if not league_ids:
         parser.error("--league (or --league-list) is required")
+    if len(set(league_ids)) != len(league_ids):
+        parser.error("--league names a league twice")
     if arguments.standings_file is not None and len(league_ids) != 1:
         parser.error("--standings-file is one league's page; name one league with it")
 

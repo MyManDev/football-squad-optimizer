@@ -26,6 +26,7 @@ from typing import Final, Protocol
 import pandas as pd
 
 from squadopt.application.views import _View
+from squadopt.data.sources.fpl_live import fpl_league_standings
 from squadopt.evaluation import FrozenSquadDecision
 from squadopt.live.free_hit import FREE_HIT_CHIP, played_free_hit_last_week
 from squadopt.live.rules import CHIP_NAMES, SeasonRules
@@ -198,6 +199,26 @@ class EntryRegistry:
 
     def ids(self) -> tuple[int, ...]:
         return tuple(sorted(e.entry_id for e in self.entries))
+
+    def in_league(self, payloads: Mapping[str, bytes], league_id: int) -> "EntryRegistry":
+        """The registered entries the league's captured standings page names.
+
+        The registry holds every member of every league the site serves; a league's
+        publication renders its own members only. A capture without the league's page
+        (one taken before the league endpoint was wired in) names nobody, and the whole
+        registry stands, which is what a single-league site always had.
+        """
+
+        name = f"league-{league_id}-standings.json"
+        if name not in payloads:
+            return self
+        members = {
+            row.entry_id for row in fpl_league_standings(payloads[name], league_id=league_id)
+        }
+        return EntryRegistry(
+            entries=tuple(entry for entry in self.entries if entry.entry_id in members),
+            contract_version=self.contract_version,
+        )
 
 
 def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int]) -> HeldSquad:

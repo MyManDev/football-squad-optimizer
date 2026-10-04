@@ -12,6 +12,7 @@ from squadopt.application.entries import (
     EntryError,
     EntryPicks,
     EntryPicksProvider,
+    EntryRegistration,
     EntryRegistry,
     frozen_decision_from_picks,
     held_squad_from_picks,
@@ -109,6 +110,32 @@ def test_the_registry_loads_unique_entries_or_is_empty(tmp_path: Path) -> None:
     path.write_text(json.dumps({"contract_version": "other"}), encoding="utf-8")
     with pytest.raises(EntryError, match="registry"):
         EntryRegistry.load(path)
+
+
+def _standings(league_id: int, *entries: int) -> bytes:
+    rows = [
+        {"entry": entry, "entry_name": f"Team {entry}", "player_name": "M", "rank": rank}
+        for rank, entry in enumerate(entries, start=1)
+    ]
+    document = {"league": {"id": league_id}, "standings": {"has_next": False, "results": rows}}
+    return json.dumps(document).encode("utf-8")
+
+
+def test_the_registry_narrows_to_the_members_a_league_page_names() -> None:
+    registry = EntryRegistry(
+        entries=tuple(
+            EntryRegistration(entry_id=entry, label="", registered_at_utc="")
+            for entry in (7, 42, 99)
+        )
+    )
+    payloads = {
+        "league-1-standings.json": _standings(1, 42, 7, 500),
+        "league-2-standings.json": _standings(2, 99),
+    }
+    assert registry.in_league(payloads, 1).ids() == (7, 42)
+    assert registry.in_league(payloads, 2).ids() == (99,)
+    # Without the league's page the registry is the league, as a one-league site had it.
+    assert registry.in_league(payloads, 3) is registry
 
 
 def test_a_provider_is_any_object_with_picks() -> None:

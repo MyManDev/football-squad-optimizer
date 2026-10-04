@@ -30,7 +30,7 @@ post-deadline picture the league's own standings page already shows.
 import argparse
 import sys
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from squadopt.application.advice_record import AdviceRecordConflictError
 from squadopt.application.capture_entries import CapturePicksProvider as CapturePicksProvider
@@ -50,7 +50,7 @@ from squadopt.application.league_publication import (
 from squadopt.application.league_publication import (
     resolve_live_snapshot_id as resolve_live_snapshot_id,
 )
-from squadopt.contracts.league_tree import league_tree_dir
+from squadopt.contracts.league_tree import league_tree_dir, read_league_directory
 from squadopt.data.errors import DataError
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
@@ -210,8 +210,19 @@ def main() -> int:
         if arguments.dry_run:
             print("Dry run: nothing written.")
             return 0
+        # A by-hand build of one league keeps the other leagues the site lists, as long
+        # as their trees are there: the directory is written whole.
+        site_data = request.out_dir / "data"
+        beside = [
+            line
+            for line in read_league_directory(site_data)
+            if line.league_id != request.league_id
+            and (site_data / Path(*PurePosixPath(line.path).parts) / "members.json").is_file()
+        ]
         with league_mapper(replace(request, season=prepared.season), arguments.workers) as mapper:
-            result = publish_prepared_league(prepared, mapper=mapper, on_mode_paths=_mode_note)
+            result = publish_prepared_league(
+                prepared, mapper=mapper, on_mode_paths=_mode_note, beside=beside
+            )
         report = result.report
         out_dir = league_tree_dir(request.out_dir / "data", request.league_id)
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")

@@ -324,6 +324,55 @@ def _legacy_members(league_id: int) -> dict[str, object]:
     }
 
 
+def _standings_page(league_id: int, *entries: int) -> bytes:
+    rows = [
+        {"entry": entry, "entry_name": f"Team {entry}", "player_name": "M", "rank": rank}
+        for rank, entry in enumerate(entries, start=1)
+    ]
+    return json.dumps(
+        {
+            "league": {"id": league_id, "name": f"League {league_id}"},
+            "standings": {"has_next": False, "results": rows},
+        }
+    ).encode("utf-8")
+
+
+def test_a_league_renders_the_members_its_standings_page_names(tmp_path: Path) -> None:
+    """The registry holds every league's members; a league prepares its own, and a league
+    none of the registered entries is in is refused before anything is solved."""
+
+    request = publication_world(tmp_path)
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    payloads["league-7-standings.json"] = _standings_page(7, 424242)
+    payloads["league-9-standings.json"] = _standings_page(9, member_fixture.ENTRY_ID, 424242)
+    other = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    with pytest.raises(DataError, match="None of the registered entries is in league 7"):
+        prepare_league_publication(replace(request, snapshot_id=other, league_id=7))
+    prepared = prepare_league_publication(replace(request, snapshot_id=other, league_id=9))
+    assert [entry.entry_id for entry in prepared.registrations] == [member_fixture.ENTRY_ID]
+    assert prepared.league_name == "League 9"
+    # The scoreboard lists the league's members the same way.
+    board = scoreboard.publish_scoreboard(
+        scoreboard.ScoreboardPublicationRequest(
+            snapshot_root=request.snapshot_root,
+            snapshot_id=other,
+            registry_path=request.registry_path,
+            ledger_root=tmp_path / "empty-ledger",
+            out_dir=request.out_dir,
+            league_id=9,
+            season=request.season,
+            now_utc="2026-08-27T10:00:00Z",
+        )
+    )
+    assert board.target == request.out_dir / "data/leagues/9/scoreboard.json"
+
+
 def test_a_tree_from_before_the_directory_is_adopted_with_its_histories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

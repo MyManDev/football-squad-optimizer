@@ -19,7 +19,11 @@ from typing import Any
 from squadopt.application.advice_record import load_member_advice_record, record_directory
 from squadopt.application.commands import DecideRequest, decide
 from squadopt.application.evidence_io import write_json
-from squadopt.application.league_publication import LeaguePublicationRequest, publish_league
+from squadopt.application.league_publication import (
+    LeaguePublicationRequest,
+    adopt_legacy_tree,
+    publish_league,
+)
 from squadopt.application.player_evidence import PlayerEvidenceRequest, export_player_evidence
 from squadopt.application.projection_handoff import build as build_handoff
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
@@ -45,8 +49,14 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
+from squadopt.application.weekly_suggestion_eval import SUPPORTED_LEAGUE_ID
 from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
-from squadopt.contracts.league_tree import PublishedLeague
+from squadopt.contracts.league_tree import (
+    LEGACY_TREE,
+    PublishedLeague,
+    legacy_tree_league_id,
+    read_league_directory,
+)
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -650,7 +660,9 @@ class WeeklyOperations:
             "decide", {"snapshot_id": result.snapshot_id, "mode": result.mode}, result.output_paths
         )
 
-    def _league_request(self, league_id: int, record: bool) -> LeaguePublicationRequest:
+    def _league_request(
+        self, league_id: int, record: bool, now: datetime
+    ) -> LeaguePublicationRequest:
         return LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
@@ -658,6 +670,7 @@ class WeeklyOperations:
             self.paths.registry,
             self.paths.out,
             league_id,
+            now=now,
             season=self.request.season,
             gameweek=self.request.gameweek,
             handoff_path=Path(self.values["handoff"]["path"]),
@@ -691,8 +704,30 @@ class WeeklyOperations:
         leagues: dict[str, dict[str, object]] = {}
         beside: list[PublishedLeague] = []
         gameweek: int | None = None
+        # One publication, one stamp: every tree and the directory carry the same
+        # generated_at_utc, which is what the release check reads.
+        now = datetime.now(UTC).replace(microsecond=0)
+        site_data = self.paths.out / "data"
+        # A tree from before the league directory is adopted by the league it names,
+        # before any league renders, whatever the order of the list; one naming a league
+        # the list does not have is refused here rather than by the first league.
+        legacy_league = legacy_tree_league_id(site_data)
+        adopted: dict[str, str] = {}
+        if legacy_league is not None and not read_league_directory(site_data):
+            if legacy_league not in self.request.league_ids:
+                raise WeekError(
+                    f"{site_data / LEGACY_TREE} names league {legacy_league}, which the "
+                    "league list does not have; it cannot be adopted."
+                )
+            outcome = adopt_legacy_tree(site_data, legacy_league)
+            if outcome is not None:
+                adopted[str(legacy_league)] = outcome[0]
         for league_id in self.request.league_ids:
-            request = self._league_request(league_id, record)
+            # The advice record and the history name one league today
+            # (weekly_suggestion_eval.SUPPORTED_LEAGUE_ID); the other leagues are rendered
+            # and published, not recorded, until the record contract carries the league.
+            recorded = record and league_id == SUPPORTED_LEAGUE_ID
+            request = self._league_request(league_id, recorded, now)
             with league_mapper(request, self.request.workers) as mapper:
                 result = publish_league(request, mapper=mapper, beside=beside)
             if result.published is not None:
@@ -700,6 +735,7 @@ class WeeklyOperations:
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
             leagues[str(league_id)] = {
+                "advice_recorded": recorded,
                 # What the build told the operator about individual members (a name it
                 # changed, a mode or the manager's word it could not solve) and the files
                 # it removed from the tree, so a run is not "completed" in silence.
@@ -712,7 +748,7 @@ class WeeklyOperations:
                 # Empty when the Top 100 menu was offered or never asked for.
                 "top100_note": result.top100_note,
                 # A tree from before the league directory, adopted or removed.
-                "legacy_tree": result.legacy_tree,
+                "legacy_tree": adopted.get(str(league_id), result.legacy_tree),
             }
         return WeeklyStageResult(
             tuple(sorted(set(outputs))),
@@ -749,6 +785,7 @@ class WeeklyOperations:
     def _scoreboard(self) -> WeeklyStageResult:
         outputs: list[Path] = []
         kept: dict[str, list[object]] = {}
+        now_utc = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         for league_id in self.request.league_ids:
             result = publish_scoreboard(
                 ScoreboardPublicationRequest(
@@ -759,6 +796,7 @@ class WeeklyOperations:
                     self.paths.out,
                     league_id,
                     season=self.request.season,
+                    now_utc=now_utc,
                     cohort_snapshot_id=self._cohort_id(),
                     elite_snapshot_id=self._elite_id(),
                     evidence_root=self.paths.evidence,
@@ -1107,11 +1145,14 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--league and --league-list name the leagues two ways; use one")
         if args.league_list is not None:
             try:
-                league_ids = read_league_list(args.league_list)
+                # Relative to the workspace, like --out and --handoff.
+                league_ids = read_league_list(root / args.league_list)
             except LeagueListError as error:
                 parser.error(str(error))
         else:
             league_ids = tuple(args.league or ())
+            if len(set(league_ids)) != len(league_ids):
+                parser.error("--league names a league twice")
         if not args.season or args.gameweek is None or not league_ids:
             parser.error(
                 "--season, --gameweek and --league (or --league-list) are required for a weekly run"

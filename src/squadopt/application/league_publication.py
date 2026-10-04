@@ -213,6 +213,14 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
 
     standings_name = f"league-{request.league_id}-standings.json"
     payloads = getattr(snapshot, "payloads", {})
+    # The league's own members: the registry holds every league's, the standings page
+    # says which are this league's.
+    registry = registry.in_league(payloads, request.league_id)
+    if not registry.entries:
+        raise DataError(
+            f"None of the registered entries is in league {request.league_id} by its "
+            f"captured standings page; seed the registry from the league list."
+        )
     standings: dict[int, MemberStanding] = {}
     league_name: str | None = None
     registered = [int(entry.entry_id) for entry in registry.entries]
