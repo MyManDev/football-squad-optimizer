@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import fixture from "../../../fixtures/device-plan/instances.json";
 import type { LpSolver } from "./lp/problem";
 import { solveRequest } from "./requests";
+import { DevicePlanRefused } from "./solve/week";
 import { benchCoefficient } from "./strategies/top100";
 import { isDevicePlanDocument, type DevicePlanDocument, type DevicePlanEntry } from "./types";
 
@@ -50,6 +51,30 @@ describe("the Top 100 inputs", () => {
     }
     // One case moves a decision, so the price path is exercised.
     expect(world.top100_cases.some((c) => c.reference.changed)).toBe(true);
+  });
+});
+
+describe("a weight combines with nothing", () => {
+  it("is refused beside a chip or a rival strategy, and where the document lacks it", () => {
+    const entry = members["101"]!;
+    expect(() =>
+      solveRequest(solver, { document, entry, top100Weight: 20, chip: "3xc" }, () => 0),
+    ).toThrow(DevicePlanRefused);
+    expect(() =>
+      solveRequest(
+        solver,
+        {
+          document,
+          entry,
+          top100Weight: 20,
+          strategy: { name: "fark-yarat", rival: world.rivals["202"] as never },
+        },
+        () => 0,
+      ),
+    ).toThrow(DevicePlanRefused);
+    expect(() => solveRequest(solver, { document, entry, top100Weight: 15 }, () => 0)).toThrow(
+      DevicePlanRefused,
+    );
   });
 });
 

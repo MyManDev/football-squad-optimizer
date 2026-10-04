@@ -283,8 +283,8 @@ test("a Top 100 weight is solved on the device and priced on the base points", a
   )!.reference;
   expect(reference.changed).toBe(true);
   await expect(page.locator("main")).toContainText("Ayar: 50 (senin seçimin).");
-  // The price on base points, as the published setting documents print it.
+  // The price on base points, in the sentence the setting documents print it in.
   await expect(page.locator("main")).toContainText(
-    reference.expected_points_cost.toFixed(1).replace(".", ","),
+    `~${reference.expected_points_cost.toFixed(1).replace(".", ",")} beklenen puan`,
   );
 });

@@ -503,9 +503,18 @@ function withComputable(
     (published.evidence.available || word);
   const asked = parseTop100(searchParams).weight;
   const target: Top100Target = { strategy, window, rivalEntryId };
+  // A weight the device computes for the one-week pure-points plan stands even where the
+  // service does not offer it; the selection then stays not listed until the device answers.
+  const onDeviceWeight =
+    strategy === "saf-puan" &&
+    window === 1 &&
+    !wordOn &&
+    published.onDevice?.top100Weights.includes(asked) === true;
   const weight =
     asked !== 0 &&
-    (settings.includes(asked) || top100Weights(index, entryId, wordOn, target).includes(asked))
+    (settings.includes(asked) ||
+      top100Weights(index, entryId, wordOn, target).includes(asked) ||
+      onDeviceWeight)
       ? asked
       : 0;
   const switched = wordOn || (weight !== 0 && !chipStrategy);

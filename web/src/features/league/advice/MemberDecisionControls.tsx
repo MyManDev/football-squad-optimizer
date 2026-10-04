@@ -266,7 +266,7 @@ export function MemberDecisionControls({
   const top100Note =
     chipChosen && !chipStrategy
       ? chipCopy.switchesOff
-      : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
+      : top100Service && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
         ? computeCopy.top100Computable
         : !top100.available
           ? top100Unavailable(top100Copy, top100.reason)
