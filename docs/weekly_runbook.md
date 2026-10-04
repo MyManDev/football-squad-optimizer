@@ -16,13 +16,15 @@ site's directory (`data/leagues.json`) lists them all. Each league is stamped af
 solves; the directory, written by the last league, carries the latest stamp, which is the
 publication's. A league renders the registered entries its captured standings page names.
 
-With more than one league, the capture stage refuses a capture that lacks a listed league's
-standings page and a registry not seeded from every listed league, before any solve. So the
-first run over a new list stops there, after its capture: seed the registry from that
-capture (`python -m scripts.seed_entry_registry --league-list config/leagues.json
---snapshot-id <that capture>`, which registers every member of every league once) and start
-a new run (new `--run-id`, no `--snapshot-id`): the registry is a capture input, so a resume
-is refused, and only a new capture holds the new members' picks.
+The capture stage refuses, before any solve, a registry that names its seed leagues and was
+not seeded from every listed league (one league or several: a league the registry was not
+seeded from would be rendered with only the members the two share), and with more than one
+league a capture that lacks a listed league's standings page. So the first run over a new
+list stops there, after its capture, and its message names the seed command for exactly the
+run's leagues (`python -m scripts.seed_entry_registry --league <id> ... --snapshot-id <that
+capture>`, which registers every member of every league once). Then start a new run (new
+`--run-id`, no `--snapshot-id`): the registry is a capture input, so a resume is refused, and
+only a new capture holds the new members' picks.
 
 The advice record and the member histories name one league
 (`weekly_suggestion_eval.SUPPORTED_LEAGUE_ID`); the other leagues are rendered and published,
@@ -31,7 +33,8 @@ league (`leagues.<id>.advice_recorded`), and its top-level `advice_recorded` is 
 league was recorded; a run asked to record whose list has none of them records nothing and
 logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed` and
 `top100_note` sit under `leagues.<id>`; `legacy_tree` (top level) says what became of a tree
-from before the directory.
+from before the directory, and `removed_trees` (top level) names the trees of leagues the list
+no longer has, which the run removes so a dropped league's member names leave the site.
 
 By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
 keeps the other leagues the directory lists only when their trees were rendered from the same
@@ -229,7 +232,9 @@ each line; the commands are in the table above and in the documents named.
    predecessor did not complete; the league tree carries one `generated_at_utc`, which the
    bundle requires to be after the capture.
 5. **The bundle is sealed against the published tree** (`scripts.prepare_football_bundle`;
-   `docs/operations/official_injury_discovery.md`). Its marker is written last, after every
+   `docs/operations/official_injury_discovery.md`; with several leagues, `--league <id>` names
+   the tree it seals, as `scripts.add_device_plan_inputs --league <id>` names the tree it
+   augments). Its marker is written last, after every
    copy has been read back through the production validators; a name or an input the reader
    would refuse is refused before anything is copied.
 6. **The site pull request merges through develop's merge queue, the release is cut and

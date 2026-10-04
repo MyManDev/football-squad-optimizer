@@ -164,15 +164,29 @@ def published_trees() -> tuple[list[Tree], bool, str | None]:
 
 
 def _tree_capture(tree: str, members: list[dict[str, Any]] | None) -> str | None:
-    """The capture a tree was rendered from: its first human entry's source_snapshot_id."""
+    """The capture a tree was rendered from: the source_snapshot_id of the first human
+    member whose entry was published (a member who was not rendered keeps a row and has no
+    entry document). None when the tree names no human member; "" when none of their
+    entries can be read."""
 
-    for member in members or []:
-        if member.get("member_kind") == "human" and isinstance(member.get("entry_id"), int):
-            path = f"/data/{tree}/entries/{member['entry_id']}.json"
-            read = _payload(_document(path), path)
-            capture = (read or {}).get("source_snapshot_id")
-            return capture if isinstance(capture, str) else ""
-    return None
+    humans = [
+        member["entry_id"]
+        for member in members or []
+        if member.get("member_kind") == "human" and isinstance(member.get("entry_id"), int)
+    ]
+    if not humans:
+        return None
+    for entry_id in humans:
+        status, body = fetch(f"/data/{tree}/entries/{entry_id}.json")
+        if status != 200:
+            continue
+        try:
+            capture = json.loads(body)["payload"]["source_snapshot_id"]
+        except (ValueError, RecursionError, KeyError, TypeError):
+            continue
+        if isinstance(capture, str) and capture:
+            return capture
+    return ""
 
 
 def smoke_checks(trees: list[Tree]) -> tuple[list[str], list[str], list[str]]:
@@ -239,6 +253,7 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     payloads: list[dict[str, Any]] = []
     settled_by_tree: list[list[Any]] = []
     captures: dict[str, str] = {}
+    stamps: list[str] = []
     for _league_id, tree in trees:
         if len(trees) > 1:
             print(f"  -- {tree}")
@@ -261,8 +276,13 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
             )
             rule = f"must not be newer than the publication {accepted_generated_at}"
             capture = _tree_capture(tree, members)
-            if capture is not None:
+            if capture == "":
+                failures += 1
+                print(f"  BAD no human member's entry document of {tree} can be read")
+            elif capture is not None:
                 captures[tree] = capture
+            if matches:
+                stamps.append(generated)
         failures += not matches
         print(f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}  ({rule})")
         print(
@@ -331,6 +351,13 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
             failures += not ok
             print(f"  {'ok ' if ok else 'BAD'} {label}")
 
+    # The directory is written by the last league the publication rendered, from that
+    # league's own stamp, so one tree carries it; every tree older is a stale publication.
+    if directory_stamp is not None and stamps and max(stamps) != directory_stamp:
+        failures += 1
+        print(
+            f"  BAD no tree carries the publication stamp {directory_stamp} (newest {max(stamps)})"
+        )
     if len(set(captures.values())) > 1:
         failures += 1
         print(f"  BAD the trees name more than one capture: {captures}")

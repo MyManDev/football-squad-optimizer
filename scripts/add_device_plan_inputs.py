@@ -103,10 +103,12 @@ def add_device_plan_inputs(
     site_data_root: Path,
     verify: bool = False,
     out=sys.stdout,
+    league_id: int | None = None,
 ) -> list[str]:
-    """Write the two documents into the tree; return the relative paths written."""
+    """Write the two documents into the tree; return the relative paths written. The tree
+    is ``league_id``'s, or the only one the site publishes when it is not named."""
 
-    league_dir = single_league_tree(site_data_root)
+    league_dir = single_league_tree(site_data_root, league_id)
     members_envelope = _read(league_dir / "members.json")
     members = members_envelope["payload"]
     stamp = str(members_envelope["generated_at_utc"])
@@ -262,6 +264,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--verify", action="store_true", help="solve every member from the written inputs"
     )
+    parser.add_argument(
+        "--league", type=int, help="the league whose tree gets the inputs (required with several)"
+    )
     arguments = parser.parse_args(argv)
     try:
         add_device_plan_inputs(
@@ -270,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             handoff_path=arguments.handoff,
             site_data_root=arguments.site_data_root,
             verify=arguments.verify,
+            league_id=arguments.league,
         )
     except (DevicePlanInputsError, EntryError, DataError, OSError, ValueError) as error:
         print(f"Refused: {error}")

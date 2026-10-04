@@ -37,6 +37,7 @@ from squadopt.application.weekly_suggestion_eval import (
     published_page_captures,
 )
 from squadopt.contracts.league_tree import (
+    LEAGUES_ROOT,
     LEGACY_TREE,
     LeagueDirectoryError,
     PublishedLeague,
@@ -398,6 +399,25 @@ def settle_legacy_tree(
     return ("adopted", named)
 
 
+def remove_unlisted_trees(site_data_root: Path, league_ids: Sequence[int]) -> list[str]:
+    """Remove the trees of leagues this publication does not render.
+
+    A league dropped from the list would otherwise keep its tree, member and team names
+    included, on the public site with no directory line pointing at it, where nothing reads
+    or checks it again. Returns the removed trees, relative to the site's data root.
+    """
+
+    root = Path(site_data_root) / LEAGUES_ROOT
+    removed: list[str] = []
+    if not root.is_dir():
+        return removed
+    for tree in sorted(root.iterdir()):
+        if tree.is_dir() and not (tree.name.isdigit() and int(tree.name) in league_ids):
+            shutil.rmtree(tree)
+            removed.append(f"{LEAGUES_ROOT}/{tree.name}")
+    return removed
+
+
 def league_tree_capture(tree: Path) -> str | None:
     """The capture a published tree was rendered from: its first human entry's
     ``source_snapshot_id``; None when the tree names no member or cannot be read."""
@@ -405,18 +425,22 @@ def league_tree_capture(tree: Path) -> str | None:
     try:
         members = json.loads((Path(tree) / "members.json").read_text(encoding="utf-8"))
         rows = members["payload"]["members"]
-        entry_id = next(
-            row["entry_id"]
-            for row in rows
-            if isinstance(row, dict) and row.get("member_kind") == "human"
-        )
-        entry = json.loads(
-            (Path(tree) / "entries" / f"{entry_id}.json").read_text(encoding="utf-8")
-        )
-        capture = entry["payload"]["source_snapshot_id"]
-    except (OSError, ValueError, KeyError, TypeError, StopIteration):
+    except (OSError, ValueError, KeyError, TypeError):
         return None
-    return capture if isinstance(capture, str) else None
+    # The first human member whose entry was published: a member who was not rendered keeps
+    # a row in members.json and has no entry document.
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or row.get("member_kind") != "human":
+            continue
+        try:
+            entry = json.loads(
+                (Path(tree) / "entries" / f"{row['entry_id']}.json").read_text(encoding="utf-8")
+            )
+            capture = entry["payload"]["source_snapshot_id"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        return capture if isinstance(capture, str) else None
+    return None
 
 
 def leagues_beside(site_data_root: Path, league_id: int, snapshot_id: str) -> list[PublishedLeague]:

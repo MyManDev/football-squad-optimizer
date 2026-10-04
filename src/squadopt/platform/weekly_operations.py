@@ -24,6 +24,7 @@ from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     publish_league,
     records_advice_for,
+    remove_unlisted_trees,
     settle_legacy_tree,
 )
 from squadopt.application.player_evidence import PlayerEvidenceRequest, export_player_evidence
@@ -693,27 +694,32 @@ class WeeklyOperations:
         another's. Refused here, before any projection or solve is spent."""
 
         leagues = self.request.league_ids
-        if len(leagues) < 2:
-            return
-        payloads = read_snapshot(self.paths.snapshots, identifier).payloads
-        missing = [
-            league for league in leagues if f"league-{league}-standings.json" not in payloads
-        ]
-        if missing:
-            raise WeekError(
-                f"Capture {identifier} holds no standings page for league(s) "
-                f"{', '.join(map(str, missing))}; a run over several leagues reads each "
-                "league's members from its page. Take a new capture (run without --snapshot-id)."
-            )
         registry = EntryRegistry.load(self.paths.registry)
+        # A registry that names its seed leagues must have been seeded from every league
+        # the run renders, one league or several: a league it was not seeded from would be
+        # rendered with only the members the two happen to share.
+        if not registry.seeded_from and len(leagues) < 2:
+            return
+        if len(leagues) > 1:
+            payloads = read_snapshot(self.paths.snapshots, identifier).payloads
+            missing = [
+                league for league in leagues if f"league-{league}-standings.json" not in payloads
+            ]
+            if missing:
+                raise WeekError(
+                    f"Capture {identifier} holds no standings page for league(s) "
+                    f"{', '.join(map(str, missing))}; a run over several leagues reads each "
+                    "league's members from its page. Take a new capture (run without "
+                    "--snapshot-id)."
+                )
         unseeded = [league for league in leagues if league not in registry.seeded_from]
         if unseeded:
             raise WeekError(
                 f"The entry registry was not seeded from league(s) "
                 f"{', '.join(map(str, unseeded))}. Seed it from this capture "
-                "(python -m scripts.seed_entry_registry --league-list "
-                f"{LEAGUE_LIST_FILE.as_posix()} --snapshot-id {identifier}), then start a "
-                "new run: it takes a capture "
+                "(python -m scripts.seed_entry_registry "
+                f"{' '.join(f'--league {league}' for league in leagues)} "
+                f"--snapshot-id {identifier}), then start a new run: it takes a capture "
                 "holding every member's picks."
             )
 
@@ -736,6 +742,8 @@ class WeeklyOperations:
             legacy = settle_legacy_tree(self.paths.out / "data", self.request.league_ids)
         except LeagueDirectoryError as error:
             raise WeekError(str(error)) from error
+        # A league dropped from the list leaves the site with its tree.
+        removed_trees = remove_unlisted_trees(self.paths.out / "data", self.request.league_ids)
         for league_id in self.request.league_ids:
             # Each league is stamped after its own solves (the stamp is when the advice
             # was published, read against the deadline); the directory the last league
@@ -783,6 +791,8 @@ class WeeklyOperations:
                 "legacy_tree": (
                     None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}
                 ),
+                # Trees of leagues the list no longer has, removed from the site.
+                "removed_trees": removed_trees,
                 "leagues": leagues,
             },
         )

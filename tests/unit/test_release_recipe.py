@@ -372,6 +372,8 @@ def _directory_site(
                 ).encode()
             if path == f"/data/{tree}/entries/101.json":
                 capture = held.get(tree, "fpl-live-one")
+                if capture is None:
+                    return 404, b""
                 return 200, json.dumps({"payload": {"source_snapshot_id": capture}}).encode()
         return served(path)
 
@@ -381,7 +383,24 @@ def _directory_site(
 @pytest.mark.parametrize(
     ("site", "said"),
     [
-        pytest.param({}, None, id="trees-older-than-the-publication"),
+        pytest.param(
+            {"tree_stamps": {"leagues/7": "2026-09-18T18:00:00Z"}},
+            None,
+            id="the-last-league-carries-the-publication-stamp",
+        ),
+        pytest.param(
+            {},
+            "BAD no tree carries the publication stamp 2026-09-18T18:00:00Z",
+            id="every-tree-older-than-the-publication",
+        ),
+        pytest.param(
+            {
+                "tree_stamps": {"leagues/7": "2026-09-18T18:00:00Z"},
+                "captures": {"leagues/352490": None},
+            },
+            "BAD no human member's entry document of leagues/352490 can be read",
+            id="no-entry-readable",
+        ),
         pytest.param(
             {"directory_stamp": "2026-09-18T17:30:00Z"},
             "BAD /data/leagues.json generated_at_utc 2026-09-18T17:30:00Z",

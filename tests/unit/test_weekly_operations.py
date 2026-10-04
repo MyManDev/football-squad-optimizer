@@ -1379,3 +1379,25 @@ def test_no_capture_keeps_todays_behaviour_exactly() -> None:
 
     assert "rotation" in plan.steps
     assert WeeklyRequest(season="2026-27", gameweek=5, league_ids=(1,)).rotation_capture is None
+
+
+def test_a_league_dropped_from_the_list_leaves_the_site_with_its_tree(tmp_path: Path) -> None:
+    operation = world(tmp_path, pages={352490: (101,)}, seeded_from=(352490,))
+    dropped = operation.paths.out / "data" / "leagues" / "9"
+    (dropped / "entries").mkdir(parents=True)
+    (dropped / "members.json").write_text("{}", encoding="utf-8")
+    doc = json.loads(operation.execute().read_bytes())
+    league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
+    assert league["removed_trees"] == ["leagues/9"]
+    assert not dropped.exists()
+    assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
+
+
+def test_a_league_the_registry_was_not_seeded_from_stops_a_one_league_run(
+    tmp_path: Path,
+) -> None:
+    operation = world(tmp_path, league_ids=(7,), pages={7: (101,)}, seeded_from=(352490,))
+    with pytest.raises(WeekError, match="not seeded from league\\(s\\) 7") as refused:
+        operation.execute()
+    # The seed command it names seeds exactly the run's leagues.
+    assert "seed_entry_registry --league 7 --snapshot-id" in str(refused.value)

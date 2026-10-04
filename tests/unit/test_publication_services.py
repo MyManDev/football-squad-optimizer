@@ -19,6 +19,7 @@ from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    league_tree_capture,
     leagues_beside,
     prepare_league_publication,
     publish_league,
@@ -611,3 +612,23 @@ def test_site_publication_rejects_a_pinned_non_live_capture(tmp_path: Path) -> N
             )
         )
     assert not request.out_dir.exists()
+
+
+def test_a_tree_s_capture_is_read_from_the_first_member_whose_entry_was_published(
+    tmp_path: Path,
+) -> None:
+    tree = tmp_path / "leagues" / "7"
+    (tree / "entries").mkdir(parents=True)
+    members = {
+        "payload": {
+            "members": [
+                {"member_kind": "human", "entry_id": 4},
+                {"member_kind": "human", "entry_id": 5},
+            ]
+        }
+    }
+    (tree / "members.json").write_text(json.dumps(members), encoding="utf-8")
+    entry = {"payload": {"source_snapshot_id": "capture-a"}}
+    (tree / "entries" / "5.json").write_text(json.dumps(entry), encoding="utf-8")
+    # Member 4 was not rendered: a row and no entry document.
+    assert league_tree_capture(tree) == "capture-a"
