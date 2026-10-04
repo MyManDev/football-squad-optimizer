@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,8 +12,11 @@ const SHELL_ELEMENT = 'id="root"';
 export const DIRECTORY = "/data/leagues.json";
 export const LEGACY_TREE = "league";
 // A name no build produces: a missing asset must answer 404, not the shell, and must not
-// be cacheable, or an edge keeps HTML for an asset name a later deploy builds.
-export const ABSENT_ASSET = "/assets/smoke-absent-asset.js";
+// be cacheable, or an edge keeps HTML for an asset name a later deploy builds. The name is
+// new on every run, so a run against a deployment from before assets/404.html poisons only
+// a name nothing will ever ask for again. Mirrored by verify_live.py.
+export const ABSENT_ASSET_PREFIX = "/assets/smoke-absent-";
+export const ABSENT_ASSET = `${ABSENT_ASSET_PREFIX}${randomBytes(4).toString("hex")}.js`;
 
 export const SMOKE_CHECKS = [
   { path: "/", kind: "html" },
@@ -67,7 +71,7 @@ export async function publishedTrees(baseUrl, { fetchImpl, sleep, attempts }) {
 
 // An asset name inside the shell or a chunk: what the build emits under assets/.
 const ASSET_NAME =
-  /(?:\/assets\/|["'`]assets\/|\.\/)([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|woff2?))/g;
+  /(?:\/assets\/|["'`]assets\/|\.\/)([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|woff2?))(?![A-Za-z0-9_.-])/g;
 const BINARY = /\.(?:wasm|woff2?)$/;
 const MAX_ASSETS = 400;
 
@@ -168,7 +172,7 @@ async function checkEndpoint(baseUrl, check, { fetchImpl, sleep, attempts }) {
         }
         if (check.uncacheable) {
           const cacheControl = (response.headers.get("cache-control") ?? "").toLowerCase();
-          if (cacheControl.includes("immutable") || /max-age=[1-9]/.test(cacheControl)) {
+          if (cacheControl.includes("immutable") || /(?:s-)?max-age=[1-9]/.test(cacheControl)) {
             throw new Error(`an absent asset is cacheable: ${cacheControl}`);
           }
         }

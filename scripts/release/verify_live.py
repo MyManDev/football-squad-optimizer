@@ -26,6 +26,7 @@ import argparse
 import http.client
 import json
 import re
+import secrets
 import sys
 import urllib.error
 import urllib.request
@@ -50,11 +51,14 @@ ROUTES = [
 DOCUMENTS = ["/data/index.json"]
 DIRECTORY = "/data/leagues.json"
 #: A name no build produces (web/scripts/smoke-deployment.mjs ABSENT_ASSET): a missing
-#: asset must answer 404, not the shell an edge would keep for that name.
-ABSENT_ASSET = "/assets/smoke-absent-asset.js"
+#: asset must answer 404, not the shell an edge would keep for that name. New on every run,
+#: so a run against a deployment from before assets/404.html poisons a name nothing will
+#: ask for again.
+ABSENT_ASSET_PREFIX = "/assets/smoke-absent-"
+ABSENT_ASSET = f"{ABSENT_ASSET_PREFIX}{secrets.token_hex(4)}.js"
 #: An asset name inside the shell or a chunk, as the build emits it under assets/.
 ASSET_NAME = re.compile(
-    rb"""(?:/assets/|["'`]assets/|\./)([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|woff2?))"""
+    rb"""(?:/assets/|["'`]assets/|\./)([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|woff2?))(?![A-Za-z0-9_.-])"""
 )
 MAX_ASSETS = 400
 #: The one tree a site from before the directory publishes.

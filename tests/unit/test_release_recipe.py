@@ -411,11 +411,12 @@ def test_the_verifier_checks_the_same_routes_the_deployment_smoke_does() -> None
     """
 
     source = (ROOT / "web/scripts/smoke-deployment.mjs").read_text(encoding="utf-8")
-    absent_asset = re.search(r'ABSENT_ASSET = "([^"]+)"', source)
-    assert absent_asset is not None and absent_asset.group(1) == verify_live.ABSENT_ASSET
+    prefix = re.search(r'ABSENT_ASSET_PREFIX = "([^"]+)"', source)
+    assert prefix is not None and prefix.group(1) == verify_live.ABSENT_ASSET_PREFIX
+    assert verify_live.ABSENT_ASSET.startswith(verify_live.ABSENT_ASSET_PREFIX)
     block = source.split("export const SMOKE_CHECKS = [", 1)[1].split("\n];", 1)[0]
     # The absent asset is named by its constant; read it as the path it stands for.
-    block = block.replace("path: ABSENT_ASSET", f'path: "{absent_asset.group(1)}"')
+    block = block.replace("path: ABSENT_ASSET", f'path: "{verify_live.ABSENT_ASSET}"')
     paths = re.findall(r'path:\s*"([^"]+)"', block)
     kinds = re.findall(r'kind:\s*"([^"]+)"', block)
     assert len(paths) == len(kinds), block
