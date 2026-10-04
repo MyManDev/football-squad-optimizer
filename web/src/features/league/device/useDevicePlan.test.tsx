@@ -17,7 +17,8 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
-import { solvePlan, type LpSolver } from "./planModel";
+import type { LpSolver } from "./lp/problem";
+import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
   deviceChip,

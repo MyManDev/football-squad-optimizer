@@ -14,8 +14,9 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { EntryAdvice, EntryAdviceIndex, EntrySquad, LeagueViewEnvelope } from "../types";
-import { solveRequest } from "./devicePlan.worker";
-import { rebuilds, type LpSolver } from "./planModel";
+import type { LpSolver } from "./lp/problem";
+import { solveRequest } from "./requests";
+import { rebuilds } from "./strategies/chips";
 import {
   isDeviceChip,
   isDevicePlanDocument,

@@ -11,8 +11,10 @@ import { createRequire } from "node:module";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import fixture from "../../../fixtures/device-plan/instances.json";
-import { solveRequest } from "./devicePlan.worker";
-import { DevicePlanRefused, buildLp, solvePlan, type LpSolver } from "./planModel";
+import { memberWeekProblem } from "./lp/memberWeek";
+import { lpText, type LpSolver } from "./lp/problem";
+import { solveRequest } from "./requests";
+import { DevicePlanRefused, solvePlan } from "./solve/week";
 import {
   isDevicePlanDocument,
   isDevicePlanEntry,
@@ -85,7 +87,7 @@ describe.each(members.map((member) => [member.entry_id, member] as const))(
 
 describe("the model text", () => {
   it("states every rule once and nothing it was not given", () => {
-    const lp = buildLp(document, members[0]!.entry);
+    const lp = lpText(memberWeekProblem(document, members[0]!.entry));
     const rules = document.rules;
     expect(lp).toContain(`squad: `);
     expect(lp).toContain(` = ${rules.squad_size}`);
