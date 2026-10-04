@@ -1,5 +1,7 @@
 #!/bin/sh
 # usage: ship.sh [--dry-run] <site PR> <tag> <release branch> <accepted generated-at ISO> <summary sentence> [settled gameweek]
+# The accepted stamp is data/leagues.json's generated_at_utc, or on a site from before the
+# league directory, data/league/members.json's.
 # Wait for the site PR, cut the release as a real two-parent merge whose tree is develop's,
 # merge it, then deploy.sh (main CI, tag, dispatch, watch) and verify the live site.
 set -u

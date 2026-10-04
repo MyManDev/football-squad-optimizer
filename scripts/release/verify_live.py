@@ -137,8 +137,9 @@ Tree = tuple[int | None, str]
 LEGACY: Tree = (None, LEGACY_TREE)
 
 
-def published_trees() -> tuple[list[Tree], bool]:
-    """The league trees the site publishes, and whether the directory could be read.
+def published_trees() -> tuple[list[Tree], bool, str | None]:
+    """The league trees the site publishes, whether the directory could be read, and the
+    directory's own stamp (None on a site from before the directory).
 
     One tree per directory line; the legacy tree alone where the site publishes no directory.
     A directory that cannot be read or lists no league is a failure, and the legacy tree is
@@ -147,16 +148,21 @@ def published_trees() -> tuple[list[Tree], bool]:
 
     status, body = fetch(DIRECTORY)
     if status == 404:
-        return [LEGACY], True
-    rows: object = None
+        return [LEGACY], True, None
+    document: object = None
     if status == 200:
         try:
-            rows = json.loads(body)["payload"]["leagues"]
-        except (ValueError, RecursionError, KeyError, TypeError):
-            rows = None
+            document = json.loads(body)
+        except (ValueError, RecursionError):
+            document = None
+    rows = (
+        document.get("payload", {}).get("leagues")
+        if isinstance(document, dict) and isinstance(document.get("payload"), dict)
+        else None
+    )
     if not isinstance(rows, list):
         print(f"  BAD {status} {DIRECTORY} is not a league directory")
-        return [LEGACY], False
+        return [LEGACY], False, None
     trees: list[Tree] = []
     for row in rows:
         if isinstance(row, dict) and isinstance(row.get("path"), str):
@@ -164,8 +170,35 @@ def published_trees() -> tuple[list[Tree], bool]:
             trees.append((league_id if isinstance(league_id, int) else None, row["path"]))
     if not trees:
         print(f"  BAD {DIRECTORY} lists no league")
-        return [LEGACY], False
-    return trees, True
+        return [LEGACY], False, None
+    stamp = document.get("generated_at_utc") if isinstance(document, dict) else None
+    return trees, True, stamp if isinstance(stamp, str) else ""
+
+
+def _tree_capture(tree: str, members: list[dict[str, Any]] | None) -> str | None:
+    """The capture a tree was rendered from: the source_snapshot_id of the first human
+    member whose entry was published (a member who was not rendered keeps a row and has no
+    entry document). None when the tree names no human member; "" when none of their
+    entries can be read."""
+
+    humans = [
+        member["entry_id"]
+        for member in members or []
+        if member.get("member_kind") == "human" and isinstance(member.get("entry_id"), int)
+    ]
+    if not humans:
+        return None
+    for entry_id in humans:
+        status, body = fetch(f"/data/{tree}/entries/{entry_id}.json")
+        if status != 200:
+            continue
+        try:
+            capture = json.loads(body)["payload"]["source_snapshot_id"]
+        except (ValueError, RecursionError, KeyError, TypeError):
+            continue
+        if isinstance(capture, str) and capture:
+            return capture
+    return ""
 
 
 def check_assets() -> int:
@@ -229,7 +262,7 @@ def smoke_checks(trees: list[Tree]) -> tuple[list[str], list[str], list[str]]:
 def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int:
     failures = 0
 
-    trees, directory_ok = published_trees()
+    trees, directory_ok, directory_stamp = published_trees()
     failures += not directory_ok
     routes, documents, absent_documents = smoke_checks(trees)
     absent_documents = [ABSENT_ASSET, *absent_documents]
@@ -260,10 +293,22 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     print("\n== content ==")
     # Every nested read below is type-checked: a document of the wrong shape inside is a
     # counted failure, where it used to end the run in an AttributeError.
-    # One publication writes every tree with one stamp, so every tree must carry the
-    # accepted one; the week claims below are read from each tree too.
+    # A site from before the directory is the one tree, whose members.json carries the
+    # accepted stamp. A directory site's publication is the directory: it is written last,
+    # after every league, and carries the accepted stamp; each league is stamped after its
+    # own solves, so no tree may be newer than the directory, and every tree must name the
+    # one capture the publication rendered. The week claims are read from each tree.
+    if directory_stamp is not None:
+        matches = directory_stamp == accepted_generated_at
+        failures += not matches
+        print(
+            f"  {'ok ' if matches else 'BAD'} {DIRECTORY} generated_at_utc {directory_stamp}"
+            f"  (must equal accepted {accepted_generated_at})"
+        )
     payloads: list[dict[str, Any]] = []
     settled_by_tree: list[list[Any]] = []
+    captures: dict[str, str] = {}
+    stamps: list[str] = []
     for _league_id, tree in trees:
         if len(trees) > 1:
             print(f"  -- {tree}")
@@ -275,12 +320,26 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
         payload = read or {}
         payloads.append(payload)
         generated = (document or {}).get("generated_at_utc", "")
-        matches = generated == accepted_generated_at
+        if directory_stamp is None:
+            matches = generated == accepted_generated_at
+            rule = f"must equal accepted {accepted_generated_at}"
+        else:
+            matches = (
+                isinstance(generated, str)
+                and bool(generated)
+                and generated <= accepted_generated_at
+            )
+            rule = f"must not be newer than the publication {accepted_generated_at}"
+            capture = _tree_capture(tree, members)
+            if capture == "":
+                failures += 1
+                print(f"  BAD no human member's entry document of {tree} can be read")
+            elif capture is not None:
+                captures[tree] = capture
+            if matches:
+                stamps.append(generated)
         failures += not matches
-        print(
-            f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}"
-            f"  (must equal accepted {accepted_generated_at})"
-        )
+        print(f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}  ({rule})")
         print(
             f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
             f" members={None if members is None else len(members)}"
@@ -347,6 +406,16 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
             failures += not ok
             print(f"  {'ok ' if ok else 'BAD'} {label}")
 
+    # The directory is written by the last league the publication rendered, from that
+    # league's own stamp, so one tree carries it; every tree older is a stale publication.
+    if directory_stamp is not None and stamps and max(stamps) != directory_stamp:
+        failures += 1
+        print(
+            f"  BAD no tree carries the publication stamp {directory_stamp} (newest {max(stamps)})"
+        )
+    if len(set(captures.values())) > 1:
+        failures += 1
+        print(f"  BAD the trees name more than one capture: {captures}")
     print(f"\n{'ALL GOOD' if failures == 0 else str(failures) + ' FAILURE(S)'}")
     return 1 if failures else 0
 
@@ -357,7 +426,8 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         "accepted_generated_at",
         help=(
             "the live publication's generated_at_utc must equal this accepted candidate stamp. "
-            "Read the exact value from the league's members.json in the accepted "
+            "Read the exact value from data/leagues.json (on a site from before the "
+            "directory, from data/league/members.json) in the accepted "
             "publication tree, not from the clock or the previous live site."
         ),
     )

@@ -35,7 +35,7 @@ def _request(capture: str | None, field: str = "rotation_capture") -> WeeklyRequ
     return WeeklyRequest(
         season="2026-27",
         gameweek=5,
-        league_id=352490,
+        league_ids=(352490,),
         workers=8,
         rotation=True,
         # Without this, `--snapshot-id` is refused by an unrelated Top-100 rule and a test
@@ -124,7 +124,7 @@ def test_the_snapshot_id_check_does_not_depend_on_the_top_100_rule() -> None:
             WeeklyRequest(
                 season="2026-27",
                 gameweek=5,
-                league_id=352490,
+                league_ids=(352490,),
                 snapshot_id="../../..",
                 skip_top100=skip,
             ).plan()

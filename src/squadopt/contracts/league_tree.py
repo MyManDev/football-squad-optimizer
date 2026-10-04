@@ -222,7 +222,7 @@ def single_league_tree(site_data_root: Path, league_id: int | None = None) -> Pa
     if len(leagues) > 1:
         raise LeagueDirectoryError(
             f"{Path(site_data_root) / LEAGUE_DIRECTORY_FILE} lists {len(leagues)} leagues; "
-            "say which one."
+            "say which one (--league)."
         )
     if leagues:
         return _tree_path(site_data_root, leagues[0])

@@ -44,7 +44,7 @@ from squadopt.application.weekly_suggestion_eval import (
     published_advice_captures,
     review_member_weeks,
 )
-from squadopt.contracts.league_tree import find_league_tree
+from squadopt.contracts.league_tree import LEAGUE_DIRECTORY_FILE, find_league_tree
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -147,6 +147,7 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
         f"{tree}/scoreboard.json",
         f"{tree}/series-horizon.json",
         "data/fixtures.json",
+        f"data/{LEAGUE_DIRECTORY_FILE}",
     ):
         return True
     path = Path(name)
@@ -630,6 +631,15 @@ def publish_settled(
             encoding="utf-8",
             newline="\n",
         )
+        # The settled view is now the site's publication, so the league directory carries
+        # its stamp as the members document does; the release check reads the directory's.
+        directory = candidate / "data" / LEAGUE_DIRECTORY_FILE
+        if directory.is_file():
+            listed = json.loads(directory.read_text(encoding="utf-8"))
+            listed["generated_at_utc"] = stamp
+            directory.write_text(
+                json.dumps(listed, indent=2) + "\n", encoding="utf-8", newline="\n"
+            )
         proposed = _files(candidate)
         changed = tuple(
             sorted(
