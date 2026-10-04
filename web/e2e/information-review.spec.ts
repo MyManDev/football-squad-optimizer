@@ -275,12 +275,13 @@ for (const [window, width, modelVersion] of [
       });
     });
     await page.goto(
-      `/league/members/35249001?mode=saf-puan&window=${window}&top100=20&model=football`,
+      `/league/352490/members/35249001?mode=saf-puan&window=${window}&top100=20&model=football`,
     );
     const region = page.getByTestId("information-review");
     await expect(region).toBeVisible();
-    await expect(region).toContainText("kesin gelecek transfer tahmini değildir");
-    await expect(region).toContainText("Top100 ağırlığı puan kazancı değildir");
+    await expect(region).not.toContainText("kesin gelecek transfer tahmini değildir");
+    await expect(region).not.toContainText("Top100 ağırlığı puan kazancı değildir");
+    await expect(region).toContainText("Puanlar temel futbol tahmininden gelir");
     const selected = region.locator(":scope > details[open]");
     const comparison = selected.getByTestId("policy-comparison");
     const format = (value: number) => value.toFixed(1).replace(".", ",");
@@ -290,9 +291,9 @@ for (const [window, width, modelVersion] of [
       `Hesaplanan haber senaryolarındaki puan aralığı: ${format(expectedComparison.scenario_min)} – ${format(expectedComparison.scenario_max)}`,
     );
     await expect(comparison).toContainText("Başlangıç planına göre senaryo farkı: 0,0 – 0,0");
-    await expect(comparison).toContainText("maç sonucu için bir güven aralığı değildir");
-    await expect(comparison).toContainText("Haberin ne zaman geleceğine olasılık atanmadı");
-    await expect(comparison).toContainText("banka ve kalan transfere ek puan yazılmadı");
+    await expect(comparison).not.toContainText("maç sonucu için bir güven aralığı değildir");
+    await expect(comparison).not.toContainText("Haberin ne zaman geleceğine olasılık atanmadı");
+    await expect(comparison).not.toContainText("banka ve kalan transfere ek puan yazılmadı");
     await expect(page.getByTestId("official-injuries")).toHaveCount(0);
     const selectedUrl = page.url();
     const breakdown = page.getByTestId("lineup-expectation");
@@ -301,8 +302,8 @@ for (const [window, width, modelVersion] of [
     await expect(breakdown).toContainText("Kaptanın ek puanı: 3,0");
     await expect(breakdown).toContainText("yardımcısının ek puanı: 2,0");
     await expect(breakdown).toContainText("Ceza sonrası beklenen puan: 49,0");
-    await breakdown.locator("summary").click();
-    await expect(breakdown).toContainText("ikinci kez uygulanmaz");
+    await expect(breakdown.locator("summary")).toHaveCount(0);
+    await expect(breakdown).not.toContainText("ikinci kez uygulanmaz");
     const participation = page.getByTestId("participation-evidence");
     await participation.locator(":scope > summary").click();
     await expect(participation).toContainText("Kontrol edilen FPL oynayabilirlik kaydı: 2");
@@ -316,10 +317,11 @@ for (const [window, width, modelVersion] of [
     const role = participation.getByTestId("role-forecast");
     await role.locator(":scope > summary").click();
     await expect(role).toContainText("Beklenen dakika: 34,0");
-    await expect(role).toContainText("kesinleşmiş bir ilk 11 değildir");
+    await expect(role).toContainText("geçmiş maçlardaki ilk 11");
+    await expect(role).not.toContainText("kesinleşmiş bir ilk 11 değildir");
     await expect(role).not.toContainText("%");
-    await expect(role).toContainText("FPL oynayabilirliği bir kez uygulanır");
-    await expect(role).toContainText("Bağımsız doğruluk ölçümü henüz tamamlanmış değildir");
+    await expect(role).not.toContainText("FPL oynayabilirliği bir kez uygulanır");
+    await expect(role).not.toContainText("Bağımsız doğruluk ölçümü henüz tamamlanmış değildir");
     await expect(role).toContainText("İlk 11 bilgisi için yeterli kayıt yok");
     await expect(role).toContainText("Beklenen dakika: 60,0");
     const rolePoints = role.getByTestId("role-point-components");
@@ -328,8 +330,8 @@ for (const [window, width, modelVersion] of [
     await page.keyboard.press("Enter");
     await expect(rolePoints).toHaveAttribute("open", "");
     await expect(rolePoints).toContainText("Toplam oyuncu puanı: 3,00");
-    await expect(rolePoints).toContainText("kaptan çarpanı ve Top100 seçim ağırlığı öncesidir");
-    await expect(rolePoints).toContainText("Oynayabilirlik zaten bir kez uygulanmıştır");
+    await expect(rolePoints).toContainText("Kaptan çarpanı ve Top100 ağırlığı öncesidir");
+    await expect(rolePoints).not.toContainText("Oynayabilirlik zaten bir kez uygulanmıştır");
     const nominal = page.getByRole("region", { name: `${window} haftalık pencere`, exact: true });
     const weeks = answer.payload.plan_weeks!;
     for (const [index, week] of weeks.entries()) {

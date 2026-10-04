@@ -89,7 +89,7 @@ const chipNamed = (value: string) => chips().find((input) => input.value === val
 
 describe("the chip control", () => {
   it("offers none and the four chips in one row, and the URL follows the choice", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
     expect(chips().map((input) => input.value)).toEqual([
       "",
       "wildcard",
@@ -119,7 +119,7 @@ describe("the chip control", () => {
   });
 
   it("turns off a chip the member cannot play, and says why", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED, "en");
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED, "en");
     expect(chipNamed("freehit").disabled).toBe(true);
     expect(chipNamed("wildcard").disabled).toBe(false);
     expect(document.body.textContent).toContain(
@@ -128,7 +128,11 @@ describe("the chip control", () => {
   });
 
   it("turns the manager's word and the settings above 0 off while a chip is chosen", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&chip=wildcard`, SOLVED, "en");
+    renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=wildcard`,
+      SOLVED,
+      "en",
+    );
     const settings = inputs("top100");
     expect(settings[0]!.disabled).toBe(false);
     expect(settings[0]!.checked).toBe(true);
@@ -148,7 +152,7 @@ describe("the chip control", () => {
     "turns the chips off while %s is on, and none still clears a chip left in the link",
     (other) => {
       renderControls(
-        `/league/members/${ENTRY}?mode=saf-puan&window=1&chip=wildcard&${other}`,
+        `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=wildcard&${other}`,
         SOLVED,
         "en",
       );
@@ -171,7 +175,11 @@ describe("the chip control", () => {
   );
 
   it("is off on a longer window, with the note", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=3&chip=wildcard`, SOLVED, "en");
+    renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=3&chip=wildcard`,
+      SOLVED,
+      "en",
+    );
     expect(
       chips()
         .slice(1)
@@ -181,7 +189,11 @@ describe("the chip control", () => {
   });
 
   it("says a chip in the link that cannot be shown is not shown", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&chip=freehit`, SOLVED, "en");
+    renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=freehit`,
+      SOLVED,
+      "en",
+    );
     expect(chips()[0]!.checked).toBe(true);
     expect(document.body.textContent).toContain(CHIP_COPY.en.notOffered);
   });
@@ -194,7 +206,7 @@ describe("the chip control", () => {
   ] as const)("gives the producer's reason %s in both languages", (reason, unavailable) => {
     for (const language of ["tr", "en"] as const) {
       renderControls(
-        `/league/members/${ENTRY}?mode=saf-puan&window=1`,
+        `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
         { available: false, reason, ...(unavailable ? { unavailable: [...unavailable] } : {}) },
         language,
       );
@@ -218,7 +230,7 @@ describe("the chip control", () => {
   });
 
   it("shows the row without a chips block at all, every chip off", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, undefined, "en");
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, undefined, "en");
     expect(chips()).toHaveLength(5);
     expect(
       chips()
@@ -231,7 +243,7 @@ describe("the chip control", () => {
   it("never words the control as a chance, in either language", () => {
     for (const language of ["tr", "en"] as const) {
       renderControls(
-        `/league/members/${ENTRY}?mode=saf-puan&window=1&chip=bboost`,
+        `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=bboost`,
         SOLVED,
         language,
       );

@@ -17,6 +17,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 /**
  * A row's figure and its unit: "8,0 xP" on screen, with "xP" hidden from a screen reader and
@@ -48,12 +49,14 @@ function renderAdvice(
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
-        <LeagueMemberView
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={squad}
-          advice={advice}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+        {withLeague(
+          <LeagueMemberView
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            squad={squad}
+            advice={advice}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -231,8 +234,8 @@ describe("the published Free Hit squad basis", () => {
  */
 describe("a squad basis the two documents disagree about", () => {
   const UNCONFIRMED = {
-    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen on this page against your own team before using these moves.",
-    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
+    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Check the fifteen on this page against your own team before using these moves.",
+    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
   } as const;
 
   it.each(["en", "tr"] as const)("says so, and names neither week, in %s", (language) => {

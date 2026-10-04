@@ -93,8 +93,11 @@ it.each(["tr", "en"] as const)(
       </LanguageProvider>,
     );
     const detail = screen.getByTestId("participation-evidence");
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr" ? "ilk 11 garantisi sayılmaz" : "do not guarantee a start",
+    );
+    expect(detail).not.toHaveTextContent(
+      language === "tr" ? "tek başına tahmini değiştirmez" : "do not change the forecast",
     );
     expect(detail).toHaveTextContent(
       language === "tr" ? "Uygulanamayan açıklama: 1" : "Statements that could not be applied: 1",
@@ -237,7 +240,7 @@ it("keeps evidence optional and rejects audit internals and invalid counts", () 
 });
 
 it.each(["tr", "en"] as const)(
-  "explains applied minute constraints without claiming calibrated likelihoods in %s",
+  "lists no assumption sentences for applied minute constraints in %s",
   (language) => {
     const minuteEvidence: AdviceParticipationEvidence = {
       ...evidence,
@@ -260,15 +263,15 @@ it.each(["tr", "en"] as const)(
       </LanguageProvider>,
     );
     const detail = screen.getByTestId("participation-evidence");
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr" ? "daha kısa sürelere" : "learned shorter durations",
     );
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr"
         ? "gol ve asist toplamı, oynayabilirlik uygulanmadan önce korunur"
         : "goal and assist totals stay fixed before eligibility is applied",
     );
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr" ? "açık bir model varsayımı" : "explicit model assumption",
     );
     expect(detail).not.toHaveTextContent("explicit_full_match_restriction");
@@ -281,7 +284,7 @@ it.each(["tr", "en"] as const)(
 );
 
 it.each(["tr", "en"] as const)(
-  "explains unavailable minute inputs without presenting them as applied in %s",
+  "shows the counts for unavailable minute inputs without an assumption sentence in %s",
   (language) => {
     const view = {
       ...mockEntryAdviceEnvelope(101, "saf-puan", 3).payload,
@@ -297,11 +300,14 @@ it.each(["tr", "en"] as const)(
       </LanguageProvider>,
     );
     const detail = screen.getByTestId("participation-evidence");
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr" ? "doğrulanamadığı için uygulanmadı" : "could not be verified",
     );
-    expect(detail).not.toHaveTextContent(
-      language === "tr" ? "daha kısa sürelere" : "learned shorter durations",
+    expect(detail).not.toHaveTextContent("minute_evidence_not_applied");
+    expect(detail).toHaveTextContent(
+      language === "tr"
+        ? "Doğrulanmış haberin uygulandığı oyuncu: 0"
+        : "Players with verified statements applied: 0",
     );
   },
 );

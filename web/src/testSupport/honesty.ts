@@ -33,3 +33,38 @@ export const AS_A_CHANCE = new RegExp(
   [PERCENT_NOT_OWNERSHIP, ...Object.values(words.stems).flat().map(textStem)].join("|"),
   "i",
 );
+
+// The owner's rule beside it: no member-facing or public page, in either language, carries a
+// caveat, a limit, a scope sentence, a "not built yet" sentence or a sentence about what a
+// figure proves or does not prove. A plain state the member acts on (a deadline, a document
+// that is not there) is not one of them. These are the phrasings the site has used for such
+// sentences, so none of them can come back without a test going red; a new phrasing has to
+// be added here when it is found.
+export const AS_A_CAVEAT = new RegExp(
+  [
+    String.raw`\b(?:does|do) not (?:prove|establish)\b`,
+    String.raw`\bnot directly comparable\b`,
+    String.raw`\bdirectional only\b`,
+    String.raw`\bbeing wired up\b`,
+    String.raw`\bcannot replace the live\b`,
+    String.raw`\bnot live advice\b`,
+    String.raw`\bremains authoritative\b`,
+    String.raw`\bdoes not run a new\b`,
+    String.raw`\bis claimed here\b`,
+    String.raw`\bresult is a diagnostic\b`,
+    String.raw`\bthis alone does not\b`,
+    "göstermez",
+    "göstermiyor",
+    "kanıtlamaz",
+    "karşılaştırılamaz",
+    "yön gösterir",
+    "bağlanacak",
+    "yerini alamaz",
+    "canlı öneri değildir",
+    "karar otoritesi",
+    "optimizasyon çalıştırmaz",
+    "iddia gösterilmiyor",
+    "teşhis göstergesi",
+  ].join("|"),
+  "i",
+);

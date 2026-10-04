@@ -1,3 +1,5 @@
+import { memberAddress } from "../../../lib/leagueAddresses";
+import { useLeague, useLeagueId } from "../useLeague";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
@@ -25,14 +27,16 @@ const SCENARIO_MODES: ReadonlySet<string> = new Set(["garantici", "agresif", "as
 
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
+  const { league, tree } = useLeague();
+  const leagueId = league.leagueId;
   const copy = messages.suggestionHistory;
   const parameter = useParams().entryId ?? "";
   const entryId = Number(parameter);
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
   const members = useLeagueMembers(valid);
   const query = useQuery({
-    queryKey: ["suggestion-history", entryId],
-    queryFn: ({ signal }) => loadSuggestionHistory(entryId, { signal }),
+    queryKey: ["suggestion-history", leagueId, entryId],
+    queryFn: ({ signal }) => loadSuggestionHistory(tree, entryId, { signal }),
     enabled: valid,
     ...LEAGUE_READ,
   });
@@ -50,7 +54,7 @@ export function LeagueMemberHistoryPage() {
           </button>
         )}
         <p>
-          <Link to={`/league/members/${entryId}`}>{copy.back}</Link>
+          <Link to={memberAddress(leagueId, entryId)}>{copy.back}</Link>
         </p>
       </EmptyState>
     );
@@ -72,6 +76,7 @@ export function LeagueMemberHistoryView({
   members?: EntryView[];
 }) {
   const { messages, locale } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.suggestionHistory;
   const { entry_id: entryId, weeks, season } = history.payload;
   const [selected, setSelected] = useState<number | null>(null);
@@ -80,12 +85,12 @@ export function LeagueMemberHistoryView({
   return (
     <div className={styles.page}>
       <header>
-        <Link to={`/league/members/${entryId}`}>{copy.back}</Link>
+        <Link to={memberAddress(leagueId, entryId)}>{copy.back}</Link>
         <p className={styles.muted}>
           {season} · #{entryId}
         </p>
         <h1>{copy.title}</h1>
-        <p>{copy.scope}</p>
+        <p>{copy.scope(leagueId)}</p>
         <p className={styles.muted}>
           {copy.outcomeAsOf}: {utcShort(history.generated_at_utc, locale)}
         </p>

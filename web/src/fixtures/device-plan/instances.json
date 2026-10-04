@@ -1749,5 +1749,2334 @@
     "expected_gain_vs_hold": 30.739999999999995
    }
   }
- ]
+ ],
+ "chips": [
+  {
+   "entry_id": 2,
+   "chip": "wildcard",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 90.127,
+    "squad": [
+     102,
+     107,
+     111,
+     116,
+     123,
+     124,
+     125,
+     129,
+     131,
+     142,
+     144,
+     147,
+     158,
+     159,
+     160
+    ],
+    "starting_xi": [
+     102,
+     111,
+     116,
+     123,
+     124,
+     125,
+     129,
+     131,
+     158,
+     159,
+     160
+    ],
+    "captain": 158,
+    "vice_captain": 159,
+    "bench": [
+     107,
+     147,
+     144,
+     142
+    ],
+    "transfers_in": [
+     107,
+     111,
+     116,
+     123,
+     124,
+     131,
+     142,
+     147,
+     158,
+     159,
+     160
+    ],
+    "transfers_out": [
+     103,
+     109,
+     112,
+     113,
+     115,
+     130,
+     132,
+     135,
+     150,
+     152,
+     153
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_own_points": 89.64,
+    "hold_points": 50.05,
+    "moves": [
+     {
+      "out": 103,
+      "in": 107,
+      "gain": 0.0
+     },
+     {
+      "out": 109,
+      "in": 111,
+      "gain": 3.3599999999999994
+     },
+     {
+      "out": 112,
+      "in": 116,
+      "gain": 4.820000000000007
+     },
+     {
+      "out": 113,
+      "in": 123,
+      "gain": 3.269999999999996
+     },
+     {
+      "out": 115,
+      "in": 124,
+      "gain": 2.660000000000011
+     },
+     {
+      "out": 130,
+      "in": 131,
+      "gain": 0.25
+     },
+     {
+      "out": 132,
+      "in": 142,
+      "gain": -4.890000000000008
+     },
+     {
+      "out": 135,
+      "in": 147,
+      "gain": -3.9000000000000057
+     },
+     {
+      "out": 150,
+      "in": 158,
+      "gain": 15.990000000000002
+     },
+     {
+      "out": 152,
+      "in": 159,
+      "gain": 8.510000000000005
+     },
+     {
+      "out": 153,
+      "in": 160,
+      "gain": 9.519999999999996
+     }
+    ],
+    "expected_gain_vs_hold": 39.59,
+    "gain_vs_no_chip": 17.42
+   }
+  },
+  {
+   "entry_id": 2,
+   "chip": "freehit",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 90.127,
+    "squad": [
+     102,
+     107,
+     111,
+     116,
+     123,
+     124,
+     125,
+     129,
+     131,
+     142,
+     144,
+     147,
+     158,
+     159,
+     160
+    ],
+    "starting_xi": [
+     102,
+     111,
+     116,
+     123,
+     124,
+     125,
+     129,
+     131,
+     158,
+     159,
+     160
+    ],
+    "captain": 158,
+    "vice_captain": 159,
+    "bench": [
+     107,
+     147,
+     144,
+     142
+    ],
+    "transfers_in": [
+     107,
+     111,
+     116,
+     123,
+     124,
+     131,
+     142,
+     147,
+     158,
+     159,
+     160
+    ],
+    "transfers_out": [
+     103,
+     109,
+     112,
+     113,
+     115,
+     130,
+     132,
+     135,
+     150,
+     152,
+     153
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_own_points": 89.64,
+    "hold_points": 50.05,
+    "moves": [
+     {
+      "out": 103,
+      "in": 107,
+      "gain": 0.0
+     },
+     {
+      "out": 109,
+      "in": 111,
+      "gain": 3.3599999999999994
+     },
+     {
+      "out": 112,
+      "in": 116,
+      "gain": 4.820000000000007
+     },
+     {
+      "out": 113,
+      "in": 123,
+      "gain": 3.269999999999996
+     },
+     {
+      "out": 115,
+      "in": 124,
+      "gain": 2.660000000000011
+     },
+     {
+      "out": 130,
+      "in": 131,
+      "gain": 0.25
+     },
+     {
+      "out": 132,
+      "in": 142,
+      "gain": -4.890000000000008
+     },
+     {
+      "out": 135,
+      "in": 147,
+      "gain": -3.9000000000000057
+     },
+     {
+      "out": 150,
+      "in": 158,
+      "gain": 15.990000000000002
+     },
+     {
+      "out": 152,
+      "in": 159,
+      "gain": 8.510000000000005
+     },
+     {
+      "out": 153,
+      "in": 160,
+      "gain": 9.519999999999996
+     }
+    ],
+    "expected_gain_vs_hold": 39.59,
+    "gain_vs_no_chip": 17.42
+   }
+  },
+  {
+   "entry_id": 2,
+   "chip": "bboost",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 74.57000000000001,
+    "squad": [
+     102,
+     103,
+     109,
+     112,
+     115,
+     123,
+     125,
+     129,
+     130,
+     132,
+     135,
+     144,
+     150,
+     159,
+     160
+    ],
+    "starting_xi": [
+     102,
+     109,
+     112,
+     115,
+     123,
+     125,
+     129,
+     130,
+     132,
+     135,
+     159
+    ],
+    "captain": 159,
+    "vice_captain": 123,
+    "bench": [
+     103,
+     160,
+     150,
+     144
+    ],
+    "transfers_in": [
+     123,
+     159,
+     160
+    ],
+    "transfers_out": [
+     113,
+     152,
+     153
+    ],
+    "transfer_hit_points": 4.0,
+    "expected_own_points": 82.57000000000001,
+    "hold_points": 54.160000000000004,
+    "moves": [
+     {
+      "out": 113,
+      "in": 123,
+      "gain": 4.189999999999998
+     },
+     {
+      "out": 152,
+      "in": 159,
+      "gain": 12.719999999999992
+     },
+     {
+      "out": 153,
+      "in": 160,
+      "gain": 11.500000000000014
+     }
+    ],
+    "expected_gain_vs_hold": 28.410000000000004,
+    "gain_vs_no_chip": 6.3500000000000085
+   }
+  },
+  {
+   "entry_id": 2,
+   "chip": "3xc",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 80.855,
+    "squad": [
+     102,
+     103,
+     109,
+     112,
+     115,
+     123,
+     125,
+     129,
+     130,
+     132,
+     135,
+     144,
+     150,
+     159,
+     160
+    ],
+    "starting_xi": [
+     102,
+     109,
+     112,
+     123,
+     125,
+     129,
+     130,
+     132,
+     135,
+     159,
+     160
+    ],
+    "captain": 159,
+    "vice_captain": 160,
+    "bench": [
+     103,
+     115,
+     150,
+     144
+    ],
+    "transfers_in": [
+     123,
+     159,
+     160
+    ],
+    "transfers_out": [
+     113,
+     152,
+     153
+    ],
+    "transfer_hit_points": 4.0,
+    "expected_own_points": 88.22,
+    "hold_points": 56.16,
+    "moves": [
+     {
+      "out": 113,
+      "in": 123,
+      "gain": 5.8700000000000045
+     },
+     {
+      "out": 152,
+      "in": 159,
+      "gain": 16.930000000000007
+     },
+     {
+      "out": 153,
+      "in": 160,
+      "gain": 9.259999999999991
+     }
+    ],
+    "expected_gain_vs_hold": 32.06,
+    "gain_vs_no_chip": 12.0
+   }
+  },
+  {
+   "entry_id": 7,
+   "chip": "wildcard",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 100.014,
+    "squad": [
+     102,
+     106,
+     111,
+     116,
+     117,
+     118,
+     123,
+     129,
+     131,
+     132,
+     135,
+     144,
+     158,
+     159,
+     160
+    ],
+    "starting_xi": [
+     102,
+     111,
+     116,
+     117,
+     118,
+     123,
+     132,
+     135,
+     158,
+     159,
+     160
+    ],
+    "captain": 158,
+    "vice_captain": 159,
+    "bench": [
+     106,
+     131,
+     129,
+     144
+    ],
+    "transfers_in": [
+     102,
+     106,
+     111,
+     116,
+     117,
+     118,
+     123,
+     129,
+     131,
+     132,
+     135,
+     158,
+     159,
+     160
+    ],
+    "transfers_out": [
+     101,
+     108,
+     112,
+     114,
+     115,
+     127,
+     128,
+     130,
+     142,
+     143,
+     148,
+     155,
+     156,
+     157
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_own_points": 99.05,
+    "hold_points": 22.35,
+    "moves": [
+     {
+      "out": 101,
+      "in": 102,
+      "gain": 7.93
+     },
+     {
+      "out": 108,
+      "in": 106,
+      "gain": 0.0
+     },
+     {
+      "out": 112,
+      "in": 111,
+      "gain": 2.469999999999999
+     },
+     {
+      "out": 114,
+      "in": 116,
+      "gain": 7.969999999999999
+     },
+     {
+      "out": 115,
+      "in": 117,
+      "gain": 4.07
+     },
+     {
+      "out": 127,
+      "in": 118,
+      "gain": 5.450000000000003
+     },
+     {
+      "out": 128,
+      "in": 123,
+      "gain": 8.439999999999998
+     },
+     {
+      "out": 130,
+      "in": 129,
+      "gain": -0.25
+     },
+     {
+      "out": 142,
+      "in": 131,
+      "gain": 1.5700000000000003
+     },
+     {
+      "out": 143,
+      "in": 132,
+      "gain": 4.280000000000001
+     },
+     {
+      "out": 148,
+      "in": 135,
+      "gain": 3.8900000000000006
+     },
+     {
+      "out": 155,
+      "in": 158,
+      "gain": 13.120000000000005
+     },
+     {
+      "out": 156,
+      "in": 159,
+      "gain": 9.379999999999995
+     },
+     {
+      "out": 157,
+      "in": 160,
+      "gain": 8.379999999999995
+     }
+    ],
+    "expected_gain_vs_hold": 76.69999999999999,
+    "gain_vs_no_chip": 51.33
+   }
+  },
+  {
+   "entry_id": 7,
+   "chip": "freehit",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 100.014,
+    "squad": [
+     102,
+     106,
+     111,
+     116,
+     117,
+     118,
+     123,
+     129,
+     131,
+     132,
+     135,
+     144,
+     158,
+     159,
+     160
+    ],
+    "starting_xi": [
+     102,
+     111,
+     116,
+     117,
+     118,
+     123,
+     132,
+     135,
+     158,
+     159,
+     160
+    ],
+    "captain": 158,
+    "vice_captain": 159,
+    "bench": [
+     106,
+     131,
+     129,
+     144
+    ],
+    "transfers_in": [
+     102,
+     106,
+     111,
+     116,
+     117,
+     118,
+     123,
+     129,
+     131,
+     132,
+     135,
+     158,
+     159,
+     160
+    ],
+    "transfers_out": [
+     101,
+     108,
+     112,
+     114,
+     115,
+     127,
+     128,
+     130,
+     142,
+     143,
+     148,
+     155,
+     156,
+     157
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_own_points": 99.05,
+    "hold_points": 22.35,
+    "moves": [
+     {
+      "out": 101,
+      "in": 102,
+      "gain": 7.93
+     },
+     {
+      "out": 108,
+      "in": 106,
+      "gain": 0.0
+     },
+     {
+      "out": 112,
+      "in": 111,
+      "gain": 2.469999999999999
+     },
+     {
+      "out": 114,
+      "in": 116,
+      "gain": 7.969999999999999
+     },
+     {
+      "out": 115,
+      "in": 117,
+      "gain": 4.07
+     },
+     {
+      "out": 127,
+      "in": 118,
+      "gain": 5.450000000000003
+     },
+     {
+      "out": 128,
+      "in": 123,
+      "gain": 8.439999999999998
+     },
+     {
+      "out": 130,
+      "in": 129,
+      "gain": -0.25
+     },
+     {
+      "out": 142,
+      "in": 131,
+      "gain": 1.5700000000000003
+     },
+     {
+      "out": 143,
+      "in": 132,
+      "gain": 4.280000000000001
+     },
+     {
+      "out": 148,
+      "in": 135,
+      "gain": 3.8900000000000006
+     },
+     {
+      "out": 155,
+      "in": 158,
+      "gain": 13.120000000000005
+     },
+     {
+      "out": 156,
+      "in": 159,
+      "gain": 9.379999999999995
+     },
+     {
+      "out": 157,
+      "in": 160,
+      "gain": 8.379999999999995
+     }
+    ],
+    "expected_gain_vs_hold": 76.69999999999999,
+    "gain_vs_no_chip": 51.33
+   }
+  },
+  {
+   "entry_id": 7,
+   "chip": "bboost",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 43.72,
+    "squad": [
+     101,
+     108,
+     112,
+     114,
+     115,
+     127,
+     128,
+     130,
+     142,
+     143,
+     144,
+     148,
+     155,
+     158,
+     159
+    ],
+    "starting_xi": [
+     101,
+     112,
+     114,
+     115,
+     127,
+     128,
+     130,
+     142,
+     143,
+     144,
+     158
+    ],
+    "captain": 158,
+    "vice_captain": 112,
+    "bench": [
+     108,
+     159,
+     155,
+     148
+    ],
+    "transfers_in": [
+     158,
+     159
+    ],
+    "transfers_out": [
+     156,
+     157
+    ],
+    "transfer_hit_points": 4.0,
+    "expected_own_points": 51.72,
+    "hold_points": 22.35,
+    "moves": [
+     {
+      "out": 156,
+      "in": 158,
+      "gain": 18.919999999999995
+     },
+     {
+      "out": 157,
+      "in": 159,
+      "gain": 10.450000000000003
+     }
+    ],
+    "expected_gain_vs_hold": 29.369999999999997,
+    "gain_vs_no_chip": 0.0
+   }
+  },
+  {
+   "entry_id": 7,
+   "chip": "3xc",
+   "reference": {
+    "solver_status": "OPTIMAL",
+    "objective_value": 56.22,
+    "squad": [
+     101,
+     108,
+     112,
+     114,
+     115,
+     127,
+     128,
+     130,
+     142,
+     143,
+     144,
+     148,
+     155,
+     158,
+     159
+    ],
+    "starting_xi": [
+     101,
+     112,
+     114,
+     115,
+     127,
+     130,
+     143,
+     144,
+     155,
+     158,
+     159
+    ],
+    "captain": 158,
+    "vice_captain": 159,
+    "bench": [
+     108,
+     128,
+     142,
+     148
+    ],
+    "transfers_in": [
+     158,
+     159
+    ],
+    "transfers_out": [
+     156,
+     157
+    ],
+    "transfer_hit_points": 4.0,
+    "expected_own_points": 64.22,
+    "hold_points": 26.44,
+    "moves": [
+     {
+      "out": 156,
+      "in": 158,
+      "gain": 27.329999999999995
+     },
+     {
+      "out": 157,
+      "in": 159,
+      "gain": 10.450000000000003
+     }
+    ],
+    "expected_gain_vs_hold": 37.78,
+    "gain_vs_no_chip": 12.5
+   }
+  }
+ ],
+ "rivals": {
+  "document": {
+   "contract_version": "league_device_plan_v1",
+   "league_id": 352490,
+   "season": "2026-27",
+   "gameweek": 2,
+   "source_snapshot_id": "fpl-live-20260827T090000Z-f2ea906adea5",
+   "policy_id": "member_planning_policy_v2",
+   "rules": {
+    "squad_size": 15,
+    "starting_size": 11,
+    "squad_position_limits": {
+     "GK": 2,
+     "DEF": 5,
+     "MID": 5,
+     "FWD": 3
+    },
+    "starting_position_min": {
+     "GK": 1,
+     "DEF": 3,
+     "MID": 2,
+     "FWD": 1
+    },
+    "starting_position_max": {
+     "GK": 1,
+     "DEF": 5,
+     "MID": 5,
+     "FWD": 3
+    },
+    "max_players_per_team": 3,
+    "max_free_transfers": 5,
+    "hit_cost_scaled": 8000,
+    "hit_points_charged": 4.0,
+    "hit_charged_scaled": 4000,
+    "expected_points_scale": 1000,
+    "strategies": {
+     "fark-yarat": {
+      "overlap_floor": null,
+      "overlap_ceiling": 5
+     },
+     "ortak-koru": {
+      "overlap_floor": 9,
+      "overlap_ceiling": null
+     }
+    },
+    "top100": {
+     "weights": [
+      5,
+      10,
+      20,
+      30,
+      40,
+      50
+     ],
+     "cohort_size": 100,
+     "cohort_snapshot_id": "synthetic-cohort",
+     "picks_snapshot_id": "fpl-live-20260813T201143Z-465e5c4fff5b",
+     "table_sha256": "synthetic-top100-counts",
+     "picks_gameweek": 1
+    }
+   },
+   "players": [
+    {
+     "id": 1001,
+     "name": "Player 1001",
+     "short_name": "1001",
+     "team": "Club 1",
+     "position": "GK",
+     "buy_tenths": 48,
+     "expected_points": 3.01,
+     "coefficients": [
+      301,
+      2709,
+      3010
+     ],
+     "top100_count": 0,
+     "top100_scaled": {
+      "5": 3010,
+      "10": 3010,
+      "20": 3010,
+      "30": 3010,
+      "40": 3010,
+      "50": 3010
+     }
+    },
+    {
+     "id": 1002,
+     "name": "Player 1002",
+     "short_name": "1002",
+     "team": "Club 2",
+     "position": "GK",
+     "buy_tenths": 50,
+     "expected_points": 2.02,
+     "coefficients": [
+      202,
+      1818,
+      2020
+     ],
+     "top100_count": 7,
+     "top100_scaled": {
+      "5": 2027,
+      "10": 2034,
+      "20": 2048,
+      "30": 2062,
+      "40": 2077,
+      "50": 2091
+     }
+    },
+    {
+     "id": 1003,
+     "name": "Player 1003",
+     "short_name": "1003",
+     "team": "Club 3",
+     "position": "GK",
+     "buy_tenths": 55,
+     "expected_points": 2.53,
+     "coefficients": [
+      253,
+      2277,
+      2530
+     ],
+     "top100_count": 44,
+     "top100_scaled": {
+      "5": 2586,
+      "10": 2641,
+      "20": 2753,
+      "30": 2864,
+      "40": 2975,
+      "50": 3087
+     }
+    },
+    {
+     "id": 1004,
+     "name": "Player 1004",
+     "short_name": "1004",
+     "team": "Club 1",
+     "position": "DEF",
+     "buy_tenths": 45,
+     "expected_points": 3.04,
+     "coefficients": [
+      304,
+      2736,
+      3040
+     ],
+     "top100_count": 81,
+     "top100_scaled": {
+      "5": 3163,
+      "10": 3286,
+      "20": 3532,
+      "30": 3779,
+      "40": 4025,
+      "50": 4271
+     }
+    },
+    {
+     "id": 1005,
+     "name": "Player 1005",
+     "short_name": "1005",
+     "team": "Club 2",
+     "position": "DEF",
+     "buy_tenths": 50,
+     "expected_points": 0.0,
+     "coefficients": [
+      0,
+      0,
+      0
+     ],
+     "top100_count": 17,
+     "top100_scaled": {
+      "5": 0,
+      "10": 0,
+      "20": 0,
+      "30": 0,
+      "40": 0,
+      "50": 0
+     }
+    },
+    {
+     "id": 1006,
+     "name": "Player 1006",
+     "short_name": "1006",
+     "team": "Club 3",
+     "position": "DEF",
+     "buy_tenths": 55,
+     "expected_points": 2.56,
+     "coefficients": [
+      256,
+      2304,
+      2560
+     ],
+     "top100_count": 0,
+     "top100_scaled": {
+      "5": 2560,
+      "10": 2560,
+      "20": 2560,
+      "30": 2560,
+      "40": 2560,
+      "50": 2560
+     }
+    },
+    {
+     "id": 1007,
+     "name": "Player 1007",
+     "short_name": "1007",
+     "team": "Club 4",
+     "position": "DEF",
+     "buy_tenths": 60,
+     "expected_points": 3.07,
+     "coefficients": [
+      307,
+      2763,
+      3070
+     ],
+     "top100_count": 91,
+     "top100_scaled": {
+      "5": 3210,
+      "10": 3349,
+      "20": 3629,
+      "30": 3908,
+      "40": 4187,
+      "50": 4467
+     }
+    },
+    {
+     "id": 1008,
+     "name": "Player 1008",
+     "short_name": "1008",
+     "team": "Club 5",
+     "position": "DEF",
+     "buy_tenths": 45,
+     "expected_points": 2.08,
+     "coefficients": [
+      208,
+      1872,
+      2080
+     ],
+     "top100_count": 27,
+     "top100_scaled": {
+      "5": 2108,
+      "10": 2136,
+      "20": 2192,
+      "30": 2248,
+      "40": 2305,
+      "50": 2361
+     }
+    },
+    {
+     "id": 1009,
+     "name": "Player 1009",
+     "short_name": "1009",
+     "team": "Club 6",
+     "position": "DEF",
+     "buy_tenths": 50,
+     "expected_points": 2.59,
+     "coefficients": [
+      259,
+      2331,
+      2590
+     ],
+     "top100_count": 64,
+     "top100_scaled": {
+      "5": 2673,
+      "10": 2756,
+      "20": 2922,
+      "30": 3087,
+      "40": 3253,
+      "50": 3419
+     }
+    },
+    {
+     "id": 1010,
+     "name": "Player 1010",
+     "short_name": "1010",
+     "team": "Club 1",
+     "position": "DEF",
+     "buy_tenths": 55,
+     "expected_points": 3.1,
+     "coefficients": [
+      310,
+      2790,
+      3100
+     ],
+     "top100_count": 100,
+     "top100_scaled": {
+      "5": 3255,
+      "10": 3410,
+      "20": 3720,
+      "30": 4030,
+      "40": 4340,
+      "50": 4650
+     }
+    },
+    {
+     "id": 1011,
+     "name": "Player 1011",
+     "short_name": "1011",
+     "team": "Club 2",
+     "position": "DEF",
+     "buy_tenths": 60,
+     "expected_points": 2.11,
+     "coefficients": [
+      211,
+      1899,
+      2110
+     ],
+     "top100_count": 0,
+     "top100_scaled": {
+      "5": 2110,
+      "10": 2110,
+      "20": 2110,
+      "30": 2110,
+      "40": 2110,
+      "50": 2110
+     }
+    },
+    {
+     "id": 1012,
+     "name": "Player 1012",
+     "short_name": "1012",
+     "team": "Club 1",
+     "position": "MID",
+     "buy_tenths": 46,
+     "expected_points": 2.62,
+     "coefficients": [
+      262,
+      2358,
+      2620
+     ],
+     "top100_count": 74,
+     "top100_scaled": {
+      "5": 2717,
+      "10": 2814,
+      "20": 3008,
+      "30": 3202,
+      "40": 3396,
+      "50": 3589
+     }
+    },
+    {
+     "id": 1013,
+     "name": "Player 1013",
+     "short_name": "1013",
+     "team": "Club 2",
+     "position": "MID",
+     "buy_tenths": 50,
+     "expected_points": 3.13,
+     "coefficients": [
+      313,
+      2817,
+      3130
+     ],
+     "top100_count": 10,
+     "top100_scaled": {
+      "5": 3146,
+      "10": 3161,
+      "20": 3193,
+      "30": 3224,
+      "40": 3255,
+      "50": 3287
+     }
+    },
+    {
+     "id": 1014,
+     "name": "Player 1014",
+     "short_name": "1014",
+     "team": "Club 3",
+     "position": "MID",
+     "buy_tenths": 55,
+     "expected_points": 2.14,
+     "coefficients": [
+      214,
+      1926,
+      2140
+     ],
+     "top100_count": 47,
+     "top100_scaled": {
+      "5": 2190,
+      "10": 2241,
+      "20": 2341,
+      "30": 2442,
+      "40": 2542,
+      "50": 2643
+     }
+    },
+    {
+     "id": 1015,
+     "name": "Player 1015",
+     "short_name": "1015",
+     "team": "Club 4",
+     "position": "MID",
+     "buy_tenths": 60,
+     "expected_points": 2.65,
+     "coefficients": [
+      265,
+      2385,
+      2650
+     ],
+     "top100_count": 84,
+     "top100_scaled": {
+      "5": 2761,
+      "10": 2873,
+      "20": 3095,
+      "30": 3318,
+      "40": 3540,
+      "50": 3763
+     }
+    },
+    {
+     "id": 1016,
+     "name": "Player 1016",
+     "short_name": "1016",
+     "team": "Club 5",
+     "position": "MID",
+     "buy_tenths": 45,
+     "expected_points": 3.16,
+     "coefficients": [
+      316,
+      2844,
+      3160
+     ],
+     "top100_count": 0,
+     "top100_scaled": {
+      "5": 3160,
+      "10": 3160,
+      "20": 3160,
+      "30": 3160,
+      "40": 3160,
+      "50": 3160
+     }
+    },
+    {
+     "id": 1017,
+     "name": "Player 1017",
+     "short_name": "1017",
+     "team": "Club 6",
+     "position": "MID",
+     "buy_tenths": 50,
+     "expected_points": 2.17,
+     "coefficients": [
+      217,
+      1953,
+      2170
+     ],
+     "top100_count": 100,
+     "top100_scaled": {
+      "5": 2279,
+      "10": 2387,
+      "20": 2604,
+      "30": 2821,
+      "40": 3038,
+      "50": 3255
+     }
+    },
+    {
+     "id": 1018,
+     "name": "Player 1018",
+     "short_name": "1018",
+     "team": "Club 1",
+     "position": "MID",
+     "buy_tenths": 55,
+     "expected_points": 2.68,
+     "coefficients": [
+      268,
+      2412,
+      2680
+     ],
+     "top100_count": 94,
+     "top100_scaled": {
+      "5": 2806,
+      "10": 2932,
+      "20": 3184,
+      "30": 3436,
+      "40": 3688,
+      "50": 3940
+     }
+    },
+    {
+     "id": 1019,
+     "name": "Player 1019",
+     "short_name": "1019",
+     "team": "Club 2",
+     "position": "MID",
+     "buy_tenths": 60,
+     "expected_points": 3.19,
+     "coefficients": [
+      319,
+      2871,
+      3190
+     ],
+     "top100_count": 30,
+     "top100_scaled": {
+      "5": 3238,
+      "10": 3286,
+      "20": 3381,
+      "30": 3477,
+      "40": 3573,
+      "50": 3669
+     }
+    },
+    {
+     "id": 1020,
+     "name": "Player 1020",
+     "short_name": "1020",
+     "team": "Club 1",
+     "position": "FWD",
+     "buy_tenths": 43,
+     "expected_points": 2.2,
+     "coefficients": [
+      220,
+      1980,
+      2200
+     ],
+     "top100_count": 67,
+     "top100_scaled": {
+      "5": 2274,
+      "10": 2347,
+      "20": 2495,
+      "30": 2642,
+      "40": 2790,
+      "50": 2937
+     }
+    },
+    {
+     "id": 1021,
+     "name": "Player 1021",
+     "short_name": "1021",
+     "team": "Club 2",
+     "position": "FWD",
+     "buy_tenths": 50,
+     "expected_points": 2.71,
+     "coefficients": [
+      271,
+      2439,
+      2710
+     ],
+     "top100_count": 0,
+     "top100_scaled": {
+      "5": 2710,
+      "10": 2710,
+      "20": 2710,
+      "30": 2710,
+      "40": 2710,
+      "50": 2710
+     }
+    },
+    {
+     "id": 1022,
+     "name": "Player 1022",
+     "short_name": "1022",
+     "team": "Club 3",
+     "position": "FWD",
+     "buy_tenths": 55,
+     "expected_points": 3.22,
+     "coefficients": [
+      322,
+      2898,
+      3220
+     ],
+     "top100_count": 40,
+     "top100_scaled": {
+      "5": 3284,
+      "10": 3349,
+      "20": 3478,
+      "30": 3606,
+      "40": 3735,
+      "50": 3864
+     }
+    },
+    {
+     "id": 1023,
+     "name": "Player 1023",
+     "short_name": "1023",
+     "team": "Club 4",
+     "position": "FWD",
+     "buy_tenths": 60,
+     "expected_points": 2.23,
+     "coefficients": [
+      223,
+      2007,
+      2230
+     ],
+     "top100_count": 95,
+     "top100_scaled": {
+      "5": 2336,
+      "10": 2442,
+      "20": 2654,
+      "30": 2866,
+      "40": 3077,
+      "50": 3289
+     }
+    },
+    {
+     "id": 1024,
+     "name": "Player 1024",
+     "short_name": "1024",
+     "team": "Club 5",
+     "position": "FWD",
+     "buy_tenths": 45,
+     "expected_points": 9.24,
+     "coefficients": [
+      924,
+      8316,
+      9240
+     ],
+     "top100_count": 0,
+     "top100_scaled": {
+      "5": 9240,
+      "10": 9240,
+      "20": 9240,
+      "30": 9240,
+      "40": 9240,
+      "50": 9240
+     }
+    }
+   ]
+  },
+  "members": {
+   "101": {
+    "top100_weights": [
+     5,
+     10,
+     20,
+     30,
+     40,
+     50
+    ],
+    "held": [
+     1001,
+     1002,
+     1004,
+     1005,
+     1006,
+     1007,
+     1008,
+     1012,
+     1013,
+     1014,
+     1015,
+     1016,
+     1020,
+     1021,
+     1022
+    ],
+    "bank_tenths": 5,
+    "free_transfers": 1,
+    "sell_tenths": {
+     "1001": 48,
+     "1002": 50,
+     "1004": 45,
+     "1005": 50,
+     "1006": 55,
+     "1007": 60,
+     "1008": 45,
+     "1012": 46,
+     "1013": 50,
+     "1014": 55,
+     "1015": 60,
+     "1016": 45,
+     "1020": 43,
+     "1021": 50,
+     "1022": 55
+    }
+   },
+   "102": {
+    "top100_weights": [
+     5,
+     10,
+     20,
+     30,
+     40,
+     50
+    ],
+    "held": [
+     1001,
+     1002,
+     1004,
+     1006,
+     1007,
+     1008,
+     1009,
+     1012,
+     1013,
+     1014,
+     1015,
+     1016,
+     1022,
+     1023,
+     1024
+    ],
+    "bank_tenths": 5,
+    "free_transfers": 1,
+    "sell_tenths": {
+     "1001": 48,
+     "1002": 50,
+     "1004": 45,
+     "1006": 55,
+     "1007": 60,
+     "1008": 45,
+     "1009": 50,
+     "1012": 46,
+     "1013": 50,
+     "1014": 55,
+     "1015": 60,
+     "1016": 45,
+     "1022": 55,
+     "1023": 60,
+     "1024": 45
+    }
+   }
+  },
+  "rivals": {
+   "202": {
+    "entry_id": 202,
+    "starting_xi": [
+     1003,
+     1004,
+     1005,
+     1006,
+     1009,
+     1012,
+     1013,
+     1014,
+     1017,
+     1018,
+     1019
+    ],
+    "captain": 1004
+   },
+   "203": {
+    "entry_id": 203,
+    "starting_xi": [
+     1002,
+     1003,
+     1009,
+     1010,
+     1011,
+     1016,
+     1017,
+     1018,
+     1019,
+     1023,
+     1024
+    ],
+    "captain": 1003
+   }
+  },
+  "cases": [
+   {
+    "entry_id": 101,
+    "rival_entry_id": 202,
+    "strategy": "ortak-koru",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1006,
+      1009,
+      1012,
+      1013,
+      1016,
+      1017,
+      1021,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1016,
+     "bench": [
+      1003,
+      1014,
+      1008,
+      1005
+     ],
+     "transfers_in": [
+      1003,
+      1009,
+      1017,
+      1023,
+      1024
+     ],
+     "transfers_out": [
+      1002,
+      1007,
+      1015,
+      1020,
+      1022
+     ],
+     "moves": [
+      {
+       "out": 1002,
+       "in": 1003,
+       "gain": 0.0
+      },
+      {
+       "out": 1007,
+       "in": 1009,
+       "gain": -0.480000000000004
+      },
+      {
+       "out": 1015,
+       "in": 1017,
+       "gain": -0.4799999999999969
+      },
+      {
+       "out": 1020,
+       "in": 1023,
+       "gain": 0.030000000000001137
+      },
+      {
+       "out": 1022,
+       "in": 1024,
+       "gain": 12.04
+      }
+     ],
+     "transfer_hit_points": 16.0,
+     "expected_own_points": 45.7,
+     "expected_gain_vs_hold": 11.11,
+     "expected_points_cost": 13.980000000000004,
+     "expected_points_cost_ceiling": 13.980000000000004,
+     "overlap_count": 9,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 9,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 0.010000000000005116,
+     "captain_agreement": false
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 202,
+    "strategy": "fark-yarat",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1013,
+      1015,
+      1016,
+      1017,
+      1020,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1014,
+      1011,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1011,
+      1017,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1006,
+      1012,
+      1021
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.38999999999999346
+      },
+      {
+       "out": 1006,
+       "in": 1011,
+       "gain": -0.35999999999999943
+      },
+      {
+       "out": 1012,
+       "in": 1017,
+       "gain": -0.44999999999999574
+      },
+      {
+       "out": 1021,
+       "in": 1024,
+       "gain": 12.549999999999997
+      }
+     ],
+     "transfer_hit_points": 12.0,
+     "expected_own_points": 46.72,
+     "expected_gain_vs_hold": 12.129999999999995,
+     "expected_points_cost": 8.960000000000008,
+     "expected_points_cost_ceiling": 8.960000000000008,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 5.030000000000001,
+     "captain_agreement": false
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 203,
+    "strategy": "ortak-koru",
+    "reference": {
+     "refused": true,
+     "reason": "The 'ortak-koru' band cannot be satisfied from this squad against entry 203: no provable plan exists."
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 203,
+    "strategy": "fark-yarat",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1020
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.38999999999999346
+      },
+      {
+       "out": 1020,
+       "in": 1024,
+       "gain": 12.700000000000003
+      }
+     ],
+     "transfer_hit_points": 4.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 13.089999999999996,
+     "expected_points_cost": 0.0,
+     "expected_points_cost_ceiling": 0.0,
+     "overlap_count": 4,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 6.1299999999999955,
+     "captain_agreement": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 202,
+    "strategy": "ortak-koru",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1006,
+      1007,
+      1009,
+      1012,
+      1013,
+      1016,
+      1019,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1023,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1015
+     ],
+     "moves": [
+      {
+       "out": 1015,
+       "in": 1019,
+       "gain": 0.5399999999999991
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 48.07,
+     "expected_gain_vs_hold": 0.5399999999999991,
+     "expected_points_cost": 0.09000000000000341,
+     "expected_points_cost_ceiling": 0.09000000000000341,
+     "overlap_count": 7,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 7,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 12.090000000000003,
+      "expected_points_cost_ceiling": 12.090000000000003
+     },
+     "expected_gap_vs_rival": 18.380000000000003,
+     "captain_agreement": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 202,
+    "strategy": "fark-yarat",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1014,
+      1011,
+      1008
+     ],
+     "transfers_in": [
+      1011
+     ],
+     "transfers_out": [
+      1006
+     ],
+     "moves": [
+      {
+       "out": 1006,
+       "in": 1011,
+       "gain": -0.3299999999999983
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.2,
+     "expected_gain_vs_hold": -0.3299999999999983,
+     "expected_points_cost": 0.9600000000000009,
+     "expected_points_cost_ceiling": 0.9600000000000009,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 0.9600000000000009,
+      "expected_points_cost_ceiling": 0.9600000000000009
+     },
+     "expected_gap_vs_rival": 17.510000000000005,
+     "captain_agreement": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 203,
+    "strategy": "ortak-koru",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1019,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1023,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1014
+     ],
+     "moves": [
+      {
+       "out": 1014,
+       "in": 1019,
+       "gain": 0.6300000000000026
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 48.160000000000004,
+     "expected_gain_vs_hold": 0.6300000000000026,
+     "expected_points_cost": 0.0,
+     "expected_points_cost_ceiling": 0.0,
+     "overlap_count": 6,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 6,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 12.030000000000001,
+      "expected_points_cost_ceiling": 12.030000000000001
+     },
+     "expected_gap_vs_rival": 10.61,
+     "captain_agreement": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 203,
+    "strategy": "fark-yarat",
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1021
+     ],
+     "transfers_out": [
+      1023
+     ],
+     "moves": [
+      {
+       "out": 1023,
+       "in": 1021,
+       "gain": 0.14999999999999858
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 0.14999999999999858,
+     "expected_points_cost": 0.4799999999999969,
+     "expected_points_cost_ceiling": 0.4799999999999969,
+     "overlap_count": 4,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 0.4799999999999969,
+      "expected_points_cost_ceiling": 0.4799999999999969
+     },
+     "expected_gap_vs_rival": 10.129999999999995,
+     "captain_agreement": false
+    }
+   }
+  ],
+  "top100_cases": [
+   {
+    "entry_id": 101,
+    "weight": 20,
+    "reference": {
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1020
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.39000000000000057,
+       "reason": "points_gain"
+      },
+      {
+       "out": 1020,
+       "in": 1024,
+       "gain": 12.850000000000001,
+       "reason": "points_gain"
+      }
+     ],
+     "transfer_hit_points": 4.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 13.240000000000002,
+     "expected_points_cost": 0.0,
+     "expected_points_cost_ceiling": 0.0,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 101,
+    "weight": 50,
+    "reference": {
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1020
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.030000000000001137,
+       "reason": "points_gain"
+      },
+      {
+       "out": 1020,
+       "in": 1024,
+       "gain": 13.21,
+       "reason": "points_gain"
+      }
+     ],
+     "transfer_hit_points": 4.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 13.240000000000002,
+     "expected_points_cost": 0.0,
+     "expected_points_cost_ceiling": 0.0,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "weight": 20,
+    "reference": {
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1019,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1023,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1014
+     ],
+     "moves": [
+      {
+       "out": 1014,
+       "in": 1019,
+       "gain": 0.9600000000000009,
+       "reason": "points_gain"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 48.160000000000004,
+     "expected_gain_vs_hold": 0.9600000000000009,
+     "expected_points_cost": 0.0,
+     "expected_points_cost_ceiling": 0.0,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "weight": 50,
+    "reference": {
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1019,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1016,
+      1006,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1014
+     ],
+     "moves": [
+      {
+       "out": 1014,
+       "in": 1019,
+       "gain": 0.030000000000001137,
+       "reason": "points_gain"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.230000000000004,
+     "expected_gain_vs_hold": 0.030000000000001137,
+     "expected_points_cost": 0.9299999999999997,
+     "expected_points_cost_ceiling": 0.9299999999999997,
+     "changed": true
+    }
+   }
+  ]
+ }
 }

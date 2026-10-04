@@ -24,11 +24,14 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "../advice/adviceClient";
-import type { DevicePlanReply, DevicePlanRequest } from "../device/devicePlan.worker";
+import type { DevicePlanReply, DevicePlanRequest } from "../device/deviceSolver.worker";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { exampleTree, withLeague } from "../../../testSupport/league";
+import type { RequestOptions } from "../../../data/request";
+import { StaticOnlyAdviceClient } from "../advice/adviceClient";
 
 afterEach(cleanup);
 
@@ -56,6 +59,11 @@ function squadWith(block: DevicePlanEntry | null): LeagueViewEnvelope<EntrySquad
 /** The real model, answered in process without a worker thread. */
 class CannedSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  /** Holding the fifteen instead: a plan that makes no transfer. */
+  private readonly hold: boolean;
+  constructor(hold = false) {
+    this.hold = hold;
+  }
   terminate(): void {}
   postMessage(request: DevicePlanRequest): void {
     const reply: DevicePlanReply = {
@@ -63,19 +71,20 @@ class CannedSolver implements DeviceSolver {
       kind: "answer",
       answer: {
         objective_scaled: 0,
+        chip: null,
         objective: member.reference.objective_value,
         squad: member.reference.squad,
         starting_xi: member.reference.starting_xi,
         captain: member.reference.captain,
         vice_captain: member.reference.vice_captain,
         bench: member.reference.bench,
-        transfers_in: member.reference.transfers_in,
-        transfers_out: member.reference.transfers_out,
-        transfer_hit_points: member.reference.transfer_hit_points,
+        transfers_in: this.hold ? [] : member.reference.transfers_in,
+        transfers_out: this.hold ? [] : member.reference.transfers_out,
+        transfer_hit_points: this.hold ? 0 : member.reference.transfer_hit_points,
         expected_own_points: member.reference.expected_own_points,
         hold_points: member.reference.hold_points,
-        moves: member.reference.moves,
-        expected_gain_vs_hold: member.reference.expected_gain_vs_hold,
+        moves: this.hold ? [] : member.reference.moves,
+        expected_gain_vs_hold: this.hold ? 0 : member.reference.expected_gain_vs_hold,
         seconds: 0.42,
       },
     };
@@ -112,6 +121,10 @@ class ServiceClient implements AdviceClient {
   async readAdvice(): Promise<AdviceReadResult> {
     return { kind: "not-computed" };
   }
+  /** The published baseline is the example tree's document, as the static client reads it. */
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return new StaticOnlyAdviceClient(exampleTree.entryAdvice).readPublished(request, options);
+  }
   async requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
     return {
       kind: "advice",
@@ -124,29 +137,35 @@ class ServiceClient implements AdviceClient {
   }
 }
 
-function renderView(squad: LeagueViewEnvelope<EntrySquad>, search = "mode=saf-puan&window=1") {
+function renderView(
+  squad: LeagueViewEnvelope<EntrySquad>,
+  search = "mode=saf-puan&window=1",
+  hold = false,
+) {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
         <SwitchWindow />
-        <LeagueMemberView
-          squad={squad}
-          advice={null}
-          adviceIssue="not-listed"
-          members={MEMBERS}
-          index={INDEX}
-          client={new ServiceClient()}
-          deviceDependencies={{
-            loadDocument: async () => ({
-              contract_version: "provisional_league_ui_v1",
-              generated_at_utc: "2026-10-03T00:00:00Z",
-              source_kind: "live",
-              payload: document,
-            }),
-            createSolver: () => new CannedSolver(),
-            now: () => new Date("2026-10-03T01:02:03Z"),
-          }}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={squad}
+            advice={null}
+            adviceIssue="not-listed"
+            members={MEMBERS}
+            index={INDEX}
+            client={new ServiceClient()}
+            deviceDependencies={{
+              loadDocument: async () => ({
+                contract_version: "provisional_league_ui_v1",
+                generated_at_utc: "2026-10-03T00:00:00Z",
+                source_kind: "live",
+                payload: document,
+              }),
+              createSolver: () => new CannedSolver(hold),
+              now: () => new Date("2026-10-03T01:02:03Z"),
+            }}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -209,5 +228,14 @@ describe("the device solve on the member page", () => {
     await act(async () => deviceButton()!.click());
     await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
     expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+  });
+
+  it("says a device plan that holds the fifteen makes no transfer, without calling it published", async () => {
+    const { container } = renderView(squadWith(entryBlock), "mode=saf-puan&window=1", true);
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    const decision = screen.getByRole("region", { name: copy.decisionTitle });
+    expect(decision).toHaveTextContent(copy.noMove);
+    expect(decision).not.toHaveTextContent(/yayımlanan plan|yayınlanan plan/i);
   });
 });

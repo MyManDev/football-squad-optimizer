@@ -43,8 +43,11 @@ it.each(["tr", "en"] as const)(
     expect(region).toHaveTextContent(
       language === "tr" ? "yardımcısının ek puanı" : "Vice-captain bonus",
     );
-    expect(region).toHaveTextContent(
+    expect(region).not.toHaveTextContent(
       language === "tr" ? "birbirinden bağımsız" : "treated as independent",
+    );
+    expect(region).not.toHaveTextContent(
+      language === "tr" ? "Oynama varsayımları" : "Playing assumptions",
     );
     expect(region).not.toHaveTextContent("independent_player_week_appearances");
   },

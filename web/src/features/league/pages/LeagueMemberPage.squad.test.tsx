@@ -14,6 +14,7 @@ import { MESSAGES, type Language } from "../../../i18n/messages";
 import * as leagueData from "../data";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberPage, LeagueMemberView } from "./LeagueMemberPage";
+import { stubTree, withLeague } from "../../../testSupport/league";
 
 const ENTRY = 35249001;
 
@@ -31,13 +32,15 @@ function memberSurface(
   const entryId = squad.payload.entry.entry_id;
   return (
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${entryId}`]}>
-        <LeagueMemberView
-          squad={squad}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={mockEntryAdviceIndex(entryId).payload}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${entryId}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={squad}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={mockEntryAdviceIndex(entryId).payload}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>
   );
@@ -224,17 +227,21 @@ describe("the member's published squad", () => {
     "shows a missing member document as unavailable rather than an empty team in %s",
     async (language) => {
       const copy = MESSAGES[language];
-      vi.spyOn(leagueData, "loadEntrySquad").mockRejectedValue(
-        new leagueData.LeagueDataMissing(`entries/${ENTRY}.json`),
-      );
+      stubTree({
+        entrySquad: vi
+          .fn<leagueData.LeagueTree["entrySquad"]>()
+          .mockRejectedValue(new leagueData.LeagueDataMissing(`entries/${ENTRY}.json`)),
+      });
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(
         <QueryClientProvider client={client}>
           <LanguageProvider initialLanguage={language}>
-            <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
-              <Routes>
-                <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
-              </Routes>
+            <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+              {withLeague(
+                <Routes>
+                  <Route path="/league/:leagueId/members/:entryId" element={<LeagueMemberPage />} />
+                </Routes>,
+              )}
             </MemoryRouter>
           </LanguageProvider>
         </QueryClientProvider>,

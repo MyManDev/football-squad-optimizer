@@ -54,9 +54,9 @@ export function MissingAdviceCard({
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const issueCopy =
+  const issueCopy: [string, string | null] =
     issue === "not-computed"
-      ? [copy.adviceNotComputed, copy.adviceNotComputedBody]
+      ? [copy.adviceNotComputed, null]
       : issue === "unavailable"
         ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
         : [copy.publicationStates[issue].title, copy.publicationStates[issue].body];
@@ -65,7 +65,7 @@ export function MissingAdviceCard({
       <p className={board.missingTitle}>
         <strong>{issueCopy[0]}</strong>
       </p>
-      <p className={styles.muted}>{issueCopy[1]}</p>
+      {issueCopy[1] ? <p className={styles.muted}>{issueCopy[1]}</p> : null}
       {reason ? (
         <p className={styles.muted}>
           {Object.hasOwn(copy.publicationReasons, reason)
@@ -137,9 +137,7 @@ function adviceBasis(view: EntryAdvice, chipCopy: ChipCopy) {
 
 /**
  * The proof stamp beside the decision heading. EN İYİ PLAN · KANITLANDI only for a plan the
- * solver proved (OPTIMAL); a plan it found without finishing the proof (FEASIBLE) keeps the
- * "proof incomplete" badge, and its gap sentence stands under the boards. Any other status
- * claims nothing.
+ * solver proved (OPTIMAL). Any other status claims nothing.
  */
 export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
   const copy = useLanguage().messages.leagueMembers;
@@ -154,10 +152,6 @@ export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
         <p className={board.stampBox} data-stamp="">
           <CheckIcon />
           {copy.stampOptimal}
-        </p>
-      ) : view.solver_status === "FEASIBLE" ? (
-        <p className={`${board.stampTags} ${board.stampUnproven}`} data-stamp="">
-          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>
         </p>
       ) : null}
     </div>
@@ -202,8 +196,7 @@ function shownPrice(view: EntryAdvice): number | undefined {
 
 /**
  * The decision itself: one substitution board per move, the gain strip, the captain line,
- * and the sentences that change how the plan may be read (the proof, the price, the rival
- * bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
+ * and the sentences that change how the plan may be read (the price, the rival bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
  */
 export function AdviceDecision({
   shown,
@@ -232,9 +225,6 @@ export function AdviceDecision({
   // sentences around it.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
   const anchorUnproven = anchorIsUnproven(view);
-  const explainedUnproven =
-    view.solver_status === "FEASIBLE" ||
-    (view.control_solver_status === "FEASIBLE" && !view.chip_choice);
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
@@ -251,9 +241,6 @@ export function AdviceDecision({
     : unproven
       ? alternative?.expected_points_cost_ceiling
       : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
-  // A bound on the planner's objective covers the whole plan at once, so the copy has to
-  // say how many gameweeks that is. A one-week document publishes no plan weeks.
-  const planWeeks = view.plan_weeks?.length ?? 1;
   const chipCopy = CHIP_COPY[language];
   const { rowsAreShares, chipBasis } = adviceBasis(view, chipCopy);
   const codes = clubCodesFromFixtures(fixtures);
@@ -307,17 +294,6 @@ export function AdviceDecision({
               : copy.squadBasisUnconfirmed}
           </p>
         ) : null}
-        {view.solver_status === "FEASIBLE" ? (
-          <p className={styles.honesty}>
-            {finiteNumber(view.optimality_gap)
-              ? planWeeks > 1
-                ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
-                : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
-              : top100Priced && price != null
-                ? top100Copy.unproven
-                : copy.unprovenPlanGapUnknown}
-          </p>
-        ) : null}
         {price != null ? (
           <p className={styles.planCost}>
             <strong className="num">
@@ -346,15 +322,6 @@ export function AdviceDecision({
             ) : null}
           </p>
         ) : null}
-        {view.control_solver_status === "FEASIBLE" && !view.chip_choice ? (
-          <p className={styles.honesty}>
-            <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-            {finiteNumber(view.control_optimality_gap)
-              ? copy.controlUnprovenBody(points(view.control_optimality_gap, 1, locale))
-              : copy.controlGapUnknown}
-          </p>
-        ) : null}
-        {explainedUnproven ? <p className={styles.honesty}>{copy.unprovenPlanNextStep}</p> : null}
         {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
           <p className={styles.muted}>
             {copy.overlapLine(view.overlap_count)} ·{" "}
@@ -1120,7 +1087,6 @@ function Top100Section({ view, priced }: { view: EntryAdvice; priced: boolean })
         {copy.weightLine(top100.weight)}{" "}
         {top100.changed ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
       </p>
-      <p className={styles.muted}>{copy.saturation}</p>
     </section>
   );
 }
@@ -1162,11 +1128,7 @@ function ChipStrategySection({ view }: { view: EntryAdvice }) {
           ))}
         </ul>
       )}
-      <p className={styles.muted}>
-        {copy.utilityNote(strategy.top100_weight)}
-        {strategy.objective_gap !== null &&
-          ` ${copy.solverGap}: ${points(strategy.objective_gap, 2, locale)}.`}
-      </p>
+      <p className={styles.muted}>{copy.utilityNote(strategy.top100_weight)}</p>
     </section>
   );
 }
@@ -1182,7 +1144,6 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
   const choice = view.chip_choice;
   if (!choice) return null;
   const name = messages.leagueMembers.chipNames[choice.chip] ?? choice.chip;
-  const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
   return (
     <section className={styles.adviceSection} data-testid="chip-choice">
       <h3 className={styles.lineupTitle}>{copy.title}</h3>
@@ -1194,7 +1155,6 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
           </strong>
         </p>
       ) : null}
-      {unproven ? <p className={styles.muted}>{copy.unproven}</p> : null}
       {choice.chip === "freehit" ? <p className={styles.muted}>{copy.freeHit}</p> : null}
     </section>
   );

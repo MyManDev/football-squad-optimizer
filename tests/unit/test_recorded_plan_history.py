@@ -30,7 +30,7 @@ def test_real_publication_carries_recorded_chip_moves_into_unsettled_history(
     member_reads = [call for call in read.call_args_list if call.args[3] == 101]
     assert len(member_reads) == 1
     history = json.loads(
-        (request.out_dir / "data/league/history/101.json").read_text(encoding="utf-8")
+        (request.out_dir / "data/leagues/352490/history/101.json").read_text(encoding="utf-8")
     )
     jsonschema.validate(history, history_schema())
     week = history["payload"]["weeks"][0]
@@ -43,9 +43,9 @@ def test_real_publication_carries_recorded_chip_moves_into_unsettled_history(
     assert all(row["window"] == 1 for row in rows.values())
     assert rows.keys() <= {doc["published_path"] for doc in record["advice"]}
     path = "advice/101/saf-puan/1/chip-bboost.json"
-    published = json.loads((request.out_dir / "data/league" / path).read_text(encoding="utf-8"))[
-        "payload"
-    ]
+    published = json.loads(
+        (request.out_dir / "data/leagues/352490" / path).read_text(encoding="utf-8")
+    )["payload"]
     assert rows[path]["chip"] == "bboost"
     assert rows[path]["captain"] == published["captain"]["name"]
     assert rows[path]["moves"] == [

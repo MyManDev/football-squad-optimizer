@@ -24,6 +24,7 @@ import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { ScoreboardCard } from "../components/ScoreboardCard";
 import type { EntryAdvice, LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -41,15 +42,17 @@ function renderState(language: Language, advice: LeagueViewEnvelope<EntryAdvice>
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter
         initialEntries={[
-          `/league/members/35249001?mode=${advice.payload.mode}&window=${advice.payload.window}`,
+          `/league/352490/members/35249001?mode=${advice.payload.mode}&window=${advice.payload.window}`,
         ]}
       >
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[35249001]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={mockEntryAdviceIndex(35249001).payload}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[35249001]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={mockEntryAdviceIndex(35249001).payload}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -227,7 +230,7 @@ describe("the weekly scoreboard shows no probability, in either language", () =>
       it(`${language}: ${name}`, () => {
         const { container, unmount } = render(
           <LanguageProvider initialLanguage={language}>
-            <ScoreboardCard envelope={envelope} />
+            {withLeague(<ScoreboardCard envelope={envelope} />)}
           </LanguageProvider>,
         );
         const text = container.textContent ?? "";

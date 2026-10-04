@@ -186,6 +186,46 @@ export interface PublishedAdviceSelection {
    * and `status` is "ready" only when the published tree answers exactly that.
    */
   computable?: ComputableAdvice;
+  /**
+   * What the member's own device can compute from the published inputs, present only
+   * where the publish wrote them: a statement beside the service's, read by the controls
+   * the same way. It changes no status; a selection the publish did not solve stays
+   * "not-listed" until the device answers it.
+   */
+  onDevice?: DeviceComputable;
+}
+
+export interface DeviceComputable {
+  strategies: MemberStrategy[];
+  windows: WindowSize[];
+  rivals: number[];
+  /** The Top 100 weights the device solves for the one-week pure-points plan; zero always. */
+  top100Weights: Top100Weight[];
+  /**
+   * The rivals' entry documents are still being read, so `rivals` is not final. Until it
+   * is, the rival a link names is kept, and the page reads as loading rather than unlisted.
+   */
+  loading?: boolean;
+  /** Rivals whose entry document could not be read; the rival a link names among them is kept. */
+  unreadRivals?: number[];
+}
+
+/**
+ * The rival a link names that the device's statement cannot judge yet: its documents are
+ * still being read, or this rival's could not be. Such a rival stays selected instead of
+ * being dropped while the page cannot tell whether the device can use them.
+ */
+function rivalHeldByDevice(
+  onDevice: DeviceComputable,
+  searchParams: URLSearchParams,
+  entryId: number,
+): number[] {
+  const raw = searchParams.get("rival");
+  const named = raw === null ? Number.NaN : Number(raw);
+  if (!Number.isSafeInteger(named) || named <= 0 || named === entryId) return [];
+  return onDevice.loading === true || onDevice.unreadRivals?.includes(named) === true
+    ? [named]
+    : [];
 }
 
 export interface ComputableAdvice {
@@ -338,9 +378,18 @@ export function resolvePublishedAdvice(
   index: EntryAdviceIndex | null | undefined,
   context?: { season: string; gameweek: number },
   capabilities?: AdviceCapabilities | null,
+  onDevice?: DeviceComputable,
 ): PublishedAdviceSelection {
   const preferences = preferencesFromUrl(searchParams);
-  const published = resolveFromIndex(searchParams, leagueId, entryId, members, index, context);
+  const published = resolveFromIndex(
+    searchParams,
+    leagueId,
+    entryId,
+    members,
+    index,
+    context,
+    onDevice,
+  );
   if (
     !capabilities ||
     capabilities.leagueId !== leagueId ||
@@ -479,9 +528,18 @@ function withComputable(
     (published.evidence.available || word);
   const asked = parseTop100(searchParams).weight;
   const target: Top100Target = { strategy, window, rivalEntryId };
+  // A weight the device computes for the one-week pure-points plan stands even where the
+  // service does not offer it; the selection then stays not listed until the device answers.
+  const onDeviceWeight =
+    strategy === "saf-puan" &&
+    window === 1 &&
+    !wordOn &&
+    published.onDevice?.top100Weights.includes(asked) === true;
   const weight =
     asked !== 0 &&
-    (settings.includes(asked) || top100Weights(index, entryId, wordOn, target).includes(asked))
+    (settings.includes(asked) ||
+      top100Weights(index, entryId, wordOn, target).includes(asked) ||
+      onDeviceWeight)
       ? asked
       : 0;
   const switched = wordOn || (weight !== 0 && !chipStrategy);
@@ -556,6 +614,7 @@ function resolveFromIndex(
   members: EntryView[],
   index: EntryAdviceIndex | null | undefined,
   context?: { season: string; gameweek: number },
+  onDevice?: DeviceComputable,
 ): PublishedAdviceSelection {
   const request = selectedAdviceRequest(searchParams, leagueId, entryId, members, context);
   const result: PublishedAdviceSelection = {
@@ -569,6 +628,7 @@ function resolveFromIndex(
     evidence: { ...EVIDENCE_OFF },
     top100: { ...TOP100_OFF, weights: [0], offered: [0] },
     chip: { ...CHIP_OFF, held: [], options: [], reasons: {} },
+    ...(onDevice ? { onDevice } : {}),
   };
   if (!index) return result;
   if (
@@ -636,10 +696,16 @@ function resolveFromIndex(
   result.windows = availableWindows(index, request.strategy);
   const { strategy, window } = request;
   if (strategyNeedsRival(strategy)) {
+    // The rivals the publish paired, and any member the device could pair for it.
     const rivalIds = [
-      ...new Set(
-        index.rival_entry_ids.filter((id) => Number.isSafeInteger(id) && id > 0 && id !== entryId),
-      ),
+      ...new Set([
+        ...index.rival_entry_ids.filter(
+          (id) => Number.isSafeInteger(id) && id > 0 && id !== entryId,
+        ),
+        ...(onDevice && isMemberStrategy(strategy) && onDevice.strategies.includes(strategy)
+          ? [...onDevice.rivals, ...rivalHeldByDevice(onDevice, searchParams, entryId)]
+          : []),
+      ]),
     ];
     result.rivals = rivalIds.map((rivalEntryId) => {
       const expectedPath = `advice/${entryId}/${strategy}/${window}/vs-${rivalEntryId}.json`;
@@ -691,7 +757,7 @@ function resolveFromIndex(
     const switched = evidenceAsked && evidencePath !== null && window === 1;
     // The Top 100 menu is the same plan at another setting. A setting whose file this
     // selection cannot read shows the plan at 0, and the controls say so.
-    const { path: weightedPath, ...top100 } = top100For(
+    const { path: weightedPath, ...published100 } = top100For(
       result.top100,
       index,
       entryId,
@@ -699,6 +765,20 @@ function resolveFromIndex(
       switched,
       top100Asked.weight,
     );
+    // A weight the publish did not solve but the device computes stays the asked one:
+    // the selection is then not listed until the device answers it.
+    const onDeviceWeight =
+      published100.weight === 0 &&
+      top100Asked.weight !== 0 &&
+      window === 1 &&
+      !switched &&
+      onDevice?.top100Weights.includes(top100Asked.weight) === true;
+    const top100 = onDeviceWeight
+      ? { ...published100, weight: top100Asked.weight, notOffered: false }
+      : published100;
+    if (onDeviceWeight) {
+      return { ...result, status: "not-listed", path: null, top100 };
+    }
     // A chosen chip is the plain one-week plan with that chip forced, and combines with
     // nothing: with the word on or a setting above 0 the chip is left out and the
     // controls say so.

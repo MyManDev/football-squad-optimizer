@@ -9,7 +9,7 @@ const COPY = {
     minutes: "Beklenen dakika",
     unknown: "İlk 11 bilgisi için yeterli kayıt yok",
     detail:
-      "Bu süre tahmini geçmiş maçlardaki ilk 11, sonradan oyuna girme ve oynamama kayıtlarını kullanır; kesinleşmiş bir ilk 11 değildir. FPL oynayabilirliği bir kez uygulanır. Bağımsız doğruluk ölçümü henüz tamamlanmış değildir.",
+      "Bu süre tahmini geçmiş maçlardaki ilk 11, sonradan oyuna girme ve oynamama kayıtlarını kullanır.",
     updated: "Kaynaklı oynama veya süre bilgisi uygulandı.",
     pointsTitle: "Bu maç için beklenen puanın ayrıntısı",
     pointTerms: {
@@ -23,14 +23,14 @@ const COPY = {
     },
     total: "Toplam oyuncu puanı",
     pointLimit:
-      "Bu, oyuncunun yalnızca bu maç için model tahminidir; kaptan çarpanı ve Top100 seçim ağırlığı öncesidir. Oynayabilirlik zaten bir kez uygulanmıştır. Diğer katkılar belirli bir olayın garantisi değildir; negatif olabilir. Alt sınır düzeltmesi, negatif toplamı sıfıra getirir.",
+      "Kaptan çarpanı ve Top100 ağırlığı öncesidir. Alt sınır düzeltmesi, negatif toplamı sıfıra getirir.",
   },
   en: {
     title: "Starting role and expected minutes",
     minutes: "Expected minutes",
     unknown: "Insufficient recorded starting-role evidence",
     detail:
-      "This minutes estimate uses past records of starts, substitute appearances and not playing; it is not a confirmed lineup. Captured FPL eligibility is applied once. Independent accuracy validation is not complete.",
+      "This minutes estimate uses past records of starts, substitute appearances and not playing.",
     updated: "A sourced availability or minutes statement was applied.",
     pointsTitle: "Expected points for this fixture",
     pointTerms: {
@@ -44,7 +44,7 @@ const COPY = {
     },
     total: "Total player points",
     pointLimit:
-      "This is the player's model estimate for this fixture only, before captain multipliers and Top100 selection weighting. Eligibility is already applied once. Other contributions do not guarantee any particular event and may be negative. The floor adjustment brings a negative total to zero.",
+      "Before the captain multiplier and the Top100 weight. The floor adjustment brings a negative total to zero.",
   },
 };
 

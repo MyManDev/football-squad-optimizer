@@ -243,6 +243,13 @@ def test_a_settled_tag_refuses_to_ship_without_the_gameweek_it_settles() -> None
     assert "must be a number" in not_a_number.stderr
 
 
+#: The checks of a site from before the directory, which publishes the legacy tree alone.
+_ROUTES, _DOCUMENTS, (_ABSENT,) = verify_live.smoke_checks([verify_live.LEGACY])
+#: The shell as the build serves it: the entry chunk by its hashed name.
+_SHELL = b'<!doctype html><script type="module" src="/assets/index-AbCd1234.js"></script>'
+_SHELL += b'<div id="root"></div>'
+
+
 def _index(season: str | None = "2026-27") -> bytes:
     latest = {} if season is None else {"season": season, "gameweek": 5}
     return json.dumps({"payload": {"latest": latest, "seasons": [season]}}).encode()
@@ -255,13 +262,17 @@ def _live(
     generated: str = "2026-09-18T18:00:00Z",
     season: str = "2026-27",
 ) -> Callable[[str], tuple[int, bytes]]:
-    """A live site that has settled ``settled`` and says so in all three documents."""
+    """A live site that has settled ``settled`` and says so in all three documents.
+
+    The site is one from before the league directory: it answers 404 for the directory and
+    publishes the legacy tree alone.
+    """
 
     def fetch(path: str) -> tuple[int, bytes]:
-        if path == verify_live.ABSENT:
+        if path in (verify_live.DIRECTORY, _ABSENT, verify_live.ABSENT_ASSET):
             return 404, b""
-        if path in verify_live.ROUTES:
-            return 200, b'<div id="root"></div>'
+        if path in _ROUTES:
+            return 200, _SHELL
         if path == "/data/index.json":
             return 200, _index(season)
         if path == "/data/league/scoreboard.json":
@@ -289,10 +300,12 @@ def test_live_checks_retain_the_absent_document_rule(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], absent_status: int
 ) -> None:
     def fetch(path: str) -> tuple[int, bytes]:
-        if path == verify_live.ABSENT:
+        if path in (verify_live.DIRECTORY, verify_live.ABSENT_ASSET):
+            return 404, b""
+        if path == _ABSENT:
             return absent_status, b""
-        if path in verify_live.ROUTES:
-            return 200, b'<div id="root"></div>'
+        if path in _ROUTES:
+            return 200, _SHELL
         if path == "/data/index.json":
             return 200, _index()
         return 200, json.dumps({"generated_at_utc": "2026-09-18T18:00:00Z", "payload": {}}).encode()
@@ -300,23 +313,137 @@ def test_live_checks_retain_the_absent_document_rule(
     monkeypatch.setattr(verify_live, "fetch", fetch)
     assert verify_live.main("2026-09-18T18:00:00Z") == (0 if absent_status == 404 else 1)
     output = capsys.readouterr().out
-    assert output.count(" html ") == len(verify_live.ROUTES)
-    assert output.count(" json ") == len(verify_live.DOCUMENTS)
+    assert output.count(" html ") == len(_ROUTES)
+    assert output.count(" json ") == len(_DOCUMENTS)
     assert "must be 404" in output
 
 
+def _directory(*leagues: tuple[int, str]) -> bytes:
+    rows = [
+        {
+            "league_id": league_id,
+            "league_name": f"League {league_id}",
+            "season": "2026-27",
+            "gameweek": 5,
+            "path": path,
+        }
+        for league_id, path in leagues
+    ]
+    return json.dumps(
+        {"contract_version": "league_directory_v1", "payload": {"leagues": rows}}
+    ).encode()
+
+
+def test_a_site_with_a_directory_is_checked_tree_by_tree(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Each listed league adds its member page by its address, its members document and
+    the entry 0 document it must refuse; the legacy paths are not asked for."""
+
+    served = _live(5, 5, 6)
+    asked: list[str] = []
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        asked.append(path)
+        if path == verify_live.DIRECTORY:
+            return 200, _directory((352490, "leagues/352490"), (7, "leagues/7"))
+        if path.startswith("/league/") and path.endswith("/members/0"):
+            return 200, _SHELL
+        if path.endswith("/entries/0.json"):
+            return 404, b""
+        if path.endswith("/scoreboard.json"):
+            return served("/data/league/scoreboard.json")
+        return served(path)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    assert verify_live.main("2026-09-18T18:00:00Z", 5) == 0
+    output = capsys.readouterr().out
+    assert "ok  200 html   /league/352490/members/0" in output
+    assert "ok  200 html   /league/7/members/0" in output
+    assert "ok  200 json   /data/leagues/352490/members.json" in output
+    assert "ok  200 json   /data/leagues/7/members.json" in output
+    assert "ok  404 absent /data/leagues/352490/entries/0.json" in output
+    assert "ok  404 absent /data/leagues/7/entries/0.json" in output
+    # The address from before the number is served on every site; the legacy tree is not.
+    assert "/league/members/0" in asked
+    assert "/data/league/members.json" not in asked
+    assert "ALL GOOD" in output
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "reported"),
+    [
+        pytest.param(0, b"", "BAD 0 /data/leagues.json is not a league directory", id="no-answer"),
+        pytest.param(500, b"", "BAD 500 /data/leagues.json is not a league directory", id="server"),
+        pytest.param(
+            200, b"[]", "BAD 200 /data/leagues.json is not a league directory", id="shape"
+        ),
+        pytest.param(200, _directory(), "BAD /data/leagues.json lists no league", id="empty"),
+    ],
+)
+def test_a_directory_that_cannot_be_read_is_a_counted_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    status: int,
+    body: bytes,
+    reported: str,
+) -> None:
+    """The legacy tree is checked in its place, so the run still reports the rest."""
+
+    served = _live(5, 5, 6)
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        return (status, body) if path == verify_live.DIRECTORY else served(path)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    assert verify_live.main("2026-09-18T18:00:00Z", 5) == 1
+    output = capsys.readouterr().out
+    assert reported in output
+    assert "ok  200 json   /data/league/members.json" in output
+    assert output.rstrip().endswith("\n1 FAILURE(S)")
+
+
 def test_the_verifier_checks_the_same_routes_the_deployment_smoke_does() -> None:
-    """The two lists drifted once: `/fixtures` was added to one and not the other."""
+    """The two lists drifted once: `/fixtures` was added to one and not the other.
+
+    The static checks are compared in order; the checks a tree adds are compared by
+    reading the smoke's templates with one directory line and one legacy tree.
+    """
 
     source = (ROOT / "web/scripts/smoke-deployment.mjs").read_text(encoding="utf-8")
+    prefix = re.search(r'ABSENT_ASSET_PREFIX = "([^"]+)"', source)
+    assert prefix is not None and prefix.group(1) == verify_live.ABSENT_ASSET_PREFIX
+    assert verify_live.ABSENT_ASSET.startswith(verify_live.ABSENT_ASSET_PREFIX)
     block = source.split("export const SMOKE_CHECKS = [", 1)[1].split("\n];", 1)[0]
+    # The absent asset is named by its constant; read it as the path it stands for.
+    block = block.replace("path: ABSENT_ASSET", f'path: "{verify_live.ABSENT_ASSET}"')
     paths = re.findall(r'path:\s*"([^"]+)"', block)
     kinds = re.findall(r'kind:\s*"([^"]+)"', block)
     assert len(paths) == len(kinds), block
     named = dict(zip(paths, kinds, strict=True))
     assert [path for path, kind in named.items() if kind == "html"] == verify_live.ROUTES
     assert [path for path, kind in named.items() if kind == "json"] == verify_live.DOCUMENTS
-    assert [path for path, kind in named.items() if kind == "absent"] == [verify_live.ABSENT]
+    assert [path for path, kind in named.items() if kind == "absent"] == [verify_live.ABSENT_ASSET]
+    directory = re.search(r'DIRECTORY = "([^"]+)"', source)
+    legacy = re.search(r'LEGACY_TREE = "([^"]+)"', source)
+    assert directory is not None and directory.group(1) == verify_live.DIRECTORY
+    assert legacy is not None and legacy.group(1) == verify_live.LEGACY_TREE
+
+    tree_block = source.split("export function treeChecks(", 1)[1].split("\n}\n", 1)[0]
+    templates = re.findall(r"path: `([^`]+)`", tree_block)
+    tree_kinds = re.findall(r'kind:\s*"([^"]+)"', tree_block)
+    assert len(templates) == len(tree_kinds), tree_block
+    for league_id, tree in ((7, "leagues/7"), (None, "league")):
+        rendered = [
+            (template.replace("${leagueId}", str(league_id)).replace("${path}", tree), kind)
+            for template, kind in zip(templates, tree_kinds, strict=True)
+            if league_id is not None or "${leagueId}" not in template
+        ]
+        routes, documents, (absent,) = verify_live.smoke_checks([(league_id, tree)])
+        assert [p for p, k in rendered if k == "html"] == routes[len(verify_live.ROUTES) :]
+        expected_documents = documents[len(verify_live.DOCUMENTS) :]
+        assert [p for p, k in rendered if k == "json"] == expected_documents
+        assert [p for p, k in rendered if k == "absent"] == [absent]
 
 
 def test_a_week_that_did_not_settle_fails_instead_of_being_printed(
@@ -738,3 +865,60 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
         assert "run watch 200 --exit-status" in log
         assert "deploy run 200 finished: failure" in result.stdout
         assert "not this release's run" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("served", "said"),
+    [
+        pytest.param({}, None, id="every-asset-is-itself"),
+        pytest.param(
+            {"/assets/Page-IjKl9012.js": (200, _SHELL)},
+            "BAD 200 asset /assets/Page-IjKl9012.js  (the HTML shell)",
+            id="a-lazy-chunk-is-the-shell",
+        ),
+        pytest.param(
+            {"/assets/solver.worker-Uv-Wx123.js": (404, b"")},
+            "BAD 404 asset /assets/solver.worker-Uv-Wx123.js",
+            id="the-worker-is-missing",
+        ),
+        pytest.param(
+            {verify_live.ABSENT_ASSET: (200, _SHELL)},
+            f"BAD 200 absent {verify_live.ABSENT_ASSET}",
+            id="a-missing-asset-is-the-shell",
+        ),
+    ],
+)
+def test_every_asset_the_shell_reaches_is_served_as_itself(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    served: dict[str, tuple[int, bytes]],
+    said: str | None,
+) -> None:
+    """A deploy is green while an edge near the operator serves a chunk as the shell: the
+    verifier follows the shell to every chunk, the lazy pages and the solver's worker."""
+
+    assets = {
+        "/assets/index-AbCd1234.js": (
+            b'import("./Page-IjKl9012.js");m.f=["assets/Page-IjKl9012.js"]'
+        ),
+        "/assets/Page-IjKl9012.js": b"new URL(`/assets/solver.worker-Uv-Wx123.js`,import.meta.url)",
+        "/assets/solver.worker-Uv-Wx123.js": b"self.onmessage=()=>{}",
+    }
+    live = _live(5, 5, 6)
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        if path in served:
+            return served[path]
+        if path in assets:
+            return 200, assets[path]
+        return live(path)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    code = verify_live.main("2026-09-18T18:00:00Z", 5)
+    output = capsys.readouterr().out
+    if said is None:
+        assert code == 0, output
+        assert "ok  3 assets, each served as itself" in output
+    else:
+        assert code == 1
+        assert said in output

@@ -32,6 +32,7 @@ import type {
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { AdviceCard } from "./MemberAdviceCard";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => writeViewerEntry(null));
@@ -159,20 +160,22 @@ const CALENDAR: FixturesPayload = {
 function show(
   language: Language = "tr",
   props: Partial<LeagueMemberViewProps> = {},
-  initial = `/league/members/${ENTRY}`,
+  initial = `/league/352490/members/${ENTRY}`,
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[initial]}>
-        <LeagueMemberView
-          squad={SQUAD}
-          advice={twoMoves()}
-          members={MEMBERS}
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          fixtures={CALENDAR}
-          leagueName={mockLeagueMembersEnvelope.payload.league_name}
-          {...props}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={SQUAD}
+            advice={twoMoves()}
+            members={MEMBERS}
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            fixtures={CALENDAR}
+            leagueName={mockLeagueMembersEnvelope.payload.league_name}
+            {...props}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -265,7 +268,7 @@ describe("the WHO block", () => {
   it("names the league and links the member back to the list to change member", () => {
     show("tr");
     const who = screen.getByRole("link", { name: /Üye değiştir/ });
-    expect(who).toHaveAttribute("href", "/league/members");
+    expect(who).toHaveAttribute("href", "/league/352490/members");
     expect(who).toHaveTextContent(SQUAD.payload.entry.team_name!);
     expect(who).toHaveTextContent(`${SQUAD.payload.entry.manager_name} · #${ENTRY}`);
     expect(screen.getByText(mockLeagueMembersEnvelope.payload.league_name)).toBeInTheDocument();
@@ -462,12 +465,15 @@ describe("the proof stamp", () => {
     expect(box.nextElementSibling).toBeNull();
   });
 
-  it("keeps the unproven badge and the gap sentence for a plan found without a proof", () => {
-    show("tr", { advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }) });
+  it("shows neither the stamp nor a proof caveat for a plan found without a proof", () => {
+    const { container } = show("tr", {
+      advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }),
+    });
     const copy = MESSAGES.tr.leagueMembers;
     expect(screen.queryByText(copy.stampOptimal)).toBeNull();
-    expect(screen.getAllByText(copy.unprovenPlanBadge)).toHaveLength(1);
-    expect(screen.getByText(copy.unprovenPlanBody("1,3"))).toBeInTheDocument();
+    expect(screen.queryByText("Kanıt tamamlanamadı")).toBeNull();
+    expect(screen.queryByText(/kanıtı tamamlayamadı/)).toBeNull();
+    expect(container.textContent).not.toMatch(/en iyisi olduğu gösterilmiş/);
   });
 
   it("claims nothing for a status that is neither", () => {
@@ -475,13 +481,13 @@ describe("the proof stamp", () => {
     delete (advice.payload as { solver_status?: string }).solver_status;
     show("en", { advice });
     expect(screen.queryByText(MESSAGES.en.leagueMembers.stampOptimal)).toBeNull();
-    expect(screen.queryByText(MESSAGES.en.leagueMembers.unprovenPlanBadge)).toBeNull();
+    expect(screen.queryByText("Proof incomplete")).toBeNull();
   });
 });
 
 describe("the decision heading", () => {
   it("names the selection beside the heading", () => {
-    show("tr", {}, `/league/members/${ENTRY}?window=1`);
+    show("tr", {}, `/league/352490/members/${ENTRY}?window=1`);
     expect(screen.getByTestId("member-selection-summary")).toHaveTextContent("Saf puan · 1 hafta");
   });
 
@@ -517,15 +523,16 @@ describe("honesty and the tools", () => {
     const how = screen.getByText(copy.howComputed).closest("details")!;
     expect(how).not.toHaveAttribute("open");
     for (const sentence of [
-      copy.honestyRule,
       copy.independentAdviceRule,
       copy.lineupRule,
       copy.moveRowsBasis,
       copy.diagnosticOnly,
-      copy.freshnessNote,
     ]) {
       expect(within(how).getByText(sentence)).not.toBeVisible();
     }
+    // The caveat sentences that used to open and close the disclosure are gone.
+    expect(within(how).queryByText(/kanıtın kapsamını belirtir/)).toBeNull();
+    expect(within(how).queryByText(/tahmini yenilemez/)).toBeNull();
     // The week's hit charge is said once, in the disclosure.
     expect(within(how).getAllByText(/beklenen puan maliyeti/)).toHaveLength(1);
   });

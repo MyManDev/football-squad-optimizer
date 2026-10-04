@@ -336,28 +336,6 @@
   }
 }
 
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 28px;
-  border-radius: var(--radius-s);
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-  text-decoration: none;
-}
-
-.status:hover {
-  color: var(--color-text);
-  text-decoration: underline;
-}
-
-.status[aria-current="page"] {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
 /* Rail: 72 px of icons. The labels stay in the accessible names. */
 
 .sidebar[data-mode="rail"] .brandRow {
@@ -406,13 +384,6 @@
   padding: var(--space-2) 0 var(--space-3);
 }
 
-.sidebar[data-mode="rail"] .status {
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  color: var(--color-text);
-}
-
 /* Drawer: the full sidebar over the page, with 44 px targets. */
 
 .sidebar[data-mode="drawer"] .brandRow {
@@ -459,10 +430,6 @@
 
 .sidebar[data-mode="drawer"] .footer {
   padding: var(--space-2) 0 calc(var(--space-2) + env(safe-area-inset-bottom));
-}
-
-.sidebar[data-mode="drawer"] .status {
-  min-height: 44px;
 }
 
 .scrim {

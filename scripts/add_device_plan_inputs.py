@@ -34,6 +34,7 @@ from squadopt.application.device_plan import (
 )
 from squadopt.application.entries import EntryError
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_tree import single_league_tree
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import read_inputs, read_season_rules
@@ -105,7 +106,7 @@ def add_device_plan_inputs(
 ) -> list[str]:
     """Write the two documents into the tree; return the relative paths written."""
 
-    league_dir = site_data_root / "league"
+    league_dir = single_league_tree(site_data_root)
     members_envelope = _read(league_dir / "members.json")
     members = members_envelope["payload"]
     stamp = str(members_envelope["generated_at_utc"])

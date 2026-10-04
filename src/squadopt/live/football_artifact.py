@@ -22,7 +22,6 @@ from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
 from squadopt.prediction.football_minutes_role import RETAINED_HISTORY_ROLE_FEATURE_VERSION
 
 FOOTBALL_CHOICE = "football"
-MODEL_CHOICES = ("current", FOOTBALL_CHOICE)
 ARTIFACT_CONTRACT = "live_football_forecast_v1"
 FEATURE_CONTRACT = "causal_football_fixture_features_v1"
 

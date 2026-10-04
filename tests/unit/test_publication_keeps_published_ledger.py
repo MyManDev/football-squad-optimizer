@@ -164,7 +164,7 @@ def test_an_empty_ledger_root_keeps_our_published_scoreboard_rows(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     request = _scoreboard_world(tmp_path)
-    target = request.out_dir / "data" / "league" / "scoreboard.json"
+    target = request.out_dir / "data" / "leagues" / "352490" / "scoreboard.json"
     target.parent.mkdir(parents=True)
     target.write_text(
         json.dumps(

@@ -30,10 +30,8 @@ export interface Top100Copy {
   rivalWindows: string;
   strategyCost: (points: string) => string;
   strategyCostAtMost: (points: string) => string;
-  variantLimits: Record<string, string>;
   title: string;
   weightLine: (weight: number) => string;
-  saturation: string;
   unchanged: string;
   changed: string;
   /** The same, where no price is printed above to point at. */
@@ -42,7 +40,6 @@ export interface Top100Copy {
   costAtMost: (points: string) => string;
   combinedCost: (points: string) => string;
   combinedCostAtMost: (points: string) => string;
-  unproven: string;
   moveReason: string;
   limit: (weight: number) => string;
 }
@@ -78,15 +75,8 @@ const en: Top100Copy = {
     `This strategy and this setting together give up ~${points} expected points in the base model against the pure-points plan at 0, hits included.`,
   strategyCostAtMost: (points) =>
     `This strategy and this setting together give up at most ${points} expected points in the base model against the pure-points plan at 0, hits included.`,
-  variantLimits: {
-    "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.":
-      "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.",
-    "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.":
-      "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.",
-  },
   title: "Top 100 influence",
   weightLine: (weight) => `Setting: ${weight} (your choice).`,
-  saturation: "A higher setting can return the same plan.",
   unchanged: "This setting did not change your plan this week.",
   changed: "This setting changed your plan; the price is stated above.",
   changedNoPrice: "This setting changed your plan.",
@@ -98,8 +88,6 @@ const en: Top100Copy = {
     `The manager's word and this setting together give up ~${points} expected points in the base model against the pure-points plan with both off, hits included.`,
   combinedCostAtMost: (points) =>
     `The manager's word and this setting together give up at most ${points} expected points in the base model against the pure-points plan with both off, hits included.`,
-  unproven:
-    "The solver found this plan without finishing its proof, so the price below is stated as at most.",
   moveReason: "In the plan because of the Top 100 influence.",
   limit: (weight) =>
     `The plan was chosen with the Top 100 influence at ${weight}; every expected-points number here is the base model's, without it.`,
@@ -132,15 +120,8 @@ const tr: Top100Copy = {
     `Bu strateji ve bu ayar birlikte, 0 ayarlı saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
   strategyCostAtMost: (points) =>
     `Bu strateji ve bu ayar birlikte, 0 ayarlı saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
-  variantLimits: {
-    "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.":
-      "Top 100 sayıları önceki haftanındır ve pencerenin her haftasında aynen tekrarlanır; sonraki haftanın seçimleri okununca yeniden hesaplanır.",
-    "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.":
-      "Rakibe karşı bant, örtüşme ve beklenen fark ilk haftaya aittir ve tek transferle ulaşılan düzeydir; sonraki haftalar yalnız puan için planlanır, çünkü rakibin sonraki kadroları bilinmiyor.",
-  },
   title: "Top 100 etkisi",
   weightLine: (weight) => `Ayar: ${weight} (senin seçimin).`,
-  saturation: "Daha yüksek bir ayar aynı planı verebilir.",
   unchanged: "Bu ayar bu hafta planını değiştirmedi.",
   changed: "Bu ayar planını değiştirdi; bedeli yukarıda yazılı.",
   changedNoPrice: "Bu ayar planını değiştirdi.",
@@ -152,8 +133,6 @@ const tr: Top100Copy = {
     `Hocanın sözü ve bu ayar birlikte, ikisinin de kapalı olduğu saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
   combinedCostAtMost: (points) =>
     `Hocanın sözü ve bu ayar birlikte, ikisinin de kapalı olduğu saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
-  unproven:
-    "Çözücü bu planın ispatını bitirmeden buldu; bu nedenle aşağıdaki bedel en fazla olarak yazılı.",
   moveReason: "Top 100 etkisi nedeniyle planda.",
   limit: (weight) =>
     `Plan Top 100 etkisi ${weight} iken seçildi; buradaki her beklenen puan, etki olmadan temel modelindir.`,
@@ -168,21 +147,4 @@ export function top100Unavailable(copy: Top100Copy, reason: string | null): stri
       ? copy.unavailableReasons[reason]
       : undefined) ?? copy.unavailableReasons.unknown
   );
-}
-
-/**
- * The producer's stated limit for a weighted document, with its weight read back. The
- * sentence carries a number, so it cannot be a key in the fixed stated-limits table.
- */
-const TOP100_LIMIT =
-  /^The plan was chosen with the Top 100 influence at (5|10|20|30|40|50); every expected-points number in this document is the base model's, without it\.$/;
-
-/** A producer sentence this menu added, in the member's language; null for any other. */
-export function variantLimit(copy: Top100Copy, sentence: string): string | null {
-  return Object.hasOwn(copy.variantLimits, sentence) ? copy.variantLimits[sentence]! : null;
-}
-
-export function top100LimitWeight(sentence: string): number | null {
-  const match = TOP100_LIMIT.exec(sentence);
-  return match ? Number(match[1]) : null;
 }

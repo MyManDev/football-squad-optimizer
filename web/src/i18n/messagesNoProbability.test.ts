@@ -23,28 +23,14 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { CATALOGUES } from "../testSupport/catalogues";
-import { AS_A_CHANCE } from "../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../testSupport/honesty";
 import type { Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
 
-/**
- * The only exempt entries, keyed by catalogue path and listed rather than pattern-matched.
- *
- * Both are denials: each tells the reader that the site does not publish a probability, and
- * a denial has to name the thing it refuses in order to refuse it. They are held to that by
- * the second test below, which fails if one of them ever stops matching the guard, so the
- * exemption cannot quietly become cover for a claim.
- *
- *   decision.diagnosticTitle   "... is a diagnostic, never a chance of winning."
- *   rivals.noRivalAfterStatus  "... rather than a probability nobody measured."
- */
-const DENIALS: readonly string[] = [
-  "en.decision.diagnosticTitle",
-  "tr.decision.diagnosticTitle",
-  "en.rivals.noRivalAfterStatus",
-  "tr.rivals.noRivalAfterStatus",
-];
+// No entry is exempt. Two denials once were (a "never a chance of winning" note on /moves and
+// a "rather than a probability nobody measured" clause on /rivals); a denial still puts the
+// word on the page, so the note is gone and the clause was rewritten without it.
 
 /**
  * Stands in for any argument a message function takes. It answers 1 to every primitive
@@ -102,8 +88,10 @@ describe("every string in both message catalogues", () => {
     expect(catalogue.get("tr.squad.squadCost")).toBe("Kadro Maliyeti");
     // A function-valued entry, called, not skipped.
     expect(catalogue.get("en.squad.projectedPlayerPoints")).toBe("xP 1");
-    expect(catalogue.get("tr.chipForecastCopy.title")).toBe("Çip görünümü");
-    expect(catalogue.get("en.chipForecastCopy.range")).toBe("1 to 1");
+    expect(catalogue.get("tr.chipCopy.title")).toBe("Çip seçimi");
+    expect(catalogue.get("en.chipCopy.chosen")).toBe(
+      "1 is played this gameweek because you chose it.",
+    );
     for (const path of catalogue.keys()) {
       const twin = path.startsWith("en.") ? `tr.${path.slice(3)}` : `en.${path.slice(3)}`;
       expect(catalogue.has(twin)).toBe(true);
@@ -119,12 +107,44 @@ describe("every string in both message catalogues", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const exempt = new Set(DENIALS);
     const offenders = [...catalogue]
-      .filter(([path]) => !exempt.has(path))
       .filter(([, text]) => AS_A_CHANCE.test(text))
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
+  });
+
+  it("words the former denials without the thing they denied, or drops them", () => {
+    for (const language of LANGUAGES) {
+      expect(catalogue.get(`${language}.rivals.noRivalAfterStatus`)).not.toMatch(AS_A_CHANCE);
+      expect(catalogue.has(`${language}.decision.diagnosticTitle`)).toBe(false);
+    }
+  });
+
+  it("carries no caveat, limit, scope or what-this-proves sentence", () => {
+    const offenders = [...catalogue]
+      .filter(([, text]) => AS_A_CAVEAT.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    // The keys that held only such a sentence are gone, not emptied.
+    for (const language of LANGUAGES)
+      for (const key of [
+        "decision.diagnosticBody",
+        "decision.researchShadowBody",
+        "decision.liveControlBody",
+        "league.note",
+        "league.comparisonMissing",
+        "liveSeries.limits",
+      ])
+        expect(catalogue.has(`${language}.${key}`)).toBe(false);
+  });
+
+  it("names no raw capture field in a sentence", () => {
+    const offenders = [...catalogue]
+      .filter(([, text]) => /selected_by_percent/.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    for (const language of LANGUAGES)
+      expect(catalogue.has(`${language}.league.ownershipNote`)).toBe(false);
   });
 
   it("never writes the Top 100 setting as a share, a winner or a gain", () => {
@@ -142,7 +162,7 @@ describe("every string in both message catalogues", () => {
 
   it("never words a chosen chip's gain as a recommendation or names a week to play it", () => {
     const chip = [...catalogue].filter(([path]) => path.includes(".chipCopy."));
-    expect(chip.length).toBeGreaterThan(60);
+    expect(chip.length).toBeGreaterThan(50);
     const offenders = chip
       .filter(([, text]) =>
         /recommend|\bbest\b|optimal|likely|should play|right week|öner|en iyi|en uygun|oynamalısın/i.test(
@@ -151,12 +171,6 @@ describe("every string in both message catalogues", () => {
       )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
-  });
-
-  it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {
-    const text = catalogue.get(path);
-    expect(text).toBeDefined();
-    expect(text).toMatch(AS_A_CHANCE);
   });
 
   it("no longer carries the keys that existed only to label a probability", () => {
@@ -207,32 +221,18 @@ const INLINE = PRODUCTION.filter((path) => path.endsWith(".tsx")).flatMap(inline
 // playing value: 75/100", under the same label the FPL card uses. It is not worded as a
 // chance and carries no percent marker, so it needs no exemption from the guard.
 
-// Conditional scenario bounds are explicitly denied the meaning of an outcome CI.
-// Role explanations have no exception: modeled role probabilities remain internal.
-const SCENARIO_DENIALS: Record<string, readonly string[]> = {
-  "features/league/advice/InformationReview.tsx": [
-    "Bu aralık maç sonucu için bir güven aralığı değildir. Haberin ne zaman geleceğine olasılık atanmadı; banka ve kalan transfere ek puan yazılmadı.",
-    "This is not a confidence interval for match outcomes. No news-arrival probability or extra point value for bank/free transfers was assigned.",
-  ],
-};
-const isScenarioDenial = ({ at, text }: { at: string; text: string }) =>
-  Object.entries(SCENARIO_DENIALS).some(
-    ([path, labels]) => at.startsWith(`${path}:`) && labels.includes(text),
-  );
-
+// No inline sentence is exempt from the guard: the scenario bounds of the information
+// review and the role explanations carry no chance wording, so nothing needs an exception
+// and modeled role probabilities remain internal.
 describe("every string a production component writes inline", () => {
-  it("limits scenario denials to their exact surface without a role-estimate exception", () => {
-    expect(
-      INLINE.filter(isScenarioDenial)
-        .map(({ text }) => text)
-        .sort(),
-    ).toEqual(Object.values(SCENARIO_DENIALS).flat().sort());
-    expect(isScenarioDenial({ at: "elsewhere.tsx:1", text: "%" })).toBe(false);
-    expect(isScenarioDenial({ at: "features/league/advice/RoleForecast.tsx:1", text: "%" })).toBe(
-      false,
-    );
-    for (const path of Object.keys(SCENARIO_DENIALS)) {
-      expect(isScenarioDenial({ at: `${path}:1`, text: "Win probability 80%" })).toBe(false);
+  it("needs no exemption for the scenario surfaces", () => {
+    for (const path of [
+      "features/league/advice/InformationReview.tsx",
+      "features/league/advice/RoleForecast.tsx",
+    ]) {
+      const inline = INLINE.filter(({ at }) => at.startsWith(`${path}:`));
+      expect(inline.length).toBeGreaterThan(0);
+      expect(inline.filter(({ text }) => AS_A_CHANCE.test(text))).toEqual([]);
     }
   });
   it("names FPL's playing value as the source's figure, with no chance wording or marker", () => {
@@ -252,9 +252,16 @@ describe("every string a production component writes inline", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const offenders = INLINE.filter((entry) => !isScenarioDenial(entry))
-      .filter(({ text }) => AS_A_CHANCE.test(text))
-      .map(({ at, text }) => `${at}: ${text}`);
+    const offenders = INLINE.filter(({ text }) => AS_A_CHANCE.test(text)).map(
+      ({ at, text }) => `${at}: ${text}`,
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("writes no caveat, limit, scope or what-this-proves sentence", () => {
+    const offenders = INLINE.filter(({ text }) => AS_A_CAVEAT.test(text)).map(
+      ({ at, text }) => `${at}: ${text}`,
+    );
     expect(offenders).toEqual([]);
   });
 });

@@ -412,13 +412,22 @@ def test_the_batch_publishes_the_wider_menu_against_the_default_rival_and_names_
     plain = _publish(world, tmp_path / "plain", counts=None)
     menu = _publish(world, tmp_path / "menu", counts=world["counts"])
 
-    # Everything the plain publish wrote keeps its bytes, the index excepted.
+    # Everything the plain publish wrote keeps its bytes, the index excepted, and the
+    # device inputs excepted too: the counts are an input a device solves the weight from,
+    # so the shared document gains them and each entry block names the weights.
     for name in plain.files:
-        if name.endswith("index.json"):
+        if name.endswith("index.json") or name == "device-plan.json":
             continue
-        assert (tmp_path / "plain" / name).read_bytes() == (
-            tmp_path / "menu" / name
-        ).read_bytes(), name
+        before = (tmp_path / "plain" / name).read_bytes()
+        after = (tmp_path / "menu" / name).read_bytes()
+        if name.startswith("entries/"):
+            document = json.loads(after)
+            block = document["payload"]["device_plan"]
+            weights = block.pop("top100_weights")
+            assert weights and all(isinstance(weight, int) and weight > 0 for weight in weights)
+            after = json.dumps(document, indent=2).encode("utf-8")
+            before = json.dumps(json.loads(before), indent=2).encode("utf-8")
+        assert before == after, name
 
     index = _read(tmp_path / "menu" / f"advice/{ENTRY}/index.json")
     assert index["default_rival_entry_id"] == RIVAL
@@ -500,10 +509,12 @@ def test_a_variant_that_fails_is_recorded_at_its_address(
     assert "Top 100 influence 50 not solved: The strategy's window at 0 did not solve." in note
 
 
-def test_the_site_holds_the_new_limit_sentences_verbatim() -> None:
+def test_the_site_keeps_no_translation_of_the_limit_sentences() -> None:
+    """A stated limit is not drawn on a member page, so the page keeps no table of them."""
+
     text = WEB_COPY.read_text(encoding="utf-8")
     for sentence in (TOP100_WINDOW_LIMIT, RIVAL_WINDOW_LIMIT):
-        assert text.count(json.dumps(sentence)) == 3, sentence
+        assert json.dumps(sentence) not in text, sentence
 
 
 # -- the review's fixes -------------------------------------------------------------------

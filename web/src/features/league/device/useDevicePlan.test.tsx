@@ -4,22 +4,26 @@
  * capture on screen, and dropped by a new selection or a service computation.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
+import { withLeague } from "../../../testSupport/league";
 import { isAdvicePayload } from "../advice/adviceShape";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
-import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
-import { solvePlan, type LpSolver } from "./planModel";
+import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
+import type { LpSolver } from "./lp/problem";
+import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
+  deviceChip,
   deviceSolvable,
   useDevicePlan,
   type DeviceSolver,
@@ -101,18 +105,25 @@ function Harness({
   loadDocument,
   solver,
   onState,
+  rivals,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
   loadDocument: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
   solver: DeviceSolver;
   onState: (state: DevicePlanPhase) => void;
+  rivals?: readonly number[];
 }) {
-  const device = useDevicePlan(squad, request, {
-    loadDocument,
-    createSolver: () => solver,
-    now: () => new Date("2026-10-03T01:02:03Z"),
-  });
+  const device = useDevicePlan(
+    squad,
+    request,
+    {
+      loadDocument,
+      createSolver: () => solver,
+      now: () => new Date("2026-10-03T01:02:03Z"),
+    },
+    rivals,
+  );
   onState(device.state);
   return (
     <div>
@@ -128,47 +139,111 @@ function Harness({
   );
 }
 
+describe("the worker", () => {
+  it("ships under its own file name, not the one an edge holds broken", () => {
+    // The browser caches the built file by name; devicePlan.worker's was cached as HTML.
+    const source = readFileSync(join(__dirname, "useDevicePlan.ts"), "utf8");
+    expect(source).toContain('new URL("./deviceSolver.worker.ts", import.meta.url)');
+    expect(source).not.toContain("devicePlan.worker");
+    expect(existsSync(join(__dirname, "deviceSolver.worker.ts"))).toBe(true);
+    expect(existsSync(join(__dirname, "devicePlan.worker.ts"))).toBe(false);
+  });
+});
+
 describe("what the device can solve", () => {
-  it("is the plain pure-points plan over one week and nothing else", () => {
-    expect(deviceSolvable(REQUEST)).toBe(true);
-    expect(deviceSolvable({ ...REQUEST, window: 3 })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru", rivalEntryId: 2 })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, top100Weight: 20 })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, managersWord: true })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, chip: "bboost" })).toBe(false);
-    expect(deviceSolvable({ ...REQUEST, model: "football" })).toBe(false);
+  it("offers a rival strategy only against a rival the statement names", () => {
+    const rivalRequest: AdviceRequest = {
+      ...REQUEST,
+      strategy: "ortak-koru",
+      rivalEntryId: 35249002,
+    };
+    const mount = (rivals?: readonly number[]) =>
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={rivalRequest}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver()}
+            onState={() => {}}
+            rivals={rivals}
+          />,
+        ),
+      );
+    mount([35249002]);
+    expect(screen.getByTestId("available")).toHaveTextContent("true");
+    cleanup();
+    mount([35249004]);
+    expect(screen.getByTestId("available")).toHaveTextContent("false");
+    cleanup();
+    mount([]);
+    expect(screen.getByTestId("available")).toHaveTextContent("false");
+  });
+
+  const squad = squadWith(entry);
+
+  it("is the pure-points plan over one week, a held chip, or a rival strategy", () => {
+    expect(deviceSolvable(REQUEST, squad)).toBe(true);
+    expect(deviceSolvable({ ...REQUEST, window: 3 }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru", rivalEntryId: 2 }, squad)).toBe(
+      true,
+    );
+    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru" }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, top100Weight: 20 }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, managersWord: true }, squad)).toBe(false);
+    expect(deviceSolvable({ ...REQUEST, chip: "bboost" }, squad)).toBe(true);
+    expect(deviceSolvable({ ...REQUEST, model: "football" }, squad)).toBe(false);
+  });
+
+  it("takes a chip only where the squad document says the member can still play it", () => {
+    const used = structuredClone(squad);
+    used.chips!.states.bboost!.first_half!.state = "used";
+    expect(deviceChip({ ...REQUEST, chip: "bboost" }, used)).toBeUndefined();
+    expect(deviceChip({ ...REQUEST, chip: "3xc" }, used)).toBe("3xc");
+    expect(deviceChip(REQUEST, used)).toBeNull();
+    // A history the producer could not read offers no chip at all.
+    const unknown = { ...squad, chips: { known: false, gameweek: squad.gameweek, states: {} } };
+    expect(deviceChip({ ...REQUEST, chip: "3xc" }, unknown)).toBeUndefined();
+    expect(deviceChip({ ...REQUEST, chip: "3xc" }, { ...squad, chips: undefined })).toBeUndefined();
+    expect(deviceChip({ ...REQUEST, chip: "auto" }, squad)).toBeUndefined();
   });
 
   it("is offered only where the publisher wrote the member's inputs", () => {
     const states: DevicePlanPhase[] = [];
     const { rerender } = render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={async () => envelope(document)}
-        solver={new InProcessSolver()}
-        onState={(s) => states.push(s)}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={(s) => states.push(s)}
+        />,
+      ),
     );
     expect(screen.getByTestId("available")).toHaveTextContent("true");
     rerender(
-      <Harness
-        squad={squadWith(null)}
-        request={REQUEST}
-        loadDocument={async () => envelope(document)}
-        solver={new InProcessSolver()}
-        onState={(s) => states.push(s)}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(null)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={(s) => states.push(s)}
+        />,
+      ),
     );
     expect(screen.getByTestId("available")).toHaveTextContent("false");
     rerender(
-      <Harness
-        squad={squadWith(entry)}
-        request={{ ...REQUEST, window: 5 }}
-        loadDocument={async () => envelope(document)}
-        solver={new InProcessSolver()}
-        onState={(s) => states.push(s)}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={{ ...REQUEST, window: 5 }}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={(s) => states.push(s)}
+        />,
+      ),
     );
     expect(screen.getByTestId("available")).toHaveTextContent("false");
   });
@@ -179,15 +254,17 @@ describe("a solve on the device", () => {
     const seen = { latest: { phase: "idle" } as DevicePlanPhase };
     const solver = new InProcessSolver();
     render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={async () => envelope(document)}
-        solver={solver}
-        onState={(s) => {
-          seen.latest = s;
-        }}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={solver}
+          onState={(s) => {
+            seen.latest = s;
+          }}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
@@ -219,13 +296,15 @@ describe("a solve on the device", () => {
 
   it("refuses inputs from another capture than the page's", async () => {
     render(
-      <Harness
-        squad={squadWith(entry, "another-capture")}
-        request={REQUEST}
-        loadDocument={async () => envelope(document)}
-        solver={new InProcessSolver()}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry, "another-capture")}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("other-capture"));
@@ -233,28 +312,32 @@ describe("a solve on the device", () => {
 
   it("says when the publish carries no inputs, and when the read fails", async () => {
     const { rerender } = render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={async () => {
-          throw new LeagueDataMissing("device-plan.json");
-        }}
-        solver={new InProcessSolver()}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => {
+            throw new LeagueDataMissing("device-plan.json");
+          }}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("unpublished"));
     rerender(
-      <Harness
-        squad={squadWith(entry)}
-        request={{ ...REQUEST, gameweek: 9 }}
-        loadDocument={async () => {
-          throw new LeagueDataError("broken");
-        }}
-        solver={new InProcessSolver()}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={{ ...REQUEST, gameweek: 9 }}
+          loadDocument={async () => {
+            throw new LeagueDataError("broken");
+          }}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
     );
     expect(screen.getByTestId("phase")).toHaveTextContent("idle");
     await act(async () => screen.getByText("run").click());
@@ -269,13 +352,15 @@ describe("a solve on the device", () => {
       stage: "plan",
     }));
     render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={async () => envelope(document)}
-        solver={refusing}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={refusing}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("refused"));
@@ -283,13 +368,15 @@ describe("a solve on the device", () => {
     cleanup();
     const crashing = new InProcessSolver((request) => ({ id: request.id, kind: "failed" }));
     render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={async () => envelope(document)}
-        solver={crashing}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={crashing}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
 
@@ -327,7 +414,7 @@ describe("a solve on the device", () => {
         </div>
       );
     }
-    render(<Page />);
+    render(withLeague(<Page />));
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
     expect(made).toHaveLength(1);
@@ -343,16 +430,18 @@ describe("a solve on the device", () => {
       release = resolve;
     });
     render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={async () => {
-          await gate;
-          return envelope(document);
-        }}
-        solver={new InProcessSolver()}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => {
+            await gate;
+            return envelope(document);
+          }}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     expect(screen.getByTestId("phase")).toHaveTextContent("loading");
@@ -377,24 +466,28 @@ describe("a solve on the device", () => {
       return envelope(document);
     };
     const { rerender } = render(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={loader}
-        solver={slow}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={loader}
+          solver={slow}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     expect(screen.getByTestId("phase")).toHaveTextContent("loading");
     rerender(
-      <Harness
-        squad={squadWith(entry)}
-        request={{ ...REQUEST, window: 3 }}
-        loadDocument={loader}
-        solver={slow}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={{ ...REQUEST, window: 3 }}
+          loadDocument={loader}
+          solver={slow}
+          onState={() => {}}
+        />,
+      ),
     );
     expect(screen.getByTestId("phase")).toHaveTextContent("idle");
     await act(async () => {
@@ -404,13 +497,15 @@ describe("a solve on the device", () => {
     expect(screen.getByTestId("phase")).toHaveTextContent("idle");
 
     rerender(
-      <Harness
-        squad={squadWith(entry)}
-        request={REQUEST}
-        loadDocument={loader}
-        solver={slow}
-        onState={() => {}}
-      />,
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={loader}
+          solver={slow}
+          onState={() => {}}
+        />,
+      ),
     );
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));

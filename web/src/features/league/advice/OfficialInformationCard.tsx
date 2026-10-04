@@ -3,7 +3,6 @@ import { utcShort } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
 import type { DecisionInformation } from "./informationFacts";
 import styles from "../pages/LeagueMemberPage.module.css";
-import { OfficialInjuryCard } from "./OfficialInjuryCard";
 
 const COPY = {
   tr: {
@@ -26,11 +25,10 @@ const COPY = {
     },
     unknown: "Kaynakta farklı durum kodu var",
     cleared: "Önceki haber metni temizlenmiş.",
-    note: "Bu değerler FPL kaydından gelir; ilk 11’de başlama garantisi veya ayrı bir dakika tahmini değildir. Kontrol tarihi, haberin yayın tarihi değildir.",
-    age: "Sunucunun çalışıyor olması, bu bilgilerin şimdi güncellendiği anlamına gelmez.",
+    note: "Bu değerler FPL kaydından gelir.",
     noFlags: "Bu plandaki oyuncular için gösterilecek FPL uyarısı yok.",
     changed:
-      "Bu plan hesaplandıktan sonra karar girdileri değişmiş. Yeni bilgilerle hesaplamak için Hesapla düğmesini kullanabilirsin. Gösterilen eski plan kendiliğinden değiştirilmedi.",
+      "Bu plan hesaplandıktan sonra karar girdileri değişmiş. Yeni bilgilerle hesaplamak için Hesapla düğmesini kullanabilirsin.",
     needsCheck:
       "Bu plan bilgi sürümünü taşımıyor. Güncel girdilerle hesaplayarak yeni sonucu karşılaştırabilirsin.",
     bindings: "Önceki ve güncel kaynak bağlantıları",
@@ -43,10 +41,7 @@ const COPY = {
     bound: "Bağlı",
     unbound: "Bağlı değil",
     notRecorded: "Kaydedilmemiş",
-    sameBindings:
-      "Bilgi sürümü değişmiş, ancak bu özet alanları aynı. Değişen kaynak içeriği bu alanlardan belirlenemez.",
-    bindingLimit:
-      "Kaynağın bağlı olması, bir açıklamanın uygulandığı veya puanların değiştiği anlamına gelmez. Kontrol zamanı haberin yayın zamanı değildir. Yeni sonuç yalnızca Hesapla ile istenir; gösterilen plan korunur.",
+    sameBindings: "Bilgi sürümü değişmiş, ancak bu özet alanları aynı.",
   },
   en: {
     title: "FPL information and this plan",
@@ -68,11 +63,10 @@ const COPY = {
     },
     unknown: "Another source status code",
     cleared: "The earlier news text was cleared.",
-    note: "These values come from FPL; they do not guarantee a start or provide a separate minute forecast. The check time is not the publication time.",
-    age: "A healthy server does not mean this information was refreshed just now.",
+    note: "These values come from FPL.",
     noFlags: "No FPL alerts to show for the players in this plan.",
     changed:
-      "Decision inputs changed after this plan was calculated. Use Calculate to request a result with the new information. The displayed earlier plan has not been changed automatically.",
+      "Decision inputs changed after this plan was calculated. Use Calculate to request a result with the new information.",
     needsCheck:
       "This plan has no information revision. Calculate with the current inputs to compare a new result.",
     bindings: "Previous and latest source bindings",
@@ -85,10 +79,7 @@ const COPY = {
     bound: "Bound",
     unbound: "Not bound",
     notRecorded: "Not recorded",
-    sameBindings:
-      "The information revision changed, but these summary fields are unchanged. They do not identify which source content changed.",
-    bindingLimit:
-      "A bound source does not mean a statement was applied or points changed. The check time is not the news publication time. Only Calculate requests a new result; the displayed plan is retained.",
+    sameBindings: "The information revision changed, but these summary fields are unchanged.",
   },
 };
 
@@ -152,7 +143,6 @@ export function NewInformationNotice({
             </tr>
           </tbody>
         </table>
-        <p className={styles.honesty}>{copy.bindingLimit}</p>
       </details>
     </div>
   );
@@ -161,18 +151,12 @@ export function NewInformationNotice({
 /**
  * The central league injury source is disabled in production (the producer's
  * ``OFFICIAL_INJURY_SOURCE_ENABLED`` is False, with no override). The page mirrors that:
- * a payload carrying the central card is not drawn, whoever built it.
+ * a payload's `official_injuries` is validated and never drawn, whoever built it.
  */
-export const OFFICIAL_INJURY_CARD_ENABLED = false;
-
 export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
   const { language, locale } = useLanguage();
   const feed = view.official_information;
-  if (!feed) {
-    return OFFICIAL_INJURY_CARD_ENABLED ? (
-      <OfficialInjuryCard data={view.official_injuries} />
-    ) : null;
-  }
+  if (!feed) return null;
   const copy = COPY[language];
   const flagged = feed.players.filter(
     (p) =>
@@ -191,9 +175,7 @@ export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
         {copy.observed}:{" "}
         <time dateTime={feed.observed_at}>{utcShort(feed.observed_at, locale)}</time>
       </p>
-      <p className={styles.muted}>
-        {copy.note} {copy.age}
-      </p>
+      <p className={styles.muted}>{copy.note}</p>
       <a href={feed.source_url} target="_blank" rel="noreferrer">
         {copy.source}
       </a>
@@ -225,14 +207,6 @@ export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
           ))}
         </ul>
       )}
-      {OFFICIAL_INJURY_CARD_ENABLED ? (
-        <OfficialInjuryCard
-          data={view.official_injuries}
-          playerNames={Object.fromEntries(
-            feed.players.map((player) => [player.player_id, player.name]),
-          )}
-        />
-      ) : null}
     </details>
   );
 }

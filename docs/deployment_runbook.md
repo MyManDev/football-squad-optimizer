@@ -223,7 +223,8 @@ sh scripts/release/ship.sh --dry-run 618 site-2026-27-gw05-fix8 \
 
 Replace the example's site PR, unused tag, release branch, content timestamp and
 summary with the accepted publication. Read the exact `generated_at_utc` from
-`web/public/data/league/members.json` in that accepted candidate tree. Verification
+the league's `members.json` (`web/public/data/leagues/<league id>/`) in that accepted
+candidate tree. Verification
 requires equality: the same tag can be re-dispatched, an older rollback refuses,
 and a fix release requires its own accepted stamp. A matching stamp identifies
 the publication claimed by that document; it is not a whole-tree byte comparison.
@@ -294,7 +295,7 @@ one. Previews spend from the same day and stop at eight; on a busy day the previ
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
 `deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
-retains the ten smoke checks and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
+retains the smoke checks (the routes, the documents, the two absent ones and every asset the shell reaches) and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
 develop queue: it rebases existing PR worktrees, waits for clean checks and squash
 merges with `clean_body.py` removing attribution lines. It is not the release-to-main
 path. These are operator commands, not scheduled jobs; inspect their output and stop
@@ -539,7 +540,7 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
+The trusted smoke test makes **ten** fixed checks, the absent asset and the asset walk, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
@@ -549,14 +550,38 @@ deliberately, because a path-scoped not-found rule would break a nested client-s
 and nothing else on the list would notice.
 
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
-revalidation policy: `/data/index.json` and `/data/league/members.json`.
+revalidation policy: `/data/index.json` and the league's `members.json`. The site's league
+directory, `/data/leagues.json`, says which league trees it publishes (`data/leagues/<league
+id>/`); the smoke and the verifier read it first and check every listed tree, each by its
+numbered member page (`/league/<id>/members/0`), its members document and its absent entry
+0. A site from before the directory answers 404 there and publishes the one tree under
+`/data/league/`, which is then checked in the same way.
 
 **The tenth is the opposite check, and reading it as a 200 inverts it.**
-`/data/league/entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
+The tree's `entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is seven route 200s, two JSON 200s, and one 404.
+rather than the application shell. A green smoke is seven route 200s, two JSON 200s and two 404s (entry 0 and the absent asset), then every asset the shell reaches answered as itself.
 
-Transient edge and propagation failures are retried for roughly one minute.
+**Assets.** `/assets/smoke-absent-<random>.js`, a name no build produces and new on every
+run (so a run against a deployment from before this rule poisons nothing anyone asks for
+again), must answer 404 without the shell and with no long cache lifetime. `web/public/assets/404.html` makes it so, the way
+`data/404.html` does for documents. Before it, Pages answered a missing asset name with the
+shell, 200, under the `/assets/*` rule's year-long `immutable` header, and the edge that served
+it kept that HTML for the name: when a later deploy built a chunk of that name, members
+reaching that edge got HTML for the chunk and browsers kept the broken copy for a year. Then
+the smoke reads the shell, follows every asset it names (the entry, its stylesheets, every
+lazy page, the device solver's worker and wasm, the fonts) and requires each to answer as
+itself, never as the shell.
+
+So **never request a not-yet-deployed asset name on the live domain** (a local build predicts
+the names CI will publish): each such request poisons that name at the edge that answered.
+The deployment's own smoke runs from GitHub's network and sees GitHub's edge;
+`scripts/release/verify_live.py` repeats the asset walk from the operator's machine, which is
+the edge members in Turkey reach. If it reports an asset served as the HTML shell, purge that
+URL in Cloudflare (Caching, Purge by URL) before members are told, and do not reuse the name.
+
+Transient edge and propagation failures are retried for roughly one minute, the league
+directory read included.
 
 Two routes are **not** in the gate and their absence is worth knowing before someone assumes
 otherwise: `/gw/:season/:gameweek`, and `/admin`, which was added later. Neither is covered.

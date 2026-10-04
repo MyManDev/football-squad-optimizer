@@ -226,7 +226,7 @@ publicly beside `/health`:
 | Check | False when |
 | --- | --- |
 | `capture_context` | no capture, no handoff for it, or the pair cannot be read |
-| `league_tree` | ops has published no `league/members.json` under the site data root |
+| `league_tree` | ops has published no league tree under the site data root (`leagues.json` and the trees it lists, or `league/members.json` on a site from before the directory) |
 | `league_tree_matches_capture` | `members.json` is for another season or gameweek than the one the current capture targets (or names no gameweek, or there is no context to compare with) |
 | `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
 | `worker_heartbeat` | no advice worker has rewritten its heartbeat under `workers/` in the store for 120 s (60 idle waits of 2 s), or `workers/` could not be listed |
@@ -517,7 +517,7 @@ answers 503 until the handoff lands.
 So publish in this order, always:
 
 1. **Site data** — `<inputs>/site/data`. Independent of the pair below, but
-   `league/members.json` is what makes the league connected at all.
+   the league's tree (`leagues.json` names it) is what makes the league connected at all.
 2. **The handoff** — `<inputs>/handoffs/<season>-gw<NN>.json`. Before the capture it belongs
    to, so it is already there the moment the capture becomes visible.
 3. **The capture** — `<inputs>/snapshots/<snapshot_id>/`: the payloads first, then

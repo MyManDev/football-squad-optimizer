@@ -5,10 +5,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { loadEntryAdviceChip } from "./data";
+import { exampleTree } from "../../testSupport/league";
 import { LeagueDataError } from "./dataErrors";
 
-describe("loadEntryAdviceChip", () => {
+const loadEntryAdviceChip = exampleTree.entryAdviceChip;
+
+describe("tree.entryAdviceChip", () => {
   it("refuses any path or chip other than the member's own", async () => {
     const refused: [string, string][] = [
       ["advice/202/saf-puan/1/chip-bboost.json", "bboost"],

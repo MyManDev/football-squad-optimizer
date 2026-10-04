@@ -5,10 +5,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { loadEntryAdviceTop100 } from "./data";
+import { exampleTree } from "../../testSupport/league";
 import { LeagueDataError } from "./dataErrors";
 
-describe("loadEntryAdviceTop100", () => {
+const loadEntryAdviceTop100 = exampleTree.entryAdviceTop100;
+
+describe("tree.entryAdviceTop100", () => {
   it("refuses any path, weight or switch other than the member's own", async () => {
     const refused: [string, number, boolean][] = [
       ["advice/202/saf-puan/1/top100-20.json", 20, false],

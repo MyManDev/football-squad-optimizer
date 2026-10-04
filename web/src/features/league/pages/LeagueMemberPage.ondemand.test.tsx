@@ -32,12 +32,14 @@ import type {
   AdviceRequestResult,
 } from "../advice/adviceClient";
 import { rememberJob } from "../advice/adviceJobStore";
-import { AdviceApiError } from "../advice/adviceClient";
+import { AdviceApiError, StaticOnlyAdviceClient } from "../advice/adviceClient";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { TOP100_WEIGHTS } from "../advice/top100";
-import * as data from "../data";
+import type * as data from "../data";
+import type { RequestOptions } from "../../../data/request";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberPage, LeagueMemberView } from "./LeagueMemberPage";
+import { exampleTree, stubTree, withLeague } from "../../../testSupport/league";
 
 afterEach(() => {
   cleanup();
@@ -80,6 +82,11 @@ class RecordingClient implements AdviceClient {
 
   constructor(answer: (request: AdviceRequest) => AdviceRequestResult) {
     this.answer = answer;
+  }
+
+  /** The published baseline is the example tree's document, as the static client reads it. */
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return new StaticOnlyAdviceClient(exampleTree.entryAdvice).readPublished(request, options);
   }
 
   async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
@@ -125,17 +132,19 @@ function renderView(
 ) {
   const element = (updated: Partial<Parameters<typeof LeagueMemberView>[0]> = {}) => (
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
-        <LeagueMemberView
-          squad={SQUAD}
-          advice={null}
-          members={MEMBERS}
-          index={INDEX}
-          client={client}
-          capabilities={CAPABILITIES}
-          {...props}
-          {...updated}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={SQUAD}
+            advice={null}
+            members={MEMBERS}
+            index={INDEX}
+            client={client}
+            capabilities={CAPABILITIES}
+            {...props}
+            {...updated}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>
   );
@@ -401,7 +410,8 @@ describe("a published selection, with the service answering", () => {
       capabilities: { ...CAPABILITIES, chipsByEntry: { [ENTRY]: ["bboost"] } },
     });
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
-    expect(container).toHaveTextContent(computeCopy.chipDurationUnknown);
+    // Neither a measured duration nor a sentence saying none was measured.
+    expect(container).not.toHaveTextContent("hesaplama süresi ölçülmedi");
     expect(container).not.toHaveTextContent(computeCopy.duration[1]);
     await pressCompute();
     expect(client.requests[0]).toMatchObject({ chip: "bboost" });
@@ -455,10 +465,12 @@ describe("a bundle built with an origin whose service is down", () => {
     return render(
       <QueryClientProvider client={queries}>
         <LanguageProvider initialLanguage="tr">
-          <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
-            <Routes>
-              <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
-            </Routes>
+          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
+            {withLeague(
+              <Routes>
+                <Route path="/league/:leagueId/members/:entryId" element={<LeagueMemberPage />} />
+              </Routes>,
+            )}
           </MemoryRouter>
         </LanguageProvider>
       </QueryClientProvider>,
@@ -466,14 +478,20 @@ describe("a bundle built with an origin whose service is down", () => {
   }
 
   function stubStaticTree() {
-    vi.spyOn(data, "loadLeagueMembers").mockResolvedValue(mockLeagueMembersEnvelope);
-    vi.spyOn(data, "loadEntrySquad").mockImplementation(async (id) => mockEntrySquadEnvelopes[id]!);
-    vi.spyOn(data, "loadEntryAdviceIndex").mockImplementation(async (id) =>
-      mockEntryAdviceIndex(id),
-    );
-    vi.spyOn(data, "loadEntryAdvice").mockImplementation(async (id, mode, window, rival) =>
-      mockEntryAdviceEnvelope(id, mode, window, rival),
-    );
+    stubTree({
+      members: vi.fn<data.LeagueTree["members"]>().mockResolvedValue(mockLeagueMembersEnvelope),
+      entrySquad: vi
+        .fn<data.LeagueTree["entrySquad"]>()
+        .mockImplementation(async (id) => mockEntrySquadEnvelopes[id]!),
+      entryAdviceIndex: vi
+        .fn<data.LeagueTree["entryAdviceIndex"]>()
+        .mockImplementation(async (id) => mockEntryAdviceIndex(id)),
+      entryAdvice: vi
+        .fn<data.LeagueTree["entryAdvice"]>()
+        .mockImplementation(async (id, mode, window, rival) =>
+          mockEntryAdviceEnvelope(id, mode, window, rival),
+        ),
+    });
   }
 
   it("is the static page with one calm notice, and Hesapla lands on the published plan", async () => {

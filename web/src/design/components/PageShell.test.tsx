@@ -14,6 +14,8 @@ import { SIDEBAR_STORAGE_KEY } from "../shell/sidebarPreference";
 import { PageShell } from "./PageShell";
 
 const TR = MESSAGES.tr.shell;
+const LEAGUE = 352490;
+const MEMBERS = `/league/${LEAGUE}/members`;
 
 function LocationProbe() {
   const location = useLocation();
@@ -25,19 +27,23 @@ function LocationProbe() {
 function renderShell({
   path = "/",
   language = "tr",
-  viewerEntryId = null,
+  viewer = null,
+  chosenLeagueId = null,
   page = <p>page</p>,
 }: {
   path?: string;
   language?: Language;
-  viewerEntryId?: number | null;
+  viewer?: { leagueId: number; entryId: number } | null;
+  chosenLeagueId?: number | null;
   page?: ReactNode;
 } = {}) {
   const user = userEvent.setup();
   const view = render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[path]}>
-        <PageShell viewerEntryId={viewerEntryId}>{page}</PageShell>
+        <PageShell viewer={viewer} chosenLeagueId={chosenLeagueId}>
+          {page}
+        </PageShell>
         <LocationProbe />
       </MemoryRouter>
     </LanguageProvider>,
@@ -117,9 +123,10 @@ describe("the app shell on a desktop", () => {
       expect(screen.getByRole("navigation", { name: copy.primary })).toBeInTheDocument();
       expect(screen.getByRole("complementary", { name: copy.sidebar })).toBeInTheDocument();
 
+      // On the home page with no league chosen, 'Lig' is the home page itself: the form.
       expect(navLinks().map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
         [copy.thisWeek, "/"],
-        [copy.league, "/league/members"],
+        [copy.league, "/"],
         [copy.fixtures, "/fixtures"],
         [copy.contribute, "/contribute"],
       ]);
@@ -128,20 +135,28 @@ describe("the app shell on a desktop", () => {
         "page",
       );
       const aside = screen.getByRole("complementary", { name: copy.sidebar });
-      const status = within(aside).getByRole("link", { name: copy.operations });
-      expect(status).toHaveAttribute("href", "/status");
       const hrefs = within(aside)
         .getAllByRole("link")
         .map((link) => link.getAttribute("href"));
-      expect(hrefs).toEqual(["/", "/league/members", "/fixtures", "/contribute", "/status"]);
+      expect(hrefs).toEqual(["/", "/", "/fixtures", "/contribute"]);
+      // The operations, analysis and admin surfaces are reachable by address only.
       expect(
-        document.querySelector('a[href="/league"], a[href="/admin"], a[href^="/gw/"]'),
+        document.querySelector(
+          'a[href="/status"], a[href="/league"], a[href="/admin"], a[href^="/gw/"]',
+        ),
       ).toBeNull();
     },
   );
 
+  it("links 'Lig' to the chosen league's member list from the home page", () => {
+    renderShell({ chosenLeagueId: LEAGUE });
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
+    expect(screen.getByRole("link", { name: TR.league })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute("href", "/");
+  });
+
   it("opens the member in the address as 'Bu hafta', with its plan, and its squad as 'Kadro'", async () => {
-    const path = "/league/members/35249001?mode=fark-yarat&window=3";
+    const path = `${MEMBERS}/35249001?mode=fark-yarat&window=3`;
     const { user } = renderShell({ path });
 
     const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
@@ -158,7 +173,7 @@ describe("the app shell on a desktop", () => {
   });
 
   it("keeps the member page in reach for the rest of the visit, in memory only", async () => {
-    const path = "/league/members/35249001?mode=ortak-koru";
+    const path = `${MEMBERS}/35249001?mode=ortak-koru`;
     const { user } = renderShell({ path });
 
     await user.click(screen.getByRole("link", { name: TR.fixtures }));
@@ -170,16 +185,34 @@ describe("the app shell on a desktop", () => {
     expect(Object.keys(window.localStorage)).not.toContain("squadopt.member");
   });
 
-  it("opens the member the visitor claimed when the address names none", () => {
-    renderShell({ path: "/fixtures", viewerEntryId: 42 });
+  it("opens the member the visitor claimed, in the claim's league, when the address names none", () => {
+    renderShell({
+      path: "/fixtures",
+      viewer: { leagueId: LEAGUE, entryId: 42 },
+      chosenLeagueId: LEAGUE,
+    });
     expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
       "href",
-      "/league/members/42",
+      `${MEMBERS}/42`,
     );
     expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute(
       "href",
-      "/league/members/42#kadro",
+      `${MEMBERS}/42#kadro`,
     );
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
+  });
+
+  it("opens the claimed member's page in the claim's league whatever league is chosen", () => {
+    renderShell({
+      path: "/fixtures",
+      viewer: { leagueId: 7, entryId: 42 },
+      chosenLeagueId: LEAGUE,
+    });
+    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
+      "href",
+      "/league/7/members/42",
+    );
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
   });
 
   it("collapses to the icon rail and remembers that in this browser", async () => {
@@ -205,7 +238,6 @@ describe("the app shell on a desktop", () => {
       TR.fixtures,
       TR.contribute,
     ]);
-    expect(screen.getByRole("link", { name: TR.operations })).toHaveAttribute("href", "/status");
     expect(screen.getByRole("group", { name: "Dil" })).toHaveClass("vertical");
     first.unmount();
 
@@ -231,7 +263,6 @@ describe("the app shell on a desktop", () => {
       ...navLinks(),
       screen.getByRole("button", { name: /^TR/ }),
       screen.getByRole("button", { name: /^EN/ }),
-      screen.getByRole("link", { name: TR.operations }),
       screen.getByRole("button", { name: "page action" }),
     ];
     for (const element of expected) {
@@ -252,7 +283,7 @@ describe("the app shell on a desktop", () => {
       const { hash } = useLocation();
       return hash ? <section id="kadro">squad</section> : null;
     }
-    const { user } = renderShell({ path: "/league/members/7", page: <Late /> });
+    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Late /> });
     await user.click(screen.getByRole("link", { name: TR.squad }));
     expect(scrolled).toContain("kadro");
   });
@@ -284,7 +315,7 @@ function Slots({ planFirst = true }: { planFirst?: boolean }) {
 
 describe("the shell's slots", () => {
   it("renders a page's WHO and PLAN parts once, inside the sidebar", () => {
-    const { container } = renderShell({ path: "/league/members/7", page: <Slots /> });
+    const { container } = renderShell({ path: `${MEMBERS}/7`, page: <Slots /> });
 
     expect(within(sidebar()).getByText("who block")).toBeInTheDocument();
     expect(within(sidebar()).getByRole("group", { name: "Strateji" })).toBeInTheDocument();
@@ -315,7 +346,7 @@ describe("the shell's slots", () => {
     expect(screen.queryByRole("button", { name: TR.changePlan })).toBeNull();
     empty.unmount();
 
-    const { user } = renderShell({ path: "/league/members/7", page: <Slots /> });
+    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Slots /> });
     const plan = await screen.findByRole("button", { name: TR.changePlan });
     expect(plan).toHaveAttribute("aria-controls", "sidebar");
     expect(plan).toHaveAttribute("aria-expanded", "false");
@@ -370,7 +401,7 @@ describe("the app shell on a phone", () => {
         </ShellPortal>
       );
     }
-    const { user } = renderShell({ path: "/league/members/7", page: <Answering /> });
+    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Answering /> });
     await user.click(screen.getByRole("button", { name: TR.openMenu }));
     await user.click(screen.getByRole("textbox", { name: "answers escape" }));
     await user.keyboard("{Escape}");
@@ -385,7 +416,7 @@ describe("the app shell on a phone", () => {
 
   it("closes the drawer from the scrim, the close button and a navigation", async () => {
     stubLayout("phone");
-    const { user, container } = renderShell();
+    const { user, container } = renderShell({ chosenLeagueId: LEAGUE });
     const menu = screen.getByRole("button", { name: TR.openMenu });
 
     await user.click(menu);
@@ -399,7 +430,7 @@ describe("the app shell on a phone", () => {
 
     await user.click(menu);
     await user.click(screen.getByRole("link", { name: TR.league }));
-    expect(location()).toBe("/league/members");
+    expect(location()).toBe(MEMBERS);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(container.querySelector(".scrim")).toBeNull();
   });
@@ -424,7 +455,7 @@ describe("the app shell on a phone", () => {
     ).toHaveAttribute("href", "/fixtures");
     plain.unmount();
 
-    const { user } = renderShell({ path: "/league/members/7", page: <SheetPage /> });
+    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <SheetPage /> });
     const open = within(screen.getByRole("banner")).getByRole("button", { name: TR.fixtures });
     expect(open).toHaveAttribute("aria-controls", FIXTURE_SHEET_ID);
     expect(open).toHaveAttribute("aria-expanded", "false");
@@ -451,13 +482,13 @@ describe("the app shell on a phone", () => {
       useEffect(() => (offered ? register?.() : undefined), [offered, register]);
       return offered ? <div id={FIXTURE_SHEET_ID}>sheet</div> : null;
     }
-    const { rerender } = renderShell({ path: "/league/members/7", page: <SheetPage offered /> });
+    const { rerender } = renderShell({ path: `${MEMBERS}/7`, page: <SheetPage offered /> });
     const bar = () => within(screen.getByRole("banner"));
     expect(bar().getByRole("button", { name: TR.fixtures })).toBeInTheDocument();
 
     rerender(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={["/league/members/7"]}>
+        <MemoryRouter initialEntries={[`${MEMBERS}/7`]}>
           <PageShell>
             <SheetPage offered={false} />
           </PageShell>

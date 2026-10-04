@@ -14,23 +14,56 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { points } from "../../../lib/format";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import { EXAMPLE_LEAGUE, stubTree, withLeague } from "../../../testSupport/league";
+import { memberAddress, membersAddress } from "../../../lib/leagueAddresses";
 import * as data from "../data";
+import type { LeagueTree } from "../data";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberPage, LeagueMemberView } from "./LeagueMemberPage";
 import { LeagueMembersPage, LeagueMembersView } from "./LeagueMembersPage";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 
 const ENTRY = 35249001;
+const LEAGUE = EXAMPLE_LEAGUE.leagueId;
 const clients: QueryClient[] = [];
+/** The example tree's reads, replaced for the page under test. */
+const reads = {
+  members: vi.fn<LeagueTree["members"]>(),
+  entrySquad: vi.fn<LeagueTree["entrySquad"]>(),
+  entryAdviceIndex: vi.fn<LeagueTree["entryAdviceIndex"]>(),
+  entryAdvice: vi.fn<LeagueTree["entryAdvice"]>(),
+};
+// The proof caveats the member page used to print for a FEASIBLE plan or control, by literal:
+// none of them may come back under any key.
+const PROOF_CAVEATS: Record<Language, readonly RegExp[]> = {
+  tr: [
+    /Kanıt tamamlanamadı/,
+    /kanıtı tamamlayamadı/,
+    /en iyi olduğu kanıtlanamadı/,
+    /en iyi diye kanıtlanamadı/,
+    /fiyat belirtilmiyor/,
+    /Karar vermeden önce gösterilen on biri/,
+  ],
+  en: [
+    /Proof incomplete/,
+    /could not finish the proof/,
+    /proof for this plan is incomplete/,
+    /was not proven optimal/,
+    /no price is stated/,
+    /Review the shown lineup and transfers before deciding/,
+  ],
+};
 
 beforeEach(() => {
   window.localStorage.clear();
-  vi.spyOn(data, "loadLeagueMembers").mockResolvedValue(mockLeagueMembersEnvelope);
-  vi.spyOn(data, "loadEntrySquad").mockImplementation(async (id) => mockEntrySquadEnvelopes[id]!);
-  vi.spyOn(data, "loadEntryAdviceIndex").mockImplementation(async (id) => mockEntryAdviceIndex(id));
-  vi.spyOn(data, "loadEntryAdvice").mockImplementation(async (id, mode, window, rival) =>
+  for (const read of Object.values(reads)) read.mockReset();
+  reads.members.mockResolvedValue(mockLeagueMembersEnvelope);
+  reads.entrySquad.mockImplementation(async (id) => mockEntrySquadEnvelopes[id]!);
+  reads.entryAdviceIndex.mockImplementation(async (id) => mockEntryAdviceIndex(id));
+  reads.entryAdvice.mockImplementation(async (id, mode, window, rival) =>
     mockEntryAdviceEnvelope(id, mode, window, rival),
   );
+  stubTree(reads);
 });
 
 afterEach(() => {
@@ -46,11 +79,15 @@ function open(language: Language, list = false) {
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
-        <MemoryRouter initialEntries={[list ? "/league/members" : `/league/members/${ENTRY}`]}>
-          <Routes>
-            <Route path="/league/members" element={<LeagueMembersPage />} />
-            <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
-          </Routes>
+        <MemoryRouter
+          initialEntries={[list ? membersAddress(LEAGUE) : memberAddress(LEAGUE, ENTRY)]}
+        >
+          {withLeague(
+            <Routes>
+              <Route path="/league/:leagueId/members" element={<LeagueMembersPage />} />
+              <Route path="/league/:leagueId/members/:entryId" element={<LeagueMemberPage />} />
+            </Routes>,
+          )}
         </MemoryRouter>
       </LanguageProvider>
     </QueryClientProvider>,
@@ -70,13 +107,15 @@ function showAdvice(
     search.set("rival", String(advice.payload.rival_entry_id));
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]!}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={index}
-        />
+      <MemoryRouter initialEntries={[memberAddress(LEAGUE, ENTRY, `?${search}`)]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]!}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={index}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -136,8 +175,8 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
           : "mode=saf-puan&window=1";
     render(
       <LanguageProvider initialLanguage={language}>
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
-          <LeagueMemberView {...props} />
+        <MemoryRouter initialEntries={[memberAddress(LEAGUE, ENTRY, `?${query}`)]}>
+          {withLeague(<LeagueMemberView {...props} />)}
         </MemoryRouter>
       </LanguageProvider>,
     );
@@ -159,21 +198,22 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
   });
 
   it.each(["plan", "control", "both", "neither"] as const)(
-    "shows one next step when %s proof is unfinished",
+    "shows no proof caveat when %s proof is unfinished",
     (kind) => {
       const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
       advice.payload.solver_status = kind === "plan" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
       advice.payload.control_solver_status =
         kind === "control" || kind === "both" ? "FEASIBLE" : "OPTIMAL";
-      showAdvice(language, advice);
-      expect(screen.queryAllByText(copy.unprovenPlanNextStep)).toHaveLength(
-        kind === "neither" ? 0 : 1,
-      );
+      const { container } = showAdvice(language, advice);
+      expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
+      for (const sentence of PROOF_CAVEATS[language]) {
+        expect(container.textContent).not.toMatch(sentence);
+      }
     },
   );
 
   it.each(["missing", "unreadable"] as const)("distinguishes a %s member list", async (kind) => {
-    vi.mocked(data.loadLeagueMembers).mockRejectedValue(
+    reads.members.mockRejectedValue(
       kind === "missing"
         ? new data.LeagueDataMissing("members.json")
         : new data.LeagueDataError("503"),
@@ -190,42 +230,42 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
   it.each(["missing", "unreadable"] as const)(
     "shows the %s member error even while its index is pending",
     async (kind) => {
-      vi.mocked(data.loadEntrySquad).mockRejectedValue(
+      reads.entrySquad.mockRejectedValue(
         kind === "missing"
           ? new data.LeagueDataMissing(`entries/${ENTRY}.json`)
           : new data.LeagueDataError("bad JSON"),
       );
-      vi.mocked(data.loadEntryAdviceIndex).mockReturnValue(new Promise(() => {}));
+      reads.entryAdviceIndex.mockReturnValue(new Promise(() => {}));
       open(language);
       expect(
         await screen.findByText(kind === "missing" ? copy.entryNotAvailable : copy.entryUnreadable),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: copy.backToMembers })).toHaveAttribute(
         "href",
-        "/league/members",
+        membersAddress(LEAGUE),
       );
       expect(
         screen.queryByRole("list", { name: MESSAGES[language].squad.pitchLabel }),
       ).not.toBeInTheDocument();
-      expect(data.loadEntryAdvice).not.toHaveBeenCalled();
+      expect(reads.entryAdvice).not.toHaveBeenCalled();
     },
   );
 
   it("keeps a loaded squad visible while the index remains pending", async () => {
-    vi.mocked(data.loadEntryAdviceIndex).mockReturnValue(new Promise(() => {}));
+    reads.entryAdviceIndex.mockReturnValue(new Promise(() => {}));
     open(language);
     expect(
       await screen.findByRole("list", { name: MESSAGES[language].squad.pitchLabel }),
     ).toBeInTheDocument();
     expect(screen.getByText(copy.loadingAdvice)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: copy.computeButton })).toBeDisabled();
-    expect(data.loadEntryAdvice).not.toHaveBeenCalled();
+    expect(reads.entryAdvice).not.toHaveBeenCalled();
   });
 
   it.each(["missing", "unreadable"] as const)(
     "distinguishes a listed advice file that is %s",
     async (kind) => {
-      vi.mocked(data.loadEntryAdvice).mockRejectedValue(
+      reads.entryAdvice.mockRejectedValue(
         kind === "missing"
           ? new data.LeagueDataMissing("listed-plan.json")
           : new data.LeagueDataError("503"),
@@ -250,7 +290,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
 
   it("keeps the squad visible while advice is pending and then displays its response", async () => {
     let finish!: (value: LeagueViewEnvelope<EntryAdvice>) => void;
-    vi.mocked(data.loadEntryAdvice).mockReturnValue(
+    reads.entryAdvice.mockReturnValue(
       new Promise((resolve) => {
         finish = resolve;
       }),
@@ -266,13 +306,11 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
 
   it("retries the same published advice after a read error while retaining the squad", async () => {
     let finish!: (value: LeagueViewEnvelope<EntryAdvice>) => void;
-    vi.mocked(data.loadEntryAdvice)
-      .mockRejectedValueOnce(new data.LeagueDataError("503"))
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-      );
+    reads.entryAdvice.mockRejectedValueOnce(new data.LeagueDataError("503")).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
     open(language);
     expect(await screen.findByText(copy.adviceUnreadable)).toBeInTheDocument();
     const user = userEvent.setup();
@@ -280,11 +318,11 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     expect(
       screen.getByRole("list", { name: MESSAGES[language].squad.pitchLabel }),
     ).toBeInTheDocument();
-    expect(data.loadEntryAdvice).toHaveBeenCalledTimes(2);
-    expect(data.loadEntryAdvice).toHaveBeenNthCalledWith(1, ENTRY, "saf-puan", 1, null, {
+    expect(reads.entryAdvice).toHaveBeenCalledTimes(2);
+    expect(reads.entryAdvice).toHaveBeenNthCalledWith(1, ENTRY, "saf-puan", 1, null, {
       signal: expect.any(AbortSignal),
     });
-    expect(data.loadEntryAdvice).toHaveBeenNthCalledWith(2, ENTRY, "saf-puan", 1, null, {
+    expect(reads.entryAdvice).toHaveBeenNthCalledWith(2, ENTRY, "saf-puan", 1, null, {
       signal: expect.any(AbortSignal),
     });
     await act(async () => finish(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)));
@@ -307,15 +345,17 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     },
   );
 
-  it("keeps absent FEASIBLE gaps unknown", () => {
+  it("says nothing about absent FEASIBLE gaps", () => {
     const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
     advice.payload.solver_status = "FEASIBLE";
     advice.payload.control_solver_status = "FEASIBLE";
     advice.payload.optimality_gap = null;
     delete advice.payload.control_optimality_gap;
-    showAdvice(language, advice);
-    expect(screen.getByText(copy.unprovenPlanGapUnknown)).toBeInTheDocument();
-    expect(screen.getByText(copy.controlGapUnknown)).toBeInTheDocument();
+    const { container } = showAdvice(language, advice);
+    expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
+    for (const sentence of PROOF_CAVEATS[language]) {
+      expect(container.textContent).not.toMatch(sentence);
+    }
   });
 
   it.each(["moves", "generated_at_utc"] as const)(
@@ -333,17 +373,17 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     },
   );
 
-  it("preserves measured zero gaps", () => {
+  it("says nothing about measured zero gaps either", () => {
     const advice = structuredClone(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
     advice.payload.solver_status = "FEASIBLE";
     advice.payload.control_solver_status = "FEASIBLE";
     advice.payload.optimality_gap = 0;
     advice.payload.control_optimality_gap = 0;
-    showAdvice(language, advice);
-    const zero = points(0, 1, language === "tr" ? "tr-TR" : "en-GB");
-    expect(screen.getByText(copy.unprovenPlanBody(zero))).toBeInTheDocument();
-    expect(screen.getByText(copy.controlUnprovenBody(zero))).toBeInTheDocument();
-    expect(screen.queryByText(copy.unprovenPlanGapUnknown)).not.toBeInTheDocument();
+    const { container } = showAdvice(language, advice);
+    expect(screen.getByText(copy.lineupTitle)).toBeInTheDocument();
+    for (const sentence of PROOF_CAVEATS[language]) {
+      expect(container.textContent).not.toMatch(sentence);
+    }
   });
 
   it("does not invent an applied overlap bound or alternative hit points", () => {
@@ -373,7 +413,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     advice.payload.data_quality = "partial";
     showAdvice(language, advice);
     expect(screen.getByText(copy.noMove)).toBeInTheDocument();
-    expect(screen.queryByText(copy.noAdviceMissingData)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Advice is withheld|öneri gösterilmiyor/)).not.toBeInTheDocument();
   });
 
   it("preserves a zero overlap bound, measured hit points and plan cost", () => {
@@ -468,9 +508,7 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
       else member.movement_places = places;
       render(
         <LanguageProvider initialLanguage={language}>
-          <MemoryRouter>
-            <LeagueMembersView envelope={envelope} />
-          </MemoryRouter>
+          <MemoryRouter>{withLeague(<LeagueMembersView envelope={envelope} />)}</MemoryRouter>
         </LanguageProvider>,
       );
       const row = screen.getByRole("link", { name: member.manager_name! }).closest("tr")!;
@@ -495,7 +533,7 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
     async (kind) => {
       const reason = "Free Hit in GW3: pre-Free Hit GW2 picks document is missing. <b>capture</b>";
       const index = mockEntryAdviceIndex(ENTRY);
-      vi.mocked(data.loadEntryAdviceIndex).mockResolvedValue({
+      reads.entryAdviceIndex.mockResolvedValue({
         ...index,
         payload: {
           ...index.payload,
@@ -505,7 +543,7 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
           ],
         },
       });
-      vi.mocked(data.loadEntrySquad).mockRejectedValue(
+      reads.entrySquad.mockRejectedValue(
         kind === "missing"
           ? new data.LeagueDataMissing(`entries/${ENTRY}.json`)
           : new data.LeagueDataError("bad JSON"),
@@ -521,14 +559,14 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
       if (kind === "missing") expect(await screen.findAllByText(reason)).toHaveLength(1);
       else expect(screen.queryByText(reason)).not.toBeInTheDocument();
       expect(screen.queryByText("capture", { selector: "b" })).not.toBeInTheDocument();
-      expect(data.loadEntryAdvice).not.toHaveBeenCalled();
+      expect(reads.entryAdvice).not.toHaveBeenCalled();
     },
   );
 
   it("names a plan that did not solve in the reader's language, never as its code", async () => {
     const copy = MESSAGES[language].leagueMembers;
     const index = mockEntryAdviceIndex(ENTRY);
-    vi.mocked(data.loadEntryAdviceIndex).mockResolvedValue({
+    reads.entryAdviceIndex.mockResolvedValue({
       ...index,
       payload: {
         ...index.payload,
@@ -539,9 +577,7 @@ describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language)
         })),
       },
     });
-    vi.mocked(data.loadEntrySquad).mockRejectedValue(
-      new data.LeagueDataMissing(`entries/${ENTRY}.json`),
-    );
+    reads.entrySquad.mockRejectedValue(new data.LeagueDataMissing(`entries/${ENTRY}.json`));
     open(language);
     expect(await screen.findByText(copy.entryNotAvailable)).toBeInTheDocument();
     const sentence = copy.publicationReasons.not_solved_for_member;

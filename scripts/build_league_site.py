@@ -7,7 +7,7 @@ The capture must have been taken with ``--entries`` so it holds each registered 
 three public documents plus the league standings page; ``scripts.seed_entry_registry``
 writes the registry that names them. This shell reads those payloads, hands them to
 ``build_league_views`` through the ``EntryPicksProvider`` seam, and writes
-``<out>/data/league/**``.
+``<out>/data/leagues/<league>/**`` and lists the league in ``<out>/data/leagues.json``.
 
 What it does not do is decide anything of ours: our season ledger is neither read nor
 written here. A member's advice is computed from that member's own squad and the shared
@@ -50,6 +50,7 @@ from squadopt.application.league_publication import (
 from squadopt.application.league_publication import (
     resolve_live_snapshot_id as resolve_live_snapshot_id,
 )
+from squadopt.contracts.league_tree import league_tree_dir
 from squadopt.data.errors import DataError
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
@@ -212,7 +213,7 @@ def main() -> int:
         with league_mapper(replace(request, season=prepared.season), arguments.workers) as mapper:
             result = publish_prepared_league(prepared, mapper=mapper, on_mode_paths=_mode_note)
         report = result.report
-        out_dir = request.out_dir / "data" / "league"
+        out_dir = league_tree_dir(request.out_dir / "data", request.league_id)
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:
             if not member.rendered:
@@ -230,6 +231,8 @@ def main() -> int:
             print(f"  removed       {path}  (not produced by this run)")
         if result.top100_note:
             print(f"  top100        {result.top100_note}")
+        if result.legacy_tree:
+            print(f"  legacy tree   {result.legacy_tree}  (data/league from before the directory)")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(

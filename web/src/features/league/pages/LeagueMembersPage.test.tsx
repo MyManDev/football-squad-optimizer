@@ -12,15 +12,20 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { LeagueMembersView } from "./LeagueMembersPage";
+import { withLeague } from "../../../testSupport/league";
 import { assertMembers } from "../publicationShape";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 
 afterEach(cleanup);
 
-function renderPage(node: React.ReactNode, path = "/league/members", language: Language = "tr") {
+function renderPage(
+  node: React.ReactNode,
+  path = "/league/352490/members",
+  language: Language = "tr",
+) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{withLeague(node)}</MemoryRouter>
     </LanguageProvider>,
   );
 }
@@ -59,7 +64,7 @@ describe("league member points", () => {
       assertMembers(value);
       const { container } = renderPage(
         <LeagueMembersView envelope={value} />,
-        "/league/members",
+        "/league/352490/members",
         language,
       );
       const copy = MESSAGES[language].leagueMembers;
@@ -202,13 +207,16 @@ describe("league member points", () => {
   });
 });
 
+/** The system squad's score explanation, which no member surface carries. */
+const SYSTEM_SCORE_NOTE = /recorded squad net|kaydedilen kadro neti/i;
+
 describe("league member surfaces", () => {
   it.each(["tr", "en"] as const)(
     "keeps member surfaces free of the system squad and its comparisons in %s",
     (language) => {
       const copy = MESSAGES[language];
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
-      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
+      expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
       expect(screen.queryByText(copy.leagueMembers.systemTeamBadge)).not.toBeInTheDocument();
       cleanup();
@@ -219,16 +227,16 @@ describe("league member surfaces", () => {
           squad={mockEntrySquadEnvelopes[entryId]!}
           advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
         />,
-        `/league/members/${entryId}`,
+        `/league/352490/members/${entryId}`,
         language,
       );
-      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
+      expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
+        screen.queryByRole("heading", {
+          name: /Recorded score difference|Kaydedilen puan farkı/,
+        }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText(copy.leagueMembers.squadoptComparison("+9")),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/point difference from SquadOpt|puan farkın/)).toBeNull();
       expect(mockEntrySquadEnvelopes[entryId]!.payload.squadopt_comparison).not.toBeNull();
     },
   );
@@ -243,7 +251,7 @@ describe("league member surfaces", () => {
         })}
       />,
     );
-    expect(screen.queryByText(MESSAGES.tr.league.note)).not.toBeInTheDocument();
+    expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
   });
 
   it("lists only the published human members when the live envelope has no system row", () => {
@@ -312,7 +320,7 @@ describe("league member surfaces", () => {
     expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.getByRole("link", { name: "Deniz Aral" })).toHaveAttribute(
       "href",
-      "/league/members/35249001",
+      "/league/352490/members/35249001",
     );
     expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
   });
@@ -326,14 +334,14 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={advice}
       />,
-      `/league/members/${entryId}?mode=ortak-koru&window=1`,
+      `/league/352490/members/${entryId}?mode=ortak-koru&window=1`,
     );
 
     expect(screen.getAllByText("örnek veri").length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue("ortak-koru")).toBeChecked();
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
+    expect(screen.getByText(/Önerin senin kadrondan/)).toBeInTheDocument();
     const transferCard = screen
       .getByRole("heading", { name: "Ücretsiz transfer hakkı" })
       .closest("section");
@@ -353,7 +361,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "ortak-koru", 1)}
       />,
-      `/league/members/${entryId}?mode=ortak-koru`,
+      `/league/352490/members/${entryId}?mode=ortak-koru`,
     );
     expect(screen.getByText(/beklenen puandan vazgeçiyor/)).toBeInTheDocument();
     expect(screen.getByText(/kadrosuna göre fiyatlandı/)).toBeInTheDocument();
@@ -365,7 +373,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
-      `/league/members/${entryId}`,
+      `/league/352490/members/${entryId}`,
     );
     expect(screen.queryByText(/beklenen puandan vazgeçiyor/)).not.toBeInTheDocument();
   });
@@ -378,7 +386,7 @@ describe("league member surfaces", () => {
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
-      `/league/members/${entryId}`,
+      `/league/352490/members/${entryId}`,
     );
 
     expect(screen.getByText("Bu üye için kadro bulunmuyor.")).toBeInTheDocument();
@@ -435,7 +443,7 @@ describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language
     };
     renderPage(
       <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} index={index} />,
-      `/league/members/${entryId}?mode=fark-yarat&rival=${rivalId}`,
+      `/league/352490/members/${entryId}?mode=fark-yarat&rival=${rivalId}`,
       language,
     );
     const copy = MESSAGES[language].leagueMembers;
@@ -454,10 +462,10 @@ describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language
     );
     if (kind === "within_free_transfers")
       expect(paragraph).toHaveTextContent(
-        language === "tr"
-          ? "yayımlanan transfer cezası 0 puan"
-          : "published transfer penalties 0 points",
+        language === "tr" ? "transfer cezası 0 puan" : "transfer penalties 0 points",
       );
+    // The hits are the plan's own, whether a publish or the member's device solved it.
+    expect(paragraph).not.toHaveTextContent(/published|yayımlanan/i);
     if (solver === "FEASIBLE")
       expect(paragraph).toHaveTextContent(language === "tr" ? "maliyet en fazla" : "cost at most");
   });

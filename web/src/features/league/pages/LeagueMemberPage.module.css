@@ -788,15 +788,13 @@ section.notice p {
   font-weight: 600;
 }
 
-.muted,
-.diagnostic {
+.muted {
   color: var(--color-text-muted);
   font-size: var(--step--1);
 }
 
 .notice,
-.honesty,
-.diagnostic {
+.honesty {
   max-width: var(--measure);
 }
 

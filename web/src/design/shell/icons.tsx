@@ -134,22 +134,6 @@ export function PlanIcon() {
 }
 
 /** A pulse line: the service's operating state. */
-export function StatusIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      aria-hidden="true"
-      focusable="false"
-      {...STROKE}
-    >
-      <path d="M1.5 9.5h3.5l2-5 4 9 2-4h3.5" />
-    </svg>
-  );
-}
-
 export function CalendarIcon() {
   return (
     <svg

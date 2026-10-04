@@ -18,6 +18,7 @@ from typing import Any
 from squadopt.application.manager_words import load_manager_words
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_tree import single_league_tree
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -132,8 +133,7 @@ def _validate(
         or not set(handoff.expected_points) <= set(inputs.players.player_id)
     ):
         raise ValueError("Projection handoff differs from the decision capture or roster.")
-    site_root = files["site_members"].parent.parent
-    site_files = _site_files(site_root)
+    site_files = _site_files(files["site_members"].parent)
     if {role: path for role, path in files.items() if role.startswith("site_")} != site_files:
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
@@ -233,9 +233,10 @@ def _validate(
     return identities, official_report
 
 
-def _site_files(site_data_root: Path) -> dict[str, Path]:
-    """Read the existing member/entry envelopes, without importing runtime services."""
-    member_path = site_data_root / "league" / "members.json"
+def _site_files(tree: Path) -> dict[str, Path]:
+    """Read the existing member/entry envelopes of one league's tree, without importing
+    runtime services."""
+    member_path = tree / "members.json"
     _safe(Path(addressable(member_path)))
     document = _object(Path(addressable(member_path)).read_bytes())
     payload = document.get("payload")
@@ -266,7 +267,7 @@ def _site_files(site_data_root: Path) -> dict[str, Path]:
         role = f"site_entry_{identifier}"
         if role in result:
             raise ValueError("Duplicate site member identity.")
-        path = site_data_root / "league" / "entries" / f"{identifier}.json"
+        path = tree / "entries" / f"{identifier}.json"
         _safe(Path(addressable(path)))
         entry = _object(Path(addressable(path)).read_bytes())
         row = entry.get("payload")
@@ -285,11 +286,30 @@ def _site_files(site_data_root: Path) -> dict[str, Path]:
     return result
 
 
+#: Where a sealed site's member documents sit inside the bundle: the league's tree as the
+#: site publishes it, the legacy ``league`` or ``leagues/<league id>``.
+_SITE_MEMBERS = re.compile(r"site/(league|leagues/[1-9][0-9]*)/members\.json")
+
+
+def _site_folder(prefix: str, records: dict[str, object]) -> str:
+    """The sealed tree's folder, read from the members record; the legacy one when it
+    names no tree, so a record of any other shape is refused by the role check."""
+
+    members = records.get("site_members")
+    path = members.get("path") if isinstance(members, dict) else None
+    if isinstance(path, str) and path.startswith(prefix):
+        match = _SITE_MEMBERS.fullmatch(path.removeprefix(prefix))
+        if match is not None:
+            return f"site/{match.group(1)}/"
+    return "site/league/"
+
+
 def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str, Path]:
     if not isinstance(records, dict):
         raise ValueError("Bundle file records must be an object.")
     result = {}
     prefix = snapshot_id + ".bundle/"
+    site = prefix + _site_folder(prefix, records)
     for role, entry in records.items():
         if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
             raise ValueError("Bundle file entries require a path and digest.")
@@ -298,10 +318,10 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
             "forecast": snapshot_id + ".json",
             "components": snapshot_id + ".components.json",
             "handoff": prefix + "handoff.json",
-            "site_members": prefix + "site/league/members.json",
+            "site_members": site + "members.json",
         }.get(role)
         if re.fullmatch(r"site_entry_[1-9][0-9]*", role):
-            expected = prefix + "site/league/entries/" + role.removeprefix("site_entry_") + ".json"
+            expected = site + "entries/" + role.removeprefix("site_entry_") + ".json"
         if expected is None:
             if (
                 role not in _OPTIONAL
@@ -407,7 +427,7 @@ def seal_football_bundle(
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(site_data_root),
+        **_site_files(single_league_tree(site_data_root)),
     }
     if rotation_table_path is not None:
         files.update(

@@ -160,8 +160,8 @@ export function ContributePage() {
         </p>
         <p>
           {tr
-            ? "Yorumlar yönetici onayından sonra herkese açılır. Kullanıcı görüşleridir; doğrulanmış haber sayılmaz ve tahmin modelini otomatik değiştirmez."
-            : "Comments become public after moderation. These are user opinions, not verified news, and do not automatically change predictions."}
+            ? "Yorumlar yönetici onayından sonra herkese açılır."
+            : "Comments become public after moderation."}
         </p>
       </header>
       {players.isPending ? (

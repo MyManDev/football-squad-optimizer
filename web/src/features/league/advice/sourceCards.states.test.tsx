@@ -14,7 +14,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { AdviceParticipationEvidence, EntryAdvice } from "../types";
 import { ExpectedLineup } from "./ExpectedLineup";
 import { InformationReview } from "./InformationReview";
-import { OFFICIAL_INJURY_CARD_ENABLED, OfficialInformationCard } from "./OfficialInformationCard";
+import { OfficialInformationCard } from "./OfficialInformationCard";
 import { ParticipationEvidence } from "./ParticipationEvidence";
 import { isAdvicePayload } from "./adviceShape";
 
@@ -161,7 +161,6 @@ describe("the information review", () => {
 
 describe("the central league injury card", () => {
   it("is off in the page as it is in the producer, whatever the payload carries", () => {
-    expect(OFFICIAL_INJURY_CARD_ENABLED).toBe(false);
     const view = {
       ...base(),
       official_injuries: {

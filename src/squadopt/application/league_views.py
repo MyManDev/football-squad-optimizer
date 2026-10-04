@@ -1,6 +1,7 @@
 """Render per-member league views: the JSON tree the site's league pages read.
 
-The web side (Package 5) reads ``data/league/members.json``, ``entries/{id}.json``,
+The web side (Package 5) reads the league's tree (``data/leagues/<league id>/``, see
+``squadopt.contracts.league_tree``): ``members.json``, ``entries/{id}.json``,
 ``advice/{id}/{mode}/{window}.json``, ``advice/{id}/{strategy}/{window}/vs-{rival}.json``
 and ``advice/{id}/index.json`` under the provisional contract its
 ``PROVISIONAL_CONTRACT.md`` records; this module is the producing half. It consumes the
@@ -877,6 +878,12 @@ class LeagueViewsReport:
     gameweek: int
     members: tuple[MemberViewResult, ...]
     files: tuple[str, ...]
+    #: The league's name and this publication's stamp, as members.json carries them: what
+    #: the site's league directory lists beside the tree's path. A settled publish rewrites
+    #: the members document's stamp, not the directory's, which stays the league
+    #: publication's.
+    league_name: str = ""
+    generated_at_utc: str = ""
     #: Documents from an earlier publish that this run removed because it did not produce
     #: them. Reported rather than done quietly: a deletion under ``web/public`` is a change
     #: to what the site serves, and the operator reads this line beside "not rendered".
@@ -1168,6 +1175,7 @@ def _device_plan_block(
     projection: Projection,
     rules: SeasonRules,
     prices: Mapping[int, int],
+    top100: Top100Counts | None = None,
 ) -> dict[str, object] | None:
     """One member's device-plan inputs, or ``None`` where the live path would not plan.
 
@@ -1180,7 +1188,7 @@ def _device_plan_block(
         held = held_squad_from_picks(picks, current_prices=prices)
     except (EntryError, DataError):
         return None
-    return device_plan_entry(inputs, projection, held, rules)
+    return device_plan_entry(inputs, projection, held, rules, top100=top100)
 
 
 def _suggested_strategy(
@@ -1567,7 +1575,9 @@ def build_league_views(
         # device: the fifteen, the spending power, the free transfers and the sale prices
         # exactly as the published plan was held to them. Absent where the live path
         # would refuse to plan, so the device never solves a problem the server did not.
-        squad_payload["device_plan"] = _device_plan_block(picks, inputs, projection, rules, prices)
+        squad_payload["device_plan"] = _device_plan_block(
+            picks, inputs, projection, rules, prices, top100_counts
+        )
         squad_path.write_text(
             json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
             encoding="utf-8",
@@ -2075,7 +2085,10 @@ def build_league_views(
     written.append(members_path.name)
     # The shared side of every member's one-week problem: the capture's table in solver
     # order with the server's integer coefficients, and the rules as numbers.
-    _write(DEVICE_PLAN_DOCUMENT, device_plan_table(inputs, projection, rules, league_id=league_id))
+    _write(
+        DEVICE_PLAN_DOCUMENT,
+        device_plan_table(inputs, projection, rules, league_id=league_id, top100=top100_counts),
+    )
 
     # Whatever this run did not produce is not this week's advice, and the tree it wrote
     # into is last week's. Removed after members.json rather than before the renders, so a
@@ -2137,4 +2150,6 @@ def build_league_views(
         members=tuple(results),
         files=tuple(sorted(written)),
         removed=(*removed, *stale_removed),
+        league_name=str(league_name),
+        generated_at_utc=generated,
     )

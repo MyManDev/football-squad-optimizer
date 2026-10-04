@@ -1,19 +1,30 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { LeagueDataMissing, lookupPublishedLeague, SUPPORTED_LEAGUE_ID } from "../data";
+import { legacyLeagueAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { LeagueDataMissing, lookupPublishedLeague } from "../data";
+import { useChosenLeague } from "../identity/useChosenLeague";
 import styles from "./LeagueEntryPage.module.css";
 
 type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "failed";
 
-export function LeagueEntryPage() {
+/**
+ * `inPlace`: the gate rendered this form at a league address. A connected league then
+ * opens the page the address named under that league (an address from before the number
+ * is rewritten with it), or the members list where the address named another league.
+ */
+export function LeagueEntryPage({ inPlace = false }: { inPlace?: boolean }) {
   const { messages } = useLanguage();
   const copy = messages.leagueEntry;
   const navigate = useNavigate();
-  const [value, setValue] = useState("");
+  const location = useLocation();
+  const { leagueId: remembered, choose } = useChosenLeague();
+  const [value, setValue] = useState(remembered === null ? "" : String(remembered));
   const [state, setState] = useState<State>("idle");
+  // The number the last lookup asked for, named in the answer that it is not published.
+  const [asked, setAsked] = useState(0);
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
@@ -31,16 +42,19 @@ export function LeagueEntryPage() {
       setState("invalid");
       return;
     }
-    if (leagueId !== SUPPORTED_LEAGUE_ID) {
-      setState("unsupported");
-      return;
-    }
     setState("loading");
+    setAsked(leagueId);
     try {
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
-      if (result === "connected") navigate("/league/members");
-      else setState("unsupported");
+      if (result.status === "connected") {
+        choose(leagueId);
+        const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
+        navigate(
+          here === null ? membersAddress(leagueId) : `${here}${location.search}${location.hash}`,
+          { replace: inPlace },
+        );
+      } else setState("unsupported");
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");
     }
@@ -76,7 +90,11 @@ export function LeagueEntryPage() {
             {copy.submit}
           </button>
           <p id="league-entry-status" role="status">
-            {state === "idle" ? "" : copy[state]}
+            {state === "idle"
+              ? ""
+              : state === "unsupported"
+                ? copy.unsupported(asked)
+                : copy[state]}
           </p>
         </form>
       </Card>

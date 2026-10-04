@@ -26,6 +26,7 @@ import { chipPath, type MemberChip } from "../advice/chipChoice";
 import { CHIP_COPY } from "../advice/chipCopy";
 import type { EntryAdvice, EntryAdviceIndex, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -61,13 +62,15 @@ function chosen(
 function renderPage(language: Language, advice: LeagueViewEnvelope<EntryAdvice>, query: string) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={INDEX}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${query}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={INDEX}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -77,9 +80,15 @@ function section(container: HTMLElement): string {
   return container.querySelector('[data-testid="chip-choice"]')?.textContent ?? "";
 }
 
+/** The proof sentences a FEASIBLE plan or control used to carry; none is on the page now. */
+const PROOF_WORDING = {
+  tr: /kanıt|ispat/i,
+  en: /proof|proven/i,
+};
+
 describe("a chosen chip on the advice card", () => {
   it.each(["tr", "en"] as const)(
-    "keeps the next step beside an explained proof in %s",
+    "says nothing about the proof, whichever status the plan and its control carry, in %s",
     (language) => {
       for (const solver_status of ["OPTIMAL", "FEASIBLE"] as const) {
         for (const control_solver_status of ["OPTIMAL", "FEASIBLE"] as const) {
@@ -88,13 +97,16 @@ describe("a chosen chip on the advice card", () => {
             chosen("3xc", 6.4, { solver_status, control_solver_status }),
             "mode=saf-puan&window=1&chip=3xc",
           );
-          expect(
-            screen.queryAllByText(MESSAGES[language].leagueMembers.unprovenPlanNextStep),
-          ).toHaveLength(solver_status === "FEASIBLE" ? 1 : 0);
-          if (solver_status === "FEASIBLE" || control_solver_status === "FEASIBLE") {
-            expect(section(container)).toContain(CHIP_COPY[language].unproven);
-          } else {
-            expect(section(container)).not.toContain(CHIP_COPY[language].unproven);
+          expect(section(container)).toContain(
+            CHIP_COPY[language].gain(language === "tr" ? "+6,4" : "+6.4"),
+          );
+          expect(section(container)).not.toMatch(PROOF_WORDING[language]);
+          if (solver_status === "FEASIBLE") {
+            expect(container.textContent).not.toMatch(
+              language === "tr"
+                ? /Kanıt tamamlanamadı|kanıtı tamamlayamadı/
+                : /Proof incomplete|finish the proof/,
+            );
           }
           cleanup();
         }
@@ -116,7 +128,9 @@ describe("a chosen chip on the advice card", () => {
     expect(text).not.toContain(CHIP_COPY.tr.freeHit);
     // The plan's published limits are not listed on the page.
     const page = container.textContent ?? "";
-    expect(page).not.toContain(CHIP_COPY.tr.limits[chosen("bboost", 0).payload.stated_limits![0]!]);
+    for (const sentence of chosen("bboost", 0).payload.stated_limits!) {
+      expect(page).not.toContain(sentence);
+    }
   });
 
   it("states the same in English, and the Free Hit's one-week squad", () => {
@@ -132,7 +146,7 @@ describe("a chosen chip on the advice card", () => {
     expect(text).toContain(CHIP_COPY.en.freeHit);
     const page = container.textContent ?? "";
     for (const sentence of chosen("freehit", 0).payload.stated_limits!) {
-      expect(page).not.toContain(CHIP_COPY.en.limits[sentence]);
+      expect(page).not.toContain(sentence);
     }
   });
 
@@ -160,11 +174,12 @@ describe("a chosen chip on the advice card", () => {
       expect(lines).not.toMatch(/gives up|give up|vazgeç|at most|en fazla/i);
       expect(lines).not.toMatch(/recommend|best week|öner|en iyi hafta/i);
       expect(container.textContent ?? "").not.toMatch(AS_A_CHANCE);
-      // The control's missing proof is said in the chip section, not as a price ceiling.
-      expect(container.textContent).not.toContain(
-        MESSAGES[language].leagueMembers.controlUnprovenBody("0.3").slice(0, 40),
+      // The control's missing proof is said nowhere: neither as a price ceiling nor in the
+      // chip section.
+      expect(container.textContent).not.toMatch(
+        language === "tr" ? /en iyi diye kanıtlanamadı/ : /was not proven optimal/,
       );
-      expect(section(container)).toContain(CHIP_COPY[language].unproven);
+      expect(section(container)).not.toMatch(PROOF_WORDING[language]);
       cleanup();
     }
   });
