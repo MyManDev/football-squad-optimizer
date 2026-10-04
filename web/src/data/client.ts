@@ -17,6 +17,7 @@ import type {
 } from "./schema";
 import { ContractMismatchError, type Loaded, type ViewEnvelope } from "./envelope";
 import { readLiveScore, type LiveScoreView } from "./liveScore";
+import { discardBody } from "./request";
 
 // Compatibility re-export, 2026-09-26: the envelope types and `ContractMismatchError` moved
 // to `./envelope` so the live score reader stops importing this client (a value import
@@ -76,11 +77,19 @@ export class StaticDataClient implements DataClient {
     this.baseUrl = baseUrl;
   }
 
-  private async read<T>(relative: string): Promise<Loaded<T>> {
+  /** The document's parsed body; a refused answer's body is read and dropped, so it ends. */
+  private async readJson(relative: string): Promise<unknown> {
     const response = await fetch(`${this.baseUrl}${relative}`, { cache: "no-cache" });
-    if (response.status === 404) throw new NotFoundError(relative);
-    if (!response.ok) throw new Error(`Could not load ${relative} (${response.status}).`);
-    return unwrap((await response.json()) as ViewEnvelope<T>);
+    if (!response.ok) {
+      await discardBody(response);
+      if (response.status === 404) throw new NotFoundError(relative);
+      throw new Error(`Could not load ${relative} (${response.status}).`);
+    }
+    return (await response.json()) as unknown;
+  }
+
+  private async read<T>(relative: string): Promise<Loaded<T>> {
+    return unwrap<T>(await this.readJson(relative));
   }
 
   getIndex(): Promise<Loaded<SiteIndex>> {
@@ -88,11 +97,11 @@ export class StaticDataClient implements DataClient {
   }
 
   async getLiveScore(season: string, gameweek: number): Promise<Loaded<LiveScoreView>> {
-    const relative = gameweekPath(season, gameweek, "live");
-    const response = await fetch(`${this.baseUrl}${relative}`, { cache: "no-cache" });
-    if (response.status === 404) throw new NotFoundError(relative);
-    if (!response.ok) throw new Error(`Could not load ${relative} (${response.status}).`);
-    return readLiveScore(await response.json(), season, gameweek);
+    return readLiveScore(
+      await this.readJson(gameweekPath(season, gameweek, "live")),
+      season,
+      gameweek,
+    );
   }
 
   getRecommendation(season: string, gameweek: number): Promise<Loaded<RecommendationView>> {
