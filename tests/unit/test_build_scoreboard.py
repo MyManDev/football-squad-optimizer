@@ -28,15 +28,61 @@ from scripts.build_scoreboard import (
     scoreboard_payload,
     top100_week,
 )
-from tests.unit.test_scoreboard_history import capture, entry_at
+from tests.unit.test_scoreboard_diagnostics import decision_inputs
 
 from squadopt.application.scoreboard import ScoreboardPublicationRequest, publish_scoreboard
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import write_snapshot
+from squadopt.data.snapshots import CapturedSnapshot, SnapshotMetadata, write_snapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, live_payload
 from squadopt.live import LedgerEntry
 from squadopt.live.ledger import LedgerError, write_manifest
 
 SEASON = "2026-27"
+
+
+def capture(
+    name: str, at: str, *, checked: bool = True, year: int = 2026, bonus: int = 0
+) -> CapturedSnapshot:
+    _, _, outcomes = decision_inputs()
+    bootstrap = {
+        "events": [
+            {
+                "id": 1,
+                "deadline_time": f"{year}-08-21T17:30:00Z",
+                "finished": True,
+                "data_checked": checked,
+            }
+        ],
+        "elements": [{"id": player + 100, "code": player} for player in range(1, 16)],
+    }
+    live = {
+        "elements": [
+            {
+                "id": int(row.player_id) + 100,
+                "stats": {
+                    "minutes": int(row.minutes),
+                    "total_points": int(row.total_points) + bonus,
+                    "starts": 0,
+                },
+            }
+            for row in outcomes.itertuples()
+        ]
+    }
+    return CapturedSnapshot(
+        SnapshotMetadata(name, "fpl-live", at, "v1", {}, "test"),
+        {
+            BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode(),
+            live_payload(1): json.dumps(live).encode(),
+        },
+    )
+
+
+def entry_at(path: Path, outcome: dict[str, Any] | None = None) -> LedgerEntry:
+    decision, projections, _ = decision_inputs()
+    projections.to_csv(path / "projections.csv", index=False)
+    return LedgerEntry("2026-27", 1, decision, outcome, path)
+
+
 DEADLINES = {
     1: "2026-08-21T17:30:00Z",
     2: "2026-08-28T17:30:00Z",

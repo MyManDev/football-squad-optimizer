@@ -229,11 +229,11 @@ describe("league member surfaces", () => {
       );
       expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
+        screen.queryByRole("heading", {
+          name: /Recorded score difference|Kaydedilen puan farkı/,
+        }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText(copy.leagueMembers.squadoptComparison("+9")),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/point difference from SquadOpt|puan farkın/)).toBeNull();
       expect(mockEntrySquadEnvelopes[entryId]!.payload.squadopt_comparison).not.toBeNull();
     },
   );

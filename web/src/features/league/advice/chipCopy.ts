@@ -34,14 +34,7 @@ export interface ChipCopy {
   moveRowsBasis: (basis: string) => string;
   gainCaption: (basis: string) => string;
   gainCaptionBeforeCost: (cost: string, basis: string) => string;
-  limits: Record<string, string>;
 }
-
-/** The producer's two chip sentences, as `application/advice_chips.py` states them. */
-const CHIP_CHOICE_LIMIT =
-  "The chip is in this plan because the member chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.";
-const FREE_HIT_LIMIT =
-  "A Free Hit squad is held for this gameweek only; the squad held before it returns at the next deadline.";
 
 const en: ChipCopy = {
   legend: "Chip",
@@ -89,12 +82,6 @@ const en: ChipCopy = {
     `expected points against keeping the squad you hold and playing the same chip, for ${basis}`,
   gainCaptionBeforeCost: (cost, basis) =>
     `expected points against keeping the squad you hold and playing the same chip, for ${basis}, before this week's transfer cost of ${cost}`,
-  limits: {
-    [CHIP_CHOICE_LIMIT]:
-      "The chip is in this plan because you chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.",
-    [FREE_HIT_LIMIT]:
-      "A Free Hit squad is held for this gameweek only; the squad held before it returns at the next deadline.",
-  },
 };
 
 const tr: ChipCopy = {
@@ -141,12 +128,6 @@ const tr: ChipCopy = {
     `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis})`,
   gainCaptionBeforeCost: (cost, basis) =>
     `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis}); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
-  limits: {
-    [CHIP_CHOICE_LIMIT]:
-      "Çip bu planda, çünkü sen seçtin; planlayıcı çipi tartmadı. Yazan kazanç yalnız bu haftanındır: çipin sonraki bir haftada kaç puan getireceği ölçülmedi, bu yüzden bu, çipi şimdi oyna tavsiyesi değildir.",
-    [FREE_HIT_LIMIT]:
-      "Free Hit kadrosu yalnız bu hafta tutulur; ondan önceki kadro bir sonraki haftada geri gelir.",
-  },
 };
 
 export const CHIP_COPY: Record<Language, ChipCopy> = { tr, en };
@@ -167,11 +148,6 @@ export function chipReason(copy: ChipCopy, reason: string | undefined): string {
       ? copy.chipReasons[reason]
       : undefined) ?? copy.chipReasons.unknown
   );
-}
-
-/** A producer sentence the chip documents added, in the member's language; null for any other. */
-export function chipLimit(copy: ChipCopy, sentence: string): string | null {
-  return Object.hasOwn(copy.limits, sentence) ? copy.limits[sentence]! : null;
 }
 
 /** Whether a chip week scores on another basis than the eleven with the captain doubled. */
