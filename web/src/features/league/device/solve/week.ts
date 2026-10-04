@@ -95,18 +95,29 @@ export function solveWeek(
 export function squadValue(
   solver: LpSolver,
   document: DevicePlanDocument,
-  options: Pick<MemberWeekOptions, "chip">,
+  options: Pick<MemberWeekOptions, "chip" | "choice">,
 ): (squad: number[]) => number {
   const ids = document.players.map((p) => p.id);
   const chip = options.chip ?? null;
+  // The eleven is chosen on the points the plan is chosen on; its worth is read on base.
   return (squad) => {
-    const fixed = solver.solve(lpText(lineupProblem(document, squad, chip)), EXACT);
-    if (fixed.Status !== "Optimal") throw new DevicePlanRefused(fixed.Status, "hold");
+    const first = solver.solve(lpText(lineupProblem(document, squad, chip, options.choice)), EXACT);
+    if (first.Status !== "Optimal") throw new DevicePlanRefused(first.Status, "hold");
+    // A second solve settles a tie between equal players the way the server reads it.
+    const settled = solver.solve(
+      lpText(
+        lineupProblem(document, squad, chip, options.choice, {
+          primaryValue: Math.round(first.ObjectiveValue),
+        }),
+      ),
+      EXACT,
+    );
+    if (settled.Status !== "Optimal") throw new DevicePlanRefused(settled.Status, "hold");
     return weekPoints(
       document,
       squad,
-      chosenIds(fixed, ids, "x"),
-      chosenIds(fixed, ids, "c")[0]!,
+      chosenIds(settled, ids, "x"),
+      chosenIds(settled, ids, "c")[0]!,
       chip,
     );
   };
@@ -118,7 +129,7 @@ export function answerFrom(
   document: DevicePlanDocument,
   entry: DevicePlanEntry,
   solution: WeekSolution,
-  options: Pick<MemberWeekOptions, "chip">,
+  options: Pick<MemberWeekOptions, "chip" | "choice">,
 ): Omit<DevicePlanAnswer, "seconds"> {
   const chip = options.chip ?? null;
   const valueOf = squadValue(solver, document, options);

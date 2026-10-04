@@ -34,7 +34,8 @@ over these numbers and solves it with HiGHS compiled to WebAssembly in a Web Wor
 | `rules.hit_charged_scaled` | The same charge on the objective's integer scale: the rival price tag's anchor is solved at the charge, not at the margin. Absent on documents from before the field; a device then scales `hit_points_charged` itself. |
 | `rules.expected_points_scale` | The integer scale; the objective divided by it is in points. |
 | `rules.strategies` | Each rival strategy's overlap band on the decided week, by slug: `overlap_floor` or `overlap_ceiling` (the other null), from the strategy catalogue. Absent on documents from before the field; a device then uses the catalogue's values as it knows them. |
-| `players[]` | The table in solver order: `id`, `name`, `short_name`, `team`, `position`, `buy_tenths`, `expected_points`, and `coefficients` as `[squad, starter, captain]`, the server's exact integers. |
+| `rules.top100` | Present where the week has Top 100 counts: the `weights` the menu offers, the `cohort_size` the counts are out of, and the counts' source record (`cohort_snapshot_id`, `picks_snapshot_id`, `table_sha256`, `picks_gameweek`). Absent where the week has none; a device then offers no weight. |
+| `players[]` | The table in solver order: `id`, `name`, `short_name`, `team`, `position`, `buy_tenths`, `expected_points`, and `coefficients` as `[squad, starter, captain]`, the server's exact integers. With `rules.top100`: `top100_count`, how many of the cohort started him, and `top100_scaled`, his weighted points on the integer scale by weight (as text keys), scaled exactly as the server scales them; the device derives the bench coefficient from the integer by the server's rounding rule. |
 
 `players` is sorted by id, the order the planner sorts its own table into before it
 solves. The order is part of the contract: the server breaks ties between equal plans by
@@ -70,6 +71,7 @@ elevens on the same table, net of the plan's hits.
 | `bank_tenths` | The spending power the live path computes from the stated squad sale value, not the raw bank. |
 | `free_transfers` | The free transfers under the cap. |
 | `sell_tenths` | Each held player's sale price in tenths, keyed by player id as text. |
+| `top100_weights` | Present where the shared document carries `rules.top100`: the weights it carries, so a page can offer them before it reads the document. |
 
 ## What holds the two solvers together
 

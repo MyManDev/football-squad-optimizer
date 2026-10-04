@@ -39,6 +39,7 @@ from squadopt.application.advice import (
     _attributed_gains,
     _paired_by_position,
     advise_entry,
+    advise_with_top100,
 )
 from squadopt.application.advice_chips import chip_week_points
 from squadopt.application.device_plan import device_plan_entry, device_plan_table
@@ -47,6 +48,7 @@ from squadopt.application.lineup_publication import (
     best_eleven_points,
     best_lineup_points_with_chip,
 )
+from squadopt.application.top100_weight import Top100Counts
 from squadopt.contracts.players import order_outfield_bench
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
 from squadopt.optimization import OptimizationConfig
@@ -75,6 +77,8 @@ CHIPS: Final = ("wildcard", "freehit", "bboost", "3xc")
 #: and the weak one with money, whose rebuild under a Wildcard is a real rebuild.
 CHIP_MEMBERS: Final = (2, 7)
 RIVAL_STRATEGIES: Final = ("ortak-koru", "fark-yarat")
+#: The Top 100 weights the device is held to, on the same world and members.
+TOP100_CASE_WEIGHTS: Final = (20, 50)
 RIVAL_LEAGUE: Final = 352490
 #: The test world's members: the repair squad (four from two clubs, an injured player) and
 #: the discretionary squad whose transfers are a choice. Codes are the world's own.
@@ -388,6 +392,60 @@ def _rival_reference(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _top100_counts(codes: list[int], picks_snapshot_id: str) -> Top100Counts:
+    """Synthetic Top 100 start counts for the world: a spread over the cohort, a few zeros.
+
+    The spread is what matters, not the numbers: some players the cohort starts almost to
+    a man, some nobody starts, so a weight moves the choice without moving every player
+    the same way.
+    """
+
+    counts = {code: (code * 37) % 101 for code in codes}
+    for code in codes[::5]:
+        counts[code] = 0
+    # Players the cohort backs almost to a man, outside the pure-points plan, so a weight
+    # that is worth anything moves a decision; the plan's own star stays unbacked.
+    counts.update({1010: 100, 1017: 100, 1023: 95, 1024: 0})
+    return Top100Counts(
+        counts={code: count for code, count in counts.items() if count > 0},
+        table_sha256="synthetic-top100-counts",
+        cohort_snapshot_id="synthetic-cohort",
+        picks_snapshot_id=picks_snapshot_id,
+        picks_gameweek=1,
+    )
+
+
+def _top100_reference(payload: dict[str, Any]) -> dict[str, Any]:
+    """What the device is held to from a Top 100 document."""
+
+    moves = payload["moves"]
+    return {
+        "solver_status": payload["solver_status"],
+        "control_solver_status": payload["control_solver_status"],
+        "starting_xi": sorted(int(row["player_id"]) for row in payload["starting_xi"]),
+        "captain": int(payload["captain"]["player_id"]),
+        "vice_captain": int(payload["vice_captain"]["player_id"]),
+        "bench": [int(row["player_id"]) for row in payload["bench"]],
+        "transfers_in": sorted(int(m["player_in"]["player_id"]) for m in moves),
+        "transfers_out": sorted(int(m["player_out"]["player_id"]) for m in moves),
+        "moves": [
+            {
+                "out": int(m["player_out"]["player_id"]),
+                "in": int(m["player_in"]["player_id"]),
+                "gain": m["expected_points_delta"],
+                "reason": m["reason_code"],
+            }
+            for m in moves
+        ],
+        "transfer_hit_points": float(payload["transfer_hit_points"]),
+        "expected_own_points": float(payload["expected_own_points"]),
+        "expected_gain_vs_hold": payload["expected_gain_vs_hold"],
+        "expected_points_cost": float(payload["expected_points_cost"]),
+        "expected_points_cost_ceiling": payload.get("expected_points_cost_ceiling"),
+        "changed": bool(payload["top100"]["changed"]),
+    }
+
+
 def build_rival_fixture() -> dict[str, Any]:
     """The test world's device document, its members' blocks, and the service's answers."""
 
@@ -426,11 +484,14 @@ def build_rival_fixture() -> dict[str, Any]:
         int(str(row["player_id"])): int(str(row["price_tenths"]))
         for _, row in inputs.players.iterrows()
     }
-    document = device_plan_table(inputs, projection, rules, league_id=RIVAL_LEAGUE)
+    counts = _top100_counts(
+        sorted(int(str(v)) for v in inputs.players["player_id"]), world["gw1_id"]
+    )
+    document = device_plan_table(inputs, projection, rules, league_id=RIVAL_LEAGUE, top100=counts)
     members = {}
     for entry_id in RIVAL_MEMBERS:
         held = held_squad_from_picks(picks[entry_id], current_prices=prices)
-        block = device_plan_entry(inputs, projection, held, rules)
+        block = device_plan_entry(inputs, projection, held, rules, top100=counts)
         if block is None:
             raise RuntimeError(f"The producer writes no inputs for member {entry_id}.")
         members[str(entry_id)] = block
@@ -476,7 +537,37 @@ def build_rival_fixture() -> dict[str, Any]:
                         "reference": reference,
                     }
                 )
-    return {"document": document, "members": members, "rivals": rivals, "cases": cases}
+    top100_cases = []
+    for entry_id in RIVAL_MEMBERS:
+        for weight in TOP100_CASE_WEIGHTS:
+            advice = advise_with_top100(
+                AdviseEntryRequest(
+                    season=str(inputs.season),
+                    gameweek=int(inputs.deadline.gameweek),
+                    league_id=RIVAL_LEAGUE,
+                    entry_id=entry_id,
+                ),
+                weight=weight,
+                counts=counts,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+            )
+            top100_cases.append(
+                {
+                    "entry_id": entry_id,
+                    "weight": weight,
+                    "reference": _top100_reference(dict(advice.payload)),
+                }
+            )
+    return {
+        "document": document,
+        "members": members,
+        "rivals": rivals,
+        "cases": cases,
+        "top100_cases": top100_cases,
+    }
 
 
 def build_fixture() -> dict[str, Any]:
@@ -566,7 +657,8 @@ def main() -> int:
     print(
         f"Wrote {FIXTURE} with {len(fixture['members'])} instances, "
         f"{len(fixture['chips'])} chip instances and "
-        f"{len(fixture['rivals']['cases'])} rival strategy cases."
+        f"{len(fixture['rivals']['cases'])} rival strategy cases and "
+        f"{len(fixture['rivals']['top100_cases'])} Top 100 cases."
     )
     return 0
 

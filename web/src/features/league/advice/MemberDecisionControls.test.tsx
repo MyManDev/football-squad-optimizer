@@ -460,6 +460,7 @@ describe("the device's statement beside the publish", () => {
               strategies: ["saf-puan", "ortak-koru", "fark-yarat"],
               windows: [1],
               rivals: humans,
+              top100Weights: [0, 20],
             }}
           />
           <Selection />
@@ -483,6 +484,29 @@ describe("the device's statement beside the publish", () => {
     ).toEqual(humans);
     fireEvent.change(select, { target: { value: String(humans[0]) } });
     expect(screen.getByTestId("selection")).toHaveTextContent(`fark-yarat/-/${humans[0]}`);
+  });
+
+  it("offers the weights the device solves for the one-week pure-points plan", () => {
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={plainIndex}
+            onDevice={{
+              strategies: ["saf-puan"],
+              windows: [1],
+              rivals: [],
+              top100Weights: [0, 20],
+            }}
+            part="top100"
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    expect(screen.getByRole("radio", { name: /^20/ })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /^50/ })).toBeDisabled();
   });
 
   it("offers nothing beyond the publish without the device's statement", () => {

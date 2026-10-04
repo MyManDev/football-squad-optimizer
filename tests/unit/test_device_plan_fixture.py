@@ -108,6 +108,17 @@ def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
         r["solver_status"] == "OPTIMAL" and r["control_solver_status"] == "OPTIMAL"
         for r in answered
     )
+    # The Top 100 inputs: the document's weights, each member block naming them, and a
+    # case whose decision the weight moved, so the price path is exercised.
+    assert rules["top100"]["weights"] == [5, 10, 20, 30, 40, 50]
+    for block in world["members"].values():
+        assert block["top100_weights"] == rules["top100"]["weights"]
+    assert any(case["reference"]["changed"] for case in world["top100_cases"])
+    assert all(
+        case["reference"]["solver_status"] == "OPTIMAL"
+        and case["reference"]["control_solver_status"] == "OPTIMAL"
+        for case in world["top100_cases"]
+    )
     # Every player in the world is on his own number, so no tie decides a case.
     points = [p["expected_points"] for p in world["document"]["players"]]
     assert len(set(points)) == len(points)

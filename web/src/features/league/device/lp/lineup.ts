@@ -9,12 +9,20 @@
 
 import type { DeviceChip, DevicePlanDocument } from "../types";
 import { chipCoefficients } from "../strategies/chips";
+import type { CoefficientChoice } from "./memberWeek";
 import { row, term, type LpProblem, type LpRow, type LpTerm } from "./problem";
+
+export interface LineupTieBreak {
+  /** The primary value to hold while the starters' rank sum is minimised. */
+  primaryValue: number;
+}
 
 export function lineupProblem(
   document: DevicePlanDocument,
   squad: readonly number[],
   chip: DeviceChip | null = null,
+  choice?: CoefficientChoice,
+  tieBreak: LineupTieBreak | null = null,
 ): LpProblem {
   const { players, rules } = document;
   const inSquad = new Set(squad);
@@ -24,7 +32,7 @@ export function lineupProblem(
   const ones = (names: string[]) => names.map((name) => term(1, name));
   const objective: LpTerm[] = [];
   for (const i of chosen) {
-    const [, starter, captain] = chipCoefficients(players[i]!, chip);
+    const [, starter, captain] = choice ? choice(players[i]!) : chipCoefficients(players[i]!, chip);
     if (starter) objective.push(term(starter, x(i)));
     if (captain) objective.push(term(captain, c(i)));
   }
@@ -40,6 +48,20 @@ export function lineupProblem(
     rows.push(
       row(`hi_${position}`, ones(members.map(x)), "<=", rules.starting_position_max[position]!),
     );
+  }
+  if (tieBreak) {
+    // The server reads a fifteen's eleven with ties on the points broken to the lowest
+    // id (`best_eleven_basis`); holding the value and minimising the starters' rank sum
+    // picks the same eleven where two players tie, the captain's rank deciding after.
+    rows.push(row("hold", objective, "=", tieBreak.primaryValue));
+    const ranks = chosen.map((i, rank) => [i, rank] as const);
+    return {
+      sense: "Minimize",
+      objective: ranks.flatMap(([i, rank]) => [term(rank * chosen.length, x(i)), term(rank, c(i))]),
+      rows,
+      generals: [],
+      binaries: chosen.flatMap((i) => [x(i), c(i)]),
+    };
   }
   return {
     sense: "Maximize",

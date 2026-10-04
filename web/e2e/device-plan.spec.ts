@@ -237,3 +237,54 @@ test("a rival strategy is solved on the device against the rival's published ele
     `istenen ortak oyuncu sınırı ${reference.overlap_target}`,
   );
 });
+
+test("a Top 100 weight is solved on the device and priced on the base points", async ({ page }) => {
+  // The fixture's rival world carries the weighted points; the case at 50 is the one
+  // whose decision the weight moves, so the price sentence states a figure.
+  const world = fixture.rivals;
+  const memberBlock = world.members["102"]!;
+  await installLeagueMocks(page);
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...squad,
+        payload: {
+          ...squad.payload,
+          source_snapshot_id: world.document.source_snapshot_id,
+          device_plan: memberBlock,
+        },
+      }),
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: world.document,
+      }),
+    }),
+  );
+
+  await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1&top100=50`);
+  const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  const reference = world.top100_cases.find(
+    (c) => c.entry_id === 102 && c.weight === 50,
+  )!.reference;
+  expect(reference.changed).toBe(true);
+  await expect(page.locator("main")).toContainText("Ayar: 50 (senin seçimin).");
+  // The price on base points, in the sentence the setting documents print it in.
+  await expect(page.locator("main")).toContainText(
+    `~${reference.expected_points_cost.toFixed(1).replace(".", ",")} beklenen puan`,
+  );
+});

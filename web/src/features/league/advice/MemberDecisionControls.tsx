@@ -217,10 +217,15 @@ export function MemberDecisionControls({
   // A setting exists wherever the producer solved one: every pure-points window, and a
   // strategy's windows against the default rival.
   const top100Applies = top100.available && top100.offered.length > 1;
-  const top100Computable = (computable?.top100Weights.length ?? 0) > 1;
+  const top100Service = (computable?.top100Weights.length ?? 0) > 1;
+  // The device solves a weight for the one-week pure-points plan only.
+  const top100Device =
+    strategy === "saf-puan" && windowSize === 1 && (onDevice?.top100Weights.length ?? 0) > 1;
+  const top100Computable = top100Service || top100Device;
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
-    (top100Computable && computable!.top100Weights.some((offered) => offered === weight));
+    (top100Service && computable!.top100Weights.some((offered) => offered === weight)) ||
+    (top100Device && onDevice!.top100Weights.some((offered) => offered === weight));
   // Legacy published chips exclude both switches. The live chip strategy permits Top100,
   // but still excludes the manager's word; explain only the applicable restriction.
   const chipCopy = CHIP_COPY[language];
@@ -261,7 +266,7 @@ export function MemberDecisionControls({
   const top100Note =
     chipChosen && !chipStrategy
       ? chipCopy.switchesOff
-      : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
+      : top100Service && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
         ? computeCopy.top100Computable
         : !top100.available
           ? top100Unavailable(top100Copy, top100.reason)

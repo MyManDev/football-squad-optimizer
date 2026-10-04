@@ -52,6 +52,32 @@ describe("what the device solves", () => {
     expect(deviceSelection({ ...plain, chip: "auto" }, squad)).toBeNull();
   });
 
+  it("takes a weight the entry block names, for the pure-points plan at one week only", () => {
+    const named = {
+      ...squad,
+      device_plan: {
+        held: squad.starting_xi.map((p) => p.player_id),
+        bank_tenths: 0,
+        free_transfers: 1,
+        sell_tenths: {},
+        top100_weights: [20, 50],
+      },
+    };
+    expect(deviceSelection({ ...plain, top100Weight: 20 }, named)).toEqual({
+      kind: "top100",
+      weight: 20,
+    });
+    expect(deviceSelection({ ...plain, top100Weight: 10 }, named)).toBeNull();
+    expect(deviceSelection({ ...plain, top100Weight: 20, chip: "3xc" }, named)).toBeNull();
+    expect(
+      deviceSelection(
+        { ...plain, top100Weight: 20, strategy: "fark-yarat", rivalEntryId: 35249002 },
+        named,
+      ),
+    ).toBeNull();
+    expect(deviceSelection({ ...plain, top100Weight: 20 }, squad)).toBeNull();
+  });
+
   it("reads the rival's eleven and captain from their document, or nothing", () => {
     const rival = rivalFromSquad(35249002, squad);
     expect(rival).not.toBeNull();

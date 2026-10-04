@@ -10,8 +10,11 @@
  * strategy), and the tie-break tier that holds the primary value and ranks.
  */
 
-import type { DeviceChip, DevicePlanDocument, DevicePlanEntry } from "../types";
+import type { DeviceChip, DevicePlanDocument, DevicePlanEntry, DevicePlanPlayer } from "../types";
 import { chipCoefficients, rebuilds } from "../strategies/chips";
+
+/** Where a player's (squad, starter, captain) coefficients come from: the base points by default. */
+export type CoefficientChoice = (player: DevicePlanPlayer) => [number, number, number];
 import { row, term, type LpProblem, type LpRow, type LpTerm } from "./problem";
 
 /** The three variable families, by the player's index in the document's order. */
@@ -33,6 +36,8 @@ export interface TieBreak {
 
 export interface MemberWeekOptions {
   chip?: DeviceChip | null;
+  /** The points the plan is chosen on, when not the base ones (a Top 100 weight). */
+  choice?: CoefficientChoice;
   /** The cost per paid transfer on the objective scale; the rules' caution margin by default. */
   hitCostScaled?: number;
   /** At most this many transfers this week. */
@@ -55,10 +60,11 @@ export function primaryObjective(
   document: DevicePlanDocument,
   chip: DeviceChip | null,
   hitCostScaled: number,
+  choice?: CoefficientChoice,
 ): LpTerm[] {
   const terms: LpTerm[] = [];
   document.players.forEach((player, index) => {
-    const [squad, starter, captain] = chipCoefficients(player, chip);
+    const [squad, starter, captain] = choice ? choice(player) : chipCoefficients(player, chip);
     if (squad) terms.push(term(squad, variable("s", index)));
     if (starter) terms.push(term(starter, variable("x", index)));
     if (captain) terms.push(term(captain, variable("c", index)));
@@ -147,7 +153,7 @@ export function memberWeekProblem(
       rows.push(row("overlap_hi", shared, "<=", options.overlap.maximum));
   }
 
-  const primary = primaryObjective(document, chip, hitCostScaled);
+  const primary = primaryObjective(document, chip, hitCostScaled, options.choice);
   let sense: LpProblem["sense"] = "Maximize";
   let objective = primary;
   const tieBreak = options.tieBreak ?? null;
