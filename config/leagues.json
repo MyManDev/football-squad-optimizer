@@ -1,0 +1,9 @@
+{
+  "contract_version": "league_list_v1",
+  "leagues": [
+    {
+      "league_id": 352490,
+      "label": "the first league the site publishes"
+    }
+  ]
+}

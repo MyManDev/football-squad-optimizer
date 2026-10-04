@@ -10,7 +10,7 @@ import re
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -146,9 +146,9 @@ def registered_endpoints(
     *,
     as_of_utc: str,
     entry_registry: Path | None,
-    league_id: int | None,
+    league_ids: Sequence[int] = (),
 ) -> Mapping[str, str]:
-    """Payload name to URL for the registered entries and their league, if asked for.
+    """Payload name to URL for the registered entries and their leagues, if asked for.
 
     The paths come from the data adapter; only the base URL is joined here. The gameweek
     is the one before the deadline this capture is open for, because that is the last
@@ -157,10 +157,10 @@ def registered_endpoints(
     is no such gameweek and no picks are read.
     """
 
-    if entry_registry is None and league_id is None:
+    if entry_registry is None and not league_ids:
         return {}
     paths: dict[str, str] = {}
-    if league_id is not None:
+    for league_id in league_ids:
         paths.update(league_standings_endpoint_path(league_id))
     if entry_registry is not None:
         identifiers = registered_entry_ids(entry_registry)
@@ -253,7 +253,7 @@ def capture(
     archive_root: Path | None = None,
     dry_run: bool = False,
     entry_registry: Path | None = None,
-    league_id: int | None = None,
+    league_ids: Sequence[int] = (),
 ) -> SnapshotMetadata | None:
     """Fetch, describe and optionally persist one immutable snapshot.
 
@@ -261,8 +261,8 @@ def capture(
     The last five supply the exact shifted minutes and points used by the operational
     Phase C component model; the football history needs all of them. Passing
     ``entry_registry`` adds the three documents each registered entry publishes, and
-    ``league_id`` adds the league standings page, so a capture can record who was in the
-    league when a recommendation was made.
+    ``league_ids`` adds each league's standings page, so a capture can record who was in
+    the league when a recommendation was made.
 
     ``captured_at`` is stamped **after every read**, so no payload in the snapshot was fetched
     later than the instant the snapshot claims. Stamping it earlier would have been wrong in a
@@ -293,7 +293,7 @@ def capture(
             payloads[BOOTSTRAP_PAYLOAD],
             as_of_utc=resolution_at,
             entry_registry=entry_registry,
-            league_id=league_id,
+            league_ids=league_ids,
         )
     )
     if extra:

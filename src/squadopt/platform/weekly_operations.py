@@ -45,6 +45,8 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
+from squadopt.contracts.league_tree import PublishedLeague
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -441,7 +443,7 @@ class WeeklyOperations:
                 self.paths.snapshots,
                 archive_root=self.paths.archive,
                 entry_registry=self.paths.registry,
-                league_id=self.request.league_id,
+                league_ids=self.request.league_ids,
             )
             if captured is None:
                 raise WeekError("The capture wrote nothing.")
@@ -648,18 +650,14 @@ class WeeklyOperations:
             "decide", {"snapshot_id": result.snapshot_id, "mode": result.mode}, result.output_paths
         )
 
-    def _league(self) -> WeeklyStageResult:
-        # Publication or explicit recording writes the record before history reads it,
-        # unless --no-advice-record turned it off. The publish stage copies this preview
-        # rather than solving again.
-        record = self.records_advice
-        request = LeaguePublicationRequest(
+    def _league_request(self, league_id: int, record: bool) -> LeaguePublicationRequest:
+        return LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
             self.paths.archive,
             self.paths.registry,
             self.paths.out,
-            self.request.league_id,
+            league_id,
             season=self.request.season,
             gameweek=self.request.gameweek,
             handoff_path=Path(self.values["handoff"]["path"]),
@@ -681,14 +679,27 @@ class WeeklyOperations:
                 else None
             ),
         )
-        with league_mapper(request, self.request.workers) as mapper:
-            result = publish_league(request, mapper=mapper)
-        return WeeklyStageResult(
-            result.output_paths,
-            {
-                "snapshot_id": result.snapshot_id,
-                "gameweek": result.gameweek,
-                "advice_recorded": record,
+
+    def _league(self) -> WeeklyStageResult:
+        # Publication or explicit recording writes the record before history reads it,
+        # unless --no-advice-record turned it off. The publish stage copies this preview
+        # rather than solving again. Every league of the run is rendered from the one
+        # capture, each listed in the site's directory beside the ones before it, so the
+        # directory the last one writes names them all.
+        record = self.records_advice
+        outputs: list[Path] = []
+        leagues: dict[str, dict[str, object]] = {}
+        beside: list[PublishedLeague] = []
+        gameweek: int | None = None
+        for league_id in self.request.league_ids:
+            request = self._league_request(league_id, record)
+            with league_mapper(request, self.request.workers) as mapper:
+                result = publish_league(request, mapper=mapper, beside=beside)
+            if result.published is not None:
+                beside.append(result.published)
+            gameweek = result.gameweek
+            outputs.extend(result.output_paths)
+            leagues[str(league_id)] = {
                 # What the build told the operator about individual members (a name it
                 # changed, a mode or the manager's word it could not solve) and the files
                 # it removed from the tree, so a run is not "completed" in silence.
@@ -700,6 +711,16 @@ class WeeklyOperations:
                 "removed": list(result.report.removed),
                 # Empty when the Top 100 menu was offered or never asked for.
                 "top100_note": result.top100_note,
+                # A tree from before the league directory, adopted or removed.
+                "legacy_tree": result.legacy_tree,
+            }
+        return WeeklyStageResult(
+            tuple(sorted(set(outputs))),
+            {
+                "snapshot_id": self._capture_id(),
+                "gameweek": gameweek,
+                "advice_recorded": record,
+                "leagues": leagues,
             },
         )
 
@@ -726,26 +747,28 @@ class WeeklyOperations:
         )
 
     def _scoreboard(self) -> WeeklyStageResult:
-        result = publish_scoreboard(
-            ScoreboardPublicationRequest(
-                self.paths.snapshots,
-                self._capture_id(),
-                self.paths.registry,
-                self.paths.ledger,
-                self.paths.out,
-                self.request.league_id,
-                season=self.request.season,
-                cohort_snapshot_id=self._cohort_id(),
-                elite_snapshot_id=self._elite_id(),
-                evidence_root=self.paths.evidence,
+        outputs: list[Path] = []
+        kept: dict[str, list[object]] = {}
+        for league_id in self.request.league_ids:
+            result = publish_scoreboard(
+                ScoreboardPublicationRequest(
+                    self.paths.snapshots,
+                    self._capture_id(),
+                    self.paths.registry,
+                    self.paths.ledger,
+                    self.paths.out,
+                    league_id,
+                    season=self.request.season,
+                    cohort_snapshot_id=self._cohort_id(),
+                    elite_snapshot_id=self._elite_id(),
+                    evidence_root=self.paths.evidence,
+                )
             )
-        )
+            outputs.extend(result.output_paths)
+            kept[str(league_id)] = list(result.ours_kept_from_published)
         return WeeklyStageResult(
-            result.output_paths,
-            {
-                "snapshot_id": result.snapshot_id,
-                "ours_kept_from_published": list(result.ours_kept_from_published),
-            },
+            tuple(outputs),
+            {"snapshot_id": self._capture_id(), "ours_kept_from_published": kept},
         )
 
     def _published_tree(self) -> Path:
@@ -813,7 +836,7 @@ class WeeklyOperations:
             "tick.week.plan",
             season=self.request.season,
             gameweek=self.request.gameweek,
-            league=self.request.league_id,
+            leagues=list(self.request.league_ids),
             stages=list(self.stages),
             resume=self.resume,
         )
@@ -955,7 +978,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", type=Path, default=Path.cwd())
     parser.add_argument("--season")
     parser.add_argument("--gameweek", type=int)
-    parser.add_argument("--league", type=int)
+    parser.add_argument(
+        "--league",
+        type=int,
+        action="append",
+        help="a classic league to render; repeat for several, or name them in --league-list",
+    )
+    parser.add_argument(
+        "--league-list",
+        type=Path,
+        help=f"the leagues the site serves ({LEAGUE_LIST_FILE.as_posix()} in the workspace)",
+    )
     parser.add_argument("--snapshot-id")
     parser.add_argument("--cohort-snapshot")
     parser.add_argument("--elite-snapshot")
@@ -1070,14 +1103,25 @@ def main(argv: list[str] | None = None) -> int:
             result = inspect_run(paths.journal, args.run_id, expected_at_utc=args.expected_at)
             print(json.dumps(result, sort_keys=True))
             return 0 if result["status"] == "completed" and result["missed"] is not True else 1
-        if not args.season or args.gameweek is None or args.league is None:
-            parser.error("--season, --gameweek and --league are required for a weekly run")
+        if args.league and args.league_list is not None:
+            parser.error("--league and --league-list name the leagues two ways; use one")
+        if args.league_list is not None:
+            try:
+                league_ids = read_league_list(args.league_list)
+            except LeagueListError as error:
+                parser.error(str(error))
+        else:
+            league_ids = tuple(args.league or ())
+        if not args.season or args.gameweek is None or not league_ids:
+            parser.error(
+                "--season, --gameweek and --league (or --league-list) are required for a weekly run"
+            )
         if args.resume and not args.run_id:
             parser.error("--resume needs the original --run-id")
         request = WeeklyRequest(
             args.season,
             args.gameweek,
-            args.league,
+            league_ids,
             args.snapshot_id,
             args.cohort_snapshot,
             args.elite_snapshot,

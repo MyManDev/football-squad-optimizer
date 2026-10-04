@@ -139,6 +139,9 @@ class LeaguePublicationResult:
     #: league's path, its histories kept) or "removed" (a leftover beside a directory);
     #: empty when there was none.
     legacy_tree: str = ""
+    #: This league's line of the site's directory, for a run that renders several leagues
+    #: and lists each one beside the next.
+    published: PublishedLeague | None = None
 
 
 def member_points(
@@ -256,13 +259,16 @@ def publish_league(
     mapper: MemberMapper = map,
     on_prepared: Callable[[PreparedLeaguePublication], None] | None = None,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
+    beside: Sequence[PublishedLeague] = (),
 ) -> LeaguePublicationResult:
     """Publish the existing contracts; callbacks observe progress without owning the work."""
 
     prepared = prepare_league_publication(request)
     if on_prepared is not None:
         on_prepared(prepared)
-    return publish_prepared_league(prepared, mapper=mapper, on_mode_paths=on_mode_paths)
+    return publish_prepared_league(
+        prepared, mapper=mapper, on_mode_paths=on_mode_paths, beside=beside
+    )
 
 
 def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
@@ -341,8 +347,13 @@ def publish_prepared_league(
     *,
     mapper: MemberMapper = map,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
+    beside: Sequence[PublishedLeague] = (),
 ) -> LeaguePublicationResult:
-    """Complete a prepared publication without rereading a possibly changing selector."""
+    """Complete a prepared publication without rereading a possibly changing selector.
+
+    ``beside`` lists the other leagues the same run has rendered, so the site's directory
+    is written with every league of the run: this one and those.
+    """
 
     request = prepared.request
     snapshot, inputs, season = prepared.snapshot, prepared.inputs, prepared.season
@@ -451,19 +462,18 @@ def publish_prepared_league(
                     request.snapshot_id,
                 )
                 outputs.extend(path for path in directory.iterdir() if path.is_file())
-    # The site's directory is what this publication rendered: this league. A run over
-    # several leagues writes the directory once, with every league it rendered.
+    # The site's directory is what this run rendered: this league, beside the others the
+    # run listed; a league the run did not render is not listed.
+    published = PublishedLeague(
+        league_id=report.league_id,
+        league_name=report.league_name,
+        season=report.season,
+        gameweek=report.gameweek,
+        path=league_tree(report.league_id).as_posix(),
+    )
     directory = write_league_directory(
         site_data,
-        [
-            PublishedLeague(
-                league_id=report.league_id,
-                league_name=report.league_name,
-                season=report.season,
-                gameweek=report.gameweek,
-                path=league_tree(report.league_id).as_posix(),
-            )
-        ],
+        [*(line for line in beside if line.league_id != published.league_id), published],
         generated_at_utc=report.generated_at_utc,
     )
     outputs.append(directory)
@@ -475,4 +485,5 @@ def publish_prepared_league(
         output_paths=tuple(sorted(outputs)),
         top100_note=top100_note,
         legacy_tree=legacy[0] if legacy is not None else "",
+        published=published,
     )

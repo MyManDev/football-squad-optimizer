@@ -167,7 +167,7 @@ def test_the_weekly_run_publishes_through_the_same_builder_function(
     assert weekly_operations.copy_preview_builder is weekly_publish.copy_preview_builder
 
     request = WeeklyRequest(
-        "2026-27", 5, 101, snapshot_id=SNAPSHOT, skip_top100=True, workers=1, publish=True
+        "2026-27", 5, (101,), snapshot_id=SNAPSHOT, skip_top100=True, workers=1, publish=True
     )
     operation = weekly_operations.WeeklyOperations(
         request,

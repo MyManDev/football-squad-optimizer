@@ -21,7 +21,9 @@ from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_pat
 from squadopt.platform.weekly_publish import tree_digests
 
 
-def world(tmp_path: Path, *, rotation: bool = False) -> weekly.WeeklyOperations:
+def world(
+    tmp_path: Path, *, rotation: bool = False, league_ids: tuple[int, ...] | None = None
+) -> weekly.WeeklyOperations:
     publication = publication_world(tmp_path)
     snapshots = tmp_path / "weekly-snapshots"
     shutil.copytree(
@@ -38,7 +40,7 @@ def world(tmp_path: Path, *, rotation: bool = False) -> weekly.WeeklyOperations:
     request = WeeklyRequest(
         "2026-27",
         2,
-        publication.league_id,
+        league_ids or (publication.league_id,),
         snapshot_id=publication.snapshot_id,
         skip_top100=True,
         rotation=rotation,
@@ -51,6 +53,35 @@ def world(tmp_path: Path, *, rotation: bool = False) -> weekly.WeeklyOperations:
         repository_commit="b" * 40,
         handoff=publication.handoff_path,
     )
+
+
+def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
+    tmp_path: Path,
+) -> None:
+    """Every league of the list is rendered from the one capture into its own tree, with
+    its own scoreboard, and the site's directory names them all."""
+
+    operation = world(tmp_path, league_ids=(352490, 7))
+    receipt = operation.execute()
+    doc = json.loads(receipt.read_bytes())
+    assert doc["status"] == "completed"
+    stages = {stage["name"]: stage["value"] for stage in doc["stages"]}
+    assert sorted(stages["league"]["leagues"]) == ["352490", "7"]
+    assert sorted(stages["scoreboard"]["ours_kept_from_published"]) == ["352490", "7"]
+    data = operation.paths.out / "data"
+    directory = json.loads((data / "leagues.json").read_bytes())
+    assert [row["league_id"] for row in directory["payload"]["leagues"]] == [7, 352490]
+    assert [row["path"] for row in directory["payload"]["leagues"]] == [
+        "leagues/7",
+        "leagues/352490",
+    ]
+    for league_id in (352490, 7):
+        tree = data / "leagues" / str(league_id)
+        members = json.loads((tree / "members.json").read_bytes())
+        assert members["payload"]["league_id"] == league_id
+        assert (tree / "entries" / "101.json").is_file()
+        assert (tree / "scoreboard.json").is_file()
+    assert not (data / "league").exists()
 
 
 def test_real_weekly_services_complete_and_resume_without_rebuilding(tmp_path: Path) -> None:
@@ -600,6 +631,8 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
             gameweek=2,
             report=SimpleNamespace(members=(), removed=()),
             top100_note="",
+            legacy_tree="",
+            published=None,
         )
 
     monkeypatch.setattr(weekly, "publish_league", publish)
@@ -625,7 +658,7 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
     # gate decides whether the menu is offered.
     table = tmp_path / "player_evidence_v1_2026-27_gw02_top100_111111111111.csv"
     publishing.values["top100_evidence"] = {"table": str(table), "manifest": str(table)}
-    assert publishing._league().value["top100_note"] == ""
+    assert publishing._league().value["leagues"]["352490"]["top100_note"] == ""
     assert calls[2].top100_evidence == table
 
 
@@ -1005,6 +1038,29 @@ def test_no_advice_record_publishes_and_says_it_recorded_nothing(
     assert weekly.main([*args, "--publish", "--run-id", "unrecorded", "--resume"]) == 1
 
 
+def test_the_leagues_come_from_the_list_or_the_flag_but_not_both(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = ["--workspace", str(tmp_path), "--season", "2026-27", "--gameweek", "5"]
+    listed = tmp_path / "leagues.json"
+    listed.write_text(
+        json.dumps({"contract_version": "league_list_v1", "leagues": [{"league_id": 352490}]}),
+        encoding="utf-8",
+    )
+    for options, said in (
+        ([], "--league (or --league-list)"),
+        (["--league", "352490", "--league-list", str(listed)], "two ways"),
+        (["--league-list", str(tmp_path / "none.json")], "No league list"),
+    ):
+        with pytest.raises(SystemExit) as error:
+            weekly.main([*arguments, "--dry-run", *options])
+        assert error.value.code == 2
+        assert said in capsys.readouterr().err
+    # The list is read: the plan names its league.
+    weekly.main([*arguments, "--dry-run", "--league-list", str(listed)])
+    assert "leagues 352490" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize(
     ("options", "said"),
     [
@@ -1122,7 +1178,7 @@ def test_a_named_capture_reaches_the_export_and_names_its_artifact() -> None:
     capture = "club-news-abcdef012345"
     decision = "decision-999999999999"
     request = WeeklyRequest(
-        season="2026-27", gameweek=5, league_id=1, rotation=True, rotation_capture=capture
+        season="2026-27", gameweek=5, league_ids=(1,), rotation=True, rotation_capture=capture
     )
 
     assert request.rotation_capture == capture
@@ -1146,7 +1202,7 @@ def test_a_capture_without_the_rotation_stage_is_refused() -> None:
 
     with pytest.raises(WeekError, match="without --rotation"):
         WeeklyRequest(
-            season="2026-27", gameweek=5, league_id=1, rotation_capture="club-news-abc"
+            season="2026-27", gameweek=5, league_ids=(1,), rotation_capture="club-news-abc"
         ).plan()
 
 
@@ -1155,7 +1211,7 @@ def test_no_capture_keeps_todays_behaviour_exactly() -> None:
 
     from squadopt.application.weekly_plan import WeeklyRequest
 
-    plan = WeeklyRequest(season="2026-27", gameweek=5, league_id=1, rotation=True).plan()
+    plan = WeeklyRequest(season="2026-27", gameweek=5, league_ids=(1,), rotation=True).plan()
 
     assert "rotation" in plan.steps
-    assert WeeklyRequest(season="2026-27", gameweek=5, league_id=1).rotation_capture is None
+    assert WeeklyRequest(season="2026-27", gameweek=5, league_ids=(1,)).rotation_capture is None
