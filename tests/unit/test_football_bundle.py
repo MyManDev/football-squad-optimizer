@@ -195,6 +195,41 @@ def test_ready_marker_is_last_and_replays_exact_bytes(case, monkeypatch):
     assert len([key for key in result.files if key.startswith("site_entry")]) == 2
 
 
+def test_a_site_with_the_league_directory_seals_and_reads_back(case):
+    """The first publication into the directory layout moves the tree to leagues/<id>/;
+    the bundle seals it there, and the reader takes the folder from the sealed record."""
+
+    site = case["site_data_root"]
+    (site / "leagues").mkdir()
+    (site / "league").rename(site / "leagues" / "1")
+    directory = {
+        "contract_version": "league_directory_v1",
+        "generated_at_utc": "2026-09-22T13:00:00Z",
+        "payload": {
+            "leagues": [
+                {
+                    "league_id": 1,
+                    "league_name": "Synthetic",
+                    "season": "2026-27",
+                    "gameweek": 6,
+                    "path": "leagues/1",
+                }
+            ]
+        },
+    }
+    dump(site / "leagues.json", directory)
+    result = bundle.seal_football_bundle(**case)
+    record = json.loads(marker(case).read_bytes())
+    assert record["files"]["site_members"]["path"].endswith(".bundle/site/leagues/1/members.json")
+    assert read(case).fingerprint == result.fingerprint
+    # A record naming a tree no site publishes is refused, as any other unexpected path.
+    record["files"]["site_members"]["path"] = record["files"]["site_members"]["path"].replace(
+        "leagues/1", "leagues/x"
+    )
+    with pytest.raises(ValueError, match="unexpected filename"):
+        bundle._relative_files(marker(case), case["snapshot_id"], record["files"])
+
+
 @pytest.mark.parametrize(
     "damage",
     [

@@ -245,6 +245,9 @@ def test_a_settled_tag_refuses_to_ship_without_the_gameweek_it_settles() -> None
 
 #: The checks of a site from before the directory, which publishes the legacy tree alone.
 _ROUTES, _DOCUMENTS, (_ABSENT,) = verify_live.smoke_checks([verify_live.LEGACY])
+#: The shell as the build serves it: the entry chunk by its hashed name.
+_SHELL = b'<!doctype html><script type="module" src="/assets/index-AbCd1234.js"></script>'
+_SHELL += b'<div id="root"></div>'
 
 
 def _index(season: str | None = "2026-27") -> bytes:
@@ -266,10 +269,10 @@ def _live(
     """
 
     def fetch(path: str) -> tuple[int, bytes]:
-        if path in (verify_live.DIRECTORY, _ABSENT):
+        if path in (verify_live.DIRECTORY, _ABSENT, verify_live.ABSENT_ASSET):
             return 404, b""
         if path in _ROUTES:
-            return 200, b'<div id="root"></div>'
+            return 200, _SHELL
         if path == "/data/index.json":
             return 200, _index(season)
         if path == "/data/league/scoreboard.json":
@@ -297,12 +300,12 @@ def test_live_checks_retain_the_absent_document_rule(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], absent_status: int
 ) -> None:
     def fetch(path: str) -> tuple[int, bytes]:
-        if path == verify_live.DIRECTORY:
+        if path in (verify_live.DIRECTORY, verify_live.ABSENT_ASSET):
             return 404, b""
         if path == _ABSENT:
             return absent_status, b""
         if path in _ROUTES:
-            return 200, b'<div id="root"></div>'
+            return 200, _SHELL
         if path == "/data/index.json":
             return 200, _index()
         return 200, json.dumps({"generated_at_utc": "2026-09-18T18:00:00Z", "payload": {}}).encode()
@@ -345,7 +348,7 @@ def test_a_site_with_a_directory_is_checked_tree_by_tree(
         if path == verify_live.DIRECTORY:
             return 200, _directory((352490, "leagues/352490"), (7, "leagues/7"))
         if path.startswith("/league/") and path.endswith("/members/0"):
-            return 200, b'<div id="root"></div>'
+            return 200, _SHELL
         if path.endswith("/entries/0.json"):
             return 404, b""
         if path.endswith("/scoreboard.json"):
@@ -408,13 +411,19 @@ def test_the_verifier_checks_the_same_routes_the_deployment_smoke_does() -> None
     """
 
     source = (ROOT / "web/scripts/smoke-deployment.mjs").read_text(encoding="utf-8")
+    prefix = re.search(r'ABSENT_ASSET_PREFIX = "([^"]+)"', source)
+    assert prefix is not None and prefix.group(1) == verify_live.ABSENT_ASSET_PREFIX
+    assert verify_live.ABSENT_ASSET.startswith(verify_live.ABSENT_ASSET_PREFIX)
     block = source.split("export const SMOKE_CHECKS = [", 1)[1].split("\n];", 1)[0]
+    # The absent asset is named by its constant; read it as the path it stands for.
+    block = block.replace("path: ABSENT_ASSET", f'path: "{verify_live.ABSENT_ASSET}"')
     paths = re.findall(r'path:\s*"([^"]+)"', block)
     kinds = re.findall(r'kind:\s*"([^"]+)"', block)
     assert len(paths) == len(kinds), block
     named = dict(zip(paths, kinds, strict=True))
     assert [path for path, kind in named.items() if kind == "html"] == verify_live.ROUTES
     assert [path for path, kind in named.items() if kind == "json"] == verify_live.DOCUMENTS
+    assert [path for path, kind in named.items() if kind == "absent"] == [verify_live.ABSENT_ASSET]
     directory = re.search(r'DIRECTORY = "([^"]+)"', source)
     legacy = re.search(r'LEGACY_TREE = "([^"]+)"', source)
     assert directory is not None and directory.group(1) == verify_live.DIRECTORY
@@ -856,3 +865,60 @@ def test_deploy_watches_only_the_run_it_dispatched(tmp_path: Path, scenario: str
         assert "run watch 200 --exit-status" in log
         assert "deploy run 200 finished: failure" in result.stdout
         assert "not this release's run" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("served", "said"),
+    [
+        pytest.param({}, None, id="every-asset-is-itself"),
+        pytest.param(
+            {"/assets/Page-IjKl9012.js": (200, _SHELL)},
+            "BAD 200 asset /assets/Page-IjKl9012.js  (the HTML shell)",
+            id="a-lazy-chunk-is-the-shell",
+        ),
+        pytest.param(
+            {"/assets/solver.worker-Uv-Wx123.js": (404, b"")},
+            "BAD 404 asset /assets/solver.worker-Uv-Wx123.js",
+            id="the-worker-is-missing",
+        ),
+        pytest.param(
+            {verify_live.ABSENT_ASSET: (200, _SHELL)},
+            f"BAD 200 absent {verify_live.ABSENT_ASSET}",
+            id="a-missing-asset-is-the-shell",
+        ),
+    ],
+)
+def test_every_asset_the_shell_reaches_is_served_as_itself(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    served: dict[str, tuple[int, bytes]],
+    said: str | None,
+) -> None:
+    """A deploy is green while an edge near the operator serves a chunk as the shell: the
+    verifier follows the shell to every chunk, the lazy pages and the solver's worker."""
+
+    assets = {
+        "/assets/index-AbCd1234.js": (
+            b'import("./Page-IjKl9012.js");m.f=["assets/Page-IjKl9012.js"]'
+        ),
+        "/assets/Page-IjKl9012.js": b"new URL(`/assets/solver.worker-Uv-Wx123.js`,import.meta.url)",
+        "/assets/solver.worker-Uv-Wx123.js": b"self.onmessage=()=>{}",
+    }
+    live = _live(5, 5, 6)
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        if path in served:
+            return served[path]
+        if path in assets:
+            return 200, assets[path]
+        return live(path)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    code = verify_live.main("2026-09-18T18:00:00Z", 5)
+    output = capsys.readouterr().out
+    if said is None:
+        assert code == 0, output
+        assert "ok  3 assets, each served as itself" in output
+    else:
+        assert code == 1
+        assert said in output
