@@ -163,9 +163,11 @@ accepted advice and entry files remain byte-identical. Generate the complete con
 roster with `scripts.build_player_catalog` from that capture before the site-data PR. That one
 stays a step: it writes `data/players.json` into the site-data tree after the candidate exists,
 and adding that path to the publisher's approved list is a boundary change for the owner to
-approve. The page's own validators (`shippedTree.test.ts`) need no run by hand here either: the
-site PR's CI runs them on the committed tree, and the deploy workflow refuses a tag without a
-successful `main` push CI, which runs them again.
+approve. The page's own validators (`shippedTree.test.ts` and the other shipped-tree guards)
+need no run by hand here either: the site PR's CI runs them on every tree the committed site
+lists (`web/src/testSupport/shippedTrees.ts`), failing rather than skipping when it lists
+none, and the deploy workflow refuses a tag without a successful `main` push CI, which runs
+them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved

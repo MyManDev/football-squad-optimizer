@@ -67,6 +67,8 @@ for (const language of ["en", "tr"] as const) {
       },
     };
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
+    // These mocks stand in for the legacy tree: no directory, whatever the site ships.
+    await page.route("**/data/leagues.json", (route) => route.fulfill({ status: 404, body: "" }));
     await page.route("**/data/league/scoreboard.json", (route) =>
       route.fulfill({
         json: {

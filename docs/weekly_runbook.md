@@ -490,9 +490,33 @@ is refused in preflight, and any other difference from the record is still refus
 the end of the league stage.
 
 Check the candidate with `python -m scripts.check_league_tree <preview>/data`. The site
-pull request's CI also runs `shippedTree.test.ts` against the shipped tree; to run that
-check by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
-publication worktree's `web` directory. Then use the [release recipe](deployment_runbook.md#release-in-one-command)
+pull request's CI also holds the shipped tree to the page's own validators
+(`shippedTree.test.ts`, `planModel.chips.shipped.test.ts`, `LeagueMemberPage.shipped.test.tsx`,
+`e2e/captain-line.spec.ts`). They find the trees the way the page does
+(`web/src/testSupport/shippedTrees.ts`: every tree `data/leagues.json` lists, or `data/league/`
+on a site without the directory) and fail, never skip, on a site that publishes neither; to
+run the first by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
+publication worktree's `web` directory.
+
+**The first publish under the directory** (GW6 of 2026-27, the first since #959 and #960)
+needs nothing typed differently: the run moves `data/league/` to `data/leagues/<league id>/`
+before it reads or writes the tree, so the members' histories carry over, and writes
+`data/leagues.json` last. Four things differ from the weeks before it:
+
+- the accepted stamp `ship.sh` and `verify_live.py` take is `data/leagues.json`'s
+  `generated_at_utc` (with one league, the same as that league's `members.json`), not the
+  scoreboard's later stamp;
+- `scripts.add_device_plan_inputs` is not run on a weekly-run tree: the builder already
+  writes `device-plan.json` and each entry's inputs, with the Top 100 weights, and the script
+  refuses an entry that publishes purchase prices (it exists for a tree published before the
+  inputs, as fix13 was);
+- the tag is the next unused one: `site-2026-27-gw06-decision` already exists, so the
+  publisher's printed `-decision` tag would be refused only after `ship.sh` has waited for
+  the site pull request (`git ls-remote --tags origin 'site-2026-27-gw06-*'`);
+- the backend is restarted only after `verify_live.py` prints `ALL GOOD`: before the
+  release, the public site still serves the legacy tree's capture and the restart refuses.
+
+Then use the [release recipe](deployment_runbook.md#release-in-one-command)
 from Git Bash:
 `sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <accepted-generated-at-ISO> <summary>`.
 Its real invocation performs the site release and runs `verify_live.py`; the restart

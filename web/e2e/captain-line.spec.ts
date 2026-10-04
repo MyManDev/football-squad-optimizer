@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
+
+import { shippedTrees } from "../src/testSupport/shippedTrees";
 
 /**
  * The decision's captain line on a phone, over the published tree rather than the example
@@ -15,17 +16,18 @@ import { expect, test } from "@playwright/test";
  * while every other member's fitted.
  */
 
-const ROOT = fileURLToPath(new URL("../public/data/league", import.meta.url));
+// The first tree the site lists; shippedTree.test.ts holds every tree to the validators.
+const ROOT = shippedTrees()[0]!.root;
 const WIDTHS = [360, 375, 390] as const;
 
 const read = (relative: string) => JSON.parse(readFileSync(join(ROOT, relative), "utf-8"));
+const LEAGUE_ID = read("members.json").payload.league_id as number;
 
 type Published = { entry: number; strategy: string; window: number; armband: boolean };
 
 /** Each page the published indexes offer, and whether its plan names a captain and a vice. */
 function publishedPages(): Map<number, Published[]> {
   const pages = new Map<number, Published[]>();
-  if (!existsSync(join(ROOT, "members.json"))) return pages;
   for (const member of read("members.json").payload.members) {
     if (member.member_kind !== "human") continue;
     const entry = member.entry_id as number;
@@ -54,7 +56,6 @@ function publishedPages(): Map<number, Published[]> {
 const PAGES = publishedPages();
 
 test("the published tree has members to check", () => {
-  test.skip(!existsSync(join(ROOT, "members.json")), "No league tree is published here.");
   expect(PAGES.size).toBeGreaterThan(0);
   expect([...PAGES.values()].flat().filter((page) => page.armband).length).toBeGreaterThan(0);
 });
@@ -69,7 +70,7 @@ for (const language of ["tr", "en"] as const) {
       for (const { strategy, window, armband } of pages) {
         if (!armband) continue;
         await page.setViewportSize({ width: WIDTHS[0], height: 800 });
-        await page.goto(`/league/352490/members/${entry}?mode=${strategy}&window=${window}`);
+        await page.goto(`/league/${LEAGUE_ID}/members/${entry}?mode=${strategy}&window=${window}`);
         const line = page.locator('[data-mark="decision"] p[class*="_captain_"]');
         await expect(line).toBeVisible();
         // The club codes come from the calendar, and the widths from the page's own faces:
