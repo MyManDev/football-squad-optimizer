@@ -392,8 +392,14 @@ def test_the_lead_one_side_of_a_week_does_not_depend_on_how_far_its_origin_looks
     )
     alone = alone.set_index("player_code")
     assert len(own) == 32 and own.GW.eq(10).all()
+    # Equal up to the platform's last binary digit: the same sums land in a different order on
+    # arm64 and x86-64, and a tolerance of a billionth still catches any dependence on the origin.
     pd.testing.assert_series_equal(
-        own.expected_points.sort_index(), alone.expected_points.sort_index(), check_exact=True
+        own.expected_points.sort_index(),
+        alone.expected_points.sort_index(),
+        check_exact=False,
+        rtol=1e-9,
+        atol=0.0,
     )
 
 
