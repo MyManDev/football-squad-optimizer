@@ -26,6 +26,7 @@ import type { FixturesPayload } from "../../fixtures/types";
 import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(() => {
   cleanup();
@@ -201,8 +202,8 @@ function view(props: Partial<LeagueMemberViewProps> = {}): LeagueMemberViewProps
 function show(language: Language = "tr", props: Partial<LeagueMemberViewProps> = {}) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
-        <LeagueMemberView {...view(props)} />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+        {withLeague(<LeagueMemberView {...view(props)} />)}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -364,7 +365,7 @@ describe("the squad after the transfers, on the pitch", () => {
     render(
       <LanguageProvider initialLanguage="en">
         <MemoryRouter>
-          <LeagueMemberView squad={partial} advice={null} members={MEMBERS} />
+          {withLeague(<LeagueMemberView squad={partial} advice={null} members={MEMBERS} />)}
         </MemoryRouter>
       </LanguageProvider>,
     );
@@ -381,7 +382,7 @@ describe("the squad after the transfers, on the pitch", () => {
     const { container } = render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter>
-          <LeagueMemberView squad={empty} advice={null} members={MEMBERS} />
+          {withLeague(<LeagueMemberView squad={empty} advice={null} members={MEMBERS} />)}
         </MemoryRouter>
       </LanguageProvider>,
     );
@@ -496,10 +497,8 @@ describe("the fixture sheet on a phone", () => {
     const user = userEvent.setup();
     render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
-          <PageShell>
-            <LeagueMemberView {...view()} />
-          </PageShell>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+          <PageShell>{withLeague(<LeagueMemberView {...view()} />)}</PageShell>
         </MemoryRouter>
       </LanguageProvider>,
     );
@@ -601,10 +600,10 @@ describe("the honesty block across the phone breakpoint", () => {
   ] as const)("keeps the open disclosure %s", async (_case, from, to, inShell) => {
     const resize = resizableViewport(from);
     const user = userEvent.setup();
-    const page = <LeagueMemberView {...view()} />;
+    const page = withLeague(<LeagueMemberView {...view()} />);
     render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
           {inShell ? <PageShell>{page}</PageShell> : page}
         </MemoryRouter>
       </LanguageProvider>,

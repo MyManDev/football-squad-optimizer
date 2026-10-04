@@ -12,8 +12,9 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import * as clients from "../advice/adviceClient";
 import { TOP100_COPY } from "../advice/top100Copy";
-import * as data from "../data";
+import type { LeagueTree } from "../data";
 import { LeagueMemberPage } from "./LeagueMemberPage";
+import { stubTree, withLeague } from "../../../testSupport/league";
 
 afterEach(() => {
   cleanup();
@@ -56,29 +57,34 @@ it.each([
       readJob: vi.fn(),
     };
     vi.spyOn(clients, "createAdviceClient").mockReturnValue(api as unknown as clients.AdviceClient);
-    vi.spyOn(data, "loadEntrySquad").mockResolvedValue(squad);
-    vi.spyOn(data, "loadLeagueMembers").mockResolvedValue(mockLeagueMembersEnvelope);
-    vi.spyOn(data, "loadEntryAdviceIndex").mockResolvedValue(index);
     const load = vi
-      .spyOn(data, "loadEntryAdvice")
+      .fn<LeagueTree["entryAdvice"]>()
       .mockImplementation(async (id, mode, window, other) => {
         const envelope = mockEntryAdviceEnvelope(id, mode, window, other);
         if (malformed && mode === "saf-puan")
           Object.assign(envelope.payload, { plan_weeks: [null, null, null] });
         return envelope;
       });
+    stubTree({
+      entrySquad: vi.fn<LeagueTree["entrySquad"]>().mockResolvedValue(squad),
+      members: vi.fn<LeagueTree["members"]>().mockResolvedValue(mockLeagueMembersEnvelope),
+      entryAdviceIndex: vi.fn<LeagueTree["entryAdviceIndex"]>().mockResolvedValue(index),
+      entryAdvice: load,
+    });
     const query = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     const { unmount, container } = render(
       <QueryClientProvider client={query}>
         <LanguageProvider initialLanguage="en">
           <MemoryRouter
             initialEntries={[
-              "/league/members/" + ENTRY + "?mode=fark-yarat&window=3&rival=" + rival,
+              "/league/352490/members/" + ENTRY + "?mode=fark-yarat&window=3&rival=" + rival,
             ]}
           >
-            <Routes>
-              <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
-            </Routes>
+            {withLeague(
+              <Routes>
+                <Route path="/league/:leagueId/members/:entryId" element={<LeagueMemberPage />} />
+              </Routes>,
+            )}
           </MemoryRouter>
         </LanguageProvider>
       </QueryClientProvider>,

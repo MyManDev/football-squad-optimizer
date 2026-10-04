@@ -16,8 +16,10 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "./adviceClient";
-import { AdviceApiError } from "./adviceClient";
+import { AdviceApiError, StaticOnlyAdviceClient } from "./adviceClient";
 import { useAdviceJob, type ComputePhase } from "./useAdviceJob";
+import type { RequestOptions } from "../../../data/request";
+import { exampleTree } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -36,6 +38,11 @@ const OTHER: AdviceRequest = { ...REQUEST, window: 3 };
 class Client implements AdviceClient {
   posts: AdviceRequest[] = [];
   answer: AdviceRequestResult | Error = { kind: "job", jobId: "job-1" };
+  private readonly published = new StaticOnlyAdviceClient(exampleTree.entryAdvice);
+
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return this.published.readPublished(request, options);
+  }
 
   async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
     return {

@@ -4,6 +4,7 @@ The service reads already captured inputs and writes the existing league/advice 
 Scheduling, process pools, argument parsing and console output are supplied by callers.
 """
 
+import shutil
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -34,6 +35,17 @@ from squadopt.application.weekly_suggestion_eval import (
     published_advice_captures,
     published_page_captures,
 )
+from squadopt.contracts.league_tree import (
+    LEGACY_TREE,
+    LeagueDirectoryError,
+    PublishedLeague,
+    league_tree,
+    league_tree_dir,
+    legacy_tree_league_id,
+    read_league_directory,
+    write_league_directory,
+)
+from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -123,6 +135,10 @@ class LeaguePublicationResult:
     #: Why the Top 100 menu is off this run, for the operator; empty when it is on or
     #: was not asked for.
     top100_note: str = ""
+    #: What became of a tree from before the league directory: "adopted" (moved to the
+    #: league's path, its histories kept) or "removed" (a leftover beside a directory);
+    #: empty when there was none.
+    legacy_tree: str = ""
 
 
 def member_points(
@@ -287,6 +303,39 @@ def load_publication_top100(
     return counts, None, ""
 
 
+def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] | None:
+    """Make the legacy tree the league's own before a publication into the new layout.
+
+    A site from before the directory carries the league under ``data/league/``; the
+    documents there (the member histories above all, which carry every earlier week) are
+    the league's, so the tree is moved to ``data/leagues/<league_id>/`` rather than left
+    beside it or rebuilt from nothing: ``("adopted", new path)``. A legacy tree beside a
+    directory is a leftover nothing lists, and is removed: ``("removed", its path)``.
+    None where there is no legacy tree. A legacy tree naming another league on a site
+    without a directory is left alone and refused: this publication cannot say whose it is.
+    """
+
+    root = Path(site_data_root)
+    legacy = root / LEGACY_TREE
+    if not legacy.is_dir():
+        return None
+    if read_league_directory(root):
+        shutil.rmtree(legacy)
+        return ("removed", legacy)
+    named = legacy_tree_league_id(root)
+    if named != league_id:
+        raise LeagueDirectoryError(
+            f"{legacy} names league {named}, not league {league_id}; it cannot be adopted."
+        )
+    target = league_tree_dir(root, league_id)
+    if target.exists():
+        raise LeagueDirectoryError(f"{target} exists beside the legacy tree {legacy}.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # The one rename helper: it waits out the handle Windows may still hold on the tree.
+    replace_retrying(legacy, target)
+    return ("adopted", target)
+
+
 def publish_prepared_league(
     prepared: PreparedLeaguePublication,
     *,
@@ -324,7 +373,11 @@ def publish_prepared_league(
                     history.source_id,
                 )
             )
-    out_dir = request.out_dir / "data" / "league"
+    site_data = request.out_dir / "data"
+    # A tree from before the directory is this league's: adopted before anything reads
+    # or writes the league's path, so its histories carry over.
+    legacy = adopt_legacy_tree(site_data, request.league_id)
+    out_dir = league_tree_dir(site_data, request.league_id)
     manager_words = load_publication_manager_words(request)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
         season,
@@ -398,6 +451,22 @@ def publish_prepared_league(
                     request.snapshot_id,
                 )
                 outputs.extend(path for path in directory.iterdir() if path.is_file())
+    # The site's directory is what this publication rendered: this league. A run over
+    # several leagues writes the directory once, with every league it rendered.
+    directory = write_league_directory(
+        site_data,
+        [
+            PublishedLeague(
+                league_id=report.league_id,
+                league_name=report.league_name,
+                season=report.season,
+                gameweek=report.gameweek,
+                path=league_tree(report.league_id).as_posix(),
+            )
+        ],
+        generated_at_utc=report.generated_at_utc,
+    )
+    outputs.append(directory)
     return LeaguePublicationResult(
         snapshot_id=request.snapshot_id,
         season=season,
@@ -405,4 +474,5 @@ def publish_prepared_league(
         report=report,
         output_paths=tuple(sorted(outputs)),
         top100_note=top100_note,
+        legacy_tree=legacy[0] if legacy is not None else "",
     )

@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
+import { exampleTree } from "../../../testSupport/league";
 import { LeagueDataMissing } from "../data";
 import { AdviceResponseError } from "./adviceResponse";
 import {
@@ -30,11 +31,13 @@ function jsonResponse(status: number, body: unknown): Response {
 
 describe("createAdviceClient", () => {
   it("an empty origin (the default) is the static client — today's site", () => {
-    expect(createAdviceClient("")).toBeInstanceOf(StaticOnlyAdviceClient);
+    expect(createAdviceClient(exampleTree.entryAdvice, "")).toBeInstanceOf(StaticOnlyAdviceClient);
   });
 
   it("a configured origin wraps HTTP in the fallback rule", () => {
-    expect(createAdviceClient("https://api.example")).toBeInstanceOf(FallbackAdviceClient);
+    expect(createAdviceClient(exampleTree.entryAdvice, "https://api.example")).toBeInstanceOf(
+      FallbackAdviceClient,
+    );
   });
 });
 
@@ -75,7 +78,7 @@ it("the HTTP deadline includes a hanging response body", async () => {
 
 describe("StaticOnlyAdviceClient", () => {
   it("serves the published tree and reports an uncomputed combination honestly", async () => {
-    const client = new StaticOnlyAdviceClient();
+    const client = new StaticOnlyAdviceClient(exampleTree.entryAdvice);
     const hit = await client.readAdvice(REQUEST);
     expect(hit.kind).toBe("advice");
     if (hit.kind === "advice") {
@@ -88,7 +91,7 @@ describe("StaticOnlyAdviceClient", () => {
   });
 
   it("cannot compute: requestAdvice degrades to the published answer or unavailable", async () => {
-    const client = new StaticOnlyAdviceClient();
+    const client = new StaticOnlyAdviceClient(exampleTree.entryAdvice);
     const hit = await client.requestAdvice(REQUEST);
     expect(hit.kind).toBe("advice");
     const missing = new StaticOnlyAdviceClient(async () => missingLoader());
@@ -198,7 +201,10 @@ describe("FallbackAdviceClient", () => {
     const dead = new HttpAdviceClient("https://api.example", async () => {
       throw new TypeError("fetch failed");
     });
-    const client = new FallbackAdviceClient(dead, new StaticOnlyAdviceClient());
+    const client = new FallbackAdviceClient(
+      dead,
+      new StaticOnlyAdviceClient(exampleTree.entryAdvice),
+    );
 
     const read = await client.readAdvice(REQUEST);
     expect(read.kind).toBe("advice");
@@ -214,14 +220,20 @@ describe("FallbackAdviceClient", () => {
     const healthy = new HttpAdviceClient("https://api.example", async () =>
       jsonResponse(200, envelope),
     );
-    const client = new FallbackAdviceClient(healthy, new StaticOnlyAdviceClient());
+    const client = new FallbackAdviceClient(
+      healthy,
+      new StaticOnlyAdviceClient(exampleTree.entryAdvice),
+    );
     const hit = await client.readAdvice(REQUEST);
     if (hit.kind === "advice") expect(hit.source).toBe("api-cache");
 
     const empty = new HttpAdviceClient("https://api.example", async () =>
       jsonResponse(404, { error: { code: "NOT_COMPUTED" } }),
     );
-    const emptyClient = new FallbackAdviceClient(empty, new StaticOnlyAdviceClient());
+    const emptyClient = new FallbackAdviceClient(
+      empty,
+      new StaticOnlyAdviceClient(exampleTree.entryAdvice),
+    );
     const baseline = await emptyClient.readAdvice(REQUEST);
     expect(baseline.kind).toBe("advice");
     if (baseline.kind === "advice") expect(baseline.source).toBe("static");
@@ -253,7 +265,7 @@ describe("advice response identity", () => {
   });
 
   it("does not treat a published rival-free answer as an explicit rival answer", async () => {
-    const client = new StaticOnlyAdviceClient();
+    const client = new StaticOnlyAdviceClient(exampleTree.entryAdvice);
     await expect(client.readAdvice({ ...REQUEST, rivalEntryId: 202 })).rejects.toBeInstanceOf(
       AdviceResponseError,
     );
@@ -273,7 +285,10 @@ describe("advice response identity", () => {
       const primary = new HttpAdviceClient("https://api.example", async () =>
         jsonResponse(status, { error: { code: "UNKNOWN_ENTRY" } }),
       );
-      const client = new FallbackAdviceClient(primary, new StaticOnlyAdviceClient());
+      const client = new FallbackAdviceClient(
+        primary,
+        new StaticOnlyAdviceClient(exampleTree.entryAdvice),
+      );
       await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceApiError);
       await expect(client.readAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceApiError);
     },

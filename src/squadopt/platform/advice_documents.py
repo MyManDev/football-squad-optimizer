@@ -734,20 +734,3 @@ def validate_league_capabilities(document: dict[str, object]) -> None:
         raise AdviceDocumentError(
             f"The capabilities violate league_capabilities_v1: {errors[0].message}"
         )
-
-
-def write_public_read_schemas() -> tuple[Path, ...]:
-    """Commit the read schemas, the same way the other wire contracts are committed."""
-
-    for path, schema in (
-        (ADVICE_READ_SCHEMA_PATH, advice_read_schema()),
-        (LEAGUE_STATE_SCHEMA_PATH, league_state_schema()),
-        (LEAGUE_CAPABILITIES_SCHEMA_PATH, league_capabilities_schema()),
-    ):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(schema, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-            newline="\n",
-        )
-    return ADVICE_READ_SCHEMA_PATH, LEAGUE_STATE_SCHEMA_PATH, LEAGUE_CAPABILITIES_SCHEMA_PATH

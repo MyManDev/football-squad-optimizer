@@ -34,7 +34,7 @@ import { useViewerEntry } from "../identity/useViewerEntry";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
 import { COMPUTE_COPY, failureSentence } from "./computeCopy";
-import type { DevicePlan } from "../device/useDevicePlan";
+import { deviceEndedWithoutPlan, type DevicePlan } from "../device/useDevicePlan";
 import type { AdviceJob, EarlierAnswer } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
@@ -106,8 +106,10 @@ export function AdviceRequestPanel({
   /** A chip computation has no measured duration to display. */
   chipChosen?: boolean;
   /**
-   * A service is configured and has not said yet what it computes. The static build's
-   * sentence about what Compute supports would be wrong a moment later, so it waits.
+   * The page has not learned yet what can be computed here: a configured service has not
+   * said what it computes, or the rivals' documents the device needs are still being read.
+   * A sentence about what Compute supports or what was published would be wrong a moment
+   * later, so the notes wait.
    */
   pending?: boolean;
   /**
@@ -121,7 +123,7 @@ export function AdviceRequestPanel({
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
-  const { viewer } = useViewerEntry();
+  const { viewer } = useViewerEntry(request.leagueId);
   const { state, compute } = job;
   const isSelf = viewer !== null && viewer.entryId === request.entryId;
   const supported =
@@ -129,6 +131,23 @@ export function AdviceRequestPanel({
     (service === "ready"
       ? computable
       : service !== "other-capture" && selectionAvailable && canComputeAdvice(request));
+  // The member's device solves this selection: no note calls it unsupported, and until it
+  // has run the notes offer it rather than send the member to a published option. Once it
+  // has answered there is nothing to add; after a run that ended without a plan the notes
+  // say what they would say without it, beside the device's own sentence.
+  const deviceOffered = device?.available === true && !deadlinePassed;
+  const deviceAnswered = deviceOffered && device.state.phase === "done";
+  const deviceStillOffered = deviceOffered && !deviceEndedWithoutPlan(device.state);
+  const unreachableNote =
+    published === true
+      ? computeCopy.serviceUnreachablePublished
+      : published === false
+        ? deviceAnswered
+          ? null
+          : deviceStillOffered
+            ? computeCopy.serviceUnreachableDevice
+            : computeCopy.serviceUnreachableAbsent
+        : computeCopy.serviceUnreachable;
 
   return (
     <>
@@ -222,7 +241,11 @@ export function AdviceRequestPanel({
             {computeCopy.deadlinePassedCompute}
           </p>
         ) : null}
-        {!deadlinePassed && !supported && !pending && service !== "other-capture" ? (
+        {!deadlinePassed &&
+        !supported &&
+        !pending &&
+        !deviceOffered &&
+        service !== "other-capture" ? (
           <p role="note" className={styles.note}>
             {service !== "ready"
               ? copy.computeUnsupportedSelection
@@ -231,13 +254,9 @@ export function AdviceRequestPanel({
                 : computeCopy.notComputable}
           </p>
         ) : null}
-        {!deadlinePassed && service === "unreachable" ? (
+        {!deadlinePassed && !pending && service === "unreachable" && unreachableNote !== null ? (
           <p role="note" className={styles.note}>
-            {published === true
-              ? computeCopy.serviceUnreachablePublished
-              : published === false
-                ? computeCopy.serviceUnreachableAbsent
-                : computeCopy.serviceUnreachable}
+            {unreachableNote}
           </p>
         ) : null}
         {!deadlinePassed && service === "other-capture" ? (
@@ -245,12 +264,11 @@ export function AdviceRequestPanel({
             {computeCopy.otherCapture}
           </p>
         ) : null}
-        {service === "ready" && supported ? (
+        {service === "ready" && supported && (published === false || !chipChosen) ? (
           <p role="note" className={styles.note}>
-            {published === false ? <>{computeCopy.notPrecomputed} </> : null}
-            {chipChosen ? (
-              computeCopy.chipDurationUnknown
-            ) : (
+            {published === false ? computeCopy.notPrecomputed : null}
+            {published === false && !chipChosen ? " " : null}
+            {chipChosen ? null : (
               <>
                 {computeCopy.duration[request.window]} {computeCopy.durationNote}
               </>

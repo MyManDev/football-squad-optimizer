@@ -1,3 +1,5 @@
+import { memberAddress, memberHistoryAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +15,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
+import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
@@ -110,6 +113,7 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   deviceDependencies,
+  deviceRivals,
   rivalSquad = null,
   windowControl = null,
   deadlinePassed = null,
@@ -118,12 +122,13 @@ function LeagueMemberContent({
   leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   const layout = useShellLayout();
   const shell = useShell();
   const view = squad.payload;
   const [searchParams] = useSearchParams();
-  const { viewer, clear } = useViewerEntry();
+  const { viewer, clear } = useViewerEntry(leagueId);
   const navigate = useNavigate();
   const {
     entryId,
@@ -134,6 +139,8 @@ function LeagueMemberContent({
     computeAvailable,
     job,
     device,
+    onDevice,
+    rivalsLoading,
     request,
     shown,
     rejectedContext,
@@ -150,13 +157,18 @@ function LeagueMemberContent({
       capabilities,
       computeService,
       deviceDependencies,
+      deviceRivals,
     },
     searchParams,
   );
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
+  // The same holds for a selection the member's device solves while the week is open,
+  // until a run ends without a plan: the card then says what is published again.
   const computeOnly =
-    computeAvailable && selection.computable !== undefined && selection.status === "not-listed";
+    selection.status === "not-listed" &&
+    ((computeAvailable && selection.computable !== undefined) ||
+      (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );
@@ -226,7 +238,6 @@ function LeagueMemberContent({
           <span>{copy.howComputed}</span>
         </summary>
         <div className={styles.howBody}>
-          <p>{copy.honestyRule}</p>
           <p>{copy.independentAdviceRule}</p>
           {!adviceLoading && shown ? <AdviceMethodNotes view={shown.envelope.payload} /> : null}
           <p>{copy.diagnosticOnly}</p>
@@ -242,12 +253,13 @@ function LeagueMemberContent({
               )}
             </p>
           ) : null}
-          <p>{copy.freshnessNote}</p>
         </div>
       </details>
-      {view.league_id === 352490 ? (
+      {view.league_id === leagueId ? (
         <p className={styles.historyLink}>
-          <Link to={`/league/members/${entryId}/history`}>{messages.suggestionHistory.title}</Link>
+          <Link to={memberHistoryAddress(leagueId, entryId)}>
+            {messages.suggestionHistory.title}
+          </Link>
         </p>
       ) : null}
     </div>
@@ -281,6 +293,7 @@ function LeagueMemberContent({
         members={members}
         index={selection.status === "index-error" ? null : index}
         capabilities={capabilities}
+        onDevice={onDevice}
         part="plan"
       />
       <MemberDecisionControls
@@ -288,6 +301,7 @@ function LeagueMemberContent({
         members={members}
         index={selection.status === "index-error" ? null : index}
         capabilities={capabilities}
+        onDevice={onDevice}
         part="top100"
       />
       <Tool title={copy.advancedSettings}>
@@ -296,6 +310,7 @@ function LeagueMemberContent({
           members={members}
           index={selection.status === "index-error" ? null : index}
           capabilities={capabilities}
+          onDevice={onDevice}
           part="advanced"
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
@@ -325,9 +340,11 @@ function LeagueMemberContent({
           selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
         }
         computable={computeAvailable}
-        pending={computePending}
+        // While the rivals' documents are read, nothing is said yet about what can be
+        // computed or what was published for this selection.
+        pending={computePending || rivalsLoading}
         published={
-          adviceLoading || !indexReadable
+          adviceLoading || rivalsLoading || !indexReadable
             ? undefined
             : selection.status === "not-listed" || selection.status === "declared-unavailable"
               ? false
@@ -347,6 +364,7 @@ function LeagueMemberContent({
         members={members}
         index={selection.status === "index-error" ? null : index}
         capabilities={capabilities}
+        onDevice={onDevice}
         part="notes"
       />
     </section>
@@ -412,6 +430,8 @@ function LeagueMemberContent({
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
+            ) : rivalsLoading ? (
+              <EmptyState title={copy.loadingRivals} />
             ) : shown ? (
               <AdviceDecision shown={shown} members={members} squad={squad} fixtures={fixtures} />
             ) : computeOnly && !rejectedContext ? null : (
@@ -474,7 +494,7 @@ function LeagueMemberContent({
                     : `#${viewer.entryId}`,
                 )}
               </strong>{" "}
-              <Link className={styles.viewerAction} to="/league/members">
+              <Link className={styles.viewerAction} to={membersAddress(leagueId)}>
                 {copy.viewerChange}
               </Link>{" "}
               <button
@@ -482,7 +502,7 @@ function LeagueMemberContent({
                 className={styles.viewerClear}
                 onClick={() => {
                   clear();
-                  navigate("/league/members", { replace: true });
+                  navigate(membersAddress(leagueId), { replace: true });
                 }}
               >
                 {copy.viewerClear}
@@ -491,7 +511,7 @@ function LeagueMemberContent({
             {viewer.entryId !== entryId ? (
               <p className={styles.notice}>
                 <strong>{copy.notYourPageTitle}</strong> {copy.notYourPageBody}{" "}
-                <Link to={`/league/members/${viewer.entryId}`}>{copy.notYourPageLink}</Link>
+                <Link to={memberAddress(leagueId, viewer.entryId)}>{copy.notYourPageLink}</Link>
               </p>
             ) : null}
           </Card>

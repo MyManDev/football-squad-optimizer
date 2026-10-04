@@ -73,7 +73,7 @@ function settings(): HTMLInputElement[] {
 
 describe("the Top 100 influence control", () => {
   it("offers seven settings in one row, and the URL follows the choice", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
     const inputs = settings();
     expect(inputs.map((input) => input.value)).toEqual(TOP100_WEIGHTS.map(String));
     const row = inputs[0]!.closest("div");
@@ -93,7 +93,11 @@ describe("the Top 100 influence control", () => {
   });
 
   it("is disabled where no setting was solved for the selection, with the note", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=3&top100=20`, SOLVED, "en");
+    renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=3&top100=20`,
+      SOLVED,
+      "en",
+    );
     expect(settings().every((input) => input.disabled)).toBe(true);
     expect(document.body.textContent).toContain(TOP100_COPY.en.notForSelection);
   });
@@ -116,7 +120,7 @@ describe("the Top 100 influence control", () => {
         path: `advice/${ENTRY}/ortak-koru/1/vs-${rival}/top100-5.json`,
       },
     ];
-    const first = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=3`, {
+    const first = renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=3`, {
       ...SOLVED!,
       documents,
     } as EntryAdviceIndex["top100"]);
@@ -132,7 +136,7 @@ describe("the Top 100 influence control", () => {
     fireEvent.click(settings()[3]!);
     expect(query().get("top100")).toBe("20");
     first.unmount();
-    renderControls(`/league/members/${ENTRY}?mode=ortak-koru&window=1`, {
+    renderControls(`/league/352490/members/${ENTRY}?mode=ortak-koru&window=1`, {
       ...SOLVED!,
       documents,
     } as EntryAdviceIndex["top100"]);
@@ -148,7 +152,7 @@ describe("the Top 100 influence control", () => {
   });
 
   it("keeps the settings without a file for the word off while the word is on", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&llm=on`, SOLVED);
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1&llm=on`, SOLVED);
     const inputs = settings();
     expect(inputs[0]!.disabled).toBe(false);
     expect(inputs.slice(1).every((input) => input.disabled)).toBe(true);
@@ -156,7 +160,7 @@ describe("the Top 100 influence control", () => {
   });
 
   it("says why when the publish solved nothing, and never prints the code", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, {
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
       available: false,
       reason: "published_plan_carries_top100",
     });
@@ -167,7 +171,11 @@ describe("the Top 100 influence control", () => {
   });
 
   it("says when the link asks for a setting that is not offered, and 0 clears it", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&top100=15`, SOLVED, "en");
+    renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&top100=15`,
+      SOLVED,
+      "en",
+    );
     expect(document.body.textContent).toContain(TOP100_COPY.en.notOffered);
     expect(settings()[0]!.checked).toBe(true);
     fireEvent.click(settings()[0]!);
@@ -176,7 +184,10 @@ describe("the Top 100 influence control", () => {
   });
 
   it("names the switches, not the menu, when the word has no file for the setting", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1&llm=on&top100=20`, SOLVED);
+    renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&llm=on&top100=20`,
+      SOLVED,
+    );
     const text = document.body.textContent ?? "";
     expect(text).toContain(TOP100_COPY.tr.notSolved);
     expect(text).not.toContain(TOP100_COPY.tr.notOffered);
@@ -185,7 +196,7 @@ describe("the Top 100 influence control", () => {
   it("carries no probability wording and no share of the setting, in either language", () => {
     for (const language of ["tr", "en"] as const) {
       const { container, unmount } = renderControls(
-        `/league/members/${ENTRY}?mode=saf-puan&window=1&top100=30`,
+        `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&top100=30`,
         SOLVED,
         language,
       );

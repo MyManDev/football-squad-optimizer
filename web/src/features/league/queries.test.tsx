@@ -5,8 +5,7 @@ import { join, relative, sep } from "node:path";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LeagueDataError } from "./data";
-import * as data from "./data";
+import { LeagueDataError, type LeagueTree } from "./data";
 import {
   mockEntryAdviceEnvelope,
   mockEntryAdviceIndex,
@@ -14,6 +13,7 @@ import {
   mockLeagueMembersEnvelope,
 } from "../../fixtures/league";
 import { useLeagueMemberData } from "./pages/useLeagueMemberData";
+import { EXAMPLE_LEAGUE, stubTree, withLeague } from "../../testSupport/league";
 import * as queries from "./queries";
 import {
   CAPABILITIES_READ,
@@ -31,9 +31,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const LEAGUE = EXAMPLE_LEAGUE.leagueId;
+
 function withClient(client: QueryClient) {
   return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientProvider client={client}>{withLeague(children)}</QueryClientProvider>
   );
 }
 
@@ -79,7 +81,7 @@ describe("league reads", () => {
     const client = new QueryClient();
     const { result } = renderHook(() => useEntrySquad(null), { wrapper: withClient(client) });
     expect(result.current.fetchStatus).toBe("idle");
-    expect(leagueKeys.entrySquad(undefined)).toEqual(leagueKeys.entrySquad(null));
+    expect(leagueKeys.entrySquad(LEAGUE, undefined)).toEqual(leagueKeys.entrySquad(LEAGUE, null));
   });
 
   it("refreshes stale capabilities on focus without recalculating or replacing the plan", async () => {
@@ -89,10 +91,15 @@ describe("league reads", () => {
     const entry = 35249001;
     const squad = mockEntrySquadEnvelopes[entry]!;
     const published = mockEntryAdviceEnvelope(entry, "saf-puan", 1);
-    vi.spyOn(data, "loadLeagueMembers").mockResolvedValue(mockLeagueMembersEnvelope);
-    vi.spyOn(data, "loadEntrySquad").mockResolvedValue(squad);
-    vi.spyOn(data, "loadEntryAdviceIndex").mockResolvedValue(mockEntryAdviceIndex(entry));
-    const readPublished = vi.spyOn(data, "loadEntryAdvice").mockResolvedValue(published);
+    const readPublished = vi.fn<LeagueTree["entryAdvice"]>().mockResolvedValue(published);
+    stubTree({
+      members: vi.fn<LeagueTree["members"]>().mockResolvedValue(mockLeagueMembersEnvelope),
+      entrySquad: vi.fn<LeagueTree["entrySquad"]>().mockResolvedValue(squad),
+      entryAdviceIndex: vi
+        .fn<LeagueTree["entryAdviceIndex"]>()
+        .mockResolvedValue(mockEntryAdviceIndex(entry)),
+      entryAdvice: readPublished,
+    });
     let revision = "a".repeat(64);
     const fetched = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -165,14 +172,15 @@ describe("league reads", () => {
 
   it("are keyed and configured in one module", () => {
     const shared = [
-      leagueKeys.members()[0],
-      leagueKeys.scoreboard()[0],
-      leagueKeys.entrySquad(1)[0],
+      leagueKeys.members(LEAGUE)[0],
+      leagueKeys.scoreboard(LEAGUE)[0],
+      leagueKeys.entrySquad(LEAGUE, 1)[0],
     ];
     const offenders: string[] = [];
     let reads = 0;
     for (const { name, text } of leagueSources()) {
-      const calls = text.match(/\buseQuery\(/g)?.length ?? 0;
+      // A `useQueries` call spreads the policy once, into the options every read it maps takes.
+      const calls = text.match(/\buseQuer(?:y|ies)\(/g)?.length ?? 0;
       const policed = text.match(/\.\.\.(?:LEAGUE_READ|CAPABILITIES_READ)\b/g)?.length ?? 0;
       if (calls !== policed)
         offenders.push(`${name}: ${policed} of ${calls} reads use a central league read policy`);

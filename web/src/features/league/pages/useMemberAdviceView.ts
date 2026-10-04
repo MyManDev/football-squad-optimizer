@@ -1,8 +1,9 @@
+import { useLeague } from "../useLeague";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { adviceRequestKey } from "../advice/adviceJobStore";
-import { canComputeAdvice, resolvePublishedAdvice } from "../advice/adviceSelection";
+import { canComputeAdvice } from "../advice/adviceSelection";
 import { AdviceContextError, checkedAdvice } from "../advice/adviceResponse";
 import {
   ANSWER_OTHER_CAPTURE,
@@ -11,14 +12,16 @@ import {
   type AdviceJob,
   type ComputePhase,
 } from "../advice/useAdviceJob";
+import { NO_DEVICE_RIVALS } from "../device/computable";
 import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
+import { deviceRequestFor, memberSelection } from "./memberSelection";
 
 /** The same attempt, without the earlier answer it carried. */
 function withoutEarlier(state: ComputePhase): ComputePhase {
   if (state.phase === "idle" || state.phase === "done") return state;
   return { ...state, earlier: null };
 }
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import { strategyNeedsRival, type EntryAdvice, type LeagueViewEnvelope } from "../types";
 import type { LeagueMemberViewProps, ShownAdvice } from "./memberPageTypes";
 
 /** Select/reset advice for the current URL while rejecting stale publication context. */
@@ -34,25 +37,37 @@ export function useMemberAdviceView(
     capabilities = null,
     computeService = "static",
     deviceDependencies,
+    deviceRivals = NO_DEVICE_RIVALS,
   }: LeagueMemberViewProps,
   searchParams: URLSearchParams,
 ) {
   const view = squad.payload;
-  const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
-  const leagueId = view.league_id;
+  const { tree } = useLeague();
+  const adviceClient = useMemo(
+    () => client ?? createAdviceClient(tree.entryAdvice),
+    [client, tree],
+  );
   const entryId = view.entry.entry_id;
-  const resolve = (params: URLSearchParams) =>
-    resolvePublishedAdvice(
-      params,
-      leagueId,
-      entryId,
-      members,
-      index,
-      { season: view.season, gameweek: view.gameweek },
-      capabilities,
-    );
+  // What the member's own device can compute from this publish's inputs, stated beside
+  // the service's capabilities so the controls offer it the same way. The page's reads
+  // resolve through the same function from the same inputs.
+  const { onDevice, resolve } = memberSelection({
+    squad: view,
+    members,
+    index,
+    capabilities,
+    deviceRivals,
+  });
   const selection = resolve(searchParams);
   const { request } = selection;
+  // A rival strategy nobody published, that the service does not answer, waits for the
+  // rivals' documents the device's statement is made from: until they are read the page
+  // cannot say whether the device answers it, so it reads as loading, not as unlisted.
+  const rivalsLoading =
+    onDevice?.loading === true &&
+    strategyNeedsRival(request.strategy) &&
+    selection.status === "not-listed" &&
+    selection.computable?.selection !== true;
   const indexReadable = adviceIssue !== "index-missing" && adviceIssue !== "index-error";
   const selectionAvailable = !adviceLoading && indexReadable && selection.status === "ready";
   // What Hesapla may be asked for. A static build computes the plain plan of a published
@@ -77,7 +92,15 @@ export function useMemberAdviceView(
     request.model !== "football" &&
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
-  const deviceJob = useDevicePlan(view, request, deviceDependencies);
+  // The chip the page shows is the selection's; without the service's capabilities the
+  // request carries none, so the device is asked for the selection, chip included. A rival
+  // strategy is offered only against a rival the device's statement names.
+  const deviceJob = useDevicePlan(
+    view,
+    deviceRequestFor(selection),
+    deviceDependencies,
+    onDevice?.rivals ?? [],
+  );
   const requestKey = [
     adviceRequestKey(request),
     selection.status,
@@ -224,7 +247,8 @@ export function useMemberAdviceView(
       origin: computed.source === "api-cache" ? "computed" : "published",
       source: computed.source,
     };
-  } else if (plainOnly && deviceJob.state.phase === "done") {
+  } else if (deviceJob.state.phase === "done") {
+    // The device's state is keyed by the selection it answered, chip included.
     shown = { envelope: deviceJob.state.envelope, origin: "computed", source: "device" };
   } else if (published) {
     shown = { envelope: published, origin: waiting ? "published-while-computing" : "published" };
@@ -241,6 +265,8 @@ export function useMemberAdviceView(
     computeAvailable,
     job: jobForPanel,
     device,
+    onDevice,
+    rivalsLoading,
     request,
     shown,
     rejectedContext,

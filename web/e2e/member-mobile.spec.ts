@@ -87,7 +87,7 @@ for (const language of ["tr", "en"] as const) {
     await installLeagueMocks(page);
     await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto("/league/members/35249001?mode=saf-puan&window=3");
+    await page.goto("/league/352490/members/35249001?mode=saf-puan&window=3");
     const copy = MESSAGES[language];
     const members = copy.leagueMembers;
 
@@ -183,7 +183,7 @@ for (const language of ["tr", "en"] as const) {
     await page.setViewportSize({ width: 375, height: 548 });
     await installLeagueMocks(page);
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto("/league/members/35249001?mode=saf-puan&window=3");
+    await page.goto("/league/352490/members/35249001?mode=saf-puan&window=3");
     const copy = MESSAGES[language].leagueMembers;
     const settings = page.getByRole("region", { name: copy.planTitle });
     const window = settings.getByRole("radio", { name: /^3 / });
@@ -254,7 +254,7 @@ for (const language of ["tr", "en"] as const) {
         body: JSON.stringify(body),
       });
     });
-    await page.goto("/league/members/35249001?window=3");
+    await page.goto("/league/352490/members/35249001?window=3");
     const copy = MESSAGES[language].leagueMembers;
     const settings = page.getByRole("region", { name: copy.planTitle });
     await settings.getByRole("radio", { name: /^5 / }).click();
@@ -295,7 +295,7 @@ for (const language of ["tr", "en"] as const) {
     );
     await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto(`/league/members/${ENTRY}`);
+    await page.goto(`/league/352490/members/${ENTRY}`);
     const copy = MESSAGES[language];
     await expect(page.getByTestId("member-selection-summary")).toBeVisible();
 

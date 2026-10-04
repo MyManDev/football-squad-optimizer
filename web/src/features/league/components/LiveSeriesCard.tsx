@@ -1,3 +1,5 @@
+import { memberHistoryAddress } from "../../../lib/leagueAddresses";
+import { useLeague, useLeagueId } from "../useLeague";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Card } from "../../../design/components/Card";
@@ -10,9 +12,10 @@ import styles from "./ScoreboardCard.module.css";
 
 export function LiveSeriesSection({ view }: { view: Scoreboard }) {
   const { messages } = useLanguage();
+  const { league, tree } = useLeague();
   const query = useQuery({
-    queryKey: ["live-member-series", view.season, view.source_snapshot_id],
-    queryFn: ({ signal }) => loadLiveSeries(view, signal),
+    queryKey: ["live-member-series", league.leagueId, view.season, view.source_snapshot_id],
+    queryFn: ({ signal }) => loadLiveSeries(tree, view, signal),
     ...LEAGUE_READ,
   });
   if (!query.data)
@@ -34,6 +37,7 @@ export function LiveSeriesCard({
   unavailableMembers: number;
 }) {
   const { messages, locale } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.liveSeries;
   return (
     <Card title={copy.title}>
@@ -45,7 +49,6 @@ export function LiveSeriesCard({
             ? copy.remaining(remaining)
             : copy.reached}
       </p>
-      <p className={styles.notice}>{copy.limits}</p>
       {unavailableMembers > 0 && <p>{copy.missing(unavailableMembers)}</p>}
       {series.meanDifference !== null && (
         <p>{copy.mean(signedPoints(series.meanDifference, 1, locale))}</p>
@@ -104,7 +107,7 @@ export function LiveSeriesCard({
                   <tr key={row.recordKey}>
                     <td>{row.gameweek}</td>
                     <th scope="row">
-                      <Link to={`/league/members/${row.entryId}/history`}>{row.entryId}</Link>
+                      <Link to={memberHistoryAddress(leagueId, row.entryId)}>{row.entryId}</Link>
                     </th>
                     <td>
                       {messages.scoreboardComparisons.official}

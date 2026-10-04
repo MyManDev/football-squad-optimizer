@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
-import { loadEntrySquad, loadLeagueMembers, loadScoreboard } from "./data";
+import { LeagueDataMissing } from "./dataErrors";
+import { useLeague } from "./useLeague";
 
 /**
  * How the league feature's own reads behave, written once. Every `useQuery` call inside
@@ -29,33 +30,72 @@ export const CAPABILITIES_READ = {
   refetchOnWindowFocus: true,
 } as const;
 
-/** The cache keys more than one league page reads: one spelling each, so the pages share one read. */
+/**
+ * The cache keys more than one league page reads: one spelling each, so the pages share one
+ * read; every key names the league, so two leagues' documents never share a cache entry.
+ */
 export const leagueKeys = {
-  members: () => ["provisional-league-members"] as const,
-  scoreboard: () => ["provisional-league-scoreboard"] as const,
-  entrySquad: (entryId: number | null | undefined) =>
-    ["provisional-entry-squad", entryId ?? null] as const,
+  directory: () => ["league-directory"] as const,
+  members: (leagueId: number) => ["provisional-league-members", leagueId] as const,
+  scoreboard: (leagueId: number) => ["provisional-league-scoreboard", leagueId] as const,
+  entrySquad: (leagueId: number, entryId: number | null | undefined) =>
+    ["provisional-entry-squad", leagueId, entryId ?? null] as const,
+  adviceIndex: (leagueId: number, entryId: number) =>
+    ["provisional-entry-advice-index", leagueId, entryId] as const,
 };
 
 export function useLeagueMembers(enabled = true) {
+  const { league, tree } = useLeague();
   return useQuery({
-    queryKey: leagueKeys.members(),
-    queryFn: loadLeagueMembers,
+    queryKey: leagueKeys.members(league.leagueId),
+    queryFn: () => tree.members(),
     enabled,
     ...LEAGUE_READ,
   });
 }
 
 export function useLeagueScoreboard() {
-  return useQuery({ queryKey: leagueKeys.scoreboard(), queryFn: loadScoreboard, ...LEAGUE_READ });
+  const { league, tree } = useLeague();
+  return useQuery({
+    queryKey: leagueKeys.scoreboard(league.leagueId),
+    queryFn: () => tree.scoreboard(),
+    ...LEAGUE_READ,
+  });
 }
 
 /** One entry's squad document; nothing is read while there is no entry to read. */
 export function useEntrySquad(entryId: number | null | undefined, enabled = true) {
+  const { league, tree } = useLeague();
   return useQuery({
-    queryKey: leagueKeys.entrySquad(entryId),
-    queryFn: () => loadEntrySquad(entryId!),
+    queryKey: leagueKeys.entrySquad(league.leagueId, entryId),
+    queryFn: () => tree.entrySquad(entryId!),
     enabled: enabled && entryId != null,
     ...LEAGUE_READ,
+  });
+}
+
+/**
+ * Several entries' squad documents, each under the same key `useEntrySquad` reads it by,
+ * so a page that reads one of them again shares the read: the documents read so far, in
+ * the order asked; whether any is still being read; and the entries whose read failed for
+ * a reason other than the document being absent, so a page never calls those unpublished.
+ */
+export function useEntrySquads(entryIds: readonly number[], enabled = true) {
+  const { league, tree } = useLeague();
+  return useQueries({
+    queries: entryIds.map((entryId) => ({
+      queryKey: leagueKeys.entrySquad(league.leagueId, entryId),
+      queryFn: () => tree.entrySquad(entryId),
+      enabled,
+      ...LEAGUE_READ,
+    })),
+    combine: (results) => ({
+      squads: results.flatMap((result) => (result.data === undefined ? [] : [result.data.payload])),
+      pending: enabled && results.some((result) => result.isPending),
+      unreadable: entryIds.filter((_, at) => {
+        const error = results[at]?.error;
+        return error != null && !(error instanceof LeagueDataMissing);
+      }),
+    }),
   });
 }

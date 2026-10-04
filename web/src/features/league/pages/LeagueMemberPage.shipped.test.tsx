@@ -5,7 +5,8 @@
  * real tree (`shippedTree.test.ts`) runs validators without drawing anything. A component
  * that throws on a real document shape the examples never carry would reach a member
  * first. This draws the page as the site does, for every member in
- * `public/data/league/members.json` and in both languages: the real loaders, the real
+ * `public/data/league/members.json` and in both languages: the real gate (which reads the
+ * directory, and the one legacy tree as the directory of one), the real loaders, the real
  * validators, the shell and the route's error boundary, with each request answered from
  * `public/` on disk. Nothing leaves the process, and a request outside `data/` fails the
  * test.
@@ -35,6 +36,8 @@ import type {
   LeagueMembers,
   LeagueViewEnvelope,
 } from "../types";
+import { memberAddress } from "../../../lib/leagueAddresses";
+import { LeagueGate } from "./LeagueGate";
 import { LeagueMemberPage } from "./LeagueMemberPage";
 
 const PUBLIC = join(__dirname, "../../../../public");
@@ -140,11 +143,18 @@ function openMemberPage(entryId: number, language: Language) {
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
-        <MemoryRouter initialEntries={[`/league/members/${entryId}`]}>
+        <MemoryRouter initialEntries={[memberAddress(league!.league_id, entryId)]}>
           <PageShell>
             <RouteErrorBoundary>
               <Routes>
-                <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
+                <Route
+                  path="/league/:leagueId/members/:entryId"
+                  element={
+                    <LeagueGate>
+                      <LeagueMemberPage />
+                    </LeagueGate>
+                  }
+                />
               </Routes>
             </RouteErrorBoundary>
           </PageShell>

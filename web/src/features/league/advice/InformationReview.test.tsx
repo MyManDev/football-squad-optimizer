@@ -44,10 +44,10 @@ it.each(["tr", "en"] as const)(
     const comparison = screen.getByTestId("policy-comparison");
     expect(comparison).toHaveTextContent("110");
     expect(comparison).toHaveTextContent("130");
-    expect(comparison).toHaveTextContent(
+    expect(comparison).not.toHaveTextContent(
       language === "tr" ? "güven aralığı değildir" : "not a confidence interval",
     );
-    expect(comparison).toHaveTextContent(
+    expect(comparison).not.toHaveTextContent(
       language === "tr" ? "olasılık atanmadı" : "No news-arrival probability",
     );
     expect(
@@ -76,8 +76,9 @@ it("shows conditional news, base points and hold without presenting future moves
   expect(region).toHaveTextContent("FPL oynama değeri: 75/100");
   expect(region).not.toHaveTextContent("%");
   expect(region).toHaveTextContent("Bu hafta transfer yapma");
-  expect(region).toHaveTextContent("kesin gelecek transfer tahmini değildir");
-  expect(region).toHaveTextContent("Top100 ağırlığı puan kazancı değildir");
+  expect(region).not.toHaveTextContent("kesin gelecek transfer tahmini değildir");
+  expect(region).not.toHaveTextContent("Top100 ağırlığı puan kazancı değildir");
+  expect(region).toHaveTextContent("Puanlar temel futbol tahmininden gelir");
   expect(within(region).getByText("Oynayamaz bilgisi gelirse")).toBeInTheDocument();
   expect(region).toHaveTextContent("2 ücretsiz transfer");
 });
