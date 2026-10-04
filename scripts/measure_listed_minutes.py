@@ -13,7 +13,8 @@ solved through the same league publication calls into ``--work-dir`` (saf-puan a
 member window and every chip the member holds; no rival menu, no Top 100 menu, no manager's
 word), and each advice document is compared on what it tells the member: captain, vice,
 moves, eleven, bench, chip and the plan's weekly transfers. ``--published-records``
-compares the control's solves with the advice records of that capture, which is what makes
+compares the control's solves with the advice records of that capture (the store's records of
+the ``--league`` measured, wherever that league's records live), which is what makes
 the control a reproduction of what members were told rather than an assumption about it.
 
 Nothing under the snapshot, handoff or record roots is written. The candidate handoff and
@@ -36,6 +37,7 @@ from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, repository_provenance,
 
 from squadopt.application import projection_handoff as producer
 from squadopt.application.advice import member_horizon_builder
+from squadopt.application.advice_record import league_record_root
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.league_publication import (
@@ -393,7 +395,9 @@ def main() -> int:
     }
     if arguments.published_records is not None:
         record["control_against_published"] = _published(
-            arguments.published_records, arguments.snapshot_id, solved_control
+            league_record_root(arguments.published_records, arguments.league),
+            arguments.snapshot_id,
+            solved_control,
         )
     write_json(arguments.output, record)
     print(json.dumps({key: value for key, value in record.items() if key != "players"}, indent=1))
