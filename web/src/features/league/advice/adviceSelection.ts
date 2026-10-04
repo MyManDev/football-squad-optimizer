@@ -186,6 +186,19 @@ export interface PublishedAdviceSelection {
    * and `status` is "ready" only when the published tree answers exactly that.
    */
   computable?: ComputableAdvice;
+  /**
+   * What the member's own device can compute from the published inputs, present only
+   * where the publish wrote them: a statement beside the service's, read by the controls
+   * the same way. It changes no status; a selection the publish did not solve stays
+   * "not-listed" until the device answers it.
+   */
+  onDevice?: DeviceComputable;
+}
+
+export interface DeviceComputable {
+  strategies: MemberStrategy[];
+  windows: WindowSize[];
+  rivals: number[];
 }
 
 export interface ComputableAdvice {
@@ -338,9 +351,18 @@ export function resolvePublishedAdvice(
   index: EntryAdviceIndex | null | undefined,
   context?: { season: string; gameweek: number },
   capabilities?: AdviceCapabilities | null,
+  onDevice?: DeviceComputable,
 ): PublishedAdviceSelection {
   const preferences = preferencesFromUrl(searchParams);
-  const published = resolveFromIndex(searchParams, leagueId, entryId, members, index, context);
+  const published = resolveFromIndex(
+    searchParams,
+    leagueId,
+    entryId,
+    members,
+    index,
+    context,
+    onDevice,
+  );
   if (
     !capabilities ||
     capabilities.leagueId !== leagueId ||
@@ -556,6 +578,7 @@ function resolveFromIndex(
   members: EntryView[],
   index: EntryAdviceIndex | null | undefined,
   context?: { season: string; gameweek: number },
+  onDevice?: DeviceComputable,
 ): PublishedAdviceSelection {
   const request = selectedAdviceRequest(searchParams, leagueId, entryId, members, context);
   const result: PublishedAdviceSelection = {
@@ -569,6 +592,7 @@ function resolveFromIndex(
     evidence: { ...EVIDENCE_OFF },
     top100: { ...TOP100_OFF, weights: [0], offered: [0] },
     chip: { ...CHIP_OFF, held: [], options: [], reasons: {} },
+    ...(onDevice ? { onDevice } : {}),
   };
   if (!index) return result;
   if (
@@ -636,10 +660,16 @@ function resolveFromIndex(
   result.windows = availableWindows(index, request.strategy);
   const { strategy, window } = request;
   if (strategyNeedsRival(strategy)) {
+    // The rivals the publish paired, and any member the device could pair for it.
     const rivalIds = [
-      ...new Set(
-        index.rival_entry_ids.filter((id) => Number.isSafeInteger(id) && id > 0 && id !== entryId),
-      ),
+      ...new Set([
+        ...index.rival_entry_ids.filter(
+          (id) => Number.isSafeInteger(id) && id > 0 && id !== entryId,
+        ),
+        ...(onDevice && isMemberStrategy(strategy) && onDevice.strategies.includes(strategy)
+          ? onDevice.rivals
+          : []),
+      ]),
     ];
     result.rivals = rivalIds.map((rivalEntryId) => {
       const expectedPath = `advice/${entryId}/${strategy}/${window}/vs-${rivalEntryId}.json`;

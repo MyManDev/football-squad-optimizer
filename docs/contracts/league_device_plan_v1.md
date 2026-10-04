@@ -31,7 +31,9 @@ over these numbers and solves it with HiGHS compiled to WebAssembly in a Web Wor
 | `rules.max_free_transfers` | The cap on banked free transfers. |
 | `rules.hit_cost_scaled` | The planner's caution margin per paid transfer, on the objective's integer scale. |
 | `rules.hit_points_charged` | What the game charges per paid transfer, in points. |
+| `rules.hit_charged_scaled` | The same charge on the objective's integer scale: the rival price tag's anchor is solved at the charge, not at the margin. Absent on documents from before the field; a device then scales `hit_points_charged` itself. |
 | `rules.expected_points_scale` | The integer scale; the objective divided by it is in points. |
+| `rules.strategies` | Each rival strategy's overlap band on the decided week, by slug: `overlap_floor` or `overlap_ceiling` (the other null), from the strategy catalogue. Absent on documents from before the field; a device then uses the catalogue's values as it knows them. |
 | `players[]` | The table in solver order: `id`, `name`, `short_name`, `team`, `position`, `buy_tenths`, `expected_points`, and `coefficients` as `[squad, starter, captain]`, the server's exact integers. |
 
 `players` is sorted by id, the order the planner sorts its own table into before it
@@ -46,7 +48,19 @@ expected-points fallback is the rule in force, and the device restates that fall
 
 Two things the device model takes as given: a player not held has no sale price (the
 planner fills the buy price, which a one-week answer never uses, since a player not held
-cannot be sold), and no per-week transfer cap applies under the member policy.
+cannot be sold), and no per-week transfer cap applies under the member policy except the
+one a rival strategy sets on itself (the free transfers the member holds, at least one).
+
+## A rival strategy on the device
+
+A rival strategy needs one more published input: the rival's eleven and captain, read from
+the rival's own entry document (`starting_xi` and the captain it marks). The device then
+restates `advice._advise_against_rival`: two candidates under the band, the strictest
+level the free transfers reach with no hits and the declared target with hits allowed; the
+one with the higher net expected points is the plan and the other the alternative; the
+price is the member's own pure-points plan at the game's charge, floored at the best plan
+solved, less the banded plan, both net of hits; the gap against the rival is the two
+elevens on the same table, net of the plan's hits.
 
 ## The member block
 

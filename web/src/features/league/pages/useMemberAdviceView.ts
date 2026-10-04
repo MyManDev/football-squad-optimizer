@@ -11,6 +11,7 @@ import {
   type AdviceJob,
   type ComputePhase,
 } from "../advice/useAdviceJob";
+import { deviceComputable } from "../device/computable";
 import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
 
 /** The same attempt, without the earlier answer it carried. */
@@ -41,6 +42,9 @@ export function useMemberAdviceView(
   const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
   const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
+  // What the member's own device can compute from this publish's inputs, stated beside
+  // the service's capabilities so the controls offer it the same way.
+  const onDevice = deviceComputable(view, members);
   const resolve = (params: URLSearchParams) =>
     resolvePublishedAdvice(
       params,
@@ -50,6 +54,7 @@ export function useMemberAdviceView(
       index,
       { season: view.season, gameweek: view.gameweek },
       capabilities,
+      onDevice,
     );
   const selection = resolve(searchParams);
   const { request } = selection;
@@ -245,6 +250,7 @@ export function useMemberAdviceView(
     computeAvailable,
     job: jobForPanel,
     device,
+    onDevice,
     request,
     shown,
     rejectedContext,

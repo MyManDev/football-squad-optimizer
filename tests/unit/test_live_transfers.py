@@ -211,6 +211,16 @@ def _panel() -> pd.DataFrame:
 
 @pytest.fixture(name="world")
 def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    return build_world(tmp_path)
+
+
+def build_world(tmp_path: Path) -> dict[str, Any]:
+    """The three-capture world under ``tmp_path``: GW1, the GW2 deadline, GW2 settled.
+
+    A plain function so the device-plan parity fixture (``scripts/export_device_plan_fixture``)
+    can build the same world outside pytest and record what the advice service answers on it.
+    """
+
     snapshot_root = tmp_path / "snapshots"
     gw1 = write_snapshot(
         snapshot_root,

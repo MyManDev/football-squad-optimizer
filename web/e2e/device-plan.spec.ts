@@ -154,3 +154,86 @@ test("a chip the member holds is solved on the device with its gain against the 
   await expect(page.getByText(names.get(member.reference.captain)!).first()).toBeVisible();
   await expect(page.locator("main")).toContainText(/Çipsiz kendi planına göre bu hafta ~\+/);
 });
+
+test("a rival strategy is solved on the device against the rival's published eleven", async ({
+  page,
+}) => {
+  // The fixture's rival world: the member's block and the rival's eleven are the ones the
+  // advice service answered for, so the device's answer on screen is the service's.
+  const world = fixture.rivals;
+  const RIVAL = 35249002;
+  const memberBlock = world.members["101"]!;
+  const rivalEleven = world.rivals["202"]!;
+  await installLeagueMocks(page);
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  const rivalSquad = mockEntrySquadEnvelopes[RIVAL]!;
+  const names = new Map(world.document.players.map((p) => [p.id, p]));
+  const asPlayer = (id: number, index: number) => ({
+    ...rivalSquad.payload.starting_xi[index]!,
+    player_id: id,
+    name: names.get(id)!.name,
+    short_name: names.get(id)!.short_name,
+    position: names.get(id)!.position,
+    team: names.get(id)!.team,
+    is_captain: id === rivalEleven.captain,
+    is_vice_captain: false,
+  });
+  const documents: Record<number, unknown> = {
+    [ENTRY]: {
+      ...squad,
+      payload: {
+        ...squad.payload,
+        source_snapshot_id: world.document.source_snapshot_id,
+        device_plan: memberBlock,
+      },
+    },
+    [RIVAL]: {
+      ...rivalSquad,
+      payload: {
+        ...rivalSquad.payload,
+        source_snapshot_id: world.document.source_snapshot_id,
+        starting_xi: rivalEleven.starting_xi.map(asPlayer),
+      },
+    },
+  };
+  await page.route(/\/data\/league\/entries\/(\d+)\.json(?:\?.*)?$/, (route) => {
+    const id = Number(/entries\/(\d+)\.json/.exec(route.request().url())![1]);
+    const document = documents[id];
+    return document
+      ? route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(document),
+        })
+      : route.fulfill({ status: 404, body: "" });
+  });
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: world.document,
+      }),
+    }),
+  );
+
+  await page.goto(`/league/members/${ENTRY}?mode=fark-yarat&window=1&rival=${RIVAL}`);
+  const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  // The band's account, as the service publishes it: the overlap, the cap and the price.
+  const reference = world.cases.find(
+    (c) => c.entry_id === 101 && c.rival_entry_id === 202 && c.strategy === "fark-yarat",
+  )!.reference;
+  await expect(page.locator("main")).toContainText(
+    `rakibin on birinden ${reference.overlap_count} tanesi senin on beşinde`,
+  );
+  await expect(page.locator("main")).toContainText(
+    `istenen ortak oyuncu sınırı ${reference.overlap_target}`,
+  );
+});

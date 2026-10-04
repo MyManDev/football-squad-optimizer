@@ -13,6 +13,14 @@ export function isDeviceChip(value: unknown): value is DeviceChip {
   return typeof value === "string" && (DEVICE_CHIPS as readonly string[]).includes(value);
 }
 
+/** The strategies with a rival's eleven as a constraint, as the catalogue names them. */
+export const RIVAL_STRATEGIES = ["ortak-koru", "fark-yarat"] as const;
+export type RivalStrategy = (typeof RIVAL_STRATEGIES)[number];
+
+export function isRivalStrategy(value: unknown): value is RivalStrategy {
+  return typeof value === "string" && (RIVAL_STRATEGIES as readonly string[]).includes(value);
+}
+
 export interface DevicePlanPlayer {
   id: number;
   name: string;
@@ -37,7 +45,13 @@ export interface DevicePlanRules {
   hit_cost_scaled: number;
   /** What the game charges per paid transfer, in points. */
   hit_points_charged: number;
+  /** The same on the objective scale; absent on documents from before the field. */
+  hit_charged_scaled?: number;
   expected_points_scale: number;
+  /** Each rival strategy's band on the decided week; absent on documents from before the field. */
+  strategies?: Partial<
+    Record<RivalStrategy, { overlap_floor: number | null; overlap_ceiling: number | null }>
+  >;
 }
 
 /** `league/device-plan.json`: the capture's table in solver order, and the rules as numbers. */
@@ -50,6 +64,37 @@ export interface DevicePlanDocument {
   policy_id: string;
   rules: DevicePlanRules;
   players: DevicePlanPlayer[];
+}
+
+/** The rival a strategy is played against: their public eleven and captain, from their entry document. */
+export interface DeviceRival {
+  entry_id: number;
+  starting_xi: number[];
+  captain: number;
+}
+
+export type DeviceRivalPlanKind = "within_free_transfers" | "with_hits";
+
+/** What a rival strategy publishes beyond the plan itself, as the server names it. */
+export interface DeviceRivalFields {
+  mode: RivalStrategy;
+  rival_entry_id: number;
+  expected_points_cost: number;
+  expected_points_cost_ceiling: number;
+  overlap_count: number;
+  transfer_cap: number;
+  overlap_target: number;
+  overlap_applied: number;
+  plan_kind: DeviceRivalPlanKind;
+  alternative_plan: {
+    kind: DeviceRivalPlanKind;
+    overlap_applied: number;
+    transfer_hit_points: number;
+    expected_points_cost: number;
+    expected_points_cost_ceiling: number;
+  } | null;
+  expected_gap_vs_rival: number;
+  captain_agreement: boolean;
 }
 
 /** One member's side of the problem, from `entries/<id>.json`. */
@@ -94,6 +139,8 @@ export interface DevicePlanAnswer {
    * net of its hits. Absent without a chip.
    */
   gain_vs_no_chip?: number;
+  /** With a rival strategy: the band's account. Absent for the plain plan and a chip. */
+  rival?: DeviceRivalFields;
   seconds: number;
 }
 
@@ -131,6 +178,16 @@ function isPlayer(value: unknown): value is DevicePlanPlayer {
   );
 }
 
+function isBands(value: unknown): boolean {
+  if (!record(value)) return false;
+  return Object.values(value).every(
+    (band) =>
+      record(band) &&
+      (band.overlap_floor === null || finite(band.overlap_floor)) &&
+      (band.overlap_ceiling === null || finite(band.overlap_ceiling)),
+  );
+}
+
 export function isDevicePlanDocument(value: unknown): value is DevicePlanDocument {
   if (!record(value) || value.contract_version !== DEVICE_PLAN_CONTRACT_VERSION) return false;
   const rules = value.rules;
@@ -150,6 +207,8 @@ export function isDevicePlanDocument(value: unknown): value is DevicePlanDocumen
     finite(rules.max_free_transfers) &&
     finite(rules.hit_cost_scaled) &&
     finite(rules.hit_points_charged) &&
+    (rules.hit_charged_scaled === undefined || finite(rules.hit_charged_scaled)) &&
+    (rules.strategies === undefined || isBands(rules.strategies)) &&
     finite(rules.expected_points_scale) &&
     rules.expected_points_scale > 0 &&
     Array.isArray(value.players) &&

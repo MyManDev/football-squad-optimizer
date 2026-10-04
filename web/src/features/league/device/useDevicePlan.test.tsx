@@ -17,7 +17,8 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
-import { solvePlan, type LpSolver } from "./planModel";
+import type { LpSolver } from "./lp/problem";
+import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
   deviceChip,
@@ -132,12 +133,13 @@ function Harness({
 describe("what the device can solve", () => {
   const squad = squadWith(entry);
 
-  it("is the pure-points plan over one week, with at most a held chip", () => {
+  it("is the pure-points plan over one week, a held chip, or a rival strategy", () => {
     expect(deviceSolvable(REQUEST, squad)).toBe(true);
     expect(deviceSolvable({ ...REQUEST, window: 3 }, squad)).toBe(false);
     expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru", rivalEntryId: 2 }, squad)).toBe(
-      false,
+      true,
     );
+    expect(deviceSolvable({ ...REQUEST, strategy: "ortak-koru" }, squad)).toBe(false);
     expect(deviceSolvable({ ...REQUEST, top100Weight: 20 }, squad)).toBe(false);
     expect(deviceSolvable({ ...REQUEST, managersWord: true }, squad)).toBe(false);
     expect(deviceSolvable({ ...REQUEST, chip: "bboost" }, squad)).toBe(true);
