@@ -55,6 +55,10 @@ describe("sitePath", () => {
     expect(sitePath("/data/leagues.json?x=1", "/")).toBe("/data/leagues.json");
     expect(sitePath("/sub/data/a%20b.json", "/sub/")).toBe("/data/a b.json");
     expect(sitePath("/other/data/x.json", "/sub/")).toBeNull();
+    // Vite keeps a base with a space or a non-ASCII letter percent-encoded.
+    expect(sitePath("/lig%20%C3%A7/data/leagues.json", "/lig%20%C3%A7/")).toBe(
+      "/data/leagues.json",
+    );
     expect(sitePath("/data/%E0%A4%A.json", "/")).toBeNull();
   });
 });

@@ -32,17 +32,19 @@ export function closestNotFound(root: string, pathname: string): string | null {
   return null;
 }
 
-/** The request's path under the site base, decoded, or null when it is not under the base. */
+/**
+ * The request's path under the site base, decoded, or null when it is not under the base.
+ * Vite keeps the base percent-encoded, so the encoded path is compared before decoding.
+ */
 export function sitePath(url: string, base: string): string | null {
-  let pathname: string;
+  const pathname = new URL(url, "http://preview.invalid").pathname;
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  if (!pathname.startsWith(prefix)) return null;
   try {
-    pathname = decodeURIComponent(new URL(url, "http://preview.invalid").pathname);
+    return `/${decodeURIComponent(pathname.slice(prefix.length))}`;
   } catch {
     return null;
   }
-  const prefix = base.endsWith("/") ? base : `${base}/`;
-  if (!pathname.startsWith(prefix)) return null;
-  return `/${pathname.slice(prefix.length)}`;
 }
 
 export function pagesNotFound(): Plugin {
