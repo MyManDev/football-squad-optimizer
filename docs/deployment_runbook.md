@@ -562,7 +562,25 @@ The tree's `entries/0.json` must be **absent**. Entry 0 does not exist, so a dep
 answers anything but a not-found there has lost the rule that an absent document answers 404
 rather than the application shell. A green smoke is seven route 200s, two JSON 200s, and one 404.
 
-Transient edge and propagation failures are retried for roughly one minute.
+**Assets.** `/assets/smoke-absent-asset.js`, a name no build produces, must answer 404 without
+the shell and with no long cache lifetime. `web/public/assets/404.html` makes it so, the way
+`data/404.html` does for documents. Before it, Pages answered a missing asset name with the
+shell, 200, under the `/assets/*` rule's year-long `immutable` header, and the edge that served
+it kept that HTML for the name: when a later deploy built a chunk of that name, members
+reaching that edge got HTML for the chunk and browsers kept the broken copy for a year. Then
+the smoke reads the shell, follows every asset it names (the entry, its stylesheets, every
+lazy page, the device solver's worker and wasm, the fonts) and requires each to answer as
+itself, never as the shell.
+
+So **never request a not-yet-deployed asset name on the live domain** (a local build predicts
+the names CI will publish): each such request poisons that name at the edge that answered.
+The deployment's own smoke runs from GitHub's network and sees GitHub's edge;
+`scripts/release/verify_live.py` repeats the asset walk from the operator's machine, which is
+the edge members in Turkey reach. If it reports an asset served as the HTML shell, purge that
+URL in Cloudflare (Caching, Purge by URL) before members are told, and do not reuse the name.
+
+Transient edge and propagation failures are retried for roughly one minute, the league
+directory read included.
 
 Two routes are **not** in the gate and their absence is worth knowing before someone assumes
 otherwise: `/gw/:season/:gameweek`, and `/admin`, which was added later. Neither is covered.

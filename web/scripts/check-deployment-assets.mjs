@@ -5,10 +5,18 @@ import { fileURLToPath } from "node:url";
 export const MAX_DEPLOYMENT_FILES = 20_000;
 export const MAX_DEPLOYMENT_FILE_BYTES = 25 * 1024 * 1024;
 
-// data/404.html is required and 404.html is forbidden for the same reason. Pages serves the
-// closest 404.html up the directory tree, so the one under data/ makes an unpublished document
-// answer 404, while the absence of a top-level one keeps every client-side route on the shell.
-const REQUIRED_FILES = ["index.html", "data/index.json", "data/404.html", "_headers"];
+// data/404.html and assets/404.html are required and 404.html is forbidden for the same
+// reason. Pages serves the closest 404.html up the directory tree, so the one under data/
+// makes an unpublished document answer 404 and the one under assets/ makes a missing asset
+// answer 404 (not the shell under a year-long immutable header, which an edge then keeps
+// for that name), while the absence of a top-level one keeps every route on the shell.
+const REQUIRED_FILES = [
+  "index.html",
+  "data/index.json",
+  "data/404.html",
+  "assets/404.html",
+  "_headers",
+];
 const FORBIDDEN_TOP_LEVEL_PATHS = new Set(["404.html", "_worker.js", "functions"]);
 
 function slashPath(root, path) {

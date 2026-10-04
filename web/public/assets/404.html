@@ -1,0 +1,11 @@
+<!doctype html>
+<!--
+  The closest 404.html for every path under /assets/, as data/404.html is for /data/.
+  Without it Pages answered a missing asset name with the application shell, 200, under the
+  /assets/* rule's year-long immutable Cache-Control, and the edge kept that HTML for the
+  name. A later deploy that built a chunk of that name then served HTML in its place at that
+  edge, and browsers kept the broken copy for a year. A missing asset now answers 404.
+-->
+<meta charset="utf-8" />
+<title>404</title>
+<p>No asset is published at this address.</p>

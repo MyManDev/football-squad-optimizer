@@ -1,4 +1,4 @@
-"""Verify the live site after a deployment: the smoke checks, then the content.
+"""Verify the live site after a deployment: the smoke checks, the assets, then the content.
 
 The checks mirror SMOKE_CHECKS in web/scripts/smoke-deployment.mjs, and a test holds the two
 lists equal so that adding a route there cannot leave this verifier behind. The site's league
@@ -49,6 +49,14 @@ ROUTES = [
 ]
 DOCUMENTS = ["/data/index.json"]
 DIRECTORY = "/data/leagues.json"
+#: A name no build produces (web/scripts/smoke-deployment.mjs ABSENT_ASSET): a missing
+#: asset must answer 404, not the shell an edge would keep for that name.
+ABSENT_ASSET = "/assets/smoke-absent-asset.js"
+#: An asset name inside the shell or a chunk, as the build emits it under assets/.
+ASSET_NAME = re.compile(
+    rb"""(?:/assets/|["'`]assets/|\./)([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|woff2?))"""
+)
+MAX_ASSETS = 400
 #: The one tree a site from before the directory publishes.
 LEGACY_TREE = "league"
 SEASON = re.compile(r"^\d{4}-\d{2}$")
@@ -156,6 +164,46 @@ def published_trees() -> tuple[list[Tree], bool]:
     return trees, True
 
 
+def check_assets() -> int:
+    """Every asset the live shell reaches answers as itself, never as the HTML shell.
+
+    Run from the operator's machine, so it reads the edge members near the operator reach:
+    an asset name an edge cached as the shell before the deploy built it is served as HTML
+    there while the deployment's own smoke, run elsewhere, sees the real file. Returns the
+    number of failures; each is printed.
+    """
+
+    status, shell = fetch("/")
+    queue = [name.decode() for name in ASSET_NAME.findall(shell)] if status == 200 else []
+    if not queue:
+        print(f"  BAD {status} the shell names no asset")
+        return 1
+    seen: set[str] = set()
+    failures = 0
+    while queue:
+        batch = sorted({name for name in queue if name not in seen})
+        seen.update(batch)
+        if len(seen) > MAX_ASSETS:
+            print(f"  BAD more than {MAX_ASSETS} assets reached")
+            return failures + 1
+        queue = []
+        for name in batch:
+            status, body = fetch(f"/assets/{name}")
+            served_shell = body.lstrip()[:15].lower().startswith(b"<!doctype html")
+            if status != 200 or served_shell:
+                failures += 1
+                print(
+                    f"  BAD {status} asset /assets/{name}"
+                    + ("  (the HTML shell)" if served_shell else "")
+                )
+                continue
+            if name.endswith((".js", ".css")):
+                queue.extend(found.decode() for found in ASSET_NAME.findall(body))
+    if not failures:
+        print(f"  ok  {len(seen)} assets, each served as itself")
+    return failures
+
+
 def smoke_checks(trees: list[Tree]) -> tuple[list[str], list[str], list[str]]:
     """The routes, documents and absent documents the smoke checks for these trees.
 
@@ -180,7 +228,8 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     trees, directory_ok = published_trees()
     failures += not directory_ok
     routes, documents, absent_documents = smoke_checks(trees)
-    print(f"== {len(routes) + len(documents) + len(absent_documents)} smoke checks ==")
+    absent_documents = [ABSENT_ASSET, *absent_documents]
+    print(f"== {len(routes) + len(documents) + len(absent_documents) + 1} smoke checks ==")
     for path in routes:
         status, body = fetch(path)
         ok = status == 200 and b'id="root"' in body
@@ -201,6 +250,8 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
         ok = status == 404 and b'id="root"' not in body
         failures += not ok
         print(f"  {'ok ' if ok else 'BAD'} {status} absent {absent}  (must be 404, not the shell)")
+
+    failures += check_assets()
 
     print("\n== content ==")
     # Every nested read below is type-checked: a document of the wrong shape inside is a
