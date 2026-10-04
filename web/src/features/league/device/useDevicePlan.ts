@@ -16,8 +16,8 @@ import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
-import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
-import { deviceSelection, rivalFromSquad } from "./selection";
+import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
+import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
 import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
 
 export { deviceChip, deviceSelection } from "./selection";
@@ -31,6 +31,20 @@ export type DevicePlanPhase =
   | { phase: "other-capture" }
   | { phase: "unpublished" }
   | { phase: "failed" };
+
+/**
+ * Whether the device's last run ended without a plan: it failed, refused the selection,
+ * found inputs from another capture or found none. The page then stops offering the
+ * device as the way to this selection and says what it would say without it.
+ */
+export function deviceEndedWithoutPlan(state: DevicePlanPhase): boolean {
+  return (
+    state.phase === "failed" ||
+    state.phase === "refused" ||
+    state.phase === "other-capture" ||
+    state.phase === "unpublished"
+  );
+}
 
 export interface DevicePlan {
   /** Whether this selection is one the device can solve from the published inputs. */
@@ -58,7 +72,8 @@ export interface DevicePlanDependencies {
 }
 
 function createWorker(): DeviceSolver {
-  return new Worker(new URL("./devicePlan.worker.ts", import.meta.url), {
+  // The worker's file name is part of what the browser caches; renaming it changes its URL.
+  return new Worker(new URL("./deviceSolver.worker.ts", import.meta.url), {
     type: "module",
   }) as unknown as DeviceSolver;
 }
@@ -72,6 +87,11 @@ export function useDevicePlan(
   squad: EntrySquad,
   request: AdviceRequest,
   dependencies: DevicePlanDependencies = {},
+  /**
+   * The rivals the device's statement offers (`computable.ts`): a rival strategy against
+   * anyone else is not offered, because the device could not play it. Absent, any rival.
+   */
+  rivals?: readonly number[],
 ): DevicePlan {
   const { tree } = useLeague();
   const {
@@ -83,7 +103,7 @@ export function useDevicePlan(
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
     : null;
-  const selection = deviceSelection(request, squad);
+  const selection = offeredDeviceSelection(request, squad, rivals);
   const available = entry !== null && squad.source_snapshot_id !== null && selection !== null;
   // The state is keyed by the selection it was asked for: a new selection reads idle
   // without an effect, and a late reply for the old one is ignored by its generation.

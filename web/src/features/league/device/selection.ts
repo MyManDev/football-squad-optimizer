@@ -85,6 +85,26 @@ export function deviceSelection(
   return { kind: "rival", strategy: request.strategy, rivalEntryId };
 }
 
+/**
+ * The selection the device is offered for this request: `deviceSelection`'s, except that a
+ * rival strategy is offered only against one of `rivals`, the rivals the device's statement
+ * names (`computable.ts`). With no list given, any rival.
+ */
+export function offeredDeviceSelection(
+  request: AdviceRequest,
+  squad: Pick<EntrySquad, "chips" | "device_plan">,
+  rivals?: readonly number[],
+): DeviceSelection | null {
+  const selection = deviceSelection(request, squad);
+  if (
+    selection?.kind === "rival" &&
+    rivals !== undefined &&
+    !rivals.includes(selection.rivalEntryId)
+  )
+    return null;
+  return selection;
+}
+
 /** The rival as the device needs them, from their entry document; null when it names no captain. */
 export function rivalFromSquad(
   entryId: number,

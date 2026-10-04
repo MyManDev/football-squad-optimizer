@@ -179,7 +179,8 @@ describe("league reads", () => {
     const offenders: string[] = [];
     let reads = 0;
     for (const { name, text } of leagueSources()) {
-      const calls = text.match(/\buseQuery\(/g)?.length ?? 0;
+      // A `useQueries` call spreads the policy once, into the options every read it maps takes.
+      const calls = text.match(/\buseQuer(?:y|ies)\(/g)?.length ?? 0;
       const policed = text.match(/\.\.\.(?:LEAGUE_READ|CAPABILITIES_READ)\b/g)?.length ?? 0;
       if (calls !== policed)
         offenders.push(`${name}: ${policed} of ${calls} reads use a central league read policy`);

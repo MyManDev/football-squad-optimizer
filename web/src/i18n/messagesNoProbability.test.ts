@@ -23,28 +23,14 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { CATALOGUES } from "../testSupport/catalogues";
-import { AS_A_CHANCE } from "../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../testSupport/honesty";
 import type { Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
 
-/**
- * The only exempt entries, keyed by catalogue path and listed rather than pattern-matched.
- *
- * Both are denials: each tells the reader that the site does not publish a probability, and
- * a denial has to name the thing it refuses in order to refuse it. They are held to that by
- * the second test below, which fails if one of them ever stops matching the guard, so the
- * exemption cannot quietly become cover for a claim.
- *
- *   decision.diagnosticTitle   "... is a diagnostic, never a chance of winning."
- *   rivals.noRivalAfterStatus  "... rather than a probability nobody measured."
- */
-const DENIALS: readonly string[] = [
-  "en.decision.diagnosticTitle",
-  "tr.decision.diagnosticTitle",
-  "en.rivals.noRivalAfterStatus",
-  "tr.rivals.noRivalAfterStatus",
-];
+// No entry is exempt. Two denials once were (a "never a chance of winning" note on /moves and
+// a "rather than a probability nobody measured" clause on /rivals); a denial still puts the
+// word on the page, so the note is gone and the clause was rewritten without it.
 
 /**
  * Stands in for any argument a message function takes. It answers 1 to every primitive
@@ -121,12 +107,44 @@ describe("every string in both message catalogues", () => {
   });
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
-    const exempt = new Set(DENIALS);
     const offenders = [...catalogue]
-      .filter(([path]) => !exempt.has(path))
       .filter(([, text]) => AS_A_CHANCE.test(text))
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
+  });
+
+  it("words the former denials without the thing they denied, or drops them", () => {
+    for (const language of LANGUAGES) {
+      expect(catalogue.get(`${language}.rivals.noRivalAfterStatus`)).not.toMatch(AS_A_CHANCE);
+      expect(catalogue.has(`${language}.decision.diagnosticTitle`)).toBe(false);
+    }
+  });
+
+  it("carries no caveat, limit, scope or what-this-proves sentence", () => {
+    const offenders = [...catalogue]
+      .filter(([, text]) => AS_A_CAVEAT.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    // The keys that held only such a sentence are gone, not emptied.
+    for (const language of LANGUAGES)
+      for (const key of [
+        "decision.diagnosticBody",
+        "decision.researchShadowBody",
+        "decision.liveControlBody",
+        "league.note",
+        "league.comparisonMissing",
+        "liveSeries.limits",
+      ])
+        expect(catalogue.has(`${language}.${key}`)).toBe(false);
+  });
+
+  it("names no raw capture field in a sentence", () => {
+    const offenders = [...catalogue]
+      .filter(([, text]) => /selected_by_percent/.test(text))
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    for (const language of LANGUAGES)
+      expect(catalogue.has(`${language}.league.ownershipNote`)).toBe(false);
   });
 
   it("never writes the Top 100 setting as a share, a winner or a gain", () => {
@@ -153,12 +171,6 @@ describe("every string in both message catalogues", () => {
       )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
-  });
-
-  it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {
-    const text = catalogue.get(path);
-    expect(text).toBeDefined();
-    expect(text).toMatch(AS_A_CHANCE);
   });
 
   it("no longer carries the keys that existed only to label a probability", () => {
@@ -241,6 +253,13 @@ describe("every string a production component writes inline", () => {
 
   it("publishes no probability, percentage of one, quantile, spread, likelihood or odds", () => {
     const offenders = INLINE.filter(({ text }) => AS_A_CHANCE.test(text)).map(
+      ({ at, text }) => `${at}: ${text}`,
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("writes no caveat, limit, scope or what-this-proves sentence", () => {
+    const offenders = INLINE.filter(({ text }) => AS_A_CAVEAT.test(text)).map(
       ({ at, text }) => `${at}: ${text}`,
     );
     expect(offenders).toEqual([]);

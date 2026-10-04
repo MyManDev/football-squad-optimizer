@@ -35,6 +35,7 @@ export function LeagueMemberPage() {
     adviceEnabled,
     advice,
     rival,
+    deviceRivals,
     windowControl,
     client,
     capabilities,
@@ -95,6 +96,7 @@ export function LeagueMemberPage() {
       squad={squad.data}
       advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
       rivalSquad={rival.data ?? null}
+      deviceRivals={deviceRivals}
       windowControl={windowControl.isError ? null : (windowControl.data ?? null)}
       adviceIssue={adviceIssue}
       adviceLoading={indexQuery.isPending || (adviceEnabled && advice.isPending)}

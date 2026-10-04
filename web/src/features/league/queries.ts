@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
+import { LeagueDataMissing } from "./dataErrors";
 import { useLeague } from "./useLeague";
 
 /**
@@ -70,5 +71,31 @@ export function useEntrySquad(entryId: number | null | undefined, enabled = true
     queryFn: () => tree.entrySquad(entryId!),
     enabled: enabled && entryId != null,
     ...LEAGUE_READ,
+  });
+}
+
+/**
+ * Several entries' squad documents, each under the same key `useEntrySquad` reads it by,
+ * so a page that reads one of them again shares the read: the documents read so far, in
+ * the order asked; whether any is still being read; and the entries whose read failed for
+ * a reason other than the document being absent, so a page never calls those unpublished.
+ */
+export function useEntrySquads(entryIds: readonly number[], enabled = true) {
+  const { league, tree } = useLeague();
+  return useQueries({
+    queries: entryIds.map((entryId) => ({
+      queryKey: leagueKeys.entrySquad(league.leagueId, entryId),
+      queryFn: () => tree.entrySquad(entryId),
+      enabled,
+      ...LEAGUE_READ,
+    })),
+    combine: (results) => ({
+      squads: results.flatMap((result) => (result.data === undefined ? [] : [result.data.payload])),
+      pending: enabled && results.some((result) => result.isPending),
+      unreadable: entryIds.filter((_, at) => {
+        const error = results[at]?.error;
+        return error != null && !(error instanceof LeagueDataMissing);
+      }),
+    }),
   });
 }

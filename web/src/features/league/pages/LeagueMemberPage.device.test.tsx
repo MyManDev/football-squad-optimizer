@@ -24,7 +24,7 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "../advice/adviceClient";
-import type { DevicePlanReply, DevicePlanRequest } from "../device/devicePlan.worker";
+import type { DevicePlanReply, DevicePlanRequest } from "../device/deviceSolver.worker";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
@@ -59,6 +59,11 @@ function squadWith(block: DevicePlanEntry | null): LeagueViewEnvelope<EntrySquad
 /** The real model, answered in process without a worker thread. */
 class CannedSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  /** Holding the fifteen instead: a plan that makes no transfer. */
+  private readonly hold: boolean;
+  constructor(hold = false) {
+    this.hold = hold;
+  }
   terminate(): void {}
   postMessage(request: DevicePlanRequest): void {
     const reply: DevicePlanReply = {
@@ -73,13 +78,13 @@ class CannedSolver implements DeviceSolver {
         captain: member.reference.captain,
         vice_captain: member.reference.vice_captain,
         bench: member.reference.bench,
-        transfers_in: member.reference.transfers_in,
-        transfers_out: member.reference.transfers_out,
-        transfer_hit_points: member.reference.transfer_hit_points,
+        transfers_in: this.hold ? [] : member.reference.transfers_in,
+        transfers_out: this.hold ? [] : member.reference.transfers_out,
+        transfer_hit_points: this.hold ? 0 : member.reference.transfer_hit_points,
         expected_own_points: member.reference.expected_own_points,
         hold_points: member.reference.hold_points,
-        moves: member.reference.moves,
-        expected_gain_vs_hold: member.reference.expected_gain_vs_hold,
+        moves: this.hold ? [] : member.reference.moves,
+        expected_gain_vs_hold: this.hold ? 0 : member.reference.expected_gain_vs_hold,
         seconds: 0.42,
       },
     };
@@ -132,7 +137,11 @@ class ServiceClient implements AdviceClient {
   }
 }
 
-function renderView(squad: LeagueViewEnvelope<EntrySquad>, search = "mode=saf-puan&window=1") {
+function renderView(
+  squad: LeagueViewEnvelope<EntrySquad>,
+  search = "mode=saf-puan&window=1",
+  hold = false,
+) {
   return render(
     <LanguageProvider initialLanguage="tr">
       <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
@@ -152,7 +161,7 @@ function renderView(squad: LeagueViewEnvelope<EntrySquad>, search = "mode=saf-pu
                 source_kind: "live",
                 payload: document,
               }),
-              createSolver: () => new CannedSolver(),
+              createSolver: () => new CannedSolver(hold),
               now: () => new Date("2026-10-03T01:02:03Z"),
             }}
           />,
@@ -219,5 +228,14 @@ describe("the device solve on the member page", () => {
     await act(async () => deviceButton()!.click());
     await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
     expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+  });
+
+  it("says a device plan that holds the fifteen makes no transfer, without calling it published", async () => {
+    const { container } = renderView(squadWith(entryBlock), "mode=saf-puan&window=1", true);
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    const decision = screen.getByRole("region", { name: copy.decisionTitle });
+    expect(decision).toHaveTextContent(copy.noMove);
+    expect(decision).not.toHaveTextContent(/yayımlanan plan|yayınlanan plan/i);
   });
 });

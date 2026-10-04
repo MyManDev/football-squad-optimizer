@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import { AS_A_CHANCE } from "../../../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { DecisionControls } from "./DecisionControls";
 
 const EVIDENCE = {
@@ -104,19 +104,51 @@ describe("DecisionControls", () => {
     await user.click(screen.getByRole("radio", { name: /3 hafta/ }));
     expect(screen.getByText(/FEASIBLE; çözücü kanıtı: unproven/)).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /5 hafta/ }));
-    expect(screen.getByText(/Sonuç toplu koşudan sonra oluşur/)).toBeInTheDocument();
+    // A window the batch did not run says which role it has, and nothing about what it cannot do.
+    const note = screen.getByText("araştırma gölgesi").closest('[role="note"]')!;
+    expect(note).toHaveTextContent(/^araştırma gölgesiH5 gölge kanıt için ayrılmıştır\.$/);
   });
 
-  it("marks crowd-relative windows as diagnostic rather than probability", () => {
+  it("shows a competitive window with its price and no caveat note", () => {
     renderControls("/moves?mode=asiri-agresif&window=5");
 
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Aşırı Agresif/ })).toBeChecked();
-    expect(screen.getByText("diagnostik")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Lig-içi 5 haftalık sonuç bir teşhis göstergesidir/),
-    ).toBeInTheDocument();
     expect(screen.getByText("maliyet 1,5 puan")).toBeInTheDocument();
+    expect(screen.queryByText("diagnostik")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    "/moves",
+    "/moves?mode=asiri-agresif&window=5",
+    "/moves?mode=agresif&window=3",
+    "/moves?mode=garantici&window=1",
+  ])("says no chance, caveat, limit or scope sentence at %s, in both languages", (path) => {
+    const evidence = { horizonEvidence: EVIDENCE };
+    const texts: string[] = [];
+    for (const withEvidence of [false, true]) {
+      const turkish = render(
+        <MemoryRouter initialEntries={[path]}>
+          <DecisionControls {...(withEvidence ? evidence : {})} />
+        </MemoryRouter>,
+      ).container;
+      texts.push(turkish.textContent ?? "");
+      cleanup();
+      const english = render(
+        <LanguageProvider initialLanguage="en">
+          <MemoryRouter initialEntries={[path]}>
+            <DecisionControls {...(withEvidence ? evidence : {})} />
+          </MemoryRouter>
+        </LanguageProvider>,
+      ).container;
+      texts.push(english.textContent ?? "");
+      cleanup();
+    }
+    for (const text of texts) {
+      expect(text).not.toMatch(AS_A_CHANCE);
+      expect(text).not.toMatch(AS_A_CAVEAT);
+      expect(text).not.toMatch(/ihtimal|chance|diagnosti|henüz yeni bir|not run a new/i);
+    }
   });
 
   it("prices every mode in points only, in both languages", () => {

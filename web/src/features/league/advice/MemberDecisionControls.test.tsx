@@ -71,10 +71,10 @@ describe("member decision controls", () => {
       );
       for (const description of [shared, different]) {
         expect(description).toHaveTextContent(
-          language === "tr"
-            ? /yayımlanan plan uygulanan sınırı/
-            : /published plan states the applied bound/,
+          language === "tr" ? /plan uygulanan sınırı/ : /the plan states the applied bound/,
         );
+        // The plan may be one the member's device solved; nothing calls it published.
+        expect(description).not.toHaveTextContent(/published|yayımlanan/i);
         expect(description).not.toHaveTextContent(
           /up to nine|down to five|en çok dokuz|en az beş|\bhit\b|reached|ulaştı/i,
         );

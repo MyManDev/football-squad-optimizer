@@ -4,8 +4,9 @@
  * capture on screen, and dropped by a new selection or a service computation.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -17,7 +18,7 @@ import { isAdvicePayload } from "../advice/adviceShape";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
-import type { DevicePlanReply, DevicePlanRequest } from "./devicePlan.worker";
+import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import type { LpSolver } from "./lp/problem";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
@@ -104,18 +105,25 @@ function Harness({
   loadDocument,
   solver,
   onState,
+  rivals,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
   loadDocument: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
   solver: DeviceSolver;
   onState: (state: DevicePlanPhase) => void;
+  rivals?: readonly number[];
 }) {
-  const device = useDevicePlan(squad, request, {
-    loadDocument,
-    createSolver: () => solver,
-    now: () => new Date("2026-10-03T01:02:03Z"),
-  });
+  const device = useDevicePlan(
+    squad,
+    request,
+    {
+      loadDocument,
+      createSolver: () => solver,
+      now: () => new Date("2026-10-03T01:02:03Z"),
+    },
+    rivals,
+  );
   onState(device.state);
   return (
     <div>
@@ -131,7 +139,47 @@ function Harness({
   );
 }
 
+describe("the worker", () => {
+  it("ships under its own file name, not the one an edge holds broken", () => {
+    // The browser caches the built file by name; devicePlan.worker's was cached as HTML.
+    const source = readFileSync(join(__dirname, "useDevicePlan.ts"), "utf8");
+    expect(source).toContain('new URL("./deviceSolver.worker.ts", import.meta.url)');
+    expect(source).not.toContain("devicePlan.worker");
+    expect(existsSync(join(__dirname, "deviceSolver.worker.ts"))).toBe(true);
+    expect(existsSync(join(__dirname, "devicePlan.worker.ts"))).toBe(false);
+  });
+});
+
 describe("what the device can solve", () => {
+  it("offers a rival strategy only against a rival the statement names", () => {
+    const rivalRequest: AdviceRequest = {
+      ...REQUEST,
+      strategy: "ortak-koru",
+      rivalEntryId: 35249002,
+    };
+    const mount = (rivals?: readonly number[]) =>
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={rivalRequest}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver()}
+            onState={() => {}}
+            rivals={rivals}
+          />,
+        ),
+      );
+    mount([35249002]);
+    expect(screen.getByTestId("available")).toHaveTextContent("true");
+    cleanup();
+    mount([35249004]);
+    expect(screen.getByTestId("available")).toHaveTextContent("false");
+    cleanup();
+    mount([]);
+    expect(screen.getByTestId("available")).toHaveTextContent("false");
+  });
+
   const squad = squadWith(entry);
 
   it("is the pure-points plan over one week, a held chip, or a rival strategy", () => {

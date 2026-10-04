@@ -25,6 +25,8 @@ export interface ComputeCopy {
   serviceUnreachable: string;
   serviceUnreachablePublished: string;
   serviceUnreachableAbsent: string;
+  /** The service is down and nothing is published here, but the member's device solves it. */
+  serviceUnreachableDevice: string;
   otherCapture: string;
   /** The gameweek this page advises on has closed; `when` is the formatted deadline. */
   deadlinePassedTitle: string;
@@ -75,6 +77,8 @@ const en: ComputeCopy = {
     "The compute service could not be reached. The published plan for this selection is on the page. Try computing again when the service is available.",
   serviceUnreachableAbsent:
     "The compute service could not be reached. No plan has been published for this selection. Choose another published option or try again when the service is available.",
+  serviceUnreachableDevice:
+    "The compute service could not be reached. This selection can be computed on this device.",
   otherCapture:
     "The compute service is working from a different data capture than this page, so only the published plans are shown.",
   deadlinePassedTitle: "This gameweek's deadline has passed",
@@ -160,6 +164,7 @@ const tr: ComputeCopy = {
     "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan sayfada okunabilir. Servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
   serviceUnreachableAbsent:
     "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan yok. Yayımlanmış başka bir seçeneği seç veya servis erişilebilir olduğunda yeniden dene.",
+  serviceUnreachableDevice: "Hesaplama servisine ulaşılamadı. Bu seçim bu cihazda hesaplanabilir.",
   otherCapture:
     "Hesaplama servisi şu an bu sayfadakinden farklı bir veri kaydıyla çalışıyor; bu yüzden yalnız yayınlanmış planlar gösteriliyor.",
   deadlinePassedTitle: "Bu oyun haftasının son tarihi geçti",

@@ -40,7 +40,7 @@ const en: ChipCopy = {
   legend: "Chip",
   none: "None",
   help: "Choosing a chip shows your one-week plan with that chip played this gameweek, and what that week is expected to score above your own plan without it.",
-  plain: "No chip is selected; the published plan plays none.",
+  plain: "No chip is selected; the plan plays none.",
   onlyBaseline: "One-week pure-points plan only.",
   blockedBySwitches:
     "A chip plan is solved on the plain one-week plan only. Switch the manager's word off and set the Top 100 influence to 0 to choose a chip.",
@@ -88,7 +88,7 @@ const tr: ChipCopy = {
   legend: "Çip",
   none: "Yok",
   help: "Bir çip seçersen bir haftalık planın, o çip bu hafta oynanmış haliyle gösterilir; yanında da o haftanın çipsiz kendi planına göre beklenen puan farkı yazar.",
-  plain: "Çip seçili değil; yayınlanan plan çip oynamaz.",
+  plain: "Çip seçili değil; plan çip oynamaz.",
   onlyBaseline: "Yalnız bir haftalık saf puan planında.",
   blockedBySwitches:
     "Çipli plan yalnız sade bir haftalık plan üzerinde çözülür. Çip seçmek için hocanın sözünü kapat ve Top 100 etkisini 0 yap.",

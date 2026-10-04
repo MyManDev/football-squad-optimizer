@@ -62,7 +62,9 @@ export function deviceAdviceEnvelope(
       player_out: player(move.out),
       player_in: player(move.in),
       expected_points_delta: move.gain,
-      reason_code: "points_gain",
+      // As the server labels a one-week plan's moves: the pure-points plan's are a points
+      // gain, a rival strategy's are its trade-off (build_advice_payload's default by mode).
+      reason_code: answer.rival === undefined ? "points_gain" : "mode_tradeoff",
     })),
     transfer_hit_points: answer.transfer_hit_points,
     expected_gain_vs_hold: answer.expected_gain_vs_hold,

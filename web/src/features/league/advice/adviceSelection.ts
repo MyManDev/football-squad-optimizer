@@ -201,6 +201,31 @@ export interface DeviceComputable {
   rivals: number[];
   /** The Top 100 weights the device solves for the one-week pure-points plan; zero always. */
   top100Weights: Top100Weight[];
+  /**
+   * The rivals' entry documents are still being read, so `rivals` is not final. Until it
+   * is, the rival a link names is kept, and the page reads as loading rather than unlisted.
+   */
+  loading?: boolean;
+  /** Rivals whose entry document could not be read; the rival a link names among them is kept. */
+  unreadRivals?: number[];
+}
+
+/**
+ * The rival a link names that the device's statement cannot judge yet: its documents are
+ * still being read, or this rival's could not be. Such a rival stays selected instead of
+ * being dropped while the page cannot tell whether the device can use them.
+ */
+function rivalHeldByDevice(
+  onDevice: DeviceComputable,
+  searchParams: URLSearchParams,
+  entryId: number,
+): number[] {
+  const raw = searchParams.get("rival");
+  const named = raw === null ? Number.NaN : Number(raw);
+  if (!Number.isSafeInteger(named) || named <= 0 || named === entryId) return [];
+  return onDevice.loading === true || onDevice.unreadRivals?.includes(named) === true
+    ? [named]
+    : [];
 }
 
 export interface ComputableAdvice {
@@ -678,7 +703,7 @@ function resolveFromIndex(
           (id) => Number.isSafeInteger(id) && id > 0 && id !== entryId,
         ),
         ...(onDevice && isMemberStrategy(strategy) && onDevice.strategies.includes(strategy)
-          ? onDevice.rivals
+          ? [...onDevice.rivals, ...rivalHeldByDevice(onDevice, searchParams, entryId)]
           : []),
       ]),
     ];
