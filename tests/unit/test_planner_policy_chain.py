@@ -12,6 +12,7 @@ import hashlib
 import inspect
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -22,12 +23,16 @@ from typing import Any
 import pandas as pd
 import pytest
 from scripts import measure_planner_policy_chain as chain
+from tests.unit.test_football_bundle import case as case
+from tests.unit.test_football_bundle_switches import make_joint_pair
 from tests.unit.test_football_prospective_prereg import _artifact
+from tests.unit.test_football_publication import publication_case as publication_case
 from tests.unit.test_live_horizon_planning import _inputs
 from tests.unit.test_live_recommendation import _bootstrap, _capture
 from tests.unit.test_live_transfers import CHIPS, _game_config
 
 from squadopt.application.entries import EntryError
+from squadopt.application.football_participation import FOOTBALL_PARTICIPATION_VERSION
 from squadopt.application.lineup_publication import lineup_fields
 from squadopt.application.weekly_suggestion_eval import score_recorded_advice
 from squadopt.data.atomic import write_document_once
@@ -36,13 +41,20 @@ from squadopt.live import plan_transfer_horizon
 from squadopt.live import transfers as live_transfers
 from squadopt.live.football_artifact import football_artifact_path, forecast_digest
 from squadopt.live.recommendation import read_inputs
+from squadopt.live.tick import handoff_path_for
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import PlanningHorizon
 from squadopt.planning.guarded import GUARDED_PLANNER_VERSION
 from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.platform.football_bundle import seal_football_bundle
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+)
 
 PROTOCOL_TEXT = " ".join(chain.PROTOCOL_PATH.read_text(encoding="utf-8").split())
 T0 = datetime(2026, 10, 10, 10, 0, tzinfo=UTC)
@@ -417,34 +429,181 @@ def test_a_forecast_of_another_model_version_is_a_missing_week(
     assert receipt["model_version"] == FOOTBALL_MODEL_VERSION
 
 
-def test_the_admitted_versions_are_the_protocols_and_each_week_keeps_its_own(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Rule 6: a week of the joint model is accepted under its own name, never relabelled.
-
-    The reader at this commit accepts only `football_team_share_v1`; the joint model's own
-    reader joins the frozen commit when it lands, with its acceptance case beside this one.
-    """
+def test_the_admitted_versions_are_the_protocols_and_the_contextual_version_is_not() -> None:
+    """Rule 6: three served versions by name, each one the reader accepts; research versions not."""
 
     assert chain.ADMITTED_MODEL_VERSIONS == (
         FOOTBALL_MODEL_VERSION,
-        "football_joint_role_minutes_v1",
+        JOINT_ROLE_MODEL_VERSION,
+        JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
     )
     for version in chain.ADMITTED_MODEL_VERSIONS:
         assert f"`{version}`" in PROTOCOL_TEXT
+    assert "football_contextual_v3" not in chain.ADMITTED_MODEL_VERSIONS
+    assert "`football_contextual_v3`, which that reader also accepts, was never" in PROTOCOL_TEXT
+
+
+@pytest.mark.parametrize("version", ["football_contextual_v3", "football_nobody_v9"])
+def test_the_model_version_is_read_from_the_artifact_before_any_reader_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str
+) -> None:
+    """Rule 6: a week of another version is missing as that, whether or not a reader knows it."""
+
     snapshots, artifacts, snapshot_id = _served(tmp_path)
-    read = chain.read_football_forecast
+    path = football_artifact_path(artifacts, snapshot_id)
+    stamp = path.stat().st_mtime
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["model_version"] = version
+    document["fingerprint"] = forecast_digest(document)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    os.utime(path, (stamp, stamp))
 
-    def joint(path: Path, inputs: object) -> object:
-        forecast = read(path, inputs)  # type: ignore[arg-type]
-        horizon = replace(forecast.horizon, model_version="football_joint_role_minutes_v1")
-        return replace(forecast, horizon=horizon)
+    def never(*args: object, **kwargs: object) -> object:
+        pytest.fail("a reader ran before the version was checked")
 
-    monkeypatch.setattr(chain, "read_football_forecast", joint)
+    monkeypatch.setattr(chain, "read_football_forecast", never)
+    monkeypatch.setattr(chain, "load_switch_inputs", never)
+    reason, receipt = chain.week_inputs(snapshots, artifacts, snapshot_id)  # type: ignore[misc]
+    assert reason == receipt["reason"] == "artifact_of_another_model_version"
+    assert receipt["model_version"] == version
+
+
+def test_a_served_week_plans_on_the_forecast_the_service_binds(tmp_path: Path) -> None:
+    """Rules 6 and 36: a v1 week without a bundle is bound as served, and the receipt says so."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
     week = chain.week_inputs(snapshots, artifacts, snapshot_id)
     assert isinstance(week, chain.WeekInputs)
-    assert week.receipt["model_version"] == "football_joint_role_minutes_v1"
+    receipt = week.receipt
+    assert receipt["ready_bundle_sha256"] is None and receipt["handoff_fingerprint"] is None
+    assert receipt["rotation_table_sha256"] is None and receipt["components_bound"] is False
+    assert receipt["participation_version"] == FOOTBALL_PARTICIPATION_VERSION
+    information = receipt["decision_information"]
+    assert information["version"] == "football_decision_information_v1"
+    assert len(information["revision"]) == 64
+    assert information["coach_news_bound"] is False
+    assert information["minute_components_bound"] is False
+    assert receipt["forecast_training_selection"] is None
+    assert receipt["forecast_role_metadata"] is None
+    evidence = week.forecast.projection.diagnostics["participation_evidence"]
+    assert evidence["version"] == FOOTBALL_PARTICIPATION_VERSION
+    assert evidence["base_revision"] == week.forecast.fingerprint == receipt["forecast_fingerprint"]
+
+
+@pytest.fixture
+def bundle_case(publication_case: dict[str, Any], request: pytest.FixtureRequest) -> dict[str, Any]:
+    """The bundle tests' sealed-bundle case, with the season rules the chain reads."""
+
+    publication_case["bootstrap_extra"] = {"game_config": _game_config(), "chips": CHIPS}
+    return request.getfixturevalue("case")
+
+
+@pytest.mark.parametrize("version", JOINT_ROLE_MODEL_VERSIONS)
+def test_a_joint_week_is_read_by_the_real_reader_and_bound_only_under_a_ready_bundle(
+    bundle_case: dict[str, Any], tmp_path: Path, version: str
+) -> None:
+    """Rule 6: a joint forecast is admitted under its own name, through the reader and the
+    service's own binding, so it needs the ready bundle the service needs, sealed against the
+    served handoff."""
+
+    make_joint_pair(bundle_case, version=version)
+    roots = (
+        bundle_case["snapshot_root"],
+        bundle_case["artifact_root"],
+        bundle_case["snapshot_id"],
+    )
+    handoffs = tmp_path / "handoffs"
+    handoffs.mkdir()
+    shutil.copy(bundle_case["handoff_path"], handoff_path_for(handoffs, chain.SEASON, 6))
+    artifact = football_artifact_path(bundle_case["artifact_root"], bundle_case["snapshot_id"])
+    inputs = read_inputs(chain.read_snapshot(roots[0], roots[2]), season=chain.SEASON)
+    before = (chain._instant(inputs.deadline.deadline_utc) - timedelta(hours=1)).timestamp()
+    os.utime(artifact, (before, before))
+
+    reason, receipt = chain.week_inputs(*roots, handoff_root=handoffs)  # type: ignore[misc]
+    assert reason == receipt["reason"] == "served_binding_refused"
+    assert receipt["model_version"] == version and receipt["ready_bundle_sha256"] is None
+    assert any("requires a complete ready bundle" in note for note in receipt["binding_notes"])
+
+    ready = seal_football_bundle(**bundle_case)
+    os.utime(artifact, (before, before))
+    week = chain.week_inputs(*roots, handoff_root=handoffs)
+    assert isinstance(week, chain.WeekInputs)
     assert week.receipt["reason"] is None
+    assert week.receipt["model_version"] == version == week.forecast.horizon.model_version
+    assert week.receipt["ready_bundle_sha256"] == ready.fingerprint
+    assert week.receipt["handoff_fingerprint"] == ready.handoff_fingerprint
+    assert week.receipt["components_bound"] is True
+    assert week.receipt["decision_information"]["minute_components_bound"] is True
+    assert week.receipt["forecast_role_metadata"]["version"]
+    assert week.forecast.projection.diagnostics["fixture_role_estimates"]
+
+    reason, receipt = chain.week_inputs(*roots)  # type: ignore[misc]
+    assert reason == "served_binding_refused"
+    assert any("served baseline handoff" in note for note in receipt["binding_notes"])
+
+
+def test_the_binding_is_asked_with_the_capture_the_handoff_and_the_configured_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 6 and 8: the service is asked as it was asked when serving, and its answer is kept."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+    inputs = read_inputs(chain.read_snapshot(snapshots, snapshot_id), season=chain.SEASON)
+    forecast = chain.read_football_forecast(football_artifact_path(artifacts, snapshot_id), inputs)
+    asked: dict[str, Any] = {}
+
+    def service(**kwargs: Any) -> Any:
+        asked.update(kwargs)
+        return SimpleNamespace(
+            football=forecast,
+            football_bundle_sha256="b" * 64,
+            rotation_table_sha256="r" * 64,
+            football_components_sha256="c" * 64,
+            football_components_bound=True,
+            notes=("top100: none",),
+            decision_information=lambda snapshot: {
+                "version": "football_decision_information_v1",
+                "revision": "d" * 64,
+                "source_snapshot_id": snapshot,
+            },
+        )
+
+    monkeypatch.setattr(chain, "load_switch_inputs", service)
+    monkeypatch.setattr(
+        chain,
+        "handoff_fingerprint_for",
+        lambda root, season, gameweek, snapshot: f"{root.name}:{season}:{gameweek}:{snapshot}",
+    )
+    source = tmp_path / "club-news-source.json"
+    week = chain.week_inputs(
+        snapshots,
+        artifacts,
+        snapshot_id,
+        handoff_root=tmp_path / "handoffs",
+        club_news_source=source,
+    )
+    assert isinstance(week, chain.WeekInputs)
+    assert asked["artifact_root"] == artifacts and asked["snapshot_root"] == snapshots
+    assert asked["club_news_source"] == source
+    assert asked["inputs"].snapshot_id == snapshot_id
+    fingerprint = f"handoffs:{chain.SEASON}:{inputs.deadline.gameweek}:{snapshot_id}"
+    assert asked["projection"].diagnostics == {"projection_handoff_fingerprint": fingerprint}
+    assert week.receipt["handoff_fingerprint"] == fingerprint
+    assert week.receipt["ready_bundle_sha256"] == "b" * 64
+    assert week.receipt["rotation_table_sha256"] == "r" * 64
+    assert week.receipt["components_sha256"] == "c" * 64
+    assert week.receipt["components_bound"] is True
+    assert week.receipt["binding_notes"] == ["top100: none"]
+    assert week.receipt["decision_information"]["revision"] == "d" * 64
+
+
+def test_the_command_line_names_the_handoff_root(tmp_path: Path) -> None:
+    """Rules 6 and 8: the served handoff's root is an input, read for its fingerprint only."""
+
+    with pytest.raises(SystemExit) as refused:
+        chain.main(["check", "--snapshot-root", str(tmp_path), "--artifact-root", str(tmp_path)])
+    assert refused.value.code == 2
 
 
 def test_a_forecast_that_changed_while_it_was_read_is_a_missing_week(
@@ -865,7 +1024,10 @@ def test_an_expected_lineup_window_is_named_as_its_own_route(tmp_path: Path) -> 
     )
     review = served.diagnostics["expected_lineup_window"]
     assert "sequential_incumbent" in served.diagnostics
-    assert chain._route(served) == ("expected", "expected_lineup_window_v1")
+    # Rule 3: the route's version string is whatever the frozen commit carries (v1 at fix11,
+    # v2 since #948); the record names it, and the test holds the route, not the digit.
+    assert str(review["version"]).startswith("expected_lineup_window_v")
+    assert chain._route(served) == ("expected", review["version"])
     status = chain._status(served, "expected")
     assert status["expected_window_status"] == review["status"]
     assert status["expected_window_chosen"] == review["chosen"]
@@ -1358,7 +1520,9 @@ def _chain_world(
     monkeypatch.setattr(
         chain, "deadline_of", lambda index, root, week: T0 + timedelta(days=7 * (week - 6))
     )
-    monkeypatch.setattr(chain, "_week", lambda index, snapshots, artifacts, week: weeks[week])
+    monkeypatch.setattr(
+        chain, "_week", lambda index, snapshots, artifacts, week, **roots: weeks[week]
+    )
     squads = chain.Squads(
         {f"p{budget}": _state() for budget, _, _ in chain.PROFILES},
         {},
@@ -1455,7 +1619,7 @@ def test_check_labels_each_week_pending_or_final_and_writes_nothing(
     monkeypatch.setattr(
         chain,
         "week_inputs",
-        lambda root, artifacts, snapshot_id: (
+        lambda root, artifacts, snapshot_id, **roots: (
             _week(6) if snapshot_id == "capture-gw6" else ("no_artifact", {})
         ),
     )
@@ -1517,7 +1681,9 @@ def test_each_weeks_receipt_lists_every_capture_that_targeted_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     index = (_entry("second", 3, 6), _entry("first", 1, 6), _entry("other", 2, 7))
-    monkeypatch.setattr(chain, "week_inputs", lambda root, artifacts, snapshot_id: _week(6))
+    monkeypatch.setattr(
+        chain, "week_inputs", lambda root, artifacts, snapshot_id, **roots: _week(6)
+    )
     week = chain._week(index, Path("."), Path("."), 6)
     assert isinstance(week, chain.WeekInputs)
     assert [entry["snapshot_id"] for entry in week.receipt["own_target_captures"]] == [

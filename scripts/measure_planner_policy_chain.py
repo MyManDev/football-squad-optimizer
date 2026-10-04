@@ -42,6 +42,7 @@ import pandas as pd
 
 import squadopt
 from squadopt.application import advice as window_advice
+from squadopt.application.football_participation import FOOTBALL_PARTICIPATION_VERSION
 from squadopt.application.lineup_publication import lineup_fields
 from squadopt.data.atomic import write_bytes_once, write_document_once
 from squadopt.data.errors import DataError
@@ -53,7 +54,12 @@ from squadopt.live.football_artifact import (
     forecast_digest,
     read_football_forecast,
 )
-from squadopt.live.recommendation import RecommendationInputs, infer_season, read_inputs
+from squadopt.live.recommendation import (
+    Projection,
+    RecommendationInputs,
+    infer_season,
+    read_inputs,
+)
 from squadopt.live.rules import SeasonRules, read_season_rules
 from squadopt.live.transfers import (
     HeldSquad,
@@ -78,7 +84,13 @@ from squadopt.planning.models import (
 )
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths, spending_power
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.platform.advice_switches import load_switch_inputs
+from squadopt.platform.capture_context import handoff_fingerprint_for
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+)
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 PROTOCOL_FILE = "docs/research/planner_policy_chain_prereg.md"
@@ -105,10 +117,12 @@ HOLD_PROBE_UNITS = 1.0
 #: routes and finances a three- or five-week window by it (rule 12).
 FOOTBALL_HORIZON_MODEL = "fixture_football_candidate"
 #: Rule 6: the served model versions a week may carry, each only as the reader at the frozen
-#: commit accepts it. A week records its own version and the two are never relabelled.
+#: commit accepts it. A week records its own version and no two are relabelled as one. The
+#: contextual research version, which that reader also accepts, was never served and is not here.
 ADMITTED_MODEL_VERSIONS: tuple[str, ...] = (
     FOOTBALL_MODEL_VERSION,
-    "football_joint_role_minutes_v1",
+    JOINT_ROLE_MODEL_VERSION,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
 )
 #: The configuration measure_shortlist_matrix.py builds its squads under (rule 9).
 SQUAD_CONFIG = OptimizationConfig(
@@ -353,12 +367,22 @@ def _receipt(
 
 
 def week_inputs(
-    snapshot_root: Path, artifact_root: Path, snapshot_id: str
+    snapshot_root: Path,
+    artifact_root: Path,
+    snapshot_id: str,
+    *,
+    handoff_root: Path | None = None,
+    club_news_source: Path | None = None,
 ) -> WeekInputs | tuple[str, Mapping[str, object]]:
-    """Rules 6 and 7: the served v1 forecast and season rules for one capture, or a reason.
+    """Rules 6 and 7: the served forecast, bound as the service binds it, and the season rules.
 
     The artifact's bytes are read once; their sha256, fingerprint and modification time are
-    the receipt, and a forecast whose fingerprint differs from those bytes' is refused.
+    the receipt, and a forecast whose fingerprint differs from those bytes' is refused. The
+    model version is read from the document before any reader runs. The forecast every arm
+    plans on is the one ``load_switch_inputs`` binds for this capture, given the served baseline
+    handoff's fingerprint, so a ready bundle, the news it seals and the participation evidence
+    apply as they did when the week was served; a week the service refuses to bind is missing
+    for the service's reason, which the receipt records.
     """
 
     snapshot = read_snapshot(snapshot_root, snapshot_id)
@@ -389,12 +413,22 @@ def week_inputs(
             "fingerprint"
         ):
             raise ValueError("The artifact's bytes do not carry their own fingerprint.")
+    except (ValueError, KeyError, TypeError):
+        reason = "artifact_unreadable_or_unbound"
+        return reason, {**receipt, "reason": reason}
+    # Rule 6: the version is the document's own, read before any reader, so a week of another
+    # version is missing as that and never as unreadable.
+    declared = document.get("model_version")
+    if declared not in ADMITTED_MODEL_VERSIONS:
+        reason = "artifact_of_another_model_version"
+        return reason, {**receipt, "reason": reason, "model_version": declared}
+    try:
         forecast = read_football_forecast(artifact, inputs)
     except OSError as error:
         raise ChainError(f"The artifact of {snapshot_id} cannot be read now: {error}") from error
     except (ValueError, KeyError, TypeError, DataError):
         reason = "artifact_unreadable_or_unbound"
-        return reason, {**receipt, "reason": reason}
+        return reason, {**receipt, "reason": reason, "model_version": declared}
     if forecast.horizon.model_version not in ADMITTED_MODEL_VERSIONS:
         reason = "artifact_of_another_model_version"
         return reason, {
@@ -405,31 +439,77 @@ def week_inputs(
     if document.get("fingerprint") != forecast.fingerprint:
         reason = "artifact_changed_while_read"
         return reason, {**receipt, "reason": reason}
+    # Rules 6 and 8: the service's own binding, with the served baseline handoff's fingerprint
+    # and nothing else of the handoff. The service never raises; it says what it refused.
+    handoff_fingerprint = (
+        None
+        if handoff_root is None
+        else handoff_fingerprint_for(
+            handoff_root, SEASON, int(inputs.deadline.gameweek), snapshot_id
+        )
+    )
+    switches = load_switch_inputs(
+        artifact_root=artifact_root,
+        club_news_source=club_news_source,
+        snapshot_root=snapshot_root,
+        inputs=inputs,
+        projection=Projection(
+            inputs.players, (), {"projection_handoff_fingerprint": handoff_fingerprint}
+        ),
+    )
+    binding: dict[str, object] = {
+        "model_version": declared,
+        "handoff_fingerprint": handoff_fingerprint,
+        "ready_bundle_sha256": switches.football_bundle_sha256,
+        "rotation_table_sha256": switches.rotation_table_sha256,
+        "components_sha256": switches.football_components_sha256,
+        "components_bound": switches.football_components_bound,
+        "participation_version": FOOTBALL_PARTICIPATION_VERSION,
+        "decision_information": switches.decision_information(snapshot_id),
+        "binding_notes": list(switches.notes),
+    }
+    bound = switches.football
+    if bound is None:
+        reason = "served_binding_refused"
+        return reason, {**receipt, "reason": reason, **binding}
+    if (bound.fingerprint, bound.horizon.model_version) != (
+        forecast.fingerprint,
+        forecast.horizon.model_version,
+    ):
+        reason = "artifact_changed_while_read"
+        return reason, {**receipt, "reason": reason, **binding}
     try:
         rules = read_season_rules(snapshot, season=SEASON)
     except Exception as error:
         raise ChainError(f"The season rules of {snapshot_id} cannot be read: {error}") from error
     hashes = document.get("archive_hashes")
     seasons = sorted({key.split("/", 1)[0] for key in hashes}) if isinstance(hashes, dict) else []
+    role = document.get("role_metadata")
     return WeekInputs(
         inputs=inputs,
         rules=rules,
-        forecast=forecast,
+        forecast=bound,
         artifact_bytes=data,
         receipt={
             **receipt,
             "reason": None,
             "forecast_fingerprint": forecast.fingerprint,
+            **binding,
             "model_version": forecast.horizon.model_version,
             "forecast_archive_seasons": seasons,
             "forecast_training_rows": document.get("training_rows"),
             "forecast_training_latest_kickoff": document.get("training_latest_kickoff"),
+            "forecast_training_selection": document.get("training_selection"),
+            "forecast_role_metadata": (
+                {
+                    "version": role.get("version"),
+                    "role_feature_version": role.get("role_feature_version"),
+                }
+                if isinstance(role, dict)
+                else None
+            ),
         },
     )
-
-
-# ---------------------------------------------------------------------------------------------
-# States (rules 9 and 10)
 
 
 def _lineup_block(week: object) -> dict[str, object]:
@@ -1117,6 +1197,8 @@ def check(
     snapshot_root: Path,
     artifact_root: Path,
     *,
+    handoff_root: Path | None = None,
+    club_news_source: Path | None = None,
     now: datetime | None = None,
     emit: Callable[[str], None] = print,
 ) -> None:
@@ -1132,7 +1214,13 @@ def check(
         if selection.snapshot_id is None:
             emit(f"GW{gameweek:02d} {label} missing {selection.reason}")
             continue
-        loaded = week_inputs(snapshot_root, artifact_root, selection.snapshot_id)
+        loaded = week_inputs(
+            snapshot_root,
+            artifact_root,
+            selection.snapshot_id,
+            handoff_root=handoff_root,
+            club_news_source=club_news_source,
+        )
         status = "ready" if isinstance(loaded, WeekInputs) else loaded[0]
         emit(f"GW{gameweek:02d} {label} {selection.snapshot_id} {status}")
 
@@ -1354,7 +1442,13 @@ def _load_week(
 
 
 def _week(
-    index: Sequence[CaptureIndexEntry], snapshot_root: Path, artifact_root: Path, gameweek: int
+    index: Sequence[CaptureIndexEntry],
+    snapshot_root: Path,
+    artifact_root: Path,
+    gameweek: int,
+    *,
+    handoff_root: Path | None = None,
+    club_news_source: Path | None = None,
 ) -> WeekInputs | tuple[str, Mapping[str, object]]:
     own = [
         {"snapshot_id": entry.snapshot_id, "captured_at_utc": entry.captured_at_utc.isoformat()}
@@ -1365,7 +1459,13 @@ def _week(
     if selection.snapshot_id is None:
         reason = selection.reason or "no_own_target_capture"
         return reason, {"snapshot_id": None, "reason": reason, "own_target_captures": own}
-    loaded = week_inputs(snapshot_root, artifact_root, selection.snapshot_id)
+    loaded = week_inputs(
+        snapshot_root,
+        artifact_root,
+        selection.snapshot_id,
+        handoff_root=handoff_root,
+        club_news_source=club_news_source,
+    )
     if isinstance(loaded, WeekInputs):
         return replace(loaded, receipt={**loaded.receipt, "own_target_captures": own})
     return loaded[0], {**loaded[1], "own_target_captures": own}
@@ -1379,6 +1479,9 @@ def start_chain(
     snapshot_root: Path,
     artifact_root: Path,
     moment: datetime,
+    *,
+    handoff_root: Path | None = None,
+    club_news_source: Path | None = None,
 ) -> dict[str, Any] | None:
     """Rules 2, 9 and 40: the first chain week, its squads and the protocol record, once.
 
@@ -1397,7 +1500,14 @@ def start_chain(
     for gameweek in range(bound_week, LAST_GAMEWEEK + 1):
         if moment <= deadline_of(index, snapshot_root, gameweek):
             return None
-        week = _week(index, snapshot_root, artifact_root, gameweek)
+        week = _week(
+            index,
+            snapshot_root,
+            artifact_root,
+            gameweek,
+            handoff_root=handoff_root,
+            club_news_source=club_news_source,
+        )
         if not isinstance(week, WeekInputs):
             skipped.append({"gameweek": gameweek, "reason": week[0]})
             continue
@@ -1433,6 +1543,8 @@ def decide(
     through_gameweek: int,
     answer: str,
     *,
+    handoff_root: Path | None = None,
+    club_news_source: Path | None = None,
     now: datetime | None = None,
     emit: Callable[[str], None] = print,
 ) -> None:
@@ -1462,6 +1574,8 @@ def decide(
                 identity,
                 moment,
                 say,
+                handoff_root=handoff_root,
+                club_news_source=club_news_source,
             )
         except ChainError as error:
             lines.append(f"refused: {error}")
@@ -1486,6 +1600,9 @@ def _decide_weeks(
     identity: Mapping[str, object],
     moment: datetime,
     emit: Callable[[str], None],
+    *,
+    handoff_root: Path | None = None,
+    club_news_source: Path | None = None,
 ) -> None:
     inventory = capture_inventory(snapshot_root)
     index = inventory.entries
@@ -1494,7 +1611,15 @@ def _decide_weeks(
     protocol = bind_protocol(output, identity)
     if protocol is None:
         protocol = start_chain(
-            output, identity, answer, index, snapshot_root, artifact_root, moment
+            output,
+            identity,
+            answer,
+            index,
+            snapshot_root,
+            artifact_root,
+            moment,
+            handoff_root=handoff_root,
+            club_news_source=club_news_source,
         )
         if protocol is None:
             emit("waiting: no first chain week has both a passed deadline and a forecast")
@@ -1520,7 +1645,14 @@ def _decide_weeks(
         if moment <= deadline_of(index, snapshot_root, gameweek):
             emit(f"GW{gameweek:02d} pending: its deadline has not passed")
             return
-        week = _week(index, snapshot_root, artifact_root, gameweek)
+        week = _week(
+            index,
+            snapshot_root,
+            artifact_root,
+            gameweek,
+            handoff_root=handoff_root,
+            club_news_source=club_news_source,
+        )
         states, max_free, digest = decide_week(
             output,
             gameweek,
@@ -1544,6 +1676,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         command = commands.add_parser(name)
         command.add_argument("--snapshot-root", type=Path, required=True)
         command.add_argument("--artifact-root", type=Path, required=True)
+        # Rules 6 and 8: the served baseline handoff's root, read for its fingerprint only, and
+        # the configured club-news source a week without a ready bundle would have been served
+        # with; a sealed bundle's news replaces it, as it does in the service.
+        command.add_argument("--handoff-root", type=Path, required=True)
+        command.add_argument("--club-news-source", type=Path)
         if name == "decide":
             command.add_argument("--output", type=Path, required=True)
             command.add_argument("--through-gameweek", type=int, required=True)
@@ -1551,7 +1688,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     try:
         if arguments.command == "check":
-            check(arguments.snapshot_root, arguments.artifact_root)
+            check(
+                arguments.snapshot_root,
+                arguments.artifact_root,
+                handoff_root=arguments.handoff_root,
+                club_news_source=arguments.club_news_source,
+            )
         else:
             decide(
                 arguments.snapshot_root,
@@ -1559,6 +1701,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 arguments.output,
                 arguments.through_gameweek,
                 arguments.answer,
+                handoff_root=arguments.handoff_root,
+                club_news_source=arguments.club_news_source,
             )
     except ChainError as error:
         print(f"refused: {error}", file=sys.stderr)
