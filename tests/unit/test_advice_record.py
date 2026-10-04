@@ -1365,3 +1365,33 @@ def test_changed_planning_evidence_is_not_silently_overwritten(tmp_path):
     with pytest.raises(AdviceRecordError, match="planning_evidence"):
         record_member_advice(tmp_path, changed)
     assert load_member_advice_record(tmp_path, SEASON, 2, 101, CAPTURE) == original
+
+
+def test_each_league_has_its_own_root_and_the_store_root_league_stays_where_it_was(
+    tmp_path: Path,
+) -> None:
+    """League 352490's records predate per-league storage and keep the store's root; any
+    other league is under ``leagues/<id>/``. One member of two leagues is then recorded once
+    in each, for the same capture, and neither record refuses the other."""
+
+    store = tmp_path / "records"
+    assert advice_records.league_record_root(store, 352490) == store
+    assert advice_records.league_record_root(store, 7) == store / "leagues" / "7"
+    for bad in (0, -1, True, "7"):
+        with pytest.raises(AdviceRecordError, match="positive integer"):
+            advice_records.league_record_root(store, bad)  # type: ignore[arg-type]
+    assert advice_records.league_record_roots(store, (7, 352490, 7)) == (
+        store / "leagues" / "7",
+        store,
+    )
+    in_root_league = {**_bare_record(), "league_id": 352490}
+    in_other_league = {**_bare_record(advice="another league's plan"), "league_id": 7}
+    first = record_member_advice(advice_records.league_record_root(store, 352490), in_root_league)
+    second = record_member_advice(advice_records.league_record_root(store, 7), in_other_league)
+    assert first == store / SEASON / "gw02" / "entry-101" / CAPTURE
+    assert second == store / "leagues" / "7" / SEASON / "gw02" / "entry-101" / CAPTURE
+    assert load_member_advice_record(store, SEASON, 2, 101, CAPTURE) == in_root_league
+    assert (
+        load_member_advice_record(store / "leagues" / "7", SEASON, 2, 101, CAPTURE)
+        == in_other_league
+    )

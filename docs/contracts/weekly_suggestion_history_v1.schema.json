@@ -20,7 +20,8 @@
           "type": "integer"
         },
         "league_id": {
-          "const": 352490
+          "minimum": 1,
+          "type": "integer"
         },
         "season": {
           "pattern": "^[0-9]{4}-[0-9]{2}$",

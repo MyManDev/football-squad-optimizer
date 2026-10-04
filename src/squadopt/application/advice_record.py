@@ -103,6 +103,19 @@ PLAYER_ID_SPACE: Final = "fpl_element_code"
 
 RECORD_FILE: Final = "advice.json"
 
+#: The league whose records predate per-league storage, and which keeps the store's root.
+#:
+#: The record's key was season, gameweek, entry and capture, with no league in the path,
+#: while only this league was recorded. A member of two leagues then needs two records of
+#: one capture, and one address cannot hold both: create-once refuses the second. Every
+#: other league is therefore kept under ``<store>/leagues/<league id>/``, and this one stays
+#: where its records already are, so the only copy of that evidence is never moved and a
+#: run already holding the store's root as this league's root reads the same files.
+STORE_ROOT_LEAGUE_ID: Final = 352490
+
+#: The directory under the store that holds every other league's own root.
+LEAGUES_DIRECTORY: Final = "leagues"
+
 #: How many differing fields a refusal names before it stops listing them.
 _DIFFERENCE_LIMIT: Final = 12
 #: What may be a capture's path segment. A snapshot identifier is
@@ -240,12 +253,45 @@ def repository_commit() -> str | None:
     return resolved.commit
 
 
+def _league_id(league_id: object) -> int:
+    if isinstance(league_id, bool) or not isinstance(league_id, int) or league_id < 1:
+        raise AdviceRecordError(f"league_id must be a positive integer, got {league_id!r}.")
+    return league_id
+
+
+def league_record_root(store: Path, league_id: int) -> Path:
+    """The root one league's records live under: what every function here calls ``root``.
+
+    ``STORE_ROOT_LEAGUE_ID`` keeps the store itself, where its records have always been;
+    any other league is ``<store>/leagues/<league id>``. The layout below a league's root is
+    the same for every league, so each caller derives this once and passes it on, and
+    nothing below it knows which league it is reading.
+    """
+
+    if _league_id(league_id) == STORE_ROOT_LEAGUE_ID:
+        return Path(store)
+    return Path(store) / LEAGUES_DIRECTORY / str(league_id)
+
+
+def league_record_roots(store: Path, league_ids: Iterable[int]) -> tuple[Path, ...]:
+    """Each league's root under ``store``, in the order the leagues are named, once each."""
+
+    roots: list[Path] = []
+    for league_id in league_ids:
+        root = league_record_root(store, league_id)
+        if root not in roots:
+            roots.append(root)
+    return tuple(roots)
+
+
 def entry_directory(root: Path, season: str, gameweek: int, entry_id: int) -> Path:
     """``<root>/<season>/gw<NN>/entry-<id>`` — every record this member has for this week.
 
     The gameweek is in the path, which is the whole point: the published tree's addresses
     have no week in them and are overwritten, and these are neither. What is *below* this
-    is one directory per capture, because a week is published more than once.
+    is one directory per capture, because a week is published more than once. ``root`` is
+    one league's root (:func:`league_record_root`), so the same member in another league
+    has a directory of their own there.
     """
 
     if not isinstance(season, str) or not season.strip():
@@ -1147,10 +1193,12 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
 
 
 __all__: tuple[str, ...] = (
+    "LEAGUES_DIRECTORY",
     "LEGACY_LAYOUT_NOTE",
     "MEMBER_ADVICE_RECORD_CONTRACT_VERSION",
     "PLAYER_ID_SPACE",
     "RECORD_FILE",
+    "STORE_ROOT_LEAGUE_ID",
     "AdviceRecordConflictError",
     "AdviceRecordError",
     "AdviceRecordNotLandedError",
@@ -1159,6 +1207,8 @@ __all__: tuple[str, ...] = (
     "build_member_advice_record",
     "encode_record",
     "entry_directory",
+    "league_record_root",
+    "league_record_roots",
     "load_member_advice_record",
     "load_member_advice_record_for_deadline",
     "record_directory",

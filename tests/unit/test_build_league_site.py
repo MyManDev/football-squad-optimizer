@@ -175,3 +175,36 @@ def test_a_refused_advice_record_names_the_escape_a_deadline_needs(
     assert "published_sha256 moved" in printed
     assert "--no-advice-record" in printed
     assert "scripts.run_week" in printed
+
+
+@pytest.mark.parametrize(
+    ("options", "recorded"),
+    [([], True), (["--no-advice-record"], False)],
+)
+def test_a_build_of_any_league_records_into_the_store_unless_told_not_to(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, options: list[str], recorded: bool
+) -> None:
+    """Any league records; the publication derives the league's own root in the store."""
+
+    import sys
+
+    import scripts.build_league_site as build_league_site
+
+    requests: list[Any] = []
+
+    def stop(request: Any) -> None:
+        requests.append(request)
+        raise DataError("stopped after the request was built")
+
+    store = tmp_path / "records"
+    monkeypatch.setattr(build_league_site, "resolve_live_snapshot_id", lambda root, named: "x")
+    monkeypatch.setattr(build_league_site, "prepare_league_publication", stop)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["build_league_site", "--league", "7", "--advice-record-root", str(store), *options],
+    )
+
+    assert build_league_site.main() == 1
+    assert [request.record_root for request in requests] == [store if recorded else None]
+    assert [request.history_record_root for request in requests] == [store]
