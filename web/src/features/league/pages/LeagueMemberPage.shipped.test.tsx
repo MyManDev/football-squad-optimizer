@@ -42,7 +42,10 @@ import { memberAddress } from "../../../lib/leagueAddresses";
 import { LeagueGate } from "./LeagueGate";
 import { LeagueMemberPage } from "./LeagueMemberPage";
 
-const LEAGUE = shippedTrees()[0]!.path;
+// The member pages of one tree are drawn. A site that lists more fails here, so a
+// second league's pages are never reported as drawn when they were not.
+const TREES = shippedTrees();
+const LEAGUE = TREES[0]!.path;
 
 function readPublished<T>(relative: string): T {
   return JSON.parse(readFileSync(join(PUBLIC, relative), "utf-8")) as T;
@@ -337,6 +340,10 @@ async function expectBreakageNoticed(entryId: number) {
 const FREE_HIT = `Entry ${humans[0]} played a Free Hit in gameweek ${league.gameweek - 1}.`;
 
 describe("every member page, from the published tree", () => {
+  it("is drawn for the one tree the site lists", () => {
+    expect(TREES.map((tree) => tree.path)).toEqual([LEAGUE]);
+  });
+
   describe.each(["tr", "en"] as const)("in %s", (language) => {
     it.each(humans)("draws member %i with its heading and its decision", async (entryId) => {
       await expectMemberDrawn(entryId, language);

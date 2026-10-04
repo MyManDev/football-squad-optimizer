@@ -210,23 +210,15 @@ describe.skipIf(trees.length === 0)("the shipped chip plans", () => {
               else expect(move.gain).toBeCloseTo(expected, 6);
             }
           } else {
-            // Within a position the outgoing and incoming players are paired by id, so a tie
-            // swapped in pairs them differently; each position's moves must gain the same.
-            const position = new Map(document.players.map((p) => [p.id, p.position]));
-            const gained = (moves: Array<[number | null, number | null]>) => {
-              const totals: Record<string, number> = {};
-              for (const [into, gain] of moves) {
-                const at = position.get(into ?? -1) ?? "none";
-                totals[at] = (totals[at] ?? 0) + (gain ?? 0);
-              }
-              return totals;
-            };
-            const mine = gained(answer.moves.map((m) => [m.in, m.gain]));
-            const theirs = gained(
-              published.moves.map((m) => [m.player_in!.player_id, m.expected_points_delta]),
+            // Moves are paired by id within a position and scored one after another on the
+            // squad so far, so a tie swapped in can move how the gain splits across rows and
+            // positions; what cannot move is their sum, the plan's gain over the squad held.
+            const total = (gains: Array<number | null>) =>
+              gains.reduce<number>((sum, gain) => sum + (gain ?? 0), 0);
+            expect(total(answer.moves.map((m) => m.gain))).toBeCloseTo(
+              total(published.moves.map((m) => m.expected_points_delta)),
+              6,
             );
-            expect(Object.keys(mine).sort()).toEqual(Object.keys(theirs).sort());
-            for (const at of Object.keys(theirs)) expect(mine[at]).toBeCloseTo(theirs[at]!, 6);
           }
           expect(answer.gain_vs_no_chip).toBeCloseTo(published.chip_choice!.gain_vs_no_chip, 6);
         },

@@ -16,30 +16,27 @@ import { shippedTrees } from "../src/testSupport/shippedTrees";
  * while every other member's fitted.
  */
 
-// The first tree the site lists; shippedTree.test.ts holds every tree to the validators.
-const ROOT = shippedTrees()[0]!.root;
 const WIDTHS = [360, 375, 390] as const;
-
-const read = (relative: string) => JSON.parse(readFileSync(join(ROOT, relative), "utf-8"));
-const LEAGUE_ID = read("members.json").payload.league_id as number;
 
 type Published = { entry: number; strategy: string; window: number; armband: boolean };
 
-/** Each page the published indexes offer, and whether its plan names a captain and a vice. */
-function publishedPages(): Map<number, Published[]> {
+/** Each page a tree's indexes offer, and whether its plan names a captain and a vice. */
+function publishedPages(root: string): { leagueId: number; pages: Map<number, Published[]> } {
+  const read = (relative: string) => JSON.parse(readFileSync(join(root, relative), "utf-8"));
+  const members = read("members.json").payload;
   const pages = new Map<number, Published[]>();
-  for (const member of read("members.json").payload.members) {
+  for (const member of members.members) {
     if (member.member_kind !== "human") continue;
     const entry = member.entry_id as number;
     const index = `advice/${entry}/index.json`;
-    if (!existsSync(join(ROOT, index))) continue;
+    if (!existsSync(join(root, index))) continue;
     const windows = (read(index).payload.windows ?? {}) as Record<string, number[]>;
     pages.set(
       entry,
       Object.entries(windows).flatMap(([strategy, sizes]) =>
         sizes.map((window) => {
           const plan = `advice/${entry}/${strategy}/${window}.json`;
-          const payload = existsSync(join(ROOT, plan)) ? read(plan).payload : null;
+          const payload = existsSync(join(root, plan)) ? read(plan).payload : null;
           return {
             entry,
             strategy,
@@ -50,19 +47,24 @@ function publishedPages(): Map<number, Published[]> {
       ),
     );
   }
-  return pages;
+  return { leagueId: members.league_id as number, pages };
 }
 
-const PAGES = publishedPages();
+// Every tree the site lists, each member and each page its index offers.
+const TREES = shippedTrees().map(({ root }) => publishedPages(root));
 
-test("the published tree has members to check", () => {
-  expect(PAGES.size).toBeGreaterThan(0);
-  expect([...PAGES.values()].flat().filter((page) => page.armband).length).toBeGreaterThan(0);
+test("the published trees have members to check", () => {
+  for (const { pages } of TREES) {
+    expect(pages.size).toBeGreaterThan(0);
+    expect([...pages.values()].flat().filter((page) => page.armband).length).toBeGreaterThan(0);
+  }
 });
 
 for (const language of ["tr", "en"] as const) {
-  for (const [entry, pages] of PAGES) {
-    test(`the captain line holds one line on a phone for ${entry} in ${language}`, async ({
+  for (const [LEAGUE_ID, entry, pages] of TREES.flatMap(({ leagueId, pages }) =>
+    [...pages].map(([entry, rows]) => [leagueId, entry, rows] as const),
+  )) {
+    test(`the captain line holds one line on a phone for ${entry} of ${LEAGUE_ID} in ${language}`, async ({
       page,
     }) => {
       await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);

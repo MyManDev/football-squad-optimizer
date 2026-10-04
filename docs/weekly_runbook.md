@@ -494,7 +494,8 @@ pull request's CI also holds the shipped tree to the page's own validators
 (`shippedTree.test.ts`, `planModel.chips.shipped.test.ts`, `LeagueMemberPage.shipped.test.tsx`,
 `e2e/captain-line.spec.ts`). They find the trees the way the page does
 (`web/src/testSupport/shippedTrees.ts`: every tree `data/leagues.json` lists, or `data/league/`
-on a site without the directory) and fail, never skip, on a site that publishes neither; to
+on a site without the directory) and fail, never skip, on a site that publishes neither; the
+member-page guard draws one tree and fails on a site that lists more, until it draws each; to
 run the first by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
 publication worktree's `web` directory.
 

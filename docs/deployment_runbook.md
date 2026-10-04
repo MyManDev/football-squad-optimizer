@@ -165,8 +165,9 @@ stays a step: it writes `data/players.json` into the site-data tree after the ca
 and adding that path to the publisher's approved list is a boundary change for the owner to
 approve. The page's own validators (`shippedTree.test.ts` and the other shipped-tree guards)
 need no run by hand here either: the site PR's CI runs them on every tree the committed site
-lists (`web/src/testSupport/shippedTrees.ts`), failing rather than skipping when it lists
-none, and the deploy workflow refuses a tag without a successful `main` push CI, which runs
+lists (`web/src/testSupport/shippedTrees.ts`; the member-page guard draws one tree and fails
+on a site that lists more), failing rather than skipping when it lists none, and the deploy
+workflow refuses a tag without a successful `main` push CI, which runs
 them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
