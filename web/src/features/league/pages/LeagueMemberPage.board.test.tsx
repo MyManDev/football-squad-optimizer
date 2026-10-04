@@ -32,6 +32,7 @@ import type {
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { AdviceCard } from "./MemberAdviceCard";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => writeViewerEntry(null));
@@ -159,20 +160,22 @@ const CALENDAR: FixturesPayload = {
 function show(
   language: Language = "tr",
   props: Partial<LeagueMemberViewProps> = {},
-  initial = `/league/members/${ENTRY}`,
+  initial = `/league/352490/members/${ENTRY}`,
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[initial]}>
-        <LeagueMemberView
-          squad={SQUAD}
-          advice={twoMoves()}
-          members={MEMBERS}
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          fixtures={CALENDAR}
-          leagueName={mockLeagueMembersEnvelope.payload.league_name}
-          {...props}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={SQUAD}
+            advice={twoMoves()}
+            members={MEMBERS}
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            fixtures={CALENDAR}
+            leagueName={mockLeagueMembersEnvelope.payload.league_name}
+            {...props}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -265,7 +268,7 @@ describe("the WHO block", () => {
   it("names the league and links the member back to the list to change member", () => {
     show("tr");
     const who = screen.getByRole("link", { name: /Üye değiştir/ });
-    expect(who).toHaveAttribute("href", "/league/members");
+    expect(who).toHaveAttribute("href", "/league/352490/members");
     expect(who).toHaveTextContent(SQUAD.payload.entry.team_name!);
     expect(who).toHaveTextContent(`${SQUAD.payload.entry.manager_name} · #${ENTRY}`);
     expect(screen.getByText(mockLeagueMembersEnvelope.payload.league_name)).toBeInTheDocument();
@@ -484,7 +487,7 @@ describe("the proof stamp", () => {
 
 describe("the decision heading", () => {
   it("names the selection beside the heading", () => {
-    show("tr", {}, `/league/members/${ENTRY}?window=1`);
+    show("tr", {}, `/league/352490/members/${ENTRY}?window=1`);
     expect(screen.getByTestId("member-selection-summary")).toHaveTextContent("Saf puan · 1 hafta");
   });
 

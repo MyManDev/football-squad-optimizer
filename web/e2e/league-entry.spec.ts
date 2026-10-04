@@ -7,7 +7,7 @@ import { NO_LEAGUE } from "./leagueState";
 test.use({ storageState: NO_LEAGUE });
 
 for (const language of ["tr", "en"] as const) {
-  test(`the league allowlist rejects unsupported IDs without fetching in ${language}`, async ({
+  test(`a number the site does not publish is refused after the directory alone in ${language}`, async ({
     page,
   }) => {
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
@@ -20,6 +20,8 @@ for (const language of ["tr", "en"] as const) {
         requests.push(path);
       }
     });
+    // No directory is published: the one league under data/league/ is the directory.
+    await page.route("**/data/leagues.json", (route) => route.fulfill({ status: 404, body: "" }));
     await page.route("**/data/league/members.json", (route) => {
       return route.fulfill(
         response === "published"
@@ -39,11 +41,14 @@ for (const language of ["tr", "en"] as const) {
     await submit.click();
     await expect(page.getByRole("status")).toHaveText(
       language === "tr"
-        ? "Şimdilik yalnız 352490 numaralı lig destekleniyor."
-        : "Only league 352490 is supported for now.",
+        ? "Bu site 123 numaralı ligi yayımlamıyor."
+        : "This site does not publish league 123.",
     );
     await expect(page).toHaveURL("/");
-    expect(requests).toEqual([]);
+    // Only the directory was read (the absent list, then the legacy tree's record); no
+    // document of league 123 was asked for.
+    const directory = ["/data/leagues.json", "/data/league/members.json"];
+    expect(requests).toEqual(directory);
     await field.fill("352490");
     response = "missing";
     await submit.click();
@@ -59,6 +64,6 @@ for (const language of ["tr", "en"] as const) {
         ? "Yayımlanan lig verisi okunamadı. Yeniden dene."
         : "The published league data could not be read. Try again.",
     );
-    expect(requests).toEqual(Array(2).fill("/data/league/members.json"));
+    expect(requests).toEqual([...directory, ...directory, ...directory]);
   });
 }

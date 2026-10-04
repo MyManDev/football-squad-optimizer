@@ -27,7 +27,7 @@ for (const language of ["en", "tr"] as const) {
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ json: publication }),
     );
-    await page.goto("/league/members");
+    await page.goto("/league/352490/members");
     const copy = MESSAGES[language].leagueMembers;
     // How the table reads is one click away, in its closed "About this table".
     await page.locator("main details summary", { hasText: copy.aboutTable }).click();

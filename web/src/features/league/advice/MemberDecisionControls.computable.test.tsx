@@ -60,7 +60,7 @@ function renderControls(
 ) {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
         <MemberDecisionControls
           entryId={ENTRY}
           members={MEMBERS}

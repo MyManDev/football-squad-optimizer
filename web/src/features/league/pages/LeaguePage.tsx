@@ -1,3 +1,5 @@
+import { membersAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { Link } from "react-router";
 
 import { useIndex, useLeague, useLedger } from "../../../data/queries";
@@ -16,6 +18,7 @@ import styles from "./LeaguePage.module.css";
 
 export function LeaguePage() {
   const { locale, messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.league;
   const index = useIndex();
   const season = index.data?.payload.seasons[0];
@@ -72,12 +75,12 @@ export function LeaguePage() {
       </StatRow>
 
       <Card
-        title={messages.leagueMembers.linkTitle}
-        aside={messages.leagueMembers.leagueNumber(352490)}
+        title={messages.leagueMembers.linkTitle(leagueId)}
+        aside={messages.leagueMembers.leagueNumber(leagueId)}
       >
         <p className={styles.para}>{messages.leagueMembers.linkBody}</p>
         <p className={styles.para}>
-          <Link to="/league/members">{messages.leagueMembers.linkLabel}</Link>
+          <Link to={membersAddress(leagueId)}>{messages.leagueMembers.linkLabel}</Link>
         </p>
       </Card>
 

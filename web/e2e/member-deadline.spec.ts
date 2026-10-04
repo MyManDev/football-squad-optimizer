@@ -16,7 +16,7 @@ for (const language of ["tr", "en"] as const) {
       route.fulfill({ contentType: "application/json", body: JSON.stringify(calendar) }),
     );
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto(`/league/members/${ENTRY}`);
+    await page.goto(`/league/352490/members/${ENTRY}`);
 
     const copy = COMPUTE_COPY[language];
     await expect(page.getByRole("heading", { name: copy.deadlinePassedTitle })).toBeVisible();
@@ -30,7 +30,7 @@ for (const language of ["tr", "en"] as const) {
 
 test("an open gameweek shows no deadline notice", async ({ page }) => {
   await installLeagueMocks(page);
-  await page.goto(`/league/members/${ENTRY}`);
+  await page.goto(`/league/352490/members/${ENTRY}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByTestId("deadline-passed")).toHaveCount(0);
 });

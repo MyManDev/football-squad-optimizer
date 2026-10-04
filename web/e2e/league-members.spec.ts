@@ -10,13 +10,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("member list links to point-labelled advice and preserves its URL state", async ({ page }) => {
-  await page.goto("/league/members");
+  await page.goto("/league/352490/members");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig tablosu");
   await expect(page.getByText("örnek veri")).toBeVisible();
   await expect(page.getByText("SquadOpt · sistem takımı")).toHaveCount(0);
 
   await page.getByRole("link", { name: "Deniz Aral" }).click();
-  await expect(page).toHaveURL(/\/league\/members\/35249001$/);
+  await expect(page).toHaveURL(/\/league\/352490\/members\/35249001$/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
 
   // Pure points is published at three and five weeks; the page lists no assumptions.
@@ -51,9 +51,9 @@ test("member list links to point-labelled advice and preserves its URL state", a
 test("the virtual SquadOpt member remains available by direct URL without probability claims", async ({
   page,
 }) => {
-  await page.goto("/league/members/squadopt");
+  await page.goto("/league/352490/members/squadopt");
 
-  await expect(page).toHaveURL(/\/league\/members\/squadopt$/);
+  await expect(page).toHaveURL(/\/league\/352490\/members\/squadopt$/);
   await expect(page.getByText("SquadOpt da oynuyor")).toBeVisible();
   await expect(page.getByText(/aynı karar kurallarıyla değerlendirilir/)).toBeVisible();
   // The virtual member shows the latest decided week from the index the site ships, which
@@ -67,14 +67,14 @@ test("the virtual SquadOpt member remains available by direct URL without probab
 
 test("member navigation is keyboard operable with reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/league/members");
+  await page.goto("/league/352490/members");
 
   const memberLink = page.getByRole("link", { name: "Deniz Aral" });
   await memberLink.focus();
   await expect(memberLink).toBeFocused();
   await expect(memberLink).toHaveCSS("outline-style", "solid");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/league\/members\/35249001$/);
+  await expect(page).toHaveURL(/\/league\/352490\/members\/35249001$/);
 
   const mode = page.getByRole("radio", { name: /^Fark yarat/ });
   await mode.focus();
@@ -104,7 +104,7 @@ const secondMember = humanMembers[1]!;
  * with the same "Viewing as" line and its own "Change member" and "Clear" controls.
  */
 async function onMemberPage(page: Page, member: (typeof humanMembers)[number]) {
-  await expect(page).toHaveURL(`/league/members/${member.entry_id}`);
+  await expect(page).toHaveURL(`/league/352490/members/${member.entry_id}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(member.team_name!);
 }
 
@@ -114,7 +114,7 @@ for (const language of ["tr", "en"] as const) {
   }) => {
     const copy = MESSAGES[language].leagueMembers;
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
-    await page.goto("/league/members");
+    await page.goto("/league/352490/members");
     const firstRow = page
       .getByRole("row")
       .filter({ has: page.getByRole("link", { name: firstMember.manager_name! }) });
@@ -137,13 +137,13 @@ for (const language of ["tr", "en"] as const) {
     await onMemberPage(page, secondMember);
     await expect(page.getByText(copy.viewerSelected(secondMember.manager_name!))).toBeVisible();
     await page.getByRole("button", { name: copy.viewerClear }).click();
-    await expect(page).toHaveURL("/league/members");
+    await expect(page).toHaveURL("/league/352490/members");
     await expect(page.getByRole("button", { name: copy.viewerSelect }).first()).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
     await page.reload();
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
 
-    await expect(page).toHaveURL("/league/members");
+    await expect(page).toHaveURL("/league/352490/members");
     await page.getByRole("link", { name: firstMember.manager_name! }).click();
     await onMemberPage(page, firstMember);
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
@@ -155,7 +155,7 @@ for (const language of ["tr", "en"] as const) {
       localStorage.setItem("squadopt.language", value);
       localStorage.setItem("squadopt.viewer", JSON.stringify({ entryId: 35249001 }));
     }, language);
-    await page.goto("/league/members");
+    await page.goto("/league/352490/members");
     await expect(page.getByRole("button", { name: copy.viewerClear })).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
     await page
@@ -179,7 +179,7 @@ for (const language of ["tr", "en"] as const) {
       .getByRole("button", { name: copy.viewerSelect })
       .click();
     await expect(page.getByText(copy.viewerSelected(secondMember.manager_name!))).toBeVisible();
-    await page.goto("/league/members");
+    await page.goto("/league/352490/members");
     await expect(page.getByRole("button", { name: copy.viewerClear })).toHaveCount(0);
     await expect(page.getByRole("button", { name: copy.viewerSelect }).first()).toBeVisible();
   });

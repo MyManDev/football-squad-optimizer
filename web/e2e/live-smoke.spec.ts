@@ -70,6 +70,8 @@ test("published league and member journey works without submitting a solve", asy
   const member = members.payload.members.find((entry) => entry.member_kind === "human");
   expect(member, "a published human member is required").toBeDefined();
   const entryId = member!.entry_id;
+  // The live tree is the one from before the directory; its league number is in its record.
+  const league = members.payload.league_id;
   const published = await page.request.get(`/data/league/advice/${entryId}/saf-puan/1.json`);
   expect(published.status()).toBe(200);
   const advice = (await published.json()) as LeagueViewEnvelope<EntryAdvice>;
@@ -95,7 +97,7 @@ test("published league and member journey works without submitting a solve", asy
   let documentTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
-      Promise.all([page.goto("/league"), ...documentReads]),
+      Promise.all([page.goto(`/league/${league}`), ...documentReads]),
       new Promise<never>((_, reject) => {
         documentTimer = setTimeout(
           () =>
@@ -111,13 +113,13 @@ test("published league and member journey works without submitting a solve", asy
   }
   await expect(page.locator("main h1")).toBeVisible();
   await expect(page.locator("main table").first()).toBeVisible();
-  await page.goto("/league/members");
+  await page.goto(`/league/${league}/members`);
   await page
     .getByRole("row")
-    .filter({ has: page.locator(`a[href="/league/members/${entryId}"]`) })
+    .filter({ has: page.locator(`a[href="/league/${league}/members/${entryId}"]`) })
     .getByRole("button", { name: MESSAGES.en.leagueMembers.viewerSelect })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/league/members/${entryId}$`));
+  await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}$`));
   const plan = page.locator('[aria-labelledby="entry-advice-title"]');
   await expect(plan).toBeVisible();
   for (const player of advice.payload.starting_xi ?? [])
@@ -175,8 +177,8 @@ test("published league and member journey works without submitting a solve", asy
       console.log(`backend cache hit matches published capture: ${cacheRead}`);
     }
   }
-  await page.locator(`a[href="/league/members/${entryId}/history"]`).click();
-  await expect(page).toHaveURL(new RegExp(`/league/members/${entryId}/history$`));
+  await page.locator(`a[href="/league/${league}/members/${entryId}/history"]`).click();
+  await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}/history$`));
   await expect(page.locator("main h1")).toBeVisible();
   await page.waitForLoadState("networkidle");
   const historyResponse = await page.request.get(`/data/league/history/${entryId}.json`);

@@ -83,7 +83,7 @@ for (const language of ["en", "tr"] as const) {
     await page.route("**/data/league/series-horizon.json", (route) =>
       route.fulfill({ status: 404 }),
     );
-    await page.goto("/league");
+    await page.goto("/league/352490");
     const copy = MESSAGES[language];
     await expect(page.getByText(copy.liveSeries.accumulated(2, 2))).toBeVisible();
     await expect(page.getByText(copy.liveSeries.unknown)).toBeVisible();

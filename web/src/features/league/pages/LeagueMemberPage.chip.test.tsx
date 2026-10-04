@@ -26,6 +26,7 @@ import { chipPath, type MemberChip } from "../advice/chipChoice";
 import { CHIP_COPY } from "../advice/chipCopy";
 import type { EntryAdvice, EntryAdviceIndex, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -61,13 +62,15 @@ function chosen(
 function renderPage(language: Language, advice: LeagueViewEnvelope<EntryAdvice>, query: string) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={INDEX}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${query}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={INDEX}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

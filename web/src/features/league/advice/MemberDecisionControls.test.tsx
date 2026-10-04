@@ -32,7 +32,7 @@ function Selection() {
 }
 
 function renderControls(
-  initial = `/league/members/${ENTRY}`,
+  initial = `/league/352490/members/${ENTRY}`,
   index: EntryAdviceIndex | null = mockEntryAdviceIndex(ENTRY).payload,
   language: "tr" | "en" = "tr",
 ) {
@@ -50,7 +50,11 @@ describe("member decision controls", () => {
   it.each(["tr", "en"] as const)(
     "describes requested minimum and maximum overlap bounds in %s",
     (language) => {
-      renderControls(`/league/members/${ENTRY}`, mockEntryAdviceIndex(ENTRY).payload, language);
+      renderControls(
+        `/league/352490/members/${ENTRY}`,
+        mockEntryAdviceIndex(ENTRY).payload,
+        language,
+      );
       const shared = screen.getByText(
         MESSAGES[language].leagueMembers.strategies["ortak-koru"].description,
       );
@@ -91,7 +95,7 @@ describe("member decision controls", () => {
   it("marks the producer's default rival and drops the parameter when it is chosen again", () => {
     const index = mockEntryAdviceIndex(ENTRY).payload;
     const other = index.rival_entry_ids.find((id) => id !== index.default_rival_entry_id)!;
-    renderControls(`/league/members/${ENTRY}?mode=fark-yarat`);
+    renderControls(`/league/352490/members/${ENTRY}?mode=fark-yarat`);
 
     const select = screen.getByRole("combobox", { name: "Karşısında oynadığın üye" });
     expect(select).toHaveValue(String(index.default_rival_entry_id));
@@ -107,7 +111,7 @@ describe("member decision controls", () => {
   it("labels a pair the producer could not compute", () => {
     const index = mockEntryAdviceIndex(ENTRY).payload;
     const missing = index.unavailable[0]!;
-    renderControls(`/league/members/${ENTRY}?mode=${missing.strategy}`);
+    renderControls(`/league/352490/members/${ENTRY}?mode=${missing.strategy}`);
     const option = screen.getByRole("option", { name: /\(hesaplanamadı\)/ });
     expect(option).toHaveValue(String(missing.rival_entry_id));
     expect(option).toBeDisabled();
@@ -127,7 +131,7 @@ describe("member decision controls", () => {
   });
 
   it("keeps a rival strategy at one week, without stating a reason", () => {
-    renderControls(`/league/members/${ENTRY}?mode=ortak-koru`);
+    renderControls(`/league/352490/members/${ENTRY}?mode=ortak-koru`);
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /3 hafta/ })).toBeDisabled();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeDisabled();
@@ -138,7 +142,7 @@ describe("member decision controls", () => {
     // Pure points solved five weeks, so the radio is clickable; every rival strategy is
     // published at one week only. The window must not survive the change and leave the
     // control showing a checked radio it has just disabled.
-    renderControls(`/league/members/${ENTRY}?window=5`);
+    renderControls(`/league/352490/members/${ENTRY}?window=5`);
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
 
     fireEvent.click(screen.getByRole("radio", { name: /Ortak çekirdeği koru/ }));
@@ -150,7 +154,7 @@ describe("member decision controls", () => {
   });
 
   it("says nothing about a moved window when the index lists the one asked for", () => {
-    renderControls(`/league/members/${ENTRY}?window=5`);
+    renderControls(`/league/352490/members/${ENTRY}?window=5`);
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
     expect(screen.queryByText(/bu strateji için yayınlanmadı/)).toBeNull();
   });
@@ -159,7 +163,7 @@ describe("member decision controls", () => {
     // The select used to display the first candidate while the request named none, so the
     // page demanded "a rival chosen" under a dropdown that appeared to show one.
     const index = mockEntryAdviceIndex(ENTRY).payload;
-    renderControls(`/league/members/${ENTRY}?mode=ortak-koru`, {
+    renderControls(`/league/352490/members/${ENTRY}?mode=ortak-koru`, {
       ...index,
       default_rival_entry_id: null,
     });
@@ -185,7 +189,7 @@ describe("member decision controls", () => {
       { ...mockEntryAdviceIndex(ENTRY).payload, windows: { "saf-puan": [1, 3] } },
     ],
   ] as const)("offers only the windows a publish solved: %s", (_name, index) => {
-    renderControls(`/league/members/${ENTRY}`, index as EntryAdviceIndex | null, "en");
+    renderControls(`/league/352490/members/${ENTRY}`, index as EntryAdviceIndex | null, "en");
     expect(screen.getByRole("radio", { name: /1 week/ })).toBeEnabled();
     expect(screen.getByRole("radio", { name: /5 weeks/ })).toBeDisabled();
     if (index?.windows?.["saf-puan"]?.includes(3)) {
@@ -197,7 +201,7 @@ describe("member decision controls", () => {
   });
 
   it("offers no strategies or guessed rivals when no index was published", () => {
-    renderControls(`/league/members/${ENTRY}?mode=ortak-koru`, null, "en");
+    renderControls(`/league/352490/members/${ENTRY}?mode=ortak-koru`, null, "en");
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.queryByDisplayValue("saf-puan")).toBeNull();
     for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
@@ -214,7 +218,7 @@ describe("member decision controls", () => {
         points_ahead_of_rival: -140,
       },
     };
-    renderControls(`/league/members/${ENTRY}`, index, "en");
+    renderControls(`/league/352490/members/${ENTRY}`, index, "en");
 
     const marked = screen.getByRole("radio", { name: /Create a gap.*The rule's pick/s });
     expect(marked).not.toBeChecked();
@@ -240,7 +244,7 @@ describe("member decision controls", () => {
         ...base,
         suggested_strategy: { ...base.suggested_strategy!, points_ahead_of_rival: gap },
       };
-      const { container } = renderControls(`/league/members/${ENTRY}`, index, language);
+      const { container } = renderControls(`/league/352490/members/${ENTRY}`, index, language);
       const note = [...container.querySelectorAll("p")].find((line) =>
         line.textContent?.startsWith(language === "tr" ? "Tanımlı bir kural" : "A declared rule"),
       );
@@ -262,7 +266,7 @@ describe("member decision controls", () => {
       ["tr", claims[1], caveats[1]],
     ] as const) {
       const { container, unmount } = renderControls(
-        `/league/members/${ENTRY}`,
+        `/league/352490/members/${ENTRY}`,
         undefined,
         language,
       );
@@ -275,7 +279,7 @@ describe("member decision controls", () => {
 
   it("shows no rule label when the producer could not state one", () => {
     const base = mockEntryAdviceIndex(ENTRY).payload;
-    renderControls(`/league/members/${ENTRY}`, { ...base, suggested_strategy: null }, "en");
+    renderControls(`/league/352490/members/${ENTRY}`, { ...base, suggested_strategy: null }, "en");
     expect(screen.queryByText(/A declared rule marks one option/)).toBeNull();
     expect(screen.queryByText("The rule's pick")).toBeNull();
   });
@@ -284,7 +288,7 @@ describe("member decision controls", () => {
     for (const language of ["tr", "en"] as const) {
       for (const mode of ["ortak-koru", "fark-yarat", "saf-puan"] as const) {
         const { container, unmount } = renderControls(
-          `/league/members/${ENTRY}?mode=${mode}`,
+          `/league/352490/members/${ENTRY}?mode=${mode}`,
           undefined,
           language,
         );
@@ -312,7 +316,7 @@ describe("member decision controls", () => {
       expect(description.length).toBeGreaterThan(0);
       expect(description).not.toMatch(SUPERLATIVE);
       const { container, unmount } = renderControls(
-        `/league/members/${ENTRY}?mode=saf-puan`,
+        `/league/352490/members/${ENTRY}?mode=saf-puan`,
         undefined,
         language,
       );
@@ -327,7 +331,7 @@ describe("member decision controls", () => {
   it("renders the plan and the advanced part apart, and every input once without a part", () => {
     const count = (container: HTMLElement, name: string) =>
       container.querySelectorAll(`input[name="${name}"]`).length;
-    const whole = renderControls(`/league/members/${ENTRY}?mode=fark-yarat`);
+    const whole = renderControls(`/league/352490/members/${ENTRY}?mode=fark-yarat`);
     for (const name of ["strategy", "window", "llm", "top100", "chip"]) {
       expect(count(whole.container, name), name).toBeGreaterThan(0);
     }
@@ -342,7 +346,7 @@ describe("member decision controls", () => {
 
     const plan = render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?mode=fark-yarat`]}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=fark-yarat`]}>
           <MemberDecisionControls
             entryId={ENTRY}
             members={MEMBERS}
@@ -369,7 +373,7 @@ describe("member decision controls", () => {
 
     const notesPart = render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?mode=fark-yarat`]}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=fark-yarat`]}>
           <MemberDecisionControls
             entryId={ENTRY}
             members={MEMBERS}
@@ -388,7 +392,7 @@ describe("member decision controls", () => {
 
     const advanced = render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}?mode=fark-yarat`]}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=fark-yarat`]}>
           <MemberDecisionControls
             entryId={ENTRY}
             members={MEMBERS}
@@ -451,7 +455,7 @@ describe("the device's statement beside the publish", () => {
   it("offers a rival strategy and every league member as its rival where the device solves them", () => {
     render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
           <MemberDecisionControls
             entryId={ENTRY}
             members={MEMBERS}
@@ -512,7 +516,7 @@ describe("the device's statement beside the publish", () => {
   it("offers nothing beyond the publish without the device's statement", () => {
     render(
       <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
           <MemberDecisionControls entryId={ENTRY} members={MEMBERS} index={plainIndex} />
         </MemoryRouter>
       </LanguageProvider>,

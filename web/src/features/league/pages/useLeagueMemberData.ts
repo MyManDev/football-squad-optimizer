@@ -6,26 +6,27 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
+import { useLeague } from "../useLeague";
 import {
-  loadEntryAdvice,
-  loadEntryAdviceChip,
-  loadEntryAdviceEvidence,
-  loadEntryAdviceIndex,
-  loadEntryAdviceTop100,
-} from "../data";
-import { CAPABILITIES_READ, LEAGUE_READ, useEntrySquad, useLeagueMembers } from "../queries";
+  CAPABILITIES_READ,
+  LEAGUE_READ,
+  leagueKeys,
+  useEntrySquad,
+  useLeagueMembers,
+} from "../queries";
 
 /** Read only the publication authorized by the current member index and URL. */
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
   const entryId = Number(entryParam);
   const validEntryId = Number.isSafeInteger(entryId) && entryId > 0;
+  const { league, tree } = useLeague();
   const squad = useEntrySquad(entryId, validEntryId);
   const membersQuery = useLeagueMembers();
   // The index says which (strategy, rival) files the producer wrote for this member; a
   // missing or unreadable index cannot authorize a guessed baseline read.
   const indexQuery = useQuery({
-    queryKey: ["provisional-entry-advice-index", entryId],
-    queryFn: () => loadEntryAdviceIndex(entryId),
+    queryKey: leagueKeys.adviceIndex(league.leagueId, entryId),
+    queryFn: () => tree.entryAdviceIndex(entryId),
     enabled: validEntryId,
     ...LEAGUE_READ,
   });
@@ -35,7 +36,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   // never runs: the page is the static site. With one, what it computes right now is read
   // on entry and again on focus once stale. A service that is down, slow or answering
   // for another capture leaves the page on the published tree with a notice, never an error.
-  const client = useMemo(() => createAdviceClient(), []);
+  const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const leagueId = squad.data?.payload.league_id;
   const canAsk = client.readCapabilities !== undefined;
   const capabilitiesQuery = useQuery({
@@ -81,6 +82,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const advice = useQuery({
     queryKey: [
       "provisional-entry-advice",
+      league.leagueId,
       entryId,
       request.strategy,
       request.window,
@@ -99,9 +101,9 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     // does a chip the member chose.
     queryFn: ({ signal }) =>
       selection.chip.chip !== null && selection.path
-        ? loadEntryAdviceChip(entryId, selection.path, selection.chip.chip, { signal })
+        ? tree.entryAdviceChip(entryId, selection.path, selection.chip.chip, { signal })
         : selection.top100.weight !== 0 && selection.path
-          ? loadEntryAdviceTop100(
+          ? tree.entryAdviceTop100(
               entryId,
               selection.path,
               selection.top100.weight,
@@ -114,8 +116,8 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
               },
             )
           : selection.evidence.on && selection.path
-            ? loadEntryAdviceEvidence(entryId, selection.path, { signal })
-            : loadEntryAdvice(
+            ? tree.entryAdviceEvidence(entryId, selection.path, { signal })
+            : tree.entryAdvice(
                 entryId,
                 request.strategy,
                 request.window,
@@ -139,6 +141,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const windowControl = useQuery({
     queryKey: [
       "published-window-control",
+      league.leagueId,
       entryId,
       request.window,
       request.season,
@@ -148,7 +151,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     ],
     queryFn: async ({ signal }) =>
       checkedAdvice(
-        await loadEntryAdvice(entryId, "saf-puan", request.window, null, { signal }),
+        await tree.entryAdvice(entryId, "saf-puan", request.window, null, { signal }),
         controlSelection.request,
       ),
     enabled:

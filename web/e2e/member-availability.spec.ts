@@ -28,7 +28,7 @@ for (const language of ["tr", "en"] as const) {
       )
         reads.push(request.url());
     });
-    await page.goto(`/league/members/${ENTRY}`);
+    await page.goto(`/league/352490/members/${ENTRY}`);
     await expect(page.getByText(copy.publicationStates["index-missing"].title)).toBeVisible();
     await expect(page.getByRole("button", { name: copy.computeButton })).toBeDisabled();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -45,7 +45,9 @@ for (const language of ["tr", "en"] as const) {
       if (/data\/league\/(advice|entries)\//.test(request.url()))
         reads.push(new URL(request.url()).pathname);
     });
-    await page.goto(`/league/members/${ENTRY}?mode=${row.strategy}&rival=${row.rival_entry_id}`);
+    await page.goto(
+      `/league/352490/members/${ENTRY}?mode=${row.strategy}&rival=${row.rival_entry_id}`,
+    );
     const region = page.getByRole("region", { name: copy.rivalPlayersTitle });
     await expect(region.getByText(copy.rivalPlayerGroups.shared)).toBeVisible();
     await expect(region.locator("p")).toHaveCount(0);
@@ -95,7 +97,7 @@ test("an unsupported saved template and direct URL cannot fetch an unlisted pair
     )
       reads.push(request.url());
   });
-  await page.goto(`/league/members/${ENTRY}?mode=fark-yarat&window=5&rival=99999999`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=fark-yarat&window=5&rival=99999999`);
   await expect(
     page.getByText(MESSAGES.tr.leagueMembers.publicationStates["not-listed"].title),
   ).toBeVisible();
@@ -161,7 +163,9 @@ for (const [state, language] of (["tr", "en"] as const).flatMap((language) =>
       )
         reads.push(request.url());
     });
-    await page.goto(`/league/members/${ENTRY}?mode=${pair.strategy}&rival=${pair.rival_entry_id}`);
+    await page.goto(
+      `/league/352490/members/${ENTRY}?mode=${pair.strategy}&rival=${pair.rival_entry_id}`,
+    );
     const issue =
       state === "index-error" || state === "wrong-path"
         ? "index-error"

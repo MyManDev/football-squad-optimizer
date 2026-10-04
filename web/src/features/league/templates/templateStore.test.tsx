@@ -20,7 +20,7 @@ function Selection() {
   );
 }
 
-function renderPicker(initial = "/league/members/1") {
+function renderPicker(initial = "/league/352490/members/1") {
   return render(
     <LanguageProvider initialLanguage="tr">
       <MemoryRouter initialEntries={[initial]}>
@@ -75,7 +75,7 @@ describe("the picker", () => {
   });
 
   it("applies and saves a named rival with the template", () => {
-    renderPicker("/league/members/1?mode=fark-yarat&window=1&rival=42");
+    renderPicker("/league/352490/members/1?mode=fark-yarat&window=1&rival=42");
 
     fireEvent.change(screen.getByLabelText("Bu kombinasyonu adlandır"), {
       target: { value: "Derbi" },
@@ -94,7 +94,7 @@ describe("the picker", () => {
   });
 
   it("saves the current selection under a name and can remove it again", () => {
-    renderPicker("/league/members/1?mode=ortak-koru&window=1");
+    renderPicker("/league/352490/members/1?mode=ortak-koru&window=1");
 
     fireEvent.change(screen.getByLabelText("Bu kombinasyonu adlandır"), {
       target: { value: "Derbi planım" },

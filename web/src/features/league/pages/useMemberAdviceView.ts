@@ -1,3 +1,4 @@
+import { useLeague } from "../useLeague";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
@@ -39,7 +40,11 @@ export function useMemberAdviceView(
   searchParams: URLSearchParams,
 ) {
   const view = squad.payload;
-  const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
+  const { tree } = useLeague();
+  const adviceClient = useMemo(
+    () => client ?? createAdviceClient(tree.entryAdvice),
+    [client, tree],
+  );
   const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
   // What the member's own device can compute from this publish's inputs, stated beside

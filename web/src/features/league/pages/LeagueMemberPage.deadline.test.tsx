@@ -14,6 +14,7 @@ import {
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -23,13 +24,15 @@ const DEADLINE = "2026-09-18T17:30:00Z";
 function renderView(deadlinePassed: string | null, language: "tr" | "en") {
   render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
-        <LeagueMemberView
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)}
-          deadlinePassed={deadlinePassed}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+        {withLeague(
+          <LeagueMemberView
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)}
+            deadlinePassed={deadlinePassed}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

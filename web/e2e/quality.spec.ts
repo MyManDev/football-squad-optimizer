@@ -6,11 +6,11 @@ import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
 const PAGES = [
   { heading: "Ligini bul", path: "/" },
-  { heading: "Lig tablosu", path: "/league/members" },
+  { heading: "Lig tablosu", path: "/league/352490/members" },
   { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
   { heading: "Önerilen Hamleler", path: "/moves" },
   { heading: "Rakip Analizi", path: "/rivals" },
-  { heading: "Lig Analizi", path: "/league" },
+  { heading: "Lig Analizi", path: "/league/352490" },
   { heading: "Yönetim", path: "/admin" },
 ] as const;
 
@@ -21,7 +21,11 @@ test.beforeEach(async ({ page }) => {
 test("visitor navigation reaches league entry without browser errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    // The league directory is optional: a site from before it answers 404 for
+    // `data/leagues.json`, which the browser logs as a failed resource, and the page reads
+    // its one league from the legacy tree. No other error is expected.
+    if (message.type() === "error" && !message.location().url.endsWith("/data/leagues.json"))
+      errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
 
@@ -30,7 +34,7 @@ test("visitor navigation reaches league entry without browser errors", async ({ 
   // member is in context.
   const navigation = page.getByRole("navigation");
   await navigation.getByRole("link", { name: "Lig", exact: true }).click();
-  await expect(page).toHaveURL("/league/members");
+  await expect(page).toHaveURL("/league/352490/members");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig tablosu");
   await navigation.getByRole("link", { name: "Bu hafta", exact: true }).click();
   await expect(page).toHaveURL("/");
@@ -58,7 +62,7 @@ for (const language of ["tr", "en"] as const) {
       language === "tr" ? "Yönetim" : "Admin",
     );
     await expect(page.locator('#sidebar a[href="/admin"], header a[href="/admin"]')).toHaveCount(0);
-    await expect(page.locator('a[href="/league"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/league/352490"]')).toHaveCount(0);
     expect(systemDataRequests).toEqual([]);
 
     // The measurement archive is not served from the member origin: its documents are the
@@ -98,7 +102,7 @@ for (const language of ["tr", "en"] as const) {
       .getByRole("button", { name: language === "tr" ? "Ligi bul" : "Find league" })
       .click();
 
-    await expect(page).toHaveURL("/league/members");
+    await expect(page).toHaveURL("/league/352490/members");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       language === "tr" ? "Lig tablosu" : "League table",
     );
@@ -110,10 +114,10 @@ for (const language of ["tr", "en"] as const) {
       await page
         .locator("#sidebar a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/league/members", "/fixtures", "/contribute"]);
+    ).toEqual(["/", "/league/352490/members", "/fixtures", "/contribute"]);
     await expect(
       page.locator(
-        'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
+        'a[href="/league/352490"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/352490/members/squadopt"]',
       ),
     ).toHaveCount(0);
     expect(systemDataRequests).toEqual([]);
@@ -121,7 +125,7 @@ for (const language of ["tr", "en"] as const) {
 }
 
 test("a member page's sidebar adds only its member block to the chrome", async ({ page }) => {
-  await page.goto("/league/members/35249001");
+  await page.goto("/league/352490/members/35249001");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
   // The member block goes back to the member list; the rest is the navigation with this
   // member's week and squad.
@@ -130,16 +134,16 @@ test("a member page's sidebar adds only its member block to the chrome", async (
       .locator("#sidebar a")
       .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
   ).toEqual([
-    "/league/members",
-    "/league/members/35249001",
-    "/league/members/35249001#kadro",
-    "/league/members",
+    "/league/352490/members",
+    "/league/352490/members/35249001",
+    "/league/352490/members/35249001#kadro",
+    "/league/352490/members",
     "/fixtures",
     "/contribute",
   ]);
   await expect(
     page.locator(
-      'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
+      'a[href="/league/352490"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/352490/members/squadopt"]',
     ),
   ).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
@@ -218,12 +222,12 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   }
 
   for (const destination of [
-    { heading: "Lig tablosu", path: "/league/members" },
-    { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
+    { heading: "Lig tablosu", path: "/league/352490/members" },
+    { heading: "North Stand Notes", path: "/league/352490/members/35249001?mode=agresif&window=3" },
     // The virtual member shows the week the shipped index names.
     {
       heading: `Oyun haftası ${indexFixture.payload.latest.gameweek}`,
-      path: "/league/members/squadopt",
+      path: "/league/352490/members/squadopt",
     },
   ]) {
     await page.goto(destination.path);

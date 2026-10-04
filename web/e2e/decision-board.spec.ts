@@ -24,7 +24,7 @@ for (const language of ["tr", "en"] as const) {
     page.on("request", (r) => {
       if (r.method() === "POST") posts.push(r.url());
     });
-    await page.goto("/league/members/35249001?window=3");
+    await page.goto("/league/352490/members/35249001?window=3");
     // The decision board is one of the page's tools, closed until it is asked for.
     const tools = page.locator("main details").filter({
       has: page.locator("summary", { hasText: MESSAGES[language].leagueMembers.decisionTools }),

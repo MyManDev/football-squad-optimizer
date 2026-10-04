@@ -40,7 +40,7 @@ test("rivals shows the projections and says why there is no rival yet", async ({
 });
 
 test("league shows the season and the cumulative chart", async ({ page }) => {
-  await page.goto("/league");
+  await page.goto("/league/352490");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
   // This test runs against whatever is currently published, so every assertion in it has to
   // hold for any week of the season rather than for the week it was written in. Whether the
@@ -84,7 +84,7 @@ test("language selection switches the full frame and persists across routes", as
   await page.reload();
   await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
     "href",
-    "/league/members",
+    "/league/352490/members",
   );
   await page.getByRole("link", { name: "This week", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find your league");

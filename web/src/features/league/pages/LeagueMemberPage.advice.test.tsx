@@ -22,7 +22,7 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "../advice/adviceClient";
-import { HttpAdviceClient } from "../advice/adviceClient";
+import { HttpAdviceClient, StaticOnlyAdviceClient } from "../advice/adviceClient";
 import type {
   AdviceMove,
   EntryAdvice,
@@ -31,6 +31,8 @@ import type {
   LeagueViewEnvelope,
 } from "../types";
 import { LeagueMemberView, type AdviceIssue } from "./LeagueMemberPage";
+import { exampleTree, withLeague } from "../../../testSupport/league";
+import type { RequestOptions } from "../../../data/request";
 
 afterEach(cleanup);
 
@@ -76,6 +78,11 @@ class FakeClient implements AdviceClient {
     return { kind: "not-computed" };
   }
 
+  /** The published baseline is the example tree's document, as the static client reads it. */
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return new StaticOnlyAdviceClient(exampleTree.entryAdvice).readPublished(request, options);
+  }
+
   requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
     return this.outcome(request);
   }
@@ -105,7 +112,7 @@ function renderView({
   advice,
   adviceIssue,
   client,
-  initialEntry = `/league/members/${ENTRY}`,
+  initialEntry = `/league/352490/members/${ENTRY}`,
   language = "tr",
   index = mockEntryAdviceIndex(ENTRY).payload,
 }: {
@@ -120,14 +127,16 @@ function renderView({
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <SwitchMode />
-        <LeagueMemberView
-          squad={squad}
-          advice={advice}
-          adviceIssue={adviceIssue}
-          members={MEMBERS}
-          index={index}
-          client={client}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={squad}
+            advice={advice}
+            adviceIssue={adviceIssue}
+            members={MEMBERS}
+            index={index}
+            client={client}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>
   );
@@ -256,7 +265,7 @@ describe("league member advice flow", () => {
       const requests: AdviceRequest[] = [];
       renderView({
         advice: mockEntryAdviceEnvelope(ENTRY, mode, 1),
-        initialEntry: `/league/members/${ENTRY}?mode=${mode}&window=${window}`,
+        initialEntry: `/league/352490/members/${ENTRY}?mode=${mode}&window=${window}`,
         client: new FakeClient(async (request) => {
           requests.push(request);
           return { kind: "unavailable" };
@@ -289,7 +298,7 @@ describe("league member advice flow", () => {
     renderView({
       advice: null,
       adviceIssue: "not-computed",
-      initialEntry: `/league/members/${ENTRY}?window=${window}`,
+      initialEntry: `/league/352490/members/${ENTRY}?window=${window}`,
       client: new FakeClient(async (request) => {
         requests.push(request);
         return { kind: "unavailable" };
@@ -318,7 +327,7 @@ describe("league member advice flow", () => {
     });
     renderView({
       advice: null,
-      initialEntry: `/league/members/${ENTRY}?window=3`,
+      initialEntry: `/league/352490/members/${ENTRY}?window=3`,
       client,
     });
     await compute();
@@ -329,7 +338,7 @@ describe("league member advice flow", () => {
     const requests: AdviceRequest[] = [];
     renderView({
       advice: null,
-      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru`,
+      initialEntry: `/league/352490/members/${ENTRY}?mode=ortak-koru`,
       index: null,
       client: new FakeClient(async (request) => {
         requests.push(request);
@@ -347,7 +356,7 @@ describe("league member advice flow", () => {
     const rival = mockEntryAdviceIndex(ENTRY).payload.default_rival_entry_id;
     renderView({
       advice: null,
-      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru`,
+      initialEntry: `/league/352490/members/${ENTRY}?mode=ortak-koru`,
       client: new FakeClient(async (request) => {
         requests.push(request);
         return { kind: "unavailable" };
@@ -369,7 +378,7 @@ describe("league member advice flow", () => {
     renderView({
       advice: null,
       index: { ...base, default_rival_entry_id: null },
-      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru`,
+      initialEntry: `/league/352490/members/${ENTRY}?mode=ortak-koru`,
       language: "en",
       client: new FakeClient(async () => ({ kind: "unavailable" })),
     });
@@ -411,7 +420,7 @@ describe("league member advice flow", () => {
     const published = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     renderView({
       advice: { ...published, payload: { ...published.payload, league_id: 999 } },
-      initialEntry: `/league/members/${ENTRY}?rival=35249002`,
+      initialEntry: `/league/352490/members/${ENTRY}?rival=35249002`,
       client: new FakeClient(async (request) => {
         requests.push(request);
         return { kind: "unavailable" };

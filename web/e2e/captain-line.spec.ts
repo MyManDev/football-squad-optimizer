@@ -69,7 +69,7 @@ for (const language of ["tr", "en"] as const) {
       for (const { strategy, window, armband } of pages) {
         if (!armband) continue;
         await page.setViewportSize({ width: WIDTHS[0], height: 800 });
-        await page.goto(`/league/members/${entry}?mode=${strategy}&window=${window}`);
+        await page.goto(`/league/352490/members/${entry}?mode=${strategy}&window=${window}`);
         const line = page.locator('[data-mark="decision"] p[class*="_captain_"]');
         await expect(line).toBeVisible();
         // The club codes come from the calendar, and the widths from the page's own faces:

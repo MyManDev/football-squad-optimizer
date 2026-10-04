@@ -24,6 +24,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { Language } from "../../../i18n/messages";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -39,15 +40,17 @@ function renderText(language: Language, advice: LeagueViewEnvelope<EntryAdvice>)
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter
         initialEntries={[
-          `/league/members/${ENTRY}?mode=${advice.payload.mode}&window=${advice.payload.window}`,
+          `/league/352490/members/${ENTRY}?mode=${advice.payload.mode}&window=${advice.payload.window}`,
         ]}
       >
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={mockEntryAdviceIndex(ENTRY).payload}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={mockEntryAdviceIndex(ENTRY).payload}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

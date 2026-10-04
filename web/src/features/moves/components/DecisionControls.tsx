@@ -5,7 +5,7 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../../lib/decisionVocabulary";
-import { loadLeagueMembers } from "../../league";
+import { lookupPublishedLeague, membersAddress } from "../../league";
 import { useDecisionSelection } from "../decisionSelection";
 import { readHorizonEvidence } from "../horizonEvidence";
 import { MODE_PRICE_FOLDS, getPlayModes } from "../modePrices";
@@ -24,7 +24,7 @@ type LeagueFieldState =
   | { kind: "checking" }
   | { kind: "invalid" }
   | { kind: "unavailable" }
-  | { kind: "mismatch"; publishedId: number };
+  | { kind: "mismatch"; requestedId: number };
 
 export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknown }) {
   const { locale, messages } = useLanguage();
@@ -45,9 +45,9 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
     try {
       // A static site can only open the league it precomputed; the published members
       // document says which one that is, and its absence is the honest "not yet" state.
-      const members = await loadLeagueMembers();
-      if (members.payload.league_id === requested) navigate("/league/members");
-      else setLeagueState({ kind: "mismatch", publishedId: members.payload.league_id });
+      const found = await lookupPublishedLeague(requested);
+      if (found.status === "connected") navigate(membersAddress(requested));
+      else setLeagueState({ kind: "mismatch", requestedId: requested });
     } catch {
       setLeagueState({ kind: "unavailable" });
     }
@@ -142,7 +142,7 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
           ) : leagueState.kind === "unavailable" ? (
             <small role="alert">{copy.leagueUnavailable}</small>
           ) : leagueState.kind === "mismatch" ? (
-            <small role="alert">{copy.leagueMismatch(leagueState.publishedId)}</small>
+            <small role="alert">{copy.leagueMismatch(leagueState.requestedId)}</small>
           ) : (
             <small>{copy.leagueHelp}</small>
           )}

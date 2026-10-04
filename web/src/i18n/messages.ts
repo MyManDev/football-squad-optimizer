@@ -24,8 +24,8 @@ const en = {
     back: "Back to member",
     week: "Recorded week",
     gameweek: (week: number) => `Gameweek ${week}`,
-    scope:
-      "League 352490 · The one-gameweek pure-points suggestion the site published, recorded before the deadline.",
+    scope: (leagueId: number) =>
+      `League ${leagueId} · The one-gameweek pure-points suggestion the site published, recorded before the deadline.`,
     method:
       "We score the recorded squad with settled player results, captain and automatic substitution rules. Past suggestions are never solved again.",
     empty: "No record",
@@ -285,8 +285,7 @@ const en = {
     leagueInvalid: "Enter a league number or an FPL league link.",
     leagueUnavailable:
       "League member data is not published yet; it arrives with the next decision publish.",
-    leagueMismatch: (leagueId: number) =>
-      `This site precomputes league ${leagueId} only; that is the league it can open.`,
+    leagueMismatch: (leagueId: number) => `This site does not publish league ${leagueId}.`,
     diagnostic: "diagnostic",
     diagnosticTitle: (weeks: number) =>
       `The league-relative ${weeks}-week result is a diagnostic, never a chance of winning.`,
@@ -521,9 +520,12 @@ const en = {
     submit: "Find league",
     invalid: "Enter a positive whole-number league ID.",
     loading: "Reading the published league…",
-    unsupported: "Only league 352490 is supported for now.",
+    unsupported: (leagueId: number) => `This site does not publish league ${leagueId}.`,
     missing: "The published league document is unavailable. Try again later.",
     failed: "The published league data could not be read. Try again.",
+    directoryUnreadable: "The list of published leagues could not be read. Try again.",
+    directoryMissing: "Nothing is published here yet. Try again later.",
+    retry: "Try again",
   },
   memberResources: {
     transfersTitle: "Free transfers",
@@ -860,7 +862,7 @@ const en = {
       wildcard: "Wildcard",
       freehit: "Free Hit",
     } as Record<string, string>,
-    linkTitle: "Classic league 352490",
+    linkTitle: (leagueId: number) => `Classic league ${leagueId}`,
     linkBody:
       "Every member row opens that member's public post-deadline squad and the moves suggested from it.",
     linkLabel: "Open league members →",
@@ -1113,8 +1115,8 @@ const tr: MessageSchema<typeof en> = {
     back: "Üyeye dön",
     week: "Kayıtlı hafta",
     gameweek: (week) => `Oyun haftası ${week}`,
-    scope:
-      "Lig 352490 · Sitede yayımlanan, son tarihten önce kaydedilmiş bir haftalık saf puan önerisi.",
+    scope: (leagueId) =>
+      `Lig ${leagueId} · Sitede yayımlanan, son tarihten önce kaydedilmiş bir haftalık saf puan önerisi.`,
     method:
       "Kayıtlı kadroyu kesinleşmiş oyuncu sonuçları, kaptan ve otomatik yedek kurallarıyla puanlıyoruz. Geçmiş önerileri yeniden hesaplatmıyoruz.",
     empty: "Kayıt yok",
@@ -1366,8 +1368,7 @@ const tr: MessageSchema<typeof en> = {
     leagueConnect: "Bağlan",
     leagueInvalid: "Bir lig numarası ya da FPL lig bağlantısı gir.",
     leagueUnavailable: "Lig üyesi verisi henüz yayınlanmadı; bir sonraki karar yayınıyla gelir.",
-    leagueMismatch: (leagueId) =>
-      `Bu site yalnızca ${leagueId} numaralı ligi hesaplar; açabildiği lig o.`,
+    leagueMismatch: (leagueId) => `Bu site ${leagueId} numaralı ligi yayımlamıyor.`,
     diagnostic: "diagnostik",
     diagnosticTitle: (weeks) =>
       `Lig-içi ${weeks} haftalık sonuç bir teşhis göstergesidir; kazanma ihtimali değildir.`,
@@ -1602,9 +1603,12 @@ const tr: MessageSchema<typeof en> = {
     submit: "Ligi bul",
     invalid: "Pozitif tam sayı olan bir lig numarası gir.",
     loading: "Yayımlanan lig okunuyor…",
-    unsupported: "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
+    unsupported: (leagueId) => `Bu site ${leagueId} numaralı ligi yayımlamıyor.`,
     missing: "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene.",
     failed: "Yayımlanan lig verisi okunamadı. Yeniden dene.",
+    directoryUnreadable: "Yayımlanan liglerin listesi okunamadı. Yeniden dene.",
+    directoryMissing: "Burada henüz yayımlanmış bir şey yok. Daha sonra yeniden dene.",
+    retry: "Yeniden dene",
   },
   memberResources: {
     transfersTitle: "Ücretsiz transfer hakkı",
@@ -1921,7 +1925,7 @@ const tr: MessageSchema<typeof en> = {
       wildcard: "Wildcard",
       freehit: "Free Hit",
     },
-    linkTitle: "Klasik lig 352490",
+    linkTitle: (leagueId) => `Klasik lig ${leagueId}`,
     linkBody:
       "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",

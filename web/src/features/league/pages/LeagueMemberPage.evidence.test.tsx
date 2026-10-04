@@ -28,6 +28,7 @@ import type {
   LeagueViewEnvelope,
 } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -101,13 +102,15 @@ function renderPage(
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={INDEX}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${query}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={INDEX}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );

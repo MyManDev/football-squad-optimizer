@@ -44,7 +44,8 @@ test("a member's plan is solved on the device and drawn as a computation result"
         contract_version: "provisional_league_ui_v1",
         generated_at_utc: "2026-10-03T00:00:00Z",
         source_kind: "live",
-        payload: fixture.document,
+        // The synthetic instances name league 1; the producer writes the league's own id.
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
       }),
     }),
   );
@@ -60,7 +61,7 @@ test("a member's plan is solved on the device and drawn as a computation result"
     if (response.url().endsWith(".wasm")) wasm.push(`${response.status()} ${response.url()}`);
   });
 
-  await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
   pressed = true;
@@ -136,12 +137,13 @@ test("a chip the member holds is solved on the device with its gain against the 
         contract_version: "provisional_league_ui_v1",
         generated_at_utc: "2026-10-03T00:00:00Z",
         source_kind: "live",
-        payload: fixture.document,
+        // The synthetic instances name league 1; the producer writes the league's own id.
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
       }),
     }),
   );
 
-  await page.goto(`/league/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
   await expect(page.locator("main")).toContainText("Triple Captain bu hafta oynanıyor");
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
@@ -220,7 +222,7 @@ test("a rival strategy is solved on the device against the rival's published ele
     }),
   );
 
-  await page.goto(`/league/members/${ENTRY}?mode=fark-yarat&window=1&rival=${RIVAL}`);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=fark-yarat&window=1&rival=${RIVAL}`);
   const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
   await expect(button).toBeVisible();
   await button.click();
