@@ -117,7 +117,8 @@ jobs:
               if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 20_000));
             }
             const label = exercise ? "backend-uptime-exercise" : "backend-down";
-            // A login shape only; anything else assigns nobody rather than failing the alarm.
+            // A login shape only; anything else assigns nobody. A login GitHub will not assign
+            // (a typo, someone who left) is refused at create time and dropped there, below.
             const assignee = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(process.env.ALERT_ASSIGNEE?.trim() ?? "")
               ? process.env.ALERT_ASSIGNEE.trim() : undefined;
             const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -146,15 +147,25 @@ jobs:
                 if (error.status !== 404) throw error;
                 await github.rest.issues.createLabel({ ...context.repo, name: label, color: "d73a4a" });
               }
-              const created = (await github.rest.issues.create({
+              const issue = {
                 ...context.repo,
                 title: exercise ? `[EXERCISE] Backend alarm permission, run ${context.runId}` : "Backend health or readiness check failed",
                 labels: [label],
-                ...(assignee && !exercise ? { assignees: [assignee] } : {}),
                 body: exercise
                   ? `${marker} at ${at}.\n\n${run}\n\nSynthetic failure and recovery. This is not a production incident.`
                   : `The backend check failed twice. Observed at ${at}. Result: ${status}.\n\n${failing}`,
-              })).data;
+              };
+              let created;
+              try {
+                created = (await github.rest.issues.create({
+                  ...issue, ...(assignee && !exercise ? { assignees: [assignee] } : {}),
+                })).data;
+              } catch (error) {
+                // The incident is the outage's record; an assignee GitHub refuses must not cost it.
+                if (!(assignee && !exercise && error.status === 422)) throw error;
+                core.warning("BACKEND_ALERT_ASSIGNEE cannot be assigned here; the incident is opened unassigned.");
+                created = (await github.rest.issues.create(issue)).data;
+              }
               if (!exercise) {
                 // A red run is what reaches the owner: GitHub mails a failed scheduled run to whoever
                 // last edited the schedule. Only a transition fails, so an outage mails once.

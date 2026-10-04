@@ -30,6 +30,7 @@ async function run({
   failCreate = false,
   missingLabel = false,
   assignee = "",
+  unassignable = "",
 } = {}) {
   const real = {
     number: 42,
@@ -42,6 +43,7 @@ async function run({
   const calls = [];
   const logs = [];
   const failures = [];
+  const warnings = [];
   const urls = [];
   let fetches = 0;
   const api = {
@@ -56,6 +58,9 @@ async function run({
     create: async (args) => {
       calls.push(["create", args]);
       if (failCreate) throw new Error("create denied");
+      if (unassignable && args.assignees?.includes(unassignable)) {
+        throw Object.assign(new Error("Validation Failed"), { status: 422 });
+      }
       const issue = {
         ...args,
         number: 99,
@@ -115,7 +120,11 @@ async function run({
         serverUrl: "https://example.test",
       },
       github,
-      { info: (line) => logs.push(line), setFailed: (line) => failures.push(line) },
+      {
+        info: (line) => logs.push(line),
+        setFailed: (line) => failures.push(line),
+        warning: (line) => warnings.push(line),
+      },
       async (url) => {
         fetches += 1;
         urls.push(String(url));
@@ -135,7 +144,7 @@ async function run({
   } catch (caught) {
     error = caught;
   }
-  return { issues, calls, logs, failures, fetches, urls, error };
+  return { issues, calls, logs, failures, warnings, fetches, urls, error };
 }
 
 describe("backend alarm issue exercise", () => {
@@ -357,6 +366,20 @@ describe("the alarm reaches a person", () => {
     expect(result.error).toBeUndefined();
     const created = result.calls.find(([kind]) => kind === "create")[1];
     expect(created.assignees).toEqual(["owner-login"]);
+    expect(result.failures).toEqual([
+      "The backend is down: health (HTTP 503), ready (HTTP 503, false: worker_heartbeat).",
+    ]);
+  });
+
+  it("opens the incident unassigned when GitHub refuses the login, and says so", async () => {
+    const result = await run({ ...down, assignee: "gone-member", unassignable: "gone-member" });
+    expect(result.error).toBeUndefined();
+    const creates = result.calls.filter(([kind]) => kind === "create").map(([, args]) => args);
+    expect(creates).toHaveLength(2);
+    expect(creates[0].assignees).toEqual(["gone-member"]);
+    expect(creates[1]).not.toHaveProperty("assignees");
+    expect(result.issues.get(99).labels).toEqual(["backend-down"]);
+    expect(result.warnings).toHaveLength(1);
     expect(result.failures).toEqual([
       "The backend is down: health (HTTP 503), ready (HTTP 503, false: worker_heartbeat).",
     ]);

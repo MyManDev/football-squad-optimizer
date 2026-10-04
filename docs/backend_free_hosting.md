@@ -160,7 +160,10 @@ Three things to know before relying on it:
   shortcut (two starters would each log a contended start), runs at normal priority
   (Task Scheduler's default, 7, is below normal and the solver workers would inherit it),
   with no time limit (the default ends a task after 72 hours) and on battery. Registering
-  it is the owner's act; replace `<repo>` with the main checkout's path:
+  it is the owner's act. End a watcher already running first (close its window, or end the
+  hidden `powershell.exe` whose command line holds `start_backend_at_logon.ps1` and `-Watch`):
+  while another watcher holds the mutex, each five-minute start finds it held, writes a
+  `startup-<stamp>.log` and exits. Replace `<repo>` with the main checkout's path:
 
   ```powershell
   powershell -ExecutionPolicy Bypass -File <repo>\scripts\start_backend_at_logon.ps1 -Unregister
@@ -174,7 +177,8 @@ Three things to know before relying on it:
   A repetition with no duration repeats indefinitely. If registering is refused for lack
   of rights, run the same lines in an elevated PowerShell; the task still runs as the
   owner, only while the owner is logged on. `Unregister-ScheduledTask -TaskName
-  SquadOptBackendWatch` removes it. The watcher still probes loopback `/health` only, so an
+  SquadOptBackendWatch` removes it; moving the connector off the PC disables it first (ADR
+  0009's tunnel move). The watcher still probes loopback `/health` only, so an
   API that answers while every worker is dead looks healthy to it; the uptime workflow's
   `/ready` probe sees that case, and watch mode still never kills.
   The PC must not sleep while members are expected; that is a Windows power setting

@@ -168,6 +168,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start_backend_at_log
 Require `READY`, matching capture/tree checks, and successful public health before
 accepting recovery. Missing metrics are unknown, not zero. `-Register` writes the
 current user's Startup shortcut with `-Watch`; it starts at the next logon, not now.
+The shortcut starts a watcher only at logon; the scheduled task in
+[backend free hosting](backend_free_hosting.md) (`SquadOptBackendWatch`) replaces it and
+re-arms a watcher that ends. Use one or the other, not both.
 The PC must remain awake and logged in. Watch behavior is covered by mocked tests;
 replacement-PC startup and logon persistence are **never exercised**.
 `-Register` has **never been exercised on any machine**.
