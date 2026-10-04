@@ -593,13 +593,13 @@ const en = {
       "ortak-koru": {
         name: "Keep the shared core",
         description:
-          "Requests at least 9 shared players between your recommended 15 and the rival's XI. This minimum may be lowered to fit the free-transfer limit; the published plan states the applied bound.",
+          "Requests at least 9 shared players between your recommended 15 and the rival's XI. This minimum may be lowered to fit the free-transfer limit; the plan states the applied bound.",
         short: "Asks for at least 9 of your 15 in the rival's eleven.",
       },
       "fark-yarat": {
         name: "Create a gap",
         description:
-          "Requests at most 5 shared players between your recommended 15 and the rival's XI. This maximum may be raised to fit the free-transfer limit; the published plan states the applied bound.",
+          "Requests at most 5 shared players between your recommended 15 and the rival's XI. This maximum may be raised to fit the free-transfer limit; the plan states the applied bound.",
         short: "Asks for at most 5 of your 15 in the rival's eleven.",
       },
     } as Record<
@@ -765,7 +765,7 @@ const en = {
     emptySquadBody: "The published member record does not contain squad data.",
     independentAdviceRule:
       "Your advice is calculated from your squad and selected strategy. Every member is evaluated under the same decision rules.",
-    noMove: "The published plan recommends no transfers.",
+    noMove: "This plan recommends no transfers.",
     diagnosticOnly:
       "The two starting XIs use the same projection. Shared players with equal multipliers cancel out; the remaining expected points, captain multipliers and this plan’s transfer hits determine the expected gap.",
     out: "Out",
@@ -1604,13 +1604,13 @@ const tr: MessageSchema<typeof en> = {
       "ortak-koru": {
         name: "Ortak çekirdeği koru",
         description:
-          "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en az 9 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu alt sınır düşürülebilir; yayımlanan plan uygulanan sınırı belirtir.",
+          "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en az 9 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu alt sınır düşürülebilir; plan uygulanan sınırı belirtir.",
         short: "15'inle rakibin ilk 11'i arasında en az 9 ortak oyuncu ister.",
       },
       "fark-yarat": {
         name: "Fark yarat",
         description:
-          "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu üst sınır yükseltilebilir; yayımlanan plan uygulanan sınırı belirtir.",
+          "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu üst sınır yükseltilebilir; plan uygulanan sınırı belirtir.",
         short: "15'inle rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister.",
       },
     },
@@ -1770,7 +1770,7 @@ const tr: MessageSchema<typeof en> = {
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
     independentAdviceRule:
       "Önerin senin kadrondan, seçtiğin stratejiye göre hesaplanır. Her üye aynı karar kurallarıyla değerlendirilir.",
-    noMove: "Yayımlanan plan transfer önermiyor.",
+    noMove: "Bu plan transfer önermiyor.",
     diagnosticOnly:
       "İki ilk 11 aynı projeksiyonla karşılaştırılır. Aynı çarpana sahip ortak oyuncuların katkıları sadeleşir; kalan beklenen puanlar, kaptan çarpanları ve bu planın transfer cezaları beklenen farkı belirler.",
     out: "Çıkan",
