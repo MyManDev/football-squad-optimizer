@@ -15,20 +15,34 @@ parity check and not a claim about any player. The ``chips`` instances play each
 game has on two of the fifteens, forced for the decided week as the member's chosen chip
 is, with every total on the chip week's own basis and the gain against the member's
 no-chip plan the way ``advice_chips`` measures it.
+
+The ``rivals`` block is a second, smaller world: the unit tests' three-capture world
+(``tests/unit/test_live_transfers.build_world``), whose device document the real producer
+writes and whose answers the real advice service gives (``advise_entry`` under each rival
+strategy against each rival). The device restates that service's rule, and this is what
+holds it to it.
 """
 
 from __future__ import annotations
 
 import json
 import random
+import tempfile
 from pathlib import Path
 from typing import Any, Final
 
 import pandas as pd
 from scripts._experiment_cli import measurement_optimization_config
 
-from squadopt.application.advice import _attributed_gains, _paired_by_position
+from squadopt.application.advice import (
+    AdviseEntryRequest,
+    _attributed_gains,
+    _paired_by_position,
+    advise_entry,
+)
 from squadopt.application.advice_chips import chip_week_points
+from squadopt.application.device_plan import device_plan_entry, device_plan_table
+from squadopt.application.entries import EntryError, held_squad_from_picks
 from squadopt.application.lineup_publication import (
     best_eleven_points,
     best_lineup_points_with_chip,
@@ -60,6 +74,20 @@ CHIPS: Final = ("wildcard", "freehit", "bboost", "3xc")
 #: Which fifteens play each chip: the one that holds two free transfers and a little money,
 #: and the weak one with money, whose rebuild under a Wildcard is a real rebuild.
 CHIP_MEMBERS: Final = (2, 7)
+RIVAL_STRATEGIES: Final = ("ortak-koru", "fark-yarat")
+RIVAL_LEAGUE: Final = 352490
+#: The test world's members: the repair squad (four from two clubs, an injured player) and
+#: the discretionary squad whose transfers are a choice. Codes are the world's own.
+RIVAL_MEMBERS: Final = {
+    101: (1001, 1002, 1004, 1005, 1006, 1007, 1008, 1012, 1013, 1014, 1015, 1016, 1020, 1021, 1022),
+    102: (1001, 1002, 1004, 1006, 1007, 1008, 1009, 1012, 1013, 1014, 1015, 1016, 1022, 1023, 1024),
+}
+#: The rivals: an eleven sharing six with the repair squad (the differential band is one
+#: swap away), and one holding the strongest players, which a core band has to buy into.
+RIVAL_ELEVENS: Final = {
+    202: (1004, 1005, 1006, 1012, 1013, 1014, 1003, 1009, 1017, 1018, 1019, 1010, 1011, 1023, 1024),
+    203: (1003, 1002, 1009, 1010, 1011, 1017, 1018, 1019, 1023, 1024, 1016, 1001, 1004, 1012, 1020),
+}
 CLUBS: Final = tuple(f"Club {k}" for k in range(1, 9))
 SHAPE: Final = {"GK": 8, "DEF": 20, "MID": 20, "FWD": 12}
 PRICE: Final = {"GK": (40, 55), "DEF": (40, 75), "MID": (45, 130), "FWD": (45, 125)}
@@ -311,6 +339,146 @@ def _gains_on_chip_basis(
     return gains
 
 
+def _rival_reference(payload: dict[str, Any]) -> dict[str, Any]:
+    """What the device is held to from a rival strategy's published answer."""
+
+    def ids(rows: list[dict[str, Any]]) -> list[int]:
+        return sorted(int(row["player_id"]) for row in rows)
+
+    moves = payload["moves"]
+    alternative = payload.get("alternative_plan")
+    return {
+        "solver_status": payload["solver_status"],
+        "control_solver_status": payload["control_solver_status"],
+        "starting_xi": ids(payload["starting_xi"]),
+        "captain": int(payload["captain"]["player_id"]),
+        "vice_captain": int(payload["vice_captain"]["player_id"]),
+        "bench": [int(row["player_id"]) for row in payload["bench"]],
+        "transfers_in": sorted(int(m["player_in"]["player_id"]) for m in moves),
+        "transfers_out": sorted(int(m["player_out"]["player_id"]) for m in moves),
+        "moves": [
+            {
+                "out": int(m["player_out"]["player_id"]),
+                "in": int(m["player_in"]["player_id"]),
+                "gain": m["expected_points_delta"],
+            }
+            for m in moves
+        ],
+        "transfer_hit_points": float(payload["transfer_hit_points"]),
+        "expected_own_points": float(payload["expected_own_points"]),
+        "expected_gain_vs_hold": payload["expected_gain_vs_hold"],
+        "expected_points_cost": float(payload["expected_points_cost"]),
+        "expected_points_cost_ceiling": payload.get("expected_points_cost_ceiling"),
+        "overlap_count": int(payload["overlap_count"]),
+        "transfer_cap": int(payload["transfer_cap"]),
+        "overlap_target": int(payload["overlap_target"]),
+        "overlap_applied": int(payload["overlap_applied"]),
+        "plan_kind": payload["plan_kind"],
+        "alternative_plan": None
+        if alternative is None
+        else {
+            "kind": alternative["kind"],
+            "overlap_applied": int(alternative["overlap_applied"]),
+            "transfer_hit_points": alternative["transfer_hit_points"],
+            "expected_points_cost": float(alternative["expected_points_cost"]),
+            "expected_points_cost_ceiling": alternative.get("expected_points_cost_ceiling"),
+        },
+        "expected_gap_vs_rival": float(payload["expected_gap_vs_rival"]),
+        "captain_agreement": bool(payload["captain_agreement"]),
+    }
+
+
+def build_rival_fixture() -> dict[str, Any]:
+    """The test world's device document, its members' blocks, and the service's answers."""
+
+    # The test modules are imported here, not at the top: they pull in pytest, which the
+    # fixture script needs for the world and nothing else.
+    from tests.unit.test_league_views import _member_picks, _Provider
+    from tests.unit.test_live_transfers import SEASON, _handoff, build_world
+
+    from squadopt.data.snapshots import read_snapshot
+    from squadopt.live import read_inputs, read_season_rules
+    from squadopt.live.recommendation import project, read_projection_handoff
+
+    with tempfile.TemporaryDirectory() as temporary:
+        world = build_world(Path(temporary))
+        snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
+        inputs = read_inputs(snapshot, season=SEASON, gameweek=2)
+        # The world's own projection is coarse (2.0, 2.5, 3.0), and two plans with the same
+        # points, the same hits and the same rank sums are told apart by nothing in either
+        # solver's tie-break; a parity fixture needs every player on his own number. Each
+        # code's points are nudged by a distinct hundredth, the world's order kept.
+        points = {
+            code: round(2.0 + (code % 3) * 0.5 + (code - 1000) / 100, 2)
+            for code in range(1001, 1025)
+        }
+        points[1024] = 9.24
+        points[1005] = 0.55
+        handoff = read_projection_handoff(_handoff(world, points=points))
+        projection = project(inputs, in_season=handoff)
+        rules = read_season_rules(snapshot, season=SEASON)
+        picks = {
+            entry_id: _member_picks(world, entry_id, list(codes))
+            for entry_id, codes in (*RIVAL_MEMBERS.items(), *RIVAL_ELEVENS.items())
+        }
+    provider = _Provider(picks)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    document = device_plan_table(inputs, projection, rules, league_id=RIVAL_LEAGUE)
+    members = {}
+    for entry_id in RIVAL_MEMBERS:
+        held = held_squad_from_picks(picks[entry_id], current_prices=prices)
+        block = device_plan_entry(inputs, projection, held, rules)
+        if block is None:
+            raise RuntimeError(f"The producer writes no inputs for member {entry_id}.")
+        members[str(entry_id)] = block
+    rivals = {
+        str(entry_id): {
+            "entry_id": entry_id,
+            "starting_xi": sorted(picks[entry_id].starting_xi),
+            "captain": int(picks[entry_id].captain),
+        }
+        for entry_id in RIVAL_ELEVENS
+    }
+    cases = []
+    for entry_id in RIVAL_MEMBERS:
+        for rival_id in RIVAL_ELEVENS:
+            for strategy in RIVAL_STRATEGIES:
+                request = AdviseEntryRequest(
+                    season=str(inputs.season),
+                    gameweek=int(inputs.deadline.gameweek),
+                    league_id=RIVAL_LEAGUE,
+                    entry_id=entry_id,
+                    strategy=strategy,
+                    rival_entry_id=rival_id,
+                )
+                try:
+                    payload = advise_entry(
+                        request,
+                        provider=provider,
+                        inputs=inputs,
+                        projection=projection,
+                        rules=rules,
+                    )
+                except EntryError as error:
+                    # A band the squad cannot meet at any level is the service's own
+                    # refusal, and the device must refuse the same case.
+                    reference: dict[str, Any] = {"refused": True, "reason": str(error)}
+                else:
+                    reference = {"refused": False, **_rival_reference(payload)}
+                cases.append(
+                    {
+                        "entry_id": entry_id,
+                        "rival_entry_id": rival_id,
+                        "strategy": strategy,
+                        "reference": reference,
+                    }
+                )
+    return {"document": document, "members": members, "rivals": rivals, "cases": cases}
+
+
 def build_fixture() -> dict[str, Any]:
     rng = random.Random(SEED)
     # The limits of a run that writes a committed record: deterministic time binds, not the
@@ -387,6 +555,7 @@ def build_fixture() -> dict[str, Any]:
         "document": document,
         "members": members,
         "chips": chips,
+        "rivals": build_rival_fixture(),
     }
 
 
@@ -395,8 +564,9 @@ def main() -> int:
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
     FIXTURE.write_text(json.dumps(fixture, indent=1), encoding="utf-8", newline="\n")
     print(
-        f"Wrote {FIXTURE} with {len(fixture['members'])} instances and "
-        f"{len(fixture['chips'])} chip instances."
+        f"Wrote {FIXTURE} with {len(fixture['members'])} instances, "
+        f"{len(fixture['chips'])} chip instances and "
+        f"{len(fixture['rivals']['cases'])} rival strategy cases."
     )
     return 0
 

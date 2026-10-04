@@ -4,9 +4,17 @@
  */
 
 import type { LpSolver } from "./lp/problem";
-import { solvePlan } from "./solve/week";
+import { DevicePlanRefused, solvePlan } from "./solve/week";
 import { gainVsNoChip } from "./strategies/chips";
-import type { DeviceChip, DevicePlanAnswer, DevicePlanDocument, DevicePlanEntry } from "./types";
+import { solveRival } from "./strategies/rival";
+import type {
+  DeviceChip,
+  DevicePlanAnswer,
+  DevicePlanDocument,
+  DevicePlanEntry,
+  DeviceRival,
+  RivalStrategy,
+} from "./types";
 
 export interface DevicePlanRequest {
   id: number;
@@ -14,17 +22,25 @@ export interface DevicePlanRequest {
   entry: DevicePlanEntry;
   /** A chip to play this week, or null for the plain plan. */
   chip?: DeviceChip | null;
+  /** A rival strategy against the named rival; null for the pure-points plan. */
+  strategy?: { name: RivalStrategy; rival: DeviceRival } | null;
 }
 
 /**
- * The plan asked for: with a chip, the chip week and, beside it, the member's own no-chip
+ * The plan asked for. With a chip: the chip week and, beside it, the member's own no-chip
  * plan the chip is measured against, exactly as the server measures `gain_vs_no_chip`.
+ * With a rival strategy: the banded plan with its price and labels. The two combine with
+ * nothing, as on the server.
  */
 export function solveRequest(
   solver: LpSolver,
-  { document, entry, chip = null }: Omit<DevicePlanRequest, "id">,
+  { document, entry, chip = null, strategy = null }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
 ): DevicePlanAnswer {
+  if (strategy !== null) {
+    if (chip !== null) throw new DevicePlanRefused("a chip with a rival strategy", "plan");
+    return solveRival(solver, document, entry, strategy.rival, strategy.name, now);
+  }
   if (chip === null) return solvePlan(solver, document, entry, now);
   const started = now();
   const without = solvePlan(solver, document, entry, now);

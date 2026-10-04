@@ -22,6 +22,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Final
 
+from squadopt.application.strategies.catalog import STRATEGY_CATALOG
 from squadopt.contracts.players import sort_players_by_id
 from squadopt.data.errors import DataSourceError
 from squadopt.live.recommendation import Projection, RecommendationInputs
@@ -87,9 +88,26 @@ def device_plan_table(
             "hit_cost_scaled": scale_expected_points(
                 policy.transfer_hit_cost_points, settings.expected_points_scale
             ),
-            # What the game charges per paid transfer, the number the page shows.
+            # What the game charges per paid transfer, the number the page shows, and
+            # the same on the objective scale: the rival price tag's anchor is solved at
+            # the charge, not at the margin.
             "hit_points_charged": float(policy.hit_points_charged),
+            "hit_charged_scaled": scale_expected_points(
+                policy.hit_points_charged, settings.expected_points_scale
+            ),
             "expected_points_scale": settings.expected_points_scale,
+            # Each rival strategy's overlap band on the decided week, from the catalogue:
+            # a floor is relaxed downward and a ceiling upward until the free transfers
+            # reach it (``advice._solve_within_free_transfers``).
+            "strategies": {
+                slug: {
+                    "overlap_floor": strategy.constraints.overlap_floor,
+                    "overlap_ceiling": strategy.constraints.overlap_ceiling,
+                }
+                for slug, strategy in sorted(STRATEGY_CATALOG.items())
+                if strategy.constraints.overlap_floor is not None
+                or strategy.constraints.overlap_ceiling is not None
+            },
         },
         "players": [
             {

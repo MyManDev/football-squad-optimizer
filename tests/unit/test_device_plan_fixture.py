@@ -45,6 +45,7 @@ def test_the_recorded_answers_are_the_planner_s() -> None:
         differences = _same(fresh["reference"], held["reference"], "reference")
         assert differences == [], (fresh["entry_id"], differences)
     assert _same(rebuilt["chips"], recorded["chips"], "chips") == []
+    assert _same(rebuilt["rivals"], recorded["rivals"], "rivals") == []
 
 
 def test_the_fixture_covers_a_paid_transfer_and_every_free_transfer_count() -> None:
@@ -80,3 +81,33 @@ def test_the_fixture_plays_every_chip_on_its_own_basis() -> None:
             plain[case["entry_id"]]["expected_own_points"]
             - plain[case["entry_id"]]["transfer_hit_points"]
         )
+
+
+def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    world = recorded["rivals"]
+    # The producer wrote the catalogue's bands and the charge into the document.
+    rules = world["document"]["rules"]
+    assert rules["strategies"] == {
+        "fark-yarat": {"overlap_floor": None, "overlap_ceiling": 5},
+        "ortak-koru": {"overlap_floor": 9, "overlap_ceiling": None},
+    }
+    assert (
+        rules["hit_charged_scaled"] == rules["hit_points_charged"] * rules["expected_points_scale"]
+    )
+    kinds = {
+        "refused" if case["reference"]["refused"] else case["reference"]["plan_kind"]
+        for case in world["cases"]
+    }
+    assert kinds == {"within_free_transfers", "with_hits", "refused"}
+    # A relaxed level, an alternative beside the plan, and every proof finished.
+    answered = [case["reference"] for case in world["cases"] if not case["reference"]["refused"]]
+    assert any(r["overlap_applied"] != r["overlap_target"] for r in answered)
+    assert any(r["alternative_plan"] is not None for r in answered)
+    assert all(
+        r["solver_status"] == "OPTIMAL" and r["control_solver_status"] == "OPTIMAL"
+        for r in answered
+    )
+    # Every player in the world is on his own number, so no tie decides a case.
+    points = [p["expected_points"] for p in world["document"]["players"]]
+    assert len(set(points)) == len(points)
