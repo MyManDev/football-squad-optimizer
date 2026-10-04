@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { installLeagueMocks } from "./leagueMocks";
 import AxeBuilder from "@axe-core/playwright";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
@@ -24,8 +25,7 @@ for (const language of ["en", "tr"] as const) {
       ...state,
     }));
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
-    // These mocks stand in for the legacy tree: no directory, whatever the site ships.
-    await page.route("**/data/leagues.json", (route) => route.fulfill({ status: 404, body: "" }));
+    await installLeagueMocks(page);
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ json: publication }),
     );
