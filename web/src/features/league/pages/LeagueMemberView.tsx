@@ -112,6 +112,7 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   deviceDependencies,
+  deviceRivals,
   rivalSquad = null,
   windowControl = null,
   deadlinePassed = null,
@@ -154,13 +155,17 @@ function LeagueMemberContent({
       capabilities,
       computeService,
       deviceDependencies,
+      deviceRivals,
     },
     searchParams,
   );
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
+  // The same holds for a selection the member's device solves while the week is open.
   const computeOnly =
-    computeAvailable && selection.computable !== undefined && selection.status === "not-listed";
+    selection.status === "not-listed" &&
+    ((computeAvailable && selection.computable !== undefined) ||
+      (device.available && deadlinePassed === null));
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );

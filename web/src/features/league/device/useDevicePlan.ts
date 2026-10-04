@@ -17,7 +17,7 @@ import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
-import { deviceSelection, rivalFromSquad } from "./selection";
+import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
 import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
 
 export { deviceChip, deviceSelection } from "./selection";
@@ -73,6 +73,11 @@ export function useDevicePlan(
   squad: EntrySquad,
   request: AdviceRequest,
   dependencies: DevicePlanDependencies = {},
+  /**
+   * The rivals the device's statement offers (`computable.ts`): a rival strategy against
+   * anyone else is not offered, because the device could not play it. Absent, any rival.
+   */
+  rivals?: readonly number[],
 ): DevicePlan {
   const { tree } = useLeague();
   const {
@@ -84,7 +89,7 @@ export function useDevicePlan(
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
     : null;
-  const selection = deviceSelection(request, squad);
+  const selection = offeredDeviceSelection(request, squad, rivals);
   const available = entry !== null && squad.source_snapshot_id !== null && selection !== null;
   // The state is keyed by the selection it was asked for: a new selection reads idle
   // without an effect, and a late reply for the old one is ignored by its generation.

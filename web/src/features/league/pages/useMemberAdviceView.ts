@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { adviceRequestKey } from "../advice/adviceJobStore";
-import { canComputeAdvice, resolvePublishedAdvice } from "../advice/adviceSelection";
+import { canComputeAdvice } from "../advice/adviceSelection";
 import { AdviceContextError, checkedAdvice } from "../advice/adviceResponse";
 import {
   ANSWER_OTHER_CAPTURE,
@@ -12,8 +12,8 @@ import {
   type AdviceJob,
   type ComputePhase,
 } from "../advice/useAdviceJob";
-import { deviceComputable } from "../device/computable";
 import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
+import { deviceRequestFor, memberSelection } from "./memberSelection";
 
 /** The same attempt, without the earlier answer it carried. */
 function withoutEarlier(state: ComputePhase): ComputePhase {
@@ -36,6 +36,7 @@ export function useMemberAdviceView(
     capabilities = null,
     computeService = "static",
     deviceDependencies,
+    deviceRivals = [],
   }: LeagueMemberViewProps,
   searchParams: URLSearchParams,
 ) {
@@ -45,22 +46,17 @@ export function useMemberAdviceView(
     () => client ?? createAdviceClient(tree.entryAdvice),
     [client, tree],
   );
-  const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
   // What the member's own device can compute from this publish's inputs, stated beside
-  // the service's capabilities so the controls offer it the same way.
-  const onDevice = deviceComputable(view, members);
-  const resolve = (params: URLSearchParams) =>
-    resolvePublishedAdvice(
-      params,
-      leagueId,
-      entryId,
-      members,
-      index,
-      { season: view.season, gameweek: view.gameweek },
-      capabilities,
-      onDevice,
-    );
+  // the service's capabilities so the controls offer it the same way. The page's reads
+  // resolve through the same function from the same inputs.
+  const { onDevice, resolve } = memberSelection({
+    squad: view,
+    members,
+    index,
+    capabilities,
+    deviceRivals,
+  });
   const selection = resolve(searchParams);
   const { request } = selection;
   const indexReadable = adviceIssue !== "index-missing" && adviceIssue !== "index-error";
@@ -88,13 +84,14 @@ export function useMemberAdviceView(
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
   // The chip the page shows is the selection's; without the service's capabilities the
-  // request carries none, so the device is asked for the selection, chip included.
-  const deviceRequest = {
-    ...request,
-    chip: request.chip ?? selection.chip.chip,
-    top100Weight: request.top100Weight ?? selection.top100.weight,
-  };
-  const deviceJob = useDevicePlan(view, deviceRequest, deviceDependencies);
+  // request carries none, so the device is asked for the selection, chip included. A rival
+  // strategy is offered only against a rival the device's statement names.
+  const deviceJob = useDevicePlan(
+    view,
+    deviceRequestFor(selection),
+    deviceDependencies,
+    onDevice?.rivals ?? [],
+  );
   const requestKey = [
     adviceRequestKey(request),
     selection.status,

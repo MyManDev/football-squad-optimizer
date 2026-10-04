@@ -47,6 +47,11 @@ export interface LeagueMemberViewProps {
   computePending?: boolean;
   /** The device solve's document loader and worker; the page's own unless a test injects them. */
   deviceDependencies?: DevicePlanDependencies;
+  /**
+   * The other members' entry documents read so far. The device offers a rival strategy
+   * only against a rival among them it can use; none given, it offers no rival.
+   */
+  deviceRivals?: readonly EntrySquad[];
   windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   /**
    * The advised gameweek's deadline once it has passed, from the published fixture

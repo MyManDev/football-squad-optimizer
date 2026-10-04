@@ -129,6 +129,9 @@ export function AdviceRequestPanel({
     (service === "ready"
       ? computable
       : service !== "other-capture" && selectionAvailable && canComputeAdvice(request));
+  // The member's device solves this selection: no note calls it unsupported or tells the
+  // member to pick a published one instead, and the device's button is the way to it.
+  const onDevice = device?.available === true && !deadlinePassed;
 
   return (
     <>
@@ -222,7 +225,7 @@ export function AdviceRequestPanel({
             {computeCopy.deadlinePassedCompute}
           </p>
         ) : null}
-        {!deadlinePassed && !supported && !pending && service !== "other-capture" ? (
+        {!deadlinePassed && !supported && !pending && !onDevice && service !== "other-capture" ? (
           <p role="note" className={styles.note}>
             {service !== "ready"
               ? copy.computeUnsupportedSelection
@@ -236,7 +239,9 @@ export function AdviceRequestPanel({
             {published === true
               ? computeCopy.serviceUnreachablePublished
               : published === false
-                ? computeCopy.serviceUnreachableAbsent
+                ? onDevice
+                  ? computeCopy.serviceUnreachableDevice
+                  : computeCopy.serviceUnreachableAbsent
                 : computeCopy.serviceUnreachable}
           </p>
         ) : null}

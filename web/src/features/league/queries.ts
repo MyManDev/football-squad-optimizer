@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { useLeague } from "./useLeague";
 
@@ -70,5 +70,24 @@ export function useEntrySquad(entryId: number | null | undefined, enabled = true
     queryFn: () => tree.entrySquad(entryId!),
     enabled: enabled && entryId != null,
     ...LEAGUE_READ,
+  });
+}
+
+/**
+ * Several entries' squad documents, each under the same key `useEntrySquad` reads it by,
+ * so a page that reads one of them again shares the read. The documents read so far, in
+ * the order asked; one that is missing or unreadable is left out.
+ */
+export function useEntrySquads(entryIds: readonly number[], enabled = true) {
+  const { league, tree } = useLeague();
+  return useQueries({
+    queries: entryIds.map((entryId) => ({
+      queryKey: leagueKeys.entrySquad(league.leagueId, entryId),
+      queryFn: () => tree.entrySquad(entryId),
+      enabled,
+      ...LEAGUE_READ,
+    })),
+    combine: (results) =>
+      results.flatMap((result) => (result.data === undefined ? [] : [result.data.payload])),
   });
 }

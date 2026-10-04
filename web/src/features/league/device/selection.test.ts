@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import type { AdviceRequest } from "../advice/adviceClient";
-import { deviceSelection, rivalFromSquad } from "./selection";
+import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
 
 const squad = mockEntrySquadEnvelopes[35249001]!.payload;
 const plain: AdviceRequest = {
@@ -76,6 +76,23 @@ describe("what the device solves", () => {
       ),
     ).toBeNull();
     expect(deviceSelection({ ...plain, top100Weight: 20 }, squad)).toBeNull();
+  });
+
+  it("offers a rival strategy only against a rival the device's statement names", () => {
+    const rival = { ...plain, strategy: "fark-yarat" as const, rivalEntryId: 35249002 };
+    expect(offeredDeviceSelection(rival, squad, [35249002, 35249004])).toEqual({
+      kind: "rival",
+      strategy: "fark-yarat",
+      rivalEntryId: 35249002,
+    });
+    expect(offeredDeviceSelection(rival, squad, [35249004])).toBeNull();
+    expect(offeredDeviceSelection(rival, squad, [])).toBeNull();
+    // The list narrows rivals only: the plain plan and a held chip stand as they are.
+    expect(offeredDeviceSelection(plain, squad, [])).toEqual({ kind: "plain" });
+    expect(offeredDeviceSelection({ ...plain, chip: "3xc" }, squad, [])).toEqual({
+      kind: "chip",
+      chip: "3xc",
+    });
   });
 
   it("reads the rival's eleven and captain from their document, or nothing", () => {

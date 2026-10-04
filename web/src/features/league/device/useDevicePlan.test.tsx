@@ -105,18 +105,25 @@ function Harness({
   loadDocument,
   solver,
   onState,
+  rivals,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
   loadDocument: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
   solver: DeviceSolver;
   onState: (state: DevicePlanPhase) => void;
+  rivals?: readonly number[];
 }) {
-  const device = useDevicePlan(squad, request, {
-    loadDocument,
-    createSolver: () => solver,
-    now: () => new Date("2026-10-03T01:02:03Z"),
-  });
+  const device = useDevicePlan(
+    squad,
+    request,
+    {
+      loadDocument,
+      createSolver: () => solver,
+      now: () => new Date("2026-10-03T01:02:03Z"),
+    },
+    rivals,
+  );
   onState(device.state);
   return (
     <div>
@@ -144,6 +151,35 @@ describe("the worker", () => {
 });
 
 describe("what the device can solve", () => {
+  it("offers a rival strategy only against a rival the statement names", () => {
+    const rivalRequest: AdviceRequest = {
+      ...REQUEST,
+      strategy: "ortak-koru",
+      rivalEntryId: 35249002,
+    };
+    const mount = (rivals?: readonly number[]) =>
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={rivalRequest}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver()}
+            onState={() => {}}
+            rivals={rivals}
+          />,
+        ),
+      );
+    mount([35249002]);
+    expect(screen.getByTestId("available")).toHaveTextContent("true");
+    cleanup();
+    mount([35249004]);
+    expect(screen.getByTestId("available")).toHaveTextContent("false");
+    cleanup();
+    mount([]);
+    expect(screen.getByTestId("available")).toHaveTextContent("false");
+  });
+
   const squad = squadWith(entry);
 
   it("is the pure-points plan over one week, a held chip, or a rival strategy", () => {
