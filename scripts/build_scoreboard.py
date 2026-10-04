@@ -4,7 +4,8 @@
     python -m scripts.build_scoreboard --league 352490 --snapshot-id <fpl-live id> \\
         --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>
 
-Writes ``<out>/data/league/scoreboard.json`` in the provisional league envelope: one row
+Writes ``scoreboard.json`` into the league's tree under ``<out>/data`` in the provisional
+league envelope: one row
 per gameweek whose deadline had passed when the live capture was taken, each carrying what
 the files on disk prove and ``null`` where they prove nothing. Nothing is decided here; the
 ledger is read, never written.

@@ -1,7 +1,7 @@
 # The accumulating member record
 
 Issue #530 adds a read-only surface on `/league`. It consumes the already published
-`data/league/history/<entry>.json` through the same validator as each member's history.
+`data/leagues/<league id>/history/<entry>.json` through the same validator as each member's history.
 Only available suggestion/actual pairs from the scoreboard's season and capture enter;
 the scoreboard must also mark the week finished and checked. Missing member files and
 incomplete pairs do not create zero observations. The card reports missing histories.
@@ -31,7 +31,7 @@ The measurement producer is owned separately in `evaluation/live_series.py`. The
 consumes its published result; the optional shape below is the current consumer seam
 to align with that producer when it lands, not an implementation of the measurement.
 
-When that measurement exists, publish `data/league/series-horizon.json` beside the
+When that measurement exists, publish `data/leagues/<league id>/series-horizon.json` beside the
 scoreboard. The standalone [member week horizon v1 contract](contracts/member_week_horizon_v1.md)
 and its [JSON schema](contracts/member_week_horizon_v1.schema.json) define the required
 fields, producer responsibilities and the reason within-week correlation is mandatory.

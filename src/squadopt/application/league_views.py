@@ -1,6 +1,7 @@
 """Render per-member league views: the JSON tree the site's league pages read.
 
-The web side (Package 5) reads ``data/league/members.json``, ``entries/{id}.json``,
+The web side (Package 5) reads the league's tree (``data/leagues/<league id>/``, see
+``squadopt.contracts.league_tree``): ``members.json``, ``entries/{id}.json``,
 ``advice/{id}/{mode}/{window}.json``, ``advice/{id}/{strategy}/{window}/vs-{rival}.json``
 and ``advice/{id}/index.json`` under the provisional contract its
 ``PROVISIONAL_CONTRACT.md`` records; this module is the producing half. It consumes the
@@ -877,6 +878,12 @@ class LeagueViewsReport:
     gameweek: int
     members: tuple[MemberViewResult, ...]
     files: tuple[str, ...]
+    #: The league's name and this publication's stamp, as members.json carries them: what
+    #: the site's league directory lists beside the tree's path. A settled publish rewrites
+    #: the members document's stamp, not the directory's, which stays the league
+    #: publication's.
+    league_name: str = ""
+    generated_at_utc: str = ""
     #: Documents from an earlier publish that this run removed because it did not produce
     #: them. Reported rather than done quietly: a deletion under ``web/public`` is a change
     #: to what the site serves, and the operator reads this line beside "not rendered".
@@ -2143,4 +2150,6 @@ def build_league_views(
         members=tuple(results),
         files=tuple(sorted(written)),
         removed=(*removed, *stale_removed),
+        league_name=str(league_name),
+        generated_at_utc=generated,
     )

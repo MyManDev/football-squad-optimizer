@@ -18,6 +18,7 @@ from typing import Any
 from squadopt.application.manager_words import load_manager_words
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_tree import single_league_tree
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -132,8 +133,7 @@ def _validate(
         or not set(handoff.expected_points) <= set(inputs.players.player_id)
     ):
         raise ValueError("Projection handoff differs from the decision capture or roster.")
-    site_root = files["site_members"].parent.parent
-    site_files = _site_files(site_root)
+    site_files = _site_files(files["site_members"].parent)
     if {role: path for role, path in files.items() if role.startswith("site_")} != site_files:
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
@@ -233,9 +233,10 @@ def _validate(
     return identities, official_report
 
 
-def _site_files(site_data_root: Path) -> dict[str, Path]:
-    """Read the existing member/entry envelopes, without importing runtime services."""
-    member_path = site_data_root / "league" / "members.json"
+def _site_files(tree: Path) -> dict[str, Path]:
+    """Read the existing member/entry envelopes of one league's tree, without importing
+    runtime services."""
+    member_path = tree / "members.json"
     _safe(Path(addressable(member_path)))
     document = _object(Path(addressable(member_path)).read_bytes())
     payload = document.get("payload")
@@ -266,7 +267,7 @@ def _site_files(site_data_root: Path) -> dict[str, Path]:
         role = f"site_entry_{identifier}"
         if role in result:
             raise ValueError("Duplicate site member identity.")
-        path = site_data_root / "league" / "entries" / f"{identifier}.json"
+        path = tree / "entries" / f"{identifier}.json"
         _safe(Path(addressable(path)))
         entry = _object(Path(addressable(path)).read_bytes())
         row = entry.get("payload")
@@ -407,7 +408,7 @@ def seal_football_bundle(
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(site_data_root),
+        **_site_files(single_league_tree(site_data_root)),
     }
     if rotation_table_path is not None:
         files.update(

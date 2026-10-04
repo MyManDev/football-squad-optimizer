@@ -77,21 +77,64 @@ function Assert-Checkout {
     if ((Git-Read -arguments @('branch', '--show-current')) -ne 'develop') { throw "Checkout must be on develop." }
     if (Git-Read -arguments @('status', '--porcelain')) { throw "Checkout must be clean, including untracked files." }
 }
+function Published-Document([string]$relative, [switch]$Public, [string]$Ref = "") {
+    # One document of the published data tree, by its path under data/, from the public
+    # site, a git ref, or the local checkout.
+    if ($Public) { return Get-Json "$publicRoot/data/$relative" }
+    if ($Ref) { return ((Git-Read -arguments @('show', "${Ref}:web/public/data/$relative")) | ConvertFrom-Json) }
+    return Read-Json (Join-Path $SiteDataRoot ($relative -replace '/', '\'))
+}
+function Published-Directory-Exists([switch]$Public, [string]$Ref = "") {
+    # Whether the site publishes data/leagues.json. Only an absent document is a site from
+    # before the directory; any other failure to read it is a failure of this check.
+    if ($Public) {
+        try {
+            $null = Invoke-WebRequest -Uri "$publicRoot/data/leagues.json" -UseBasicParsing -TimeoutSec 15 -Headers $headers -Method Head
+            return $true
+        } catch [System.Net.WebException] {
+            $response = $_.Exception.Response
+            if ($null -ne $response -and [int]$response.StatusCode -eq 404) { return $false }
+            throw
+        }
+    }
+    if ($Ref) {
+        $null = & git --no-optional-locks -C $RepoRoot cat-file -e "${Ref}:web/public/data/leagues.json" 2>$null
+        return ($LASTEXITCODE -eq 0)
+    }
+    return (Test-Path -LiteralPath (Join-Path $SiteDataRoot 'leagues.json') -PathType Leaf)
+}
+function Published-Trees([switch]$Public, [string]$Ref = "") {
+    # The league trees the site publishes, by their paths under data/: every line of the
+    # directory (data/leagues.json), or the one legacy tree of a site from before it.
+    if (-not (Published-Directory-Exists -Public:$Public -Ref $Ref)) { return @('league') }
+    $directory = Published-Document 'leagues.json' -Public:$Public -Ref $Ref
+    if ($null -eq $directory -or -not ($directory.PSObject.Properties.Name -contains 'contract_version')) { throw "data/leagues.json is not a league directory." }
+    if ($directory.contract_version -ne 'league_directory_v1') { throw "data/leagues.json is not a league directory." }
+    if (-not ($directory.PSObject.Properties.Name -contains 'payload') -or $null -eq $directory.payload -or -not ($directory.payload.PSObject.Properties.Name -contains 'leagues')) { throw "data/leagues.json lists no league." }
+    $trees = @()
+    foreach ($row in $directory.payload.leagues) {
+        $tree = [string]$row.path
+        if ($tree -notmatch '^[A-Za-z0-9_][A-Za-z0-9_/-]*$') { throw "Invalid league tree path." }
+        $trees += $tree
+    }
+    if ($trees.Count -eq 0) { throw "data/leagues.json lists no league." }
+    return $trees
+}
 function Published-Capture([switch]$Public, [string]$Ref = "") {
-    if ($Public) { $members = Get-Json "$publicRoot/data/league/members.json" }
-    elseif ($Ref) { $members = (Git-Read -arguments @('show', "${Ref}:web/public/data/league/members.json")) | ConvertFrom-Json }
-    else { $members = Read-Json (Join-Path $SiteDataRoot 'league\members.json') }
+    # Every human entry of every published league names the capture it was rendered from;
+    # a publication renders them all from one capture, so they must agree.
     $identities = @()
-    foreach ($member in $members.payload.members) {
-        if ($member.member_kind -ne 'human') { continue }
-        $entry = [string]$member.entry_id
-        if ($entry -notmatch '^[1-9][0-9]*$') { throw "Invalid human entry id." }
-        if ($Public) { $document = Get-Json "$publicRoot/data/league/entries/$entry.json" }
-        elseif ($Ref) { $document = (Git-Read -arguments @('show', "${Ref}:web/public/data/league/entries/$entry.json")) | ConvertFrom-Json }
-        else { $document = Read-Json (Join-Path $SiteDataRoot "league\entries\$entry.json") }
-        $capture = [string]$document.payload.source_snapshot_id
-        if ($capture -notmatch '^fpl-live-[A-Za-z0-9_-]+$') { throw "Entry $entry has no usable capture identity." }
-        $identities += $capture
+    foreach ($tree in (Published-Trees -Public:$Public -Ref $Ref)) {
+        $members = Published-Document "$tree/members.json" -Public:$Public -Ref $Ref
+        foreach ($member in $members.payload.members) {
+            if ($member.member_kind -ne 'human') { continue }
+            $entry = [string]$member.entry_id
+            if ($entry -notmatch '^[1-9][0-9]*$') { throw "Invalid human entry id." }
+            $document = Published-Document "$tree/entries/$entry.json" -Public:$Public -Ref $Ref
+            $capture = [string]$document.payload.source_snapshot_id
+            if ($capture -notmatch '^fpl-live-[A-Za-z0-9_-]+$') { throw "Entry $entry has no usable capture identity." }
+            $identities += $capture
+        }
     }
     $agreed = @($identities | Select-Object -Unique)
     if ($agreed.Count -ne 1) { throw "Published human entries are empty or disagree on capture." }

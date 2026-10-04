@@ -43,6 +43,7 @@ from squadopt.application.league_publication import (
     prepare_league_publication,
 )
 from squadopt.application.league_views import build_league_views
+from squadopt.contracts.league_tree import league_tree_dir
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
@@ -90,7 +91,7 @@ def _solve(
     snapshot, inputs, season = prepared.snapshot, prepared.inputs, prepared.season
     panel = build_panel(request.archive_root)
     in_season = read_projection_handoff(handoff)
-    league = request.out_dir / "data" / "league"
+    league = league_tree_dir(request.out_dir / "data", request.league_id)
     with league_mapper(request, arguments.workers) as mapper:
         build_league_views(
             CapturePicksProvider(snapshot, request.snapshot_id),

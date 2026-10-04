@@ -648,7 +648,9 @@ def test_the_shell_writes_the_scoreboard_beside_the_league_tree(
     assert cli.main() == 0
 
     document = json.loads(
-        (tmp_path / "site" / "data" / "league" / "scoreboard.json").read_text(encoding="utf-8")
+        (tmp_path / "site" / "data" / "leagues" / "352490" / "scoreboard.json").read_text(
+            encoding="utf-8"
+        )
     )
     payload = document["payload"]
     assert payload["source_snapshot_id"] == live.snapshot_id
