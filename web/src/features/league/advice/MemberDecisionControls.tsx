@@ -134,6 +134,12 @@ export function MemberDecisionControls({
       ...(onDevice?.strategies ?? []),
     ]),
   ];
+  // The rival a link names stays the choice while the device cannot judge them yet: the
+  // rivals' documents are still being read, or theirs could not be.
+  const rivalHeld = (rivalId: number) =>
+    rivalId === chosenRival &&
+    (onDevice?.loading === true || onDevice?.unreadRivals?.includes(rivalId) === true);
+  const rivalsUnread = (onDevice?.unreadRivals?.length ?? 0) > 0;
   // A rival can be chosen where its file was published or, for a window the service or
   // the device computes, against any member either lists.
   const rivalSelectable = (rivalId: number) =>
@@ -147,7 +153,7 @@ export function MemberDecisionControls({
       isMemberStrategy(strategy) &&
       onDevice.strategies.includes(strategy) &&
       onDevice.windows.includes(windowSize) &&
-      onDevice.rivals.includes(rivalId) &&
+      (onDevice.rivals.includes(rivalId) || rivalHeld(rivalId)) &&
       !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason);
 
   function strategySelection(slug: string) {
@@ -181,7 +187,9 @@ export function MemberDecisionControls({
       !!offered.onDevice &&
       isMemberStrategy(slug) &&
       offered.onDevice.strategies.includes(slug) &&
-      (!strategyNeedsRival(slug) || offered.onDevice.rivals.length > 0);
+      (!strategyNeedsRival(slug) ||
+        offered.onDevice.rivals.length > 0 ||
+        offered.onDevice.loading === true);
     return publishedHere || computedHere || onDeviceHere;
   }
 
@@ -338,7 +346,14 @@ export function MemberDecisionControls({
       {needsRival ? (
         <div className={styles.field}>
           {rivalIds.length === 0 ? (
-            <p className={styles.line}>{copy.rivalNone}</p>
+            // Absent squads are said to be unpublished only once every read has answered.
+            <p className={styles.line}>
+              {onDevice?.loading
+                ? copy.rivalsLoading
+                : rivalsUnread
+                  ? copy.rivalsUnreadable
+                  : copy.rivalNone}
+            </p>
           ) : (
             <label className={styles.rivalField}>
               <span className={styles.label}>{copy.rivalLabel}</span>
@@ -367,6 +382,9 @@ export function MemberDecisionControls({
           )}
           {rivalIds.length > 0 && chosenRival === null ? (
             <p className={styles.line}>{copy.rivalNoDefault}</p>
+          ) : null}
+          {rivalIds.length > 0 && rivalsUnread ? (
+            <p className={styles.line}>{copy.rivalsUnreadable}</p>
           ) : null}
         </div>
       ) : null}

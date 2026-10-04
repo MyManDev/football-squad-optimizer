@@ -3,6 +3,7 @@ import type { ComputeService } from "../advice/AdviceRequestPanel";
 import type { AdviceCapabilities } from "../advice/adviceCapabilities";
 import type { AdviceClient, AdviceSource } from "../advice/adviceClient";
 import type { PublishedAdviceStatus } from "../advice/adviceSelection";
+import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
 import type {
   EntryAdvice,
@@ -48,10 +49,10 @@ export interface LeagueMemberViewProps {
   /** The device solve's document loader and worker; the page's own unless a test injects them. */
   deviceDependencies?: DevicePlanDependencies;
   /**
-   * The other members' entry documents read so far. The device offers a rival strategy
-   * only against a rival among them it can use; none given, it offers no rival.
+   * What the page has read of the other members' entry documents. The device offers a
+   * rival strategy only against a rival among them it can use; none given, it offers no rival.
    */
-  deviceRivals?: readonly EntrySquad[];
+  deviceRivals?: DeviceRivalReads;
   windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
   /**
    * The advised gameweek's deadline once it has passed, from the published fixture

@@ -29,7 +29,7 @@ import { stubTree, withLeague } from "../../../testSupport/league";
 import * as clients from "../advice/adviceClient";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import type { LeagueTree } from "../data";
-import { LeagueDataMissing } from "../dataErrors";
+import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { LpSolver } from "../device/lp/problem";
 import { solveRequest, type DevicePlanRequest } from "../device/requests";
 import type { DevicePlanReply } from "../device/deviceSolver.worker";
@@ -47,6 +47,12 @@ beforeAll(async () => {
   })) as unknown as LpSolver;
 }, 60_000);
 
+/** How the next worker answers: the real solve, or a run that ends without a plan. */
+let workerAnswer: "solve" | "failed" | "refused" = "solve";
+
+/** How many times the page asked the unreachable service what it computes. */
+let capabilityReads = 0;
+
 /** The worker the page creates, answered in process by the real solver. */
 class InProcessWorker {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
@@ -54,6 +60,8 @@ class InProcessWorker {
   postMessage(request: DevicePlanRequest): void {
     let reply: DevicePlanReply;
     try {
+      if (workerAnswer === "failed") throw new Error("The solver could not load here.");
+      if (workerAnswer === "refused") throw new DevicePlanRefused("infeasible", "plan");
       reply = { id: request.id, kind: "answer", answer: solveRequest(highs, request, () => 0) };
     } catch (error) {
       reply =
@@ -72,6 +80,8 @@ class InProcessWorker {
 }
 
 beforeEach(() => {
+  workerAnswer = "solve";
+  capabilityReads = 0;
   vi.stubGlobal("Worker", InProcessWorker);
   // Nothing leaves the test: the fixture calendar and anything else unstubbed is absent.
   vi.stubGlobal(
@@ -163,14 +173,31 @@ function liveIndex(): LeagueViewEnvelope<EntryAdviceIndex> {
 
 class UnreachableClient extends clients.StaticOnlyAdviceClient {
   async readCapabilities(): Promise<null> {
+    capabilityReads += 1;
     throw new Error("The compute service could not be reached.");
   }
 }
 
-function renderPage(search: string, service: "static" | "unreachable" = "static") {
+interface PageOptions {
+  service?: "static" | "unreachable";
+  /** The other members' documents: read at once, held until a promise settles, or unreadable. */
+  rivals?: "read" | Promise<void> | "unreadable";
+  /** The shared device document: published, absent, or from another capture. */
+  devicePlan?: "published" | "missing" | "other-capture";
+}
+
+function renderPage(search: string, options: PageOptions | PageOptions["service"] = {}) {
+  const {
+    service = "static",
+    rivals = "read",
+    devicePlan = "published",
+  } = typeof options === "string" ? { service: options } : options;
   const documents = squads();
   stubTree({
     entrySquad: vi.fn<LeagueTree["entrySquad"]>().mockImplementation(async (id) => {
+      if (id !== ENTRY && rivals === "unreadable")
+        throw new LeagueDataError(`entries/${id}.json did not answer.`);
+      if (id !== ENTRY && rivals instanceof Promise) await rivals;
       const found = documents[id];
       if (!found) throw new LeagueDataMissing(`entries/${id}.json`);
       return found;
@@ -182,11 +209,17 @@ function renderPage(search: string, service: "static" | "unreachable" = "static"
       .mockImplementation(async (id, mode, window, other) =>
         mockEntryAdviceEnvelope(id, mode, window, other),
       ),
-    devicePlan: vi.fn<LeagueTree["devicePlan"]>().mockResolvedValue({
-      contract_version: "provisional_league_ui_v1",
-      generated_at_utc: "2026-10-03T00:00:00Z",
-      source_kind: "live",
-      payload: document,
+    devicePlan: vi.fn<LeagueTree["devicePlan"]>().mockImplementation(async () => {
+      if (devicePlan === "missing") throw new LeagueDataMissing("device-plan.json");
+      return {
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload:
+          devicePlan === "other-capture"
+            ? { ...document, source_snapshot_id: "fpl-live-another-capture" }
+            : document,
+      };
     }),
   });
   if (service === "unreachable") {
@@ -268,11 +301,65 @@ describe("a rival strategy solved on the member's device", () => {
     expect(offeredRivals()).not.toContain(BENCHED_CAPTAIN);
     cleanup();
 
-    // Named in the link, he is still not the rival: the device has nothing to offer.
+    // Named in the link, he is still not the rival once the documents are read: the device
+    // has nothing to offer.
     const { container } = renderPage(`mode=ortak-koru&window=1&rival=${BENCHED_CAPTAIN}`);
-    await waitFor(() => expect(offeredRivals()).toContain(RIVAL));
-    expect(offeredRivals()).not.toContain(BENCHED_CAPTAIN);
+    await waitFor(() => {
+      expect(offeredRivals()).toContain(RIVAL);
+      expect(offeredRivals()).not.toContain(BENCHED_CAPTAIN);
+    });
     expect(deviceButton()).toBeNull();
     expect(container).not.toHaveTextContent(copy.deviceRefused);
+  }, 60_000);
+
+  it("keeps the link's rival and reads as loading until the rivals' documents are read", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const { container } = renderPage(`mode=ortak-koru&window=1&rival=${RIVAL}`, {
+      service: "unreachable",
+      rivals: held,
+    });
+    await screen.findByText(copy.loadingRivals);
+    // The service has answered (unreachable) before anything is checked.
+    await waitFor(() => expect(capabilityReads).toBeGreaterThan(0));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.getByText(copy.loadingRivals)).toBeVisible();
+    const summary = screen.getByTestId("member-selection-summary");
+    expect(summary).toHaveTextContent(copy.rivalLabel);
+    expect(offeredRivals()).toContain(RIVAL);
+    const whileReading = [
+      copy.publicationStates["not-listed"].title,
+      copy.computeUnsupportedSelection,
+      computeCopy.serviceUnreachableAbsent,
+      computeCopy.serviceUnreachable,
+      copy.rivalNone,
+    ];
+    for (const sentence of whileReading) expect(container).not.toHaveTextContent(sentence);
+    expect(deviceButton()).toBeNull();
+
+    await act(async () => release());
+    await waitFor(() => expect(deviceButton()).not.toBeNull());
+    expect(screen.queryByText(copy.loadingRivals)).toBeNull();
+    expect(summary).toHaveTextContent(copy.rivalLabel);
+    for (const sentence of whileReading) expect(container).not.toHaveTextContent(sentence);
+  }, 60_000);
+
+  it("never calls the squads unpublished when their reads failed", async () => {
+    const { container } = renderPage(`mode=ortak-koru&window=1&rival=${RIVAL}`, {
+      rivals: "unreadable",
+    });
+    await screen.findByText(copy.rivalsUnreadable);
+    // The link's rival stays the choice; the device cannot use a rival it could not read.
+    expect(offeredRivals()).toContain(RIVAL);
+    expect(screen.getByTestId("member-selection-summary")).toHaveTextContent(copy.rivalLabel);
+    expect(container).not.toHaveTextContent(copy.rivalNone);
+    expect(deviceButton()).toBeNull();
+    cleanup();
+
+    const { container: none } = renderPage("mode=ortak-koru&window=1", { rivals: "unreadable" });
+    await screen.findByText(copy.rivalsUnreadable);
+    expect(none).not.toHaveTextContent(copy.rivalNone);
   }, 60_000);
 });

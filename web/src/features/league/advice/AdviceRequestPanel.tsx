@@ -106,8 +106,10 @@ export function AdviceRequestPanel({
   /** A chip computation has no measured duration to display. */
   chipChosen?: boolean;
   /**
-   * A service is configured and has not said yet what it computes. The static build's
-   * sentence about what Compute supports would be wrong a moment later, so it waits.
+   * The page has not learned yet what can be computed here: a configured service has not
+   * said what it computes, or the rivals' documents the device needs are still being read.
+   * A sentence about what Compute supports or what was published would be wrong a moment
+   * later, so the notes wait.
    */
   pending?: boolean;
   /**
@@ -234,7 +236,7 @@ export function AdviceRequestPanel({
                 : computeCopy.notComputable}
           </p>
         ) : null}
-        {!deadlinePassed && service === "unreachable" ? (
+        {!deadlinePassed && !pending && service === "unreachable" ? (
           <p role="note" className={styles.note}>
             {published === true
               ? computeCopy.serviceUnreachablePublished

@@ -12,6 +12,7 @@ import {
   type AdviceJob,
   type ComputePhase,
 } from "../advice/useAdviceJob";
+import { NO_DEVICE_RIVALS } from "../device/computable";
 import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
 import { deviceRequestFor, memberSelection } from "./memberSelection";
 
@@ -20,7 +21,7 @@ function withoutEarlier(state: ComputePhase): ComputePhase {
   if (state.phase === "idle" || state.phase === "done") return state;
   return { ...state, earlier: null };
 }
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import { strategyNeedsRival, type EntryAdvice, type LeagueViewEnvelope } from "../types";
 import type { LeagueMemberViewProps, ShownAdvice } from "./memberPageTypes";
 
 /** Select/reset advice for the current URL while rejecting stale publication context. */
@@ -36,7 +37,7 @@ export function useMemberAdviceView(
     capabilities = null,
     computeService = "static",
     deviceDependencies,
-    deviceRivals = [],
+    deviceRivals = NO_DEVICE_RIVALS,
   }: LeagueMemberViewProps,
   searchParams: URLSearchParams,
 ) {
@@ -59,6 +60,14 @@ export function useMemberAdviceView(
   });
   const selection = resolve(searchParams);
   const { request } = selection;
+  // A rival strategy nobody published, that the service does not answer, waits for the
+  // rivals' documents the device's statement is made from: until they are read the page
+  // cannot say whether the device answers it, so it reads as loading, not as unlisted.
+  const rivalsLoading =
+    onDevice?.loading === true &&
+    strategyNeedsRival(request.strategy) &&
+    selection.status === "not-listed" &&
+    selection.computable?.selection !== true;
   const indexReadable = adviceIssue !== "index-missing" && adviceIssue !== "index-error";
   const selectionAvailable = !adviceLoading && indexReadable && selection.status === "ready";
   // What Hesapla may be asked for. A static build computes the plain plan of a published
@@ -257,6 +266,7 @@ export function useMemberAdviceView(
     job: jobForPanel,
     device,
     onDevice,
+    rivalsLoading,
     request,
     shown,
     rejectedContext,

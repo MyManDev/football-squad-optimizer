@@ -6,6 +6,7 @@ import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
 import { resolvePublishedAdvice, rivalCandidates } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
+import type { DeviceRivalReads } from "../device/computable";
 import { offeredDeviceSelection } from "../device/selection";
 import { isDevicePlanEntry } from "../device/types";
 import type { EntryView } from "../types";
@@ -79,10 +80,17 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   // use, and the view is handed the same documents to make the same statement from.
   const ownSquad = squad.data?.payload;
   const deviceInputs = isDevicePlanEntry(ownSquad?.device_plan) && !!ownSquad?.source_snapshot_id;
-  const deviceRivals = useEntrySquads(
+  const rivalReads = useEntrySquads(
     ownSquad ? rivalCandidateIds(members, ownSquad.entry.entry_id) : [],
     deviceInputs,
   );
+  // Until the member list and those documents are read, the device's statement is not
+  // final: the view keeps the rival a link names and reads as loading meanwhile.
+  const deviceRivals: DeviceRivalReads = {
+    squads: rivalReads.squads,
+    loading: deviceInputs && (membersQuery.isPending || rivalReads.pending),
+    unreadable: rivalReads.unreadable,
+  };
   // One resolver for the page's reads and its view, so the rival read here is the rival
   // the view selects and the device solves against.
   const resolved = ownSquad

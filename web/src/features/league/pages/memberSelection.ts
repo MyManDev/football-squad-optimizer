@@ -13,7 +13,7 @@ import {
   type DeviceComputable,
   type PublishedAdviceSelection,
 } from "../advice/adviceSelection";
-import { deviceComputable } from "../device/computable";
+import { deviceComputable, type DeviceRivalReads } from "../device/computable";
 import type { EntryAdviceIndex, EntrySquad, EntryView } from "../types";
 
 export interface MemberSelectionInputs {
@@ -21,8 +21,8 @@ export interface MemberSelectionInputs {
   members: EntryView[];
   index: EntryAdviceIndex | null;
   capabilities: AdviceCapabilities | null;
-  /** The rivals' entry documents read so far, which the device's statement is made from. */
-  deviceRivals: readonly EntrySquad[];
+  /** What the page has read of the rivals' entry documents; the device's statement is made from it. */
+  deviceRivals: DeviceRivalReads;
 }
 
 export interface MemberSelection {

@@ -664,6 +664,8 @@ const en = {
     rivalDefaultSuffix: "(nearest above in the standings)",
     rivalUnavailableSuffix: "(not computed)",
     rivalNone: "No other member's squad is published for this week.",
+    rivalsLoading: "Reading the other members' squads…",
+    rivalsUnreadable: "Some members' squads could not be read. Reload the page to read them again.",
     rivalNoDefault:
       "This publish named no standings neighbour for you, so no rival is chosen on your behalf: pick one and the plan against them can be computed.",
     windowLegend: "Window",
@@ -708,6 +710,7 @@ const en = {
       "This member's held squad remains visible. Some names in the member list may be unavailable.",
     retryPublishedRead: "Try reading again",
     loadingAdvice: "Loading published advice…",
+    loadingRivals: "Reading the rivals' squads…",
     entryUnreadable: "This member's squad could not be read.",
     entryUnreadableBody: "The published squad document did not return readable data.",
     planWithinFreeUnknown: (cap: number, target: number) =>
@@ -1684,6 +1687,8 @@ const tr: MessageSchema<typeof en> = {
     rivalDefaultSuffix: "(sıralamada hemen üstün)",
     rivalUnavailableSuffix: "(hesaplanamadı)",
     rivalNone: "Bu hafta için başka bir üyenin kadrosu yayınlanmamış.",
+    rivalsLoading: "Diğer üyelerin kadroları okunuyor…",
+    rivalsUnreadable: "Bazı üyelerin kadroları okunamadı. Yeniden okumak için sayfayı yenile.",
     rivalNoDefault:
       "Bu yayın senin için sıralamada bir komşu belirlemedi, o yüzden yerine bir rakip seçilmiyor: birini seç, ona karşı plan hesaplanabilsin.",
     windowLegend: "Pencere",
@@ -1727,6 +1732,7 @@ const tr: MessageSchema<typeof en> = {
       "Bu üyenin mevcut kadrosu görünür kalır. Üye listesindeki bazı adlar kullanılamayabilir.",
     retryPublishedRead: "Yeniden oku",
     loadingAdvice: "Yayımlanan öneri okunuyor…",
+    loadingRivals: "Rakiplerin kadroları okunuyor…",
     entryUnreadable: "Bu üyenin kadrosu okunamadı.",
     entryUnreadableBody: "Yayımlanan kadro belgesi okunabilir veri döndürmedi.",
     planWithinFreeUnknown: (cap: number, target: number) =>

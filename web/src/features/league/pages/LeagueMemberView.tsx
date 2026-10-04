@@ -139,6 +139,7 @@ function LeagueMemberContent({
     job,
     device,
     onDevice,
+    rivalsLoading,
     request,
     shown,
     rejectedContext,
@@ -337,9 +338,11 @@ function LeagueMemberContent({
           selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
         }
         computable={computeAvailable}
-        pending={computePending}
+        // While the rivals' documents are read, nothing is said yet about what can be
+        // computed or what was published for this selection.
+        pending={computePending || rivalsLoading}
         published={
-          adviceLoading || !indexReadable
+          adviceLoading || rivalsLoading || !indexReadable
             ? undefined
             : selection.status === "not-listed" || selection.status === "declared-unavailable"
               ? false
@@ -425,6 +428,8 @@ function LeagueMemberContent({
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
+            ) : rivalsLoading ? (
+              <EmptyState title={copy.loadingRivals} />
             ) : shown ? (
               <AdviceDecision shown={shown} members={members} squad={squad} fixtures={fixtures} />
             ) : computeOnly && !rejectedContext ? null : (
