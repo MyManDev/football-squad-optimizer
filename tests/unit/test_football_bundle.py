@@ -1,6 +1,7 @@
 """Offline ready-marker checks over real synthetic capture/pair/news/site readers."""
 
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -493,3 +494,34 @@ def test_disabled_central_source_cannot_be_sealed_or_read(case, monkeypatch):
     )
     with pytest.raises(ValueError, match="central official injury source is disabled"):
         read(case)
+
+
+def test_a_site_with_several_leagues_seals_the_league_it_is_told(case):
+    site = case["site_data_root"]
+    (site / "leagues").mkdir()
+    (site / "league").rename(site / "leagues" / "1")
+    shutil.copytree(site / "leagues" / "1", site / "leagues" / "2")
+    rows = [
+        {
+            "league_id": league,
+            "league_name": "Synthetic",
+            "season": "2026-27",
+            "gameweek": 6,
+            "path": f"leagues/{league}",
+        }
+        for league in (1, 2)
+    ]
+    dump(
+        site / "leagues.json",
+        {
+            "contract_version": "league_directory_v1",
+            "generated_at_utc": "2026-09-22T13:00:00Z",
+            "payload": {"leagues": rows},
+        },
+    )
+    with pytest.raises(ValueError, match="lists 2 leagues"):
+        bundle.seal_football_bundle(**case)
+    result = bundle.seal_football_bundle(**case, league_id=1)
+    record = json.loads(marker(case).read_bytes())
+    assert record["files"]["site_members"]["path"].endswith(".bundle/site/leagues/1/members.json")
+    assert read(case).fingerprint == result.fingerprint

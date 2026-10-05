@@ -4,11 +4,12 @@ The service reads already captured inputs and writes the existing league/advice 
 Scheduling, process pools, argument parsing and console output are supplied by callers.
 """
 
+import json
 import shutil
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from squadopt.application.advice import member_horizon_builder
 from squadopt.application.advice_record import record_directory
@@ -36,6 +37,7 @@ from squadopt.application.weekly_suggestion_eval import (
     published_page_captures,
 )
 from squadopt.contracts.league_tree import (
+    LEAGUES_ROOT,
     LEGACY_TREE,
     LeagueDirectoryError,
     PublishedLeague,
@@ -139,6 +141,9 @@ class LeaguePublicationResult:
     #: league's path, its histories kept) or "removed" (a leftover beside a directory);
     #: empty when there was none.
     legacy_tree: str = ""
+    #: This league's line of the site's directory, for a run that renders several leagues
+    #: and lists each one beside the next.
+    published: PublishedLeague | None = None
 
 
 def member_points(
@@ -210,6 +215,14 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
 
     standings_name = f"league-{request.league_id}-standings.json"
     payloads = getattr(snapshot, "payloads", {})
+    # The league's own members: the registry holds every league's, the standings page
+    # says which are this league's.
+    registry = registry.in_league(payloads, request.league_id)
+    if not registry.entries:
+        raise DataError(
+            f"None of the registered entries is in league {request.league_id} by its "
+            f"captured standings page; seed the registry from the league list."
+        )
     standings: dict[int, MemberStanding] = {}
     league_name: str | None = None
     registered = [int(entry.entry_id) for entry in registry.entries]
@@ -256,13 +269,16 @@ def publish_league(
     mapper: MemberMapper = map,
     on_prepared: Callable[[PreparedLeaguePublication], None] | None = None,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
+    beside: Sequence[PublishedLeague] = (),
 ) -> LeaguePublicationResult:
     """Publish the existing contracts; callbacks observe progress without owning the work."""
 
     prepared = prepare_league_publication(request)
     if on_prepared is not None:
         on_prepared(prepared)
-    return publish_prepared_league(prepared, mapper=mapper, on_mode_paths=on_mode_paths)
+    return publish_prepared_league(
+        prepared, mapper=mapper, on_mode_paths=on_mode_paths, beside=beside
+    )
 
 
 def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
@@ -336,13 +352,136 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
     return ("adopted", target)
 
 
+def records_advice_for(league_id: int) -> bool:
+    """Whether a publication of ``league_id`` may write the advice record.
+
+    The record is keyed by season, gameweek, entry and capture, not by league, and the
+    member histories read it for one league (``weekly_suggestion_eval``). A member of two
+    leagues would otherwise be recorded twice for one capture with different documents,
+    which the record refuses. Until the record carries the league, the other leagues are
+    rendered and published without one.
+    """
+
+    return league_id == SUPPORTED_LEAGUE_ID
+
+
+def settle_legacy_tree(
+    site_data_root: Path, league_ids: Sequence[int]
+) -> tuple[str, int | None] | None:
+    """Settle a tree from before the league directory before any league renders.
+
+    ``("adopted", league)`` when the site has no directory and the legacy tree names one
+    of ``league_ids``: it moves to that league's path, histories included. ``("removed",
+    None)`` when a directory already lists the site's trees: the legacy tree is a leftover
+    nothing reads. None when there is no legacy tree. A legacy tree that names no league,
+    or a league this publication does not render, is refused: nothing here can say whose
+    it is, and its member histories are not to be dropped.
+    """
+
+    root = Path(site_data_root)
+    legacy = root / LEGACY_TREE
+    if not legacy.is_dir():
+        return None
+    if read_league_directory(root):
+        shutil.rmtree(legacy)
+        return ("removed", None)
+    named = legacy_tree_league_id(root)
+    if named is None:
+        raise LeagueDirectoryError(
+            f"{legacy} has no readable members.json naming its league; it cannot be adopted."
+        )
+    if named not in league_ids:
+        raise LeagueDirectoryError(
+            f"{legacy} names league {named}, which this publication does not render; it "
+            "cannot be adopted."
+        )
+    adopt_legacy_tree(root, named)
+    return ("adopted", named)
+
+
+def remove_unlisted_trees(site_data_root: Path, league_ids: Sequence[int]) -> list[str]:
+    """Remove the trees of leagues this publication does not render.
+
+    A league dropped from the list would otherwise keep its tree, member and team names
+    included, on the public site with no directory line pointing at it, where nothing reads
+    or checks it again. Returns the removed trees, relative to the site's data root.
+    """
+
+    root = Path(site_data_root) / LEAGUES_ROOT
+    removed: list[str] = []
+    if not root.is_dir():
+        return removed
+    for tree in sorted(root.iterdir()):
+        if tree.is_dir() and not (tree.name.isdigit() and int(tree.name) in league_ids):
+            shutil.rmtree(tree)
+            removed.append(f"{LEAGUES_ROOT}/{tree.name}")
+    return removed
+
+
+def league_tree_capture(tree: Path) -> str | None:
+    """The capture a published tree was rendered from: its first human entry's
+    ``source_snapshot_id``; None when the tree names no member or cannot be read."""
+
+    try:
+        members = json.loads((Path(tree) / "members.json").read_text(encoding="utf-8"))
+        rows = members["payload"]["members"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    # The first human member whose entry was published: a member who was not rendered keeps
+    # a row in members.json and has no entry document.
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or row.get("member_kind") != "human":
+            continue
+        try:
+            entry = json.loads(
+                (Path(tree) / "entries" / f"{row['entry_id']}.json").read_text(encoding="utf-8")
+            )
+            capture = entry["payload"]["source_snapshot_id"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        return capture if isinstance(capture, str) else None
+    return None
+
+
+def leagues_beside(site_data_root: Path, league_id: int, snapshot_id: str) -> list[PublishedLeague]:
+    """The other leagues a build of ``league_id`` alone keeps in the site's directory.
+
+    A league whose tree is gone is not kept. One rendered from another capture refuses
+    the build: the site would serve two captures at once, which the backend and the
+    release check both refuse; every league is rebuilt together by the weekly run.
+    """
+
+    root = Path(site_data_root)
+    kept: list[PublishedLeague] = []
+    for line in read_league_directory(root):
+        if line.league_id == league_id:
+            continue
+        tree = root / Path(*PurePosixPath(line.path).parts)
+        if not (tree / "members.json").is_file():
+            continue
+        capture = league_tree_capture(tree)
+        if capture != snapshot_id:
+            raise DataError(
+                f"The site lists league {line.league_id} rendered from capture {capture}; "
+                f"building league {league_id} alone from {snapshot_id} would leave the site "
+                "on two captures. Rebuild every league with the weekly run's league list."
+            )
+        kept.append(line)
+    return kept
+
+
 def publish_prepared_league(
     prepared: PreparedLeaguePublication,
     *,
     mapper: MemberMapper = map,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
+    beside: Sequence[PublishedLeague] = (),
 ) -> LeaguePublicationResult:
-    """Complete a prepared publication without rereading a possibly changing selector."""
+    """Complete a prepared publication without rereading a possibly changing selector.
+
+    ``beside`` lists the other leagues the same run has rendered, so the site's directory
+    is written with every league of the run: this one and those.
+    """
 
     request = prepared.request
     snapshot, inputs, season = prepared.snapshot, prepared.inputs, prepared.season
@@ -376,7 +515,7 @@ def publish_prepared_league(
     site_data = request.out_dir / "data"
     # A tree from before the directory is this league's: adopted before anything reads
     # or writes the league's path, so its histories carry over.
-    legacy = adopt_legacy_tree(site_data, request.league_id)
+    legacy = settle_legacy_tree(site_data, (request.league_id,))
     out_dir = league_tree_dir(site_data, request.league_id)
     manager_words = load_publication_manager_words(request)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
@@ -451,19 +590,18 @@ def publish_prepared_league(
                     request.snapshot_id,
                 )
                 outputs.extend(path for path in directory.iterdir() if path.is_file())
-    # The site's directory is what this publication rendered: this league. A run over
-    # several leagues writes the directory once, with every league it rendered.
+    # The site's directory is what this run rendered: this league, beside the others the
+    # run listed; a league the run did not render is not listed.
+    published = PublishedLeague(
+        league_id=report.league_id,
+        league_name=report.league_name,
+        season=report.season,
+        gameweek=report.gameweek,
+        path=league_tree(report.league_id).as_posix(),
+    )
     directory = write_league_directory(
         site_data,
-        [
-            PublishedLeague(
-                league_id=report.league_id,
-                league_name=report.league_name,
-                season=report.season,
-                gameweek=report.gameweek,
-                path=league_tree(report.league_id).as_posix(),
-            )
-        ],
+        [*(line for line in beside if line.league_id != published.league_id), published],
         generated_at_utc=report.generated_at_utc,
     )
     outputs.append(directory)
@@ -475,4 +613,5 @@ def publish_prepared_league(
         output_paths=tuple(sorted(outputs)),
         top100_note=top100_note,
         legacy_tree=legacy[0] if legacy is not None else "",
+        published=published,
     )

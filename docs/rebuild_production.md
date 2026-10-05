@@ -174,8 +174,10 @@ replacement-PC startup and logon persistence are **never exercised**.
 
 ## 6. Prove what the member can read
 
-Use the exact `generated_at_utc` from the league's `members.json` under
-`web/public/data/leagues/<league id>/` in the accepted
+Use the exact value of the publication's `generated_at_utc`: on a site with the league directory, the one in
+`data/leagues.json` (written last, after every league; each league's `members.json` is
+stamped after its own solves and may be older, never newer), and on a site from before
+the directory, the one in `data/league/members.json`, in the accepted
 publication tree. The verifier requires equality, including for a same-tag re-dispatch.
 Do not use the recovery time (restoring a PC does not republish the site):
 

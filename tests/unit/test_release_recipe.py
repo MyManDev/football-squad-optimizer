@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from scripts.release import verify_live
@@ -318,7 +319,7 @@ def test_live_checks_retain_the_absent_document_rule(
     assert "must be 404" in output
 
 
-def _directory(*leagues: tuple[int, str]) -> bytes:
+def _directory(*leagues: tuple[int, str], stamp: str = "2026-09-18T18:00:00Z") -> bytes:
     rows = [
         {
             "league_id": league_id,
@@ -330,8 +331,115 @@ def _directory(*leagues: tuple[int, str]) -> bytes:
         for league_id, path in leagues
     ]
     return json.dumps(
-        {"contract_version": "league_directory_v1", "payload": {"leagues": rows}}
+        {
+            "contract_version": "league_directory_v1",
+            "generated_at_utc": stamp,
+            "payload": {"leagues": rows},
+        }
     ).encode()
+
+
+def _directory_site(
+    *,
+    directory_stamp: str = "2026-09-18T18:00:00Z",
+    tree_stamps: dict[str, str] | None = None,
+    captures: dict[str, str] | None = None,
+) -> Callable[[str], tuple[int, bytes]]:
+    """A two-league directory site: each tree's members stamp and its member's capture."""
+
+    stamps = tree_stamps or {}
+    held = captures or {}
+    served = _live(5, 5, 6)
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        if path == verify_live.DIRECTORY:
+            return 200, _directory(
+                (352490, "leagues/352490"), (7, "leagues/7"), stamp=directory_stamp
+            )
+        if path.startswith("/league/") and path.endswith("/members/0"):
+            return 200, b'<div id="root"></div>'
+        if path.endswith("/entries/0.json"):
+            return 404, b""
+        if path.endswith("/scoreboard.json"):
+            return served("/data/league/scoreboard.json")
+        for tree in ("leagues/352490", "leagues/7"):
+            if path == f"/data/{tree}/members.json":
+                return 200, json.dumps(
+                    {
+                        "generated_at_utc": stamps.get(tree, "2026-09-18T17:00:00Z"),
+                        "payload": {
+                            "scored_gameweek": 5,
+                            "members": [{"member_kind": "human", "entry_id": 101}],
+                        },
+                    }
+                ).encode()
+            if path == f"/data/{tree}/entries/101.json":
+                capture = held.get(tree, "fpl-live-one")
+                if capture is None:
+                    return 404, b""
+                return 200, json.dumps({"payload": {"source_snapshot_id": capture}}).encode()
+        return served(path)
+
+    return fetch
+
+
+@pytest.mark.parametrize(
+    ("site", "said"),
+    [
+        pytest.param(
+            {"tree_stamps": {"leagues/7": "2026-09-18T18:00:00Z"}},
+            None,
+            id="the-last-league-carries-the-publication-stamp",
+        ),
+        pytest.param(
+            {},
+            "BAD no tree carries the publication stamp 2026-09-18T18:00:00Z",
+            id="every-tree-older-than-the-publication",
+        ),
+        pytest.param(
+            {
+                "tree_stamps": {"leagues/7": "2026-09-18T18:00:00Z"},
+                "captures": {"leagues/352490": None},
+            },
+            "BAD no human member's entry document of leagues/352490 can be read",
+            id="no-entry-readable",
+        ),
+        pytest.param(
+            {"directory_stamp": "2026-09-18T17:30:00Z"},
+            "BAD /data/leagues.json generated_at_utc 2026-09-18T17:30:00Z",
+            id="directory-of-another-publication",
+        ),
+        pytest.param(
+            {"tree_stamps": {"leagues/7": "2026-09-18T19:00:00Z"}},
+            "BAD generated_at_utc 2026-09-18T19:00:00Z  (must not be newer than the publication",
+            id="tree-newer-than-the-directory",
+        ),
+        pytest.param(
+            {"captures": {"leagues/7": "fpl-live-two"}},
+            "BAD the trees name more than one capture",
+            id="two-captures",
+        ),
+    ],
+)
+def test_a_directory_site_is_one_publication_of_one_capture(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    site: dict[str, Any],
+    said: str | None,
+) -> None:
+    """Each league is stamped after its own solves, so the trees' stamps differ; the
+    directory is the publication and carries the accepted stamp, no tree is newer, and
+    every tree names the one capture."""
+
+    monkeypatch.setattr(verify_live, "fetch", _directory_site(**site))
+    code = verify_live.main("2026-09-18T18:00:00Z", 5)
+    output = capsys.readouterr().out
+    if said is None:
+        assert code == 0, output
+        assert "ok  /data/leagues.json generated_at_utc 2026-09-18T18:00:00Z" in output
+    else:
+        assert code == 1
+        assert said in output
 
 
 def test_a_site_with_a_directory_is_checked_tree_by_tree(

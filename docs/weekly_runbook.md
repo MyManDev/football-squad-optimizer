@@ -5,8 +5,41 @@ gameweek, from the capture to the site pull request, and — when asked — deci
 own squad on the way:
 
 ```bash
-python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --league 352490 --workers 8 --run-id 2026-27-gw05-decision
+python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --league-list config/leagues.json --workers 8 --run-id 2026-27-gw05-decision
 ```
+
+`config/leagues.json` (`league_list_v1`) is the one place that says which classic leagues the
+site serves; `--league <id>`, repeatable, names them on the command line instead (the list
+path is relative to `--workspace`). Every league in the list is rendered from the one
+capture into its own tree (`data/leagues/<league id>/`), with its own scoreboard, and the
+site's directory (`data/leagues.json`) lists them all. Each league is stamped after its own
+solves; the directory, written by the last league, carries the latest stamp, which is the
+publication's. A league renders the registered entries its captured standings page names.
+
+The capture stage refuses, before any solve, a registry that names its seed leagues and was
+not seeded from every listed league (one league or several: a league the registry was not
+seeded from would be rendered with only the members the two share), and with more than one
+league a capture that lacks a listed league's standings page. So the first run over a new
+list stops there, after its capture, and its message names the seed command for exactly the
+run's leagues (`python -m scripts.seed_entry_registry --league <id> ... --snapshot-id <that
+capture>`, which registers every member of every league once). Then start a new run (new
+`--run-id`, no `--snapshot-id`): the registry is a capture input, so a resume is refused, and
+only a new capture holds the new members' picks.
+
+The advice record and the member histories name one league
+(`weekly_suggestion_eval.SUPPORTED_LEAGUE_ID`); the other leagues are rendered and published,
+not recorded, until the record contract carries the league. The league receipt says so per
+league (`leagues.<id>.advice_recorded`), and its top-level `advice_recorded` is whether any
+league was recorded; a run asked to record whose list has none of them records nothing and
+logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed` and
+`top100_note` sit under `leagues.<id>`; `legacy_tree` (top level) says what became of a tree
+from before the directory, and `removed_trees` (top level) names the trees of leagues the list
+no longer has, which the run removes so a dropped league's member names leave the site.
+
+By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
+keeps the other leagues the directory lists only when their trees were rendered from the same
+capture, and refuses otherwise (the site would serve two captures); it records advice only
+for the league the record names.
 
 `--decide` is deliberately absent from that line. It is the members' loop that runs every
 week; our own squad is a separate decision with a precondition that is not currently met
@@ -35,7 +68,7 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | step | service / compatibility command | what it needs | what it leaves |
 | --- | --- | --- | --- |
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
-| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents and the standings page |
+| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents and the standings page |
 | settled outcomes | `application.settled_outcomes.export_settled_outcomes` | stored captures no newer than the selected capture; an earlier week with both pre-deadline and finished/checked captures | immutable table/manifest pairs under `artifacts/rotation`, plus per-run reports; unavailable pairs are stated, never filled with zero outcomes |
 | rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and either the committed synthetic fixture or the real club-news capture selected by `--rotation-capture` | `artifacts/rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash>_decision_<decision hash>.{csv,manifest.json}` for a real club-news capture; `rotation_evidence_v4_<season>_gw<NN>_<decision hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
@@ -86,7 +119,7 @@ points scaled by `1 + w/100 * count/100` and every number in it is scored on the
 projection; the price is the base-model difference against the member's own plan at 0. The
 index's `top100` block names the files, or says why there are none
 (`no_top100_this_run`, `top100_inputs_refused`, `published_plan_carries_top100`), and the
-league receipt's `top100_note` carries the refusal. The export passes the handoff's own gate
+league receipt's `leagues.<id>.top100_note` carries the refusal. The export passes the handoff's own gate
 before anything is solved, so the menu needs a live capture taken **after** the Top-100
 export. **The published plan must stay at 0, so a week that offers the menu is run with
 `--projection component-only`**: the default `component` bakes the frozen uplift into the
@@ -199,7 +232,9 @@ each line; the commands are in the table above and in the documents named.
    predecessor did not complete; the league tree carries one `generated_at_utc`, which the
    bundle requires to be after the capture.
 5. **The bundle is sealed against the published tree** (`scripts.prepare_football_bundle`;
-   `docs/operations/official_injury_discovery.md`). Its marker is written last, after every
+   `docs/operations/official_injury_discovery.md`; with several leagues, `--league <id>` names
+   the tree it seals, as `scripts.add_device_plan_inputs --league <id>` names the tree it
+   augments). Its marker is written last, after every
    copy has been read back through the production validators; a name or an input the reader
    would refuse is refused before anything is copied.
 6. **The site pull request merges through develop's merge queue, the release is cut and

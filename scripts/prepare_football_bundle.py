@@ -18,6 +18,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--news-capture-id")
     parser.add_argument("--rotation-table", type=Path)
     parser.add_argument("--official-injury-capture-id")
+    parser.add_argument(
+        "--league", type=int, help="the league whose tree is sealed (required with several)"
+    )
     args = parser.parse_args(argv)
     try:
         bundle = seal_football_bundle(
@@ -29,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
             news_capture_id=args.news_capture_id,
             rotation_table_path=args.rotation_table,
             official_injury_capture_id=args.official_injury_capture_id,
+            league_id=args.league,
         )
     except (DataError, OSError, ValueError, KeyError, TypeError) as error:
         print(f"Refused: {error}")

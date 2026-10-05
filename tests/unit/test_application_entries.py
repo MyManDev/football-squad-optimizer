@@ -1,6 +1,7 @@
 """Phase C seam: entry picks, the registry, and the held squad the planner starts from."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,7 @@ from squadopt.application.entries import (
     EntryError,
     EntryPicks,
     EntryPicksProvider,
+    EntryRegistration,
     EntryRegistry,
     frozen_decision_from_picks,
     held_squad_from_picks,
@@ -108,6 +110,54 @@ def test_the_registry_loads_unique_entries_or_is_empty(tmp_path: Path) -> None:
         EntryRegistry.load(path)
     path.write_text(json.dumps({"contract_version": "other"}), encoding="utf-8")
     with pytest.raises(EntryError, match="registry"):
+        EntryRegistry.load(path)
+
+
+def _standings(league_id: int, *entries: int) -> bytes:
+    rows = [
+        {"entry": entry, "entry_name": f"Team {entry}", "player_name": "M", "rank": rank}
+        for rank, entry in enumerate(entries, start=1)
+    ]
+    document = {"league": {"id": league_id}, "standings": {"has_next": False, "results": rows}}
+    return json.dumps(document).encode("utf-8")
+
+
+def test_the_registry_narrows_to_the_members_a_league_page_names() -> None:
+    registry = EntryRegistry(
+        entries=tuple(
+            EntryRegistration(entry_id=entry, label="", registered_at_utc="")
+            for entry in (7, 42, 99)
+        )
+    )
+    payloads = {
+        "league-1-standings.json": _standings(1, 42, 7, 500),
+        "league-2-standings.json": _standings(2, 99),
+    }
+    assert registry.in_league(payloads, 1).ids() == (7, 42)
+    assert registry.in_league(payloads, 2).ids() == (99,)
+    # Without the league's page the registry is the league, as a one-league site had it.
+    assert registry.in_league(payloads, 3) is registry
+    seeded_alone = replace(registry, seeded_from=(3,))
+    assert seeded_alone.in_league(payloads, 3) is seeded_alone
+    # A registry seeded from several leagues cannot say who is in a league whose page the
+    # capture lacks; nor can one seeded from another league.
+    for seeded in ((1, 3), (1,)):
+        with pytest.raises(EntryError, match="no standings page for league 3"):
+            replace(registry, seeded_from=seeded).in_league(payloads, 3)
+
+
+def test_the_registry_reads_the_leagues_it_was_seeded_from(tmp_path: Path) -> None:
+    path = tmp_path / "registry.json"
+    base = {"contract_version": ENTRY_REGISTRY_CONTRACT_VERSION, "entries": [{"entry_id": 1}]}
+    for extra, seeded in (
+        ({}, ()),
+        ({"seeded_from_league": 7}, (7,)),
+        ({"seeded_from_league": 7, "seeded_from_leagues": [7, 9]}, (7, 9)),
+    ):
+        path.write_text(json.dumps({**base, **extra}), encoding="utf-8")
+        assert EntryRegistry.load(path).seeded_from == seeded
+    path.write_text(json.dumps({**base, "seeded_from_leagues": ["7"]}), encoding="utf-8")
+    with pytest.raises(EntryError, match="seed league"):
         EntryRegistry.load(path)
 
 

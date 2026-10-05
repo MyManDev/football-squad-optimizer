@@ -406,8 +406,12 @@ def seal_football_bundle(
     news_capture_id: str | None = None,
     rotation_table_path: Path | None = None,
     official_injury_capture_id: str | None = None,
+    league_id: int | None = None,
 ) -> FootballBundle:
     """Seal existing inputs without overwriting either artifacts or an earlier marker.
+
+    The site files sealed are one league's tree: ``league_id``'s, or the only one the site
+    publishes when it is not named.
 
     Copies may survive an interruption; only the final marker makes them ready.
     Repeating the identical inputs completes that interruption or returns a replay.
@@ -427,7 +431,7 @@ def seal_football_bundle(
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(single_league_tree(site_data_root)),
+        **_site_files(single_league_tree(site_data_root, league_id)),
     }
     if rotation_table_path is not None:
         files.update(

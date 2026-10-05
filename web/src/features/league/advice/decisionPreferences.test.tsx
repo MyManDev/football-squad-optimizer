@@ -140,3 +140,16 @@ it("selects team, position and player; keeps choices in the URL and clears chip 
     save_chips: true,
   });
 });
+
+it("reads a refused roster's body, so the request ends", async () => {
+  const response = new Response("<html>bad gateway</html>", { status: 502 });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+  render(
+    <LanguageProvider>
+      <MemoryRouter>
+        <DecisionPreferencesPanel squad={squad} available />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+  await waitFor(() => expect(response.bodyUsed).toBe(true));
+});
