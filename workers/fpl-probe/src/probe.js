@@ -23,11 +23,33 @@ export const PROBE_TIMEOUT_MS = 10_000;
 /** A record outlives the 3 to 5 day probe with room to read it afterwards. */
 export const RECORD_TTL_SECONDS = 14 * 24 * 60 * 60;
 
+/**
+ * The deploy workflow passes PROBE_UNTIL, this many days after the deploy. From then on the
+ * schedule and the live probe ask FPL nothing, so a probe nobody deletes stops by itself.
+ */
+export const PROBE_DAYS = 7;
+
 /** The live probe runs at most once in this window, whoever asks. */
 export const NOW_INTERVAL_MS = 60_000;
 
-/** The KV key holding the time the live probe last ran. */
-export const LAST_NOW_KEY = "now:last";
+/** And at most this many times a UTC day, whoever asks: 3 KV writes each, 144 a day at most. */
+export const NOW_DAILY_CAP = 48;
+
+/** The KV key holding the live probe's gate: when it last ran, on which UTC day, how often. */
+export const NOW_GATE_KEY = "now:gate";
+
+/** The gate outlives the UTC day it counts, then expires by itself. */
+export const NOW_GATE_TTL_SECONDS = 2 * 24 * 60 * 60;
+
+/**
+ * A live probe must carry this request header with the value "now". A page on another site
+ * cannot add it without a CORS preflight, which the Worker never grants, so a browser cannot be
+ * made to run the probe from someone else's page. Every answer of the Worker carries the same
+ * header with the value "1", so the deploy workflow can tell the Worker from anything else.
+ */
+export const PROBE_HEADER = "x-squadopt-probe";
+export const NOW_HEADER_VALUE = "now";
+export const MARKER_VALUE = "1";
 
 /** Every record key starts with this, so one prefix lists them all in time order. */
 export const RECORD_PREFIX = "r:";
@@ -35,15 +57,25 @@ export const RECORD_PREFIX = "r:";
 export const RESULTS_PATH = "/api/v1/fpl-probe";
 export const NOW_PATH = "/api/v1/fpl-probe/now";
 
+/** The results answer is built at most once per data centre in this many seconds. */
+export const RESULTS_CACHE_SECONDS = 300;
+
 /** The most of a non-JSON answer a record keeps: enough to tell a block page from an outage. */
 export const HEAD_CHARACTERS = 120;
 
 /** KV refuses metadata larger than this, serialized. */
 export const METADATA_LIMIT_BYTES = 1024;
 
-/** The verdict rule, fixed before any data (docs/fpl_forwarder_probe.md). */
-export const VERDICT_SHARE = 0.95;
+/**
+ * The verdict rule, fixed before any data (docs/fpl_forwarder_probe.md): the scheduled standings
+ * probes in the first 72 hours from the first of them, both ends included, which is 145 probes at
+ * one every 30 minutes. Fewer than VERDICT_MIN_PROBES of them is no verdict.
+ */
+export const VERDICT_PERCENT = 95;
 export const VERDICT_HOURS = 72;
+export const VERDICT_WINDOW_MS = VERDICT_HOURS * 3_600_000;
+export const VERDICT_EXPECTED_PROBES = 145;
+export const VERDICT_MIN_PROBES = 130;
 
 const ERROR_CHARACTERS = 160;
 const CONTENT_TYPE_CHARACTERS = 100;
@@ -66,18 +98,80 @@ export function routeFor(method, pathname) {
 }
 
 /**
- * Whether the live probe may run now, given the stored time of its last run (text from KV, or
- * null when there is none). A refusal says how many whole seconds remain. A stored time ahead
- * of this clock refuses too: another data centre has just run it, and the key expires anyway.
+ * Whether the probe is still meant to run: PROBE_UNTIL must be a time, and it must lie ahead.
+ * A missing or unreadable end refuses, so a deploy without one probes nothing.
  */
-export function nowGate(lastText, nowMs, intervalMs = NOW_INTERVAL_MS) {
-  const last = lastText === null || lastText === undefined ? NaN : Number(lastText);
-  if (!Number.isFinite(last)) return { allowed: true, retryAfterSeconds: 0 };
-  const elapsed = nowMs - last;
-  if (elapsed >= intervalMs) return { allowed: true, retryAfterSeconds: 0 };
-  const windowSeconds = Math.ceil(intervalMs / 1000);
-  const remaining = Math.ceil((intervalMs - elapsed) / 1000);
-  return { allowed: false, retryAfterSeconds: Math.min(windowSeconds, Math.max(1, remaining)) };
+export function probeActive(untilText, nowMs) {
+  if (typeof untilText !== "string" || untilText.trim() === "") return false;
+  const until = Date.parse(untilText);
+  return Number.isFinite(until) && nowMs < until;
+}
+
+function utcDay(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function readGate(text) {
+  if (typeof text !== "string") return null;
+  try {
+    const value = JSON.parse(text);
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      Number.isFinite(value.last) &&
+      typeof value.day === "string" &&
+      Number.isInteger(value.count) &&
+      value.count >= 0
+    ) {
+      return value;
+    }
+  } catch {
+    // An unreadable gate is treated as no gate; only the Worker writes it.
+  }
+  return null;
+}
+
+/**
+ * Whether the live probe may run now, given the stored gate (JSON text from KV, or null when
+ * there is none). The gate holds { last, day, count }: the time of the last live probe, its UTC
+ * day, and how many ran on that day. A run is refused within NOW_INTERVAL_MS of the last one,
+ * and once NOW_DAILY_CAP have run on this UTC day. A refusal says how many whole seconds remain;
+ * an allowed run carries the gate to write, so each allowed run costs one write. A stored time
+ * ahead of this clock refuses too: another data centre has just run it.
+ */
+export function nowGate(
+  gateText,
+  nowMs,
+  { intervalMs = NOW_INTERVAL_MS, dailyCap = NOW_DAILY_CAP } = {},
+) {
+  const gate = readGate(gateText);
+  const today = utcDay(nowMs);
+  const countToday = gate !== null && gate.day === today ? gate.count : 0;
+  if (gate !== null) {
+    const elapsed = nowMs - gate.last;
+    if (elapsed < intervalMs) {
+      const windowSeconds = Math.ceil(intervalMs / 1000);
+      const remaining = Math.ceil((intervalMs - elapsed) / 1000);
+      return {
+        allowed: false,
+        reason: "interval",
+        retryAfterSeconds: Math.min(windowSeconds, Math.max(1, remaining)),
+      };
+    }
+  }
+  if (countToday >= dailyCap) {
+    const nextDay = Date.parse(`${today}T00:00:00.000Z`) + 86_400_000;
+    return {
+      allowed: false,
+      reason: "daily_cap",
+      retryAfterSeconds: Math.max(1, Math.ceil((nextDay - nowMs) / 1000)),
+    };
+  }
+  return {
+    allowed: true,
+    retryAfterSeconds: 0,
+    next: JSON.stringify({ last: nowMs, day: today, count: countToday + 1 }),
+  };
 }
 
 function clip(value, characters) {
@@ -186,6 +280,7 @@ function statusKey(record) {
   return timedOut ? "timeout" : "error";
 }
 
+/** Hours between two ISO times, rounded for reading only; no rule compares this number. */
 function hoursBetween(from, to) {
   if (from === null || to === null) return 0;
   return Math.round(((Date.parse(to) - Date.parse(from)) / 3_600_000) * 100) / 100;
@@ -240,42 +335,88 @@ function summarizeTarget(target, records) {
   };
 }
 
-/**
- * The record read as a whole: per target, how many probes, how many were served, the count of
- * each status (or "timeout" and "error" for a probe that got no answer), the first and last
- * time, the longest run of consecutive failures with when it began and ended, and the longest
- * gap between two probes. The verdict applies the rule fixed in docs/fpl_forwarder_probe.md to
- * the standings probes; until they span 72 hours it says "pending".
- */
-export function summarize(records) {
-  const ordered = [...records].sort(byTime);
+function byTarget(records) {
   const groups = new Map(TARGETS.map((target) => [target, []]));
-  for (const record of ordered) {
+  for (const record of records) {
     if (!groups.has(record.target)) groups.set(record.target, []);
     groups.get(record.target).push(record);
   }
-  const targets = [...groups].map(([target, group]) => summarizeTarget(target, group));
-  const standings = targets.find((entry) => entry.target === STANDINGS_URL);
+  return [...groups].map(([target, group]) => summarizeTarget(target, group));
+}
+
+/**
+ * The rule fixed in docs/fpl_forwarder_probe.md, applied to the scheduled standings probes in
+ * time order. The window is the first VERDICT_HOURS from the first of them, both ends included,
+ * so reading later never moves it. Until a scheduled standings probe exists at or after the
+ * window's end the outcome is "pending"; then it is "too few probes" when the window holds
+ * fewer than VERDICT_MIN_PROBES, and otherwise "served" or "not served", and it stays so.
+ * Times are compared in whole milliseconds and the share in integers, so nothing rounds.
+ */
+export function verdictFor(scheduledStandings) {
+  const rule =
+    `served when at least ${VERDICT_PERCENT} percent of the scheduled standings probes in the ` +
+    `first ${VERDICT_HOURS} hours from the first of them answer 200 JSON, with at least ` +
+    `${VERDICT_MIN_PROBES} of the ${VERDICT_EXPECTED_PROBES} expected probes in that window`;
+  if (scheduledStandings.length === 0) {
+    return {
+      rule,
+      window_from: null,
+      window_to: null,
+      window_probes: 0,
+      window_served: 0,
+      share: null,
+      min_probes: VERDICT_MIN_PROBES,
+      outcome: "pending",
+    };
+  }
+  const fromMs = Date.parse(scheduledStandings[0].at);
+  const toMs = fromMs + VERDICT_WINDOW_MS;
+  const inWindow = scheduledStandings.filter((record) => Date.parse(record.at) <= toMs);
+  const served = inWindow.filter(isServed).length;
+  const closed = scheduledStandings.some((record) => Date.parse(record.at) >= toMs);
 
   let outcome = "pending";
-  if (standings.probes > 0 && standings.span_hours >= VERDICT_HOURS) {
-    outcome = standings.served / standings.probes >= VERDICT_SHARE ? "served" : "not served";
+  if (closed && inWindow.length < VERDICT_MIN_PROBES) outcome = "too few probes";
+  else if (closed) {
+    outcome = served * 100 >= VERDICT_PERCENT * inWindow.length ? "served" : "not served";
+  }
+  return {
+    rule,
+    window_from: new Date(fromMs).toISOString(),
+    window_to: new Date(toMs).toISOString(),
+    window_probes: inWindow.length,
+    window_served: served,
+    share: Math.round((served / inWindow.length) * 10_000) / 10_000,
+    min_probes: VERDICT_MIN_PROBES,
+    outcome,
+  };
+}
+
+/**
+ * The record read as a whole. `scheduled` and `live` hold, per target, the probes of the cron
+ * and of /now apart: how many probes, how many were served, the count of each status (or
+ * "timeout" and "error" for a probe that got no answer), the first and last time, the longest
+ * run of consecutive failures with when it began and ended, and the longest gap between two
+ * probes. The verdict reads only the scheduled standings probes: a caller of /now chooses when
+ * and from which data centre a live probe runs, so live probes are context, never evidence.
+ */
+export function summarize(records) {
+  const ordered = [...records].sort(byTime);
+  const scheduled = ordered.filter((record) => record.trigger === "cron");
+  const live = ordered.filter((record) => record.trigger === "now");
+  const byTrigger = {};
+  for (const record of ordered) {
+    const key = String(record.trigger);
+    byTrigger[key] = (byTrigger[key] ?? 0) + 1;
   }
 
   return {
     probes: ordered.length,
     first_at: ordered.length > 0 ? ordered[0].at : null,
     last_at: ordered.length > 0 ? ordered[ordered.length - 1].at : null,
-    targets,
-    verdict: {
-      rule:
-        "served when at least 95 percent of the standings probes over at least 72 hours " +
-        "answer 200 JSON",
-      standings_probes: standings.probes,
-      standings_served: standings.served,
-      share: standings.served_share,
-      span_hours: standings.span_hours,
-      outcome,
-    },
+    by_trigger: byTrigger,
+    scheduled: byTarget(scheduled),
+    live: byTarget(live),
+    verdict: verdictFor(scheduled.filter((record) => record.target === STANDINGS_URL)),
   };
 }
