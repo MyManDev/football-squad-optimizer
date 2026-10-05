@@ -30,6 +30,7 @@ from squadopt.data.sources.club_news_coding import (
     SYSTEM_PROMPT,
     coding_prompt_sha256,
     locate_claim_response,
+    locate_claims_reporting,
     require_requested_coding_contract,
     response_schema,
 )
@@ -189,6 +190,79 @@ def test_vague_past_wrong_competition_and_conditional_quotes_do_not_authorize_ne
     response = _response(quote=quote)
     with pytest.raises(ClubNewsError, match="explicit, unconditional"):
         parse_claim_response(locate_claim_response(response, (document,)), (document,))
+
+
+GOOD = "Odegaard will not travel."
+
+
+def _beside_a_good_claim(response: ClaimResponse, **saka: str) -> ClaimResponse:
+    """Saka's claim, changed as given, followed by a claim nobody would refuse."""
+
+    document = json.loads(response.text)
+    document["claims"][0].update(saka)
+    document["claims"].append(
+        {
+            **document["claims"][0],
+            "player_name": "Odegaard",
+            "disposition": "stated_expected_absent",
+            "quote": GOOD,
+            "fixture_scope": "upcoming_premier_league",
+        }
+    )
+    return ClaimResponse(
+        text=json.dumps(document),
+        model_identifier=response.model_identifier,
+        model_version=response.model_version,
+    )
+
+
+@pytest.mark.parametrize(
+    "quote,scope,why",
+    [
+        (
+            "Saka's minutes will be managed in the next league match.",
+            "upcoming_premier_league",
+            "explicit, unconditional",
+        ),
+        (QUOTE, "next_week", "fixture_scope"),
+    ],
+)
+def test_a_claim_the_parser_refuses_alone_is_set_aside_and_the_rest_kept(
+    quote: str, scope: str, why: str
+) -> None:
+    documents = (_document(f"{quote}\n{GOOD}"),)
+    response = _beside_a_good_claim(_response(quote=quote), fixture_scope=scope)
+    located, dropped = locate_claims_reporting(response, documents)
+    (claim,) = parse_claim_response(located, documents)
+    assert claim.player_name == "Odegaard"
+    (refused,) = dropped
+    assert (refused.player_name, refused.team_name, refused.source_url) == ("Saka", "Arsenal", URL)
+    assert why in refused.why
+    with pytest.raises(ClubNewsError, match=why):
+        parse_claim_response(locate_claim_response(response, documents), documents)
+
+
+def test_a_fault_of_the_whole_response_still_refuses_it_rather_than_every_claim() -> None:
+    document = json.loads(_beside_a_good_claim(_response()).text)
+    document["documents"][0]["published_at_utc"] = None
+    response = ClaimResponse(
+        text=json.dumps(document), model_identifier="synthetic-stub", model_version="fixture-2"
+    )
+    with pytest.raises(ClubNewsError, match="no dateline"):
+        locate_claims_reporting(response, (_document(f"{QUOTE}\n{GOOD}"),))
+
+
+def test_two_claims_about_one_player_are_still_refused_and_not_set_aside() -> None:
+    documents = (_document(f"{QUOTE}\n{GOOD}"),)
+    document = json.loads(_beside_a_good_claim(_response()).text)
+    document["claims"][1]["player_name"] = "Saka"
+    response = ClaimResponse(
+        text=json.dumps(document), model_identifier="synthetic-stub", model_version="fixture-2"
+    )
+    located, dropped = locate_claims_reporting(response, documents)
+    assert dropped == ()
+    with pytest.raises(ClubNewsError, match="twice"):
+        parse_claim_response(located, documents)
 
 
 @pytest.mark.parametrize("label", ["stated_minutes_limited", "ambiguous", "no_statement"])

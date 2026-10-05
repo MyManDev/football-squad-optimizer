@@ -1,3 +1,5 @@
+import { memberAddress, memberHistoryAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +15,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
+import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
@@ -21,7 +24,6 @@ import type { AdviceJob } from "../advice/useAdviceJob";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
-import { ChipForecastCard } from "../components/ChipForecastCard";
 import { MemberFixtureRail, type RailPlacement } from "../components/MemberFixtureRail";
 import { DisclosureIcon, InfoIcon } from "../components/memberIcons";
 import { isMemberStrategy } from "../types";
@@ -58,7 +60,7 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 
 /**
  * The state of a request for this page's plan as one quiet line, for the decision heading:
- * it stays beside the result when the member scrolls past the settings. Nothing while
+ * it stays beside the result, while the settings sit further down the page. Nothing while
  * no request was made.
  */
 function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null {
@@ -110,6 +112,8 @@ function LeagueMemberContent({
   capabilities = null,
   computeService = "static",
   computePending = false,
+  deviceDependencies,
+  deviceRivals,
   rivalSquad = null,
   windowControl = null,
   deadlinePassed = null,
@@ -118,12 +122,13 @@ function LeagueMemberContent({
   leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   const layout = useShellLayout();
   const shell = useShell();
   const view = squad.payload;
   const [searchParams] = useSearchParams();
-  const { viewer, clear } = useViewerEntry();
+  const { viewer, clear } = useViewerEntry(leagueId);
   const navigate = useNavigate();
   const {
     entryId,
@@ -133,9 +138,11 @@ function LeagueMemberContent({
     selectionAvailable,
     computeAvailable,
     job,
+    device,
+    onDevice,
+    rivalsLoading,
     request,
     shown,
-    computedForecast,
     rejectedContext,
     rejectedUnreadable,
   } = useMemberAdviceView(
@@ -149,13 +156,19 @@ function LeagueMemberContent({
       client,
       capabilities,
       computeService,
+      deviceDependencies,
+      deviceRivals,
     },
     searchParams,
   );
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
+  // The same holds for a selection the member's device solves while the week is open,
+  // until a run ends without a plan: the card then says what is published again.
   const computeOnly =
-    computeAvailable && selection.computable !== undefined && selection.status === "not-listed";
+    selection.status === "not-listed" &&
+    ((computeAvailable && selection.computable !== undefined) ||
+      (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );
@@ -182,7 +195,10 @@ function LeagueMemberContent({
   ]
     .filter(Boolean)
     .join(" · ");
-  const echo = computeEcho(copy, job.state);
+  const echo =
+    shown?.source === "device"
+      ? copy.computeEcho(copy.computeEchoStates.device)
+      : computeEcho(copy, job.state);
   const dateTime = (iso: string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
       new Date(iso),
@@ -213,21 +229,15 @@ function LeagueMemberContent({
       codes={codes}
     />
   );
-  // What to make of the decision: the two honesty lines, how it was worked out and the
-  // member's history. Placed after the decision on a phone and after the squad elsewhere.
+  // What to make of the decision: how it was worked out and the member's history. Placed after the decision on a phone and after the squad elsewhere.
   const honesty = (
     <div key="honesty" className={styles.honestyBlock} data-mark="honesty">
-      <div className={styles.honestyLines}>
-        <p>{copy.honestyModel}</p>
-        <p>{copy.honestyDecision}</p>
-      </div>
       <details className={styles.how}>
         <summary className={styles.howSummary}>
           <InfoIcon />
           <span>{copy.howComputed}</span>
         </summary>
         <div className={styles.howBody}>
-          <p>{copy.honestyRule}</p>
           <p>{copy.independentAdviceRule}</p>
           {!adviceLoading && shown ? <AdviceMethodNotes view={shown.envelope.payload} /> : null}
           <p>{copy.diagnosticOnly}</p>
@@ -243,12 +253,13 @@ function LeagueMemberContent({
               )}
             </p>
           ) : null}
-          <p>{copy.freshnessNote}</p>
         </div>
       </details>
-      {view.league_id === 352490 ? (
+      {view.league_id === leagueId ? (
         <p className={styles.historyLink}>
-          <Link to={`/league/members/${entryId}/history`}>{messages.suggestionHistory.title}</Link>
+          <Link to={memberHistoryAddress(leagueId, entryId)}>
+            {messages.suggestionHistory.title}
+          </Link>
         </p>
       ) : null}
     </div>
@@ -265,6 +276,98 @@ function LeagueMemberContent({
         {railPlacement === "flow" ? rail : null}
       </div>
     </div>
+  );
+
+  // The plan's settings sit under the decision they change. A member opens the page to
+  // read this week's move; the controls that recompute it are one link away, not in front.
+  const planSettings = (
+    <section
+      id="plan-settings"
+      aria-labelledby="plan-settings-title"
+      className={styles.planSettings}
+      // The decision's "change settings" link lands here; focus follows it.
+      tabIndex={-1}
+    >
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        onDevice={onDevice}
+        part="plan"
+      />
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        onDevice={onDevice}
+        part="top100"
+      />
+      <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          onDevice={onDevice}
+          part="advanced"
+        />
+        <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
+        <TemplatePicker
+          canApply={(params) => {
+            const offered = resolve(params);
+            return (
+              !adviceLoading &&
+              indexReadable &&
+              (offered.status === "ready" || offered.computable?.selection === true)
+            );
+          }}
+        />
+      </Tool>
+      <AdviceRequestPanel
+        dockClassName={styles.computeDock}
+        request={request}
+        job={job}
+        device={device}
+        selectionAvailable={
+          selectionAvailable &&
+          !selection.evidence.on &&
+          selection.top100.weight === 0 &&
+          selection.chip.chip === null
+        }
+        service={
+          selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
+        }
+        computable={computeAvailable}
+        // While the rivals' documents are read, nothing is said yet about what can be
+        // computed or what was published for this selection.
+        pending={computePending || rivalsLoading}
+        published={
+          adviceLoading || rivalsLoading || !indexReadable
+            ? undefined
+            : selection.status === "not-listed" || selection.status === "declared-unavailable"
+              ? false
+              : selectionAvailable &&
+                  advice &&
+                  !adviceIssue &&
+                  !rejectedContext &&
+                  !rejectedUnreadable
+                ? true
+                : undefined
+        }
+        chipChosen={selection.chip.chip !== null}
+        deadlinePassed={deadlinePassed !== null}
+      />
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        onDevice={onDevice}
+        part="notes"
+      />
+    </section>
   );
 
   return (
@@ -304,89 +407,6 @@ function LeagueMemberContent({
           </p>
         ) : null}
 
-        <section
-          id="plan-settings"
-          aria-labelledby="plan-settings-title"
-          className={styles.planSettings}
-        >
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="plan"
-          />
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="top100"
-          />
-          <Tool title={copy.advancedSettings}>
-            <MemberDecisionControls
-              entryId={entryId}
-              members={members}
-              index={selection.status === "index-error" ? null : index}
-              capabilities={capabilities}
-              part="advanced"
-            />
-            <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-            <TemplatePicker
-              canApply={(params) => {
-                const offered = resolve(params);
-                return (
-                  !adviceLoading &&
-                  indexReadable &&
-                  (offered.status === "ready" || offered.computable?.selection === true)
-                );
-              }}
-            />
-          </Tool>
-          <AdviceRequestPanel
-            dockClassName={styles.computeDock}
-            request={request}
-            job={job}
-            selectionAvailable={
-              selectionAvailable &&
-              !selection.evidence.on &&
-              selection.top100.weight === 0 &&
-              selection.chip.chip === null
-            }
-            service={
-              selection.computable
-                ? "ready"
-                : computeService === "ready"
-                  ? "static"
-                  : computeService
-            }
-            computable={computeAvailable}
-            pending={computePending}
-            published={
-              adviceLoading || !indexReadable
-                ? undefined
-                : selection.status === "not-listed" || selection.status === "declared-unavailable"
-                  ? false
-                  : selectionAvailable &&
-                      advice &&
-                      !adviceIssue &&
-                      !rejectedContext &&
-                      !rejectedUnreadable
-                    ? true
-                    : undefined
-            }
-            chipChosen={selection.chip.chip !== null}
-            deadlinePassed={deadlinePassed !== null}
-          />
-          <MemberDecisionControls
-            entryId={entryId}
-            members={members}
-            index={selection.status === "index-error" ? null : index}
-            capabilities={capabilities}
-            part="notes"
-          />
-        </section>
-
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
@@ -397,6 +417,11 @@ function LeagueMemberContent({
                 <p className={styles.selectionSummary} data-testid="member-selection-summary">
                   {selectionSummary}
                 </p>
+                {/* The settings now sit under the decision, so the way to them is named
+                    where the decision says which settings it was made under. */}
+                <a href="#plan-settings" className={styles.changePlan}>
+                  {copy.changePlan}
+                </a>
                 <p className={styles.echo} aria-live="polite">
                   {echo}
                 </p>
@@ -405,6 +430,8 @@ function LeagueMemberContent({
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
+            ) : rivalsLoading ? (
+              <EmptyState title={copy.loadingRivals} />
             ) : shown ? (
               <AdviceDecision shown={shown} members={members} squad={squad} fixtures={fixtures} />
             ) : computeOnly && !rejectedContext ? null : (
@@ -454,6 +481,8 @@ function LeagueMemberContent({
           ) : null}
         </section>
 
+        {planSettings}
+
         {viewer ? (
           <Card tone="muted" title={copy.viewerTitle}>
             <p className={styles.notice}>{copy.viewerBody}</p>
@@ -465,7 +494,7 @@ function LeagueMemberContent({
                     : `#${viewer.entryId}`,
                 )}
               </strong>{" "}
-              <Link className={styles.viewerAction} to="/league/members">
+              <Link className={styles.viewerAction} to={membersAddress(leagueId)}>
                 {copy.viewerChange}
               </Link>{" "}
               <button
@@ -473,7 +502,7 @@ function LeagueMemberContent({
                 className={styles.viewerClear}
                 onClick={() => {
                   clear();
-                  navigate("/league/members", { replace: true });
+                  navigate(membersAddress(leagueId), { replace: true });
                 }}
               >
                 {copy.viewerClear}
@@ -482,7 +511,7 @@ function LeagueMemberContent({
             {viewer.entryId !== entryId ? (
               <p className={styles.notice}>
                 <strong>{copy.notYourPageTitle}</strong> {copy.notYourPageBody}{" "}
-                <Link to={`/league/members/${viewer.entryId}`}>{copy.notYourPageLink}</Link>
+                <Link to={memberAddress(leagueId, viewer.entryId)}>{copy.notYourPageLink}</Link>
               </p>
             ) : null}
           </Card>
@@ -519,11 +548,6 @@ function LeagueMemberContent({
           </Tool>
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
-            <ChipForecastCard
-              published={indexReadable ? index?.chip_forecast : undefined}
-              computed={computedForecast}
-              squad={view}
-            />
           </Tool>
         </div>
       </div>

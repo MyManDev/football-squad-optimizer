@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fixture from "../../../fixtures/weeklySuggestionHistory.json";
 import rows from "../../../fixtures/recordedPlanRows.json";
+import { createLeagueTree } from "../data";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
+import { EXAMPLE_LEAGUE, exampleTree } from "../../../testSupport/league";
 import { checkedHistory, loadSuggestionHistory, type SuggestionHistory } from "./historyData";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,7 +53,11 @@ describe("recorded weekly history", () => {
       value.payload.entry_id = 202;
     },
     (value) => {
+      // Another league's history, where the tree's league is asked for.
       Object.assign(value.payload, { league_id: 123 });
+    },
+    (value) => {
+      Object.assign(value.payload, { league_id: 0 });
     },
     (value) => {
       value.payload.weeks[0].status = "unsettled";
@@ -87,7 +93,14 @@ describe("recorded weekly history", () => {
   ])("rejects inconsistent identity, points, timing or settlement (%#)", (mutate) => {
     const value = document();
     mutate(value);
-    expect(() => checkedHistory(value, 101)).toThrow(LeagueDataError);
+    expect(() => checkedHistory(value, 101, 352490)).toThrow(LeagueDataError);
+  });
+
+  it("reads a league's history for whichever league the tree is", () => {
+    const value = document();
+    Object.assign(value.payload, { league_id: 123 });
+    expect(checkedHistory(value, 101, 123).payload.league_id).toBe(123);
+    expect(checkedHistory(value, 101).payload.league_id).toBe(123);
   });
 
   it("accepts an empty archive and an explicit unsettled record without scores", () => {
@@ -115,7 +128,9 @@ describe("recorded weekly history", () => {
         "fetch",
         vi.fn().mockResolvedValue(new Response("<!doctype html><html></html>", { status })),
       );
-      await expect(loadSuggestionHistory(101)).rejects.toBeInstanceOf(LeagueDataMissing);
+      await expect(loadSuggestionHistory(exampleTree, 101)).rejects.toBeInstanceOf(
+        LeagueDataMissing,
+      );
     },
   );
 
@@ -125,10 +140,21 @@ describe("recorded weekly history", () => {
       .mockResolvedValueOnce(new Response("{broken"))
       .mockResolvedValueOnce(new Response(JSON.stringify(fixture)));
     vi.stubGlobal("fetch", fetch);
-    await expect(loadSuggestionHistory(101)).rejects.toBeInstanceOf(LeagueDataError);
-    await expect(loadSuggestionHistory(101)).resolves.toEqual(fixture);
+    await expect(loadSuggestionHistory(exampleTree, 101)).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(loadSuggestionHistory(exampleTree, 101)).resolves.toEqual(fixture);
     expect(fetch).toHaveBeenLastCalledWith(
       "/data/league/history/101.json",
+      expect.objectContaining({ cache: "no-cache" }),
+    );
+  });
+
+  it("reads a league published under the directory at its own path", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture)));
+    vi.stubGlobal("fetch", fetch);
+    const tree = createLeagueTree({ ...EXAMPLE_LEAGUE, path: "leagues/352490" });
+    await expect(loadSuggestionHistory(tree, 101)).resolves.toEqual(fixture);
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/data/leagues/352490/history/101.json",
       expect.objectContaining({ cache: "no-cache" }),
     );
   });

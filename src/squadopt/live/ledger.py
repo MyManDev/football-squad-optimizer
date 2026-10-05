@@ -66,6 +66,7 @@ from typing import Any, Final
 
 import pandas as pd
 
+from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError, RenameRefusedError
 from squadopt.data.snapshots import CapturedSnapshot
@@ -126,6 +127,24 @@ def _replace_retrying(source: Path, destination: Path) -> None:
         raise LedgerError(str(error)) from error
 
 
+def _reach(path: Path) -> Path:
+    """The same path, spelled so a call can reach it however long it is.
+
+    A record is assembled in a hidden staging sibling, and every file in it is written
+    through a temporary of its own. Both names are longer than the ones they become, so
+    the paths written while a record is being built are longer than any path the finished
+    record has. On Windows a path-based call fails once the absolute path reaches 260
+    characters, which is how a record whose own files fit could still fail to be written:
+    a week's publish ended on a 268 character manifest temporary, after every plan had
+    been solved. Each call that touches a staging path, a lock, or a record's own files
+    goes through here, as the rename that lands a record already did. Measured on the
+    owner's machine: a directory cannot be created past 247 characters, a file cannot be
+    opened or examined past 259, and ``exists`` answers False rather than raising.
+    """
+
+    return Path(addressable(path))
+
+
 def _write_atomic(path: Path, data: bytes) -> None:
     """Write bytes to ``path`` through a sibling temporary file and one rename.
 
@@ -137,11 +156,11 @@ def _write_atomic(path: Path, data: bytes) -> None:
 
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
     try:
-        temporary.write_bytes(data)
+        _reach(temporary).write_bytes(data)
         _replace_retrying(temporary, path)
     finally:
         with contextlib.suppress(FileNotFoundError):
-            temporary.unlink()
+            _reach(temporary).unlink()
 
 
 def _staging_directory(directory: Path) -> Path:
@@ -160,11 +179,11 @@ def prune_stale_staging(root: Path, season: str, *, older_than_seconds: float | 
     now = datetime.now(UTC).timestamp()
     removed = 0
     for path in season_directory.iterdir():
-        if not path.is_dir() or _STAGING_MARKER not in path.name:
+        if not _reach(path).is_dir() or _STAGING_MARKER not in path.name:
             continue
-        if now - path.stat().st_mtime < limit:
+        if now - _reach(path).stat().st_mtime < limit:
             continue
-        shutil.rmtree(path, ignore_errors=True)
+        shutil.rmtree(_reach(path), ignore_errors=True)
         removed += 1
     return removed
 
@@ -177,16 +196,16 @@ def _gameweek_lock(directory: Path) -> Iterator[None]:
     ``STALE_LOCK_SECONDS`` is treated as abandoned and broken once.
     """
 
-    directory.parent.mkdir(parents=True, exist_ok=True)
+    _reach(directory.parent).mkdir(parents=True, exist_ok=True)
     lock_path = directory.with_name(f".{directory.name}{_LOCK_SUFFIX}")
     for attempt in range(2):
         try:
-            handle = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            handle = os.open(_reach(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
-            age = datetime.now(UTC).timestamp() - lock_path.stat().st_mtime
+            age = datetime.now(UTC).timestamp() - _reach(lock_path).stat().st_mtime
             if attempt == 0 and age >= STALE_LOCK_SECONDS:
                 with contextlib.suppress(FileNotFoundError):
-                    lock_path.unlink()
+                    _reach(lock_path).unlink()
                 continue
             raise LedgerError(
                 f"Another writer holds the ledger lock {lock_path} ({age:.0f} s old); "
@@ -204,7 +223,7 @@ def _gameweek_lock(directory: Path) -> Iterator[None]:
         yield
     finally:
         with contextlib.suppress(FileNotFoundError):
-            lock_path.unlink()
+            _reach(lock_path).unlink()
 
 
 def _entry_directory(root: Path, season: str, gameweek: int) -> Path:
@@ -227,7 +246,7 @@ def _write_manifest(
 
     entries = {
         path.name: _digest(path.read_bytes())
-        for path in sorted(directory.iterdir())
+        for path in sorted(_reach(directory).iterdir())
         if path.name != _MANIFEST_FILE and path.is_file()
     }
     manifest = {
@@ -241,7 +260,7 @@ def _write_manifest(
 
 
 def _manifest_files(directory: Path) -> dict[str, str]:
-    manifest_path = directory / _MANIFEST_FILE
+    manifest_path = _reach(directory / _MANIFEST_FILE)
     if not manifest_path.is_file():
         return {}
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -250,7 +269,7 @@ def _manifest_files(directory: Path) -> dict[str, str]:
 
 
 def _verify_manifest(directory: Path) -> None:
-    manifest_path = directory / _MANIFEST_FILE
+    manifest_path = _reach(directory / _MANIFEST_FILE)
     if not manifest_path.is_file():
         raise LedgerError(f"Ledger entry {directory} has no manifest.")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -258,7 +277,7 @@ def _verify_manifest(directory: Path) -> None:
     if not isinstance(files, dict):
         raise LedgerError(f"Ledger manifest in {directory} is malformed.")
     for name, expected in files.items():
-        path = directory / str(name)
+        path = _reach(directory / str(name))
         if not path.is_file():
             raise LedgerError(f"Ledger entry {directory} is missing recorded file {name!r}.")
         if _digest(path.read_bytes()) != expected:
@@ -309,7 +328,7 @@ def record_decision(
     if not isinstance(report_text, str) or not report_text.strip():
         raise LedgerError("report_text must be non-empty text.")
     directory = _entry_directory(root, recommendation.season, recommendation.gameweek)
-    if directory.exists():
+    if _reach(directory).exists():
         raise LedgerError(
             f"Ledger entry {directory} already exists; recorded decisions are "
             "immutable. A revised decision needs an explicit, separate record."
@@ -391,16 +410,16 @@ def _land_entry(root: Path, season: str, directory: Path, populate: Callable[[Pa
     with _gameweek_lock(directory):
         # Re-check under the lock: another writer may have landed the entry between
         # the caller's check and the lock.
-        if directory.exists():
+        if _reach(directory).exists():
             raise LedgerError(
                 f"Ledger entry {directory} already exists; recorded decisions are "
                 "immutable. A revised decision needs an explicit, separate record."
             )
         prune_stale_staging(root, season)
         staging = _staging_directory(directory)
-        staging.mkdir(parents=True)
+        _reach(staging).mkdir(parents=True)
         try:
-            populate(staging)
+            populate(_reach(staging))
             _write_manifest(staging)
             _verify_manifest(staging)
             # One rename: the entry exists complete or not at all. The check above
@@ -408,7 +427,7 @@ def _land_entry(root: Path, season: str, directory: Path, populate: Callable[[Pa
             # is the operating system still holding what was just written.
             _replace_retrying(staging, directory)
         except BaseException:
-            shutil.rmtree(staging, ignore_errors=True)
+            shutil.rmtree(_reach(staging), ignore_errors=True)
             raise
 
 
@@ -515,7 +534,7 @@ def record_roll(
     if isinstance(budget_tenths, bool) or not isinstance(budget_tenths, int) or budget_tenths < 1:
         raise LedgerError("budget_tenths must be a positive integer.")
     directory = _entry_directory(root, season, gameweek)
-    if directory.exists():
+    if _reach(directory).exists():
         raise LedgerError(
             f"Ledger entry {directory} already exists; recorded decisions are "
             "immutable. A revised decision needs an explicit, separate record."
@@ -525,7 +544,7 @@ def record_roll(
             "The opening gameweek is decided from its capture, never rolled: there is no "
             "earlier squad to carry."
         )
-    if not _entry_directory(root, season, gameweek - 1).is_dir():
+    if not _reach(_entry_directory(root, season, gameweek - 1)).is_dir():
         raise LedgerError(
             f"No entry for {season} GW{gameweek - 1}; a roll carries the squad the ledger "
             f"holds for the week before, so record GW{gameweek - 1} first (a decision, or a "
@@ -728,13 +747,13 @@ def record_outcome(
 
     directory = _entry_directory(root, season, gameweek)
     decision_path = directory / _DECISION_FILE
-    if not decision_path.is_file():
+    if not _reach(decision_path).is_file():
         raise LedgerError(
             f"No recorded decision for {season} GW{gameweek}; an outcome without a "
             "frozen decision is not evidence."
         )
     outcome_path = directory / _OUTCOME_FILE
-    if outcome_path.exists():
+    if _reach(outcome_path).exists():
         if _OUTCOME_FILE not in _manifest_files(directory):
             # A writer landed the outcome but died before rewriting the manifest:
             # finish its work instead of refusing forever. Verify first — rewriting the
@@ -752,7 +771,7 @@ def record_outcome(
     if not isinstance(source_snapshot_id, str) or not source_snapshot_id.strip():
         raise LedgerError("source_snapshot_id must be non-empty text.")
     _verify_manifest(directory)
-    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision = json.loads(_reach(decision_path).read_text(encoding="utf-8"))
     if is_roll(decision):
         raise LedgerError(
             f"{season} GW{gameweek} is a roll: the squad stood still and nothing was "
@@ -795,7 +814,7 @@ def record_outcome(
     if scored is not None:
         outcome["diagnostics"] = scored["diagnostics"]
     with _gameweek_lock(directory):
-        if outcome_path.exists():
+        if _reach(outcome_path).exists():
             raise LedgerError(
                 f"Outcome for {season} GW{gameweek} is already recorded; outcomes are immutable."
             )
@@ -890,13 +909,15 @@ def load_entry(root: Path, season: str, gameweek: int) -> LedgerEntry:
     """
 
     directory = _entry_directory(root, season, gameweek)
-    if not directory.is_dir():
+    if not _reach(directory).is_dir():
         raise LedgerError(f"No ledger entry at {directory}.")
     _verify_manifest(directory)
-    decision = json.loads((directory / _DECISION_FILE).read_text(encoding="utf-8"))
+    decision = json.loads(_reach(directory / _DECISION_FILE).read_text(encoding="utf-8"))
     outcome_path = directory / _OUTCOME_FILE
     outcome = (
-        json.loads(outcome_path.read_text(encoding="utf-8")) if outcome_path.is_file() else None
+        json.loads(_reach(outcome_path).read_text(encoding="utf-8"))
+        if _reach(outcome_path).is_file()
+        else None
     )
     outcome = _stated_basis(decision, outcome, season, gameweek)
     return LedgerEntry(

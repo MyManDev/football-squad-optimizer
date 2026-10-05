@@ -16,8 +16,10 @@ import type {
   AdviceRequestOptions,
   AdviceRequestResult,
 } from "./adviceClient";
-import { AdviceApiError } from "./adviceClient";
+import { AdviceApiError, StaticOnlyAdviceClient } from "./adviceClient";
 import { adviceRequestKey, recallJob, rememberJob } from "./adviceJobStore";
+import type { RequestOptions } from "../../../data/request";
+import { exampleTree } from "../../../testSupport/league";
 import {
   ANSWER_MISMATCH,
   PATIENCE_EXHAUSTED,
@@ -43,6 +45,9 @@ const REQUEST: AdviceRequest = {
 
 class SlowClient implements AdviceClient {
   polls: number[] = [];
+  private readonly published = new StaticOnlyAdviceClient(exampleTree.entryAdvice);
+  readPublished = (request: AdviceRequest, options?: RequestOptions) =>
+    this.published.readPublished(request, options);
   keys: (string | undefined)[] = [];
   job: AdviceJobStatus["status"] | { errorCode: string } | Error = "running";
   readAdvice = async (request: AdviceRequest): Promise<AdviceReadResult> => ({

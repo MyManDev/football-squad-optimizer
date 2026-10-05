@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
 import { PageShell } from "../design/components/PageShell";
+import { useChosenLeague } from "../features/league/identity/useChosenLeague";
 import { useViewerEntry } from "../features/league/identity/useViewerEntry";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
@@ -23,6 +24,9 @@ const LeagueEntryPage = lazy(() =>
 );
 const LeaguePage = lazy(() =>
   import("../features/league/pages/LeaguePage").then((m) => ({ default: m.LeaguePage })),
+);
+const LeagueGate = lazy(() =>
+  import("../features/league/pages/LeagueGate").then((m) => ({ default: m.LeagueGate })),
 );
 const LeagueMembersPage = lazy(() =>
   import("../features/league/pages/LeagueMembersPage").then((m) => ({
@@ -69,10 +73,11 @@ function LocalizedApp({ basename }: { basename: string }) {
   const { messages } = useLanguage();
   // The member the visitor said they are, in memory only: 'Bu hafta' opens their page.
   const { viewer } = useViewerEntry();
+  const { leagueId } = useChosenLeague();
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
-        <PageShell viewerEntryId={viewer?.entryId ?? null}>
+        <PageShell viewer={viewer} chosenLeagueId={leagueId}>
           <RouteErrorBoundary>
             <Suspense fallback={<EmptyState title={messages.common.loading} />}>
               <Routes>
@@ -82,13 +87,55 @@ function LocalizedApp({ basename }: { basename: string }) {
                 <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
                 <Route path="/rivals" element={<RivalsPage />} />
                 <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
-                <Route path="/league" element={<LeaguePage />} />
-                <Route path="/league/members" element={<LeagueMembersPage />} />
-                <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
-                <Route
-                  path="/league/members/:entryId/history"
-                  element={<LeagueMemberHistoryPage />}
-                />
+                {/* Every league address names its league; the old shape without the
+                    number goes through the gate, which rewrites it to the chosen league. */}
+                {["/league", "/league/:leagueId"].map((root) => (
+                  <Route
+                    key={root}
+                    path={root}
+                    element={
+                      <LeagueGate>
+                        <LeaguePage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
+                {["/league/members", "/league/:leagueId/members"].map((root) => (
+                  <Route
+                    key={root}
+                    path={root}
+                    element={
+                      <LeagueGate>
+                        <LeagueMembersPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
+                {["/league/members/:entryId", "/league/:leagueId/members/:entryId"].map((root) => (
+                  <Route
+                    key={root}
+                    path={root}
+                    element={
+                      <LeagueGate>
+                        <LeagueMemberPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
+                {[
+                  "/league/members/:entryId/history",
+                  "/league/:leagueId/members/:entryId/history",
+                ].map((root) => (
+                  <Route
+                    key={root}
+                    path={root}
+                    element={
+                      <LeagueGate>
+                        <LeagueMemberHistoryPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
                 <Route path="/fixtures" element={<FixturesPage />} />
                 <Route path="/contribute" element={<ContributePage />} />
                 <Route path="/status" element={<StatusPage />} />

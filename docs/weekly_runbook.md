@@ -5,8 +5,41 @@ gameweek, from the capture to the site pull request, and — when asked — deci
 own squad on the way:
 
 ```bash
-python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --league 352490 --workers 8 --run-id 2026-27-gw05-decision
+python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --league-list config/leagues.json --workers 8 --run-id 2026-27-gw05-decision
 ```
+
+`config/leagues.json` (`league_list_v1`) is the one place that says which classic leagues the
+site serves; `--league <id>`, repeatable, names them on the command line instead (the list
+path is relative to `--workspace`). Every league in the list is rendered from the one
+capture into its own tree (`data/leagues/<league id>/`), with its own scoreboard, and the
+site's directory (`data/leagues.json`) lists them all. Each league is stamped after its own
+solves; the directory, written by the last league, carries the latest stamp, which is the
+publication's. A league renders the registered entries its captured standings page names.
+
+The capture stage refuses, before any solve, a registry that names its seed leagues and was
+not seeded from every listed league (one league or several: a league the registry was not
+seeded from would be rendered with only the members the two share), and with more than one
+league a capture that lacks a listed league's standings page. So the first run over a new
+list stops there, after its capture, and its message names the seed command for exactly the
+run's leagues (`python -m scripts.seed_entry_registry --league <id> ... --snapshot-id <that
+capture>`, which registers every member of every league once). Then start a new run (new
+`--run-id`, no `--snapshot-id`): the registry is a capture input, so a resume is refused, and
+only a new capture holds the new members' picks.
+
+The advice record and the member histories name one league
+(`weekly_suggestion_eval.SUPPORTED_LEAGUE_ID`); the other leagues are rendered and published,
+not recorded, until the record contract carries the league. The league receipt says so per
+league (`leagues.<id>.advice_recorded`), and its top-level `advice_recorded` is whether any
+league was recorded; a run asked to record whose list has none of them records nothing and
+logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed` and
+`top100_note` sit under `leagues.<id>`; `legacy_tree` (top level) says what became of a tree
+from before the directory, and `removed_trees` (top level) names the trees of leagues the list
+no longer has, which the run removes so a dropped league's member names leave the site.
+
+By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
+keeps the other leagues the directory lists only when their trees were rendered from the same
+capture, and refuses otherwise (the site would serve two captures); it records advice only
+for the league the record names.
 
 `--decide` is deliberately absent from that line. It is the members' loop that runs every
 week; our own squad is a separate decision with a precondition that is not currently met
@@ -35,15 +68,21 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | step | service / compatibility command | what it needs | what it leaves |
 | --- | --- | --- | --- |
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
-| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents and the standings page |
+| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents and the standings page |
 | settled outcomes | `application.settled_outcomes.export_settled_outcomes` | stored captures no newer than the selected capture; an earlier week with both pre-deadline and finished/checked captures | immutable table/manifest pairs under `artifacts/rotation`, plus per-run reports; unavailable pairs are stated, never filled with zero outcomes |
-| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and a club-news source — **today that source is the committed synthetic fixture** | `artifacts/rotation/rotation_evidence_v2_<season>_gw<NN>_<capture hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
+| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and either the committed synthetic fixture or the real club-news capture selected by `--rotation-capture` | `artifacts/rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash>_decision_<decision hash>.{csv,manifest.json}` for a real club-news capture; `rotation_evidence_v4_<season>_gw<NN>_<decision hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
 | decide | `squadopt.application.commands.decide`, in-process (only with `--decide`; `--chip` as `squadopt gameweek decide` takes it) | the capture and the handoff, each verified at its own stage; a ledger that holds the previous gameweek, and — with `--chip` — an open, unspent chip window, both checked **before** the first capture, so a week the ledger cannot start refuses without spending one. The mode is derived, never asserted: `live` only when this run took the capture and the clock is still before its deadline; a reused `--snapshot-id`, or a run past the deadline, is recorded `replay`. A gameweek the ledger already holds is skipped rather than refused, so a run that died after the decision can rebuild the rest of the week | `data/ledger/<season>/gw<NN>/` — decision, projections, report, manifest; the report is printed |
-| league | `scripts.build_league_site --workers N` | the capture and the handoff | `<preview>/data/league/**`: `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/saf-puan/3.json` and `5.json` (the week-1 projection repeated over the calendar, published with its stated limits), `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` (`windows` names what solved per strategy; a window that did not is in `unavailable` with its reason). Without `--publish` or `--record-advice` this is a local preview and writes no advice record. Either option makes this step write this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` from the same solve, before `history/<id>.json` reads it, unless `--publish --no-advice-record` turns the record off; the records the season already held are declared as this stage's inputs, so a week whose records moved between two runs shows in the journal |
+| league | `scripts.build_league_site --workers N` | the capture and the handoff | `<preview>/data/leagues/<league id>/**` (and `<preview>/data/leagues.json`, the directory that lists every published league with its tree): `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/saf-puan/3.json` and `5.json` (the week-1 projection repeated over the calendar, published with its stated limits), `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` (`windows` names what solved per strategy; a window that did not is in `unavailable` with its reason). Without `--publish` or `--record-advice` this is a local preview and writes no advice record. Either option makes this step write this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` from the same solve, before `history/<id>.json` reads it, unless `--publish --no-advice-record` turns the record off; the records the season already held are declared as this stage's inputs, so a week whose records moved between two runs shows in the journal |
 | site | `scripts.build_site` | the ledger and captures | `<preview>/data/**` season views (they read the ledger, so after the decision) |
-| scoreboard | `scripts.build_scoreboard --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>` | the capture, the registry, the ledger, and the Top-100 captures when they were taken or reused | `<preview>/data/league/scoreboard.json` — per played gameweek: the game's average and highest, every member's gross week, hit cost and net, our ledger row with its mode and its scoring basis, the Top-100 mean for the cohort capture's own week with the basis it is on; `null` wherever a file on disk does not say |
-| publish | `platform.weekly_publish.publish` with `copy_preview_builder` (only with `--publish`); by hand, `scripts.publish_gameweek_site --kind decision --gameweek <NN> --run-id <run id>` | a clean `origin/develop` at the run's source revision | an owned `.codex-tmp/publications/gw<NN>-decision[-<suffix>]` worktree, a commit of `web/public/data` holding the preview's `data/` tree, copied in over the tree the worktree carried from `origin/develop` and read back byte for byte before the commit (nothing is solved again: what was previewed is what ships), a push, a pull request; then the printed human steps: merge, release, tag, dispatch. The advice record at this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` is the league step's, written from the solve that ships when the run was built with `--publish` or `--record-advice`: the immutable record of what each member was told, digests included, so the week can be reviewed after the site has been overwritten. One record per capture: publishing a week twice (mid-week, then again before the deadline from a fresher capture) records both, and the review page reads the last capture that preceded the deadline. What is **refused** is rebuilding *one* capture into different bytes: the handoff, switch artifacts, settings and code revision also affect advice, but cannot overwrite the same capture's immutable record, with the differing fields named; if the deadline will not wait, `--no-advice-record` publishes without recording and leaves the first record and the difference to be reconciled afterwards. Typed by hand, `scripts.publish_gameweek_site --run-id <run id>` publishes the preview a run already built, through the same copy and read-back; it solves nothing and writes no advice record itself. It reads that run's journal and, before any git command, refuses a run that has not completed every stage before `publish` or whose league, site or scoreboard outputs no longer hold the bytes the run recorded, and a run whose league stage recorded no advice: one built without `--publish` or `--record-advice`, as the standard command above is. `--no-advice-record` publishes such a run anyway and says it records nothing, so a week meant to be published by hand is built with `--record-advice`. The publication base is then held to the run's recorded source revision, the check the run's own publish stage makes: if develop has moved, start a new run. A settled view is published with `--kind settled --preview <dir> --source-commit <revision>`; the candidate records no revision of its own, so the base is checked against the revision the operator names. For any gameweek the candidate is built in a clean checkout at `origin/develop`: copy `web/public/data` to `<dir>/data`, then run `scripts.build_site --season <season> --out <dir>`, which writes the settled season views over that copy and leaves the members' `league/` tree and the rest as the site carries them (the build the settled publish used to run inside the publication worktree, over the same carried tree; run from the checkout, it reads that checkout's handoff and archive roots where the old run read the worktree's); `--source-commit` is that checkout's `git rev-parse HEAD`. `scripts.build_settled_site` builds only the 2026-27 GW5 candidate. A candidate that lacks a top-level entry the publication carries (a `scripts.build_site` run into an empty directory lacks `league/`, `players.json` and `404.html`) is refused before the commit, because the copy would delete it from the site |
+| scoreboard | `scripts.build_scoreboard --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>` | the capture, the registry, the ledger, and the Top-100 captures when they were taken or reused | `<preview>/data/leagues/<league id>/scoreboard.json`: per played gameweek: the game's average and highest, every member's gross week, hit cost and net, our ledger row with its mode and its scoring basis, the Top-100 mean for the cohort capture's own week with the basis it is on; `null` wherever a file on disk does not say |
+| publish | `platform.weekly_publish.publish` with `copy_preview_builder` (only with `--publish`); by hand, `scripts.publish_gameweek_site --kind decision --gameweek <NN> --run-id <run id>` | a clean `origin/develop` at the run's source revision | an owned `.codex-tmp/publications/gw<NN>-decision[-<suffix>]` worktree, a commit of `web/public/data` holding the preview's `data/` tree, copied in over the tree the worktree carried from `origin/develop` and read back byte for byte before the commit (nothing is solved again: what was previewed is what ships), a push, a pull request; then the printed human steps: merge, release, tag, dispatch. The advice record at this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` is the league step's, written from the solve that ships when the run was built with `--publish` or `--record-advice`: the immutable record of what each member was told, digests included, so the week can be reviewed after the site has been overwritten. One record per capture: publishing a week twice (mid-week, then again before the deadline from a fresher capture) records both, and the review page reads the last capture that preceded the deadline. What is **refused** is rebuilding *one* capture into different bytes: the handoff, switch artifacts, settings and code revision also affect advice, but cannot overwrite the same capture's immutable record, with the differing fields named; if the deadline will not wait, `--no-advice-record` publishes without recording and leaves the first record and the difference to be reconciled afterwards. Typed by hand, `scripts.publish_gameweek_site --run-id <run id>` publishes the preview a run already built, through the same copy and read-back; it solves nothing and writes no advice record itself. It reads that run's journal and, before any git command, refuses a run that has not completed every stage before `publish` or whose league, site or scoreboard outputs no longer hold the bytes the run recorded, and a run whose league stage recorded no advice: one built without `--publish` or `--record-advice`, as the standard command above is. `--no-advice-record` publishes such a run anyway and says it records nothing, so a week meant to be published by hand is built with `--record-advice`. The publication base is then held to the run's recorded source revision, the check the run's own publish stage makes: if develop has moved, start a new run. A settled view is published with `--kind settled --preview <dir> --source-commit <revision>`; the candidate records no revision of its own, so the base is checked against the revision the operator names. For any gameweek the candidate is built in a clean checkout at `origin/develop`: copy `web/public/data` to `<dir>/data`, then run `scripts.build_site --season <season> --out <dir>`, which writes the settled season views over that copy and leaves the members' league trees (`leagues/<league id>/` and `leagues.json`) and the rest as the site carries them (the build the settled publish used to run inside the publication worktree, over the same carried tree; run from the checkout, it reads that checkout's handoff and archive roots where the old run read the worktree's); `--source-commit` is that checkout's `git rev-parse HEAD`. `scripts.build_settled_site` builds only the 2026-27 GW5 candidate. A candidate that lacks a top-level entry the publication carries (a `scripts.build_site` run into an empty directory lacks `leagues/`, `leagues.json`, `players.json` and `404.html`) is refused before the commit, because the copy would delete it from the site |
+
+The current rotation pair binds the real news capture and the decision capture in its
+filename; each hash above is the final 12 characters of the corresponding snapshot ID.
+A reused decision with `--rotation-capture` requires that exact readable pair before any
+stage spends work. An older news-only filename is not a substitute. V2/V3 pairs remain
+readable for historical replay, without claiming the new V4 binding.
 
 Before publishing, run `python -m scripts.check_league_tree <preview>/data` against the
 candidate tree, or use the publication worktree's `web/public/data`. It runs the wider
@@ -56,9 +95,10 @@ tree lacks is (the one-week `saf-puan/1.json` included), and so is an index that
 page's `assertAdviceIndex` (the envelope is not checked) or a Top 100 menu, an `unavailable`
 row or a refused member stated without its reason. The manager's word and the chip menu are
 read as the producer writes them; their absences are not checked for a reason.
-Pass a site origin URL instead to check its published `/data/league/` documents. The URL
+Pass a site origin URL instead to check its published league trees (every tree
+`/data/leagues.json` lists, or `/data/league/` on a site from before the directory). The URL
 form is narrower: its figure sweep covers only the word files it fetches, while the local
-check sweeps every word file under the supplied root. This command only reads the tree;
+check sweeps every word file under each listed tree. This command only reads the tree;
 it does not publish or solve anything.
 
 Existing captures can be named explicitly: `--cohort-snapshot` / `--elite-snapshot`
@@ -79,7 +119,7 @@ points scaled by `1 + w/100 * count/100` and every number in it is scored on the
 projection; the price is the base-model difference against the member's own plan at 0. The
 index's `top100` block names the files, or says why there are none
 (`no_top100_this_run`, `top100_inputs_refused`, `published_plan_carries_top100`), and the
-league receipt's `top100_note` carries the refusal. The export passes the handoff's own gate
+league receipt's `leagues.<id>.top100_note` carries the refusal. The export passes the handoff's own gate
 before anything is solved, so the menu needs a live capture taken **after** the Top-100
 export. **The published plan must stay at 0, so a week that offers the menu is run with
 `--projection component-only`**: the default `component` bakes the frozen uplift into the
@@ -170,6 +210,39 @@ is published **gross**, labelled gross, and the card says it does not compare wi
 net columns beside it.
 
 ## Timing
+
+### The order the week's instants must keep
+
+Every step below records an instant, and the readers refuse a step whose instant is
+out of order. The list is the whole order for one deadline, with the check that holds
+each line; the commands are in the table above and in the documents named.
+
+1. **Club news is fetched, then coded from one observation instant taken after the last
+   page was read** (`scripts.capture_club_news`; `docs/club_news_configuration.md`). The
+   coding refuses a document fetched after its observation instant.
+2. **The decision capture is taken** (`fpl_capture.capture`). The rotation export refuses a
+   news document fetched at or after the decision capture, and the bundle refuses a news
+   capture that completed after it.
+3. **The football forecast is built with its components from that capture**
+   (`scripts.build_football_forecast --with-components`), and **the projection handoff from
+   the capture and the evidence** (`scripts.build_projection_handoff`). The bundle binds
+   the forecast's and the handoff's fingerprints to the capture and refuses any other.
+4. **The weekly run**: rotation export, league tree, advice record, site, scoreboard,
+   publish pull request (`platform.weekly_operations`). The journal refuses a stage whose
+   predecessor did not complete; the league tree carries one `generated_at_utc`, which the
+   bundle requires to be after the capture.
+5. **The bundle is sealed against the published tree** (`scripts.prepare_football_bundle`;
+   `docs/operations/official_injury_discovery.md`; with several leagues, `--league <id>` names
+   the tree it seals, as `scripts.add_device_plan_inputs --league <id>` names the tree it
+   augments). Its marker is written last, after every
+   copy has been read back through the production validators; a name or an input the reader
+   would refuse is refused before anything is copied.
+6. **The site pull request merges through develop's merge queue, the release is cut and
+   tagged, the backend is restarted** (`docs/deployment_runbook.md`). The restart reads the
+   one capture every published human entry names, on the public site and locally, and
+   refuses when the two differ.
+
+A step run out of this order is not late; its artifact is refused by the next reader.
 
 - **Take the capture two to three hours before the deadline, not the night before.**
   The capture must be open for the requested gameweek — the command reads the deadline
@@ -417,9 +490,34 @@ is refused in preflight, and any other difference from the record is still refus
 the end of the league stage.
 
 Check the candidate with `python -m scripts.check_league_tree <preview>/data`. The site
-pull request's CI also runs `shippedTree.test.ts` against the shipped tree; to run that
-check by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
-publication worktree's `web` directory. Then use the [release recipe](deployment_runbook.md#release-in-one-command)
+pull request's CI also holds the shipped tree to the page's own validators
+(`shippedTree.test.ts`, `planModel.chips.shipped.test.ts`, `LeagueMemberPage.shipped.test.tsx`,
+`e2e/captain-line.spec.ts`). They find the trees the way the page does
+(`web/src/testSupport/shippedTrees.ts`: every tree `data/leagues.json` lists, or `data/league/`
+on a site without the directory) and fail, never skip, on a site that publishes neither; the
+member-page guard draws one tree and fails on a site that lists more, until it draws each; to
+run the first by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
+publication worktree's `web` directory.
+
+**The first publish under the directory** (GW6 of 2026-27, the first since #959 and #960)
+needs nothing typed differently: the run moves `data/league/` to `data/leagues/<league id>/`
+before it reads or writes the tree, so the members' histories carry over, and writes
+`data/leagues.json` last. Four things differ from the weeks before it:
+
+- the accepted stamp `ship.sh` and `verify_live.py` take is `data/leagues.json`'s
+  `generated_at_utc` (with one league, the same as that league's `members.json`), not the
+  scoreboard's later stamp;
+- `scripts.add_device_plan_inputs` is not run on a weekly-run tree: the builder already
+  writes `device-plan.json` and each entry's inputs, with the Top 100 weights, and the script
+  refuses an entry that publishes purchase prices (it exists for a tree published before the
+  inputs, as fix13 was);
+- the tag is the next unused one: `site-2026-27-gw06-decision` already exists, so the
+  publisher's printed `-decision` tag would be refused only after `ship.sh` has waited for
+  the site pull request (`git ls-remote --tags origin 'site-2026-27-gw06-*'`);
+- the backend is restarted only after `verify_live.py` prints `ALL GOOD`: before the
+  release, the public site still serves the legacy tree's capture and the restart refuses.
+
+Then use the [release recipe](deployment_runbook.md#release-in-one-command)
 from Git Bash:
 `sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <accepted-generated-at-ISO> <summary>`.
 Its real invocation performs the site release and runs `verify_live.py`; the restart

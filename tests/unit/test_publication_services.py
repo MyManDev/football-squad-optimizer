@@ -19,10 +19,18 @@ from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    league_tree_capture,
+    leagues_beside,
     prepare_league_publication,
     publish_league,
+    settle_legacy_tree,
 )
 from squadopt.application.site_publication import SitePublicationRequest, publish_site
+from squadopt.contracts.league_tree import (
+    LeagueDirectoryError,
+    PublishedLeague,
+    write_league_directory,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.vaastav import SUPPORTED_SEASONS
@@ -219,8 +227,24 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert all(path.is_file() for path in first.output_paths)
     assert any(path.name == "advice.json" for path in first.output_paths)
     assert any(path.name == "manifest.json" for path in first.output_paths)
-    history = request.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
+    tree = request.out_dir / "data/leagues/352490"
+    history = tree / "history" / f"{member_fixture.ENTRY_ID}.json"
     assert history in first.output_paths
+    # The site's directory lists the league beside its tree.
+    directory = request.out_dir / "data/leagues.json"
+    assert directory in first.output_paths
+    listed = json.loads(directory.read_text(encoding="utf-8"))
+    assert listed["contract_version"] == "league_directory_v1"
+    assert listed["payload"]["leagues"] == [
+        {
+            "league_id": 352490,
+            "league_name": first.report.league_name,
+            "season": first.season,
+            "gameweek": first.gameweek,
+            "path": "leagues/352490",
+        }
+    ]
+    assert listed["generated_at_utc"] == "2026-08-27T10:00:00Z"
     document = json.loads(history.read_text(encoding="utf-8"))
     assert document["payload"]["weeks"][0]["status"] == "unsettled"
     assert document["payload"]["weeks"][0]["advice_generated_at_utc"] == "2026-08-27T10:00:00Z"
@@ -230,19 +254,19 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
         second = publish_league(parallel, mapper=mapper)
     assert first.report.files == second.report.files
     for output in (request.out_dir, parallel.out_dir):
-        index = output / "data/league/advice" / str(member_fixture.ENTRY_ID) / "index.json"
+        index = output / "data/leagues/352490/advice" / str(member_fixture.ENTRY_ID) / "index.json"
         forecast = json.loads(index.read_text(encoding="utf-8"))["payload"]["chip_forecast"]
         assert forecast["status"] == "available", forecast
         assert forecast["source_snapshot_id"] == request.snapshot_id
         assert forecast["forecast"]["chips"]
     for name in first.report.files:
-        assert (request.out_dir / "data/league" / name).read_bytes() == (
-            parallel.out_dir / "data/league" / name
+        assert (tree / name).read_bytes() == (
+            parallel.out_dir / "data/leagues/352490" / name
         ).read_bytes()
     assert (
         history.read_bytes()
         == (
-            parallel.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
+            parallel.out_dir / "data/leagues/352490/history" / f"{member_fixture.ENTRY_ID}.json"
         ).read_bytes()
     )
 
@@ -284,7 +308,7 @@ def test_the_history_counts_only_the_captures_the_published_trees_carried(
         deadline_utc=deadline_utc,
     )
     assert unproven is not None and unproven["capture"]["snapshot_id"] == "unpublished-gw1"
-    league = request.out_dir / "data/league"
+    league = request.out_dir / "data/leagues/352490"
     page = {"payload": {"gameweek": 1, "source_snapshot_id": "published-gw1"}}
     (league / "entries").mkdir(parents=True)
     (league / "entries" / f"{entry_id}.json").write_text(json.dumps(page), encoding="utf-8")
@@ -296,6 +320,208 @@ def test_the_history_counts_only_the_captures_the_published_trees_carried(
     # This publication's own page names this week, the replaced tree's page the week before.
     assert weeks[2]["advice_snapshot_id"] == request.snapshot_id
     assert weeks[1]["advice_snapshot_id"] == "published-gw1"
+
+
+def _legacy_members(league_id: int) -> dict[str, object]:
+    return {
+        "contract_version": "provisional_league_ui_v1",
+        "generated_at_utc": "2026-08-20T10:00:00Z",
+        "source_kind": "live",
+        "payload": {"league_id": league_id, "members": []},
+    }
+
+
+def _standings_page(league_id: int, *entries: int) -> bytes:
+    rows = [
+        {"entry": entry, "entry_name": f"Team {entry}", "player_name": "M", "rank": rank}
+        for rank, entry in enumerate(entries, start=1)
+    ]
+    return json.dumps(
+        {
+            "league": {"id": league_id, "name": f"League {league_id}"},
+            "standings": {"has_next": False, "results": rows},
+        }
+    ).encode("utf-8")
+
+
+def test_a_league_renders_the_members_its_standings_page_names(tmp_path: Path) -> None:
+    """The registry holds every league's members; a league prepares its own, and a league
+    none of the registered entries is in is refused before anything is solved."""
+
+    request = publication_world(tmp_path)
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    payloads["league-7-standings.json"] = _standings_page(7, 424242)
+    payloads["league-9-standings.json"] = _standings_page(9, member_fixture.ENTRY_ID, 424242)
+    other = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    with pytest.raises(DataError, match="None of the registered entries is in league 7"):
+        prepare_league_publication(replace(request, snapshot_id=other, league_id=7))
+    prepared = prepare_league_publication(replace(request, snapshot_id=other, league_id=9))
+    assert [entry.entry_id for entry in prepared.registrations] == [member_fixture.ENTRY_ID]
+    assert prepared.league_name == "League 9"
+    # The scoreboard lists the league's members the same way.
+    board = scoreboard.publish_scoreboard(
+        scoreboard.ScoreboardPublicationRequest(
+            snapshot_root=request.snapshot_root,
+            snapshot_id=other,
+            registry_path=request.registry_path,
+            ledger_root=tmp_path / "empty-ledger",
+            out_dir=request.out_dir,
+            league_id=9,
+            season=request.season,
+            now_utc="2026-08-27T10:00:00Z",
+        )
+    )
+    assert board.target == request.out_dir / "data/leagues/9/scoreboard.json"
+
+
+def test_a_league_renders_only_the_registered_entries_its_page_names(tmp_path: Path) -> None:
+    """With two registered entries and a page naming one, the league prepares that one,
+    and its scoreboard lists that one."""
+
+    request = publication_world(tmp_path)
+    registry = json.loads(request.registry_path.read_text(encoding="utf-8"))
+    registry["entries"].append({"entry_id": 202, "label": "the other league's member"})
+    request.registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    payloads["league-9-standings.json"] = _standings_page(9, member_fixture.ENTRY_ID)
+    other = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    prepared = prepare_league_publication(replace(request, snapshot_id=other, league_id=9))
+    assert [entry.entry_id for entry in prepared.registrations] == [member_fixture.ENTRY_ID]
+    board = scoreboard.publish_scoreboard(
+        scoreboard.ScoreboardPublicationRequest(
+            snapshot_root=request.snapshot_root,
+            snapshot_id=other,
+            registry_path=request.registry_path,
+            ledger_root=tmp_path / "empty-ledger",
+            out_dir=request.out_dir,
+            league_id=9,
+            season=request.season,
+            now_utc="2026-08-27T10:00:00Z",
+        )
+    )
+    assert board.document["payload"]["registered_members"] == 1
+
+
+def _tree(root: Path, league_id: int, capture: str) -> PublishedLeague:
+    tree = root / "leagues" / str(league_id)
+    (tree / "entries").mkdir(parents=True)
+    members = {"payload": {"members": [{"member_kind": "human", "entry_id": 5}]}}
+    (tree / "members.json").write_text(json.dumps(members), encoding="utf-8")
+    entry = {"payload": {"source_snapshot_id": capture}}
+    (tree / "entries" / "5.json").write_text(json.dumps(entry), encoding="utf-8")
+    return PublishedLeague(league_id, f"League {league_id}", "2026-27", 2, f"leagues/{league_id}")
+
+
+def test_a_build_of_one_league_keeps_the_others_of_its_capture_and_refuses_another(
+    tmp_path: Path,
+) -> None:
+    lines = [_tree(tmp_path, 7, "capture-a"), _tree(tmp_path, 9, "capture-a")]
+    write_league_directory(tmp_path, [*lines, _published_line(11)], generated_at_utc="x")
+    # League 11's tree is gone, so it is not kept; 9 is the league being built.
+    assert leagues_beside(tmp_path, 9, "capture-a") == [lines[0]]
+    with pytest.raises(DataError, match="two captures"):
+        leagues_beside(tmp_path, 9, "capture-b")
+
+
+def _published_line(league_id: int) -> PublishedLeague:
+    return PublishedLeague(league_id, f"League {league_id}", "2026-27", 2, f"leagues/{league_id}")
+
+
+def test_the_legacy_tree_is_settled_before_any_league_renders(tmp_path: Path) -> None:
+    assert settle_legacy_tree(tmp_path, (1,)) is None
+    legacy = tmp_path / "league"
+    legacy.mkdir()
+    (legacy / "members.json").write_text("{", encoding="utf-8")
+    with pytest.raises(LeagueDirectoryError, match=r"no readable members.json"):
+        settle_legacy_tree(tmp_path, (1,))
+    (legacy / "members.json").write_text(json.dumps(_legacy_members(5)), encoding="utf-8")
+    with pytest.raises(LeagueDirectoryError, match="names league 5"):
+        settle_legacy_tree(tmp_path, (1, 2))
+    assert settle_legacy_tree(tmp_path, (1, 5)) == ("adopted", 5)
+    assert (tmp_path / "leagues" / "5" / "members.json").is_file()
+    write_league_directory(tmp_path, [_published_line(5)], generated_at_utc="x")
+    legacy.mkdir()
+    assert settle_legacy_tree(tmp_path, (1,)) == ("removed", None)
+    assert not legacy.exists()
+
+
+def test_a_tree_from_before_the_directory_is_adopted_with_its_histories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first publication into the new layout moves data/league/ to the league's path,
+    so the earlier weeks the replaced tree carried stay in the member histories."""
+
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    request = publication_world(tmp_path)
+    assert request.record_root is not None
+    entry_id = member_fixture.ENTRY_ID
+    bootstrap = json.loads(
+        read_snapshot(request.snapshot_root, request.snapshot_id).payloads["bootstrap-static.json"]
+    )
+    deadline_utc = next(event["deadline_time"] for event in bootstrap["events"] if event["id"] == 1)
+    deadline = datetime.fromisoformat(deadline_utc.replace("Z", "+00:00"))
+    captured = (deadline - timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    published = (deadline - timedelta(hours=47)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    record_member_advice(
+        request.record_root,
+        recorded(gameweek=1, entry_id=entry_id, captured=captured, published=published, name="gw1"),
+    )
+    legacy = request.out_dir / "data" / "league"
+    (legacy / "entries").mkdir(parents=True)
+    (legacy / "members.json").write_text(json.dumps(_legacy_members(352490)), encoding="utf-8")
+    page = {"payload": {"gameweek": 1, "source_snapshot_id": "gw1"}}
+    (legacy / "entries" / f"{entry_id}.json").write_text(json.dumps(page), encoding="utf-8")
+
+    result = publish_league(request)
+
+    assert result.legacy_tree == "adopted"
+    assert not legacy.exists()
+    tree = request.out_dir / "data" / "leagues" / "352490"
+    history = json.loads((tree / "history" / f"{entry_id}.json").read_text(encoding="utf-8"))
+    weeks = {row["gameweek"]: row for row in history["payload"]["weeks"]}
+    assert weeks[1]["advice_snapshot_id"] == "gw1"
+    assert weeks[2]["advice_snapshot_id"] == request.snapshot_id
+    directory = json.loads((request.out_dir / "data/leagues.json").read_text(encoding="utf-8"))
+    assert [row["path"] for row in directory["payload"]["leagues"]] == ["leagues/352490"]
+
+
+def test_a_tree_from_before_the_directory_naming_another_league_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    request = publication_world(tmp_path)
+    legacy = request.out_dir / "data" / "league"
+    legacy.mkdir(parents=True)
+    (legacy / "members.json").write_text(json.dumps(_legacy_members(7)), encoding="utf-8")
+    with pytest.raises(LeagueDirectoryError, match="names league 7"):
+        publish_league(request)
+    assert legacy.is_dir()
+
+
+def test_a_legacy_tree_beside_a_directory_is_a_leftover_and_is_removed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    request = publication_world(tmp_path)
+    publish_league(request)
+    legacy = request.out_dir / "data" / "league"
+    legacy.mkdir(parents=True)
+    (legacy / "members.json").write_text(json.dumps(_legacy_members(352490)), encoding="utf-8")
+    result = publish_league(replace(request, out_dir=request.out_dir))
+    assert result.legacy_tree == "removed"
+    assert not legacy.exists()
 
 
 def test_scoreboard_service_uses_the_named_capture_and_returns_the_written_path(
@@ -321,7 +547,7 @@ def test_scoreboard_service_uses_the_named_capture_and_returns_the_written_path(
             now_utc="2026-08-27T10:00:00Z",
         )
     )
-    assert result.output_paths == (request.out_dir / "data/league/scoreboard.json",)
+    assert result.output_paths == (request.out_dir / "data/leagues/352490/scoreboard.json",)
     assert result.snapshot_id == request.snapshot_id
     raw = result.target.read_bytes()
     assert json.loads(raw)["payload"]["source_snapshot_id"] == request.snapshot_id
@@ -386,3 +612,23 @@ def test_site_publication_rejects_a_pinned_non_live_capture(tmp_path: Path) -> N
             )
         )
     assert not request.out_dir.exists()
+
+
+def test_a_tree_s_capture_is_read_from_the_first_member_whose_entry_was_published(
+    tmp_path: Path,
+) -> None:
+    tree = tmp_path / "leagues" / "7"
+    (tree / "entries").mkdir(parents=True)
+    members = {
+        "payload": {
+            "members": [
+                {"member_kind": "human", "entry_id": 4},
+                {"member_kind": "human", "entry_id": 5},
+            ]
+        }
+    }
+    (tree / "members.json").write_text(json.dumps(members), encoding="utf-8")
+    entry = {"payload": {"source_snapshot_id": "capture-a"}}
+    (tree / "entries" / "5.json").write_text(json.dumps(entry), encoding="utf-8")
+    # Member 4 was not rendered: a row and no entry document.
+    assert league_tree_capture(tree) == "capture-a"

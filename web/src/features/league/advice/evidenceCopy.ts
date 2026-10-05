@@ -53,7 +53,7 @@ const en: EvidenceCopy = {
   coveredClubs: "Clubs covered by the news",
   noCoveredClubs: "No covered club names were reported for this result.",
   intro: (clubs: number) =>
-    `Declared rule, not measured: a stated absence keeps a player out of the eleven, a stated doubt off the armband. Clubs read: ${clubs}.`,
+    `A stated absence keeps a player out of the eleven, a stated doubt off the armband. Clubs read: ${clubs}.`,
   unchanged: "The club's page did not change this plan.",
   changed: "The club's page changed this plan; the cost is stated above.",
   changedNoPrice: "The club's page changed this plan.",
@@ -93,7 +93,7 @@ const tr: EvidenceCopy = {
   coveredClubs: "Haber kapsamındaki kulüpler",
   noCoveredClubs: "Bu sonuçta kapsanan kulüp adı bildirilmedi.",
   intro: (clubs) =>
-    `Beyan edilmiş kural, ölçülmemiş: söylenmiş yokluk on birin, söylenmiş şüphe kaptanlığın dışında tutar. Okunan kulüp: ${clubs}.`,
+    `Söylenmiş yokluk on birin, söylenmiş şüphe kaptanlığın dışında tutar. Okunan kulüp: ${clubs}.`,
   unchanged: "Kulübün sayfası bu planı değiştirmedi.",
   changed: "Kulübün sayfası bu planı değiştirdi; bedeli yukarıda yazılı.",
   changedNoPrice: "Kulübün sayfası bu planı değiştirdi.",

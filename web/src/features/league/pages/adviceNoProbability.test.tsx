@@ -24,6 +24,7 @@ import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { ScoreboardCard } from "../components/ScoreboardCard";
 import type { EntryAdvice, LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -41,15 +42,17 @@ function renderState(language: Language, advice: LeagueViewEnvelope<EntryAdvice>
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter
         initialEntries={[
-          `/league/members/35249001?mode=${advice.payload.mode}&window=${advice.payload.window}`,
+          `/league/352490/members/35249001?mode=${advice.payload.mode}&window=${advice.payload.window}`,
         ]}
       >
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[35249001]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={mockEntryAdviceIndex(35249001).payload}
-        />
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[35249001]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={mockEntryAdviceIndex(35249001).payload}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -227,7 +230,7 @@ describe("the weekly scoreboard shows no probability, in either language", () =>
       it(`${language}: ${name}`, () => {
         const { container, unmount } = render(
           <LanguageProvider initialLanguage={language}>
-            <ScoreboardCard envelope={envelope} />
+            {withLeague(<ScoreboardCard envelope={envelope} />)}
           </LanguageProvider>,
         );
         const text = container.textContent ?? "";
@@ -291,17 +294,15 @@ describe("a move card claims only what the payload carries", () => {
     expect(advice.payload.window).toBe(1);
     const english = renderState("en", advice);
     expect(english).not.toMatch(/longer window/);
-    expect(english).toMatch(/Part of the one-week pure-points plan/);
+    expect(english).not.toMatch(/Part of the one-week pure-points plan/);
     const turkish = renderState("tr", advice);
     expect(turkish).not.toMatch(/Uzun pencere/);
-    expect(turkish).toMatch(/Bir haftalık saf puan planının parçası/);
+    expect(turkish).not.toMatch(/Bir haftalık saf puan planının parçası/);
   });
 
-  it("keeps the longer-window caption for a window that solved one", () => {
+  it("captions no move with the window it was solved in", () => {
     const window = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
     expect(window.payload.moves[0]?.reason_code).toBe("window_value");
-    expect(renderState("en", window)).toMatch(
-      /Part of the multiweek plan using published projections/,
-    );
+    expect(renderState("en", window)).not.toMatch(/Part of the multiweek plan/);
   });
 });

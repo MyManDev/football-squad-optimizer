@@ -86,7 +86,6 @@ if (-not $StoreRoot) { $StoreRoot = Join-Path $RepoRoot "data\runtime\backend" }
 if (-not $SiteDataRoot) { $SiteDataRoot = Join-Path $RepoRoot "web\public\data" }
 if (-not $SnapshotRoot) { $SnapshotRoot = Join-Path $RepoRoot "data\snapshots" }
 if (-not $HandoffRoot) { $HandoffRoot = Join-Path $RepoRoot "data\handoffs" }
-if (-not $ArtifactRoot) { $ArtifactRoot = Join-Path $RepoRoot "artifacts" }
 if (-not $ClubNewsSource) { $ClubNewsSource = Join-Path $RepoRoot "data\sample\club_news_v1.fixture.json" }
 
 $RunDirectory = Join-Path $StoreRoot "run"
@@ -213,6 +212,12 @@ if ($Status) {
         Write-Host "Not running: no pid file at $PidFile"
         exit 1
     }
+    # Old registries predate artifact selection metadata.
+    $recordedArtifact = "unrecorded (legacy launcher)"
+    if ($state.PSObject.Properties.Name -contains 'artifact_root') {
+        $recordedArtifact = [string]$state.artifact_root
+    }
+    Write-Host ("artifacts  {0}" -f $recordedArtifact)
     $down = 0
     foreach ($entry in $state.processes) {
         $word = "running"
@@ -235,6 +240,45 @@ if ($Status) {
 }
 
 # ---------------------------------------------------------------------------- start
+# Never from an agent application's process tree (scripts\backend_parentage.ps1).
+. (Join-Path $PSScriptRoot "backend_parentage.ps1")
+Assert-NotUnderAgentApplication -Action "start the backend"
+
+# This operator-owned file is outside the runtime store. Never read it for Stop/Status:
+# a malformed selection must not prevent inspecting or stopping recorded processes.
+if ($PSBoundParameters.ContainsKey('ArtifactRoot')) {
+    if ([string]::IsNullOrWhiteSpace($ArtifactRoot)) {
+        throw "Explicit ArtifactRoot must not be empty."
+    }
+} else {
+    $selectionFile = Join-Path $RepoRoot "artifacts\backend-artifact-root.json"
+    if (Test-Path -LiteralPath $selectionFile) {
+        if (-not (Test-Path -LiteralPath $selectionFile -PathType Leaf)) {
+            throw "Artifact selection must be a JSON file."
+        }
+        $selectionText = Get-Content -LiteralPath $selectionFile -Raw -Encoding UTF8
+        # Exactly one literal key/string; reject duplicate keys, arrays and trailing data
+        # rather than allowing ConvertFrom-Json to collapse or unwrap them.
+        $selectionShape = '\A\s*\{\s*"artifact_root"\s*:\s*"(?:[^"\\\x00-\x1f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"\s*\}\s*\z'
+        if ($null -eq $selectionText -or $selectionText -cnotmatch $selectionShape) {
+            throw "Artifact selection must contain exactly one artifact_root string."
+        }
+        $selection = $selectionText | ConvertFrom-Json
+        $selectedRoot = [string]$selection.artifact_root
+        if ([string]::IsNullOrWhiteSpace($selectedRoot)) {
+            throw "Artifact selection artifact_root must not be empty."
+        }
+        if (-not [IO.Path]::IsPathRooted($selectedRoot)) {
+            $selectedRoot = Join-Path $RepoRoot $selectedRoot
+        }
+        if (-not (Test-Path -LiteralPath $selectedRoot -PathType Container)) {
+            throw "Artifact selection artifact_root must name an existing directory."
+        }
+        $ArtifactRoot = (Resolve-Path -LiteralPath $selectedRoot).Path
+    } else {
+        $ArtifactRoot = Join-Path $RepoRoot "artifacts"
+    }
+}
 if ($Workers -lt 1) { throw "-Workers must be at least 1: an api with no worker queues jobs nobody computes." }
 if ($Port -lt 1 -or $Port -gt 65535) { throw "-Port must be between 1 and 65535." }
 
@@ -329,6 +373,7 @@ function Write-PidFile {
         port              = $Port
         store_root        = $StoreRoot
         source_root       = $SourceRoot
+        artifact_root     = $ArtifactRoot
         repository_commit = $commit
         processes         = @($started)
     }
@@ -405,6 +450,7 @@ Write-Host ("api       http://127.0.0.1:{0} (pid {1})" -f $Port, $started[0].pid
 Write-Host ("workers   {0}" -f $Workers)
 Write-Host ("code      {0} at {1}" -f $SourceRoot, $commit)
 Write-Host ("store     {0}" -f $StoreRoot)
+Write-Host ("artifacts {0}" -f $ArtifactRoot)
 Write-Host ("logs      {0}" -f $LogDirectory)
 Write-Host ("pid file  {0}" -f $PidFile)
 $ready = Get-Json ("http://127.0.0.1:{0}/ready" -f $Port)

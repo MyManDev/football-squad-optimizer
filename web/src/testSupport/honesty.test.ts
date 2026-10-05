@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import quotes from "../../../docs/contracts/quote_withheld_corpus.json" with { type: "json" };
 import words from "../../../docs/contracts/honesty_words.json" with { type: "json" };
 import { QUOTE_WITHHELD } from "../features/league/advice/evidenceCopy";
-import { AS_A_CHANCE } from "./honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "./honesty";
 
 describe("the shared product-copy honesty guard", () => {
   it.each(Object.values(words.stems).flat())("rejects the committed stem %s", (stem) => {
@@ -127,5 +127,30 @@ describe("the quote rule, on the corpus the producer's test reads too", () => {
 
   it.each(quotes.shown)("shows %s", (quote) => {
     expect(quote).not.toMatch(QUOTE_WITHHELD);
+  });
+});
+
+describe("the shared caveat guard", () => {
+  it.each([
+    "They do not prove that a member followed the suggestion.",
+    "This alone does not establish an improvement.",
+    "It is not directly comparable with official FPL scores.",
+    "Üyenin öneriyi uyguladığını göstermez.",
+    "Resmi FPL puanlarıyla birebir karşılaştırılamaz.",
+    "Bu nedenle rekabetçi pencere yalnız yön gösterir.",
+  ])("rejects %s", (copy) => {
+    expect(copy).toMatch(AS_A_CAVEAT);
+  });
+
+  it.each([
+    "The deadline of gameweek 6 passed on 10 Oct.",
+    "No other member's squad is published for this week.",
+    "Bu oyun haftasının son tarihi geçti.",
+    "Bu hafta için başka bir üyenin kadrosu yayınlanmamış.",
+    "Not yet: the recorded measurement calls for 60 more settled weeks.",
+    // A device run that found no plan says so; that is a state, not a claim about a figure.
+    "This device did not prove a plan for this selection.",
+  ])("accepts the plain state %s", (copy) => {
+    expect(copy).not.toMatch(AS_A_CAVEAT);
   });
 });

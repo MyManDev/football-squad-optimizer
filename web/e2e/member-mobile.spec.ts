@@ -87,7 +87,7 @@ for (const language of ["tr", "en"] as const) {
     await installLeagueMocks(page);
     await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto("/league/members/35249001?mode=saf-puan&window=3");
+    await page.goto("/league/352490/members/35249001?mode=saf-puan&window=3");
     const copy = MESSAGES[language];
     const members = copy.leagueMembers;
 
@@ -183,7 +183,7 @@ for (const language of ["tr", "en"] as const) {
     await page.setViewportSize({ width: 375, height: 548 });
     await installLeagueMocks(page);
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto("/league/members/35249001?mode=saf-puan&window=3");
+    await page.goto("/league/352490/members/35249001?mode=saf-puan&window=3");
     const copy = MESSAGES[language].leagueMembers;
     const settings = page.getByRole("region", { name: copy.planTitle });
     const window = settings.getByRole("radio", { name: /^3 / });
@@ -254,7 +254,7 @@ for (const language of ["tr", "en"] as const) {
         body: JSON.stringify(body),
       });
     });
-    await page.goto("/league/members/35249001?window=3");
+    await page.goto("/league/352490/members/35249001?window=3");
     const copy = MESSAGES[language].leagueMembers;
     const settings = page.getByRole("region", { name: copy.planTitle });
     await settings.getByRole("radio", { name: /^5 / }).click();
@@ -295,7 +295,7 @@ for (const language of ["tr", "en"] as const) {
     );
     await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
-    await page.goto(`/league/members/${ENTRY}`);
+    await page.goto(`/league/352490/members/${ENTRY}`);
     const copy = MESSAGES[language];
     await expect(page.getByTestId("member-selection-summary")).toBeVisible();
 
@@ -328,8 +328,9 @@ for (const language of ["tr", "en"] as const) {
         return [!!inside?.closest("#fixture-sheet"), String(beside?.className).includes("scrim")];
       }),
     ).toEqual([true, true]);
-    // Taller than a phone with Safari's bars shown, it scrolls inside itself and keeps its
-    // close button in view at either end.
+    // On a screen shorter than its tables it scrolls inside itself and keeps its close
+    // button in view at either end.
+    await page.setViewportSize({ width: 390, height: 520 });
     const sheetBody = page.locator("#fixture-sheet");
     expect(await sheetBody.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
       true,
@@ -351,7 +352,6 @@ for (const language of ["tr", "en"] as const) {
     await expect(eleven.locator("tbody tr").first().locator("td")).toHaveCount(3);
     await expect(eleven.locator('[data-venue="home"]').first()).toBeVisible();
     await expect(eleven.locator('[data-venue="away"]').first()).toBeVisible();
-    await expect(sheet).toContainText(copy.leagueMembers.railLegendDifficulty);
     // Tab stays in the sheet.
     for (let step = 0; step < 6; step += 1) {
       await page.keyboard.press("Tab");

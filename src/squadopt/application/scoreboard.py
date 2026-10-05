@@ -4,7 +4,8 @@
     python -m scripts.build_scoreboard --league 352490 --snapshot-id <fpl-live id> \\
         --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>
 
-Writes ``<out>/data/league/scoreboard.json`` in the provisional league envelope: one row
+Writes ``scoreboard.json`` into the league's tree under ``<out>/data`` in the provisional
+league envelope: one row
 per gameweek whose deadline had passed when the live capture was taken, each carrying what
 the files on disk prove and ``null`` where they prove nothing. Nothing is decided here; the
 ledger is read, never written.
@@ -67,6 +68,12 @@ from typing import Any, Final
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.scoreboard_baselines import human_baseline_rows
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_tree import (
+    LEGACY_TREE,
+    find_league_tree,
+    league_tree_dir,
+    read_league_directory,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -744,7 +751,7 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
             f"No registered entries in {request.registry_path}; seed it first with "
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
-    registered = registry.ids()
+    registered = registry.in_league(snapshot.payloads, request.league_id).ids()
     histories = {
         entry_id: snapshot.payloads[name]
         for entry_id in registered
@@ -780,7 +787,21 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         evidence_root=request.evidence_root,
         as_of_utc=snapshot.metadata.captured_at_utc,
     )
-    target = Path(request.out_dir) / "data" / "league" / SCOREBOARD_FILE
+    # The scoreboard sits in the league's tree: the directory's line for it, else the
+    # league's path in the new layout. A site from before the directory is adopted by the
+    # league publication, which runs first; a scoreboard written beside a legacy tree
+    # would be published in a tree nothing lists.
+    site_data = Path(request.out_dir) / "data"
+    listed = read_league_directory(site_data)
+    if not listed and (site_data / LEGACY_TREE).is_dir():
+        raise DataError(
+            f"{site_data / LEGACY_TREE} is a tree from before the league directory; "
+            "publish the league first, which adopts it."
+        )
+    tree = (find_league_tree(site_data, request.league_id) if listed else None) or league_tree_dir(
+        site_data, request.league_id
+    )
+    target = tree / SCOREBOARD_FILE
     # An empty ledger root beside a scoreboard that already publishes our rows: the
     # decisions were made, their local record is what is missing. Keep the rows.
     published_ours = _published_ours(target, season) if not entries else {}

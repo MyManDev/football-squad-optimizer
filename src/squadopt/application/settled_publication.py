@@ -44,6 +44,7 @@ from squadopt.application.weekly_suggestion_eval import (
     published_advice_captures,
     review_member_weeks,
 )
+from squadopt.contracts.league_tree import LEAGUE_DIRECTORY_FILE, find_league_tree
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -120,6 +121,19 @@ def _document(content: bytes, name: str) -> dict[str, Any]:
     return value
 
 
+def _tree_name(request: SettledPublicationRequest) -> str:
+    """The league's tree in the accepted site, relative to the site root (``data/...``).
+
+    The candidate is a copy of the accepted tree, so the same name holds on both sides:
+    a settled publish rewrites a tree, it never moves one.
+    """
+
+    tree = find_league_tree(request.accepted_dir / "data", request.league_id)
+    if tree is None:
+        raise DataError(f"The accepted tree does not publish league {request.league_id}.")
+    return tree.relative_to(request.accepted_dir).as_posix()
+
+
 def _allowed(name: str, request: SettledPublicationRequest) -> bool:
     if {"advice", "entries"} & set(Path(name).parts):
         return False
@@ -127,15 +141,17 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
         return True
     # series-horizon is derived from the SAME history rows. Its consumer requires
     # the same member-week key set, so histories and this companion travel together.
+    tree = _tree_name(request)
     if name in (
-        "data/league/members.json",
-        "data/league/scoreboard.json",
-        "data/league/series-horizon.json",
+        f"{tree}/members.json",
+        f"{tree}/scoreboard.json",
+        f"{tree}/series-horizon.json",
         "data/fixtures.json",
+        f"data/{LEAGUE_DIRECTORY_FILE}",
     ):
         return True
     path = Path(name)
-    return path.parent.as_posix() == "data/league/history" and path.suffix == ".json"
+    return path.parent.as_posix() == f"{tree}/history" and path.suffix == ".json"
 
 
 def _preflight(
@@ -156,7 +172,7 @@ def _preflight(
     if any(out.is_relative_to(p.resolve()) or p.resolve().is_relative_to(out) for p in inputs):
         raise DataError("Output must be separate from every input path.")
     accepted = _files(request.accepted_dir)
-    name = "data/league/members.json"
+    name = f"{_tree_name(request)}/members.json"
     if name not in accepted:
         raise DataError(f"Accepted tree is missing {name}")
     members = _document(accepted[name], name)
@@ -171,12 +187,15 @@ def _preflight(
     ids = EntryRegistry.load(request.registry_path).ids()
     if len(ids) != 15 or len(rows) != 15 or {row.get("entry_id") for row in rows} != set(ids):
         raise DataError("The accepted tree and registry must identify the same fifteen members.")
+    tree = _tree_name(request)
     for path, content in accepted.items():
         if Path(path).name == "recommendation.json":
             decision_week = _document(content, path)["payload"].get("gameweek")
             if not isinstance(decision_week, int) or decision_week > request.gameweek:
                 raise DataError(f"Later or unreadable decision in accepted tree: {path}")
-        if "advice" in Path(path).parts and path.endswith(".json"):
+        # The league's own advice is of the settled week; another league's tree keeps
+        # its own week and is carried unchanged.
+        if path.startswith(f"{tree}/advice/") and path.endswith(".json"):
             advice = _document(content, path)["payload"]
             if advice.get("gameweek") != request.gameweek:
                 raise DataError(f"Advice outside the accepted GW5 decision: {path}")
@@ -228,7 +247,7 @@ def _preflight(
         season=request.season,
         league_id=request.league_id,
         entry_ids=ids,
-        published=published_advice_captures(request.accepted_dir / "data" / "league"),
+        published=published_advice_captures(request.accepted_dir / _tree_name(request)),
     )
     for entry_id, reviewed_weeks in reviews.items():
         if any(week.gameweek > request.gameweek for week in reviewed_weeks):
@@ -242,7 +261,7 @@ def _preflight(
             )
         if reviewed.outcome_snapshot_id != request.snapshot_id:
             raise DataError(f"Member {entry_id} history did not settle on the named capture.")
-        advice_path = f"data/league/advice/{entry_id}/saf-puan/1.json"
+        advice_path = f"{_tree_name(request)}/advice/{entry_id}/saf-puan/1.json"
         # WeekReview carries advice_sha256: the canonical payload digest, not
         # published_sha256 (the envelope's original bytes and publication clock).
         payload = (
@@ -281,7 +300,7 @@ def _carry_scoreboard_evidence(
     These cells do not enter the builder's system/member/game cumulative arithmetic.
     GW5 evidence is a separate approval: never infer it from an earlier comparison.
     """
-    name = "data/league/scoreboard.json"
+    name = f"{_tree_name(request)}/scoreboard.json"
     source = request.accepted_dir / name
     if not source.exists():
         return
@@ -351,7 +370,7 @@ def _publish_scoreboard(
         generated_at_utc=snapshot.metadata.captured_at_utc,
     )
     _carry_scoreboard_evidence(request, document)
-    (candidate / "data/league/scoreboard.json").write_text(
+    (candidate / _tree_name(request) / "scoreboard.json").write_text(
         json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
         newline="\n",
@@ -595,8 +614,8 @@ def publish_settled(
             season=request.season,
             league_id=request.league_id,
             entry_ids=tuple(scores),
-            out_dir=candidate / "data" / "league",
-            published=published_advice_captures(request.accepted_dir / "data" / "league"),
+            out_dir=candidate / _tree_name(request),
+            published=published_advice_captures(request.accepted_dir / _tree_name(request)),
         )
         members["generated_at_utc"] = stamp
         members["payload"]["scored_gameweek"] = request.gameweek
@@ -607,11 +626,20 @@ def publish_settled(
                 transfer_cost=score.transfer_cost,
                 total_points=score.total_points,
             )
-        (candidate / "data/league/members.json").write_text(
+        (candidate / _tree_name(request) / "members.json").write_text(
             json.dumps(members, ensure_ascii=False, allow_nan=False, indent=2) + "\n",
             encoding="utf-8",
             newline="\n",
         )
+        # The settled view is now the site's publication, so the league directory carries
+        # its stamp as the members document does; the release check reads the directory's.
+        directory = candidate / "data" / LEAGUE_DIRECTORY_FILE
+        if directory.is_file():
+            listed = json.loads(directory.read_text(encoding="utf-8"))
+            listed["generated_at_utc"] = stamp
+            directory.write_text(
+                json.dumps(listed, indent=2) + "\n", encoding="utf-8", newline="\n"
+            )
         proposed = _files(candidate)
         changed = tuple(
             sorted(

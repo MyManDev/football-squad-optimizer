@@ -18,7 +18,7 @@ import {
   type RequestOptions,
 } from "../../../data/request";
 import type { WindowSize } from "../../../lib/decisionVocabulary";
-import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
+import { LeagueDataError, LeagueDataMissing } from "../data";
 import type { AdviceStrategy, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { checkedCapabilities, type AdviceCapabilities } from "./adviceCapabilities";
 import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
@@ -48,7 +48,8 @@ export interface AdviceRequest {
 }
 
 /** Where an answer came from; the page shows capture identity, not a "cached" badge. */
-export type AdviceSource = "static" | "api-cache" | "static-fallback";
+/** Where a shown answer came from; `device` is a plan the member's own device solved. */
+export type AdviceSource = "static" | "api-cache" | "static-fallback" | "device";
 
 export type AdviceReadResult =
   | { kind: "advice"; envelope: LeagueViewEnvelope<EntryAdvice>; source: AdviceSource }
@@ -73,6 +74,8 @@ export interface AdviceReadOptions extends RequestOptions {
 export interface AdviceClient {
   /** Read an already-computed answer; never triggers computation. */
   readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;
+  /** Read the published document alone, whatever the service would say. */
+  readPublished(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult>;
   /** Ask for the answer, computing it if needed (202 + job when it will take time). */
   requestAdvice(
     request: AdviceRequest,
@@ -117,8 +120,12 @@ type AdviceLoader = (
 export class StaticOnlyAdviceClient implements AdviceClient {
   private readonly loader: AdviceLoader;
 
-  constructor(loader: AdviceLoader = loadEntryAdvice) {
+  constructor(loader: AdviceLoader) {
     this.loader = loader;
+  }
+
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return this.readAdvice(request, options);
   }
 
   async readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
@@ -225,6 +232,11 @@ function isRequestRejection(error: unknown): boolean {
 export class HttpAdviceClient implements AdviceClient {
   private readonly origin: string;
   private readonly fetcher: FetchLike;
+
+  /** The service holds no published tree; a caller wanting the document reads the tree. */
+  async readPublished(): Promise<AdviceReadResult> {
+    return { kind: "not-computed" };
+  }
 
   constructor(origin: string, fetcher: FetchLike = (input, init) => fetch(input, init)) {
     this.origin = origin.replace(/\/$/, "");
@@ -390,6 +402,10 @@ export class FallbackAdviceClient implements AdviceClient {
     this.fallback = fallback;
   }
 
+  readPublished(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult> {
+    return this.fallback.readPublished(request, options);
+  }
+
   async readAdvice(request: AdviceRequest, options?: AdviceReadOptions): Promise<AdviceReadResult> {
     let primaryResult: AdviceReadResult | null = null;
     try {
@@ -453,9 +469,15 @@ export class FallbackAdviceClient implements AdviceClient {
 /** The page's own code for a service that did not answer at all. */
 export const SERVICE_UNREACHABLE = "SERVICE_UNREACHABLE";
 
-/** The composition root: empty origin (the default) is today's static site. */
-export function createAdviceClient(origin?: string): AdviceClient {
+/**
+ * The composition root: the published documents are read through the league's tree, and
+ * an empty origin (the default) is the static site alone.
+ */
+export function createAdviceClient(loader: AdviceLoader, origin?: string): AdviceClient {
   const configured = origin ?? (import.meta.env.VITE_ADVICE_API_ORIGIN as string | undefined) ?? "";
-  if (!configured) return new StaticOnlyAdviceClient();
-  return new FallbackAdviceClient(new HttpAdviceClient(configured), new StaticOnlyAdviceClient());
+  if (!configured) return new StaticOnlyAdviceClient(loader);
+  return new FallbackAdviceClient(
+    new HttpAdviceClient(configured),
+    new StaticOnlyAdviceClient(loader),
+  );
 }

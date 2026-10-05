@@ -38,6 +38,7 @@ from squadopt.planning.models import (
     TransferPlanResult,
 )
 from squadopt.planning.optimizer import optimize_transfer_plan
+from squadopt.planning.policy_comparison import PolicyComparisonInput, compare_completed_policies
 from squadopt.planning.policy_seed import forecast_policy_seed
 from squadopt.planning.recourse import ObservationNode
 from squadopt.planning.recourse_chips import net_week_points, restrict_first_chip
@@ -131,6 +132,8 @@ def optimize_observed_window(
     """
     horizon = horizon.validated_copy()
     validate_observations(horizon, nodes)
+    # Stable proposal/seed admission and tie priority for the same named updates.
+    nodes = tuple(sorted(nodes, key=lambda node: node.observation_id))
     budget = optimization.solver_deterministic_time_limit
     if budget is None or budget < 5:
         raise ValueError("Observed windows need an explicit total budget of at least five.")
@@ -464,13 +467,13 @@ def optimize_observed_window(
             record(f"candidate_{index}/{node.observation_id}", share, continuation)
             if not continuation.has_solution:
                 return finish(baseline, "incomplete_continuation")
-            utility += node.probability * sum(
-                _utility(w, optimization, transfer) for w in continuation.weeks
-            )
+            branch_utility = sum(_utility(w, optimization, transfer) for w in continuation.weeks)
+            utility += node.probability * branch_utility
             branch_summaries.append(
                 {
                     "id": node.observation_id,
                     "probability": node.probability,
+                    "selection_utility": branch_utility,
                     "point_terms": point_terms(continuation.weeks),
                     "net_points_on_selection_scale": sum(
                         net_week_points(w) for w in continuation.weeks
@@ -559,4 +562,17 @@ def optimize_observed_window(
         horizon_length=len(horizon.gameweeks),
         proposal_completed=all(proposal_completed.values()),
         proposal_completion_by_observation=proposal_completed,
+        policy_comparison=compare_completed_policies(
+            [
+                PolicyComparisonInput(
+                    branch_values={b["id"]: b["selection_utility"] for b in summary["branches"]},
+                    transfer_count=len(summary["first_in"]),
+                    chip=summary["first_chip"],
+                    bank_tenths=int(summary["branches"][0]["first_action"]["bank"]),
+                    free_transfers=int(summary["branches"][0]["first_action"]["ft"]),
+                )
+                for summary in summaries
+            ],
+            basis="selection_utility",
+        ),
     )

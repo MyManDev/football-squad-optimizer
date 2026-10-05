@@ -349,16 +349,3 @@ def backend_jobs_schema() -> dict[str, object]:
         ],
         "additionalProperties": False,
     }
-
-
-def write_backend_jobs_schema(path: Path | str | None = None) -> Path:
-    import json as _json
-
-    target = Path(path) if path is not None else BACKEND_JOBS_SCHEMA_PATH
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        _json.dumps(backend_jobs_schema(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-        newline="\n",
-    )
-    return target

@@ -1,10 +1,29 @@
 import { expect, test } from "@playwright/test";
 
-import { mockEntryAdviceEnvelope, mockEntryAdviceIndex } from "../src/fixtures/league";
+import {
+  mockEntryAdviceEnvelope,
+  mockEntryAdviceIndex,
+  mockLeagueMembersEnvelope,
+} from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 
 const ENTRY = 35249001;
+
+/**
+ * The published directory, naming the mocked league under the legacy tree path. Without a
+ * directory the gate reads `members.json` as the directory of one, so a member list that
+ * is missing or unreadable would never reach the members page; the states below are the
+ * members page's own, so the league is found through the directory first.
+ */
+function directory() {
+  const { league_id, league_name, season, gameweek } = mockLeagueMembersEnvelope.payload;
+  return {
+    contract_version: "league_directory_v1",
+    generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
+    payload: { leagues: [{ league_id, league_name, season, gameweek, path: "league" }] },
+  };
+}
 const failures = [
   "list-missing",
   "list-error",
@@ -31,6 +50,9 @@ for (const language of ["tr", "en"] as const) {
         language,
       );
       await installLeagueMocks(page);
+      await page.route("**/data/leagues.json", (route) =>
+        route.fulfill({ contentType: "application/json", body: JSON.stringify(directory()) }),
+      );
       const browserErrors: string[] = [];
       page.on("pageerror", (error) => browserErrors.push(error.message));
       const planReads: string[] = [];
@@ -98,7 +120,9 @@ for (const language of ["tr", "en"] as const) {
       await page.route(`**/data/league/${path}`, (route) =>
         route.fulfill({ status, contentType: "application/json", body }),
       );
-      await page.goto(failure.startsWith("list-") ? "/league/members" : `/league/members/${ENTRY}`);
+      await page.goto(
+        failure.startsWith("list-") ? "/league/352490/members" : `/league/352490/members/${ENTRY}`,
+      );
       await expect(page.getByText(expected, { exact: true })).toBeVisible();
       if (
         failure.startsWith("index-") ||

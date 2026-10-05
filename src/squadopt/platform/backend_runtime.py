@@ -495,6 +495,7 @@ class CaptureContextProvider:
         if self._config.artifact_root is None:
             return held
         signature = discovery_signature(
+            snapshot_root=self._config.snapshot_root,
             artifact_root=self._config.artifact_root,
             club_news_source=self._config.club_news_source,
             season=held.context.season,

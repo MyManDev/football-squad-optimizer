@@ -15,22 +15,6 @@ const COPY = {
     bench_boost_points: "Yedek Gücü puanı",
     hits: "Transfer cezası",
     net: "Ceza sonrası beklenen puan",
-    assumptions: "Oynama varsayımları",
-    unknown: "Bu tahmin ek oynama varsayımlarına dayanır; gerçekleşecek puan değildir.",
-    rules: {
-      independent_player_week_appearances:
-        "Oyuncuların bu hafta oynayıp oynamaması birbirinden bağımsız kabul edilir. Birlikte dinlendirilme veya aynı habere bağlı değişimler modellenmez.",
-      unconditional_weekly_points_already_include_appearance:
-        "Oyuncu puanları sahaya çıkmayı zaten hesaba katar; aynı etki puana ikinci kez uygulanmaz.",
-      conditional_player_points_unaffected_by_other_appearances:
-        "Bir oyuncunun sahaya çıktığında beklenen puanı, takım arkadaşları veya rakipleri oynamadığında değişmez kabul edilir.",
-      any_positive_gameweek_minutes_including_cameos_block_autosubs:
-        "Kısa süre de olsa oynayan bir oyuncunun yerine yedek girmez.",
-      no_card_only_participation_outside_the_appearance_model:
-        "Hiç süre almadan görülen kartların otomatik değişikliğe etkisi bu tahminde yer almaz.",
-      double_gameweek_appearance_probability_is_supplied_by_the_caller:
-        "Bir haftada birden fazla maçı olan oyuncu, o haftaki maçlardan en az birinde süre alırsa oynamış sayılır.",
-    },
   },
   en: {
     title: "How are expected points calculated?",
@@ -43,22 +27,6 @@ const COPY = {
     bench_boost_points: "Bench Boost points",
     hits: "Transfer hits",
     net: "Expected points after hits",
-    assumptions: "Playing assumptions",
-    unknown: "This forecast uses additional playing assumptions; it is not a realized score.",
-    rules: {
-      independent_player_week_appearances:
-        "Whether each player appears this week is treated as independent. Shared rotation or news affecting several players is not modeled.",
-      unconditional_weekly_points_already_include_appearance:
-        "Player points already account for participation; the same effect is not applied to their points a second time.",
-      conditional_player_points_unaffected_by_other_appearances:
-        "A player's expected points when they appear are assumed unchanged when teammates or opponents do not play.",
-      any_positive_gameweek_minutes_including_cameos_block_autosubs:
-        "Even a brief appearance prevents an automatic substitute from replacing that player.",
-      no_card_only_participation_outside_the_appearance_model:
-        "The effect of a card received without playing any minutes on automatic substitutions is not included in this forecast.",
-      double_gameweek_appearance_probability_is_supplied_by_the_caller:
-        "A player with several matches in one gameweek counts as appearing if they play in at least one of those matches.",
-    },
   },
 };
 
@@ -74,15 +42,6 @@ export function ExpectedLineup({ view }: { view: EntryAdvice }) {
     "vice_bonus_points",
     "bench_boost_points",
   ] as const;
-  const assumptions = [
-    ...new Set(
-      expectation.assumptions.map((rule) =>
-        Object.hasOwn(copy.rules, rule)
-          ? copy.rules[rule as keyof typeof copy.rules]
-          : copy.unknown,
-      ),
-    ),
-  ];
   return (
     <section
       className={styles.adviceSection}
@@ -97,23 +56,16 @@ export function ExpectedLineup({ view }: { view: EntryAdvice }) {
             {copy[term]}: <strong className="num">{points(expectation[term], 1, locale)}</strong>
           </li>
         ))}
-        <li>
-          {copy.hits}:{" "}
-          <span className="num">{points(view.transfer_hit_points ?? 0, 1, locale)}</span>
-        </li>
+        {typeof view.transfer_hit_points === "number" ? (
+          <li>
+            {copy.hits}: <span className="num">{points(view.transfer_hit_points, 1, locale)}</span>
+          </li>
+        ) : null}
       </ul>
       <p>
         {copy.net}:{" "}
         <strong className="num">{points(expectation.expected_net_points, 1, locale)}</strong>
       </p>
-      <details>
-        <summary>{copy.assumptions}</summary>
-        <ul>
-          {assumptions.map((assumption) => (
-            <li key={assumption}>{assumption}</li>
-          ))}
-        </ul>
-      </details>
     </section>
   );
 }

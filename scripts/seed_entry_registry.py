@@ -2,6 +2,7 @@
 
     python -m scripts.seed_entry_registry --league 352490 --dry-run
     python -m scripts.seed_entry_registry --league 352490
+    python -m scripts.seed_entry_registry --league-list config/leagues.json
     python -m scripts.seed_entry_registry --league 352490 --standings-file page1.json
 
 The site's per-entry recommendations are precomputed for the ids in
@@ -38,6 +39,7 @@ from pathlib import Path
 from scripts._provenance import REPOSITORY_ROOT, write_json
 
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION, EntryRegistry
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -100,47 +102,88 @@ def _printable(value: str) -> str:
 
 
 def _registry_document(
-    members: Sequence[LeagueStanding], *, league_id: int, now: str
+    members: Sequence[LeagueStanding], *, league_ids: Sequence[int], now: str
 ) -> dict[str, object]:
+    """The registry: every member of every league once, by entry id.
+
+    An entry in two of the site's leagues is one entry with one squad; the first league
+    to name it keeps its team name.
+    """
+
+    by_id: dict[int, LeagueStanding] = {}
+    for member in members:
+        by_id.setdefault(member.entry_id, member)
     entries = [
         {"entry_id": member.entry_id, "label": member.entry_name, "registered_at_utc": now}
-        for member in sorted(members, key=lambda member: member.entry_id)
+        for member in sorted(by_id.values(), key=lambda member: member.entry_id)
     ]
     return {
         "contract_version": ENTRY_REGISTRY_CONTRACT_VERSION,
-        "seeded_from_league": league_id,
+        "seeded_from_league": league_ids[0],
+        "seeded_from_leagues": list(league_ids),
         "entries": entries,
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--league", type=int, required=True, help="classic league id")
+    parser.add_argument(
+        "--league",
+        type=int,
+        action="append",
+        help="classic league id; repeat for every league the site serves",
+    )
+    parser.add_argument(
+        "--league-list",
+        type=Path,
+        help=f"the leagues the site serves ({LEAGUE_LIST_FILE.as_posix()}), instead of --league",
+    )
     parser.add_argument("--snapshot-id", help="capture to read (default: the most recent)")
     parser.add_argument(
         "--standings-file", type=Path, help="a saved standings page, for the first seed"
     )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
-
+    if arguments.league and arguments.league_list is not None:
+        parser.error("--league and --league-list name the leagues two ways; use one")
     try:
-        payload, origin = _standings_bytes(
-            league_id=arguments.league,
-            snapshot_id=arguments.snapshot_id,
-            standings_file=arguments.standings_file,
-        )
-        members = fpl_league_standings(payload, league_id=arguments.league)
+        if arguments.league_list is not None:
+            listed = Path(arguments.league_list)
+            # Relative to the repository, like the snapshot and registry roots.
+            league_ids: tuple[int, ...] = read_league_list(
+                listed if listed.is_absolute() else REPOSITORY_ROOT / listed
+            )
+        else:
+            league_ids = tuple(arguments.league or ())
+    except LeagueListError as error:
+        parser.error(str(error))
+    if not league_ids:
+        parser.error("--league (or --league-list) is required")
+    if len(set(league_ids)) != len(league_ids):
+        parser.error("--league names a league twice")
+    if arguments.standings_file is not None and len(league_ids) != 1:
+        parser.error("--standings-file is one league's page; name one league with it")
+
+    members: list[LeagueStanding] = []
+    try:
+        for league_id in league_ids:
+            payload, origin = _standings_bytes(
+                league_id=league_id,
+                snapshot_id=arguments.snapshot_id,
+                standings_file=arguments.standings_file,
+            )
+            standings = fpl_league_standings(payload, league_id=league_id)
+            print(f"League    {league_id}  ({origin})")
+            print(f"Members   {len(standings)}")
+            for member in standings:
+                print(f"  {member.rank:>3}  {member.entry_id:>9}  {_printable(member.entry_name)}")
+            members.extend(standings)
     except (DataError, OSError) as error:
         print(f"\nThe registry could not be seeded:\n  {error}")
         return 1
 
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    document = _registry_document(members, league_id=arguments.league, now=now)
-
-    print(f"League    {arguments.league}  ({origin})")
-    print(f"Members   {len(members)}")
-    for member in members:
-        print(f"  {member.rank:>3}  {member.entry_id:>9}  {_printable(member.entry_name)}")
+    document = _registry_document(members, league_ids=league_ids, now=now)
     print()
     print("Recording each member's entry id and team name. The page also publishes the")
     print("manager's own name; it is not written.")
@@ -151,7 +194,7 @@ def main() -> int:
 
     write_json(REGISTRY_PATH, document)
     reread = EntryRegistry.load(REGISTRY_PATH)
-    if reread.ids() != tuple(sorted(member.entry_id for member in members)):
+    if reread.ids() != tuple(sorted({member.entry_id for member in members})):
         print(f"\nWrote {REGISTRY_PATH} but reading it back did not reproduce the ids.")
         return 1
     print(f"\nWrote {REGISTRY_PATH}")

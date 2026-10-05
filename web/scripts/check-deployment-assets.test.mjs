@@ -14,6 +14,8 @@ async function validArtifact() {
   await writeFile(join(root, "index.html"), "<!doctype html><title>SquadOpt</title>");
   await writeFile(join(root, "data", "index.json"), '{"version":1}');
   await writeFile(join(root, "data", "404.html"), "<!doctype html><title>404</title>");
+  await mkdir(join(root, "assets"), { recursive: true });
+  await writeFile(join(root, "assets", "404.html"), "<!doctype html><title>404</title>");
   await writeFile(
     join(root, "_headers"),
     "/data/*\n  Cache-Control: public, max-age=0, must-revalidate\n",
@@ -32,13 +34,19 @@ afterEach(async () => {
 describe("deployment artifact preflight", () => {
   it("accepts a static site with the required data cache rule", async () => {
     const root = await validArtifact();
-    await expect(inspectDeploymentArtifact(root)).resolves.toMatchObject({ fileCount: 4 });
+    await expect(inspectDeploymentArtifact(root)).resolves.toMatchObject({ fileCount: 5 });
   });
 
   it("requires the not-found document that keeps /data/ off the shell", async () => {
     const root = await validArtifact();
     await rm(join(root, "data", "404.html"));
     await expect(inspectDeploymentArtifact(root)).rejects.toThrow("missing data/404.html");
+  });
+
+  it("requires assets/404.html, so a missing asset is not the cached shell", async () => {
+    const root = await validArtifact();
+    await rm(join(root, "assets", "404.html"));
+    await expect(inspectDeploymentArtifact(root)).rejects.toThrow("missing assets/404.html");
   });
 
   it("requires the cache policy on /data/* itself", async () => {

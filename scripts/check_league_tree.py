@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Any
 
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN, FORBIDDEN_TEXT_PATTERN
+from squadopt.contracts.league_tree import (
+    LEAGUE_DIRECTORY_CONTRACT_VERSION,
+    LEAGUE_DIRECTORY_FILE,
+    LEGACY_TREE,
+)
 
 LIMIT = re.compile(
     r"^The plan was chosen with the Top 100 influence at (\d+); every expected-points "
@@ -61,15 +66,23 @@ MAX_SAFE_INTEGER = 2**53 - 1
 
 
 class Tree:
-    def __init__(self, root: str) -> None:
+    """One league's tree: ``<root>/<path>`` on disk, or ``<origin>/data/<path>`` live."""
+
+    def __init__(self, root: str, path: str = LEGACY_TREE) -> None:
         self.root = root.rstrip("/")
         self.live = self.root.startswith(("https://", "http://"))
+        self.path = path.strip("/")
         self.word_files: dict[str, str] = {}
+
+    @property
+    def directory(self) -> Path:
+        """The tree on disk; meaningless for a live origin."""
+        return Path(self.root) / Path(*self.path.split("/"))
 
     def read(self, relative: str) -> Any:
         if self.live:
             request = urllib.request.Request(
-                f"{self.root}/data/league/{relative}",
+                f"{self.root}/data/{self.path}/{relative}",
                 headers={"User-Agent": "squadopt-verify/1.0"},
             )
             try:
@@ -80,7 +93,7 @@ class Tree:
                     return None
                 raise
         else:
-            path = Path(self.root) / "league" / relative
+            path = self.directory / relative
             if not path.is_file():
                 return None
             raw = path.read_text(encoding="utf-8")
@@ -633,9 +646,7 @@ def check_word(tree: Tree) -> list[str]:
             continue
         word_file = f"{advice_dir}/saf-puan/1/hoca-sozu.json"
         word_exists = (
-            read(word_file) is not None
-            if tree.live
-            else (Path(tree.root) / "league" / word_file).is_file()
+            read(word_file) is not None if tree.live else (tree.directory / word_file).is_file()
         )
         if refused is not None:
             check(not word_exists, f"{entry}: no advice this week ({refused}) and no file")
@@ -704,8 +715,8 @@ def check_word(tree: Tree) -> list[str]:
         tree.word_files
         if tree.live
         else {
-            path.relative_to(Path(tree.root)).as_posix(): path.read_text(encoding="utf-8")
-            for path in Path(tree.root).rglob("hoca-sozu.json")
+            path.relative_to(tree.directory).as_posix(): path.read_text(encoding="utf-8")
+            for path in tree.directory.rglob("hoca-sozu.json")
         }
     )
     hits = [
@@ -736,18 +747,83 @@ def run_checks(tree: Tree) -> list[str]:
     return findings
 
 
+def published_trees(root: str) -> list[str]:
+    """The trees the site publishes: every line of its directory, else the legacy tree.
+
+    A directory that cannot be read, or lists a line that is not a published league, is a
+    ``ValueError`` naming the problem; the caller prints it as the finding it is.
+    """
+
+    root = root.rstrip("/")
+    if root.startswith(("https://", "http://")):
+        request = urllib.request.Request(
+            f"{root}/data/{LEAGUE_DIRECTORY_FILE}", headers={"User-Agent": "squadopt-verify/1.0"}
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read().decode("utf-8")
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return [LEGACY_TREE]
+            raise ValueError(f"{LEAGUE_DIRECTORY_FILE} answered HTTP {error.code}") from error
+        except (urllib.error.URLError, OSError) as error:
+            raise ValueError(f"{LEAGUE_DIRECTORY_FILE} could not be read: {error}") from error
+    else:
+        target = Path(root) / LEAGUE_DIRECTORY_FILE
+        if not target.is_file():
+            return [LEGACY_TREE]
+        raw = target.read_text(encoding="utf-8")
+    try:
+        document = json.loads(raw)
+    except ValueError as error:
+        raise ValueError(f"{LEAGUE_DIRECTORY_FILE} does not parse as JSON") from error
+    if (
+        not isinstance(document, dict)
+        or document.get("contract_version") != LEAGUE_DIRECTORY_CONTRACT_VERSION
+        or not isinstance(document.get("payload"), dict)
+        or not isinstance(document["payload"].get("leagues"), list)
+    ):
+        raise ValueError(f"{LEAGUE_DIRECTORY_FILE} is not a league directory")
+    paths: list[str] = []
+    for row in document["payload"]["leagues"]:
+        path = row.get("path") if isinstance(row, dict) else None
+        if not isinstance(path, str) or not path or path.startswith("/") or ".." in path.split("/"):
+            raise ValueError(f"{LEAGUE_DIRECTORY_FILE} lists a line without a usable tree path")
+        paths.append(path)
+    if not paths:
+        raise ValueError(f"{LEAGUE_DIRECTORY_FILE} lists no league")
+    return paths
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("root", help="Directory containing league/, or the site's origin URL.")
+    parser.add_argument(
+        "root",
+        help="The site's data directory (containing leagues.json or league/), or its origin URL.",
+    )
     args = parser.parse_args(argv)
-    tree = Tree(args.root)
-    if not tree.live and not (Path(tree.root) / "league" / "members.json").is_file():
-        print(
-            f"Missing {Path(tree.root) / 'league' / 'members.json'}; "
-            "pass the directory containing league/, such as <preview>/data."
-        )
+    failed = False
+    try:
+        trees = published_trees(args.root)
+    except ValueError as error:
+        print(f"BAD {error}")
         return 1
-    return 1 if run_checks(tree) else 0
+    for path in trees:
+        tree = Tree(args.root, path)
+        if not tree.live and not (tree.directory / "members.json").is_file():
+            if path == LEGACY_TREE:
+                print(
+                    f"Missing {tree.directory / 'members.json'}; "
+                    "pass the site's data directory, such as <preview>/data."
+                )
+            else:
+                members = tree.directory / "members.json"
+                print(f"BAD the directory lists {path} but {members} is missing")
+            return 1
+        print(f"== {path}")
+        if run_checks(tree):
+            failed = True
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

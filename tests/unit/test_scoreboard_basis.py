@@ -30,10 +30,8 @@ from squadopt.application.scoreboard import (
     _published_ours,
     single_basis,
 )
-from squadopt.application.scoreboard_history import settled_scoreboard_entries
 from squadopt.data.errors import DataError
 from squadopt.evaluation.models import ScoringBasis, ScoringPolicy
-from squadopt.live import LedgerEntry
 from squadopt.live.settlement import score_recorded_decision
 
 LEGACY = str(ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS)
@@ -114,34 +112,6 @@ def test_a_published_row_that_cannot_say_what_produced_its_number_is_not_carried
     # GW1 says what produced its number and stays. GW4 has no number to account for and
     # stays. GW2 and GW3 each publish a score with no basis, and are gone.
     assert sorted(kept) == [1, 4]
-
-
-def test_an_uncoverable_entry_with_no_stated_basis_refuses_settlement(tmp_path: Path) -> None:
-    """The layer boundary refuses too, not just the publisher.
-
-    When no capture covers a week, its recorded outcome is carried through as it stands.
-    That is the one path where a number reaches the scoreboard without a scorer having
-    just run and stated the basis itself, so it is the path that has to demand one.
-    """
-
-    decision, _, _ = decision_inputs()
-    entry = LedgerEntry(SEASON, 1, decision, {"realized_net_score": 42.0}, tmp_path)
-
-    with pytest.raises(DataError, match="scoring_basis"):
-        settled_scoreboard_entries((entry,), (), season=SEASON, as_of_utc="2026-08-24T12:00:00Z")
-
-
-def test_an_uncoverable_entry_with_no_outcome_is_carried_through_untouched(
-    tmp_path: Path,
-) -> None:
-    """Absent is not broken. A week with no outcome owes no basis and is not refused."""
-
-    decision, _, _ = decision_inputs()
-    entry = LedgerEntry(SEASON, 1, decision, None, tmp_path)
-
-    assert settled_scoreboard_entries(
-        (entry,), (), season=SEASON, as_of_utc="2026-08-24T12:00:00Z"
-    ) == (entry,)
 
 
 # --- two bases cannot enter one total ----------------------------------------------------

@@ -18,6 +18,7 @@ records which chip was played so the season's second half knows what is left.
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Final, TypedDict
 
@@ -45,6 +46,7 @@ from squadopt.planning import (
     spending_power,
 )
 from squadopt.planning.chip_strategy import optimize_chip_strategy
+from squadopt.planning.chip_tail import ChipTailForecast
 from squadopt.planning.expected_window import optimize_expected_window
 from squadopt.planning.guarded import optimize_guarded_window
 from squadopt.planning.observed import optimize_observed_window
@@ -475,6 +477,51 @@ def _prepare_planning(
     )
 
 
+@dataclass(frozen=True)
+class MemberPlanningInputs:
+    """What one member's one-week solve is given, as the live path builds it.
+
+    The bank is the spending power after the stated sale value, the free transfers are
+    under the season's cap, and the sale prices are the ones the horizon carries for the
+    held fifteen. Published for a solve on the member's own device, which must receive
+    the numbers the server's solver receives and not a description of them.
+    """
+
+    bank_tenths: int
+    free_transfers: int
+    sell_prices_tenths: Mapping[int, int]
+    transfer_config: TransferPlanningConfig
+    settings: OptimizationConfig
+
+
+def member_planning_policy(rules: SeasonRules) -> TransferPlanningConfig:
+    """The member planning policy under this season's rules, as every published plan uses it."""
+
+    return _transfer_config(rules)
+
+
+def member_planning_inputs(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+) -> MemberPlanningInputs:
+    """One member's one-week inputs, through the same preparation as ``plan_transfers``.
+
+    Raises ``DataSourceError`` exactly where the live path would refuse to plan: a held
+    squad from another season or week, or a held player the capture no longer lists.
+    """
+
+    prepared = _prepare_planning(inputs, projection, held, rules, optimization=None, chip=None)
+    return MemberPlanningInputs(
+        bank_tenths=int(prepared.state.bank_tenths),
+        free_transfers=int(prepared.state.free_transfers),
+        sell_prices_tenths=dict(prepared.sell_prices),
+        transfer_config=prepared.transfer_config,
+        settings=prepared.settings,
+    )
+
+
 def _package_decision(
     plan: TransferPlanResult,
     held: HeldSquad,
@@ -820,6 +867,7 @@ def plan_transfer_horizon(
     first_week_exclusion: FirstWeekExclusion | None = None,
     linearization_level: int | None = None,
     chip_strategy: bool = False,
+    chip_tail_forecast: ChipTailForecast | None = None,
     preferences: DecisionPreferences | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
@@ -852,6 +900,28 @@ def plan_transfer_horizon(
     was for every caller that does not name them.
     """
 
+    if chip_tail_forecast is not None and not chip_strategy:
+        raise DataSourceError("A dated chip tail requires the automatic chip strategy.")
+    if chip_tail_forecast is not None:
+        as_of = chip_tail_forecast.as_of
+        if (
+            not isinstance(as_of, datetime)
+            or as_of.tzinfo is None
+            or as_of.utcoffset() != UTC.utcoffset(as_of)
+            or pd.Timestamp(as_of) > pd.Timestamp(inputs.captured_at_utc)
+        ):
+            raise DataSourceError(
+                "Chip tail evidence must be UTC and known by the decision capture."
+            )
+        for opportunity in chip_tail_forecast.opportunities:
+            deadline = opportunity.deadline
+            if (
+                not isinstance(deadline, datetime)
+                or deadline.tzinfo is None
+                or deadline.utcoffset() != UTC.utcoffset(deadline)
+                or pd.Timestamp(deadline) <= pd.Timestamp(inputs.deadline.deadline_utc)
+            ):
+                raise DataSourceError("Chip tail dates must follow the current decision deadline.")
     if not isinstance(projection_horizon, ProjectionHorizon):
         raise DataSourceError("projection_horizon must be a ProjectionHorizon.")
     projection_horizon.assert_fingerprint()
@@ -1033,6 +1103,7 @@ def plan_transfer_horizon(
             preferences=preferences,
             protect_hold=True,
             expected_lineups=bounded_football and "appearance_probability" in planning_table,
+            tail_forecast=chip_tail_forecast,
         )
         if chip_strategy
         else optimize_transfer_plan(

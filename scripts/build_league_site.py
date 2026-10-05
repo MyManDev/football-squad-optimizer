@@ -7,7 +7,7 @@ The capture must have been taken with ``--entries`` so it holds each registered 
 three public documents plus the league standings page; ``scripts.seed_entry_registry``
 writes the registry that names them. This shell reads those payloads, hands them to
 ``build_league_views`` through the ``EntryPicksProvider`` seam, and writes
-``<out>/data/league/**``.
+``<out>/data/leagues/<league>/**`` and lists the league in ``<out>/data/leagues.json``.
 
 What it does not do is decide anything of ours: our season ledger is neither read nor
 written here. A member's advice is computed from that member's own squad and the shared
@@ -38,8 +38,10 @@ from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     ModePathsSummary,
     PreparedLeaguePublication,
+    leagues_beside,
     prepare_league_publication,
     publish_prepared_league,
+    records_advice_for,
 )
 from squadopt.application.league_publication import (
     last_scored_gameweek as last_scored_gameweek,
@@ -50,6 +52,7 @@ from squadopt.application.league_publication import (
 from squadopt.application.league_publication import (
     resolve_live_snapshot_id as resolve_live_snapshot_id,
 )
+from squadopt.contracts.league_tree import league_tree_dir
 from squadopt.data.errors import DataError
 from squadopt.platform.publication_workers import (
     _render_in_worker as _render_in_worker,
@@ -104,6 +107,13 @@ def main() -> int:
     parser.add_argument("--out", default="web/public")
     parser.add_argument("--season")
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
+    parser.add_argument(
+        "--training-season",
+        action="append",
+        dest="training_seasons",
+        help="Explicit prospective inputs; repeat allowed archive seasons and 2026-27 for "
+        "captured current history. Omit to preserve the existing archive policy.",
+    )
     parser.add_argument("--registry", default=str(REGISTRY_PATH))
     parser.add_argument(
         "--in-season-projection",
@@ -149,7 +159,7 @@ def main() -> int:
     parser.add_argument(
         "--rotation-evidence",
         type=Path,
-        help="this week's rotation evidence table (rotation_evidence_v2 csv, its manifest "
+        help="this week's rotation evidence table (rotation_evidence_v4 csv, its manifest "
         "beside it); with --club-news-source, the manager's word is solved for every "
         "member as a switchable, priced constraint",
     )
@@ -172,6 +182,13 @@ def main() -> int:
     if arguments.workers < 1:
         parser.error("--workers must be at least 1")
 
+    # The advice record names one league; another league is published without one.
+    recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
+    if not arguments.no_advice_record and not recorded:
+        print(
+            f"League {arguments.league} is published without an advice record: the record "
+            "names one league until it carries the league."
+        )
     try:
         snapshot_root = Path(arguments.snapshot_root)
         snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
@@ -185,22 +202,33 @@ def main() -> int:
             season=arguments.season,
             handoff_path=arguments.in_season_projection,
             mode_residuals=arguments.mode_residuals,
-            record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
+            record_root=Path(arguments.advice_record_root) if recorded else None,
             history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
             rotation_evidence=arguments.rotation_evidence,
             club_news_source=arguments.club_news_source,
             top100_evidence=arguments.top100_evidence,
+            training_seasons=(
+                tuple(arguments.training_seasons)
+                if arguments.training_seasons is not None
+                else None
+            ),
         )
         prepared = prepare_league_publication(request)
         _capture_note(prepared)
         if arguments.dry_run:
             print("Dry run: nothing written.")
             return 0
+        # A by-hand build of one league keeps the other leagues the site lists when their
+        # trees are there and were rendered from the same capture; another capture is
+        # refused, before anything is solved.
+        beside = leagues_beside(request.out_dir / "data", request.league_id, snapshot_id)
         with league_mapper(replace(request, season=prepared.season), arguments.workers) as mapper:
-            result = publish_prepared_league(prepared, mapper=mapper, on_mode_paths=_mode_note)
+            result = publish_prepared_league(
+                prepared, mapper=mapper, on_mode_paths=_mode_note, beside=beside
+            )
         report = result.report
-        out_dir = request.out_dir / "data" / "league"
+        out_dir = league_tree_dir(request.out_dir / "data", request.league_id)
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:
             if not member.rendered:
@@ -218,6 +246,8 @@ def main() -> int:
             print(f"  removed       {path}  (not produced by this run)")
         if result.top100_note:
             print(f"  top100        {result.top100_note}")
+        if result.legacy_tree:
+            print(f"  legacy tree   {result.legacy_tree}  (data/league from before the directory)")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(

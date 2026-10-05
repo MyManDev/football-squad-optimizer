@@ -54,7 +54,6 @@ page's work. No field and no sentence expresses how sure anything is.
 This module is wired into nothing: no publication, no route, no page.
 """
 
-import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -170,7 +169,6 @@ __all__ = [
     "chip_forecast_schema",
     "holding_threshold",
     "scaled_expected_points",
-    "write_chip_forecast_schema",
 ]
 
 
@@ -803,14 +801,3 @@ def chip_forecast_schema() -> dict[str, Any]:
         ],
         "additionalProperties": False,
     }
-
-
-def write_chip_forecast_schema(path: Path | None = None) -> Path:
-    """Write the schema to ``path`` (default: the committed contract file)."""
-
-    target = Path(path) if path is not None else CHIP_FORECAST_SCHEMA_PATH
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps(chip_forecast_schema(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    return target

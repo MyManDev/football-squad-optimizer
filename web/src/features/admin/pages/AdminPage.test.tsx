@@ -33,7 +33,7 @@ it.each(["tr", "en"] as const)(
     // The measurement archive is no longer served from the member origin: its documents
     // are the laboratory's record, written in the laboratory's vocabulary, and they were
     // reachable inside the member shell.
-    expect(screen.queryByRole("link", { name: copy.analysis })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Measurement archive|Ölçüm arşivi/ })).toBeNull();
     expect(screen.getByRole("link", { name: copy.status })).toHaveAttribute("href", "/status");
     expect(screen.getByRole("link", { name: copy.decisions })).toHaveAttribute(
       "href",

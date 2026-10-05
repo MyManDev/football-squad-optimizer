@@ -28,7 +28,7 @@ def _plan(**overrides: object):  # type: ignore[no-untyped-def]
     fields: dict[str, object] = {
         "season": "2026-27",
         "gameweek": 4,
-        "league_id": 352490,
+        "league_ids": (352490,),
         "snapshot_id": None,
         "cohort_snapshot": None,
         "elite_snapshot": None,

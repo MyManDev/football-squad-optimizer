@@ -9,19 +9,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../../fixtures/league";
+import { jsonResponse, notFound, stubFetchByUrl } from "../../testSupport/fetchByUrl";
+import { EXAMPLE_LEAGUE, exampleTree } from "../../testSupport/league";
 
 import {
+  createLeagueTree,
   LeagueDataError,
   LeagueDataMissing,
-  loadEntryAdvice,
-  loadEntryAdviceIndex,
-  loadEntrySquad,
-  loadLeagueMembers,
-  loadScoreboard,
   lookupPublishedLeague,
 } from "./data";
+import { DIRECTORY_CONTRACT_VERSION } from "./directory";
 
 const ENTRY = 35249001;
+
+// The example league's tree, read the way a page reads it: through the methods the gate
+// hands down, under the legacy path `data/league/`.
+const loadEntryAdvice = exampleTree.entryAdvice;
+const loadEntryAdviceIndex = exampleTree.entryAdviceIndex;
+const loadEntrySquad = exampleTree.entrySquad;
+const loadLeagueMembers = exampleTree.members;
+const loadScoreboard = exampleTree.scoreboard;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -55,7 +62,7 @@ const published = {
   payload: { season: "2026-27", gameweeks: [], cumulative: { through_gameweek: null } },
 };
 
-describe("loadScoreboard", () => {
+describe("tree.scoreboard", () => {
   it("refuses a measured row without a named scoring basis", async () => {
     const value = structuredClone(published);
     Object.assign(value.payload, { gameweeks: [{ ours: { net: 26, scoring_basis: null } }] });
@@ -73,6 +80,28 @@ describe("loadScoreboard", () => {
       signal: expect.any(AbortSignal),
     });
     expect(envelope.payload.season).toBe("2026-27");
+  });
+
+  it("reads a league listed by the directory under its own path", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(published)));
+    vi.stubGlobal("fetch", fetcher);
+    const tree = createLeagueTree({ ...EXAMPLE_LEAGUE, path: "leagues/352490" });
+
+    const envelope = await tree.scoreboard();
+
+    expect(fetcher).toHaveBeenCalledWith("/data/leagues/352490/scoreboard.json", {
+      cache: "no-cache",
+      signal: expect.any(AbortSignal),
+    });
+    expect(envelope.payload.season).toBe("2026-27");
+  });
+
+  it("refuses a document of another league under the tree's path", async () => {
+    const other = { ...published, payload: { ...published.payload, league_id: 7 } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(other))));
+    const tree = createLeagueTree({ ...EXAMPLE_LEAGUE, path: "leagues/352490" });
+
+    await expect(tree.scoreboard()).rejects.toThrow(/league 7's, not league 352490's/);
   });
 
   it("raises LeagueDataMissing on a 404, the normal state before the first weekly run", async () => {
@@ -151,22 +180,79 @@ const publishedMembers = {
   },
 };
 
+const legacyLeague = {
+  leagueId: 352490,
+  leagueName: "Published league",
+  season: "2026-27",
+  gameweek: 4,
+  path: "league",
+};
+
+/** A site from before the directory: no `leagues.json`, one league under `data/league/`. */
+function legacySite(members: unknown = publishedMembers) {
+  return stubFetchByUrl([
+    ["/data/leagues.json", notFound],
+    ["/data/league/members.json", () => jsonResponse(members)],
+  ]);
+}
+
 describe("published league lookup", () => {
-  it("uses the fixed publication URL and treats an empty connected league as connected", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(publishedMembers)));
-    vi.stubGlobal("fetch", fetcher);
-    await expect(lookupPublishedLeague(352490)).resolves.toBe("connected");
+  it("reads the legacy tree as the directory of one and treats an empty connected league as connected", async () => {
+    const fetcher = legacySite();
+    await expect(lookupPublishedLeague(352490)).resolves.toEqual({
+      status: "connected",
+      league: legacyLeague,
+    });
     expect(fetcher).toHaveBeenCalledWith("/data/league/members.json", {
       cache: "no-cache",
       signal: expect.any(AbortSignal),
     });
   });
 
-  it("rejects any other ID without requesting a document or upstream API", async () => {
-    const fetcher = vi.fn();
-    vi.stubGlobal("fetch", fetcher);
-    await expect(lookupPublishedLeague(123)).resolves.toBe("unsupported");
-    expect(fetcher).not.toHaveBeenCalled();
+  it("reads a league the directory lists at the path the directory names", async () => {
+    const directory = {
+      contract_version: DIRECTORY_CONTRACT_VERSION,
+      generated_at_utc: "2026-09-09T06:00:00Z",
+      payload: {
+        leagues: [
+          {
+            league_id: 352490,
+            league_name: "Published league",
+            season: "2026-27",
+            gameweek: 4,
+            path: "leagues/352490",
+          },
+        ],
+      },
+    };
+    const fetcher = stubFetchByUrl([
+      ["/data/leagues.json", () => jsonResponse(directory)],
+      ["/data/leagues/352490/members.json", () => jsonResponse(publishedMembers)],
+    ]);
+    await expect(lookupPublishedLeague(352490)).resolves.toEqual({
+      status: "connected",
+      league: { ...legacyLeague, path: "leagues/352490" },
+    });
+    expect(fetcher).toHaveBeenCalledWith("/data/leagues/352490/members.json", {
+      cache: "no-cache",
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetcher.mock.calls.map(([url]) => url)).not.toContain("/data/league/members.json");
+  });
+
+  it("rejects any other ID after the directory alone, without a document or upstream API", async () => {
+    const fetcher = legacySite();
+    await expect(lookupPublishedLeague(123)).resolves.toEqual({ status: "unsupported" });
+    // Only the directory was read: the absent list, then the legacy tree's record.
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      "/data/leagues.json",
+      "/data/league/members.json",
+    ]);
+  });
+
+  it("does not read a legacy tree that publishes another league as the one asked for", async () => {
+    legacySite({ ...publishedMembers, payload: { ...publishedMembers.payload, league_id: 123 } });
+    await expect(lookupPublishedLeague(352490)).resolves.toEqual({ status: "unsupported" });
   });
 
   it.each(["test", "development"])("never falls back to an example in %s", async (mode) => {
@@ -192,12 +278,11 @@ describe("published league lookup", () => {
     { ...publishedMembers, payload: null },
     { ...publishedMembers, payload: { ...publishedMembers.payload, public_after_deadline: false } },
     { ...publishedMembers, payload: { ...publishedMembers.payload, league_id: "352490" } },
-    { ...publishedMembers, payload: { ...publishedMembers.payload, league_id: 123 } },
     { ...publishedMembers, payload: { ...publishedMembers.payload, members: [null] } },
   ])(
     "does not classify an incompatible or invalid publication as a league result",
     async (value) => {
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
+      legacySite(value);
       await expect(lookupPublishedLeague(352490)).rejects.toBeInstanceOf(LeagueDataError);
     },
   );
