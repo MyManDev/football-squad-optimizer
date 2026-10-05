@@ -597,8 +597,9 @@ def _located_entries(
     """Locate every coded claim, and either refuse or report the ones that will not locate.
 
     The line between the two outcomes is what can still be *said* about the failure. A claim
-    whose quote is absent or ambiguous, or which cites a document nobody fetched, can be named
-    -- the player, the club, the URL -- so it can be dropped and recorded. A claim missing a
+    whose quote is absent or ambiguous, which cites a document nobody fetched, or which leaves
+    another text field empty, can be named -- the player, the club, the URL -- so it can be
+    dropped and recorded. A claim missing a
     required field cannot: there is no identity to report, and a response shaped like that is
     a broken answer rather than one bad citation, so it refuses the whole response either way.
     """
@@ -627,20 +628,7 @@ def _located_entries(
                     "there are no bytes to locate its quote in."
                 )
             span_start, span_end = locate_quote(content, _text(record, "quote", label), label)
-        except ClubNewsError as error:
-            if not report_unverifiable:
-                raise
-            dropped.append(
-                UnlocatableClaim(
-                    player_name=player_name,
-                    team_name=team_name,
-                    source_url=source_url,
-                    why=str(error),
-                )
-            )
-            continue
-        located.append(
-            {
+            claim = {
                 "player_name": player_name,
                 "team_name": team_name,
                 "disposition": _text(record, "disposition", label),
@@ -655,7 +643,19 @@ def _located_entries(
                     else {}
                 ),
             }
-        )
+        except ClubNewsError as error:
+            if not report_unverifiable:
+                raise
+            dropped.append(
+                UnlocatableClaim(
+                    player_name=player_name,
+                    team_name=team_name,
+                    source_url=source_url,
+                    why=str(error),
+                )
+            )
+            continue
+        located.append(claim)
     return located, dropped
 
 
