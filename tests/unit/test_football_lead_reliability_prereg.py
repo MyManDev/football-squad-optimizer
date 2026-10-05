@@ -112,7 +112,9 @@ def test_the_interval_uses_the_policy_values_the_protocol_states() -> None:
     ) == (0.90, 5000, 4, 0)
     assert "candidate_id" in inspect.signature(season_aware_moving_block_interval).parameters
     quantities = _section("Quantities")
-    assert "confidence 0.90, 5000 resamples, blocks of 4, seed 0" in quantities
+    assert "confidence 0.90, 5000 resamples, blocks of 1, seed 0" in quantities
+    assert "fewer than six units in total over the two seasons" in quantities
+    assert "no interval, marked thin" in quantities
     assert "ordered by target gameweek" in quantities
 
 
@@ -150,3 +152,50 @@ def test_the_protocol_opens_no_unread_season_and_claims_no_confirmation() -> Non
     assert '`seasons_never_opened: ["2025-26"]`' in record
     assert "`locked_holdout_accessed: false`" in record
     assert "never rerun with other settings" in record
+
+
+def test_the_binding_clauses_of_the_primary_quantity_are_pinned() -> None:
+    """Review of 5 October: the clauses a runner is held to, not only the roster phrases."""
+
+    quantities = _section("Quantities")
+    for clause in (
+        "for the same player and fixture, at lead 1 from the lead-1 origin g",
+        "Its paired difference is e_k^2 - e_1^2.",
+        "The unit is the target gameweek within a season",
+        "The lead's figure is the mean over its units.",
+        "`candidate_id` `lead_k` for lead k",
+        "one coefficient per position",
+        "the ten are chosen per origin, target gameweek and position",
+    ):
+        assert clause in quantities, clause
+    apart = _section("Kept apart")
+    assert "do not enter the primary quantity or the secondary quantities" in apart
+    assert "with no interval" in apart
+    instant = _section("Decision instant, fit and roster")
+    assert "less 90 minutes" in instant
+
+
+def test_the_interval_policy_resamples_the_smallest_lead() -> None:
+    """Review of 5 October: with blocks of 4 a season of four units could not resample."""
+
+    policy = PromotionPolicy(
+        confidence_level=0.90, bootstrap_resamples=5000, moving_block_length=1, deterministic_seed=0
+    )
+    units = [("2023-24", float(value)) for value in (1.0, 2.0, 4.0, 8.0)]
+    units += [("2024-25", float(value)) for value in (1.0, 3.0, 9.0, 27.0)]
+    low, high = season_aware_moving_block_interval(units, policy=policy, candidate_id="lead_13")
+    assert low < high
+    collapsed = PromotionPolicy(
+        confidence_level=0.90, bootstrap_resamples=50, moving_block_length=4, deterministic_seed=0
+    )
+    low, high = season_aware_moving_block_interval(units, policy=collapsed, candidate_id="lead_13")
+    assert low == high
+
+
+def test_the_motivation_names_the_records_that_read_the_early_leads() -> None:
+    why = _section("Why this is written")
+    assert "scored v1 at leads 1 to 3 from the same six origins" in why
+    assert "`docs/research/football_joint_role_minutes_2026_10_02.md`" in why
+    assert "neither goes past lead 3" in why
+    read = _section("What has been read")
+    assert "scored v1 as its control at GW11, 19, 27 and 35 of it" in read

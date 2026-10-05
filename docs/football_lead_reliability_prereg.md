@@ -11,8 +11,14 @@ waits until this protocol has merged.
 
 A planner's horizon should rest on how its forecast degrades with lead
 (`docs/prediction_research_agenda.md`, "Multi-horizon forecasting"). For
-`football_team_share_v1`, the football model the experimental option has served so far, no
-such record exists:
+`football_team_share_v1`, the football model the experimental option served first, the per-lead
+record is partial. The fixed future-role ablation in `docs/research/football_candidate_results.md`
+scored v1 at leads 1 to 3 from the same six origins, with a proxy cutoff 90 minutes before the
+first kickoff, as the control arm of a role-transition comparison (2024-25 point MSE 3.4388,
+3.8381 and 4.0932 at leads 1, 2 and 3), and #924's record
+(`docs/research/football_joint_role_minutes_2026_10_02.md`) scored v1 as its control at 2023-24
+GW11, 19, 27 and 35. Neither pairs a lead against a lead-1 forecast of the same target, and
+neither goes past lead 3. The other records do not measure leads either:
 
 - `horizon_decay` (`src/squadopt/backtest/horizon_decay.py`) measures the drift of the
   earlier horizon builder, not the football model, at offsets 0 to 3 by default.
@@ -20,22 +26,25 @@ such record exists:
   week windows. A summed error mixes leads and cannot be compared across window lengths, as
   that record says.
 
-This protocol measures the error at each lead separately, for `football_team_share_v1`
-only, from one to fourteen weeks ahead. The joint role model the owner is preparing for the
-experimental option (`football_joint_role_minutes_v1`) is a different model; a record of it
-needs its own protocol, and this one says nothing about it.
+This protocol measures the error at each lead separately, for `football_team_share_v1` only,
+from one to fourteen weeks ahead, each lead paired against a lead-1 forecast of the same target;
+what it adds to the ablation is that pairing at every lead and the leads 4 to 14. The joint role
+models the experimental option now serves (`football_joint_role_minutes_v1` from #924 and
+`football_joint_role_retained_history_v1` from #948) are different models; a record of them
+needs its own protocol, and this one says nothing about them.
 
 ## What has been read
 
 - 2022-23 supplies priors only: `causal_training` in
   `src/squadopt/application/football_live.py` skips the first archive season.
 - 2024-25 is reused. It was a development season of the football candidate
-  (`docs/research/football_candidate_results.md`), and #880 scored its five-week forecasts
-  from GW11, 15, 19, 23, 27 and 31, so its leads 1 to 5 from those origins have been read.
-  Its leads 6 to 14 have not.
+  (`docs/research/football_candidate_results.md`), whose fixed future-role ablation scored v1 at
+  leads 1 to 3 from GW11, 15, 19, 23, 27 and 31, and #880 scored its five-week forecasts from
+  the same origins, so its leads 1 to 5 from those origins have been read. Its leads 6 to 14
+  have not.
 - 2023-24 is reused too. It was the inner validation season of the component ablation
-  (`docs/research/football_component_ablation.md`), and its archive files are hashed in later
-  football records.
+  (`docs/research/football_component_ablation.md`), its archive files are hashed in later
+  football records, and #924's record scored v1 as its control at GW11, 19, 27 and 35 of it.
 - No evaluation season here is unread, so the record is descriptive development evidence
   and claims no confirmation.
 - 2025-26 is never opened. The owner's 2026-09-28 scope
@@ -108,26 +117,35 @@ lead.
 - The figure's interval is `season_aware_moving_block_interval` from
   `src/squadopt/evaluation/statistics.py`, with the units of each season ordered by target
   gameweek. It uses these PromotionPolicy values, stated explicitly: confidence 0.90, 5000
-  resamples, blocks of 4, seed 0, with `candidate_id` `lead_k` for lead k.
-- A lead with fewer than six units is reported with its interval marked thin. Leads 13 and
-  14 have at most four units in each season.
+  resamples, blocks of 1, seed 0, with `candidate_id` `lead_k` for lead k. Blocks of 1, because
+  a lead's units from the measured origins are four gameweeks apart, and because with blocks of
+  4 a season of four units has one block start, so every resample reproduces the sample and the
+  interval collapses to a point; blocks of 1 resample every unit within its season.
+- A lead with fewer than six units in total over the two seasons is reported with its point
+  estimate and no interval, marked thin. Counts are read over both seasons: with the measured
+  origins, leads 13 and 14 have four units in each season, eight in total, and the blank and
+  double exclusion can lower any lead's count.
 - The record also reports the mean of e_k^2 and the mean of e_1^2 behind each difference.
 
 **Secondary,** descriptive, by lead, over the measured origins' forecasts:
 
 - the mean signed error;
 - the slope of realized on forecast points, by ordinary least squares;
-- the within-position Spearman rank correlation of forecast and realized points, pooled over
-  the lead's player-fixtures;
-- top-ten optimism: forecast less realized points among each position's ten highest
-  forecasts at each origin and target gameweek;
+- the within-position Spearman rank correlation of forecast and realized points: one
+  coefficient per position, over the lead's player-fixtures of that position pooled across
+  origins, target gameweeks and seasons;
+- top-ten optimism: the mean, over player-fixtures, of forecast less realized points among each
+  position's ten highest forecasts at each origin and target gameweek (the ten are chosen per
+  origin, target gameweek and position; the mean pools them, by lead);
 - counts of forecast, matched, unmatched and paired player-fixtures.
 
 ## Kept apart
 
 - Target gameweeks in which any club has a blank or a double in the final calendar are
-  reported separately and do not enter the primary quantity. The final calendar knows them
-  in hindsight.
+  reported separately and do not enter the primary quantity or the secondary quantities, which
+  are computed over the same units as the primary. What is reported for them, by lead: the
+  number of such units and the mean paired difference e_k^2 - e_1^2 over their player-fixtures,
+  descriptive, with no interval. The final calendar knows them in hindsight.
 - A fixture moved after an origin cannot be told apart. `archive_history` reads only
   `team_h` and `team_a` from `fixtures.csv`, and that file carries final values, so the
   primary quantity may contain such fixtures. The record says so.
