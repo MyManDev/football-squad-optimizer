@@ -34,6 +34,7 @@ from squadopt.data.sources.club_news_coding import (
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     coding_prompt_sha256,
 )
+from squadopt.data.sources.club_news_scope import is_whole_sentence
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 
@@ -167,8 +168,10 @@ def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body,
     table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
     row = read_rotation_evidence_artifact(table_path, manifest_path)
     observed = row.loc[row.rotation_claim_observed].iloc[0]
-    # The table accepts it: its rule reads the quote alone.
-    assert bool(observed.rotation_claim_scope_verified)
+    # The table refuses it too: the parser asks the reader's question of the cited bytes.
+    # The label keeps what the quote's own wording says; only the flag is withheld.
+    assert not bool(observed.rotation_claim_scope_verified)
+    assert observed.rotation_claim_fixture_scope == "upcoming_premier_league"
 
     (word,) = load_manager_words(table_path, club_news_source=source).words
 
@@ -187,7 +190,9 @@ def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body,
     ],
 )
 def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, body, quote):
-    table_path, _, source = _pair(tmp_path, quote=quote, body=body)
+    table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
+    row = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert bool(row.loc[row.rotation_claim_observed].iloc[0].rotation_claim_scope_verified)
 
     (word,) = load_manager_words(table_path, club_news_source=source).words
 
@@ -230,12 +235,38 @@ def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, bo
 def test_whole_sentence_boundaries(text, quote, expected):
     encoded = text.encode("utf-8")
     first = encoded.index(quote.encode("utf-8"))
-    assert _is_whole_sentence(encoded, first, first + len(quote.encode("utf-8"))) is expected
+    last = first + len(quote.encode("utf-8"))
+    assert _is_whole_sentence(encoded, first, last) is expected
+    # The parser's copy, which sets the table's flag, answers the same.
+    assert is_whole_sentence(encoded, first, last) is expected
 
 
 def test_a_span_that_cuts_a_character_in_half_is_not_a_sentence():
     encoded = "Şaka is out.".encode()
     assert _is_whole_sentence(encoded, 1, len(encoded)) is False
+    assert is_whole_sentence(encoded, 1, len(encoded)) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'Arteta said: "Saka is out." Is he fit? No\u2026 Timber is.\nCoach: (Saka is out)!',
+        "It is not true that Saka is out, he said... Really?! \u201cYes.\u201d\r\nEnd: [no] ",
+        "Şaka?\tOut!  Out. 'In'.. ok",
+    ],
+)
+def test_the_parser_and_the_reader_hold_one_definition_of_a_whole_sentence(text):
+    """The parser sets the table's flag and the reader refuses a claim by its own copy.
+
+    Every span of each text gets the same answer from both, so neither copy can move alone.
+    """
+
+    encoded = text.encode("utf-8")
+    for first in range(len(encoded)):
+        for last in range(first + 1, len(encoded) + 1):
+            assert is_whole_sentence(encoded, first, last) is _is_whole_sentence(
+                encoded, first, last
+            ), (first, last)
 
 
 def _rewrite(table_path, manifest_path, change):

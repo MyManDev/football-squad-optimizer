@@ -182,6 +182,45 @@ def test_current_absence_and_source_publication_survive_without_moving_quote_off
     assert claim.publication_source_sha256 == hashlib.sha256(document.content).hexdigest()
 
 
+ABSENCE = "Saka will miss the next Premier League match."
+
+
+@pytest.mark.parametrize(
+    "body,quote,verified",
+    [
+        (ABSENCE, ABSENCE, True),
+        (f"Team news. {ABSENCE} Timber is fit.", ABSENCE, True),
+        (f"Arteta said: {ABSENCE}", ABSENCE, True),
+        (f"Team news\n{ABSENCE[:-1]}\nTimber is fit.", ABSENCE[:-1], True),
+        (f"It is not true that {ABSENCE}", ABSENCE, False),
+        (f"{ABSENCE[:-1]} if he trains.", ABSENCE[:-1], False),
+        # As the reader reads it: a period after the span is read like an ellipsis, as
+        # the sentence going on, so a quote must keep its sentence's own final period.
+        (ABSENCE, ABSENCE[:-1], False),
+    ],
+)
+def test_a_quote_cut_from_inside_a_sentence_is_not_scope_verified(body, quote, verified):
+    """The quote's own wording passes the scope rule; the sentence around it decides.
+
+    The flag alone is withheld. The label keeps what the quote's wording says, as it does
+    when the builder withholds the flag for a wrong name or calendar.
+    """
+
+    assert verified_fixture_scope(quote.encode(), "stated_expected_absent", player_name="Saka") == (
+        "upcoming_premier_league",
+        True,
+    )
+    document = _document(body)
+    claim = parse_claim_response(
+        locate_claim_response(_response(quote=quote, label="stated_expected_absent"), (document,)),
+        (document,),
+    )[0]
+    assert claim.scope_verified is verified
+    assert claim.fixture_scope == "upcoming_premier_league"
+    assert claim.publication_verified
+    assert resolve_span(document.readable, claim) == quote.encode()
+
+
 def test_model_dateline_cannot_replace_missing_or_disagreeing_source_metadata():
     quote = "Saka will miss the next league match."
     for prefix, expected in [
