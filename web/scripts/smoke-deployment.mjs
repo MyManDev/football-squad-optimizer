@@ -85,8 +85,20 @@ function assetNames(body) {
  * or the solver's wasm, never the HTML shell. A name an edge cached as HTML before it was built
  * is the failure this exists for: the deploy is green and the page is broken there.
  */
+/**
+ * Every asset the shell reaches answers as itself. While a deployment takes over, the alias
+ * can still answer the previous release's shell for a moment, naming assets the new
+ * deployment no longer holds (404). So a walk that fails is started again from a freshly read
+ * shell, within the same budget, and only a shell that keeps naming a missing asset fails.
+ */
 export async function checkAssets(baseUrl, { fetchImpl, sleep, attempts }) {
-  const shell = await withAttempts(new URL("/", baseUrl), { sleep, attempts }, async (url) => {
+  return retrying({ sleep, attempts }, () => walkAssets(baseUrl, fetchImpl));
+}
+
+/** One pass: the shell, then every asset it reaches, each asked once. */
+async function walkAssets(baseUrl, fetchImpl) {
+  const once = { sleep: async () => {}, attempts: 1 };
+  const shell = await withAttempts(new URL("/", baseUrl), once, async (url) => {
     const response = await fetchImpl(url, request());
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.text();
@@ -100,7 +112,7 @@ export async function checkAssets(baseUrl, { fetchImpl, sleep, attempts }) {
     if (seen.size > MAX_ASSETS) throw new Error(`more than ${MAX_ASSETS} assets reached`);
     const bodies = await Promise.all(
       batch.map((name) =>
-        withAttempts(new URL(`/assets/${name}`, baseUrl), { sleep, attempts }, async (url) => {
+        withAttempts(new URL(`/assets/${name}`, baseUrl), once, async (url) => {
           const response = await fetchImpl(url, request());
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const type = (response.headers.get("content-type") ?? "").toLowerCase();
@@ -140,19 +152,26 @@ function request() {
 }
 
 /** One check, tried up to `attempts` times with a growing pause, as a deploy propagates. */
-async function withAttempts(url, { sleep, attempts }, check) {
+/** Run `attempt` until it succeeds, backing off between tries; rethrow the last failure. */
+async function retrying({ sleep, attempts }, attempt) {
   let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  for (let tried = 1; tried <= attempts; tried += 1) {
     try {
-      return await check(url);
+      return await attempt();
     } catch (error) {
       lastError = error;
-      if (attempt < attempts) await sleep(Math.min(2 ** attempt * 1_000, 15_000));
+      if (tried < attempts) await sleep(Math.min(2 ** tried * 1_000, 15_000));
     }
   }
-  throw new Error(`Deployment smoke failed for ${url}: ${lastError?.message}`, {
-    cause: lastError,
-  });
+  throw lastError;
+}
+
+async function withAttempts(url, options, check) {
+  try {
+    return await retrying(options, () => check(url));
+  } catch (error) {
+    throw new Error(`Deployment smoke failed for ${url}: ${error?.message}`, { cause: error });
+  }
 }
 
 async function checkEndpoint(baseUrl, check, { fetchImpl, sleep, attempts }) {

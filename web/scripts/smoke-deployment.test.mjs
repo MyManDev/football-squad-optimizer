@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ABSENT_ASSET,
+  checkAssets,
   DIRECTORY,
   LEGACY_TREE,
   SMOKE_CHECKS,
@@ -119,6 +120,48 @@ describe("deployment smoke", () => {
         }),
       }),
     ).rejects.toThrow(`Deployment smoke failed for ${BASE}${asset}`);
+  });
+
+  // While a deployment takes over, the alias can answer the previous release's shell, naming
+  // an entry the new deployment no longer holds.
+  const STALE_SHELL = SHELL.replace("index-AbCd1234.js", "index-OldOld12.js");
+  const takingOver = (shells) => {
+    const asked = [];
+    const fetchImpl = async (url) => {
+      asked.push(url.pathname);
+      if (url.pathname === "/") {
+        const shell = shells.length > 1 ? shells.shift() : shells[0];
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => "text/html" },
+          text: async () => shell,
+        };
+      }
+      if (url.pathname === "/assets/index-OldOld12.js") {
+        return { ok: false, status: 404, headers: { get: () => "no-store" }, text: async () => "" };
+      }
+      return responseFor(url);
+    };
+    return { asked, fetchImpl };
+  };
+
+  it("reads the shell again when an asset it names is gone, as during a takeover", async () => {
+    const { asked, fetchImpl } = takingOver([STALE_SHELL, SHELL]);
+    const reached = await checkAssets(BASE, { fetchImpl, sleep: async () => {}, attempts: 3 });
+    expect(asked.filter((path) => path === "/")).toHaveLength(2);
+    expect(reached.sort()).toEqual(
+      Object.keys(ASSETS)
+        .map((path) => path.slice(8))
+        .sort(),
+    );
+  });
+
+  it("fails, naming the asset, when every shell names one that is gone", async () => {
+    const { fetchImpl } = takingOver([STALE_SHELL]);
+    await expect(
+      checkAssets(BASE, { fetchImpl, sleep: async () => {}, attempts: 3 }),
+    ).rejects.toThrow(`Deployment smoke failed for ${BASE}/assets/index-OldOld12.js: HTTP 404`);
   });
 
   it("rejects a missing asset that answers the shell or can be cached", async () => {
