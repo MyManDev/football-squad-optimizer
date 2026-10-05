@@ -326,8 +326,9 @@ Run it from a plain Windows PowerShell window, never from an agent application's
 terminal: a backend started inside an application's process tree dies when that application
 updates or closes, as on 2026-10-04 when a Store update of the Codex app ended the api and
 the workers started from its sandbox. The helper and the launcher refuse to start a backend
-when `claude.exe`, `codex.exe` or the Codex sandbox service is among their ancestors
-(`scripts/backend_parentage.ps1`); the dry run is not refused. Replace `<same-ISO>` with the
+when an agent application (`claude.exe`, the Codex app's `ChatGPT.exe` and `codex.exe`, its
+sandbox service) is among their ancestors, or a variable those agents set for their shells
+is present (`scripts/backend_parentage.ps1`); the dry run is not refused. Replace `<same-ISO>` with the
 accepted candidate timestamp used for `ship.sh`. First preview the restart:
 
 ```powershell

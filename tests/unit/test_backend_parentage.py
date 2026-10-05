@@ -28,12 +28,23 @@ POWERSHELL = shutil.which("powershell.exe")
 pytestmark = pytest.mark.skipif(POWERSHELL is None, reason="requires Windows PowerShell 5.1")
 
 
-def _powershell(*arguments: str, agents: str | None = None) -> subprocess.CompletedProcess[str]:
+#: The variables an agent sets for its shells; whatever ran pytest may have set them.
+MARKERS = ("CLAUDECODE", "CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_SESSION_ID")
+
+
+def _powershell(
+    *arguments: str, agents: str | None = None, marker: str | None = None
+) -> subprocess.CompletedProcess[str]:
     assert POWERSHELL is not None
-    environment = dict(os.environ)
-    environment.pop("SQUADOPT_AGENT_APPLICATIONS", None)
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name not in MARKERS and name != "SQUADOPT_AGENT_APPLICATIONS"
+    }
     if agents is not None:
         environment["SQUADOPT_AGENT_APPLICATIONS"] = agents
+    if marker is not None:
+        environment[marker] = "1"
     return subprocess.run(
         [POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", *arguments],
         capture_output=True,
@@ -42,6 +53,12 @@ def _powershell(*arguments: str, agents: str | None = None) -> subprocess.Comple
         check=False,
         env=environment,
     )
+
+
+def _flat(text: str) -> str:
+    """An error as a reader sees it: PowerShell wraps it at the console width."""
+
+    return " ".join(text.split())
 
 
 def _walk(table: str, start: int, agents: str = "claude.exe,codex.exe") -> str:
@@ -99,9 +116,12 @@ def test_a_plain_console_or_the_watch_task_is_not_an_agent() -> None:
     )
 
 
-def test_the_default_list_names_both_agent_applications_and_the_sandbox() -> None:
+def test_the_default_lists_name_the_agents_the_codex_app_and_their_markers() -> None:
     text = HELPER.read_text(encoding="ascii")
-    assert "@('claude.exe', 'codex.exe', 'codex-windows-sandbox-service.exe')" in text
+    assert (
+        "@('claude.exe', 'ChatGPT.exe', 'codex.exe', 'codex-windows-sandbox-service.exe')" in text
+    )
+    assert "@('" + "', '".join(MARKERS) + "')" in text
 
 
 def test_the_launcher_refuses_to_start_under_an_agent_and_starts_nothing(tmp_path: Path) -> None:
@@ -118,8 +138,30 @@ def test_the_launcher_refuses_to_start_under_an_agent_and_starts_nothing(tmp_pat
         agents="python.exe",
     )
     assert completed.returncode != 0
-    assert "Refusing to start the backend: this runs under python.exe" in completed.stderr
+    assert "Refusing to start the backend: this runs under python.exe" in _flat(completed.stderr)
     assert not store.exists(), "the refusal must come before anything is written"
+
+
+@pytest.mark.parametrize("marker", MARKERS)
+def test_a_start_detached_from_an_agent_shell_is_refused_by_the_marker_it_inherits(
+    tmp_path: Path, marker: str
+) -> None:
+    # No agent among the ancestors (none is named), as when the shell that started the
+    # launcher has exited; the variable the agent set for that shell is still here.
+    store = tmp_path / "store"
+    completed = _powershell(
+        "-File",
+        str(LAUNCHER),
+        "-RepoRoot",
+        str(tmp_path),
+        "-StoreRoot",
+        str(store),
+        agents="no-agent-application.exe",
+        marker=marker,
+    )
+    assert completed.returncode != 0
+    assert f"this runs with {marker} set" in _flat(completed.stderr)
+    assert not store.exists()
 
 
 def test_the_launcher_still_stops_and_reports_under_an_agent(tmp_path: Path) -> None:
@@ -134,6 +176,10 @@ def test_the_restart_refuses_under_an_agent_but_a_dry_run_is_not_refused(tmp_pat
     arguments = ("-File", str(RESTART), "-AcceptedGeneratedAt", "2026-10-02T16:56:19Z")
     real = _powershell(*arguments, "-RepoRoot", str(tmp_path), agents="python.exe")
     assert real.returncode != 0
-    assert "Refusing to restart the backend: this runs under python.exe" in real.stderr
+    refusal = _flat(real.stderr)
+    assert "Refusing to restart the backend: this runs under python.exe" in refusal
+    # The watch task starts a missing backend; it never replaces a running one.
+    assert "Run it from a plain Windows PowerShell window." in refusal
+    assert "SquadOptBackendWatch" not in refusal
     dry = _powershell(*arguments, "-RepoRoot", str(tmp_path), "-DryRun", agents="python.exe")
     assert "Refusing to" not in dry.stdout + dry.stderr

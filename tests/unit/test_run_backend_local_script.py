@@ -22,6 +22,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = REPOSITORY_ROOT / "scripts" / "run_backend_local.ps1"
 LOGON = REPOSITORY_ROOT / "scripts" / "start_backend_at_logon.ps1"
 PARENTAGE = REPOSITORY_ROOT / "scripts" / "backend_parentage.ps1"
+# The variables an agent sets for its shells (scripts/backend_parentage.ps1).
+AGENT_MARKERS = {
+    "CLAUDECODE",
+    "CODEX_SANDBOX",
+    "CODEX_SANDBOX_NETWORK_DISABLED",
+    "CODEX_SESSION_ID",
+}
 TUNNEL = REPOSITORY_ROOT / "deploy" / "cloudflared" / "config.example.yml"
 BACKEND_RUNTIME = REPOSITORY_ROOT / "src" / "squadopt" / "platform" / "backend_runtime.py"
 
@@ -208,7 +215,10 @@ function Invoke-WebRequest {
     return subprocess.run(
         [str(POWERSHELL), "-NoProfile", "-File", str(harness)],
         # Whatever started pytest is no agent here; test_backend_parentage.py covers the guard.
-        env={**os.environ, "SQUADOPT_AGENT_APPLICATIONS": "no-agent-application.exe"},
+        env={
+            **{name: value for name, value in os.environ.items() if name not in AGENT_MARKERS},
+            "SQUADOPT_AGENT_APPLICATIONS": "no-agent-application.exe",
+        },
         capture_output=True,
         text=True,
         timeout=30,
