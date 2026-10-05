@@ -576,7 +576,10 @@ it kept that HTML for the name: when a later deploy built a chunk of that name, 
 reaching that edge got HTML for the chunk and browsers kept the broken copy for a year. Then
 the smoke reads the shell, follows every asset it names (the entry, its stylesheets, every
 lazy page, the device solver's worker and wasm, the fonts) and requires each to answer as
-itself, never as the shell.
+itself, never as the shell. A walk that meets a missing asset reads the shell again and walks
+again within the same retry budget: for a moment after a deploy the alias can still answer the
+previous release's shell, whose entry the new deployment no longer holds (fix16's production
+smoke failed on exactly that, `index-DWoiDReR.js`, while the site itself was consistent).
 
 So **never request a not-yet-deployed asset name on the live domain** (a local build predicts
 the names CI will publish): each such request poisons that name at the edge that answered.
