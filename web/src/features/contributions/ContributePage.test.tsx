@@ -127,3 +127,12 @@ it("filters the complete roster in order and clears drafts when upstream filters
   await user.selectOptions(screen.getByLabelText("Oyuncu"), "4");
   expect(screen.queryByRole("option", { name: /Defender/ })).toBeNull();
 });
+it("reads a refused catalogue's body, so the request ends", async () => {
+  const response = new Response("<html>bad gateway</html>", { status: 502 });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => response),
+  );
+  mount();
+  await vi.waitFor(() => expect(response.bodyUsed).toBe(true));
+});
