@@ -1,0 +1,32 @@
+# The FPL probe: a low-rate Worker that measures whether FPL answers requests leaving
+# Cloudflare's network (docs/fpl_forwarder_probe.md). It is deployed and deleted only by
+# .github/workflows/deploy-fpl-probe.yml, which fills in the KV namespace id on the runner.
+# The Pages site is not part of this: it stays static, with no functions/ and no _worker.js.
+
+name = "squadopt-fpl-probe"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# One address only: the route below. No workers.dev subdomain and no preview addresses.
+workers_dev = false
+preview_urls = false
+
+# Exactly the probe's two paths on the site's host. The pattern starts at /api/v1/fpl-probe,
+# so the site's own paths never reach this Worker. The zone's /api/v1/ rate-limit rule
+# (50 requests per 10 s per IP) applies in front of it.
+routes = [
+  { pattern = "squadopt.mymandev.com/api/v1/fpl-probe*", zone_name = "mymandev.com" },
+]
+
+# Two requests to FPL every 30 minutes: about 96 a day.
+[triggers]
+crons = ["*/30 * * * *"]
+
+# The records. The deploy workflow finds or creates the namespace titled squadopt-fpl-probe
+# and replaces this placeholder with its id; the committed file never holds an account's id.
+[[kv_namespaces]]
+binding = "PROBE"
+id = "FILLED_IN_BY_THE_DEPLOY_WORKFLOW"
+
+[observability]
+enabled = true
