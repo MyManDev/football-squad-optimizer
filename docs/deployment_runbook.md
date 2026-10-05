@@ -322,8 +322,13 @@ recovery guidance. It can only replace a running backend, never start one. If it
 start it by hand from the released code, as [a stopped backend](#a-stopped-backend-starts-from-the-release)
 below describes, then carry on. The processes belong to the logon session and nothing restarts
 them, so a logoff or a reboot between the publish and this step leaves nothing to restart.
-Replace `<same-ISO>` with the accepted candidate timestamp used for `ship.sh`. First preview
-the restart:
+Run it from a plain Windows PowerShell window, never from an agent application's shell or
+terminal: a backend started inside an application's process tree dies when that application
+updates or closes, as on 2026-10-04 when a Store update of the Codex app ended the api and
+the workers started from its sandbox. The helper and the launcher refuse to start a backend
+when `claude.exe`, `codex.exe` or the Codex sandbox service is among their ancestors
+(`scripts/backend_parentage.ps1`); the dry run is not refused. Replace `<same-ISO>` with the
+accepted candidate timestamp used for `ship.sh`. First preview the restart:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO> -DryRun
@@ -347,7 +352,9 @@ as `web/`, do not refuse. The main checkout stays on `develop`, so the answer to
 is to wait for the next release and restart after it, or to pass `-Force`, which runs
 develop's code anyway and prints `FORCED`. `-Force` is one switch: it also permits open work.
 This check needs no running backend and comes before the registry is read, so the dry run
-prints the release and its verdict even when the backend is down.
+prints the release and its verdict even when the backend is down. A release whose production
+job ended red although the site serves it (fix16's smoke failed on the takeover race #971
+fixed) is not the one the script finds; name it with `-ReleaseTag`.
 
 The script then verifies the public site, requires the public capture to match the fetched
 `origin/develop` publication, refuses open work unless `-Force`, and pulls with

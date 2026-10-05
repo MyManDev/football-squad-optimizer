@@ -100,6 +100,8 @@ class World:
         script = (ROOT / "scripts/release/restart_backend.ps1").read_text(encoding="ascii")
         _write(self.author, "scripts/release/restart_backend.ps1", script)
         _write(self.author, "scripts/run_backend_local.ps1", launcher)
+        helper = (ROOT / "scripts/backend_parentage.ps1").read_text(encoding="ascii")
+        _write(self.author, "scripts/backend_parentage.ps1", helper)
         _write(self.author, "docs/contracts/advice.schema.json", "{}\n")
         _write(self.author, "docs/notes.md", "notes\n")
         _write(self.author, DATA, '{"gameweek": 6}\n')
@@ -410,7 +412,12 @@ class Owner:
     def __init__(self, world: World) -> None:
         self.world = world
         self.log = world.root / "launcher.log"
-        self.environment = {**os.environ, "SQUADOPT_TEST_LAUNCHER_LOG": str(self.log)}
+        # Whatever started pytest is no agent here; test_backend_parentage.py covers the guard.
+        self.environment = {
+            **os.environ,
+            "SQUADOPT_TEST_LAUNCHER_LOG": str(self.log),
+            "SQUADOPT_AGENT_APPLICATIONS": "no-agent-application.exe",
+        }
         self.commit = ""
 
     def follow(self, blocks: list[list[str]], values: dict[str, str]) -> list[tuple[str, str]]:

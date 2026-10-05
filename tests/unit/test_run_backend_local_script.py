@@ -8,6 +8,7 @@ probes replaced, so durable artifact selection is exercised without starting a b
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -20,6 +21,7 @@ from squadopt.platform.backend_runtime import SITE_ORIGINS
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = REPOSITORY_ROOT / "scripts" / "run_backend_local.ps1"
 LOGON = REPOSITORY_ROOT / "scripts" / "start_backend_at_logon.ps1"
+PARENTAGE = REPOSITORY_ROOT / "scripts" / "backend_parentage.ps1"
 TUNNEL = REPOSITORY_ROOT / "deploy" / "cloudflared" / "config.example.yml"
 BACKEND_RUNTIME = REPOSITORY_ROOT / "src" / "squadopt" / "platform" / "backend_runtime.py"
 
@@ -53,7 +55,9 @@ def test_every_backend_variable_the_launcher_sets_is_one_the_backend_reads() -> 
     assert sorted(name for name in names if f'"{name}"' not in known) == []
 
 
-@pytest.mark.parametrize("path", [LAUNCHER, LOGON], ids=["launcher", "logon"])
+@pytest.mark.parametrize(
+    "path", [LAUNCHER, LOGON, PARENTAGE], ids=["launcher", "logon", "parentage"]
+)
 def test_the_launcher_parses_under_windows_powershell_5_1(path: Path) -> None:
     """5.1 reads a file without a byte order mark as ANSI, and has neither && nor ?:."""
 
@@ -203,6 +207,8 @@ function Invoke-WebRequest {
     )
     return subprocess.run(
         [str(POWERSHELL), "-NoProfile", "-File", str(harness)],
+        # Whatever started pytest is no agent here; test_backend_parentage.py covers the guard.
+        env={**os.environ, "SQUADOPT_AGENT_APPLICATIONS": "no-agent-application.exe"},
         capture_output=True,
         text=True,
         timeout=30,

@@ -50,6 +50,10 @@ if (-not $Python) { $Python = Join-Path $RepoRoot ".venv\Scripts\python.exe" }
 $SourceRoot = Join-Path $RepoRoot "src"
 $launcher = Join-Path $RepoRoot "scripts\run_backend_local.ps1"
 $registry = Join-Path $StoreRoot "run\backend.pids.json"
+# Never from an agent application's process tree (scripts\backend_parentage.ps1); a dry
+# run changes nothing and stays available for diagnosis.
+. (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) "backend_parentage.ps1")
+if (-not $DryRun) { Assert-NotUnderAgentApplication -Action "restart the backend" }
 $publicRoot = "https://squadopt.mymandev.com"
 $headers = @{"User-Agent" = "squadopt-backend-restart/1"}
 $repository = "MyManDev/football-squad-optimizer"
