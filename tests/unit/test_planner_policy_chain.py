@@ -40,7 +40,7 @@ from squadopt.data.errors import ConflictingBytesError, DataError
 from squadopt.live import InSeasonProjection, plan_transfer_horizon, write_projection_handoff
 from squadopt.live import transfers as live_transfers
 from squadopt.live.football_artifact import football_artifact_path, forecast_digest
-from squadopt.live.recommendation import read_inputs
+from squadopt.live.recommendation import read_inputs, read_projection_handoff
 from squadopt.live.tick import handoff_path_for
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import PlanningHorizon
@@ -354,7 +354,11 @@ def test_the_merge_identities_are_the_commits_on_the_line_they_were_merged_into(
 
 
 def _served(
-    tmp_path: Path, *, written_before_deadline: bool = True, handoff: bool = True
+    tmp_path: Path,
+    *,
+    written_before_deadline: bool = True,
+    handoff: bool = True,
+    handoff_written_before_deadline: bool = True,
 ) -> tuple[Path, Path, str]:
     """A synthetic capture with its served v1 artifact, written at a chosen instant, and the
     served baseline handoff for that capture under ``_handoffs(tmp_path)``."""
@@ -388,6 +392,10 @@ def _served(
                 {int(player): 2.0 for player in inputs.players.player_id},
             ),
         )
+        stamp = deadline + (
+            timedelta(hours=-1) if handoff_written_before_deadline else timedelta(0)
+        )
+        os.utime(alias, (stamp.timestamp(), stamp.timestamp()))
     return snapshots, artifacts, capture.metadata.snapshot_id
 
 
@@ -601,11 +609,12 @@ def test_a_joint_week_is_read_by_the_real_reader_and_bound_only_under_a_ready_bu
     inputs = read_inputs(chain.read_snapshot(roots[0], roots[2]), season=chain.SEASON)
     deadline = chain._instant(inputs.deadline.deadline_utc)
     before = (deadline - timedelta(hours=1)).timestamp()
-    for path in (artifact, components):
+    for path in (artifact, components, handoff_path_for(handoffs, chain.SEASON, 6)):
         os.utime(path, (before, before))
 
     reason, receipt = chain.week_inputs(*roots, handoff_root=handoffs)  # type: ignore[misc]
     assert reason == receipt["reason"] == "served_binding_refused"
+    assert receipt["components_present"] is True and receipt["ready_bundle_present"] is False
     assert receipt["model_version"] == version and receipt["ready_bundle_sha256"] is None
     assert any("requires a complete ready bundle" in note for note in receipt["binding_notes"])
 
@@ -649,7 +658,11 @@ def test_a_joint_week_is_read_by_the_real_reader_and_bound_only_under_a_ready_bu
     # handoff is one the service refuses.
     reason, receipt = chain.week_inputs(*roots)  # type: ignore[misc]
     assert reason == "no_served_handoff"
-    monkeypatch.setattr(chain, "handoff_fingerprint_for", lambda *arguments: "e" * 64)
+    monkeypatch.setattr(
+        chain,
+        "served_handoff_file",
+        lambda *arguments: ("e" * 64, handoff_path_for(handoffs, chain.SEASON, 6)),
+    )
     reason, receipt = chain.week_inputs(*roots, handoff_root=handoffs)  # type: ignore[misc]
     assert reason == "served_binding_refused"
     assert any("served baseline handoff" in note for note in receipt["binding_notes"])
@@ -691,8 +704,11 @@ def test_the_binding_is_asked_with_the_capture_the_served_handoff_and_no_news_so
     monkeypatch.setattr(chain, "load_switch_inputs", service)
     monkeypatch.setattr(
         chain,
-        "handoff_fingerprint_for",
-        lambda root, season, gameweek, snapshot: f"{root.name}:{season}:{gameweek}:{snapshot}",
+        "served_handoff_file",
+        lambda root, season, gameweek, snapshot: (
+            f"{root.name}:{season}:{gameweek}:{snapshot}",
+            handoff_path_for(root, season, gameweek),
+        ),
     )
     week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
     assert isinstance(week, chain.WeekInputs)
@@ -728,6 +744,11 @@ def test_the_command_line_names_the_handoff_root_and_takes_no_club_news_source(
         with pytest.raises(SystemExit) as refused:
             chain.main(["check", *roots, *extra])
         assert refused.value.code == 2
+    # Rule 39: decide also names the evidence copy root outside the checkout.
+    decide = ["decide", *roots, "--handoff-root", str(tmp_path), "--output", str(tmp_path)]
+    with pytest.raises(SystemExit) as refused:
+        chain.main([*decide, "--through-gameweek", "6", "--answer", "issuecomment-1"])
+    assert refused.value.code == 2
 
 
 def test_a_capture_without_its_served_handoff_is_a_missing_week(
@@ -1747,8 +1768,11 @@ def _chain_world(
         chain, "source_identity", lambda: {"repository_commit": "b", "binding_commits": commits}
     )
     monkeypatch.setattr(
-        chain, "capture_inventory", lambda root: chain.CaptureInventory((), ("late-capture",))
+        chain,
+        "capture_inventory",
+        lambda root, *roots: chain.CaptureInventory((), ("late-capture",)),
     )
+    monkeypatch.setattr(chain, "refuse_unlocked_worktree", lambda: None)
     monkeypatch.setattr(chain, "first_bound_week", lambda index, root, bound: 6)
     monkeypatch.setattr(
         chain, "deadline_of", lambda index, root, week: T0 + timedelta(days=7 * (week - 6))
@@ -1839,7 +1863,7 @@ def test_check_labels_each_week_pending_or_final_and_writes_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     index = (_entry("capture-gw6", -20, 6), _entry("capture-gw7", 100, 7, deadline_hours=168))
-    monkeypatch.setattr(chain, "capture_index", lambda root: index)
+    monkeypatch.setattr(chain, "capture_index", lambda root, *roots: index)
     monkeypatch.setattr(
         chain,
         "binding_commits",
@@ -1928,6 +1952,7 @@ def test_each_weeks_receipt_lists_every_capture_that_targeted_it(
         "first",
         "second",
     ]
+    assert all(entry["served"] is True for entry in week.receipt["own_target_captures"])
     missing = chain._week(index, Path("."), Path("."), 8)
     assert missing[1]["own_target_captures"] == []  # type: ignore[index]
 
@@ -1967,6 +1992,14 @@ def test_the_receipt_names_the_archive_seasons_and_training_rows(tmp_path: Path)
     assert isinstance(week, chain.WeekInputs)
     assert week.receipt["forecast_archive_seasons"] == ["2022-23", "2025-26"]
     assert week.receipt["forecast_training_rows"] == 1234
+    # Rule 38: a field the artifact does not carry is recorded as absent, not as an empty list.
+    del document["archive_hashes"]
+    document["fingerprint"] = forecast_digest(document)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    os.utime(path, (stamp, stamp))
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
+    assert isinstance(week, chain.WeekInputs)
+    assert week.receipt["forecast_archive_seasons"] is None
 
 
 def test_bytes_that_do_not_carry_their_own_fingerprint_are_a_missing_week(
@@ -2051,3 +2084,205 @@ def test_the_runners_constants_are_the_protocols() -> None:
         "writes only under `artifacts/planner_policy_chain/`",
     ):
         assert phrase in PROTOCOL_TEXT
+
+
+# Review of 5 October: served captures, the dated handoff, the locked worktree, the evidence copy
+
+
+def test_the_decision_capture_passes_over_a_capture_the_backend_could_not_serve() -> None:
+    """Rule 5: a later capture without a served handoff does not displace the served one."""
+
+    served = _entry("served", 2, 6)
+    rehearsal = replace(_entry("rehearsal", 5, 6), served=False)
+    assert chain.decision_capture((served, rehearsal), 6) == chain.Selection("served", None)
+    assert chain.decision_capture((rehearsal,), 6) == chain.Selection(None, "no_served_handoff")
+    assert chain.decision_capture((), 6) == chain.Selection(None, "no_own_target_capture")
+
+
+def test_the_capture_index_marks_each_capture_served_by_its_handoff(tmp_path: Path) -> None:
+    """Rule 5: served means the handoff root holds a served baseline handoff for the capture."""
+
+    snapshots, _, snapshot_id = _served(tmp_path / "served")
+    (entry,) = chain.capture_index(snapshots, _handoffs(tmp_path / "served"))
+    assert entry.snapshot_id == snapshot_id and entry.served is True
+    unserved, _, _ = _served(tmp_path / "unserved", handoff=False)
+    (entry,) = chain.capture_index(unserved, _handoffs(tmp_path / "unserved"))
+    assert entry.served is False
+    (entry,) = chain.capture_index(unserved)
+    assert entry.served is True
+    missing = chain._week(
+        chain.capture_index(unserved, _handoffs(tmp_path / "unserved")),
+        unserved,
+        tmp_path / "unserved" / "artifacts",
+        entry.target,
+        handoff_root=_handoffs(tmp_path / "unserved"),
+    )
+    assert missing[0] == "no_served_handoff"  # type: ignore[index]
+    assert missing[1]["own_target_captures"][0]["served"] is False  # type: ignore[index]
+
+
+def test_the_served_handoff_file_is_the_alias_or_the_retained_copy(tmp_path: Path) -> None:
+    """Rule 6: the file the backend's fingerprint came from, so its write time can be read."""
+
+    snapshots, _, snapshot_id = _served(tmp_path)
+    root = _handoffs(tmp_path)
+    inputs = read_inputs(chain.read_snapshot(snapshots, snapshot_id), season=chain.SEASON)
+    gameweek = int(inputs.deadline.gameweek)
+    alias = handoff_path_for(root, chain.SEASON, gameweek)
+    fingerprint, path = chain.served_handoff_file(root, chain.SEASON, gameweek, snapshot_id)
+    assert path == alias and fingerprint == read_projection_handoff(alias).fingerprint
+    retained = root / "by-capture" / snapshot_id / "kept.json"
+    retained.parent.mkdir(parents=True)
+    alias.rename(retained)
+    assert chain.served_handoff_file(root, chain.SEASON, gameweek, snapshot_id) == (
+        fingerprint,
+        retained,
+    )
+    retained.unlink()
+    assert chain.served_handoff_file(root, chain.SEASON, gameweek, snapshot_id) == (None, None)
+
+
+def test_a_served_handoff_written_at_or_after_the_deadline_is_a_missing_week(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 6 and 21: a handoff republished after the deadline is not what the service bound."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path, handoff_written_before_deadline=False)
+
+    def never(**kwargs: object) -> object:
+        pytest.fail("the service was asked with a handoff written after the deadline")
+
+    monkeypatch.setattr(chain, "load_switch_inputs", never)
+    reason, receipt = chain.week_inputs(  # type: ignore[misc]
+        snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path)
+    )
+    assert reason == receipt["reason"] == "handoff_written_at_or_after_deadline"
+    assert receipt["handoff_modified_utc"] == receipt["deadline_utc"].replace("Z", "+00:00")
+
+
+def test_the_receipt_says_whether_the_marker_and_the_components_file_were_present(
+    tmp_path: Path,
+) -> None:
+    """Rules 6 and 36: a team_share week binds without a marker or components; the receipt says
+    they were absent, so such a week can be reported apart."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
+    assert isinstance(week, chain.WeekInputs)
+    assert week.receipt["ready_bundle_present"] is False
+    assert week.receipt["components_present"] is False
+    assert week.receipt["ready_bundle_modified_utc"] is None
+    assert week.receipt["components_modified_utc"] is None
+    assert week.receipt["handoff_modified_utc"] is not None
+
+
+def test_an_unlocked_worktree_is_refused_before_anything_is_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Rule 39: git worktree remove deletes the ignored evidence, so the worktree must be locked."""
+
+    here = chain.REPOSITORY.resolve()
+    elsewhere = "worktree /elsewhere\nHEAD def\nlocked\n"
+    porcelain = {"text": f"worktree {here}\nHEAD abc\nbranch refs/heads/x\n\n{elsewhere}"}
+    monkeypatch.setattr(chain, "_git", lambda *arguments, **kwargs: porcelain["text"])
+    with pytest.raises(chain.ChainError, match="git worktree lock"):
+        chain.refuse_unlocked_worktree()
+    for line in ("locked", "locked planner policy chain evidence"):
+        porcelain["text"] = f"worktree {here}\nHEAD abc\n{line}\n\n{elsewhere}"
+        chain.refuse_unlocked_worktree()
+
+
+def test_decide_refuses_an_unlocked_worktree_before_the_source_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: _week(6)})
+
+    def unlocked() -> None:
+        raise chain.ChainError("unlocked")
+
+    monkeypatch.setattr(chain, "refuse_unlocked_worktree", unlocked)
+    monkeypatch.setattr(chain, "source_identity", lambda: pytest.fail("read before the lock"))
+    with pytest.raises(chain.ChainError, match="unlocked"):
+        chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0 + timedelta(hours=1))
+    assert not (root / "protocol.json").exists()
+
+
+def test_each_decided_week_is_copied_outside_the_checkout_and_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 39: the copy reproduces the digest the manifest records, once, and a changed copy is
+    refused on the next run."""
+
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: _week(6), 7: _week(7)})
+    copies = tmp_path / "copies"
+    lines: list[str] = []
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(
+        *ROOTS(tmp_path),
+        root,
+        7,
+        "issuecomment-1",
+        now=now,
+        evidence_copy_root=copies,
+        emit=lines.append,
+    )
+    for week in ("gw06", "gw07"):
+        manifest = json.loads((root / week / "manifest.json").read_text(encoding="utf-8"))
+        assert chain.evidence_digest(root / week) == manifest["evidence_digest"]
+        assert chain.evidence_digest(copies / week) == manifest["evidence_digest"]
+        assert (copies / week / "manifest.json").read_bytes() == (
+            root / week / "manifest.json"
+        ).read_bytes()
+    assert sum("evidence copied" in line for line in lines) == 2
+    # A later run finds the copies and leaves them; a copy that changed is refused by name.
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now, evidence_copy_root=copies)
+    (copies / "gw06" / "receipt.json").write_text("changed", encoding="utf-8")
+    with pytest.raises(chain.ChainError, match="different copy of gw06"):
+        chain.decide(
+            *ROOTS(tmp_path), root, 7, "issuecomment-1", now=now, evidence_copy_root=copies
+        )
+
+
+def test_the_evidence_copy_root_lies_outside_the_checkout_and_every_root_it_reads(
+    tmp_path: Path,
+) -> None:
+    snapshots, artifacts = ROOTS(tmp_path)
+    output = tmp_path / "out"
+    for copy_root in (
+        chain.REPOSITORY / "artifacts" / "copies",
+        chain.REPOSITORY.parent,
+        snapshots / "copies",
+        artifacts,
+        output / "copies",
+        tmp_path / "handoffs" / "copies",
+    ):
+        with pytest.raises(chain.ChainError, match="must lie outside"):
+            chain.refuse_evidence_root(
+                copy_root, output, snapshots, artifacts, tmp_path / "handoffs"
+            )
+    chain.refuse_evidence_root(
+        tmp_path / "copies", output, snapshots, artifacts, tmp_path / "handoffs"
+    )
+
+
+def test_a_first_week_missing_on_a_later_read_holds_to_the_recorded_maximum(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 21: the protocol record keeps the first week's season maximum, so a later read that
+    finds the week missing holds to min(f + 1, that maximum), never to zero."""
+
+    weeks: dict[int, object] = {6: _week(6)}
+    root, _ = _chain_world(tmp_path, monkeypatch, weeks)
+    now = T0 + timedelta(hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now)
+    protocol = json.loads((root / "protocol.json").read_text(encoding="utf-8"))
+    maximum = int(_week(6).rules.transfers.max_free_transfers)
+    assert protocol["max_free_transfers"] == maximum > 1
+    shutil.rmtree(root / "gw06")
+    weeks[6] = ("no_artifact", {"snapshot_id": None, "reason": "no_artifact"})
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now)
+    manifest = json.loads((root / "gw06" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["missing_reason"] == "no_artifact"
+    assert manifest["max_free_transfers"] == maximum
+    held = json.loads((root / "gw06" / "p1000-served_3.json").read_text(encoding="utf-8"))
+    assert held["state_after"]["free_transfers"] == min(_state().free_transfers + 1, maximum)

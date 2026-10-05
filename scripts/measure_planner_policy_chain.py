@@ -29,6 +29,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -62,6 +63,7 @@ from squadopt.live.recommendation import (
     RecommendationInputs,
     infer_season,
     read_inputs,
+    read_projection_handoff,
 )
 from squadopt.live.rules import SeasonRules, read_season_rules
 from squadopt.live.tick import handoff_path_for
@@ -241,6 +243,9 @@ class CaptureIndexEntry:
     captured_at_utc: datetime
     target: int
     deadline_utc: datetime
+    #: Rule 5: whether the handoff root holds a served baseline handoff for this capture, so the
+    #: backend could have served it. True when no handoff root was given (the index alone).
+    served: bool = True
 
 
 def _instant(text: str) -> datetime:
@@ -266,8 +271,9 @@ def _named_before_season(snapshot_id: str) -> bool:
     return named < SEASON_OPENS
 
 
-def capture_inventory(snapshot_root: Path) -> CaptureInventory:
-    """Every live capture of the season with its instant, its own target and its deadline.
+def capture_inventory(snapshot_root: Path, handoff_root: Path | None = None) -> CaptureInventory:
+    """Every live capture of the season with its instant, its own target, its deadline and
+    whether the backend could have served it (rule 5).
 
     A capture named before the season opens is never opened, and one of another season is left
     out. A capture taken after every published deadline had closed targets no gameweek and is
@@ -293,21 +299,28 @@ def capture_inventory(snapshot_root: Path) -> CaptureInventory:
             inputs = read_inputs(snapshot, season=SEASON)
         except (DataError, ValueError, KeyError, TypeError) as error:
             raise ChainError(f"Capture {snapshot_id} cannot be read: {error}") from error
+        gameweek = int(inputs.deadline.gameweek)
+        served = handoff_root is None or (
+            handoff_fingerprint_for(handoff_root, SEASON, gameweek, snapshot_id) is not None
+        )
         entries.append(
             CaptureIndexEntry(
                 snapshot_id,
                 captured,
-                int(inputs.deadline.gameweek),
+                gameweek,
                 _instant(inputs.deadline.deadline_utc),
+                served,
             )
         )
     return CaptureInventory(tuple(entries), tuple(closed))
 
 
-def capture_index(snapshot_root: Path) -> tuple[CaptureIndexEntry, ...]:
+def capture_index(
+    snapshot_root: Path, handoff_root: Path | None = None
+) -> tuple[CaptureIndexEntry, ...]:
     """The inventory's captures that target a gameweek."""
 
-    return capture_inventory(snapshot_root).entries
+    return capture_inventory(snapshot_root, handoff_root).entries
 
 
 @dataclass(frozen=True)
@@ -317,13 +330,17 @@ class Selection:
 
 
 def decision_capture(index: Sequence[CaptureIndexEntry], gameweek: int) -> Selection:
-    """Rule 5: the last capture, by instant, whose own target is the gameweek; a tie is missing."""
+    """Rule 5: the last capture, by instant, whose own target is the gameweek and that the
+    backend could have served; an unserved capture is passed over, and a tie is missing."""
 
     own = [entry for entry in index if entry.target == gameweek]
     if not own:
         return Selection(None, "no_own_target_capture")
-    latest = max(entry.captured_at_utc for entry in own)
-    at_latest = [entry for entry in own if entry.captured_at_utc == latest]
+    served = [entry for entry in own if entry.served]
+    if not served:
+        return Selection(None, "no_served_handoff")
+    latest = max(entry.captured_at_utc for entry in served)
+    at_latest = [entry for entry in served if entry.captured_at_utc == latest]
     if len(at_latest) > 1:
         return Selection(None, "tied_latest_captures")
     return Selection(at_latest[0].snapshot_id, None)
@@ -387,6 +404,26 @@ def binding_notes(notes: Sequence[str]) -> list[str]:
     """
 
     return [_PATH_IN_NOTE.sub("<path>", note) for note in notes if not note.startswith("top100")]
+
+
+def served_handoff_file(
+    handoff_root: Path, season: str, gameweek: int, snapshot_id: str
+) -> tuple[str | None, Path | None]:
+    """Rule 6: the served baseline handoff's fingerprint, by the backend's own rule, and the file
+    that carries it: the gameweek alias when it matches, else the one retained copy that does."""
+
+    fingerprint = handoff_fingerprint_for(handoff_root, season, gameweek, snapshot_id)
+    if fingerprint is None:
+        return None, None
+    alias = handoff_path_for(Path(handoff_root), season, gameweek)
+    retained = Path(handoff_root) / "by-capture" / snapshot_id
+    for path in (alias, *sorted(retained.glob("*.json"))):
+        try:
+            if read_projection_handoff(path).fingerprint == fingerprint:
+                return fingerprint, path
+        except (OSError, ValueError, DataError):
+            continue
+    return fingerprint, None
 
 
 def _written_before(path: Path, deadline: datetime) -> tuple[str | None, bool]:
@@ -486,23 +523,29 @@ def week_inputs(
         return reason, {**receipt, "reason": reason}
     # Rules 6 and 8: the served baseline handoff is used for its fingerprint only; a capture the
     # backend holds no such handoff for is one it does not serve.
-    handoff_fingerprint = (
-        None
+    handoff_fingerprint, handoff_file = (
+        (None, None)
         if handoff_root is None
-        else handoff_fingerprint_for(
-            handoff_root, SEASON, int(inputs.deadline.gameweek), snapshot_id
-        )
+        else served_handoff_file(handoff_root, SEASON, int(inputs.deadline.gameweek), snapshot_id)
     )
-    if handoff_fingerprint is None:
+    if handoff_fingerprint is None or handoff_file is None:
         reason = "no_served_handoff"
         return reason, {**receipt, "reason": reason, "model_version": declared}
-    # Rule 6: the service could not have bound a marker or a components file written later.
+    # Rule 6: the backend can republish a corrected handoff, so the handoff the chain reads must
+    # have been written before the deadline, like the artifact; and the service could not have
+    # bound a marker or a components file written later. A marker or components file that is
+    # gone is recorded as absent: the service binds a team_share week without them.
     times: dict[str, object] = {}
+    times["handoff_modified_utc"], before = _written_before(handoff_file, deadline)
+    if not before:
+        reason = "handoff_written_at_or_after_deadline"
+        return reason, {**receipt, "reason": reason, "model_version": declared, **times}
     for key, path in (
-        ("ready_bundle_modified_utc", football_bundle_path(artifact_root, snapshot_id)),
-        ("components_modified_utc", football_components_path(artifact_root, snapshot_id)),
+        ("ready_bundle", football_bundle_path(artifact_root, snapshot_id)),
+        ("components", football_components_path(artifact_root, snapshot_id)),
     ):
-        times[key], before = _written_before(path, deadline)
+        times[f"{key}_modified_utc"], before = _written_before(path, deadline)
+        times[f"{key}_present"] = times[f"{key}_modified_utc"] is not None
         if not before:
             reason = "binding_input_written_at_or_after_deadline"
             return reason, {**receipt, "reason": reason, "model_version": declared, **times}
@@ -550,7 +593,8 @@ def week_inputs(
     except Exception as error:
         raise ChainError(f"The season rules of {snapshot_id} cannot be read: {error}") from error
     hashes = document.get("archive_hashes")
-    seasons = sorted({key.split("/", 1)[0] for key in hashes}) if isinstance(hashes, dict) else []
+    # Rule 38: a field the artifact does not carry is recorded as absent, never as an empty list.
+    seasons = sorted({key.split("/", 1)[0] for key in hashes}) if isinstance(hashes, dict) else None
     role = document.get("role_metadata")
     return WeekInputs(
         inputs=inputs,
@@ -1194,6 +1238,85 @@ def first_bound_week(
     return max(week, TARGET_FIRST_WEEK + 1) if late else week
 
 
+def refuse_unlocked_worktree() -> None:
+    """Rule 39: the evidence is uncommitted under an ignored directory, and `git worktree remove`
+    deletes ignored files, so the runner refuses a worktree that is not locked."""
+
+    here = REPOSITORY.resolve()
+    found = locked = False
+    for block in _git("worktree", "list", "--porcelain").split("\n\n"):
+        lines = block.strip().splitlines()
+        if not lines or not lines[0].startswith("worktree "):
+            continue
+        if Path(lines[0][len("worktree ") :]).resolve() == here:
+            found = True
+            locked = any(line == "locked" or line.startswith("locked ") for line in lines)
+    if not (found and locked):
+        raise ChainError(
+            "The evidence lives in this worktree and git worktree remove would delete it; lock "
+            'it first: git worktree lock --reason "planner policy chain evidence" (rule 39).'
+        )
+
+
+def refuse_evidence_root(
+    copy_root: Path,
+    output: Path,
+    snapshot_root: Path,
+    artifact_root: Path,
+    handoff_root: Path | None,
+) -> None:
+    """Rule 39: the evidence copy root lies outside the checkout and every root the chain reads."""
+
+    resolved = copy_root.resolve()
+    roots = [
+        REPOSITORY.resolve(),
+        output.resolve(),
+        snapshot_root.resolve(),
+        artifact_root.resolve(),
+    ]
+    if handoff_root is not None:
+        roots.append(handoff_root.resolve())
+    for root in roots:
+        if resolved == root or resolved.is_relative_to(root) or root.is_relative_to(resolved):
+            raise ChainError(f"The evidence copy root {copy_root} must lie outside {root}.")
+
+
+def evidence_digest(directory: Path) -> str:
+    """The digest of a week's files, each by its relative name and sha256, the manifest left out."""
+
+    digest = hashlib.sha256()
+    files = (p for p in directory.rglob("*") if p.is_file() and p.name != "manifest.json")
+    for path in sorted(files):
+        digest.update(path.relative_to(directory).as_posix().encode("utf-8") + b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("ascii") + b"\n")
+    return digest.hexdigest()
+
+
+def copy_week_evidence(directory: Path, copy_root: Path) -> tuple[Path, str]:
+    """Rule 39: the week's directory copied outside the checkout, once, and checked against the
+    digest its manifest records; a copy already there must be the same week."""
+
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    expected = str(manifest["evidence_digest"])
+    if evidence_digest(directory) != expected:
+        raise ChainError(f"{directory.name}: the week's files no longer match their manifest.")
+    target = copy_root / directory.name
+    if target.exists():
+        same = (
+            evidence_digest(target) == expected
+            and (target / "manifest.json").read_bytes() == manifest_path.read_bytes()
+        )
+        if not same:
+            raise ChainError(f"{target} holds a different copy of {directory.name}.")
+        return target, expected
+    copy_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(directory, target)
+    if evidence_digest(target) != expected:
+        raise ChainError(f"The copy of {directory.name} does not reproduce its digest.")
+    return target, expected
+
+
 def refuse_output(output: Path, snapshot_root: Path, artifact_root: Path) -> None:
     """Rules 36 and 39: the chain writes only under artifacts/planner_policy_chain/."""
 
@@ -1287,7 +1410,7 @@ def check(
 
     moment = datetime.now(UTC) if now is None else now
     refuse_roots(snapshot_root, artifact_root, handoff_root)
-    index = capture_index(snapshot_root)
+    index = capture_index(snapshot_root, handoff_root)
     first = first_bound_week(index, snapshot_root, binding_commits())
     for gameweek in range(first, LAST_GAMEWEEK + 1):
         pending = moment <= deadline_of(index, snapshot_root, gameweek)
@@ -1489,6 +1612,7 @@ def decide_week(
         missing_reason=None if isinstance(week, WeekInputs) else week[0],
         max_free_transfers=max_free,
         records=digests,
+        evidence_digest=evidence_digest(directory),
         work={"decided_at_utc": None if moment is None else moment.isoformat()},
     )
     write_document_once(manifest, directory / "manifest.json", replay_identity=replay_identity)
@@ -1528,7 +1652,11 @@ def _week(
     handoff_root: Path | None = None,
 ) -> WeekInputs | tuple[str, Mapping[str, object]]:
     own = [
-        {"snapshot_id": entry.snapshot_id, "captured_at_utc": entry.captured_at_utc.isoformat()}
+        {
+            "snapshot_id": entry.snapshot_id,
+            "captured_at_utc": entry.captured_at_utc.isoformat(),
+            "served": entry.served,
+        }
         for entry in sorted(index, key=lambda entry: (entry.captured_at_utc, entry.snapshot_id))
         if entry.target == gameweek
     ]
@@ -1590,6 +1718,7 @@ def start_chain(
             "answer": answer,
             "bound_week": bound_week,
             "first_chain_week": gameweek,
+            "max_free_transfers": int(week.rules.transfers.max_free_transfers),
             "skipped_weeks": skipped,
             "dropped_profiles": dict(squads.dropped),
             "squad_statuses": {k: list(v) for k, v in squads.statuses.items()},
@@ -1609,6 +1738,7 @@ def decide(
     answer: str,
     *,
     handoff_root: Path | None = None,
+    evidence_copy_root: Path | None = None,
     now: datetime | None = None,
     emit: Callable[[str], None] = print,
 ) -> None:
@@ -1621,6 +1751,9 @@ def decide(
     refuse_before_first_computation(moment)
     refuse_output(output, snapshot_root, artifact_root)
     refuse_roots(snapshot_root, artifact_root, handoff_root)
+    if evidence_copy_root is not None:
+        refuse_evidence_root(evidence_copy_root, output, snapshot_root, artifact_root, handoff_root)
+    refuse_unlocked_worktree()
     identity = source_identity()
     with single_run(output):
         lines: list[str] = []
@@ -1640,6 +1773,7 @@ def decide(
                 moment,
                 say,
                 handoff_root=handoff_root,
+                evidence_copy_root=evidence_copy_root,
             )
         except ChainError as error:
             lines.append(f"refused: {error}")
@@ -1666,8 +1800,9 @@ def _decide_weeks(
     emit: Callable[[str], None],
     *,
     handoff_root: Path | None = None,
+    evidence_copy_root: Path | None = None,
 ) -> None:
-    inventory = capture_inventory(snapshot_root)
+    inventory = capture_inventory(snapshot_root, handoff_root)
     index = inventory.entries
     if inventory.closed:
         emit(f"left out {len(inventory.closed)} captures taken after every deadline")
@@ -1698,11 +1833,14 @@ def _decide_weeks(
         )
         states.update({(profile, arm): state for arm in ARMS})
     blocked: set[tuple[str, str]] = set()
-    max_free = 0
+    # Rule 21: a first week that reads as missing on a later read still holds to the season
+    # maximum the first read recorded, never to zero.
+    max_free = int(protocol.get("max_free_transfers", 0))
     for gameweek in range(first, min(through_gameweek, LAST_GAMEWEEK) + 1):
         directory = output / f"gw{gameweek:02d}"
         if (directory / "manifest.json").exists():
             states, max_free = _load_week(directory, blocked)
+            _copy_evidence(directory, evidence_copy_root, emit)
             continue
         if moment <= deadline_of(index, snapshot_root, gameweek):
             emit(f"GW{gameweek:02d} pending: its deadline has not passed")
@@ -1722,6 +1860,14 @@ def _decide_weeks(
             week.receipt["snapshot_id"] if isinstance(week, WeekInputs) else f"missing {week[0]}"
         )
         emit(f"GW{gameweek:02d} decided from {source}; manifest sha256 {digest}")
+        _copy_evidence(directory, evidence_copy_root, emit)
+
+
+def _copy_evidence(directory: Path, copy_root: Path | None, emit: Callable[[str], None]) -> None:
+    if copy_root is None:
+        return
+    target, digest = copy_week_evidence(directory, copy_root)
+    emit(f"{directory.name} evidence copied to {target.name} under the copy root; digest {digest}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1738,6 +1884,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             command.add_argument("--output", type=Path, required=True)
             command.add_argument("--through-gameweek", type=int, required=True)
             command.add_argument("--answer", required=True)
+            # Rule 39: each decided week is copied outside the checkout, where a worktree
+            # cleanup cannot reach it.
+            command.add_argument("--evidence-copy-root", type=Path, required=True)
     arguments = parser.parse_args(argv)
     try:
         if arguments.command == "check":
@@ -1754,6 +1903,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 arguments.through_gameweek,
                 arguments.answer,
                 handoff_root=arguments.handoff_root,
+                evidence_copy_root=arguments.evidence_copy_root,
             )
     except ChainError as error:
         print(f"refused: {error}", file=sys.stderr)
