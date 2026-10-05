@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 
-import members from "../public/data/league/members.json" with { type: "json" };
-import { REMEMBERED_LEAGUE_ID } from "./leagueState";
+import { shippedTrees } from "../src/testSupport/shippedTrees";
 
 /**
  * No page leaves a request open. Chromium keeps a response whose body is never read open
@@ -10,9 +12,13 @@ import { REMEMBERED_LEAGUE_ID } from "./leagueState";
  * does (vite/pagesNotFound.ts), and each reader that can refuse an answer is made to refuse
  * one here, whatever the published tree holds.
  */
-const member = members.payload.members.find((row) => row.member_kind === "human");
+// The first tree the site lists, found the way the page finds it.
+const published = JSON.parse(
+  readFileSync(join(shippedTrees()[0]!.root, "members.json"), "utf-8"),
+) as { payload: { league_id: number; members: { member_kind: string; entry_id: number }[] } };
+const member = published.payload.members.find((row) => row.member_kind === "human");
 if (member === undefined) throw new Error("The published league lists no human member.");
-const league = `/league/${REMEMBERED_LEAGUE_ID}`;
+const league = `/league/${published.payload.league_id}`;
 
 /**
  * Send the request to an address the preview does not serve, so the refusal is the
