@@ -6,10 +6,13 @@ fee will be applied on any profits made on that player." The 2026-27 bootstrap s
 same two facts as ``transfers_sell_on_fee`` 0.5 and ``element_sell_at_purchase_price``
 false.
 
-The public endpoints publish no purchase price, so no consumer can say what one named
-player would raise. They do publish the entry's whole worth at the deadline, and the bank
-inside it, so the fifteen together are stated exactly. These tests pin the rule with
-literals, the aggregate the parser reads, and the budget a plan is then held to.
+The picks document publishes no purchase price. It does publish the entry's worth at the
+deadline and the bank inside it, but that worth is the fifteen at the deadline's market
+prices, not what they sell for: a cap on the budget, not the budget. Where the purchase
+prices are rebuilt from the transfers list the rule gives the budget exactly
+(``tests/unit/test_purchase_prices_provider.py``); where they are not, the cap is all a plan
+is held to. These tests pin the rule with literals, the aggregate the parser reads, the
+budget a plan is then held to, and one real member's numbers under both.
 """
 
 from typing import Any
@@ -60,10 +63,12 @@ def test_a_rise_of_an_odd_number_of_tenths_rounds_the_retained_half_down() -> No
 # --- the aggregate the endpoints do publish -------------------------------------------
 
 
-def test_the_parser_reads_the_squads_selling_value_as_the_worth_less_the_bank() -> None:
-    """``entry_history.value`` is squad plus bank, so the squad alone is value minus bank.
+def test_the_parser_reads_the_fifteens_market_value_as_the_worth_less_the_bank() -> None:
+    """``entry_history.value`` is the bank plus the fifteen at market prices, so the
+    fifteen alone are value minus bank, at the prices of that deadline.
 
-    A member worth 100.4 with 1.8 in the bank holds fifteen that would raise 98.6.
+    A member worth 100.4 with 1.8 in the bank holds fifteen priced at 98.6, which they
+    would raise only if none of them had risen since he was bought.
     """
 
     record = fpl_entry_picks(
@@ -76,6 +81,38 @@ def test_the_parser_reads_the_squads_selling_value_as_the_worth_less_the_bank() 
     assert record.bank_tenths == 18
     assert record.squad_sell_value_tenths == 986
     assert record.purchase_prices_known is False, "the split among the fifteen is not published"
+
+
+# Entry 2199732 in the capture of 2026-10-05, gameweek 5 picks: each held element's price
+# at the capture and the price paid for it, rebuilt from the transfers list (115 bought in
+# gameweek 2, 154 and 40 in gameweek 4, the rest held since the opening deadline). In tenths.
+REAL_MEMBER_PRICES = {
+    1: (61, 60), 8: (58, 55), 388: (60, 60), 31: (46, 45), 368: (69, 70),
+    40: (77, 75), 154: (97, 96), 237: (58, 60), 124: (59, 55), 411: (156, 155),
+    346: (60, 60), 301: (40, 40), 165: (77, 75), 115: (50, 45), 259: (40, 40),
+}  # fmt: skip
+REAL_MEMBER_BANK = 8
+REAL_MEMBER_STATED = 1006  # the picks document's value 101.4 less the bank
+
+
+def test_a_real_members_stated_worth_overstates_what_the_squad_raises() -> None:
+    """The stated worth less the bank is 100.6, and the planner held the member to it plus
+    the bank: 101.4. The fifteen at market prices are 100.8, so the stated value took back
+    0.2 of moves since the deadline and nothing of the fee on rises since purchase. Under
+    the rule, with the prices paid, the fifteen raise 99.5 and the budget is 100.3."""
+
+    current = {element: now for element, (now, _) in REAL_MEMBER_PRICES.items()}
+    assert sum(current.values()) == 1008
+    stated = spending_power(
+        bank_tenths=REAL_MEMBER_BANK,
+        sell_prices_tenths=current,
+        stated_squad_sell_value_tenths=REAL_MEMBER_STATED,
+    )
+    assert stated.spendable_tenths == 1014
+    rule = sum(sell_price_tenths(now, paid) for now, paid in REAL_MEMBER_PRICES.values())
+    assert rule == 995
+    assert REAL_MEMBER_BANK + rule == 1003
+    assert stated.spendable_tenths - (REAL_MEMBER_BANK + rule) == 11
 
 
 def test_a_worth_smaller_than_its_own_bank_is_refused_rather_than_read_as_a_debt() -> None:

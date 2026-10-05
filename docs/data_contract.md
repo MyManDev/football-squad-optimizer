@@ -163,16 +163,48 @@ should run it rather than discover the mismatch downstream as missing prices.
 `league-{id}-standings.json` states who was in the league at that instant. It seeds the
 registry; it is not a source of player-gameweek rows and no feature reads it.
 
-Two fields the public endpoints do not publish, and which therefore have to be carried as
-a declared unknown or a derivation that says when it is one:
+**The transfers list is where the purchase prices come from.** `entry-{id}-transfers.json`
+(`entry/{id}/transfers/`, parsed by `entry_transfers`) lists every transfer the entry has
+made, newest first: `element_out` sold for `element_out_cost` tenths and `element_in`
+bought for `element_in_cost` tenths, for the deadline of gameweek `event`, at the instant
+`time`. Every row carries those seven fields and its own `entry`; an entry that has made no
+transfer publishes `[]`, which is an answer and not a changed payload. Rows made for a
+deadline after the captured picks' gameweek (none were seen on 2026-10-05, but nothing
+establishes that the source withholds them) are left out of the rebuild, because the
+captured squad does not hold them yet.
+
+**The opening picks are the other half.** For a member whose history starts at gameweek 1
+the capture also reads `entry-{id}-picks-gw01.json`, the fifteen held at the opening
+deadline. No price moves before that deadline, so each of them was bought at his start
+price, `now_cost - cost_change_start` in the bootstrap (`element_prices`). A gameweek 2
+capture already holds this document as its picks. Both documents are read after the
+other entry documents, and one the source still refuses after the retries is left out
+with a line saying so rather than failing the capture.
+
+**`squad_sell_value_tenths` is a market value unless the purchase prices were rebuilt.**
+The picks document's `entry_history.value` minus `entry_history.bank` is the fifteen at
+the market prices of that gameweek's deadline, not what they would sell for: for the
+current gameweek's picks it equalled the fifteen's `now_cost - cost_change_event` for 15 of
+15 members on 2026-10-05. That identity holds only for the gameweek the bootstrap
+describes, because `cost_change_event` counts moves since that gameweek's deadline; a Free
+Hit basis record from the week before is at an older deadline's prices. A market value
+overstates the budget by about half of every rise since a player was bought. Where the
+purchase prices are rebuilt the field is the game's selling rule summed over the fifteen at
+the capture's prices, the same prices, rule and sell-on fee the planner applies, so the
+budget a page states is the budget the plan was held to.
+
+Two fields the picks document does not publish, and which therefore have to be carried as
+a derivation that says when it is one:
 
 | Field | State | What a consumer may not claim |
 | --- | --- | --- |
-| `purchase_prices` | empty, `purchase_prices_known=False` | Not a selling price. A held squad built from these picks values every player at his *current* price, which overstates the budget for anyone who has risen since he was bought. |
+| `purchase_prices` | rebuilt; `purchase_prices_known=True` only when every check of the rebuild held | The picks document states no purchase price. The parser reports none with the flag down; the application provider replays the transfers list over the opening fifteen (`live/purchase_prices.py`, `rebuild_purchase_prices`), skipping the rows of a Free Hit week (the chip reverts the squad and bank) and keeping a Wildcard's. The answer is trusted only when the opening fifteen at their start prices plus the opening bank make exactly the season's `squad_total_spend`, the history's gameweek 1 bank is the opening picks' bank, every row lies inside its own gameweek's transfer window, every week outside a Wildcard or Free Hit counts as many rows as the history's `event_transfers`, every week outside a Free Hit ends on the history's bank, and the replay ends on the captured squad and bank. Otherwise the field is empty with the flag down: a late joiner (whose opening squad was bought at a later deadline's prices, which no document states), a capture without either document, an unreadable document, a failed check, or a capture whose `game_config.rules` states no sell-on fee or sets `element_sell_at_purchase_price`. That fallback keeps `squad_sell_value_tenths` at `value - bank`, a market value, so it still overstates such a member's budget. |
 | `free_transfers` | derived; `free_transfers_known=True` only when the derivation held | The endpoints never state the banked count. The parser reports the floor of `1` with the flag down and returns the history's per-event transfers and costs (`entry_transfer_history`); the banking model in `live/banking.py` (`banked_free_transfers`, called by the application provider) derives the count for the coming deadline from them: none at the GW1 deadline, one added per week up to the cap the bootstrap's `max_extra_free_transfers` implies, consumed before any hit is paid, untouched by a Wildcard or Free Hit week. Every week's recorded cost is checked against that model; a missing week, a late joiner, a capture without the cap, or a cost the model does not reproduce leaves the floor of `1` with the flag down. |
 
 Both flags exist so a consumer that spends real budget or plans real transfers on these
-numbers has to acknowledge the limit rather than discover it.
+numbers has to acknowledge the limit rather than discover it. No check validates one
+purchase price against one sale: a sale price is the rule applied to the market price at
+the moment of the sale, which no captured document states.
 
 **Pick order is data, not presentation.** `squad` holds the fifteen picks in the platform's
 own positions 1 to 15. `squad[:11]` is the named eleven and **`squad[11:]` is the bench in

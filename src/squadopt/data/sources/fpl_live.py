@@ -86,6 +86,12 @@ def entry_picks_payload(entry_id: int, gameweek: int) -> str:
     )
 
 
+def entry_transfers_payload(entry_id: int) -> str:
+    """Payload name for one entry's list of every transfer it has made."""
+
+    return f"entry-{_positive(entry_id, 'entry id')}-transfers.json"
+
+
 def league_standings_payload(league_id: int) -> str:
     """Payload name for a classic league's standings page."""
 
@@ -1101,7 +1107,10 @@ def entry_endpoint_paths(entry_ids: Sequence[int], *, gameweek: int) -> Mapping[
 
     Three documents per entry, because they answer three different questions and the
     platform publishes them separately: the summary names the team, the history carries
-    the chips a planner's windows need, and the picks are the squad itself.
+    the chips a planner's windows need, and the picks are the squad itself. The
+    transfers list and the opening picks, which the purchase prices are rebuilt from,
+    are not here: the capture reads them in a later pass that may miss them without
+    failing (``entry_transfers_endpoint_path``).
 
     The gameweek is the one whose picks are *known*. Per the time-of-knowledge rule in
     ``docs/data_contract.md``, the picks for gameweek N are only complete once N has been
@@ -1847,6 +1856,14 @@ class EntryTransferWeek:
 
     transfers: int
     cost: int
+    bank: int | None = None
+    """The bank after the week's transfers, in tenths, or None when the row states none.
+
+    Read when present and never required, so a history without it still answers the
+    banking model; the purchase-price rebuild needs it and says so when it is absent. In a
+    Free Hit week the source reports the bank from before the chip (two real entries,
+    2026-10-05), because the chip's squad and bank revert after the week.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -1886,12 +1903,164 @@ def entry_transfer_history(history: bytes, *, entry_id: int) -> EntryTransferHis
         by_week[event] = EntryTransferWeek(
             transfers=_integer(record, "event_transfers", "Entry history"),
             cost=_integer(record, "event_transfers_cost", "Entry history"),
+            bank=_integer(record, "bank", "Entry history") if "bank" in record else None,
         )
     return EntryTransferHistory(
         entry_id=identifier,
         weeks=MappingProxyType(by_week),
         chips_used=_chips_used(history, entry_id=identifier),
     )
+
+
+# --- the transfers list and the prices it is read against -----------------------------
+#
+# The raw inputs of the purchase-price rebuild in ``squadopt.live.purchase_prices``. This
+# layer parses them; the replay, and the checks that decide whether its answer is trusted,
+# are the model's.
+
+_TRANSFER_FIELDS: Final = (
+    "element_in",
+    "element_in_cost",
+    "element_out",
+    "element_out_cost",
+    "entry",
+    "event",
+    "time",
+)
+_ELEMENT_PRICE_FIELDS: Final = ("id", "now_cost", "cost_change_start")
+
+
+@dataclass(frozen=True, slots=True)
+class EntryTransfer:
+    """One row of an entry's transfers list: who left, who came, and at what prices.
+
+    ``element_in_cost`` is what the member paid for the incoming player and
+    ``element_out_cost`` what the sale of the outgoing one raised, both in tenths and both
+    as the source states them. ``event`` is the gameweek whose deadline the transfer was
+    made for, and ``time_utc`` the instant it was made.
+    """
+
+    event: int
+    element_in: int
+    element_in_cost: int
+    element_out: int
+    element_out_cost: int
+    time_utc: str
+
+
+def entry_transfers_endpoint_path(entry_id: int) -> str:
+    """API path of one entry's transfers list."""
+
+    return f"entry/{_positive(entry_id, 'entry id')}/transfers/"
+
+
+def _cost(record: Mapping[str, object], key: str, label: str) -> int:
+    value = _integer(record, key, label)
+    if value < 0:
+        raise InvalidValueError(f"{label} field {key!r} must not be negative, got {value}.")
+    return value
+
+
+def entry_transfers(payload: bytes, *, entry_id: int) -> tuple[EntryTransfer, ...]:
+    """Parse ``entry/{id}/transfers/`` into the entry's transfers, in the order they were made.
+
+    The top level is an array and an empty one is an answer: a member who has made no
+    transfer is listed as ``[]``. That is why this does not share ``_array_records``, which
+    reads an empty array as a changed payload.
+
+    The source lists the newest first; the rows come back in time order instead, compared
+    as instants rather than as text. The canonical spelling drops a zero fraction of a
+    second, so as text ``...:02Z`` would sort after ``...:02.775205Z``. Rows stamped with
+    the same instant keep the document's order, and nothing here reads meaning into it.
+    """
+
+    identifier = _positive(entry_id, "entry id")
+    label = f"Entry {identifier} transfer"
+    if not isinstance(payload, bytes):
+        raise DataSourceError(f"{label}s payload must be raw bytes, got {type(payload).__name__}.")
+    try:
+        parsed = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise DataSourceError(f"{label}s payload is not valid UTF-8 JSON: {error}") from error
+    if not isinstance(parsed, list):
+        raise DataSourceError(
+            f"{label}s payload must be a JSON array, got {type(parsed).__name__}. An entry "
+            "that has made no transfer publishes an empty array."
+        )
+    non_objects = [index for index, record in enumerate(parsed) if not isinstance(record, dict)]
+    if non_objects:
+        raise DataSourceError(
+            f"{label}s payload has non-object entries at indexes {format_examples(non_objects)}."
+        )
+    records = tuple(record for record in parsed if isinstance(record, dict))
+    _require_fields(records, _TRANSFER_FIELDS, "Entry transfer")
+
+    transfers: list[EntryTransfer] = []
+    seen: set[EntryTransfer] = set()
+    for record in records:
+        declared = _integer(record, "entry", label)
+        if declared != identifier:
+            raise DataSourceError(f"Entry {identifier} transfers list a row for entry {declared}.")
+        transfer = EntryTransfer(
+            event=_positive(_integer(record, "event", label), "gameweek"),
+            element_in=_positive(_integer(record, "element_in", label), "element id"),
+            element_in_cost=_cost(record, "element_in_cost", label),
+            element_out=_positive(_integer(record, "element_out", label), "element id"),
+            element_out_cost=_cost(record, "element_out_cost", label),
+            time_utc=normalize_utc_timestamp(record.get("time"), label=f"{label} time"),
+        )
+        if transfer.element_in == transfer.element_out:
+            raise InvalidValueError(
+                f"Entry {identifier} lists a gameweek {transfer.event} transfer that sells "
+                f"and buys element {transfer.element_in}."
+            )
+        if transfer in seen:
+            raise DuplicateRecordsError(
+                f"Entry {identifier} lists the transfer of element {transfer.element_out} "
+                f"for {transfer.element_in} at {transfer.time_utc} more than once."
+            )
+        seen.add(transfer)
+        transfers.append(transfer)
+    return tuple(sorted(transfers, key=lambda transfer: as_instant(transfer.time_utc)))
+
+
+@dataclass(frozen=True, slots=True)
+class ElementPrice:
+    """One element's price at the capture and at the start of the season, in tenths."""
+
+    current_tenths: int
+    start_tenths: int
+
+
+def element_prices(bootstrap: bytes) -> Mapping[int, ElementPrice]:
+    """Return every element's current and start price, keyed by element id.
+
+    ``now_cost`` is the price at the capture and ``cost_change_start`` how far it has moved
+    since the season's first price, so the start price is their difference. Prices do not
+    move before the opening deadline, so a squad built before it paid the start price for
+    every player. Keyed by element id rather than by code, because the transfers list and
+    the picks name players by element id. Like :func:`player_codes` this is a translation
+    table and keeps every element the payload names.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _ELEMENT_PRICE_FIELDS, "Element")
+    prices: dict[int, ElementPrice] = {}
+    for record in records:
+        identifier = _integer(record, "id", "Element")
+        if identifier in prices:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares element id {identifier} more than once."
+            )
+        current = _integer(record, "now_cost", "Element")
+        start = current - _integer(record, "cost_change_start", "Element")
+        if current < 0 or start < 0:
+            raise InvalidValueError(
+                f"Element {identifier} states a current price of {current} and a start "
+                f"price of {start} tenths; neither may be negative."
+            )
+        prices[identifier] = ElementPrice(current_tenths=current, start_tenths=start)
+    return MappingProxyType(prices)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1930,14 +2099,27 @@ class EntryPicksRecord:
     """
     bank_tenths: int
     squad_sell_value_tenths: int
-    """What the fifteen would raise if they were all sold, in tenths.
+    """``value`` minus ``bank`` from the picks document, in tenths: the fifteen at their
+    market price, which is not what they sell for.
 
-    The picks document's ``entry_history.value`` is the entry's whole worth at that
-    gameweek's deadline, the squad's selling value *plus* the bank; the same pair is on
-    the entry endpoint as ``last_deadline_value`` and ``last_deadline_bank``. Every entry
-    reads 1000 at gameweek 1 whatever its bank, which is what fixes the reading. So the
-    squad's own selling value is ``value`` minus ``bank``, and it is stated exactly even
-    though the purchase price behind any one player is not published.
+    The picks document's ``entry_history.value`` is the entry's worth at that gameweek's
+    deadline: the bank plus the fifteen at the price the market put on them then; the same
+    pair is on the entry endpoint as ``last_deadline_value`` and ``last_deadline_bank``.
+    For the current gameweek's picks the difference equalled the fifteen's
+    ``now_cost - cost_change_event`` for 15 of 15 members on 2026-10-05.
+    ``cost_change_event`` counts moves since the current gameweek's deadline, so that
+    identity is for the gameweek the bootstrap describes; a Free Hit basis record from an
+    earlier week is at an older deadline's prices. Every entry reads 1000 at gameweek 1,
+    because no price has moved by then.
+
+    A market value is an upper bound on what the fifteen raise: the game keeps half of
+    every rise since a player was bought (``planning.pricing.sell_price_tenths``). The
+    parser still reports this aggregate, with ``purchase_prices`` empty and the flag down;
+    the application provider rebuilds the purchase prices from the transfers list and,
+    where every check of that rebuild holds, replaces this field with the rule's own sum at
+    the capture's prices, as it replaces the free transfers. The field keeps its name: the
+    record and its application twin share field names by design, and the name is in the
+    published documents.
     """
     free_transfers: int
     free_transfers_known: bool
@@ -2113,10 +2295,12 @@ def fpl_entry_picks(
     Two limits are recorded rather than papered over, because both change what a consumer
     may claim.
 
-    ``purchase_prices`` is empty and flagged unknown: the public endpoints publish no
+    ``purchase_prices`` is empty and flagged unknown: the picks document publishes no
     purchase price, so nothing here can say what any one player would sell for.
-    ``squad_sell_value_tenths`` is the answer for the fifteen together, which the
-    endpoints do publish, so a consumer can bound the budget without inventing the split.
+    ``squad_sell_value_tenths`` is ``value`` minus ``bank``, the fifteen at the deadline's
+    market prices, which bounds the budget from above. The application provider rebuilds
+    the purchase prices from the transfers list (``entry_transfers``) and sets both fields
+    in the parser's place where that rebuild holds.
 
     ``free_transfers`` is the rule floor of one, flagged unknown: the endpoints never
     state the banked count, and deriving it is a season-rules question this parsing layer

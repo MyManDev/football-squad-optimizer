@@ -20,17 +20,23 @@ from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
     SCOUT_COLUMNS,
     SNAPSHOT_COLUMNS,
+    ElementPrice,
     EntryPicksRecord,
+    EntryTransfer,
     GameweekDeadline,
     LeagueStanding,
     LiveEventPoints,
     availability_snapshot,
+    element_prices,
     entry_endpoint_paths,
     entry_history_payload,
     entry_label,
     entry_payload,
     entry_picks_payload,
     entry_transfer_history,
+    entry_transfers,
+    entry_transfers_endpoint_path,
+    entry_transfers_payload,
     fixture_snapshot,
     fpl_entry_picks,
     fpl_league_name,
@@ -854,9 +860,9 @@ def _picks_payload(
 ) -> bytes:
     """Return one ``event/{gw}/picks`` document carrying the fields the adapter reads.
 
-    ``value`` is the platform's own field: the entry's whole worth at the deadline, the
-    squad's selling value *plus* the bank, which is why every entry reads 1000 at
-    gameweek 1 whatever it has banked.
+    ``value`` is the platform's own field: the entry's worth at the deadline, the bank plus
+    the fifteen at that deadline's market prices, which is why every entry reads 1000 at
+    gameweek 1 whatever it has banked: no price has moved by then.
     """
 
     elements = squad if squad is not None else list(range(101, 116))
@@ -960,6 +966,7 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         entry_payload(11),
         entry_history_payload(11),
         entry_picks_payload(11, 2),
+        entry_transfers_payload(11),
         league_standings_payload(352490),
         league_standings_page_payload(314, 2),
         live_payload(2),
@@ -968,6 +975,7 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         "entry-11.json",
         "entry-11-history.json",
         "entry-11-picks-gw02.json",
+        "entry-11-transfers.json",
         "league-352490-standings.json",
         "league-314-standings-page-02.json",
         "event-gw02-live.json",
@@ -983,6 +991,10 @@ def test_a_payload_name_refuses_an_identifier_the_source_never_publishes(identif
 
 
 def test_each_entry_contributes_three_documents_with_the_gameweek_in_its_picks() -> None:
+    """The transfers list is not among them: the capture reads it in a later pass that may
+    miss it without failing, so it has a path of its own."""
+
+    assert entry_transfers_endpoint_path(11) == "entry/11/transfers/"
     paths = entry_endpoint_paths([11, 22], gameweek=1)
     assert dict(paths) == {
         "entry-11.json": "entry/11/",
@@ -998,6 +1010,7 @@ def test_the_endpoint_map_carries_paths_rather_than_urls() -> None:
     """The base URL and the transport stay with the platform adapter, not here."""
 
     paths = list(entry_endpoint_paths([11], gameweek=2).values())
+    paths.append(entry_transfers_endpoint_path(11))
     paths += list(league_standings_endpoint_path(352490).values())
     paths += list(league_standings_page_endpoint_path(314, 2).values())
     assert not any(path.startswith("http") for path in paths)
@@ -1379,6 +1392,158 @@ def test_the_parser_carries_the_floor_not_a_derived_count() -> None:
         gameweek=3,
     )
     assert (record.free_transfers, record.free_transfers_known) == (1, False)
+
+
+def test_a_history_row_carries_its_bank_when_it_states_one() -> None:
+    """Read for the purchase-price rebuild and never required: the banking model's rows,
+    and a history captured without the field, still parse."""
+
+    history = entry_transfer_history(
+        _history_payload(current=[{**_row(1), "bank": 5}, _row(2)]), entry_id=11
+    )
+    assert history.weeks[1].bank == 5
+    assert history.weeks[2].bank is None
+
+
+def test_the_parser_reports_the_worth_less_the_bank_and_no_purchase_prices() -> None:
+    """The parser's field is ``value - bank``, a market value; the application provider
+    replaces it where the purchase prices are rebuilt."""
+
+    record = fpl_entry_picks(
+        _picks_payload(bank=18, value=1_004),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+    assert record.squad_sell_value_tenths == 986
+    assert (dict(record.purchase_prices), record.purchase_prices_known) == ({}, False)
+
+
+# --- the transfers list -------------------------------------------------------------
+#
+# The raw input of the purchase-price rebuild in ``live/purchase_prices.py``, whose tests
+# live beside it. This layer parses the list and checks each row on its own.
+
+
+def _transfer_row(**overrides: Any) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "element_in": 201,
+        "element_in_cost": 56,
+        "element_out": 101,
+        "element_out_cost": 76,
+        "entry": 11,
+        "event": 2,
+        "time": "2026-08-25T16:53:56.349095Z",
+    }
+    row.update(overrides)
+    return row
+
+
+def _transfers_payload(rows: list[dict[str, Any]]) -> bytes:
+    return json.dumps(rows).encode("utf-8")
+
+
+def test_the_transfers_list_comes_back_in_the_order_the_transfers_were_made() -> None:
+    """The source lists the newest first. The canonical spelling drops a zero fraction of a
+    second, so the order is read from instants: as text ``...:02.5Z`` sorts before the
+    earlier ``...:02Z``."""
+
+    newest_first = [
+        _transfer_row(element_in=203, element_out=103, event=3, time="2026-09-01T10:00:02.5Z"),
+        _transfer_row(element_in=202, element_out=102, event=3, time="2026-09-01T10:00:02Z"),
+        _transfer_row(element_in=201, element_out=101, event=2, time="2026-08-25T16:53:56Z"),
+    ]
+    transfers = entry_transfers(_transfers_payload(newest_first), entry_id=11)
+    assert [transfer.element_in for transfer in transfers] == [201, 202, 203]
+    assert transfers[0] == EntryTransfer(
+        event=2,
+        element_in=201,
+        element_in_cost=56,
+        element_out=101,
+        element_out_cost=76,
+        time_utc="2026-08-25T16:53:56Z",
+    )
+
+
+def test_an_entry_that_has_made_no_transfer_publishes_an_empty_list() -> None:
+    assert entry_transfers(b"[]", entry_id=11) == ()
+
+
+@pytest.mark.parametrize("payload", [b'{"read": "x"}', b"null", b"not json"])
+def test_a_transfers_payload_that_is_not_an_array_is_refused(payload: bytes) -> None:
+    with pytest.raises(DataSourceError):
+        entry_transfers(payload, entry_id=11)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "element_in",
+        "element_in_cost",
+        "element_out",
+        "element_out_cost",
+        "entry",
+        "event",
+        "time",
+    ],
+)
+def test_a_transfer_without_one_of_its_fields_is_refused_by_name(field: str) -> None:
+    row = _transfer_row()
+    del row[field]
+    with pytest.raises(DataSourceError, match=field):
+        entry_transfers(_transfers_payload([row]), entry_id=11)
+
+
+def test_a_transfer_listed_for_another_entry_is_refused() -> None:
+    with pytest.raises(DataSourceError, match="row for entry 22"):
+        entry_transfers(_transfers_payload([_transfer_row(entry=22)]), entry_id=11)
+
+
+def test_a_transfer_that_sells_and_buys_the_same_player_is_refused() -> None:
+    with pytest.raises(InvalidValueError, match="sells and buys element 101"):
+        entry_transfers(_transfers_payload([_transfer_row(element_in=101)]), entry_id=11)
+
+
+@pytest.mark.parametrize("field", ["element_in_cost", "element_out_cost"])
+def test_a_negative_transfer_price_is_refused(field: str) -> None:
+    with pytest.raises(InvalidValueError, match="must not be negative"):
+        entry_transfers(_transfers_payload([_transfer_row(**{field: -1})]), entry_id=11)
+
+
+@pytest.mark.parametrize("field", ["event", "element_in", "element_out"])
+def test_a_transfer_identifier_that_is_not_positive_is_refused(field: str) -> None:
+    with pytest.raises(InvalidValueError, match="positive integer"):
+        entry_transfers(_transfers_payload([_transfer_row(**{field: 0})]), entry_id=11)
+
+
+@pytest.mark.parametrize("time", ["2026-08-25T18:53:56+02:00", "2026-08-25T16:53:56", ""])
+def test_a_transfer_time_that_is_not_a_utc_instant_is_refused(time: str) -> None:
+    with pytest.raises(DataSourceError, match="time"):
+        entry_transfers(_transfers_payload([_transfer_row(time=time)]), entry_id=11)
+
+
+def test_a_transfer_listed_twice_is_refused() -> None:
+    with pytest.raises(DuplicateRecordsError, match="more than once"):
+        entry_transfers(_transfers_payload([_transfer_row(), _transfer_row()]), entry_id=11)
+
+
+def test_a_start_price_is_the_current_price_less_the_seasons_change() -> None:
+    bootstrap = _payload(
+        elements=[
+            _element(id=5, now_cost=58, cost_change_start=3),
+            _element(code=99, id=6, now_cost=45, cost_change_start=-2),
+        ]
+    )
+    assert dict(element_prices(bootstrap)) == {
+        5: ElementPrice(current_tenths=58, start_tenths=55),
+        6: ElementPrice(current_tenths=45, start_tenths=47),
+    }
+
+
+def test_an_element_without_its_season_change_is_refused_by_name() -> None:
+    with pytest.raises(DataSourceError, match="cost_change_start"):
+        element_prices(_payload(elements=[_element()]))
 
 
 # --- live gameweek points -----------------------------------------------------------

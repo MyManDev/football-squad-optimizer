@@ -28,6 +28,9 @@ from squadopt.data.sources.fpl_live import (
     entry_endpoint_paths,
     entry_picks_endpoint_path,
     entry_picks_payload,
+    entry_transfer_history,
+    entry_transfers_endpoint_path,
+    entry_transfers_payload,
     gameweek_deadlines,
     league_standings_endpoint_path,
     live_endpoint_path,
@@ -35,6 +38,7 @@ from squadopt.data.sources.fpl_live import (
     player_snapshot,
 )
 from squadopt.data.sources.vaastav import build_panel
+from squadopt.live.free_hit import FIRST_GAMEWEEK
 from squadopt.prediction.component_dataset import COMPONENT_HISTORY_WINDOW
 
 BASE_URL = "https://fantasy.premierleague.com/api"
@@ -64,8 +68,8 @@ def fetch(
     """Read one endpoint, translating network failures into the data error contract.
 
     A capture used to be two requests, where a rate limit was best left to the operator.
-    It is now two plus three per registered entry, so the same polite pause the old error
-    message told a human to take is taken here instead: 429 and 5xx are retried with a
+    It is now two plus up to five per registered entry, so the same polite pause the old
+    error message told a human to take is taken here instead: 429 and 5xx are retried with a
     bounded backoff, because they say "later", while every other 4xx says "never" and is
     raised immediately. A response that times out, is dropped or ends short once the host
     has been reached says "later" too. The last failure is reported rather than swallowed.
@@ -226,6 +230,41 @@ def free_hit_basis_endpoints(payloads: Mapping[str, bytes]) -> Mapping[str, str]
     return urls
 
 
+_HISTORY_PAYLOAD = re.compile(r"^entry-(\d+)-history\.json$")
+
+
+def purchase_price_endpoints(payloads: Mapping[str, bytes]) -> Mapping[str, str]:
+    """Payload name to URL for the documents a member's purchase prices are rebuilt from.
+
+    For every entry whose history the capture holds: its transfers list, and, when that
+    history starts at gameweek 1, its gameweek 1 picks, the fifteen it opened the season
+    with (``squadopt.live.purchase_prices`` replays the one over the other). A late joiner
+    gets no opening picks: that squad was bought at a later deadline's prices, which no
+    document states. A document already present is not read again, because a gameweek 2
+    capture's picks are the gameweek 1 picks and a Free Hit walk-back may already have read
+    them. A history this cannot read is skipped and left to the consumer that will refuse
+    it: the capture's job is to keep bytes, not to validate them.
+    """
+
+    urls: dict[str, str] = {}
+    for name in sorted(payloads):
+        match = _HISTORY_PAYLOAD.match(name)
+        if match is None:
+            continue
+        entry_id = int(match.group(1))
+        transfers = entry_transfers_payload(entry_id)
+        if transfers not in payloads:
+            urls[transfers] = f"{BASE_URL}/{entry_transfers_endpoint_path(entry_id)}"
+        try:
+            history = entry_transfer_history(payloads[name], entry_id=entry_id)
+        except DataError:
+            continue
+        opening = entry_picks_payload(entry_id, FIRST_GAMEWEEK)
+        if history.weeks and min(history.weeks) == FIRST_GAMEWEEK and opening not in payloads:
+            urls[opening] = f"{BASE_URL}/{entry_picks_endpoint_path(entry_id, FIRST_GAMEWEEK)}"
+    return urls
+
+
 def registered_entry_ids(path: Path) -> tuple[int, ...]:
     """Read the registry, reporting a bad one in the data error contract.
 
@@ -262,7 +301,10 @@ def capture(
     Phase C component model; the football history needs all of them. Passing
     ``entry_registry`` adds the three documents each registered entry publishes, and
     ``league_ids`` adds each league's standings page, so a capture can record who was in
-    the league when a recommendation was made.
+    the league when a recommendation was made. Each entry's transfers list and opening
+    picks follow (``purchase_price_endpoints``); they sharpen a budget rather than make
+    one, so a document the source still refuses after the retries is left out with a line
+    saying so, and that member's budget stays the stated worth.
 
     ``captured_at`` is stamped **after every read**, so no payload in the snapshot was fetched
     later than the instant the snapshot claims. Stamping it earlier would have been wrong in a
@@ -307,6 +349,20 @@ def capture(
             print(f"Reading {len(earlier)} pre-Free-Hit picks endpoint(s)")
             for name, url in earlier.items():
                 payloads[name] = fetch(url)
+                extra[name] = url
+                print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
+        # The purchase prices are rebuilt from these, and a member without them keeps the
+        # stated worth as the budget, as every member did before. So unlike the documents
+        # above a final failure here does not fail the capture: the document is left out.
+        rebuild = purchase_price_endpoints(payloads)
+        if rebuild:
+            print(f"Reading {len(rebuild)} purchase-price endpoint(s)")
+            for name, url in rebuild.items():
+                try:
+                    payloads[name] = fetch(url)
+                except DataSourceError as error:
+                    print(f"  missed   {name}  ({error})")
+                    continue
                 extra[name] = url
                 print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
 
