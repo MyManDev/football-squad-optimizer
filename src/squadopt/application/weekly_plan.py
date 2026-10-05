@@ -94,12 +94,13 @@ class WeekPlan:
 
     season: str
     gameweek: int
-    league_id: int
+    league_ids: tuple[int, ...]
     steps: tuple[str, ...]
     reasons: dict[str, str] = field(default_factory=dict)
 
     def describe(self) -> str:
-        lines = [f"week plan: {self.season} gameweek {self.gameweek}, league {self.league_id}"]
+        leagues = ", ".join(str(league_id) for league_id in self.league_ids)
+        lines = [f"week plan: {self.season} gameweek {self.gameweek}, leagues {leagues}"]
         for step in STEPS:
             state = "run" if step in self.steps else f"skip ({self.reasons.get(step, 'not asked')})"
             lines.append(f"  {step:<8} {state}")
@@ -110,7 +111,9 @@ class WeekPlan:
 class WeeklyRequest:
     season: str
     gameweek: int
-    league_id: int
+    #: Every league the run renders, in the order the operator listed them; the capture
+    #: reads each one's standings and the site's directory lists them all.
+    league_ids: tuple[int, ...]
     snapshot_id: str | None = None
     cohort_snapshot: str | None = None
     elite_snapshot: str | None = None
@@ -127,8 +130,10 @@ class WeeklyRequest:
     rotation_capture: str | None = None
 
     def plan(self) -> WeekPlan:
-        if self.workers < 1 or self.league_id < 1:
-            raise WeekError("League id and worker count must be positive.")
+        if self.workers < 1 or not self.league_ids or min(self.league_ids) < 1:
+            raise WeekError("At least one positive league id and a positive worker count.")
+        if len(set(self.league_ids)) != len(self.league_ids):
+            raise WeekError("A league is listed once.")
         if self.projection not in {"component", "component-only"}:
             raise WeekError("Unknown weekly projection selection.")
         if self.rotation_capture is not None and not self.rotation:
@@ -158,7 +163,7 @@ class WeeklyRequest:
         return plan_week(
             season=self.season,
             gameweek=self.gameweek,
-            league_id=self.league_id,
+            league_ids=self.league_ids,
             snapshot_id=self.snapshot_id,
             cohort_snapshot=self.cohort_snapshot,
             elite_snapshot=self.elite_snapshot,
@@ -232,7 +237,7 @@ def plan_week(
     *,
     season: str,
     gameweek: int,
-    league_id: int,
+    league_ids: tuple[int, ...],
     snapshot_id: str | None,
     cohort_snapshot: str | None,
     elite_snapshot: str | None,
@@ -296,7 +301,7 @@ def plan_week(
         steps.append("publish")
     else:
         reasons["publish"] = "pass --publish to open the site PR"
-    return WeekPlan(season, gameweek, league_id, tuple(steps), reasons)
+    return WeekPlan(season, gameweek, league_ids, tuple(steps), reasons)
 
 
 def evidence_artifact(

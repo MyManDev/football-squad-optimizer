@@ -38,8 +38,10 @@ from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     ModePathsSummary,
     PreparedLeaguePublication,
+    leagues_beside,
     prepare_league_publication,
     publish_prepared_league,
+    records_advice_for,
 )
 from squadopt.application.league_publication import (
     last_scored_gameweek as last_scored_gameweek,
@@ -180,6 +182,13 @@ def main() -> int:
     if arguments.workers < 1:
         parser.error("--workers must be at least 1")
 
+    # The advice record names one league; another league is published without one.
+    recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
+    if not arguments.no_advice_record and not recorded:
+        print(
+            f"League {arguments.league} is published without an advice record: the record "
+            "names one league until it carries the league."
+        )
     try:
         snapshot_root = Path(arguments.snapshot_root)
         snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
@@ -193,7 +202,7 @@ def main() -> int:
             season=arguments.season,
             handoff_path=arguments.in_season_projection,
             mode_residuals=arguments.mode_residuals,
-            record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
+            record_root=Path(arguments.advice_record_root) if recorded else None,
             history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
             rotation_evidence=arguments.rotation_evidence,
@@ -210,8 +219,14 @@ def main() -> int:
         if arguments.dry_run:
             print("Dry run: nothing written.")
             return 0
+        # A by-hand build of one league keeps the other leagues the site lists when their
+        # trees are there and were rendered from the same capture; another capture is
+        # refused, before anything is solved.
+        beside = leagues_beside(request.out_dir / "data", request.league_id, snapshot_id)
         with league_mapper(replace(request, season=prepared.season), arguments.workers) as mapper:
-            result = publish_prepared_league(prepared, mapper=mapper, on_mode_paths=_mode_note)
+            result = publish_prepared_league(
+                prepared, mapper=mapper, on_mode_paths=_mode_note, beside=beside
+            )
         report = result.report
         out_dir = league_tree_dir(request.out_dir / "data", request.league_id)
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")

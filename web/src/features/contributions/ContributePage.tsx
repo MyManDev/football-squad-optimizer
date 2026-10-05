@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
-import { withRequestDeadline } from "../../data/request";
+import { discardBody, withRequestDeadline } from "../../data/request";
 import { useLanguage } from "../../i18n/context";
 import styles from "./ContributePage.module.css";
 
@@ -30,7 +30,10 @@ async function read(path: string, init?: RequestInit) {
       signal,
       cache: "no-store",
     });
-    if (!response.ok) throw new Error(response.status === 429 ? "limited" : "unavailable");
+    if (!response.ok) {
+      await discardBody(response);
+      throw new Error(response.status === 429 ? "limited" : "unavailable");
+    }
     return response.json() as Promise<unknown>;
   });
 }

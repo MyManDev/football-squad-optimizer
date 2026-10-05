@@ -248,7 +248,7 @@ def test_no_registry_and_no_league_reads_nothing_extra() -> None:
             _bootstrap(),
             as_of_utc="2026-08-25T09:00:00Z",
             entry_registry=None,
-            league_id=None,
+            league_ids=(),
         )
         == {}
     )
@@ -256,7 +256,7 @@ def test_no_registry_and_no_league_reads_nothing_extra() -> None:
 
 def test_a_league_alone_records_only_its_standings_page() -> None:
     endpoints = fpl_capture.registered_endpoints(
-        _bootstrap(), as_of_utc="2026-08-25T09:00:00Z", entry_registry=None, league_id=352490
+        _bootstrap(), as_of_utc="2026-08-25T09:00:00Z", entry_registry=None, league_ids=(352490,)
     )
     assert endpoints == {
         "league-352490-standings.json": (
@@ -272,7 +272,7 @@ def test_each_registered_entry_contributes_three_documents_for_the_played_gamewe
         _bootstrap(),
         as_of_utc="2026-08-25T09:00:00Z",
         entry_registry=_registry(tmp_path / "registry.json", [11]),
-        league_id=None,
+        league_ids=(),
     )
     assert endpoints == {
         "entry-11.json": "https://fantasy.premierleague.com/api/entry/11/",
@@ -290,7 +290,7 @@ def test_before_the_opening_deadline_no_picks_exist_to_read(tmp_path: Path) -> N
         _bootstrap(),
         as_of_utc="2026-08-20T09:00:00Z",
         entry_registry=_registry(tmp_path / "registry.json", [11]),
-        league_id=None,
+        league_ids=(),
     )
     assert endpoints == {}
 
@@ -300,7 +300,7 @@ def test_an_empty_registry_reads_nothing_extra(tmp_path: Path) -> None:
         _bootstrap(),
         as_of_utc="2026-08-25T09:00:00Z",
         entry_registry=_registry(tmp_path / "registry.json", []),
-        league_id=None,
+        league_ids=(),
     )
     assert endpoints == {}
 
@@ -365,7 +365,7 @@ def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     written = fpl_capture.capture(
         tmp_path / "snapshots",
         entry_registry=_registry(tmp_path / "registry.json", [11]),
-        league_id=352490,
+        league_ids=(352490,),
     )
     assert written is not None
 
@@ -667,7 +667,7 @@ def test_the_recorded_instant_is_taken_after_every_read(
     written = fpl_capture.capture(
         tmp_path / "snapshots",
         entry_registry=_registry(tmp_path / "registry.json", [11, 22]),
-        league_id=352490,
+        league_ids=(352490,),
     )
     assert written is not None
 

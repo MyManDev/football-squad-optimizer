@@ -28,9 +28,11 @@ MEMBERS: list[dict[str, Any]] = [
 ]
 
 
-def _standings(*, results: list[dict[str, Any]] | None = None, has_next: bool = False) -> bytes:
+def _standings(
+    *, results: list[dict[str, Any]] | None = None, has_next: bool = False, league_id: int = LEAGUE
+) -> bytes:
     document = {
-        "league": {"id": LEAGUE, "name": "The Mini League"},
+        "league": {"id": league_id, "name": "The Mini League"},
         "standings": {
             "has_next": has_next,
             "page": 1,
@@ -42,7 +44,18 @@ def _standings(*, results: list[dict[str, Any]] | None = None, has_next: bool = 
 
 def _document() -> dict[str, Any]:
     members = fpl_league_standings(_standings(), league_id=LEAGUE)
-    return _registry_document(members, league_id=LEAGUE, now="2026-08-25T09:00:00Z")
+    return _registry_document(members, league_ids=(LEAGUE,), now="2026-08-25T09:00:00Z")
+
+
+def test_two_leagues_seed_one_registry_with_each_member_once() -> None:
+    first = fpl_league_standings(_standings(), league_id=LEAGUE)
+    second = fpl_league_standings(_standings(league_id=7), league_id=7)
+    document = _registry_document(
+        [*first, *second], league_ids=(LEAGUE, 7), now="2026-08-25T09:00:00Z"
+    )
+    assert document["seeded_from_leagues"] == [LEAGUE, 7]
+    assert document["seeded_from_league"] == LEAGUE
+    assert [entry["entry_id"] for entry in document["entries"]] == [11, 22]
 
 
 def test_the_registry_records_every_member_ordered_by_entry_id() -> None:
@@ -192,7 +205,7 @@ def test_the_registry_keeps_the_name_the_source_published(tmp_path: Path) -> Non
 
     results = [{"entry": 11, "entry_name": EMOJI_NAME, "player_name": "Ada Manager", "rank": 1}]
     members = fpl_league_standings(_standings(results=results), league_id=LEAGUE)
-    document = _registry_document(members, league_id=LEAGUE, now="2026-08-25T09:00:00Z")
+    document = _registry_document(members, league_ids=(LEAGUE,), now="2026-08-25T09:00:00Z")
     assert document["entries"][0]["label"] == EMOJI_NAME
 
     path = tmp_path / "registry.json"

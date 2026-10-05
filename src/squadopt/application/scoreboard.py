@@ -751,7 +751,7 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
             f"No registered entries in {request.registry_path}; seed it first with "
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
-    registered = registry.ids()
+    registered = registry.in_league(snapshot.payloads, request.league_id).ids()
     histories = {
         entry_id: snapshot.payloads[name]
         for entry_id in registered
