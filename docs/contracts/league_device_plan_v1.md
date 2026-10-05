@@ -155,6 +155,8 @@ recorded answers to still be the planner's and the service's; in
 the plain and chip answers, `rival.parity.test.ts` the rival answers and the refusal, and
 `top100.parity.test.ts` the weighted answers and the refused combinations.
 `tests/unit/test_device_plan.py` rebuilds the problem from the two published documents
-alone and gets the plan the same build published, and `planModel.chips.shipped.test.ts`
-solves every chip document of the committed tree on the device and requires what the tree
-publishes.
+alone and gets the plan the same build published. `planModel.chips.shipped.test.ts` solves
+every chip document of the committed tree on the device and requires what the tree
+publishes; `planModel.shipped.test.ts` does the same, player by player, for every human
+member's pure-points plan and every rival and Top 100 document of one week the member's
+index names, and lists by name each named document the device declines by contract.
