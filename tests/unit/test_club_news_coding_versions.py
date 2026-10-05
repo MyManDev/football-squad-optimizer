@@ -152,6 +152,7 @@ def test_old_contract_cannot_smuggle_in_the_new_label() -> None:
         QUOTE,
         "In the next league match, Saka cannot play the full 90 minutes.",
         "Saka won't be able to complete the whole next Premier League game.",
+        "Saka cannot complete the full next Premier League fixture.",
     ],
 )
 def test_explicit_upcoming_full_match_limit_remains_categorical_and_cited(quote: str) -> None:

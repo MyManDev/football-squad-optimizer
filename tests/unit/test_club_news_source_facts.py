@@ -474,6 +474,7 @@ def test_numeric_subject_binding_does_not_infer_aliases_or_transfer_clauses(quot
         ("Saka will be rested for the next league match.", True),
         ("Saka will be rotated in the upcoming league game.", True),
         ("Saka will be rested for the next league fixture.", True),
+        ("Saka is a rotation risk for the next league fixture.", True),
         ("Saka is fit for the next league match. Timber is a rotation risk.", False),
         ("Timber is a rotation risk for the next league match.", False),
         ("Saka is fit for the next league match.", False),

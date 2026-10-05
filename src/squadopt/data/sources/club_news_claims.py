@@ -257,7 +257,7 @@ def _require_explicit_full_match_limit(quote: bytes) -> None:
     Existing labels and source-role handling do not pass through this gate.
     """
     text = " ".join(quote.decode("utf-8").casefold().replace("\u2019", "'").split())
-    scope = re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game)\b", text)
+    scope = re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game|fixture)\b", text)
     uncertainty = re.search(
         r"\b(?:if|unless|might|may|could|unlikely|perhaps|possibly)\b"
         r"|\b(?:not saying|did not say|didn't say|not true|no longer|not the case)\b",
@@ -267,7 +267,7 @@ def _require_explicit_full_match_limit(quote: bytes) -> None:
         r"\b(?:cannot|can't|will not(?: be able to)?|won't(?: be able to)?|is unable to) "
         r"(?:complete|finish|play|last) (?:the )?"
         r"(?:(?:full|whole|entire) (?:(?:upcoming|next) )?(?:(?:premier )?league )?"
-        r"(?:match|game)|(?:full )?(?:90|ninety) minutes)\b",
+        r"(?:match|game|fixture)|(?:full )?(?:90|ninety) minutes)\b",
         text,
     )
     if scope is None or inability is None or uncertainty is not None:
