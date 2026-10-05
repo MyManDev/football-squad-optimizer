@@ -154,6 +154,11 @@ def test_missing_invalid_ambiguous_or_updated_metadata_cannot_invent_a_dateline(
         "Saka will start in the next league match.",
         "Saka cannot play the full upcoming league match.",
         "Saka is out of contention to start in the next league match.",
+        "Saka might miss the next Premier League fixture.",
+        "Saka is not available for the next Premier League match if he fails a late test.",
+        "Saka misses the next Premier League match after the cup match.",
+        "Timber is sidelined for the next Premier League match.",
+        "Saka is not sidelined for the next Premier League match.",
     ],
 )
 def test_absence_scope_refuses_other_competitions_past_and_ambiguous_words(quote):
@@ -335,6 +340,34 @@ def test_malformed_or_timezone_missing_publication_cannot_bind_to_a_fixture(publ
             "stated_full_match_unavailable",
             False,
         ),
+        (
+            "Saka cannot complete the full next Premier League fixture.",
+            "stated_full_match_unavailable",
+            True,
+        ),
+        (
+            "Saka cannot play ninety minutes in the next league fixture.",
+            "stated_full_match_unavailable",
+            True,
+        ),
+        (
+            "In the next league fixture, Saka cannot play 90 minutes.",
+            "stated_full_match_unavailable",
+            True,
+        ),
+        (
+            "Saka might not complete the full next Premier League fixture.",
+            "stated_full_match_unavailable",
+            False,
+        ),
+        (
+            "Saka will miss the next Premier League fixture.",
+            "stated_full_match_unavailable",
+            False,
+        ),
+        ("Saka misses the next Premier League match.", "stated_full_match_unavailable", False),
+        ("Saka is sidelined for the next Premier League match.", "stated_rotation_risk", False),
+        ("Saka will play no part in the next Premier League match.", "stated_rotation_risk", False),
         ("Saka cannot complete the full next Premier League match.", "invented_label", False),
         (
             "Saka will miss the next league match in the Nations League.",
@@ -440,6 +473,7 @@ def test_numeric_subject_binding_does_not_infer_aliases_or_transfer_clauses(quot
         ("Saka is a rotation risk for the next Premier League match.", True),
         ("Saka will be rested for the next league match.", True),
         ("Saka will be rotated in the upcoming league game.", True),
+        ("Saka will be rested for the next league fixture.", True),
         ("Saka is fit for the next league match. Timber is a rotation risk.", False),
         ("Timber is a rotation risk for the next league match.", False),
         ("Saka is fit for the next league match.", False),
@@ -447,6 +481,7 @@ def test_numeric_subject_binding_does_not_infer_aliases_or_transfer_clauses(quot
         ("Saka is not a rotation risk for the next league match.", False),
         ("Saka will not be rested for the next league match.", False),
         ("Saka may be rested for the next league match.", False),
+        ("Saka may be rested for the next league fixture.", False),
         ("Saka will be rested for the cup match.", False),
         ("Saka was rested for the previous league match.", False),
         ("He will be rested for the next league match.", False),
