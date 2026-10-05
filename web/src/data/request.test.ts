@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cancellableDelay, withRequestDeadline } from "./request";
+import { cancellableDelay, discardBody, withRequestDeadline } from "./request";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -37,4 +37,21 @@ it("cancels a poll delay immediately and clears its timer", async () => {
   controller.abort();
   await waiting;
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it("reads a refused answer's body to its end, so the request is not left open", async () => {
+  const response = new Response("<!doctype html><p>No document is published.</p>", {
+    status: 404,
+  });
+  await discardBody(response);
+  expect(response.bodyUsed).toBe(true);
+});
+
+it("settles quietly when the body cannot be read", async () => {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new DOMException("Request cancelled.", "AbortError"));
+    },
+  });
+  await expect(discardBody(new Response(body, { status: 503 }))).resolves.toBeUndefined();
 });

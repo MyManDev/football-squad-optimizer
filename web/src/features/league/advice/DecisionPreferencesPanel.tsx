@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
-import { withRequestDeadline } from "../../../data/request";
+import { discardBody, withRequestDeadline } from "../../../data/request";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import type { EntrySquad } from "../types";
@@ -50,7 +50,10 @@ export function DecisionPreferencesPanel({
           signal,
           cache: "no-store",
         });
-        if (!response.ok) throw new Error("Roster unavailable");
+        if (!response.ok) {
+          await discardBody(response);
+          throw new Error("Roster unavailable");
+        }
         const value = (await response.json()) as { season?: string; players?: Player[] };
         if (
           value.season !== squad.season ||
