@@ -124,8 +124,16 @@ so N workers are at most N busy cores. The three BLAS variables pin numpy's and 
 pools to one thread so N workers cannot oversubscribe through them. Whether the projection
 uses a threaded BLAS call at all was not measured.
 
-Three things to know before relying on it:
+What to know before relying on it:
 
+- **Start it from a console or the task, never from an agent.** A backend started inside an
+  application's process tree ends when that application updates or closes: on 2026-10-04
+  a Store update of the Codex app ended the api and the workers started from its sandbox.
+  The launcher and the restart helper refuse to start one when `claude.exe`, the Codex app
+  (`ChatGPT.exe`, `codex.exe`) or its sandbox service is among their ancestors, or when a
+  variable those agents set for their shells is present (`CLAUDECODE`, `CODEX_SANDBOX`,
+  `CODEX_SANDBOX_NETWORK_DISABLED`, `CODEX_SESSION_ID`), which a detached start still
+  inherits (`scripts/backend_parentage.ps1`).
 - **Stopping is a kill.** Windows delivers no SIGTERM, so a worker stopped in the middle of
   a job leaves it `running`. The next worker walks it back to `queued` once the claim is
   older than the 300 s lease and computes it again. Stop when `-Status` shows
