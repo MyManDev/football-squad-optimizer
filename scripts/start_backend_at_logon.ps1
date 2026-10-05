@@ -102,6 +102,10 @@ if ($Register) {
         $Cloudflared = (Resolve-Path -LiteralPath $Cloudflared).Path
         $link.Arguments += " -Cloudflared `"$Cloudflared`""
     }
+    if ($GitHubCli -ne "") {
+        $GitHubCli = (Resolve-Path -LiteralPath $GitHubCli).Path
+        $link.Arguments += " -GitHubCli `"$GitHubCli`""
+    }
     $link.WorkingDirectory = $RepoRoot
     $link.WindowStyle = 7
     $link.Description = "Starts the SquadOpt advice backend and its tunnel connector at logon"
@@ -221,10 +225,19 @@ function Test-BackendReady {
 # repository's uptime check is asked to run now, and it opens the backend-down incident,
 # assigned to the owner, in a red run GitHub mails, instead of waiting for the schedule's
 # next slot, hours apart (docs/backend_free_hosting.md). Asked once per episode, and once
-# more when the backend is ready again, so the incident closes.
+# more when the backend is ready again, so the incident closes. $requestTaken says
+# whether GitHub took the request (a return value would carry the logged lines too). A
+# refused or failed request is tried again at the fifth call after it, so a broken CLI
+# is not run every minute.
 function Request-UptimeCheck([string]$reason) {
+    $script:requestTaken = $false
+    if ($script:requestSkips -gt 0) {
+        $script:requestSkips--
+        return
+    }
     if ($DryRun) {
         Write-Line "would ask GitHub to run the uptime check now: $reason"
+        $script:requestTaken = $true
         return
     }
     $gh = $GitHubCli
@@ -241,24 +254,47 @@ function Request-UptimeCheck([string]$reason) {
         $answer = & $gh workflow run backend-uptime.yml -f dry_run=false -R MyManDev/football-squad-optimizer 2>&1
         if ($LASTEXITCODE -eq 0) {
             Write-Line "asked GitHub to run the uptime check now: $reason"
-        } else {
-            Write-Line ("could not ask GitHub to run the uptime check ({0}): {1}" -f $reason, (($answer | Out-String).Trim()))
+            $script:requestTaken = $true
+            return
         }
+        Write-Line ("could not ask GitHub to run the uptime check ({0}): {1}" -f $reason, (($answer | Out-String).Trim()))
     } catch {
         Write-Line "could not ask GitHub to run the uptime check ($reason): $_"
     } finally { $ErrorActionPreference = $preference }
+    $script:requestSkips = 4
+}
+
+# The episode is kept in a file beside the process registry, so a watcher the task starts
+# again after a reboot or a logoff still asks for the run that closes the incident.
+$alertMarker = Join-Path $RepoRoot "data\runtime\backend\run\watch-alert.txt"
+
+function Set-AlertMarker([bool]$on) {
+    if ($DryRun) { return }
+    try {
+        if ($on) {
+            New-Item -ItemType Directory -Force (Split-Path -Parent $alertMarker) | Out-Null
+            (Get-Date).ToUniversalTime().ToString("s") | Out-File -FilePath $alertMarker -Encoding ascii
+        } elseif (Test-Path -LiteralPath $alertMarker) {
+            Remove-Item -LiteralPath $alertMarker -Force
+        }
+    } catch { Write-Line "could not record the alert episode: $_" }
 }
 
 function Send-OperatorAlert([string]$reason) {
     if ($script:alerted) { return }
     Request-UptimeCheck $reason
-    $script:alerted = $true
+    if ($script:requestTaken) {
+        $script:alerted = $true
+        Set-AlertMarker $true
+    }
 }
 
 $backendFailures = 0
 $notReadyChecks = 0
 $launchesSinceHealthy = 0
-$alerted = $false
+$requestSkips = 0
+$requestTaken = $false
+$alerted = Test-Path -LiteralPath $alertMarker
 $connectorFailures = 0
 $threshold = 1
 $labelPattern = '(?:^|\s)--label(?:=|\s+)"?' + [regex]::Escape($ConnectorLabel) + '"?(?=\s|$)'
@@ -293,7 +329,10 @@ try {
             Write-Condition "backend" "backend healthy on 127.0.0.1:$Port"
             if ($alerted) {
                 Request-UptimeCheck "the backend is healthy and ready again"
-                $alerted = $false
+                if ($requestTaken) {
+                    $alerted = $false
+                    Set-AlertMarker $false
+                }
             }
         } else {
             $notReadyChecks++

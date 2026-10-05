@@ -184,9 +184,12 @@ Three things to know before relying on it:
   launch did not bring back) it reports by asking GitHub to run the uptime workflow now
   (`gh workflow run backend-uptime.yml`), so the incident opens within minutes instead
   of at the schedule's next slot. It asks once per episode and once more when the
-  backend is ready again, so the incident closes; a refused request is logged and the
-  watch goes on. `-GitHubCli` names the CLI when it is neither on PATH nor in its
-  default folder. Watch mode still never kills or restarts a running backend.
+  backend is ready again, so the incident closes. The open episode is kept in
+  `data/runtime/backend/run/watch-alert.txt`, so a watcher the task starts again after a
+  reboot or a logoff still asks for the closing run. A refused request is logged, the
+  watch goes on, and the request is made again at the fifth call after it. `-GitHubCli`
+  names the CLI when it is neither on PATH nor in its default folder; `-Register` keeps
+  it in the shortcut. Watch mode still never kills or restarts a running backend.
   The PC must not sleep while members are expected; that is a Windows power setting
   for the owner to change.
 - **The answer's identity includes the commit.** Publication and a backend code rollout
